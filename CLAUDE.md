@@ -25,6 +25,11 @@ Claude-only by design — one self-contained `CLAUDE.md`, no `AGENTS.md` stub.
 4. **One MCP server per graph.** The server binds to an ABSOLUTE `graph.json`
    path (`mise run kb-serve`), so multiple graphify projects on one host never
    collide.
+5. **Every source is ingested THROUGH graphify (and its extensions), never an
+   ad-hoc fetch.** `graphify clone`/`add`/`extract` are the entry points (see the
+   `kb-curator` skill MANDATE). `curl`/WebFetch is a fallback only when graphify
+   cannot reach a source, and even then the content is routed into the graph. One
+   ingestion path = uniform provenance + freshness + reproducibility.
 
 ## The two verbs
 

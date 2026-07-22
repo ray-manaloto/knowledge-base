@@ -28,6 +28,26 @@ nodes but never records *how the last ingestion went* repeats every mistake.
 lesson (`reflections/LESSONS.md` + the `.graphify_learning.json` overlay), which
 `graphify explain`/`query` then surface to the next agent. That is the whole point.
 
+## MANDATE — ingest every source THROUGH graphify (and its extensions)
+
+**All ingestion goes through graphify's own tooling, never an ad-hoc fetch.** This is
+enforced (KB repo + the consuming dotfiles repo). Entry points:
+- **GitHub repo** → `graphify clone <url>` (or a `sources/<name>.manifest` + `kb-build`).
+- **Any URL** (docs page, blog, article) → `graphify add <url>` — it fetches to `./raw`
+  and updates the graph. `--author`/`--contributor` tag provenance.
+- **Sitemap** → enumerate, then `graphify add` each on-topic page.
+- **Video/YouTube** → `graphify add <url>` (downloads audio; whisper transcribes at
+  extraction — needs ffmpeg, pinned).
+- **Live PostgreSQL** → `graphify extract --postgres <DSN>`.
+
+`curl`/WebFetch/manual vendoring are a **fallback ONLY** when graphify genuinely
+cannot reach a source — and even then the content must be routed into the graph via
+the extraction chunk, never left as a loose file. With no API key the *semantic*
+extraction still falls to the host agent, but the FETCH + pipeline is graphify's.
+Why: one ingestion path = uniform provenance (`source_url`/`captured_at`), the
+freshness policy, and reproducibility. Reaching for `curl` first is the thing this
+mandate exists to stop.
+
 ## The aggregate-graph model
 
 The KB is MANY per-source graphs merged into one (`graph.json`), extended every

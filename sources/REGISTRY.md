@@ -66,12 +66,15 @@ not just ingested).
   choosing-a-model, whats-new-4-8, agent-sdk overview/subagents/cost-tracking/skills,
   model-config, agents, hooks. **PENDING**: host-agent prose extraction → chunk.
 
-- **2026-07-22 — `/commands` doc EXTRACTED (first crown-jewel merged).**
-  `code.claude.com/docs/en/commands` → chunk `sources/extractions/claude-commands-docs.json`
-  (10 nodes: /clear /compact /branch /fork /subtask /background /resume + 2 rationale),
-  merged → 60,903 nodes. **Settled a factual correction**: `/subtask` + `/fork` ARE
-  real (v2.1.212+) and BOTH inherit context (neither resets like `/clear`). The KB
-  now answers this via `graphify query`.
+- **2026-07-22 — long-running/dynamic-workflow sources added** (Ray) →
+  `sources/workflow-sources.txt` (19 URLs, categorized by handling). Feed the
+  autonomous-orchestrator design. **7 code.claude.com docs pre-staged** to
+  `sources/raw/claude-docs/` (commands, whats-new, best-practices, common-workflows,
+  workflows, channels, goal). **11 blog/research articles** are HTML-only → extract
+  via **WebFetch** (claude.com/blog dynamic-workflows/loops/verification-loops/
+  migration/fable-field-guide, anthropic.com long-running-Claude, claudefa.st,
+  towardsdatascience 24h-agents, digg, mindstudio patterns). **1 YouTube** (whisper).
+  These are HIGH priority for the orchestrator/Workflow build (phase 4).
 
 ### Freshness policy (mintlify / refetchable prose)
 
