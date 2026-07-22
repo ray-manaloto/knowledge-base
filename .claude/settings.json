@@ -1,4 +1,16 @@
 {
+  "extraKnownMarketplaces": {
+    "fable-orchestrator": {
+      "source": { "source": "github", "repo": "mar3co/fable-orchestrator" }
+    },
+    "antigravity-for-claude-code": {
+      "source": { "source": "github", "repo": "yuting0624/antigravity-for-claude-code" }
+    }
+  },
+  "enabledPlugins": {
+    "fable-orchestrator@fable-orchestrator": true,
+    "antigravity@antigravity-for-claude-code": true
+  },
   "hooks": {
     "PreToolUse": [
       {

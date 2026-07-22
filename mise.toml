@@ -28,6 +28,17 @@ typos = "1.48.0"
 taplo = "0.10.0"
 rumdl = "v0.2.40"
 gitleaks = "8.30.1"
+# Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
+# (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
+# (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
+# (https://mise.jdx.dev/registry.html): `codex`=aqua:openai/codex,
+# `antigravity-cli`=aqua:google-antigravity/antigravity-cli (Google's current
+# agentic CLI, exposes Gemini 3.x; ships both `antigravity` and the `agy`
+# symlink the antigravity plugin drives). The Claude architect stays in the
+# chair; these are the executor lanes only. auth is per-user (codex login /
+# Google account) — mise manages the binaries, not the credentials.
+codex = "0.145.0"
+antigravity-cli = "1.1.5"
 
 [settings]
 experimental = true
