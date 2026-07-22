@@ -21,6 +21,10 @@ typos = "1.48.0"
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
 "pipx:graphifyy" = { version = "0.9.23", extras = ["all"] }
+# ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
+# extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
+# supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
+"conda:ffmpeg" = "8.1.2"
 
 [settings]
 experimental = true
@@ -64,11 +68,17 @@ depends = ["lint", "test"]
 # Knowledge-base tasks — the reason this repo exists
 # ---------------------------------------------------------------------------
 [tasks.kb-build]
-description = "(Re)build the knowledge graph from sources/ (AST for code = no LLM/key)"
-# graphify update does deterministic AST extraction over code with no LLM and no
-# API key. For prose sources semantic extraction falls to the HOST AGENT (this
-# Claude Code session's subagents) — see AGENTS.md "Adding sources".
-run = "graphify update sources"
+description = "Reproduce graph.json from committed inputs (manifests + doc extractions) — deterministic, no LLM"
+# Clones each sources/*.manifest at its pinned SHA (gitignored), AST-extracts code
+# (free), then replays the committed sources/extractions/*.json doc chunks. No
+# host-agent needed — reproduction is free. Logic in kb_setup.graph.
+run = "uv run --project python kb-setup build"
+
+[tasks.kb-update]
+description = "Advance a source to latest upstream + incrementally re-extract: mise run kb-update -- <name>"
+# Bumps the manifest SHA to upstream HEAD, re-clones, `graphify update` (incremental
+# AST, free). Changed DOCS still need a host-agent pass in a Claude session.
+run = "uv run --project python kb-setup update"
 
 [tasks.kb-query]
 description = 'Query the graph: mise run kb-query -- "<question>" [--budget N]'
@@ -85,5 +95,15 @@ run = "graphify-mcp {{config_root}}/graphify-out/graph.json"
 [tasks.kb-add]
 description = 'Add a URL source then rebuild: mise run kb-add -- <url> [--author NAME]'
 # Fetches the URL into sources/ and updates the graph. Repo ingestion uses the
-# graphify clone + kb-build flow instead (see AGENTS.md).
+# graphify clone + kb-build flow instead (see CLAUDE.md).
 run = "graphify add"
+
+[tasks.kb-artifacts]
+description = 'Regenerate all derived outputs (wiki/graphml/cypher/html/tree/obsidian/svg): mise run kb-artifacts [-- fmt...]'
+# Data-driven registry in kb_setup.artifacts (no copy-paste); ensures output deps
+# (scipy for svg) first. All read graph.json; none are committed (regenerable).
+run = "uv run --project python kb-setup artifacts"
+
+[tasks.kb-ensure-deps]
+description = "Inject output-only runtime deps missing from graphify's env (e.g. scipy for svg on py3.14)"
+run = "uv run --project python kb-setup ensure-deps"
