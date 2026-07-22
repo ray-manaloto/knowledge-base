@@ -58,3 +58,6 @@ graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 # transient fetch cache for refetchable prose (mintlify docs etc.) — the durable
 # artifact is the extraction chunk (records source_url + captured_at), not the raw md
 sources/raw/
+# graphify `add`'s default fetch dir (./raw) — same policy: transient (fetched
+# webpages + downloaded audio like yt_*.m4a); the extraction chunk is the artifact
+/raw/

@@ -90,6 +90,25 @@ not just ingested).
   YouTube sources in `workflow-sources.txt` via `graphify add` (the mandate;
   WebFetch note above is superseded by the graphify-ingestion-first rule).
 
+- **2026-07-22 — phase 1b DONE: 11 long-running/dynamic-workflow blog sources
+  ingested via graphify.** Fetched through `mise run kb-add` → `graphify add`
+  (the mandate path — clean md into `raw/` with graphify's own source_url +
+  captured_at frontmatter; no-key `add` fetches but does NOT recluster, so batch-
+  fetch → one merge). Host-agent extraction via a resumable Workflow (11 parallel
+  Opus extractors, run `wf_910ff42c-45f`, 0 errors, none thin) → one chunk
+  `sources/extractions/claude-workflow-blogs-docs.json` (**223 nodes / 319 edges**).
+  Merged (`dedup=False`) → **61,747 nodes / 134,209 edges / 2,405 communities**.
+  Sources: anthropic.com long-running-Claude; claude.com/blog dynamic-workflows-
+  intro / harness-for-every-task / getting-started-with-loops / verification-loops /
+  ai-code-migration / fable-field-guide; claudefa.st dynamic-workflows;
+  towardsdatascience 24h-agents; digg; mindstudio patterns. Verified: a "keep an
+  agent running autonomously for hours" query synthesizes across the new blogs +
+  fable-5/agent-sdk docs + orchestrator code. `kb-remember` + `kb-reflect` run.
+  **YouTube** (`youtu.be/e3rbymcXeuc`): audio downloaded via `graphify add`
+  (`raw/yt_21d5f7e6c45c.m4a`) — transcription PENDING (whisper runs in graphify's
+  keyed extraction path; no-key host-agent can't transcribe audio directly).
+  `raw/` gitignored (transient; extraction chunk is the artifact).
+
 ### Freshness policy (mintlify / refetchable prose)
 
 Mintlify doc mirrors go stale — do NOT commit raw `.md` as frozen sources. The
