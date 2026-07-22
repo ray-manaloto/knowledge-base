@@ -100,7 +100,7 @@ Deep graphify operational reference: `docs/graphify-reference.md`.
 | `sources/*.manifest` | github-repo pins (url+SHA); the clone `sources/<name>/` is gitignored, re-fetched on build. |
 | `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
-| `graphify-out/` | Commit ONLY `graph.json` + `manifest.json` + `.graphify_labels.json`; all derived views (wiki/graphml/cypher/svg/obsidian/report) gitignored, regenerable via `kb-artifacts`. |
+| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (at aggregate scale 119MB+ exceeds git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
 | `python/` | `kb_setup` (build/update/artifacts/env — thin helpers, zero-bash-logic). |
 | `tests/` | Pytest (`uv run --project python pytest tests/`). |
 | `mise.toml` | Tool pins + tasks: `kb-build`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-artifacts`/`kb-ensure-deps`. |
