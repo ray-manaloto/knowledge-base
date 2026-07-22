@@ -11,6 +11,15 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base/python kb-setup hookguard"
+          }
+        ]
+      },
+      {
         "matcher": "Read|Glob",
         "hooks": [
           {

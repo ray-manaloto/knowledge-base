@@ -24,10 +24,14 @@ Plain dicts + NetworkX, no side effects outside `graphify-out/`.
   namespaced `semantic` vs `semantic-deep` since 0.9.17).
 - **Pass-3 backends** (`--backend`): `gemini/openai/kimi/deepseek/claude/bedrock`
   (need keys), `ollama` (local), `claude-cli` (routes through `claude -p`, **BROKEN
-  on v8 — #2076, returns prose → 0 nodes**). **With no key, pass 3 falls to the
-  HOST AGENT** — the running Claude Code session dispatches `general-purpose`
-  subagents (the `/graphify` skill's Step 3B) that emit graph JSON. This is the
-  only no-key prose path here.
+  on v8 — #2076, returns prose → 0 nodes**). **This KB FORBIDS every non-Claude
+  backend**: `kb_setup.graphify_env.clean_env()` strips Gemini/Google/OpenAI/Kimi/
+  DeepSeek/Azure/**Bedrock (`AWS_REGION`)**/Ollama from every graphify subprocess, so
+  `detect_backend()` returns None (keeping only `ANTHROPIC_*`). Do NOT read "no key"
+  as "no key present" — a global `GEMINI_API_KEY` exists and is deliberately blocked.
+  Prose extraction therefore falls to the **HOST AGENT** (Claude) — the running Claude
+  Code session dispatches a `Workflow` fan-out of `general-purpose` subagents that emit
+  graph JSON. That is the only prose path here, and it is Claude.
 - **Incremental:** `graphify update <path>` re-extracts only files whose MD5 changed
   (`detect_incremental` diffs `graphify-out/manifest.json`). CLI `update` is
   **code-only**; changed docs still need a host-agent pass. Semantic cache
@@ -41,10 +45,15 @@ Plain dicts + NetworkX, no side effects outside `graphify-out/`.
 - **Leiden** (graspologic) requires `python_version < '3.13'` → **≤ 3.12 only**.
   On 3.14 it auto-skips → **Louvain fallback** (accepted). Louvain numbering is
   **non-deterministic** — re-clustering renumbers communities.
-- **Labeling** names communities via LLM (`graphify label`, batches ~100/call). With
-  no key it's **host-agent** (skill Step 5): read each community's node labels, write
-  a 2-5 word name → `graphify-out/.graphify_labels.json` (keyed to community ids).
-  Unlabeled communities ("Community N") cripple the wiki — always label.
+- **Labeling** (`mise run kb-label` — NEVER `graphify label` by hand). This KB uses
+  the **deterministic, LLM-free hub labeler**: each community is named after its
+  highest-degree node → `graphify-out/.graphify_labels.json` (keyed to community ids;
+  gitignored/derived). Why not LLM names: the only non-Gemini LLM backend is
+  `claude-cli`, and it is **broken for labeling (#2076)**; and Gemini is FORBIDDEN
+  (`clean_env` strips it). `mise run kb-label` prints "no LLM backend configured;
+  keeping Community N placeholders" — MISLEADING: the deterministic hub labels are
+  still applied during clustering (verified 2026-07-22: 2,409/2,409 named, 0
+  placeholders). Always relabel after a merge (Louvain renumbers).
 
 ## Outputs (`graphify export <fmt>` = 8 formats + more)
 
@@ -96,9 +105,11 @@ extended every time a source is ingested:
   union-merges `graph.json` on branch merges (wired by `hook install` — which we do
   NOT run, #857). Relevant to the deferred concurrency design: git-native graph merge
   is one candidate for serializing parallel adds.
-- Re-cluster after a merge: **`graphify cluster-only <path>`** (regenerates report;
-  `--no-label` keeps placeholders, `--no-viz` for >5000 nodes). Incremental relabel:
-  **`graphify label <path> --missing-only`** names only new/placeholder communities.
+- Re-label after a merge: **`mise run kb-label`** (deterministic hub labels). Do NOT
+  use `--missing-only` after a merge: Louvain **renumbers every community**, so the
+  surviving labels are pinned to the wrong ids — a FULL relabel is required, which
+  `kb-label` does. (`--missing-only` is only correct when community numbering is
+  stable, which it never is after a merge.)
 
 ## Work memory (the self-learning loop) — USE IT
 

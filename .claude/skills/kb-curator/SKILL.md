@@ -28,25 +28,52 @@ nodes but never records *how the last ingestion went* repeats every mistake.
 lesson (`reflections/LESSONS.md` + the `.graphify_learning.json` overlay), which
 `graphify explain`/`query` then surface to the next agent. That is the whole point.
 
-## MANDATE — ingest every source THROUGH graphify (and its extensions)
+## TWO HARD MANDATES (Ray, 2026-07-22 — machine-enforced)
 
-**All ingestion goes through graphify's own tooling, never an ad-hoc fetch.** This is
-enforced (KB repo + the consuming dotfiles repo). Entry points:
-- **GitHub repo** → `graphify clone <url>` (or a `sources/<name>.manifest` + `kb-build`).
-- **Any URL** (docs page, blog, article) → `graphify add <url>` — it fetches to `./raw`
-  and updates the graph. `--author`/`--contributor` tag provenance.
-- **Sitemap** → enumerate, then `graphify add` each on-topic page.
-- **Video/YouTube** → `graphify add <url>` (downloads audio; whisper transcribes at
-  extraction — needs ffmpeg, pinned).
-- **Live PostgreSQL** → `graphify extract --postgres <DSN>`.
+**1. NEVER run graphify by hand — every graphify operation is a mise task.**
+Do NOT type `graphify …`, `_merge_docs.py`, or run graphify's bundled interpreter
+directly. Drive it through the task; the PreToolUse guard (`kb_setup.hook_guard`,
+wired in `.claude/settings.json`) DENIES raw graphify calls and redirects here.
+The task map:
+
+| Operation | mise task | not the raw command |
+|---|---|---|
+| add a URL (page/blog/article/video) | `mise run kb-add -- <url> [--author NAME]` | ~~`graphify add`~~ |
+| rebuild from committed inputs | `mise run kb-build` | ~~`graphify extract`/`merge-graphs`~~ |
+| advance a repo source | `mise run kb-update -- <name>` | ~~`graphify update`~~ |
+| merge one doc chunk | `mise run kb-merge -- <chunk.json> [root]` | ~~`_merge_docs.py`~~ |
+| (re)label communities | `mise run kb-label` | ~~`graphify label`~~ |
+| transcribe local audio | `mise run kb-transcribe -- <audio>` | ~~`graphify.transcribe`~~ |
+| query | `mise run kb-query -- "<q>"` | ~~`graphify query`~~ |
+| record / reflect | `mise run kb-remember` / `mise run kb-reflect` | ~~`graphify save-result`/`reflect`~~ |
+| artifacts | `mise run kb-artifacts` | — |
+
+**2. Claude Code only — NEVER Gemini or any auto-detected key.** All LLM work is
+Claude (the host-agent Workflow for extraction; deterministic no-LLM for labeling).
+Every task strips `GEMINI_API_KEY`/`GOOGLE_API_KEY` (`graphify_env.clean_env`) so
+graphify's backend auto-detect can never pick a non-Claude provider. graphify's
+`claude-cli` backend exists but is BROKEN for labeling (#2076 — prose-wrapped JSON),
+so `kb-label` defaults to the deterministic hub labeler.
+
+## Ingest every source THROUGH graphify (via the tasks above)
+
+**All ingestion goes through graphify's own tooling, never an ad-hoc fetch** — and
+via the task, per mandate 1. Entry points:
+- **GitHub repo** → `sources/<name>.manifest` + `mise run kb-build`.
+- **Any URL** (docs page, blog, article) → `mise run kb-add -- <url>` — fetches to
+  `./raw` (graphify writes `source_url`/`captured_at` frontmatter). `--author`/
+  `--contributor` tag provenance. No-key `add` fetches but does NOT re-cluster, so
+  batch all adds, then merge once.
+- **Sitemap** → enumerate, then `mise run kb-add --` each on-topic page.
+- **Video/YouTube** → `mise run kb-add -- <url>` downloads audio, then
+  `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — NO key, NO LLM).
+- **Live PostgreSQL** → (add a task if this recurs; do not hand-run `graphify extract`).
 
 `curl`/WebFetch/manual vendoring are a **fallback ONLY** when graphify genuinely
-cannot reach a source — and even then the content must be routed into the graph via
-the extraction chunk, never left as a loose file. With no API key the *semantic*
-extraction still falls to the host agent, but the FETCH + pipeline is graphify's.
-Why: one ingestion path = uniform provenance (`source_url`/`captured_at`), the
-freshness policy, and reproducibility. Reaching for `curl` first is the thing this
-mandate exists to stop.
+cannot reach a source — and even then route the content into the graph via an
+extraction chunk. With no API key the *semantic* extraction falls to the host agent
+(Claude), but the FETCH + pipeline is graphify's. One ingestion path = uniform
+provenance, the freshness policy, and reproducibility.
 
 ## The aggregate-graph model
 
@@ -74,18 +101,28 @@ in `sources/REGISTRY.md`.
 
 1. **Register.** Add/append a row in `sources/REGISTRY.md` (kind, tier, status) so
    nothing is lost. The registry IS the backlog the KB works down over time.
-2. **Ingest.**
+2. **Ingest** (via the tasks — never raw graphify).
    - Repo → write the manifest, `mise run kb-build`. A prose-only repo (no code)
      is skipped without aborting — its value comes from the prose step, not AST.
-   - Prose → dispatch `general-purpose` subagent(s) that READ the source and emit
-     graphify node/edge JSON (there is no API key; host-agent extraction is the
-     no-key prose path). Instruct them to write incrementally, not at the end — an
-     agent that dies at source 13 of 20 should leave 13 (see `agent-report-persistence`).
-     Commit the chunk to `sources/extractions/<name>-docs.json`.
-3. **Merge + cluster.** `kb-build` merges and re-clusters. Louvain renumbers
-   communities globally and non-deterministically → **every merge staleifies labels**.
-4. **Label.** `graphify label <path> --missing-only` names new/placeholder
-   communities (host-agent when no key). Unlabeled communities cripple the wiki.
+   - URL(s) → `mise run kb-add -- <url>` (batch all; no-key add fetches to `./raw`
+     without re-clustering). Video → `mise run kb-add --` then
+     `mise run kb-transcribe -- raw/<yt>.m4a`.
+   - Prose extraction = **Claude host-agent, and for N sources use a `Workflow`
+     fan-out** (proven 2026-07-22: 32 docs, 0 errors). Each `agent()` reads one raw
+     file and returns a schema-validated `{nodes, edges}`; assemble into ONE combined
+     chunk `sources/extractions/<name>-docs.json` with `source_url` + `captured_at`
+     per node. A single-shot source can be one `general-purpose` subagent instead.
+     Write incrementally / rely on Workflow resume — an agent dying at source 13 of
+     20 must leave 13 (`agent-report-persistence`). **This is the ONLY LLM path and
+     it is Claude — never Gemini** (mandate 2).
+3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
+   or `mise run kb-build` to replay all committed chunks. Both re-cluster; Louvain
+   renumbers communities globally + non-deterministically → **every merge staleifies
+   labels**, so relabel after.
+4. **Label.** `mise run kb-label` — deterministic, no-LLM hub labels (Gemini-free,
+   instant). Do NOT expect an LLM to name communities: graphify's only non-Gemini LLM
+   backend is `claude-cli`, and it is broken for labeling (#2076 — prose-wrapped JSON).
+   Unlabeled communities cripple the wiki, so always relabel after a merge.
 5. **SELF-LEARN (do not skip).** Record the outcome, then reflect:
    ```bash
    mise run kb-remember -- --question "Q" --answer "A" --nodes N1 N2 --outcome useful|dead_end|corrected
@@ -99,14 +136,31 @@ in `sources/REGISTRY.md`.
 
 ## Gotchas (hard-won — see LESSONS.md as it grows)
 
+- **NEVER Gemini / never an auto-detected key.** graphify's `detect_backend()`
+  priority is gemini→kimi→claude→openai→deepseek→azure→**bedrock (any `AWS_REGION`/
+  `AWS_PROFILE`)**→ollama. A stray global `GEMINI_API_KEY` (a mise secret) once made
+  `graphify label` silently use Gemini; stripping only Gemini then fell to Bedrock
+  (25 failed "Converse" batches). `graphify_env.clean_env()` strips ALL of them from
+  every graphify subprocess (keeping only `ANTHROPIC_*` — the Claude path), so
+  detect_backend returns None. Verified 2026-07-22.
+- **`kb-label` = deterministic hub labels, and that is correct.** graphify prints
+  "no LLM backend configured; keeping Community N placeholders" — MISLEADING: the
+  deterministic hub labeler (names each community after its highest-degree node) still
+  runs during clustering, so `.graphify_labels.json` ends up fully named (2,409/2,409,
+  0 placeholders), just not LLM-enriched. Do not chase that warning.
+- **claude-cli backend is BROKEN for labeling (#2076).** It returns prose-wrapped
+  JSON ("Done — cluster names above") graphify can't parse → every batch fails. This
+  is why `kb-label` is deterministic by default; `--claude-cli` only to re-probe a fix.
+- **Never run graphify by hand** — the PreToolUse guard (`kb_setup.hook_guard`) denies
+  raw `graphify …`/`_merge_docs.py`/graphify-python and redirects to the task. Also
+  never `graphify hook install` (#857) or bare `graphify install` (mutates `~/.claude`).
 - **`graphify extract --code-only` exits non-zero on a no-code repo.** `kb-build`
   tolerates it (skips, keeps the pin). Never treat a prose-only repo as fatal.
-- **Never `graphify hook install`** (#857 shared-manifest skip) and **never bare
-  `graphify install`** (mutates `~/.claude`) — project-scoped only.
 - **Python 3.14**: no Leiden (Louvain fallback, accepted) and `export svg` needs a
   scipy inject (`mise run kb-ensure-deps`).
-- **`graphify add <youtube>`** downloads audio but transcription happens at
-  extraction (whisper needs ffmpeg, pinned in `mise.toml`).
+- **YouTube**: `mise run kb-add -- <url>` downloads audio; then
+  `mise run kb-transcribe -- raw/<yt>.m4a` (graphify's bundled faster-whisper — local,
+  NO key, NO LLM; ffmpeg pinned). Then host-agent extract the transcript like any prose.
 - Version-gated (0.9.24+, not in installed 0.9.23): `reflect --if-stale`,
   `extract --dedup-llm`. Bump the pin before relying on them.
 

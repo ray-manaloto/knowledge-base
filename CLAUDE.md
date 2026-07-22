@@ -50,31 +50,37 @@ graphify's surface splits by transport AND by liveness:
   registration (frequent use). All MCP tools are graph reads and spend **zero
   LLM tokens** — the LLM cost is entirely at build/extraction time.
 
-### Adding sources (host-agent extraction — no API key, no Ollama)
+### Adding sources — Claude Code ONLY, and every graphify op is a mise task
 
-Adding is inherently an **agent-in-repo** operation: graphify exposes **no "add"
-tool over MCP** (the server is read-only — confirmed from its own graph:
-`serve.py`'s neighbors are all read/query helpers). With no provider key set,
-**semantic extraction falls to the host agent itself** — this Claude Code session
-dispatches `general-purpose` subagents that read each source and emit graph JSON,
-then merges. Code is extracted structurally (AST) with **no LLM at all**.
+Two hard mandates (Ray, 2026-07-22, machine-enforced):
 
-The python add-path graphify already exposes (wrappable):
-`graphify.ingest.ingest(url, target_dir)` fetches a URL → graphify-ready file in
-`sources/`; `graphify.extract.extract()` builds. CLI equivalents:
-`graphify clone <url>` (GitHub repo), `graphify add <url>`, `graphify extract <path>`.
+1. **Never run graphify by hand — drive it through a mise task.** `kb-add` /
+   `kb-build` / `kb-update` / `kb-merge` / `kb-label` / `kb-transcribe` / `kb-query` /
+   `kb-remember` / `kb-reflect` / `kb-artifacts`. The PreToolUse guard
+   `kb_setup.hook_guard` (wired in `.claude/settings.json`) DENIES a raw `graphify …`
+   / `_merge_docs.py` / graphify-bundled-python call and prints the task to use. See
+   `.claude/skills/kb-curator` for the full workflow.
+2. **All LLM work is Claude — NEVER Gemini or any auto-detected key.** A global
+   `GEMINI_API_KEY` (a mise secret) exists, so this is NOT "no API key" — it is a
+   *forbidden* key: `kb_setup.graphify_env.clean_env()` strips every non-Claude
+   backend trigger (Gemini/Google/OpenAI/Kimi/DeepSeek/Azure/**Bedrock via
+   `AWS_REGION`**/Ollama) from every graphify subprocess, so graphify's
+   `detect_backend()` can never pick one. `ANTHROPIC_*` is kept (the Claude path).
 
-- **A code repo** (common case): add a `sources/<name>.manifest` (url+ref+commit);
-  `mise run kb-build` clones it at the pinned SHA + AST-extracts (free, no LLM) +
-  replays committed doc/media chunks. `mise run kb-update -- <name>` advances it to
-  the latest upstream commit and incrementally re-extracts.
-- **Prose (docs/URLs/transcripts)**: needs an LLM → **host-agent** extraction (a
-  Claude Code session dispatches `general-purpose` subagents; claude-cli is broken,
-  Ollama out, no keys). Vendor the source under `sources/media/`, commit the
-  resulting extraction chunk to `sources/extractions/`, merge via `build_merge`.
-  See `docs/graphify-reference.md`.
-- **Never** prompt for or block on `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` — a
-  code-only corpus needs no key, and prose extraction uses the host agent.
+Concretely:
+- **Code repo** (common): add `sources/<name>.manifest` (url+ref+commit);
+  `mise run kb-build` clones at the pinned SHA + AST-extracts (**free, no LLM**) +
+  replays committed doc chunks. `mise run kb-update -- <name>` advances to upstream.
+- **Prose (docs/URLs/blogs)**: `mise run kb-add -- <url>` fetches to `./raw`; semantic
+  extraction is the **Claude host agent** (a Workflow fan-out of `general-purpose`
+  subagents that read each raw file → `{nodes,edges}` → one combined chunk in
+  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. This is the only LLM
+  path and it is Claude — graphify's `claude-cli` backend is broken (#2076,
+  prose-wrapped JSON), Ollama/other backends are stripped.
+- **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a`
+  (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
+- **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM,
+  Gemini-free). Do not expect LLM-named communities (claude-cli #2076).
 
 ## Quick start
 

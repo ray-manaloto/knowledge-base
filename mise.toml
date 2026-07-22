@@ -95,8 +95,32 @@ run = "graphify-mcp {{config_root}}/graphify-out/graph.json"
 [tasks.kb-add]
 description = 'Add a URL source then rebuild: mise run kb-add -- <url> [--author NAME]'
 # Fetches the URL into sources/ and updates the graph. Repo ingestion uses the
-# graphify clone + kb-build flow instead (see CLAUDE.md).
+# graphify clone + kb-build flow instead (see CLAUDE.md). GEMINI/GOOGLE keys are
+# blanked so graphify's backend auto-detect can NEVER pick a non-Claude backend
+# (Claude-Code-only mandate); the no-key fetch path uses no LLM anyway.
+env = { GEMINI_API_KEY = "", GOOGLE_API_KEY = "" }
 run = "graphify add"
+
+[tasks.kb-merge]
+description = 'Merge one host-agent extraction chunk into the graph: mise run kb-merge -- <chunk.json> [source_root]'
+# Wraps _merge_docs.py under graphify's interpreter (Gemini-free env). No LLM —
+# build_merge + Louvain re-cluster only. Logic in kb_setup.graphify_ops.
+run = "uv run --project python kb-setup merge"
+
+[tasks.kb-label]
+description = "(Re)label communities (deterministic, no-LLM, Gemini-free): mise run kb-label [-- --missing-only | --claude-cli]"
+# Default = graphify's deterministic hub labeler (no API, no Gemini). GEMINI/GOOGLE
+# keys are stripped in kb_setup.graphify_ops.clean_env so Gemini can never be
+# auto-selected. `--claude-cli` opts into the claude-cli backend, which is BROKEN
+# for labeling (#2076: prose-wrapped JSON graphify can't parse) and falls back to
+# deterministic — kept only to re-probe a future graphify fix. Logic in graphify_ops.
+run = "uv run --project python kb-setup label"
+
+[tasks.kb-transcribe]
+description = "Transcribe a local audio file with graphify's bundled whisper (local, no API): mise run kb-transcribe -- <audio>"
+# For a graphify-downloaded yt_*.m4a. Local faster-whisper — no LLM backend. The
+# transcript is then host-agent (Claude Code) extracted like any prose source.
+run = "uv run --project python kb-setup transcribe"
 
 [tasks.kb-artifacts]
 description = 'Regenerate all derived outputs (wiki/graphml/cypher/html/tree/obsidian/svg): mise run kb-artifacts [-- fmt...]'

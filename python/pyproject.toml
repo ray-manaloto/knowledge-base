@@ -24,6 +24,55 @@ packages = ["src/kb_setup"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["ALL"]
+ignore = [
+    # Docstring rule pairs ruff itself flags as mutually exclusive (Google style).
+    "D203", "D211", "D212", "D213",
+    # Formatter conflicts (ruff docs: ignore when using `ruff format`).
+    "COM812", "ISC001",
+    # subprocess is the core mechanism of this graphify-driver tool; tools resolve
+    # via mise shims on $PATH, so full paths (S607) would break, and every
+    # subprocess call (S603) is an intentional, trusted graphify/git invocation.
+    "S603", "S607",
+    # print IS the user interface — these are CLI progress/output helpers.
+    "T201",
+    # Lazy imports inside the CLI dispatch are intentional (fast startup, optional
+    # heavy deps like graphify only when that subcommand runs).
+    "PLC0415",
+    # Exception-message style rules — noise for a small tool.
+    "TRY003", "EM101", "EM102",
+    # Runtime-vs-type-checking import placement — a micro import-time optimization
+    # irrelevant to a CLI; keeps imports in one obvious place.
+    "TC003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: assert IS the mechanism (S101), self-describing names (D103), magic
+# values (PLR2004), private-member probing is the point (SLF001), fixture args
+# are untyped by pytest convention (ANN), and the dir is an implicit package (INP001).
+"tests/**/*.py" = ["S101", "D103", "PLR2004", "SLF001", "ANN001", "ANN201", "INP001", "ARG001"]
+# Intentional catch-all fail-open: a crashed PreToolUse guard must NEVER brick Bash.
+"src/kb_setup/hook_guard.py" = ["BLE001"]
+# Best-effort report block (BLE001); `G` is the standard NetworkX graph name (N806).
+"src/kb_setup/_merge_docs.py" = ["BLE001", "N806"]
+# The CLI main() is a flat command dispatch — branchy by nature, not complex logic.
+"src/kb_setup/cli.py" = ["C901", "PLR0911", "PLR0912"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+# _merge_docs.py runs ONLY under graphify's bundled interpreter (it imports
+# graphify.build/cluster/export/... which are absent from the KB uv env), so ty
+# cannot resolve those imports here. It is a foreign-interpreter script driven via
+# `mise run kb-merge` — ruff still lints it; ty legitimately cannot type-check it.
+exclude = ["**/_merge_docs.py"]

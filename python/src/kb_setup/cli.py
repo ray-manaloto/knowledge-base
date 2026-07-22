@@ -13,11 +13,15 @@ from kb_setup import __version__
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch a kb-setup subcommand; returns the process exit code."""
     args = sys.argv[1:] if argv is None else argv
     repo_root = Path.cwd()
 
     if not args:
-        print("kb-setup: build | update <name> | version")
+        print(
+            "kb-setup: build | update <name> | merge <chunk> | label | "
+            "transcribe <audio> | artifacts | ensure-deps | version"
+        )
         return 0
 
     cmd, rest = args[0], args[1:]
@@ -41,6 +45,32 @@ def main(argv: list[str] | None = None) -> int:
         from kb_setup import artifacts
 
         return artifacts.generate(repo_root, only=rest or None)
+    if cmd == "merge":
+        from kb_setup import graphify_ops
+
+        if not rest:
+            print("kb-setup merge <chunk.json> [source_root]", file=sys.stderr)
+            return 2
+        return graphify_ops.merge_chunk(repo_root, rest[0], rest[1] if len(rest) > 1 else None)
+    if cmd == "label":
+        from kb_setup import graphify_ops
+
+        return graphify_ops.label(
+            repo_root,
+            missing_only="--missing-only" in rest,
+            claude_cli="--claude-cli" in rest,
+        )
+    if cmd == "transcribe":
+        from kb_setup import graphify_ops
+
+        if not rest:
+            print("kb-setup transcribe <audio-file>", file=sys.stderr)
+            return 2
+        return graphify_ops.transcribe(repo_root, rest[0])
+    if cmd == "hookguard":
+        from kb_setup import hook_guard
+
+        return hook_guard.run()
     if cmd == "ensure-deps":
         from kb_setup.graphify_env import ensure_runtime_deps
 
@@ -50,7 +80,9 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"kb-setup: unknown command {cmd!r} "
-        "(build | update [name] | artifacts [fmt...] | ensure-deps | version)",
+        "(build | update [name] | merge <chunk> [root] | label [--missing-only] "
+        "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
+        "ensure-deps | version)",
         file=sys.stderr,
     )
     return 2

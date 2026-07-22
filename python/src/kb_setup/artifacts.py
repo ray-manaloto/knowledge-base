@@ -8,10 +8,19 @@ manifest.json are). Runs sequentially (safe — no shared-file races).
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
-from kb_setup.graphify_env import ensure_runtime_deps
+from kb_setup.graphify_env import clean_env, ensure_runtime_deps
+
+# svg does a full matplotlib spring_layout: O(n^2)-ish (useless hairball at scale)
+# AND it feeds node labels through matplotlib mathtext, so any label containing a
+# bare `$` raises `ParseException: Expected end of text, found '$'` and fails the
+# whole task. graphify already skips its own graph.html above 5000 nodes for the
+# same reason; we mirror that for svg. Verified 2026-07-22: a 61,767-node graph
+# with a `$`-bearing label crashed `graphify export svg` (rc=1).
+_SVG_NODE_LIMIT = 5000
 
 # name -> graphify command. All read graph.json; each writes its own file(s).
 # neo4j/falkordb both emit cypher.txt (OpenCypher, usable by either) — one entry.
@@ -28,6 +37,14 @@ _ARTIFACTS: list[tuple[str, list[str], str]] = [
 ]
 
 
+def _node_count(graph: Path) -> int:
+    """Node count from graph.json (0 if unreadable — callers gate on it)."""
+    try:
+        return len(json.loads(graph.read_text(encoding="utf-8")).get("nodes", []))
+    except OSError, json.JSONDecodeError:
+        return 0
+
+
 def generate(repo_root: Path, only: list[str] | None = None) -> int:
     """Generate all artifacts (or the subset in `only`). Returns non-zero on any failure."""
     graph = repo_root / "graphify-out" / "graph.json"
@@ -37,11 +54,26 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
     ensure_runtime_deps(repo_root)  # scipy for svg, etc.
 
     selected = [a for a in _ARTIFACTS if not only or a[0] in only]
+
+    # Skip svg on a large graph — it is both doomed (mathtext `$` crash) and
+    # useless (unreadable hairball). Explicit skip, NOT a silent drop: an
+    # explicitly-requested `only=['svg']` still runs so the failure is visible.
+    n_nodes = _node_count(graph)
+    if not only and n_nodes > _SVG_NODE_LIMIT:
+        before = len(selected)
+        selected = [a for a in selected if a[0] != "svg"]
+        if len(selected) < before:
+            print(
+                f"[kb-artifacts] skipping svg: {n_nodes} nodes > {_SVG_NODE_LIMIT} "
+                "(full spring_layout is unreadable + crashes on `$` labels)"
+            )
+
     print(f"[kb-artifacts] generating {len(selected)} artifact(s)")
     failures: list[str] = []
     for name, cmd, desc in selected:
         print(f"  → {name}: {desc}")
-        rc = subprocess.run(cmd, cwd=repo_root).returncode
+        # clean_env: no non-Claude backend key reaches graphify (Gemini-free).
+        rc = subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
         if rc != 0:
             print(f"    FAILED ({name}, rc={rc})")
             failures.append(name)

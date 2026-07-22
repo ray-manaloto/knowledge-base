@@ -15,19 +15,22 @@ import subprocess
 from pathlib import Path
 
 from kb_setup import manifest as mf
-from kb_setup.graphify_env import graphify_python
+from kb_setup.graphify_env import clean_env, graphify_python
 
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 
 
 def _run(cmd: list[str], cwd: Path) -> None:
     print(f"  $ {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=cwd, check=True)
+    # clean_env: no non-Claude provider key reaches graphify (Claude-Code-only).
+    subprocess.run(cmd, cwd=cwd, check=True, env=clean_env())
 
 
 def _ensure_clone(m: mf.Manifest) -> None:
-    """Clone m.url at m.commit into m.clone_dir (gitignored). Re-clones if the
-    working tree is missing or lacks git history."""
+    """Clone m.url at m.commit into m.clone_dir (gitignored).
+
+    Re-clones if the working tree is missing or lacks git history.
+    """
     d = m.clone_dir
     if not (d / ".git").is_dir():
         if d.exists():
@@ -35,30 +38,33 @@ def _ensure_clone(m: mf.Manifest) -> None:
         print(f"  cloning {m.name} @ {m.commit[:10]}")
         subprocess.run(
             ["git", "clone", "--quiet", "--branch", m.ref, m.url, str(d)],
-            check=True, timeout=600,
+            check=True,
+            timeout=600,
         )
-    subprocess.run(
-        ["git", "-C", str(d), "checkout", "--quiet", m.commit], check=True, timeout=120
-    )
+    subprocess.run(["git", "-C", str(d), "checkout", "--quiet", m.commit], check=True, timeout=120)
 
 
 def _extract_code(repo_root: Path, name: str) -> bool:
-    """AST-extract one source's code into its own sub-graph (`--force` = clean full
-    re-scan, no cache/manifest gate — a true reproduction). Returns True iff it
-    produced nodes. A prose-only repo yields an empty graph and graphify exits
-    non-zero; that is NON-fatal here (its value comes from the host-agent prose
-    wave), so the status is swallowed and emptiness is read from the sub-graph."""
+    """AST-extract one source's code into its own sub-graph; True iff it made nodes.
+
+    `--force` = clean full re-scan, no cache/manifest gate (a true reproduction). A
+    prose-only repo yields an empty graph and graphify exits non-zero; that is
+    NON-fatal here (its value comes from the host-agent prose wave), so the status is
+    swallowed and emptiness is read from the sub-graph.
+    """
     print(f"  $ graphify extract sources/{name} --code-only --force")
     subprocess.run(
         ["graphify", "extract", f"sources/{name}", "--code-only", "--force"],
-        cwd=repo_root, check=False,
+        cwd=repo_root,
+        check=False,
+        env=clean_env(),
     )
     sub = repo_root / "sources" / name / "graphify-out" / "graph.json"
     if not sub.is_file():
         return False
     try:
         data = json.loads(sub.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return False
     return bool(data.get("nodes"))
 

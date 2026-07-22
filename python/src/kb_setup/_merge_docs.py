@@ -53,15 +53,25 @@ def main() -> int:
         )
         tokens = {"input": 0, "output": 0}
         report = generate(
-            G, communities, cohesion, labels, gods, surprises, detection, tokens,
-            root, suggested_questions=questions,
+            G,
+            communities,
+            cohesion,
+            labels,
+            gods,
+            surprises,
+            detection,
+            tokens,
+            root,
+            suggested_questions=questions,
         )
         (Path(out).parent / "GRAPH_REPORT.md").write_text(report, encoding="utf-8")
-    except Exception as e:  # noqa: BLE001 - report is optional
+    except Exception as e:
         print(f"[merge] note: report skipped ({type(e).__name__}: {e})")
 
-    print(f"[merge] {chunk_path}: +{n} doc nodes -> {G.number_of_nodes()} nodes, "
-          f"{G.number_of_edges()} edges, {len(communities)} communities")
+    print(
+        f"[merge] {chunk_path}: +{n} doc nodes -> {G.number_of_nodes()} nodes, "
+        f"{G.number_of_edges()} edges, {len(communities)} communities"
+    )
     return 0
 
 
