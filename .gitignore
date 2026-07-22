@@ -55,3 +55,6 @@ sources/media/*.pdf.txt   # regenerable from the committed .pdf via pypdf
 graphify-out/reflections/
 # graphify dated backup dirs (redundant with git history)
 graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+# transient fetch cache for refetchable prose (mintlify docs etc.) — the durable
+# artifact is the extraction chunk (records source_url + captured_at), not the raw md
+sources/raw/

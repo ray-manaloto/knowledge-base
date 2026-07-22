@@ -58,6 +58,22 @@ not just ingested).
   docs — where the orchestrator insight lives). Docs sitemaps (#1–#3), articles/forum/
   media (#10, #12–#14, #19) untouched. X timelines (#20–#21) deferred.
 
+- **2026-07-22 — Claude docs enumerated (wave-1 vendored).** Parsed both Claude
+  sitemaps → **173 on-topic English pages** (`sources/claude-docs-backlog.txt`).
+  14 crown-jewel pages fetched (Mintlify `.md`) to the **transient** cache
+  `sources/raw/claude-docs/` (gitignored): multiagent-orchestration, managed-agents
+  overview/define-outcomes, prompting-claude-fable-5, introducing-fable-5,
+  choosing-a-model, whats-new-4-8, agent-sdk overview/subagents/cost-tracking/skills,
+  model-config, agents, hooks. **PENDING**: host-agent prose extraction → chunk.
+
+### Freshness policy (mintlify / refetchable prose)
+
+Mintlify doc mirrors go stale — do NOT commit raw `.md` as frozen sources. The
+durable artifact is the **extraction chunk** (records `source_url` + `captured_at`).
+Raw fetches live in gitignored `sources/raw/`. Refetch + re-extract when a
+doc-sourced node is **> 1 month** past its `captured_at`. Going forward, query the
+graphify KB (which we control), not external mirrors.
+
 ## Program notes
 
 - **graphify-first**: ingest+extract into this KB **before** web search — graphify
