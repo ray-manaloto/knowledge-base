@@ -19,8 +19,12 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# The package source lives under python/src/ (repo layout), but this is the ONE
+# pyproject.toml at the repo root — it aggregates project metadata + ruff + ty +
+# pytest so every python surface (python/src AND the root-level tests/) resolves
+# the same config. `uv run` (no --project) uses it.
 [tool.hatch.build.targets.wheel]
-packages = ["src/kb_setup"]
+packages = ["python/src/kb_setup"]
 
 [tool.ruff]
 line-length = 100
@@ -55,11 +59,11 @@ ignore = [
 # are untyped by pytest convention (ANN), and the dir is an implicit package (INP001).
 "tests/**/*.py" = ["S101", "D103", "PLR2004", "SLF001", "ANN001", "ANN201", "INP001", "ARG001"]
 # Intentional catch-all fail-open: a crashed PreToolUse guard must NEVER brick Bash.
-"src/kb_setup/hook_guard.py" = ["BLE001"]
+"python/src/kb_setup/hook_guard.py" = ["BLE001"]
 # Best-effort report block (BLE001); `G` is the standard NetworkX graph name (N806).
-"src/kb_setup/_merge_docs.py" = ["BLE001", "N806"]
+"python/src/kb_setup/_merge_docs.py" = ["BLE001", "N806"]
 # The CLI main() is a flat command dispatch — branchy by nature, not complex logic.
-"src/kb_setup/cli.py" = ["C901", "PLR0911", "PLR0912"]
+"python/src/kb_setup/cli.py" = ["C901", "PLR0911", "PLR0912"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -76,3 +80,7 @@ python-version = "3.14"
 # cannot resolve those imports here. It is a foreign-interpreter script driven via
 # `mise run kb-merge` — ruff still lints it; ty legitimately cannot type-check it.
 exclude = ["**/_merge_docs.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -9,7 +9,6 @@ import io
 import json
 
 import pytest
-
 from kb_setup.hook_guard import _verdict, run
 
 # (command, expected_task_substring) — must be DENIED, reason names the task.
@@ -49,7 +48,7 @@ ALLOW = [
 ]
 
 
-@pytest.mark.parametrize("command,task", DENY)
+@pytest.mark.parametrize(("command", "task"), DENY)
 def test_denies_hand_run_graphify(command: str, task: str) -> None:
     reason = _verdict(command)
     assert reason is not None, f"should deny: {command!r}"

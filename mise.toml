@@ -13,7 +13,7 @@
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.6"
 uv = "0.11.28"
-hk = "1.50.0"
+hk = "1.52.0"
 pkl = "0.32.0"
 typos = "1.48.0"
 # graphify [all] resolves on host Python 3.14 (leiden/graspologic extra
@@ -58,7 +58,7 @@ run = "hk fix"
 
 [tasks.test]
 description = "Run the Python test suite"
-run = "uv run --project python pytest tests/ -x -q"
+run = "uv run pytest tests/ -x -q"
 
 [tasks.check]
 description = "Full quality check (lint + test)"
@@ -72,13 +72,13 @@ description = "Reproduce graph.json from committed inputs (manifests + doc extra
 # Clones each sources/*.manifest at its pinned SHA (gitignored), AST-extracts code
 # (free), then replays the committed sources/extractions/*.json doc chunks. No
 # host-agent needed — reproduction is free. Logic in kb_setup.graph.
-run = "uv run --project python kb-setup build"
+run = "uv run kb-setup build"
 
 [tasks.kb-update]
 description = "Advance a source to latest upstream + incrementally re-extract: mise run kb-update -- <name>"
 # Bumps the manifest SHA to upstream HEAD, re-clones, `graphify update` (incremental
 # AST, free). Changed DOCS still need a host-agent pass in a Claude session.
-run = "uv run --project python kb-setup update"
+run = "uv run kb-setup update"
 
 [tasks.kb-query]
 description = 'Query the graph: mise run kb-query -- "<question>" [--budget N]'
@@ -105,7 +105,7 @@ run = "graphify add"
 description = 'Merge one host-agent extraction chunk into the graph: mise run kb-merge -- <chunk.json> [source_root]'
 # Wraps _merge_docs.py under graphify's interpreter (Gemini-free env). No LLM —
 # build_merge + Louvain re-cluster only. Logic in kb_setup.graphify_ops.
-run = "uv run --project python kb-setup merge"
+run = "uv run kb-setup merge"
 
 [tasks.kb-label]
 description = "(Re)label communities (deterministic, no-LLM, Gemini-free): mise run kb-label [-- --missing-only | --claude-cli]"
@@ -114,23 +114,23 @@ description = "(Re)label communities (deterministic, no-LLM, Gemini-free): mise 
 # auto-selected. `--claude-cli` opts into the claude-cli backend, which is BROKEN
 # for labeling (#2076: prose-wrapped JSON graphify can't parse) and falls back to
 # deterministic — kept only to re-probe a future graphify fix. Logic in graphify_ops.
-run = "uv run --project python kb-setup label"
+run = "uv run kb-setup label"
 
 [tasks.kb-transcribe]
 description = "Transcribe a local audio file with graphify's bundled whisper (local, no API): mise run kb-transcribe -- <audio>"
 # For a graphify-downloaded yt_*.m4a. Local faster-whisper — no LLM backend. The
 # transcript is then host-agent (Claude Code) extracted like any prose source.
-run = "uv run --project python kb-setup transcribe"
+run = "uv run kb-setup transcribe"
 
 [tasks.kb-artifacts]
 description = 'Regenerate all derived outputs (wiki/graphml/cypher/html/tree/obsidian/svg): mise run kb-artifacts [-- fmt...]'
 # Data-driven registry in kb_setup.artifacts (no copy-paste); ensures output deps
 # (scipy for svg) first. All read graph.json; none are committed (regenerable).
-run = "uv run --project python kb-setup artifacts"
+run = "uv run kb-setup artifacts"
 
 [tasks.kb-ensure-deps]
 description = "Inject output-only runtime deps missing from graphify's env (e.g. scipy for svg on py3.14)"
-run = "uv run --project python kb-setup ensure-deps"
+run = "uv run kb-setup ensure-deps"
 
 # --- self-learning loop (work memory) — record outcomes, aggregate lessons ---
 [tasks.kb-remember]

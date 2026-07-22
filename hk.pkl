@@ -1,9 +1,9 @@
-amends "package://github.com/jdx/hk/releases/download/v1.50.0/hk@1.50.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.52.0/hk@1.52.0#/Config.pkl"
 
 // Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
 // bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
 // skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
-import "package://github.com/jdx/hk/releases/download/v1.50.0/hk@1.50.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.52.0/hk@1.52.0#/Builtins.pkl"
 
 // Refuse this config on an older hk binary rather than silently misreading it.
 min_hk_version = "1.49.0"
@@ -20,27 +20,34 @@ exclude = List(
   "**/*.lock",
 )
 
-// Python: ruff (strict `select=ALL`; config in python/pyproject.toml) + ty
-// (strict static type check). The `uv run --project python` prefix makes hk use
-// the repo's pinned ruff/ty and its config verbatim. Order per Astral docs:
-// `ruff check --fix` BEFORE `ruff format`; `exclusive` (a barrier), NOT `depends`
-// — a failed `depends` dep deadlocks hk (dotfiles #268). ty is a cross-module
-// analyzer, so it runs whole-dir (not file-scoped) with --project to attach the
-// [tool.ty] config. Builtins are amended (`= (Builtins.x) {}`), never bare blocks
-// (feedback_hk_builtins_need_assignment); `ty` is a custom step, so a bare block.
+// Python: ruff (strict `select=ALL`) + ty (strict types); config in the single
+// repo-root pyproject.toml, so `uv run` (no --project) uses it for BOTH python/src
+// and tests/. ruff/ruff_format/ty are all CUSTOM shell-string steps: hk 1.51+
+// (#1067) moved the ruff builtins to structured `argv` commands, which "can't be
+// combined with `shell` or `prefix`" — so `(Builtins.ruff){prefix=…}` panics.
+// A string `check`/`fix` carries the `uv run` prefix instead. Order per Astral
+// docs: `ruff check --fix` BEFORE `ruff format`; `exclusive` (a barrier), NOT
+// `depends` — a failed `depends` dep deadlocks hk (dotfiles #268). ty is a
+// cross-module analyzer, so it runs whole-dir (python/src tests), not file-scoped.
 hooks {
   ["check"] {
     steps {
       ["typos"] = Builtins.typos
       ["pkl"] = Builtins.pkl
-      ["ruff"] = (Builtins.ruff) { prefix = "uv run --project python" }
-      ["ruff_format"] = (Builtins.ruff_format) {
-        prefix = "uv run --project python"
+      ["ruff"] {
+        glob = List("python/src/**/*.py", "tests/**/*.py")
+        check = "uv run ruff check {{files}}"
+        fix = "uv run ruff check --fix {{files}}"
+      }
+      ["ruff_format"] {
+        glob = List("python/src/**/*.py", "tests/**/*.py")
+        check = "uv run ruff format --check {{files}}"
+        fix = "uv run ruff format {{files}}"
         exclusive = true
       }
       ["ty"] {
         glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run --project python ty check --project python python/src tests"
+        check = "uv run ty check python/src tests"
       }
     }
   }
@@ -49,14 +56,20 @@ hooks {
     steps {
       ["typos"] = Builtins.typos
       ["pkl"] = Builtins.pkl
-      ["ruff"] = (Builtins.ruff) { prefix = "uv run --project python" }
-      ["ruff_format"] = (Builtins.ruff_format) {
-        prefix = "uv run --project python"
+      ["ruff"] {
+        glob = List("python/src/**/*.py", "tests/**/*.py")
+        check = "uv run ruff check {{files}}"
+        fix = "uv run ruff check --fix {{files}}"
+      }
+      ["ruff_format"] {
+        glob = List("python/src/**/*.py", "tests/**/*.py")
+        check = "uv run ruff format --check {{files}}"
+        fix = "uv run ruff format {{files}}"
         exclusive = true
       }
       ["ty"] {
         glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run --project python ty check --project python python/src tests"
+        check = "uv run ty check python/src tests"
       }
     }
   }
@@ -65,14 +78,20 @@ hooks {
     steps {
       ["typos"] = Builtins.typos
       ["pkl"] = Builtins.pkl
-      ["ruff"] = (Builtins.ruff) { prefix = "uv run --project python" }
-      ["ruff_format"] = (Builtins.ruff_format) {
-        prefix = "uv run --project python"
+      ["ruff"] {
+        glob = List("python/src/**/*.py", "tests/**/*.py")
+        check = "uv run ruff check {{files}}"
+        fix = "uv run ruff check --fix {{files}}"
+      }
+      ["ruff_format"] {
+        glob = List("python/src/**/*.py", "tests/**/*.py")
+        check = "uv run ruff format --check {{files}}"
+        fix = "uv run ruff format {{files}}"
         exclusive = true
       }
       ["ty"] {
         glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run --project python ty check --project python python/src tests"
+        check = "uv run ty check python/src tests"
       }
     }
   }
