@@ -76,6 +76,20 @@ not just ingested).
   towardsdatascience 24h-agents, digg, mindstudio patterns). **1 YouTube** (whisper).
   These are HIGH priority for the orchestrator/Workflow build (phase 4).
 
+- **2026-07-22 — phase 1a DONE: 20 crown-jewel/workflow Claude docs extracted +
+  merged.** Host-agent semantic extraction via a resumable `Workflow` fan-out
+  (20 parallel Opus extractors, run `wf_06cee647-acc`, 0 errors) → one combined
+  chunk `sources/extractions/claude-docs-docs.json` (**621 nodes / 888 edges**,
+  provenance-tagged `source_url` + `captured_at=2026-07-22`). Merged into the
+  aggregate graph (`_merge_docs.py`, `dedup=False`) → **61,524 nodes / 133,897
+  edges / 2,385 communities**. Verified: managed-agent orchestration + dynamic-
+  workflow nodes are queryable and cross-link to the deer-flow orchestrator code
+  (TokenBudgetConfig, CircuitBreakerConfig, lead_agent, SubagentsAppConfig).
+  Recorded via `kb-remember` + `kb-reflect`. `/commands` was extracted earlier
+  (`claude-commands-docs.json`). **PENDING phase 1b**: the 12 blog/HTML + 1
+  YouTube sources in `workflow-sources.txt` via `graphify add` (the mandate;
+  WebFetch note above is superseded by the graphify-ingestion-first rule).
+
 ### Freshness policy (mintlify / refetchable prose)
 
 Mintlify doc mirrors go stale — do NOT commit raw `.md` as frozen sources. The
