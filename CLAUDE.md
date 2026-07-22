@@ -59,42 +59,46 @@ The python add-path graphify already exposes (wrappable):
 `sources/`; `graphify.extract.extract()` builds. CLI equivalents:
 `graphify clone <url>` (GitHub repo), `graphify add <url>`, `graphify extract <path>`.
 
-- **A code repo** (common case): clone under `sources/`, add a manifest, rebuild:
-  ```bash
-  git clone --branch <ref> <url> sources/<name>     # or graphify clone <url>
-  mise run kb-build                                  # AST — no LLM, no key
-  ```
-  For a first build of a fresh corpus use
-  `graphify extract sources/<name> --code-only --out .` (headless AST → repo-root
-  `graphify-out/`). `mise run kb-build` (`graphify update`) refreshes an existing
-  graph.
-- **A URL / doc / paper**: `mise run kb-add -- <url>` fetches into `sources/` and
-  updates the graph. Prose triggers host-agent semantic extraction (this
-  session's subagents), so run it from a Claude Code session, not a bare shell.
+- **A code repo** (common case): add a `sources/<name>.manifest` (url+ref+commit);
+  `mise run kb-build` clones it at the pinned SHA + AST-extracts (free, no LLM) +
+  replays committed doc/media chunks. `mise run kb-update -- <name>` advances it to
+  the latest upstream commit and incrementally re-extracts.
+- **Prose (docs/URLs/transcripts)**: needs an LLM → **host-agent** extraction (a
+  Claude Code session dispatches `general-purpose` subagents; claude-cli is broken,
+  Ollama out, no keys). Vendor the source under `sources/media/`, commit the
+  resulting extraction chunk to `sources/extractions/`, merge via `build_merge`.
+  See `docs/graphify-reference.md`.
 - **Never** prompt for or block on `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` — a
   code-only corpus needs no key, and prose extraction uses the host agent.
 
 ## Quick start
 
 ```bash
-mise install                                  # tools (python, uv, hk, pkl, typos, graphify)
+mise install                                  # tools (python, uv, hk, pkl, typos, graphify, ffmpeg)
 graphify install --project                    # project-scoped skill + graphify-out/
-graphify extract sources/<name> --code-only --out .   # first build (code, AST, free)
+mise run kb-build                             # reproduce graph.json from committed inputs (no LLM)
 mise run kb-query -- "what does this corpus cover?"
 mise run kb-serve                             # read-only MCP server for other agents
+mise run kb-artifacts                         # regenerate all derived outputs (wiki/graphml/svg/…)
+mise run kb-update -- <name>                  # advance a github source to latest + re-extract
 mise run lint && mise run test                # gates
 ```
+
+Deep graphify operational reference: `docs/graphify-reference.md`.
 
 ## Layout
 
 | Path | Purpose |
 |---|---|
-| `sources/` | The corpus. Committed content or `<name>.manifest` pointers (pinned SHA); vendored clones are gitignored + rebuilt. |
-| `graphify-out/` | Generated graph (`graph.json`, report, html). Gitignored, rebuilt from sources. |
-| `python/` | `kb_setup` package (uv-managed; thin helpers only, zero-bash-logic). |
-| `tests/` | Pytest suite (`uv run --project python pytest tests/`). |
-| `mise.toml` | Tool pins + tasks (`lint`, `test`, `kb-build`, `kb-query`, `kb-serve`, `kb-add`). |
-| `hk.pkl` | Git-hook lint config (typos, pkl). |
+| `sources/*.manifest` | github-repo pins (url+SHA); the clone `sources/<name>/` is gitignored, re-fetched on build. |
+| `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
+| `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
+| `graphify-out/` | Commit ONLY `graph.json` + `manifest.json` + `.graphify_labels.json`; all derived views (wiki/graphml/cypher/svg/obsidian/report) gitignored, regenerable via `kb-artifacts`. |
+| `python/` | `kb_setup` (build/update/artifacts/env — thin helpers, zero-bash-logic). |
+| `tests/` | Pytest (`uv run --project python pytest tests/`). |
+| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-artifacts`/`kb-ensure-deps`. |
+| `hk.pkl` | Git-hook lint (typos, pkl). |
+| `docs/graphify-reference.md` | Expert operational reference for graphify itself. |
 | `.claude/` | graphify skill + project-scoped settings/hooks. |
 
 ## Stack conventions
