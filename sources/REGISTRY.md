@@ -104,10 +104,15 @@ not just ingested).
   towardsdatascience 24h-agents; digg; mindstudio patterns. Verified: a "keep an
   agent running autonomously for hours" query synthesizes across the new blogs +
   fable-5/agent-sdk docs + orchestrator code. `kb-remember` + `kb-reflect` run.
-  **YouTube** (`youtu.be/e3rbymcXeuc`): audio downloaded via `graphify add`
-  (`raw/yt_21d5f7e6c45c.m4a`) — transcription PENDING (whisper runs in graphify's
-  keyed extraction path; no-key host-agent can't transcribe audio directly).
-  `raw/` gitignored (transient; extraction chunk is the artifact).
+  **YouTube** (`youtu.be/e3rbymcXeuc`) — DONE: audio downloaded via `graphify add`,
+  then transcribed with graphify's bundled faster-whisper
+  (`graphify.transcribe.transcribe`, model=base, 37 segments) — NO API key needed
+  (whisper is local). Extracted → `sources/extractions/claude-video-docs.json`
+  (**20 nodes / 23 edges**: background subagents auto-PR, /fork, /subtask, Sonnet-5
+  1M, and the durability suite — network-drop survival, rate-limit report+resume,
+  session survives daemon restart, interrupted agents resume). Merged → **61,767
+  nodes / 134,232 edges / 2,414 communities**. `raw/` gitignored (transient;
+  extraction chunk is the artifact). **Phase 1 COMPLETE: 32 sources ingested.**
 
 ### Freshness policy (mintlify / refetchable prose)
 
