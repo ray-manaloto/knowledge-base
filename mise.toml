@@ -1,0 +1,89 @@
+# knowledge-base — tool versions + tasks
+#
+# A mise/hk/uv project (same stack as ray-manaloto/dotfiles) whose purpose is to
+# be the shared research substrate any AI/LLM agent connects to: add sources,
+# query the resulting graphify knowledge graph, and every other graphify
+# feature. See CLAUDE.md.
+#
+# graphify is PROJECT-SCOPED here (never global): the graph lives in this repo's
+# graphify-out/, and the MCP server is pinned to THIS graph.json — so multiple
+# graphify projects on the same host never collide.
+
+[tools]
+# Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
+python = "3.14.6"
+uv = "0.11.28"
+hk = "1.50.0"
+pkl = "0.32.0"
+typos = "1.48.0"
+# graphify [all] resolves on host Python 3.14 (leiden/graspologic extra
+# auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
+# `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
+# strands the pin — dotfiles 2026-07-20).
+"pipx:graphifyy" = { version = "0.9.23", extras = ["all"] }
+
+[settings]
+experimental = true
+auto_install = true
+lockfile = true
+# New tool requests get exact-pinned versions (pins are the versioning model).
+pin = true
+
+[settings.status]
+show_tools = true
+missing_tools = "always"
+
+[hooks]
+# Reshim after installs (pipx backend leaves stale shims otherwise) + install
+# the hk git hooks against mise-provided binaries.
+postinstall = "mise reshim && hk install --mise"
+
+[env]
+HK_MISE = "1"
+
+# ---------------------------------------------------------------------------
+# Lint / test gates (thin wrappers; logic lives in hk.pkl and python/)
+# ---------------------------------------------------------------------------
+[tasks.lint]
+description = "Run hk check --all (read-only, ≡ CI) — hygiene, typos, pkl"
+run = "hk run check --all"
+
+[tasks.fmt]
+description = "Auto-fix formatting/lint issues"
+run = "hk fix"
+
+[tasks.test]
+description = "Run the Python test suite"
+run = "uv run --project python pytest tests/ -x -q"
+
+[tasks.check]
+description = "Full quality check (lint + test)"
+depends = ["lint", "test"]
+
+# ---------------------------------------------------------------------------
+# Knowledge-base tasks — the reason this repo exists
+# ---------------------------------------------------------------------------
+[tasks.kb-build]
+description = "(Re)build the knowledge graph from sources/ (AST for code = no LLM/key)"
+# graphify update does deterministic AST extraction over code with no LLM and no
+# API key. For prose sources semantic extraction falls to the HOST AGENT (this
+# Claude Code session's subagents) — see AGENTS.md "Adding sources".
+run = "graphify update sources"
+
+[tasks.kb-query]
+description = 'Query the graph: mise run kb-query -- "<question>" [--budget N]'
+# Deterministic BFS/DFS over graphify-out/graph.json — no LLM, source-cited.
+run = "graphify query"
+
+[tasks.kb-serve]
+description = "Start the read-only MCP server pinned to THIS graph (stdio)"
+# graphify-mcp binds to an ABSOLUTE graph path, so this server only ever serves
+# this repo's graph — no collision with other graphify projects. HTTP transport:
+# add `-- --transport http --port 8080`.
+run = "graphify-mcp {{config_root}}/graphify-out/graph.json"
+
+[tasks.kb-add]
+description = 'Add a URL source then rebuild: mise run kb-add -- <url> [--author NAME]'
+# Fetches the URL into sources/ and updates the graph. Repo ingestion uses the
+# graphify clone + kb-build flow instead (see AGENTS.md).
+run = "graphify add"

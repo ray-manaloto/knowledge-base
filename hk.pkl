@@ -1,0 +1,44 @@
+amends "package://github.com/jdx/hk/releases/download/v1.50.0/hk@1.50.0#/Config.pkl"
+
+// Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
+// bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
+// skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
+import "package://github.com/jdx/hk/releases/download/v1.50.0/hk@1.50.0#/Builtins.pkl"
+
+// Refuse this config on an older hk binary rather than silently misreading it.
+min_hk_version = "1.49.0"
+
+// Zero-skip: report ALL issues, not just the first.
+fail_fast = false
+
+// Non-source paths excluded from every builtin.
+exclude = List(
+  "graphify-out/**",
+  "sources/**",
+  "**/.venv/**",
+  "**/__pycache__/**",
+  "**/*.lock",
+)
+
+hooks {
+  ["check"] {
+    steps {
+      ["typos"] = Builtins.typos
+      ["pkl"] = Builtins.pkl
+    }
+  }
+  ["fix"] {
+    fix = true
+    steps {
+      ["typos"] = Builtins.typos
+      ["pkl"] = Builtins.pkl
+    }
+  }
+  ["pre-commit"] {
+    fix = true
+    steps {
+      ["typos"] = Builtins.typos
+      ["pkl"] = Builtins.pkl
+    }
+  }
+}

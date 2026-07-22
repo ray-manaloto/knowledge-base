@@ -1,0 +1,14 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Re-clone at build time; the working tree under sources/graphify/ is gitignored.
+#
+#   git clone --depth 1 --branch <ref> <url> sources/graphify
+#   git -C sources/graphify checkout <commit>
+#
+# First corpus: graphify's own source, so the KB can answer "how does graphify
+# work?" (esp. whether add/write is exposed via MCP or the python API) from the
+# graph instead of guessing.
+url = https://github.com/Graphify-Labs/graphify
+ref = v8
+commit = e32c9f431c5ed7ed8c980f6d34dc3fe6c99a389b
+kind = code
+added = 2026-07-21
