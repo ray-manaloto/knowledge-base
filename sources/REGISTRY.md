@@ -24,27 +24,33 @@ not just ingested).
 
 | # | Source | Kind | Tier | Status | Why it's here |
 |---|---|---|---|---|---|
-| 1 | [platform.claude.com/sitemap.xml](https://platform.claude.com/sitemap.xml) → [multiagent-orchestration](https://platform.claude.com/docs/en/managed-agents/multiagent-orchestration) | docs | T1 | pending | Authoritative: managed-agents + multi-agent orchestration. |
-| 2 | [code.claude.com/sitemap.xml](https://code.claude.com/sitemap.xml) | docs | T1 | pending | Authoritative: Claude Code subagents, model config, hooks, skills. |
-| 3 | [prompting-claude-fable-5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5) | docs | T1 | pending | Fable-5 prompt engineering (orchestrator prompt design). |
-| 4 | [bytedance/deer-flow](https://github.com/bytedance/deer-flow) | repo | T1 | pending | Multi-agent deep-research framework — blueprint candidate. |
-| 5 | [microsoft/SkillOpt](https://github.com/microsoft/SkillOpt) | repo | T1 | pending | Self-learning / skill optimization — feeds the self-learning loop. |
-| 6 | [DannyMac180/fable-advisor](https://github.com/DannyMac180/fable-advisor) | repo | T1 | pending | Fable-5 advisor pattern reference. |
-| 7 | [Cjbuilds/Codex-Orchestration](https://github.com/Cjbuilds/Codex-Orchestration) | repo | T1 | pending | Codex handoff / orchestration reference. |
-| 8 | [Rylaa/fable5-orchestrator](https://github.com/Rylaa/fable5-orchestrator) | repo | T1 | pending | Fable-5 orchestrator reference. |
-| 9 | [mar3co/fable-orchestrator](https://github.com/mar3co/fable-orchestrator) | repo | T1 | pending | Fable orchestrator reference. |
-| 10 | [advisor-executor-pattern (mindstudio)](https://www.mindstudio.ai/blog/advisor-executor-pattern-claude-code-fable-5) | article | T1 | pending | Directly on the advisor/executor decision. |
-| 11 | [asgeirtj/system_prompts_leaks → claude-fable-5.md](https://github.com/asgeirtj/system_prompts_leaks/blob/main/Anthropic/claude-fable-5.md) | repo | T1 | pending | Fable-5 system-prompt leak (behavioral priors). |
-| 12 | [linas.substack — Fable-5-lite/Opus-4.8](https://linas.substack.com/p/unlock-claude-fable-5-lite-opus-48) | article | T1 | pending | Fable-5→Opus-4.8 fallback pattern. |
-| 13 | [r/claude — fable_5_and_opus_48_prompt](https://www.reddit.com/r/claude/comments/1unhubx/fable_5_and_opus_48_prompt/) | forum | T1 | pending | Fable-5/Opus-4.8 fallback prompt discussion. |
-| 14 | [youtu.be/XTBWVVcF3Pk](https://youtu.be/XTBWVVcF3Pk) | media | T1 | pending | Fallback-pattern walkthrough (transcribe via whisper). |
-| 15 | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) | repo | T1 | pending | **tool**: install+configure for Reddit/X/HN trend gap-fill. |
-| 16 | [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | repo | T2 | pending | Catalog — extract structure/pointers, don't fan out every link. |
-| 17 | [anthropics/claude-plugins-community](https://github.com/anthropics/claude-plugins-community) | repo | T2 | pending | Plugin catalog — pointers to reusable agents/skills. |
-| 18 | [affaan-m/ECC](https://github.com/affaan-m/ECC) | repo | T2 | pending | Notable resource (evaluate on ingest). |
-| 19 | [mindstudio blog — tag/claude](https://www.mindstudio.ai/blog/tag/claude) | article | T2 | pending | Broader Claude blog set (light). |
+| 1 | [platform.claude.com/sitemap.xml](https://platform.claude.com/sitemap.xml) → [multiagent-orchestration](https://platform.claude.com/docs/en/managed-agents/multiagent-orchestration) | docs | T1 | prose | Authoritative: managed-agents + multi-agent orchestration. Core pages extracted (claude-docs-docs.json). |
+| 2 | [code.claude.com/sitemap.xml](https://code.claude.com/sitemap.xml) | docs | T1 | prose | Authoritative: Claude Code subagents, model config, hooks, skills. 14 core pages extracted; ~151-page long tail deferred. |
+| 3 | [prompting-claude-fable-5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5) | docs | T1 | prose | Fable-5 prompt engineering (orchestrator prompt design). Extracted. |
+| 4 | [bytedance/deer-flow](https://github.com/bytedance/deer-flow) | repo | T1 | prose | Multi-agent deep-research framework. Code + prose (README/AGENTS) extracted 2026-07-22. |
+| 5 | [microsoft/SkillOpt](https://github.com/microsoft/SkillOpt) | repo | T1 | prose | Self-learning / skill optimization. Code + prose extracted 2026-07-22. |
+| 6 | [DannyMac180/fable-advisor](https://github.com/DannyMac180/fable-advisor) | repo | T1 | prose | THE advisor-pattern reference. Prose extracted 2026-07-22 (was never code-ingested — prose-only). |
+| 7 | [Cjbuilds/Codex-Orchestration](https://github.com/Cjbuilds/Codex-Orchestration) | repo | T1 | prose | Codex handoff / orchestration. Code + prose extracted 2026-07-22. |
+| 8 | [Rylaa/fable5-orchestrator](https://github.com/Rylaa/fable5-orchestrator) | repo | T1 | prose | Fable-5 orchestrator + dynamic-workflow instructions. Code + prose extracted 2026-07-22. |
+| 9 | [mar3co/fable-orchestrator](https://github.com/mar3co/fable-orchestrator) | repo | T1 | prose | Fable orchestrator. Code + prose extracted 2026-07-22. |
+| 10 | [advisor-executor-pattern (mindstudio)](https://www.mindstudio.ai/blog/advisor-executor-pattern-claude-code-fable-5) | article | T1 | prose | THE advisor/executor decision. Extracted 2026-07-22. |
+| 11 | [asgeirtj/system_prompts_leaks → claude-fable-5.md](https://github.com/asgeirtj/system_prompts_leaks/blob/main/Anthropic/claude-fable-5.md) | repo | T1 | prose | Fable-5 system-prompt leak (behavioral priors). Distilled 2026-07-22. |
+| 12 | [linas.substack — Fable-5-lite/Opus-4.8](https://linas.substack.com/p/unlock-claude-fable-5-lite-opus-48) | article | T1 | prose | Fable-5→Opus-4.8 fallback pattern. Extracted 2026-07-22. |
+| 13 | [r/claude — fable_5_and_opus_48_prompt](https://www.reddit.com/r/claude/comments/1unhubx/fable_5_and_opus_48_prompt/) | forum | T1 | deferred | BLOCKED: Reddit bot-verification wall ("Please wait for verification"); graphify fetch returns a stub. Fallback covered by #10/#12/#14 (control-arm). |
+| 14 | [youtu.be/XTBWVVcF3Pk](https://youtu.be/XTBWVVcF3Pk) | media | T1 | prose | Fallback-pattern walkthrough. Transcribed (whisper) + extracted 2026-07-22. |
+| 15 | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) | repo | T1 | prose | **tool**: trend gap-fill. Code + prose (README/CONCEPTS) extracted 2026-07-22. |
+| 16 | [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | repo | T2 | code | Catalog — code-ingested; prose deferred (catalog, low insight density). |
+| 17 | [anthropics/claude-plugins-community](https://github.com/anthropics/claude-plugins-community) | repo | T2 | code | Plugin catalog — code-ingested; prose deferred. |
+| 18 | [affaan-m/ECC](https://github.com/affaan-m/ECC) | repo | T2 | code | Code-ingested; prose deferred. |
+| 19 | [mindstudio blog — tag/claude](https://www.mindstudio.ai/blog/tag/claude) | article | T2 | pending | Broader Claude blog set (light). Deferred. |
 | 20 | [x.com/ClaudeDevs](https://x.com/ClaudeDevs) | timeline | T3 | deferred | Live timeline → reach via last30days-skill, not static ingest. |
 | 21 | [x.com/ClaudeAI](https://x.com/ClaudeAI) | timeline | T3 | deferred | Live timeline → reach via last30days-skill, not static ingest. |
+| 22 | [youtu.be/GnA9xjYWHBg](https://youtu.be/GnA9xjYWHBg) | media | T1 | prose | Ray-added video (graphify KB build walkthrough). Transcribed + extracted 2026-07-22. |
+| 23 | [youtu.be/22iy2mDFiF8](https://youtu.be/22iy2mDFiF8) | media | T1 | prose | Ray-added video (AI second-brain / read-once graph). Transcribed + extracted 2026-07-22. |
+| 24 | [youtu.be/rtutpoT4SYg](https://youtu.be/rtutpoT4SYg) | media | T1 | prose | Ray-added video — ALREADY extracted (media-docs.json). |
+| 25 | [youtu.be/RGVXR0OFNzI](https://youtu.be/RGVXR0OFNzI) | media | T1 | prose | Ray-added video. Transcribed + extracted 2026-07-22. |
+| 26 | [youtu.be/mHSOsy_usAg](https://youtu.be/mHSOsy_usAg) | media | T1 | prose | Ray-added video. Transcribed + extracted 2026-07-22. |
+| 27 | [youtu.be/0CZtRw0KrXo](https://youtu.be/0CZtRw0KrXo) | media | T1 | prose | Ray-added video. Transcribed + extracted 2026-07-22. |
 
 ## Progress log
 
@@ -113,6 +119,30 @@ not just ingested).
   session survives daemon restart, interrupted agents resume). Merged → **61,767
   nodes / 134,232 edges / 2,414 communities**. `raw/` gitignored (transient;
   extraction chunk is the artifact). **Phase 1 COMPLETE: 32 sources ingested.**
+
+- **2026-07-22 — wave 2: orchestrator/advisor/fallback prose + 6 Ray videos (phases 3–4 grounding).**
+  Closed the "code-ingested but no prose" gap for the orchestrator repos + the fallback cluster
+  + 6 new videos. **Two host-agent Workflow fan-outs (Opus, Claude-only), 16 agents, 0 errors:**
+  - **Repos + articles** (`sources/extractions/orchestrator-repos-docs.json`, **261 nodes / 282
+    edges**): fable-advisor (#6, prose-only, first ingest — the architect/advisor-executor
+    routing doctrine: cheapest-adequate-lane table, cost discipline, five-part spec contract,
+    cross-vendor review, verify-before-done), fable5-orchestrator (#8), fable-orchestrator (#9),
+    codex-orchestration (#7), deer-flow (#4), skillopt (#5), last30days-skill (#15),
+    claude-fable-5 system-prompt leak (#11, priors distilled), + articles mindstudio
+    advisor-executor (#10) & linas Fable-5→Opus-4.8 (#12).
+  - **Videos** (`sources/extractions/fable-videos-docs.json`, **121 nodes / 139 edges**): 6 Ray
+    videos #22/#23/#25/#26/#27 + fallback video #14 — `mise run kb-add` (audio) →
+    `mise run kb-transcribe` (local faster-whisper, NO key) → host-agent extract. URL↔hash map
+    in `raw/video-map.txt`.
+  - Merged (`dedup=False`) → **62,149 nodes / 134,652 edges / 2,354 communities**; relabeled
+    (deterministic hub); `kb-artifacts` regenerated (svg skipped >5000 nodes); `kb-remember` +
+    `kb-reflect` (10 memories → LESSONS.md). Verified: an advisor/executor+fallback query now
+    synthesizes the new prose (linas fallback, fable-advisor lanes, mindstudio "Opus/Sonnet as
+    Executor") with deer-flow rate-exhaustion/circuit-breaker code + model-config effort levels.
+  - **#13 (r/claude) BLOCKED** — Reddit bot-verification wall; graphify fetch returns a stub.
+    Deferred; fallback pattern is control-armed by #10/#12/#14.
+  - **Still deferred:** the ~151-page code.claude.com long tail (#2, T2 API/SDK ref), the T2
+    catalogs #16/#17/#18 prose, #19 mindstudio tag set, #20/#21 X timelines (T3).
 
 ### Freshness policy (mintlify / refetchable prose)
 
