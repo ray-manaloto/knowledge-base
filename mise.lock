@@ -8,10 +8,6 @@ checksum = "sha256:58ea99a3fe5fed86bfa40acc801010eb2a0a04dcf0180f68b4e2bf7b0ba7e
 url = "https://conda.anaconda.org/conda-forge/osx-arm64/bzip2-1.0.8-hd037594_9.conda"
 checksum = "sha256:540fe54be35fac0c17feefbdc3e29725cce05d7367ffedfaaa1bdda234b019df"
 
-[conda-packages.macos-arm64."ca-certificates-2026.6.17-hbd8a1cb_0"]
-url = "https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda"
-checksum = "sha256:f8e3c730fa14ee3f170493779f06522c4acf89169f43db4f039727709b6419cf"
-
 [conda-packages.macos-arm64."cairo-1.18.4-he0f2337_1"]
 url = "https://conda.anaconda.org/conda-forge/osx-arm64/cairo-1.18.4-he0f2337_1.conda"
 checksum = "sha256:cde9b79ee206fe3ba6ca2dc5906593fb7a1350515f85b2a1135a4ce8ec1539e3"
@@ -39,10 +35,6 @@ checksum = "sha256:00925c8c055a2275614b4d983e1df637245e19058d79fc7dd1a93b8d9fb4b
 [conda-packages.macos-arm64."font-ttf-ubuntu-0.83-h77eed37_3"]
 url = "https://conda.anaconda.org/conda-forge/noarch/font-ttf-ubuntu-0.83-h77eed37_3.conda"
 checksum = "sha256:2821ec1dc454bd8b9a31d0ed22a7ce22422c0aef163c59f49dfdf915d0f0ca14"
-
-[conda-packages.macos-arm64."fontconfig-2.18.1-h2b252f5_0"]
-url = "https://conda.anaconda.org/conda-forge/osx-arm64/fontconfig-2.18.1-h2b252f5_0.conda"
-checksum = "sha256:8607d8d0b32f9f6fc61ea8c06b537486b78428a04516658222fa4d1d521af765"
 
 [conda-packages.macos-arm64.fonts-conda-ecosystem-1-0]
 url = "https://conda.anaconda.org/conda-forge/noarch/fonts-conda-ecosystem-1-0.tar.bz2"
@@ -363,10 +355,6 @@ checksum = "sha256:f4b61d6701205611c11e2dedaf398ebce30ecf05c193be98df9f7887e1891
 [conda-packages.macos-x64."bzip2-1.0.8-h500dc9f_9"]
 url = "https://conda.anaconda.org/conda-forge/osx-64/bzip2-1.0.8-h500dc9f_9.conda"
 checksum = "sha256:9f242f13537ef1ce195f93f0cc162965d6cc79da578568d6d8e50f70dd025c42"
-
-[conda-packages.macos-x64."ca-certificates-2026.6.17-hbd8a1cb_0"]
-url = "https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda"
-checksum = "sha256:f8e3c730fa14ee3f170493779f06522c4acf89169f43db4f039727709b6419cf"
 
 [conda-packages.macos-x64."cairo-1.18.4-h7656bdc_1"]
 url = "https://conda.anaconda.org/conda-forge/osx-64/cairo-1.18.4-h7656bdc_1.conda"
@@ -720,10 +708,6 @@ checksum = "sha256:3033fa8953f7f0c1bb5b89b5af77253badc14a89ba94d743dde3c9159e10f
 url = "https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_9.conda"
 checksum = "sha256:76dfb71df5e8d1c4eded2dbb5ba15bb8fb2e2b0fe42d94145d5eed4c75c35902"
 
-[conda-packages.windows-x64."ca-certificates-2026.6.17-h4c7d964_0"]
-url = "https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-h4c7d964_0.conda"
-checksum = "sha256:7f458e4a82514d7bebbfef23d92817794a16aaf1c748a15f04870d4fb49aeab2"
-
 [conda-packages.windows-x64."cairo-1.18.4-h477c42c_1"]
 url = "https://conda.anaconda.org/conda-forge/win-64/cairo-1.18.4-h477c42c_1.conda"
 checksum = "sha256:9ee4ad706c5d3e1c6c469785d60e3c2b263eec569be0eac7be33fbaef978bccc"
@@ -747,10 +731,6 @@ checksum = "sha256:00925c8c055a2275614b4d983e1df637245e19058d79fc7dd1a93b8d9fb4b
 [conda-packages.windows-x64."font-ttf-ubuntu-0.83-h77eed37_3"]
 url = "https://conda.anaconda.org/conda-forge/noarch/font-ttf-ubuntu-0.83-h77eed37_3.conda"
 checksum = "sha256:2821ec1dc454bd8b9a31d0ed22a7ce22422c0aef163c59f49dfdf915d0f0ca14"
-
-[conda-packages.windows-x64."fontconfig-2.18.1-hd47e2ca_0"]
-url = "https://conda.anaconda.org/conda-forge/win-64/fontconfig-2.18.1-hd47e2ca_0.conda"
-checksum = "sha256:9217184c4a8e82101b0e512b059ae3ff67e3913133b9031edad89ab5341284e4"
 
 [conda-packages.windows-x64.fonts-conda-ecosystem-1-0]
 url = "https://conda.anaconda.org/conda-forge/noarch/fonts-conda-ecosystem-1-0.tar.bz2"
@@ -1031,6 +1011,84 @@ checksum = "sha256:ef408f85f664a4b9c9dac3cb2e36154d9baa15a88984ea800e11060e0f239
 [conda-packages.windows-x64."zstd-1.5.7-h534d264_6"]
 url = "https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda"
 checksum = "sha256:368d8628424966fd8f9c8018326a9c779e06913dd39e646cf331226acc90e5b2"
+
+[[tools.antigravity-cli]]
+version = "1.1.5"
+backend = "aqua:google-antigravity/antigravity-cli"
+
+[tools.antigravity-cli."platforms.linux-arm64"]
+checksum = "sha256:d61ace663d7efee9dfd8f4f881e6f1021eff904a0688a91cd4d84359ee76f044"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140596"
+
+[tools.antigravity-cli."platforms.linux-arm64-musl"]
+checksum = "sha256:d61ace663d7efee9dfd8f4f881e6f1021eff904a0688a91cd4d84359ee76f044"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140596"
+
+[tools.antigravity-cli."platforms.linux-x64"]
+checksum = "sha256:1d586501b8a13d146e8aa3c7f00634f50c6034e2c428ea7d013377d36315a69a"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140628"
+
+[tools.antigravity-cli."platforms.linux-x64-musl"]
+checksum = "sha256:1d586501b8a13d146e8aa3c7f00634f50c6034e2c428ea7d013377d36315a69a"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140628"
+
+[tools.antigravity-cli."platforms.macos-arm64"]
+checksum = "sha256:04254cb335c4f056308e1a7f188365f58d5c688d5af162921eac4bdda736ba55"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_mac_arm64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140659"
+
+[tools.antigravity-cli."platforms.macos-x64"]
+checksum = "sha256:57727fcf8048860bbcfddbb404a2df9aa26557238c4e7d21feb7d646525f478b"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_mac_x64.tar.gz"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140668"
+
+[tools.antigravity-cli."platforms.windows-x64"]
+checksum = "sha256:0e37447c3d63284d5404e7e6679e099b7e8a6bdd800a56cee70d0283398eebed"
+url = "https://github.com/google-antigravity/antigravity-cli/releases/download/1.1.5/agy_cli_windows_x64.zip"
+url_api = "https://api.github.com/repos/google-antigravity/antigravity-cli/releases/assets/484140699"
+
+[[tools.codex]]
+version = "0.145.0"
+backend = "aqua:openai/codex"
+
+[tools.codex."platforms.linux-arm64"]
+checksum = "sha256:54f79a05aba6f9abf8ef988abcae8bf2fcefba20beb549b4ff2b3acdb2cb6f54"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000960"
+
+[tools.codex."platforms.linux-arm64-musl"]
+checksum = "sha256:54f79a05aba6f9abf8ef988abcae8bf2fcefba20beb549b4ff2b3acdb2cb6f54"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000960"
+
+[tools.codex."platforms.linux-x64"]
+checksum = "sha256:71a28d362c96ac9829bf8203a2c71be451aeb726adb843167fdaf0eae8fe7dd9"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000878"
+
+[tools.codex."platforms.linux-x64-musl"]
+checksum = "sha256:71a28d362c96ac9829bf8203a2c71be451aeb726adb843167fdaf0eae8fe7dd9"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000878"
+
+[tools.codex."platforms.macos-arm64"]
+checksum = "sha256:ece937169d4c9e910d60826a6ea4ae7848a16c089403d122e70e7da4ac41ba34"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000998"
+
+[tools.codex."platforms.macos-x64"]
+checksum = "sha256:9d402c9ca814655fddc07b548d7086491c0afcebe1f746cdeba1045fd6f62646"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000909"
+
+[tools.codex."platforms.windows-x64"]
+checksum = "sha256:8d0d281346aedf63c4cc3922997df822fbb8881f7ffb2b57416f48e8c52a734e"
+url = "https://github.com/openai/codex/releases/download/rust-v0.145.0/codex-package-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/openai/codex/releases/assets/485000896"
 
 [[tools."conda:ffmpeg"]]
 version = "8.1.2"
