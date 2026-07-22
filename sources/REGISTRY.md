@@ -66,6 +66,13 @@ not just ingested).
   choosing-a-model, whats-new-4-8, agent-sdk overview/subagents/cost-tracking/skills,
   model-config, agents, hooks. **PENDING**: host-agent prose extraction → chunk.
 
+- **2026-07-22 — `/commands` doc EXTRACTED (first crown-jewel merged).**
+  `code.claude.com/docs/en/commands` → chunk `sources/extractions/claude-commands-docs.json`
+  (10 nodes: /clear /compact /branch /fork /subtask /background /resume + 2 rationale),
+  merged → 60,903 nodes. **Settled a factual correction**: `/subtask` + `/fork` ARE
+  real (v2.1.212+) and BOTH inherit context (neither resets like `/clear`). The KB
+  now answers this via `graphify query`.
+
 ### Freshness policy (mintlify / refetchable prose)
 
 Mintlify doc mirrors go stale — do NOT commit raw `.md` as frozen sources. The
