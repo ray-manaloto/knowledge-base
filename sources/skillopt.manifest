@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Self-learning / skill optimization (T1).
+url = https://github.com/microsoft/SkillOpt
+ref = main
+commit = 61735e3922efc2b90c6d6cab561e62e98452ca90
+kind = code
+added = 2026-07-22

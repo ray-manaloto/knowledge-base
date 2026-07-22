@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Fable-5 advisor pattern reference (T1).
+url = https://github.com/DannyMac180/fable-advisor
+ref = main
+commit = c5a1bf51213c407ad8774307ed3732ed527566ab
+kind = code
+added = 2026-07-22

@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Fable-5 system-prompt leak — prose (T1).
+url = https://github.com/asgeirtj/system_prompts_leaks
+ref = main
+commit = 2195b1035f8eaafe22ac571c0811fb84688fe32d
+kind = code
+added = 2026-07-22

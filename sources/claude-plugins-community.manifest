@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Plugin catalog — reusable agents/skills (T2).
+url = https://github.com/anthropics/claude-plugins-community
+ref = main
+commit = 07fb1efee9efabca112175c914db6614803221a1
+kind = code
+added = 2026-07-22

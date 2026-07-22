@@ -24,7 +24,13 @@ def main() -> int:
         print(f"[merge] {chunk_path}: 0 nodes — skipped")
         return 0
 
-    G = build_merge([chunk], graph_path=out, prune_sources=None, root=root, directed=False)
+    # dedup=False: the chunk is already single-repo-deduped at extraction, and the
+    # target graph now spans MULTIPLE repos — graphify forbids cross-project dedup
+    # (a `main` in repo A != repo B), the same reason the code layer merges via
+    # `merge-graphs` without deduping. Cross-repo dedup here raises ValueError.
+    G = build_merge(
+        [chunk], graph_path=out, prune_sources=None, root=root, directed=False, dedup=False
+    )
     communities = cluster(G)
     cohesion = score_all(G, communities)
     gods = god_nodes(G)

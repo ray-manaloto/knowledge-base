@@ -1,0 +1,23 @@
+{
+  "skill_name": "kb-curator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "add https://github.com/simonw/llm to the knowledge base — I want to be able to query how its plugin system works",
+      "expected_output": "Registers the repo in sources/REGISTRY.md with kind=repo and a tier; writes sources/llm.manifest pinned to a resolved SHA; runs kb-build (AST, free) so the repo merges into the aggregate graph; verifies with a kb-query about the plugin system; records a work-memory entry via kb-remember and runs kb-reflect. Does NOT prompt for an API key (code is AST-only).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I found a good blog post on multi-agent orchestration patterns at https://example.com/blog/orchestration — get it into the graph so our agents can use it",
+      "expected_output": "Recognizes this as prose (not a code repo): vendors the source under sources/media/, dispatches a host-agent extraction (general-purpose subagent emitting graphify node/edge JSON, written incrementally), commits the chunk to sources/extractions/, merges + re-clusters + labels missing communities, then records work-memory and reflects. Uses graphify ingestion rather than a raw web fetch.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "run the reflection step and tell me what lessons the KB has accumulated so far",
+      "expected_output": "Runs `mise run kb-reflect` (graphify reflect --graph ...), which aggregates graphify-out/memory/ into reflections/LESSONS.md plus the .graphify_learning.json overlay, then summarizes the lessons (useful/dead_end/corrected counts and the key corrections) for the user.",
+      "files": []
+    }
+  ]
+}

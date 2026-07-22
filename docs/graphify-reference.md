@@ -78,11 +78,52 @@ it (`kb-ensure-deps`). Choosing 3.14 = Louvain + a scipy inject; 3.12 = both nat
   add` (shared mutable machine state). `--strict` install blocks the first raw read
   → redirects to `graphify query` (toggle `GRAPHIFY_HOOK_STRICT`).
 
-## Work memory
+## Aggregate graph (many sources → one, ongoing)
 
-`save-result`/`save_query_result` logs query outcomes (`useful|dead_end|corrected`)
-→ `graphify reflect` aggregates. (reflect's exact artifact is unconfirmed — the
-"LESSONS.md synthesis" claim was refuted in research.)
+The KB grows by MERGING per-source graphs into one aggregate — the intended model,
+extended every time a source is ingested:
+
+- **`graphify merge-graphs <g1> <g2> [...] --out <path>`** — union-merge 2+ graph.json
+  into one **cross-repo** graph. This is the code layer's merge path and is
+  multi-repo-safe (no cross-project dedup).
+- **Cross-project dedup is DISABLED by design.** `build`/`build_merge` run
+  `deduplicate_entities`, which **raises** once nodes span >1 repo (`main` in repo A
+  ≠ repo B). Each source is already single-repo-deduped at extraction, so at
+  merge-into-aggregate time dedup MUST be off — `kb-build`'s doc merge passes
+  `dedup=False` for exactly this (see `_merge_docs.py`). This was a real 60k-node
+  build failure, now fixed.
+- **`graphify merge-driver <base> <cur> <other>`** — a git merge driver that
+  union-merges `graph.json` on branch merges (wired by `hook install` — which we do
+  NOT run, #857). Relevant to the deferred concurrency design: git-native graph merge
+  is one candidate for serializing parallel adds.
+- Re-cluster after a merge: **`graphify cluster-only <path>`** (regenerates report;
+  `--no-label` keeps placeholders, `--no-viz` for >5000 nodes). Incremental relabel:
+  **`graphify label <path> --missing-only`** names only new/placeholder communities.
+
+## Work memory (the self-learning loop) — USE IT
+
+Two verbs turn query outcomes into durable, graph-aware lessons. Record load-bearing
+research findings here so the corpus improves itself.
+
+- **`graphify save-result`** → appends a Q&A record to `graphify-out/memory/`.
+  `--question` (req) · `--answer`/`--answer-file` · `--type query|path_query|explain`
+  · `--nodes L1 L2 …` (cited node labels) · `--outcome useful|dead_end|corrected` ·
+  `--correction TEXT` (with `corrected`). One record per meaningful result.
+- **`graphify reflect`** → aggregates `memory/` into a **deterministic** (no-LLM)
+  lessons doc `graphify-out/reflections/LESSONS.md`. `--half-life-days N` (default 30;
+  signal weight halves) · `--min-corroboration N` (default 2 distinct `useful` to
+  PREFER a node). With `--graph`, groups lessons by community, drops stale nodes, and
+  writes the work-memory overlay **`.graphify_learning.json`** tagging nodes
+  preferred/tentative/contested (recency-weighted, with provenance); `explain`/`query`
+  then surface a "Lesson:" hint, flagged "code changed — re-verify" when the source
+  moved on.
+- **Corrects** the prior "reflect artifact unconfirmed / LESSONS.md refuted" note —
+  verified against the installed **0.9.23** CLI: `reflect` definitively writes
+  `reflections/LESSONS.md`.
+- **Version-gated (0.9.24+, NOT in installed 0.9.23; control-armed 2026-07-22):**
+  `reflect --if-stale` (no-op when LESSONS.md newer than every input) and
+  `extract --dedup-llm` (LLM tiebreaker for 75–92 Jaro-Winkler entity pairs). Bump
+  the `graphifyy` pin before relying on either.
 
 ## GitHub repos touched
 

@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Notable resource — evaluate on ingest (T2).
+url = https://github.com/affaan-m/ECC
+ref = main
+commit = 8348fb5387303060c1c2cfec37daf27e20a11df6
+kind = code
+added = 2026-07-22

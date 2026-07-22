@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Multi-agent deep-research framework — orchestrator blueprint (T1).
+url = https://github.com/bytedance/deer-flow
+ref = main
+commit = cb698832deaf876d204045a68d79acedcbb1d26c
+kind = code
+added = 2026-07-22

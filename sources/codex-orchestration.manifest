@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Codex handoff / orchestration reference (T1).
+url = https://github.com/Cjbuilds/Codex-Orchestration
+ref = main
+commit = 521f3deb6e7e35b1679d5f9139a0e4f1c04e8679
+kind = code
+added = 2026-07-22

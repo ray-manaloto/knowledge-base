@@ -81,8 +81,15 @@ mise run kb-query -- "what does this corpus cover?"
 mise run kb-serve                             # read-only MCP server for other agents
 mise run kb-artifacts                         # regenerate all derived outputs (wiki/graphml/svg/…)
 mise run kb-update -- <name>                  # advance a github source to latest + re-extract
+mise run kb-reflect                           # aggregate work-memory -> reflections/LESSONS.md + overlay
 mise run lint && mise run test                # gates
 ```
+
+**Adding sources is automated + self-improving** via the `kb-curator` skill
+(`.claude/skills/kb-curator/`): register → ingest → merge → cluster → label →
+**always** `kb-remember` (record the outcome) + `kb-reflect` (aggregate lessons),
+so the corpus gets smarter every ingestion. `sources/REGISTRY.md` is the durable
+source backlog. See `docs/graphify-reference.md` for the graphify mental model.
 
 Deep graphify operational reference: `docs/graphify-reference.md`.
 

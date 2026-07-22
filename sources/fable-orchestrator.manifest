@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Fable orchestrator reference (T1).
+url = https://github.com/mar3co/fable-orchestrator
+ref = main
+commit = cd43e27691e83a9c6239d33efd93cabf45aa8aac
+kind = code
+added = 2026-07-22

@@ -107,3 +107,16 @@ run = "uv run --project python kb-setup artifacts"
 [tasks.kb-ensure-deps]
 description = "Inject output-only runtime deps missing from graphify's env (e.g. scipy for svg on py3.14)"
 run = "uv run --project python kb-setup ensure-deps"
+
+# --- self-learning loop (work memory) — record outcomes, aggregate lessons ---
+[tasks.kb-remember]
+description = 'Record a Q&A outcome to work memory: mise run kb-remember -- --question "Q" --answer "A" --nodes N1 N2 --outcome useful|dead_end|corrected'
+# Appends to graphify-out/memory/ (git-tracked — authored knowledge). The
+# kb-curator skill runs this on every ingestion so the corpus self-improves.
+run = "graphify save-result"
+
+[tasks.kb-reflect]
+description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the .graphify_learning.json overlay (deterministic, no LLM)"
+# --graph groups lessons by community + tags nodes preferred/tentative/contested.
+# reflections/ + overlay are gitignored (regenerable); run each session.
+run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"

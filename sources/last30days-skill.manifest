@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Trend-research skill — tool + reference (T1).
+url = https://github.com/mvanhorn/last30days-skill
+ref = main
+commit = 01aef34ca49db1ccc9caaee72913760f4468f6c1
+kind = code
+added = 2026-07-22

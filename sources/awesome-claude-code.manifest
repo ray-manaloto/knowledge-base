@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Catalog — pointers, don't fan out (T2).
+url = https://github.com/hesreallyhim/awesome-claude-code
+ref = main
+commit = 020a9507f18efec015e92bdf2a59f8e4260036bf
+kind = code
+added = 2026-07-22

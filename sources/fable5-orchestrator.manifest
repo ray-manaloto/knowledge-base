@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Fable-5 orchestrator reference (T1).
+url = https://github.com/Rylaa/fable5-orchestrator
+ref = main
+commit = afafe02ec7ff20af8fc9b8f698380f1ff0d6b47b
+kind = code
+added = 2026-07-22

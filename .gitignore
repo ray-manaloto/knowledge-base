@@ -43,3 +43,7 @@ sources/media/*.pdf.txt   # regenerable from the committed .pdf via pypdf
 
 # OS / editor
 .DS_Store
+# reflect derived doc (regenerable via `graphify reflect`); memory/ IS tracked (authored)
+graphify-out/reflections/
+# graphify dated backup dirs (redundant with git history)
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/

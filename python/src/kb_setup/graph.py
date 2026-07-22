@@ -9,6 +9,7 @@ so consumers query on clone and `update` can diff incrementally.
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -41,6 +42,27 @@ def _ensure_clone(m: mf.Manifest) -> None:
     )
 
 
+def _extract_code(repo_root: Path, name: str) -> bool:
+    """AST-extract one source's code into its own sub-graph (`--force` = clean full
+    re-scan, no cache/manifest gate — a true reproduction). Returns True iff it
+    produced nodes. A prose-only repo yields an empty graph and graphify exits
+    non-zero; that is NON-fatal here (its value comes from the host-agent prose
+    wave), so the status is swallowed and emptiness is read from the sub-graph."""
+    print(f"  $ graphify extract sources/{name} --code-only --force")
+    subprocess.run(
+        ["graphify", "extract", f"sources/{name}", "--code-only", "--force"],
+        cwd=repo_root, check=False,
+    )
+    sub = repo_root / "sources" / name / "graphify-out" / "graph.json"
+    if not sub.is_file():
+        return False
+    try:
+        data = json.loads(sub.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(data.get("nodes"))
+
+
 def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
@@ -53,19 +75,24 @@ def build(repo_root: Path) -> None:
     for m in manifests:
         _ensure_clone(m)
 
-    # Code graph (AST — free, deterministic). `--force` = clean full re-scan (skip
-    # the incremental manifest gate + cache) so a rebuild is a true reproduction,
-    # not a diff against stale state. First source seeds graph.json; further
-    # sources merge in via merge-graphs.
-    first, *rest = manifests
-    _run(
-        ["graphify", "extract", f"sources/{first.name}", "--code-only", "--force", "--out", "."],
-        repo_root,
-    )
-    for m in rest:
-        _run(["graphify", "extract", f"sources/{m.name}", "--code-only", "--force"], repo_root)
-        sub = f"sources/{m.name}/graphify-out/graph.json"
-        _run(["graphify", "merge-graphs", str(out), sub, "--out", str(out)], repo_root)
+    # Code graph (AST — free, deterministic). Each source extracts into its own
+    # sub-graph; prose-only repos (no code) are skipped WITHOUT aborting the build —
+    # their content is added later by the host-agent prose wave, not here.
+    with_code = [m.name for m in manifests if _extract_code(repo_root, m.name)]
+    skipped = [m.name for m in manifests if m.name not in with_code]
+    for name in skipped:
+        print(f"  [skip] {name}: no code nodes — prose-only, deferred to the extraction wave")
+    if not with_code:
+        raise SystemExit("no source produced code nodes")
+
+    # Seed graph.json from the first code-bearing source; merge the rest.
+    seed, *rest = with_code
+    out.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(sources / seed / "graphify-out" / "graph.json", out)
+    print(f"[kb-build] seeded graph.json from {seed}")
+    for name in rest:
+        sub = sources / name / "graphify-out" / "graph.json"
+        _run(["graphify", "merge-graphs", str(out), str(sub), "--out", str(out)], repo_root)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)
