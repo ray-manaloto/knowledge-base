@@ -15,84 +15,85 @@ fail_fast = false
 exclude = List(
   "graphify-out/**",
   "sources/**",
+  "raw/**",
   "**/.venv/**",
   "**/__pycache__/**",
   "**/*.lock",
 )
 
-// Python: ruff (strict `select=ALL`) + ty (strict types); config in the single
-// repo-root pyproject.toml, so `uv run` (no --project) uses it for BOTH python/src
-// and tests/. ruff/ruff_format/ty are all CUSTOM shell-string steps: hk 1.51+
-// (#1067) moved the ruff builtins to structured `argv` commands, which "can't be
-// combined with `shell` or `prefix`" — so `(Builtins.ruff){prefix=…}` panics.
-// A string `check`/`fix` carries the `uv run` prefix instead. Order per Astral
-// docs: `ruff check --fix` BEFORE `ruff format`; `exclusive` (a barrier), NOT
-// `depends` — a failed `depends` dep deadlocks hk (dotfiles #268). ty is a
-// cross-module analyzer, so it runs whole-dir (python/src tests), not file-scoped.
+// Toolset — most efficient/optimized tool per job; rust-native preferred, Go/others
+// fine when they're the best option (Ray, 2026-07-22):
+//   Python  ruff + ty        (rust)   — strict `select=ALL`; config in the single
+//                                       repo-root pyproject.toml, so `uv run` (no
+//                                       --project) governs BOTH python/src and tests/.
+//   TOML    taplo(_format)    (rust)
+//   Markdown rumdl(_format)   (rust)   — rumdl_format is the hk 1.52 (#1080) formatter
+//                                       half, mirroring the ruff/taplo lint+fmt split.
+//   Spelling typos            (rust)
+//   Secrets gitleaks         (go)     — the standard, well-optimized scanner.
+//   Pkl      pkl              (pkl CLI)
+//   Hygiene  hk util builtins (rust, in the hk binary — no external tool)
+// ruff/ruff_format/ty are CUSTOM shell-string steps: hk 1.51+ (#1067) moved the ruff
+// builtins to structured `argv`, which "can't be combined with `shell`/`prefix`" — so
+// `(Builtins.ruff){prefix=…}` panics. A string check/fix carries the `uv run` prefix.
+// Order per Astral docs: `ruff check --fix` BEFORE `ruff format`; `exclusive` (a
+// barrier), NOT `depends` (a failed dep deadlocks hk — dotfiles #268). taplo/rumdl and
+// the hygiene builtins are on PATH via mise (HK_MISE=1), so they need no prefix.
+local pyGlob = List("python/src/**/*.py", "tests/**/*.py")
+
+local lintSteps: Mapping<String, Step> = new {
+  ["typos"] = Builtins.typos
+  ["gitleaks"] = Builtins.gitleaks
+  ["pkl"] = Builtins.pkl
+  ["taplo"] = Builtins.taplo
+  ["taplo_format"] = Builtins.taplo_format
+  ["rumdl"] = Builtins.rumdl
+  ["rumdl_format"] = Builtins.rumdl_format
+  ["trailing_whitespace"] = Builtins.trailing_whitespace
+  ["newlines"] = Builtins.newlines
+  ["mixed_line_ending"] = Builtins.mixed_line_ending
+  ["check_merge_conflict"] = Builtins.check_merge_conflict
+  ["detect_private_key"] = Builtins.detect_private_key
+  ["check_added_large_files"] = Builtins.check_added_large_files
+  ["ruff"] = new Step {
+    glob = pyGlob
+    check = "uv run ruff check {{files}}"
+    fix = "uv run ruff check --fix {{files}}"
+  }
+  ["ruff_format"] = new Step {
+    glob = pyGlob
+    check = "uv run ruff format --check {{files}}"
+    fix = "uv run ruff format {{files}}"
+    exclusive = true
+  }
+  ["ty"] = new Step {
+    glob = pyGlob
+    check = "uv run ty check python/src tests"
+  }
+  // Zero inline suppressions: all suppressions live in the ONE pyproject.toml as
+  // per-file-ignores, never inline noqa/type:ignore/ty:ignore in source. Logic in
+  // kb_setup.lint_checks (zero-bash-logic — no inline shell in hk.pkl).
+  ["no_lint_skip"] = new Step {
+    glob = pyGlob
+    check = "uv run kb-setup no-lint-skip"
+  }
+}
+
 hooks {
   ["check"] {
-    steps {
-      ["typos"] = Builtins.typos
-      ["pkl"] = Builtins.pkl
-      ["ruff"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ruff check {{files}}"
-        fix = "uv run ruff check --fix {{files}}"
-      }
-      ["ruff_format"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ruff format --check {{files}}"
-        fix = "uv run ruff format {{files}}"
-        exclusive = true
-      }
-      ["ty"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ty check python/src tests"
-      }
-    }
+    steps = lintSteps
   }
   ["fix"] {
     fix = true
-    steps {
-      ["typos"] = Builtins.typos
-      ["pkl"] = Builtins.pkl
-      ["ruff"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ruff check {{files}}"
-        fix = "uv run ruff check --fix {{files}}"
-      }
-      ["ruff_format"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ruff format --check {{files}}"
-        fix = "uv run ruff format {{files}}"
-        exclusive = true
-      }
-      ["ty"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ty check python/src tests"
-      }
-    }
+    steps = lintSteps
   }
   ["pre-commit"] {
     fix = true
+    steps = lintSteps
+  }
+  ["commit-msg"] {
     steps {
-      ["typos"] = Builtins.typos
-      ["pkl"] = Builtins.pkl
-      ["ruff"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ruff check {{files}}"
-        fix = "uv run ruff check --fix {{files}}"
-      }
-      ["ruff_format"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ruff format --check {{files}}"
-        fix = "uv run ruff format {{files}}"
-        exclusive = true
-      }
-      ["ty"] {
-        glob = List("python/src/**/*.py", "tests/**/*.py")
-        check = "uv run ty check python/src tests"
-      }
+      ["check_conventional_commit"] = Builtins.check_conventional_commit
     }
   }
 }

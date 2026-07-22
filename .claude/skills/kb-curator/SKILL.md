@@ -59,6 +59,7 @@ so `kb-label` defaults to the deterministic hub labeler.
 
 **All ingestion goes through graphify's own tooling, never an ad-hoc fetch** — and
 via the task, per mandate 1. Entry points:
+
 - **GitHub repo** → `sources/<name>.manifest` + `mise run kb-build`.
 - **Any URL** (docs page, blog, article) → `mise run kb-add -- <url>` — fetches to
   `./raw` (graphify writes `source_url`/`captured_at` frontmatter). `--author`/
@@ -124,10 +125,12 @@ in `sources/REGISTRY.md`.
    backend is `claude-cli`, and it is broken for labeling (#2076 — prose-wrapped JSON).
    Unlabeled communities cripple the wiki, so always relabel after a merge.
 5. **SELF-LEARN (do not skip).** Record the outcome, then reflect:
+
    ```bash
    mise run kb-remember -- --question "Q" --answer "A" --nodes N1 N2 --outcome useful|dead_end|corrected
    mise run kb-reflect                 # aggregates memory/ -> reflections/LESSONS.md + overlay
    ```
+
    Record the load-bearing thing you learned (a gotcha, a working command, a dead
    end), citing the graph nodes it touched. `corrected` + `--correction` when you
    fixed a wrong prior belief. This is what makes the KB self-improve per run.

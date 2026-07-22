@@ -1,0 +1,13 @@
+# gitleaks config for the KB. This repo INGESTS external content — the cloned
+# source repos under sources/ (e.g. system-prompts-leaks) and the derived
+# graphify-out/ cache are gitignored research data that inherently contain
+# secret-LIKE strings (leaked prompts, fixture keys). They are never committed, so
+# scanning them is pure noise. Scan only the real, tracked repo files.
+title = "kb-gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "gitignored research corpus + derived artifacts (never committed)"
+paths = ['''^sources/''', '''^graphify-out/''', '''^raw/''']

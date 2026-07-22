@@ -68,6 +68,7 @@ Two hard mandates (Ray, 2026-07-22, machine-enforced):
    `detect_backend()` can never pick one. `ANTHROPIC_*` is kept (the Claude path).
 
 Concretely:
+
 - **Code repo** (common): add `sources/<name>.manifest` (url+ref+commit);
   `mise run kb-build` clones at the pinned SHA + AST-extracts (**free, no LLM**) +
   replays committed doc chunks. `mise run kb-update -- <name>` advances to upstream.
@@ -113,16 +114,19 @@ Deep graphify operational reference: `docs/graphify-reference.md`.
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
 | `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (at aggregate scale 119MB+ exceeds git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
 | `python/` | `kb_setup` (build/update/artifacts/env — thin helpers, zero-bash-logic). |
-| `tests/` | Pytest (`uv run --project python pytest tests/`). |
+| `tests/` | Pytest (`uv run pytest tests/`); config in the root `pyproject.toml`. |
 | `mise.toml` | Tool pins + tasks: `kb-build`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-artifacts`/`kb-ensure-deps`. |
-| `hk.pkl` | Git-hook lint (typos, pkl). |
+| `pyproject.toml` | The ONE python config (repo root): `[project]` + ruff (`select=ALL`) + ty + pytest. `uv run` uses it for `python/src` AND `tests/`. |
+| `hk.pkl` | Git-hook lint: ruff/ty (python), taplo (toml), rumdl (md), gitleaks (secrets), typos, pkl, hygiene + `no-lint-skip`. All logic in `kb_setup` (zero-bash). |
 | `docs/graphify-reference.md` | Expert operational reference for graphify itself. |
 | `.claude/` | graphify skill + project-scoped settings/hooks. |
 
 ## Stack conventions
 
 - **mise-first**: tools pinned in `mise.toml`; use mise binaries, not `npx`.
-- **uv for Python**: `uv run --project python …` (never `--directory`).
+- **uv for Python**: `uv run …` from the repo root (single root `pyproject.toml`).
+- **Zero bash**: no `.sh` scripts, no inline shell in hk.pkl/mise.toml — every check is
+  `kb_setup` python invoked via `uv run kb-setup <cmd>` / a mise task.
 - **hk for hooks**: `mise run lint` (read-only ≡ CI); `mise run fmt` to fix.
 - **Exact pins**: no floating ranges; Renovate-friendly.
 
@@ -131,6 +135,7 @@ Deep graphify operational reference: `docs/graphify-reference.md`.
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
 Rules:
+
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.

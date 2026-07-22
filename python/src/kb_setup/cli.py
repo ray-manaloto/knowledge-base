@@ -71,6 +71,10 @@ def main(argv: list[str] | None = None) -> int:
         from kb_setup import hook_guard
 
         return hook_guard.run()
+    if cmd == "no-lint-skip":
+        from kb_setup import lint_checks
+
+        return lint_checks.no_lint_skip(repo_root)
     if cmd == "ensure-deps":
         from kb_setup.graphify_env import ensure_runtime_deps
 

@@ -1,0 +1,6 @@
+# rumdl (rust markdown linter). Keep the STRUCTURAL rules that catch real defects
+# (blanks around fences/lists, file-end newline, bare URLs); disable the stylistic
+# ones that fight intentional doc conventions here (bold pseudo-headings, code-fence
+# language tags, heading-increment in dense reference docs, line length).
+[global]
+disable = ["MD013", "MD036", "MD040", "MD001", "MD025", "MD049"]
