@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/rmanaloto/.local/share/mise/installs/pipx-graphifyy/0.9.23/bin/graphify hook-guard search"
+            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard search"
           }
         ]
       },
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/rmanaloto/.local/share/mise/installs/pipx-graphifyy/0.9.23/bin/graphify hook-guard read"
+            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard read"
           }
         ]
       }

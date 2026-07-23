@@ -51,6 +51,10 @@ sources/media/*.pdf.txt   # regenerable from the committed .pdf via pypdf
 
 # OS / editor
 .DS_Store
+# Agent session state (OMC HUD etc.) — per-session scratch, never source. dotfiles
+# learned this the hard way (see its do-not.md #5: phantom .omc/state/** files are
+# why bulk `git add .` is banned there); ignore it here rather than repeat that.
+.omc/
 # reflect derived doc (regenerable via `graphify reflect`); memory/ IS tracked (authored)
 graphify-out/reflections/
 # graphify dated backup dirs (redundant with git history)

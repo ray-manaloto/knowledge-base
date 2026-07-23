@@ -20,7 +20,7 @@ typos = "1.48.0"
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.23", extras = ["all"] }
+"pipx:graphifyy" = { version = "0.9.25", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
