@@ -9,6 +9,6 @@
 # graph instead of guessing.
 url = https://github.com/Graphify-Labs/graphify
 ref = v8
-commit = e32c9f431c5ed7ed8c980f6d34dc3fe6c99a389b
+commit = 2fa6cd3d5548577f8c5f591b713f0bf80c1af183
 kind = code
 added = 2026-07-21
