@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# pensyve — universal memory runtime for AI agents; episodic/semantic/procedural memory, MCP-served. Evaluated as an additive layer to graphify.
+url = https://github.com/major7apps/pensyve
+ref = main
+commit = 10b22eb42d652db541b22d563a6fe6e0eeb05736
+kind = code
