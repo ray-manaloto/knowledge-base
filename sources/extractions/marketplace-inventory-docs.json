@@ -1,0 +1,4554 @@
+{
+ "nodes": [
+  {
+   "id": "marketplace_cat_browser",
+   "label": "Browser Automation",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Browser Automation"
+  },
+  {
+   "id": "marketplace_cat_debate",
+   "label": "Debate / Council",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Debate / Council"
+  },
+  {
+   "id": "marketplace_cat_domain",
+   "label": "Domain-Specific",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Domain-Specific"
+  },
+  {
+   "id": "marketplace_cat_graph",
+   "label": "Knowledge Graph",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Knowledge Graph"
+  },
+  {
+   "id": "marketplace_cat_harness",
+   "label": "Harness / Workflow",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Harness / Workflow"
+  },
+  {
+   "id": "marketplace_cat_memory",
+   "label": "Memory",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Memory"
+  },
+  {
+   "id": "marketplace_cat_multi_agent",
+   "label": "Multi-Agent",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Multi-Agent"
+  },
+  {
+   "id": "marketplace_cat_observability",
+   "label": "Observability",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Observability"
+  },
+  {
+   "id": "marketplace_cat_orchestration",
+   "label": "Orchestration",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Orchestration"
+  },
+  {
+   "id": "marketplace_cat_research",
+   "label": "Research",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Research"
+  },
+  {
+   "id": "marketplace_cat_review",
+   "label": "Code Review",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Code Review"
+  },
+  {
+   "id": "marketplace_cat_security",
+   "label": "Security / Governance",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Security / Governance"
+  },
+  {
+   "id": "marketplace_cat_session_handoff",
+   "label": "Session Handoff",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Session Handoff"
+  },
+  {
+   "id": "marketplace_cat_spec_workflow",
+   "label": "Spec-Driven Workflow",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Spec-Driven Workflow"
+  },
+  {
+   "id": "marketplace_cat_task_management",
+   "label": "Task Management",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace category: Task Management"
+  },
+  {
+   "id": "marketplace_16minds",
+   "label": "16minds",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Summons agents modeled on 16 personality types to debate and review"
+  },
+  {
+   "id": "marketplace_8_habit_ai_dev",
+   "label": "8-habit-ai-dev",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Structured 7-step AI dev workflow: Research to Build Brief"
+  },
+  {
+   "id": "marketplace_adversarial_spec",
+   "label": "adversarial-spec",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Refine product specs through multi-model debate until consensus"
+  },
+  {
+   "id": "marketplace_aeon_flux",
+   "label": "aeon-flux",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Bash-loop operating mode for Claude Code: action over explanation"
+  },
+  {
+   "id": "marketplace_ag2_claude_plugins",
+   "label": "ag2-claude-plugins",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace for building AG2 (AutoGen) multi-agent workflows"
+  },
+  {
+   "id": "marketplace_al_development_collection_for_claude_code",
+   "label": "al-development-collection-for-claude-code",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "AI-assisted toolkit for Microsoft Dynamics 365 Business Central"
+  },
+  {
+   "id": "marketplace_aldc_al_development_plugin_for_business_central",
+   "label": "aldc-al-development-plugin-for-business-central",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Business Central extension development toolkit"
+  },
+  {
+   "id": "marketplace_anamnese_core",
+   "label": "anamnese-core",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Secure, portable, cloud-persistent memory across every conversation"
+  },
+  {
+   "id": "marketplace_anti_ai_writing",
+   "label": "anti-ai-writing",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Edits drafts to remove AI-writing tells and banned words"
+  },
+  {
+   "id": "marketplace_aomi_build",
+   "label": "aomi-build",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Build agents hosted by Aomi Labs (Rust API client agentic apps)"
+  },
+  {
+   "id": "marketplace_aomi_transact",
+   "label": "aomi-transact",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Build natural-language crypto/web3 trading agents"
+  },
+  {
+   "id": "marketplace_architecture_studio",
+   "label": "architecture-studio",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Plugin system for architects, designers, AEC professionals"
+  },
+  {
+   "id": "marketplace_atelier",
+   "label": "atelier",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Universal multi-agent project harness discovery to release"
+  },
+  {
+   "id": "marketplace_atelier_pipeline",
+   "label": "atelier-pipeline",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent orchestration with eleven specialized personas"
+  },
+  {
+   "id": "marketplace_attacca",
+   "label": "attacca",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent coding orchestrator: Manager/Engineer/Security"
+  },
+  {
+   "id": "marketplace_audit_project",
+   "label": "audit-project",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent iterative code review until zero issues remain"
+  },
+  {
+   "id": "marketplace_avicenna",
+   "label": "avicenna",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Code knowledge graph MCP: semantic search, symbol/dependency analysis"
+  },
+  {
+   "id": "marketplace_axme_code",
+   "label": "axme-code",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory, architectural decisions, safety guardrails"
+  },
+  {
+   "id": "marketplace_backpack_ontology",
+   "label": "backpack-ontology",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent knowledge graph engine giving structured searchable memory"
+  },
+  {
+   "id": "marketplace_belmont",
+   "label": "belmont",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Structured coding sessions managing a PRD and orchestration"
+  },
+  {
+   "id": "marketplace_blue_collar_governance",
+   "label": "blue-collar-governance",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Deterministic AI governance runtime; 22 JS engines"
+  },
+  {
+   "id": "marketplace_blueprint_sdlc",
+   "label": "blueprint-sdlc",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "27 slash commands turning Claude Code into an engineering team"
+  },
+  {
+   "id": "marketplace_briefing",
+   "label": "briefing",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Subagents declare required skills in frontmatter, loaded first"
+  },
+  {
+   "id": "marketplace_browser_harness",
+   "label": "browser-harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Open-source browser agent driven via CDP for direct control"
+  },
+  {
+   "id": "marketplace_building_multiagent_systems",
+   "label": "building-multiagent-systems",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Architecture patterns for multi-agent orchestrators/sub-agents"
+  },
+  {
+   "id": "marketplace_cc_native",
+   "label": "cc-native",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Keeps Claude Code config aware of weekly feature changes"
+  },
+  {
+   "id": "marketplace_cc_orchestrador_subagents",
+   "label": "cc-orchestrador-subagents",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Turns Claude Code into a technical execution manager of subagents"
+  },
+  {
+   "id": "marketplace_cc10x_router_owned_harness",
+   "label": "cc10x-router-owned-harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Orchestrated skills, subagents, persistent memory"
+  },
+  {
+   "id": "marketplace_challenger",
+   "label": "challenger",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Adversarial plugin stress-testing decisions via challenge rounds"
+  },
+  {
+   "id": "marketplace_chess_coach_ai",
+   "label": "chess-coach-ai",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent chess coaching system with 4 specialized agents"
+  },
+  {
+   "id": "marketplace_chrome_extension_builder",
+   "label": "chrome-extension-builder",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Scaffold/validate/test/publish Manifest V3 browser extensions"
+  },
+  {
+   "id": "marketplace_claude_alloy",
+   "label": "claude-alloy",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent orchestration harness with 11 specialized agents"
+  },
+  {
+   "id": "marketplace_claude_code_survival_kit",
+   "label": "claude-code-survival-kit",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "10 slash commands + 3 agent definitions from daily CC use"
+  },
+  {
+   "id": "marketplace_claude_cognis",
+   "label": "claude-cognis",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory loading relevant context each session"
+  },
+  {
+   "id": "marketplace_claude_context_optimizer",
+   "label": "claude-context-optimizer",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Audit/optimize Claude Code context window usage, 9-phase"
+  },
+  {
+   "id": "marketplace_claude_crew",
+   "label": "claude-crew",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Mobile agent harness with 8 specialist agents for iOS/Android"
+  },
+  {
+   "id": "marketplace_claude_handoff",
+   "label": "claude-handoff",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Auto-generate handoff prompts and restart with fresh context"
+  },
+  {
+   "id": "marketplace_claude_harness",
+   "label": "claude-harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Autonomous Plan-Work-Review cycle with runtime guardrails"
+  },
+  {
+   "id": "marketplace_claude_lens",
+   "label": "claude-lens",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Fast statusline with quota/pace tracking"
+  },
+  {
+   "id": "marketplace_claude_library",
+   "label": "claude-library",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "23 reusable skills, 2 agents, smart hooks for any project"
+  },
+  {
+   "id": "marketplace_claude_mem",
+   "label": "claude-mem",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory system preserving context across sessions"
+  },
+  {
+   "id": "marketplace_claude_perfectionist",
+   "label": "claude-perfectionist",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Audits the Claude Code instruction harness for contradictions"
+  },
+  {
+   "id": "marketplace_claude_project_context_manager",
+   "label": "claude-project-context-manager",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Reads/enforces project architecture documentation"
+  },
+  {
+   "id": "marketplace_claude_review_loop",
+   "label": "claude-review-loop",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Automated code review + swarm remediation for large changesets"
+  },
+  {
+   "id": "marketplace_claude_skills_gov",
+   "label": "claude-skills-gov",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Open-source skills for local government work (68 skills)"
+  },
+  {
+   "id": "marketplace_claude_train_prep",
+   "label": "claude-train-prep",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "AI consulting training material workflow with multi-agent parallelism"
+  },
+  {
+   "id": "marketplace_claude2figma",
+   "label": "claude2figma",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Design System compliance harness for Claude Code + Figma"
+  },
+  {
+   "id": "marketplace_claudetokensap",
+   "label": "claudetokensap",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplace focused on reducing context waste, session efficiency"
+  },
+  {
+   "id": "marketplace_clawket",
+   "label": "clawket",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "LLM-native work management; 10 lifecycle hooks auto-track workflow"
+  },
+  {
+   "id": "marketplace_closedloop",
+   "label": "closedloop",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent software delivery: plan-first SDLC, review, judges"
+  },
+  {
+   "id": "marketplace_cloudplayplus",
+   "label": "cloudplayplus",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Channel plugin bridging Claude Code to a CloudPlayPlus Flutter app"
+  },
+  {
+   "id": "marketplace_cmux_ultimate",
+   "label": "cmux-ultimate",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Complete cmux integration: CLI reference + browser automation"
+  },
+  {
+   "id": "marketplace_co_dialectic",
+   "label": "co-dialectic",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Real-time prompt coaching with persistent status line"
+  },
+  {
+   "id": "marketplace_code_review_harness",
+   "label": "code-review-harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Code review via Generator-Evaluator harness that runs the code"
+  },
+  {
+   "id": "marketplace_codealive",
+   "label": "codealive",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CodeAlive context engine for semantic code search and Q&A"
+  },
+  {
+   "id": "marketplace_codealive_context_engine",
+   "label": "codealive-context-engine",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CodeAlive semantic code search and codebase understanding"
+  },
+  {
+   "id": "marketplace_codeflash",
+   "label": "codeflash",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Background agent auto-optimizing code for performance"
+  },
+  {
+   "id": "marketplace_codesmith",
+   "label": "codesmith",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Enforces spec-to-TDD-to-parallel-multi-agent-review lifecycle"
+  },
+  {
+   "id": "marketplace_colosseum",
+   "label": "colosseum",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Debate arena scoring on accuracy/independence with Devil's Advocate"
+  },
+  {
+   "id": "marketplace_compounded",
+   "label": "compounded",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Turns skills into a trust-gradient system earning autonomy"
+  },
+  {
+   "id": "marketplace_conductor",
+   "label": "conductor",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Orchestrate microservices/business processes with Conductor"
+  },
+  {
+   "id": "marketplace_coremem",
+   "label": "coremem",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory across sessions via structured mems"
+  },
+  {
+   "id": "marketplace_cost_guard",
+   "label": "cost-guard",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Real-time USD cost enforcement halting runaway loops"
+  },
+  {
+   "id": "marketplace_crowdcast",
+   "label": "crowdcast",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent social simulation for prediction and exploration"
+  },
+  {
+   "id": "marketplace_csitrep_generator",
+   "label": "csitrep-generator",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent SitRep generator; 25 specialist agents"
+  },
+  {
+   "id": "marketplace_ddw",
+   "label": "ddw",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Development harness enforcing decisions-before-code discipline"
+  },
+  {
+   "id": "marketplace_debate",
+   "label": "debate",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Structured multi-round debate with proposer/challenger roles"
+  },
+  {
+   "id": "marketplace_decibel_peers",
+   "label": "decibel-peers",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Peer network patterns for agent specialization/messaging"
+  },
+  {
+   "id": "marketplace_decision_council",
+   "label": "decision-council",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "AI advisory panel debating decisions from multiple angles"
+  },
+  {
+   "id": "marketplace_deep_research",
+   "label": "deep-research",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent deep research pipelines: internet, repo, schema"
+  },
+  {
+   "id": "marketplace_deeplake_hivemind",
+   "label": "deeplake-hivemind",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cloud-backed persistent memory capturing all session activity"
+  },
+  {
+   "id": "marketplace_demo_stage",
+   "label": "demo-stage",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Deploy static sites/demos to demo.st from Claude Code"
+  },
+  {
+   "id": "marketplace_dev_forge",
+   "label": "dev-forge",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "SQLite-backed multi-agent dev team with sprint contracts"
+  },
+  {
+   "id": "marketplace_devils_advocate",
+   "label": "devils-advocate",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Devil's advocate agent delivering final critical review"
+  },
+  {
+   "id": "marketplace_dj_claude",
+   "label": "dj-claude",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Live music and multi-agent jam band capabilities"
+  },
+  {
+   "id": "marketplace_drift_detect",
+   "label": "drift-detect",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Repo analysis realigning plans with actual code reality"
+  },
+  {
+   "id": "marketplace_enam",
+   "label": "enam",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory at ~350 tokens ambient cost, no Docker/MCP"
+  },
+  {
+   "id": "marketplace_engram",
+   "label": "engram",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory for agents: semantic recall, consolidation"
+  },
+  {
+   "id": "marketplace_epic_harness",
+   "label": "epic-harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Replaces 30+ commands with 6, auto-triggers/evolves skills"
+  },
+  {
+   "id": "marketplace_ergo",
+   "label": "ergo",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Toolkits for distributed actor-based systems with Ergo (Go)"
+  },
+  {
+   "id": "marketplace_experimental_engineer",
+   "label": "experimental-engineer",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Subagent exploring first-principles solutions to hard problems"
+  },
+  {
+   "id": "marketplace_fde_os",
+   "label": "fde-os",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Makes Claude operate like a Forward Deployed Engineer"
+  },
+  {
+   "id": "marketplace_fellowship",
+   "label": "fellowship",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "LotR-themed multi-agent system; Gandalf orchestrates nine"
+  },
+  {
+   "id": "marketplace_flow",
+   "label": "flow",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Project partner managing your backlog: park/what's-next"
+  },
+  {
+   "id": "marketplace_formal_agent_contracts",
+   "label": "formal-agent-contracts",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Formal methods: inter-agent contracts in VDM-SL, verify with Z3"
+  },
+  {
+   "id": "marketplace_fortytwo_mcp",
+   "label": "fortytwo-mcp",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Collective multi-agent inference for high-stakes questions"
+  },
+  {
+   "id": "marketplace_gambit",
+   "label": "gambit",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Structured PM workflows across the product lifecycle"
+  },
+  {
+   "id": "marketplace_gate_and_ship",
+   "label": "gate-and-ship",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Quality gates then ship; chains prepare-delivery and ship"
+  },
+  {
+   "id": "marketplace_gitkb",
+   "label": "gitkb",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Local code intelligence, persistent knowledge graph, task context"
+  },
+  {
+   "id": "marketplace_goalkeeper",
+   "label": "goalkeeper",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Durable contract-driven goal execution for long-running tasks"
+  },
+  {
+   "id": "marketplace_gr0m_mem",
+   "label": "gr0m-mem",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Zero-install persistent memory brain; four MCP tools"
+  },
+  {
+   "id": "marketplace_graperoot",
+   "label": "graperoot",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Dual-graph code context: structural call graph + dependency graph"
+  },
+  {
+   "id": "marketplace_graph_query_mcp",
+   "label": "graph-query-mcp",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "FastMCP server for surgical queries against a vault knowledge graph"
+  },
+  {
+   "id": "marketplace_groundwork",
+   "label": "groundwork",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Structured dev workflow: requirements to architecture to impl"
+  },
+  {
+   "id": "marketplace_guard",
+   "label": "guard",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "PreToolUse hooks denying dangerous shell/git/credential commands"
+  },
+  {
+   "id": "marketplace_guild",
+   "label": "guild",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Self-evolving team of specialist agents that plans before execution"
+  },
+  {
+   "id": "marketplace_handoffkit",
+   "label": "handoffkit",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Push AI session handoffs to HandoffKit automatically via MCP"
+  },
+  {
+   "id": "marketplace_harness",
+   "label": "harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Decomposes complex tasks into coordinated teams of agents"
+  },
+  {
+   "id": "marketplace_harness_architect",
+   "label": "harness-architect",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Meta-tool scanning a project and building an end-to-end harness"
+  },
+  {
+   "id": "marketplace_harness_boot",
+   "label": "harness-boot",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent dev harness via living specs and specialist agents"
+  },
+  {
+   "id": "marketplace_harness_designing_plugin",
+   "label": "harness-designing-plugin",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Helps design teams unify scattered AI setup into a harness"
+  },
+  {
+   "id": "marketplace_harness_engineering",
+   "label": "harness-engineering",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Bootstrap/audit/evolve a reliable 6-layer agent harness"
+  },
+  {
+   "id": "marketplace_harness_evolver",
+   "label": "harness-evolver",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Autonomous LLM agent optimization via LangSmith and worktrees"
+  },
+  {
+   "id": "marketplace_harness_init",
+   "label": "harness-init",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Makes a repo agent-ready with AGENTS.md, boundary tests, CI"
+  },
+  {
+   "id": "marketplace_harness_kit",
+   "label": "harness-kit",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Engineering framework empowering agents with structured controls"
+  },
+  {
+   "id": "marketplace_harness_sast_and_sca",
+   "label": "harness-sast-and-sca",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Secure AI Coding: real-time SAST/SCA in AI-assisted development"
+  },
+  {
+   "id": "marketplace_harnesskit",
+   "label": "harnesskit",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Adaptive harness detecting stack, applying experience-level guardrails"
+  },
+  {
+   "id": "marketplace_heimdall",
+   "label": "heimdall",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Analyze video files/bug-report screen recordings in Claude Code"
+  },
+  {
+   "id": "marketplace_hipocampus",
+   "label": "hipocampus",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "3-tier hot/warm/cold memory with self-compression"
+  },
+  {
+   "id": "marketplace_hive",
+   "label": "hive",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Bio-inspired swarm orchestrator coordinating agents via stigmergy"
+  },
+  {
+   "id": "marketplace_hivemind",
+   "label": "hivemind",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory, context sync, virtual filesystem, AI wikis"
+  },
+  {
+   "id": "marketplace_ido4specs",
+   "label": "ido4specs",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Bridges a strategic spec to GitHub issues, decomposing tasks"
+  },
+  {
+   "id": "marketplace_indian_consumer_drafting",
+   "label": "indian-consumer-drafting",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Legal drafting for India's Consumer Disputes Commissions"
+  },
+  {
+   "id": "marketplace_infiniteclaud",
+   "label": "infiniteclaud",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Autonomous automation agent with 20 specialized MCP tools"
+  },
+  {
+   "id": "marketplace_ix_memory",
+   "label": "ix-memory",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Connects Claude Code to Ix, a structured persistent memory backend"
+  },
+  {
+   "id": "marketplace_just_ship",
+   "label": "just-ship",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent framework: one ticket triggers a full pipeline"
+  },
+  {
+   "id": "marketplace_karimo_harness_engineering_agent_orchestration",
+   "label": "karimo-harness-engineering-agent-orchestration",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Harness engineering: product-design-driven agent orchestration"
+  },
+  {
+   "id": "marketplace_kindex",
+   "label": "kindex",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent knowledge graph turning Claude project-scoped"
+  },
+  {
+   "id": "marketplace_larch",
+   "label": "larch",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent workflow automation orchestrating the full SDLC"
+  },
+  {
+   "id": "marketplace_launchpad",
+   "label": "launchpad",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Comprehensive agentic coding harness; 38 slash commands"
+  },
+  {
+   "id": "marketplace_lean_kg",
+   "label": "lean-kg",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Lightweight local-first knowledge graph for accurate codebase context"
+  },
+  {
+   "id": "marketplace_learning_planner",
+   "label": "learning-planner",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Long-running learning companion: plan, track, review"
+  },
+  {
+   "id": "marketplace_lightning_tv_expert_plugin",
+   "label": "lightning-tv-expert-plugin",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Lightning TV framework expertise for Smart TV apps"
+  },
+  {
+   "id": "marketplace_lightrun",
+   "label": "lightrun",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Runtime investigation: evidence-first debugging of live apps"
+  },
+  {
+   "id": "marketplace_llm_secure_patterns",
+   "label": "llm-secure-patterns",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Secure design patterns for LLM apps: ingestion, hardening"
+  },
+  {
+   "id": "marketplace_looper_loop",
+   "label": "looper-loop",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Agentic loop where each step is reviewed by another agent"
+  },
+  {
+   "id": "marketplace_loreconvo",
+   "label": "loreconvo",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cross-surface persistent memory across Code, Cowork, Chat"
+  },
+  {
+   "id": "marketplace_magellan",
+   "label": "magellan",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Enterprise knowledge discovery and process repository"
+  },
+  {
+   "id": "marketplace_magician",
+   "label": "magician",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "SDLC plugin taking a task from idea to merged PR autonomously"
+  },
+  {
+   "id": "marketplace_make_documentation",
+   "label": "make-documentation",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Generates/updates technical documentation for GitHub projects"
+  },
+  {
+   "id": "marketplace_marcopolo",
+   "label": "marcopolo",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Data computer connecting databases, warehouses, SaaS"
+  },
+  {
+   "id": "marketplace_mash_multi_agent_software_harness",
+   "label": "mash-multi-agent-software-harness",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-Agent Software Harness managing the full lifecycle"
+  },
+  {
+   "id": "marketplace_meeting_bots",
+   "label": "meeting-bots",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Panel of AI personas debating decisions; 3-10 participants"
+  },
+  {
+   "id": "marketplace_mem0",
+   "label": "mem0",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Connect Mem0 for persistent memory across sessions"
+  },
+  {
+   "id": "marketplace_membase",
+   "label": "membase",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Membase Cloud persistent memory and wiki workflows"
+  },
+  {
+   "id": "marketplace_memento",
+   "label": "memento",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent searchable knowledge surviving every session/device"
+  },
+  {
+   "id": "marketplace_memex_mcp",
+   "label": "memex-mcp",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Temporal knowledge graph of codebase from commits/source"
+  },
+  {
+   "id": "marketplace_meta_harness_ygn",
+   "label": "meta-harness-ygn",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Brings scientific rigor to harness engineering"
+  },
+  {
+   "id": "marketplace_mexus_agent_team",
+   "label": "mexus-agent-team",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Markdown-only Agent Team coordinating via Markdown files"
+  },
+  {
+   "id": "marketplace_mindwright",
+   "label": "mindwright",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent per-agent memory distilling sessions into facts"
+  },
+  {
+   "id": "marketplace_mister_anderson",
+   "label": "mister-anderson",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Beads development: task tracking, review gates, orchestration"
+  },
+  {
+   "id": "marketplace_mmpm_cognitive_os",
+   "label": "mmpm-cognitive-os",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Constitutional multi-agent governance; 16 agents across 4 layers"
+  },
+  {
+   "id": "marketplace_mosaic",
+   "label": "mosaic",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "DCVE planning + Discuss for multi-perspective debate"
+  },
+  {
+   "id": "marketplace_mumei",
+   "label": "mumei",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Quality Enforcement Layer gating spec phases at OS boundary"
+  },
+  {
+   "id": "marketplace_munin_memory",
+   "label": "munin-memory",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Long-term memory system remembering your work"
+  },
+  {
+   "id": "marketplace_neko_gundan",
+   "label": "neko-gundan",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent orchestration as a hierarchical cat team"
+  },
+  {
+   "id": "marketplace_neko_harness_doctor",
+   "label": "neko-harness-doctor",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Diagnoses your harness against 25 anti-patterns"
+  },
+  {
+   "id": "marketplace_nexo_brain",
+   "label": "nexo-brain",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cognitive co-operator: persistent memory, learning, continuity"
+  },
+  {
+   "id": "marketplace_next_task",
+   "label": "next-task",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Autonomous workflow orchestrator across 12 coordinated phases"
+  },
+  {
+   "id": "marketplace_nexus_the_cartographer",
+   "label": "nexus-the-cartographer",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cowork metabrain with knowledge graph and 20 MCP tools"
+  },
+  {
+   "id": "marketplace_notify_sounds",
+   "label": "notify-sounds",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Plays system sounds when a task finishes or needs permission"
+  },
+  {
+   "id": "marketplace_obsidian_knowledge",
+   "label": "obsidian-knowledge",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Self-evolving plugin managing an Obsidian knowledge vault"
+  },
+  {
+   "id": "marketplace_oh_my_forge",
+   "label": "oh-my-forge",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Workflow harness preventing agent mistakes from repeating"
+  },
+  {
+   "id": "marketplace_orchestrator",
+   "label": "orchestrator",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Generates prompts with the right agent and orchestration pattern"
+  },
+  {
+   "id": "marketplace_orchestrator_workflow_plugin",
+   "label": "orchestrator-workflow-plugin",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent framework splitting builds into phases via three roles"
+  },
+  {
+   "id": "marketplace_patristic",
+   "label": "patristic",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Search/cite the Russian Orthodox patristic corpus"
+  },
+  {
+   "id": "marketplace_personal_council",
+   "label": "personal-council",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "5-voice weighted think tank for founders"
+  },
+  {
+   "id": "marketplace_phone_a_friend",
+   "label": "phone-a-friend",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CLI relay letting agents collaborate with other AI backends"
+  },
+  {
+   "id": "marketplace_phone_a_friend_paf",
+   "label": "phone-a-friend-paf",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Lets Claude Code call other AI backends for second opinions"
+  },
+  {
+   "id": "marketplace_pownie",
+   "label": "pownie",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Agent harness for offensive security work"
+  },
+  {
+   "id": "marketplace_pramana",
+   "label": "pramana",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Reference implementation of a semantic layer for AI-assisted SE"
+  },
+  {
+   "id": "marketplace_prd_to_kanban",
+   "label": "prd-to-kanban",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Transfers a PRD to a Kanban doc with dev waves/parallel windows"
+  },
+  {
+   "id": "marketplace_prepare_delivery",
+   "label": "prepare-delivery",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Pre-ship quality gates: deslop, simplify, agnix lint"
+  },
+  {
+   "id": "marketplace_project_pilot",
+   "label": "project-pilot",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory layer capturing architecture decisions"
+  },
+  {
+   "id": "marketplace_project_scaffolder_synaptic_edition",
+   "label": "project-scaffolder-synaptic-edition",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Generate a project KB then orchestrate development"
+  },
+  {
+   "id": "marketplace_pushnotifime_human_in_the_loop",
+   "label": "pushnotifime-human-in-the-loop",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Human-in-the-loop notifications and approvals for agents"
+  },
+  {
+   "id": "marketplace_pydantic_ai",
+   "label": "pydantic-ai",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Accurate Pydantic AI code patterns and gotchas"
+  },
+  {
+   "id": "marketplace_qlik_agents",
+   "label": "qlik-agents",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent development pipeline for Qlik Sense"
+  },
+  {
+   "id": "marketplace_quick_question",
+   "label": "quick-question",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Unity Agent Harness auto-compiling C# and running test pipelines"
+  },
+  {
+   "id": "marketplace_reflect",
+   "label": "reflect",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Session-local metacognition harness for long-running work"
+  },
+  {
+   "id": "marketplace_review_all",
+   "label": "review-all",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Project-agnostic multi-agent code review with verification"
+  },
+  {
+   "id": "marketplace_rpm_relentless_product_manager",
+   "label": "rpm-relentless-product-manager",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persists project state and prevents documentation drift"
+  },
+  {
+   "id": "marketplace_sabha_os",
+   "label": "sabha-os",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Local-first AI council: 9 C-suite roles in the Chanakya tradition"
+  },
+  {
+   "id": "marketplace_scaffold",
+   "label": "scaffold",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Framework with persistent memory backed by Obsidian"
+  },
+  {
+   "id": "marketplace_sciqlab_supply_chain",
+   "label": "sciqlab-supply-chain",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Three AI agents for supply chain operations and S&OP"
+  },
+  {
+   "id": "marketplace_self_improving_agent_pipeline",
+   "label": "self-improving-agent-pipeline",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Pipeline of skills implementing two feedback loops"
+  },
+  {
+   "id": "marketplace_session_handoff",
+   "label": "session-handoff",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Hand off an in-flight task from one AI tool to another"
+  },
+  {
+   "id": "marketplace_session_orchestrator",
+   "label": "session-orchestrator",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Session-level orchestration into 5 typed waves"
+  },
+  {
+   "id": "marketplace_shipwright",
+   "label": "shipwright",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A la carte toolkit: best practices, memory, agent-team planning"
+  },
+  {
+   "id": "marketplace_shipwright_brain",
+   "label": "shipwright-brain",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory via markdown files, no database"
+  },
+  {
+   "id": "marketplace_shipyard",
+   "label": "shipyard",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Runs Claude Code through a spec-driven agile sprint lifecycle"
+  },
+  {
+   "id": "marketplace_simple_workflow",
+   "label": "simple-workflow",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Dev lifecycle with ticket management and Generator-Evaluator"
+  },
+  {
+   "id": "marketplace_sindri",
+   "label": "sindri",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Turns a one-line goal into an autonomous overnight experiment loop"
+  },
+  {
+   "id": "marketplace_skill_picker",
+   "label": "skill-picker",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Compare AI coding skills head-to-head via controlled A/B tests"
+  },
+  {
+   "id": "marketplace_spec_engine",
+   "label": "spec-engine",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Spec-driven engine turning specs into code via wave-based agents"
+  },
+  {
+   "id": "marketplace_stackpilot",
+   "label": "stackpilot",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sprint orchestration: design-spec-plan-code-QA pipeline"
+  },
+  {
+   "id": "marketplace_stash",
+   "label": "stash",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent cloud memory surviving beyond a single session"
+  },
+  {
+   "id": "marketplace_strands_sdk",
+   "label": "strands-sdk",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Strands-agents SDK reference: A2A, swarms, agents-as-tools"
+  },
+  {
+   "id": "marketplace_strategy_consultant",
+   "label": "strategy-consultant",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Runs a full strategy consulting engagement end-to-end"
+  },
+  {
+   "id": "marketplace_superfast",
+   "label": "superfast",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Keeps a coding agent building exactly what you want, fast"
+  },
+  {
+   "id": "marketplace_superpipelines",
+   "label": "superpipelines",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent pipelines with write/review isolation, crash-safe"
+  },
+  {
+   "id": "marketplace_superpowers",
+   "label": "superpowers",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Coding-agent skill layer engaging from the moment you build"
+  },
+  {
+   "id": "marketplace_sym_mesh_channel",
+   "label": "sym-mesh-channel",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Real-time Claude-to-Claude mesh peer communication"
+  },
+  {
+   "id": "marketplace_tdd_evolutionary_loop",
+   "label": "tdd-evolutionary-loop",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "TDD cycle with two parallel coders and a devil's advocate"
+  },
+  {
+   "id": "marketplace_techknowmad_ai_skills",
+   "label": "techknowmad-ai-skills",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "20 enterprise skills for autonomous AI/ML research lab ops"
+  },
+  {
+   "id": "marketplace_the_courtroom",
+   "label": "the-courtroom",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cross-model deliberation: Claude proposes, Codex cross-examines"
+  },
+  {
+   "id": "marketplace_three_pillars",
+   "label": "three-pillars",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Design-first pipelines, multi-persona deliberation, continuity"
+  },
+  {
+   "id": "marketplace_tianluo",
+   "label": "tianluo",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Methodology for multi-hour to multi-day autonomous tasks"
+  },
+  {
+   "id": "marketplace_tradememory",
+   "label": "tradememory",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent memory + strategy evolution for AI traders"
+  },
+  {
+   "id": "marketplace_train_prep",
+   "label": "train-prep",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Prepare AI consulting training materials for any industry"
+  },
+  {
+   "id": "marketplace_trinity",
+   "label": "trinity",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Three-agent harness turning a requirement into a reviewed PR"
+  },
+  {
+   "id": "marketplace_twining",
+   "label": "twining",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Agent coordination: shared blackboard, decision tracking"
+  },
+  {
+   "id": "marketplace_tycono",
+   "label": "tycono",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "AI team orchestration: CTO/Engineer roles instead of one AI"
+  },
+  {
+   "id": "marketplace_understand_anything",
+   "label": "understand-anything",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent pipeline building a knowledge graph of every file"
+  },
+  {
+   "id": "marketplace_using_cmux",
+   "label": "using-cmux",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Teaches the agent to operate cmux, an agent-integrated multiplexer"
+  },
+  {
+   "id": "marketplace_vector_md_context_injector",
+   "label": "vector-md-context-injector",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Hooks auto-injecting sub-tree scoped context files on read"
+  },
+  {
+   "id": "marketplace_velixar",
+   "label": "velixar",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cognitive memory system with knowledge graph and contradiction detection"
+  },
+  {
+   "id": "marketplace_versori_skills",
+   "label": "versori-skills",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Create/build/deploy/monitor production-grade data integrations"
+  },
+  {
+   "id": "marketplace_vibe_flow",
+   "label": "vibe-flow",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Orchestration skills for Vibe Kanban: multi-agent waves"
+  },
+  {
+   "id": "marketplace_vibe_test",
+   "label": "vibe-test",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Test coverage for vibe-coded apps classified by risk"
+  },
+  {
+   "id": "marketplace_waterfall",
+   "label": "waterfall",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent Specification-Driven Development framework"
+  },
+  {
+   "id": "marketplace_wave_planner",
+   "label": "wave-planner",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Transform issues into execution-ready plans with risk prediction"
+  },
+  {
+   "id": "marketplace_waves_exovian",
+   "label": "waves-exovian",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Product dev framework turning ideas into software via artifacts"
+  },
+  {
+   "id": "marketplace_web_ctl",
+   "label": "web-ctl",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Browser automation toolkit: navigate, authenticate, interact"
+  },
+  {
+   "id": "marketplace_wicked_garden",
+   "label": "wicked-garden",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "AI-Native SDLC: 14 domains, 80 specialist agents, 152 skills"
+  },
+  {
+   "id": "marketplace_wiq",
+   "label": "wiq",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Bardeen wiq: workflow automation with multi-agent orchestration"
+  },
+  {
+   "id": "marketplace_wmux_orchestrator",
+   "label": "wmux-orchestrator",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Decomposes tasks into parallel Claude Code agents"
+  },
+  {
+   "id": "marketplace_wrightward",
+   "label": "wrightward",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multi-agent coordination blocking conflicting writes across sessions"
+  },
+  {
+   "id": "marketplace_writ",
+   "label": "writ",
+   "file_type": "concept",
+   "source_file": "marketplace-235-relevant.txt",
+   "source_url": "https://github.com/anthropics/claude-plugins-community",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Hybrid RAG rule retrieval: BM25 + vector + graph traversal"
+  }
+ ],
+ "edges": [
+  {
+   "source": "marketplace_16minds",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_8_habit_ai_dev",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_adversarial_spec",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_aeon_flux",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_ag2_claude_plugins",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_al_development_collection_for_claude_code",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_aldc_al_development_plugin_for_business_central",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_anamnese_core",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_anti_ai_writing",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_aomi_build",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_aomi_transact",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_architecture_studio",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_atelier",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_atelier_pipeline",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_attacca",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_audit_project",
+   "target": "marketplace_cat_review",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_avicenna",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_axme_code",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_backpack_ontology",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_belmont",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_blue_collar_governance",
+   "target": "marketplace_cat_security",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_blueprint_sdlc",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_briefing",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_browser_harness",
+   "target": "marketplace_cat_browser",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_building_multiagent_systems",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_cc_native",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_cc_orchestrador_subagents",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_cc10x_router_owned_harness",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_challenger",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_chess_coach_ai",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_chrome_extension_builder",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_alloy",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_code_survival_kit",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_cognis",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_context_optimizer",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_crew",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_handoff",
+   "target": "marketplace_cat_session_handoff",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_harness",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_lens",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_library",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_mem",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_perfectionist",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_project_context_manager",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_review_loop",
+   "target": "marketplace_cat_review",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_skills_gov",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude_train_prep",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claude2figma",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_claudetokensap",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_clawket",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_closedloop",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_cloudplayplus",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_cmux_ultimate",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_co_dialectic",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_code_review_harness",
+   "target": "marketplace_cat_review",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_codealive",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_codealive_context_engine",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_codeflash",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_codesmith",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_colosseum",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_compounded",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_conductor",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_coremem",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_cost_guard",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_crowdcast",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_csitrep_generator",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_ddw",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_debate",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_decibel_peers",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_decision_council",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_deep_research",
+   "target": "marketplace_cat_research",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_deeplake_hivemind",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_demo_stage",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_dev_forge",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_devils_advocate",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_dj_claude",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_drift_detect",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_enam",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_engram",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_epic_harness",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_ergo",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_experimental_engineer",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_fde_os",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_fellowship",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_flow",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_formal_agent_contracts",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_fortytwo_mcp",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_gambit",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_gate_and_ship",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_gitkb",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_goalkeeper",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_gr0m_mem",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_graperoot",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_graph_query_mcp",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_groundwork",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_guard",
+   "target": "marketplace_cat_security",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_guild",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_handoffkit",
+   "target": "marketplace_cat_session_handoff",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_architect",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_boot",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_designing_plugin",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_engineering",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_evolver",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_init",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_kit",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harness_sast_and_sca",
+   "target": "marketplace_cat_security",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_harnesskit",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_heimdall",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_hipocampus",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_hive",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_hivemind",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_ido4specs",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_indian_consumer_drafting",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_infiniteclaud",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_ix_memory",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_just_ship",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_karimo_harness_engineering_agent_orchestration",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_kindex",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_larch",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_launchpad",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_lean_kg",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_learning_planner",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_lightning_tv_expert_plugin",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_lightrun",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_llm_secure_patterns",
+   "target": "marketplace_cat_security",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_looper_loop",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_loreconvo",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_magellan",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_magician",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_make_documentation",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_marcopolo",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mash_multi_agent_software_harness",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_meeting_bots",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mem0",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_membase",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_memento",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_memex_mcp",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_meta_harness_ygn",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mexus_agent_team",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mindwright",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mister_anderson",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mmpm_cognitive_os",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mosaic",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_mumei",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_munin_memory",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_neko_gundan",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_neko_harness_doctor",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_nexo_brain",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_next_task",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_nexus_the_cartographer",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_notify_sounds",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_obsidian_knowledge",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_oh_my_forge",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_orchestrator",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_orchestrator_workflow_plugin",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_patristic",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_personal_council",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_phone_a_friend",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_phone_a_friend_paf",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_pownie",
+   "target": "marketplace_cat_security",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_pramana",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_prd_to_kanban",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_prepare_delivery",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_project_pilot",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_project_scaffolder_synaptic_edition",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_pushnotifime_human_in_the_loop",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_pydantic_ai",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_qlik_agents",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_quick_question",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_reflect",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_review_all",
+   "target": "marketplace_cat_review",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_rpm_relentless_product_manager",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_sabha_os",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_scaffold",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_sciqlab_supply_chain",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_self_improving_agent_pipeline",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_session_handoff",
+   "target": "marketplace_cat_session_handoff",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_session_orchestrator",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_shipwright",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_shipwright_brain",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_shipyard",
+   "target": "marketplace_cat_spec_workflow",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_simple_workflow",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_sindri",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_skill_picker",
+   "target": "marketplace_cat_observability",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_spec_engine",
+   "target": "marketplace_cat_spec_workflow",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_stackpilot",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_stash",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_strands_sdk",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_strategy_consultant",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_superfast",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_superpipelines",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_superpowers",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_sym_mesh_channel",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_tdd_evolutionary_loop",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_techknowmad_ai_skills",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_the_courtroom",
+   "target": "marketplace_cat_debate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_three_pillars",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_tianluo",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_tradememory",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_train_prep",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_trinity",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_twining",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_tycono",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_understand_anything",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_using_cmux",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_vector_md_context_injector",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_velixar",
+   "target": "marketplace_cat_memory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_versori_skills",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_vibe_flow",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_vibe_test",
+   "target": "marketplace_cat_domain",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_waterfall",
+   "target": "marketplace_cat_spec_workflow",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_wave_planner",
+   "target": "marketplace_cat_task_management",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_waves_exovian",
+   "target": "marketplace_cat_harness",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_web_ctl",
+   "target": "marketplace_cat_browser",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_wicked_garden",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_wiq",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_wmux_orchestrator",
+   "target": "marketplace_cat_orchestration",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_wrightward",
+   "target": "marketplace_cat_multi_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  },
+  {
+   "source": "marketplace_writ",
+   "target": "marketplace_cat_graph",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "marketplace-235-relevant.txt",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [],
+ "input_tokens": 0,
+ "output_tokens": 0
+}

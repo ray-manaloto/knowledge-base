@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# claude-code-memory-setup — vault template + chat-import; second-brain prior art (T1).
+url = https://github.com/lucasrosati/claude-code-memory-setup
+ref = main
+commit = c5f2e0b5465b66699f4ffcb108afee70d2cdf87b
+kind = code
+added = 2026-07-23

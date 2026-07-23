@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# basic-memory — read-through + MCP memory patterns; markdown knowledge substrate (T1).
+url = https://github.com/basicmachines-co/basic-memory
+ref = main
+commit = d3b716305963e654e01f3cbbc63ed136a0095a97
+kind = code
+added = 2026-07-23

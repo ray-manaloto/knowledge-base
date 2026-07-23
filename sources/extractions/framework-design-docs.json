@@ -1,0 +1,2821 @@
+{
+ "nodes": [
+  {
+   "id": "autonomous_bible_vision",
+   "label": "Autonomous execution vision",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Run fully autonomous execution of well-specified tickets end-to-end, with all agents standing on graphify as a shared, self-improving knowledge substrate, and the human pulled in only for genuine decisions they cannot resolve after research."
+  },
+  {
+   "id": "autonomous_bible_foundation_first_sequencing",
+   "label": "Foundation-first sequencing decision",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "DECISION: build the graphify Phase 0 substrate first while cross-cutting research (Tracks A and B) runs in parallel; then build the knowledge layer, specialists, and orchestrator on the finished substrate, with a /to-spec PRD per buildable component after research."
+  },
+  {
+   "id": "autonomous_bible_program_vs_prd",
+   "label": "Program plan vs per-component PRD",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "This document is the program roadmap (a plan), NOT a single PRD; per the repo's plan-vs-spec split each buildable component gets its own /to-spec PRD -> ready-for-agent tickets that the orchestrator eventually runs. Spec-authoring (/to-spec, /to-tickets, /grilling) stays human."
+  },
+  {
+   "id": "autonomous_bible_graphify_foundation",
+   "label": "Component 1: graphify Phase 0 foundation",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The substrate is graphify Phase 0 (T3 guarded refresh + doc-guard, T4 gated real tests, T5 wiring contract, T6 docs, T7 dogfood build), tickets #314-#318."
+  },
+  {
+   "id": "autonomous_bible_knowledge_layer",
+   "label": "Component 2: knowledge layer (graphify-first)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "All agents query graphify FIRST, with precedence over web for STABLE knowledge; volatile facts (tool versions) still hit the live source via tool-currency. A miss means answer now plus queue the finding with provenance for a gated batched update."
+  },
+  {
+   "id": "autonomous_bible_specialists",
+   "label": "Component 3: per-tool specialist agents",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Per-tool god-node agents (docker, mise, hk, uv, ruff, python, github-actions, gh-cli, claude-code, graphite, ...), each anchored on graphify god nodes plus the tool's live docs."
+  },
+  {
+   "id": "autonomous_bible_orchestrator",
+   "label": "Component 4: orchestrator loop",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A batch-per-DAG autonomous loop (proven on graphify #312-#318) graduating to a standing ready-for-agent puller. Mac-local because ship/land are Mac-pinned; carries escalation channels plus observability."
+  },
+  {
+   "id": "autonomous_bible_autonomy_scope",
+   "label": "Autonomy scope policy",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #1 and #6: execute well-specified ready-for-agent tickets end-to-end and escalate only on genuine decisions; only well-specified tickets are in scope, spec-authoring stays human."
+  },
+  {
+   "id": "autonomous_bible_merge_boundary",
+   "label": "Auto-merge-on-green merge boundary",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #2: auto-merge on green and review after, trusting the CI gate coverage rather than a human pre-merge review."
+  },
+  {
+   "id": "autonomous_bible_fork_policy",
+   "label": "Fork-resolution policy",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #3: on a fork pick the documented default and log it; escalate to the human only if the choice is costly-to-reverse, spends money, or the spec/research cannot settle it."
+  },
+  {
+   "id": "autonomous_bible_surprise_crosscheck",
+   "label": "Surprise cross-check policy",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #4: a surprise mandates a cross-check; the agent self-corrects its OWN assumptions but escalates SPEC conflicts or probe disagreement to the human."
+  },
+  {
+   "id": "autonomous_bible_failure_handling",
+   "label": "Fail-stop vs park-and-continue failure handling",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #7: fail-stop the batch on an unfixable red gate (respecting zero-skip / verify-before-advancing); park-and-continue on other unblocked tickets when a pending question blocks one."
+  },
+  {
+   "id": "autonomous_bible_escalation_channels",
+   "label": "Multi-channel escalation fan-out",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #8: escalations fan out to GitHub issues, GitHub Discussions, Slack, Discord (a new server), and channels — with native two-way permission relay so the human can approve from Slack/Discord."
+  },
+  {
+   "id": "autonomous_bible_observability_event_stream",
+   "label": "Curated per-agent event stream observability",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #9: a curated timestamped per-agent EVENT stream (findings/decisions/escalations/gates) writes to .omc/logs/ plus a channel mirror, with the raw Claude Code transcript as the drill-down backing store."
+  },
+  {
+   "id": "autonomous_bible_writeback_gated",
+   "label": "Gated provenanced write-back",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #11: knowledge write-back is queued, gated, and provenanced — never inline or auto — draining the queue on Ray's cadence (respects #310 US9, no auto-hook build)."
+  },
+  {
+   "id": "autonomous_bible_provenance_confidence",
+   "label": "Provenance + confidence anti-poisoning",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Provenance (source, agent, timestamp, confidence) plus confidence labels prevent knowledge poisoning: web/informal sources carry lower confidence per research-doc-sources. Poisoning is mitigated by provenance/confidence, not eliminated."
+  },
+  {
+   "id": "autonomous_bible_prior_art_gate",
+   "label": "Prior-art gate before building",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked policy #12: research existing graphify usage and adjacent tools BEFORE building the knowledge layer (use-tool-builtins), to adopt/extend rather than reinvent."
+  },
+  {
+   "id": "autonomous_bible_kb_search_readthrough",
+   "label": "Read-through routing seam (G4)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Gap G4: the read-through routing seam that makes agents query graphify first. It needs an always-on project .claude/ rule telling agents to consult graphify before web (issue #749, Disc #921), and must handle the 0.9.16 source_file relative->basename flip (#1941) as a path-stability gotcha."
+  },
+  {
+   "id": "autonomous_bible_staleness_scorer_g1",
+   "label": "Age-based staleness scorer (G1)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Gap G1: age-based staleness SCORING. graphify stores captured_at but never scores it, so stale nodes (e.g. #2051: 1,444 nodes for deleted files, including deleted SECURITY files, returned as authoritative) leak through. Must be QUERY-TIME; borrow Graphiti's pattern, not its infra — build age-scoring on graphify."
+  },
+  {
+   "id": "autonomous_bible_g2_lightweight_append",
+   "label": "Lightweight single-fact append (G2)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Gap G2: an optional lightweight single-fact append path. Native provenance via graphify's add --author/--contributor maps to G2 (and graphify's own save-result/reflect agent-memory overlay may shrink it), but that provenance workflow is UNVERIFIED in practice (schema-only per llm.py:437) so it must be re-verified before relying on it."
+  },
+  {
+   "id": "autonomous_bible_g3_expert_view",
+   "label": "Per-tool expert-view selection layer (G3)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Gap G3: a per-tool expert-view selection layer, needed because graphify has no first-class per-domain god-node views (only an MCP god_nodes tool + GRAPH_REPORT.md). Feeds the per-tool specialist agents."
+  },
+  {
+   "id": "autonomous_bible_build_on_graphify_verdict",
+   "label": "Build-on-graphify (hybrid) verdict",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "use-tool-builtins VERDICT: BUILD ON graphify (hybrid); do NOT adopt a graph-DB memory service. graphify already ships ~70% of the needed primitives (provenance/confidence/citation); the only new engine work is the four gaps G1-G4. Confidence HIGH on facts, MEDIUM on adopt/no-adopt."
+  },
+  {
+   "id": "autonomous_bible_reject_graphdb_memory",
+   "label": "Rejected graph-DB memory services",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Graphiti/Zep alone beats graphify on bi-temporal invalidation but needs Neo4j + a resident server (violates host-only); mem0/cognee are heavier (Qdrant/Postgres); Letta is not a fit; GraphRAG is offline. Adopting Graphiti for staleness = a 2nd LLM-fed store + pay-twice re-ingest, disproportionate to a captured_at post-filter. No GA non-deprecated embedded Graphiti exists today."
+  },
+  {
+   "id": "autonomous_bible_graphify_maturity_risk",
+   "label": "graphify maturity / bus-factor risk",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "graphify is not abandoned (91,451 stars, YC S26, ~daily releases) but is pre-1.0 with effectively ONE maintainer and schema churn across patches. Risk = MEDIUM, well-mitigated: pin 0.9.20, host-only/removable, own the portable NetworkX JSON, thin skill coupling. BUILD ON graphify CONFIRMED."
+  },
+  {
+   "id": "autonomous_bible_ast_solid_semantic_risky",
+   "label": "AST solid, semantic-doc-ingestion risky",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "graphify extract . --code-only (local AST) is 0-token, maintainer-endorsed, and solid — the bet. Semantic doc ingestion is RISKY: file-count chunking crashes ~35% of chunks past the 64k cap (#1758), 53% of docs lost even with gpt-5 (#1890), AST and semantic layers largely disconnected (#198). Net: validate semantic enrichment on our own corpus first; don't bet the KB on it."
+  },
+  {
+   "id": "autonomous_bible_no_auto_hook",
+   "label": "No auto-hook graphify build (US9)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The gated/manual-build decision and forbidding graphify hook install / --watch is validated by a real user hitting CPU/swap exhaustion (load 12+) after wiring graphify update into PostToolUse/Stop hooks. We deliberately diverge from graphify's recommendation to commit graphify-out/ and hook install — project-only, gated, wiki-only."
+  },
+  {
+   "id": "autonomous_bible_single_writer_sqlite",
+   "label": "SQLite single-writer queue + state (infra rec)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Recommendation: SQLite (WAL) + an atomic-claim/lease table (or a file/dir queue for inspectability) for queue+state, plus native harness primitives (Routines/schedule, /loop, background tasks, SessionEnd/Stop hooks) for scheduling — NO daemon. Truest 'write only your logic' and consistent with host-only."
+  },
+  {
+   "id": "autonomous_bible_postgres_flip_point",
+   "label": "Postgres consolidation flip point",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Postgres is justified ONLY when the control plane must be shared across >1 machine OR a concurrent worker pool contends on one queue (dozens+ claims/sec) — a coordination threshold, not a data-size one. In a container (not host-only) Postgres-as-agent-backbone becomes attractive; below the threshold SQLite fits and Postgres is weight without payoff."
+  },
+  {
+   "id": "autonomous_bible_dbos_bridge",
+   "label": "DBOS Transact backend-agnostic bridge",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "REVISED axis: not SQLite vs Postgres but CONSOLIDATION vs MINIMALISM, bridged by DBOS Transact (durable @workflow/queues/scheduling, backend-agnostic across Postgres OR SQLite with the same code). Start DBOS-on-SQLite (host, zero-server) -> graduate to DBOS-on-containerized-Postgres when many-specialist-agents/observability/vector-memory earns consolidation, no rewrite. graphify stays the KG substrate; Postgres would be control-plane state only. DECISION PENDING."
+  },
+  {
+   "id": "autonomous_bible_iceoryx_out",
+   "label": "iceoryx ruled out for control plane",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "iceoryx is OUT for the control plane: it is non-durable (volatile shared memory, no reboot persistence — the one thing we need) and its network tier carries only pub-sub/event, not request-response/blackboard cross-host. It remains a deferred candidate only for a future co-located zero-copy data tier; Zenoh is the cross-machine bus if we go multi-machine."
+  },
+  {
+   "id": "autonomous_bible_zero_cost_ingestion",
+   "label": "Zero-cost local ingestion",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "$0 ingestion is real: graphify --backend ollama (Ollama 0.19+ MLX-powered on Apple Silicon, qwen3:14b, JSON-schema constrained) uses zero Claude tokens; fallbacks are free NIM and Gemini free tier. Caveat: free non-Claude backends are less ready than hoped — OpenAI-compat base-URL is an open issue (#959/#981/#723) so NIM/vLLM/local may not work yet; Ollama is wired but buggy."
+  },
+  {
+   "id": "autonomous_bible_verify_gate_guardrail",
+   "label": "Verify-gate as the load-bearing guardrail",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cheap-model quality comes from the VERIFICATION LOOP, not the model. We already own the oracle (mise run lint / pytest / verify run): the cheap worker writes, our gate judges, self-repair caps at ~3 iterations. The objective verify-gate is the one load-bearing guardrail, and guardrail intensity is inversely proportional to worker capability."
+  },
+  {
+   "id": "autonomous_bible_rag_graph_into_workers",
+   "label": "RAG the graphify graph into workers",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Highest-leverage synergy: RAG the graphify graph INTO workers so the graphify investment pays off as cheap source-cited context instead of workers re-reading files and burning tokens."
+  },
+  {
+   "id": "autonomous_bible_litellm_routing_seam",
+   "label": "LiteLLM routing seam",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Routing seam to build: LiteLLM fronts both graphify's OpenAI backend and Claude Code's Anthropic endpoint (ANTHROPIC_BASE_URL) so one config routes graphify + Claude Code + subagents. Rules cascade first, learned router later, plus embedding-dedup and confidence-gated escalation in front of graphify."
+  },
+  {
+   "id": "autonomous_bible_provider_ladder",
+   "label": "Cost-tiered provider ladder",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Provider ladder: local Ollama+MLX ($0 default) -> free NIM (stronger fallback) -> Gemini free (third) -> Claude for orchestration/synthesis ONLY. Codex codex exec is scriptable but subscription-priced; Antigravity absorbed Gemini CLI (2026-06-18)."
+  },
+  {
+   "id": "autonomous_bible_orchestrator_dispatch_seams",
+   "label": "Cross-vendor dispatch seams (A and B)",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The Agent-SDK model override is Claude-only (no per-subagent provider field), so a Claude orchestrator fans out only Claude subagents (Seam A). The cross-vendor path is a Bash shell-out (codex exec, gemini, graphify --backend, LiteLLM CLI) wrapped in a completion-contract launcher (Seam B). ANTHROPIC_BASE_URL is session-wide so it cannot express strong-orch + cheap-worker."
+  },
+  {
+   "id": "autonomous_bible_lane_supervisor",
+   "label": "Launcher-wrapped shell-out with completion contract",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Orchestration substrate DECISION: a launcher-wrapped codex exec / CLI shell-out that carries hang/fake-success rails and fits our governance — NOT the codex-plugin-cc plugin (Codex-only, watchdog-less) and NOT LiteLLM/ccr (session-wide, cannot split roles). A machine completion contract (STATUS: + wall/stall watchdog) ensures autonomy cannot hang or fake success. Cherry-pick warm broker, background-job ledger, and a bounded Stop-hook review gate."
+  },
+  {
+   "id": "autonomous_bible_fable_architect_only",
+   "label": "Strong model = architect only",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Orchestrator shape (fable-orchestrator, read from source): the strong model is ARCHITECT ONLY (never types), enforced by a PreToolUse deny-hook no-touch list; cheap workers get a five-part spec contract (zero shared context) and return compressed report shapes, with an external ledger for state across compaction."
+  },
+  {
+   "id": "autonomous_bible_reject_leaked_fable_prompt",
+   "label": "Reject leaked Fable prompt, adopt procedure",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "SETTLED: the leaked ~1,585-line Fable 5 prompt is the Claude product harness (tool schemas/artifacts), not an orchestrator mode; its intelligence gain is 'actually zero' -> REJECT the leaked prompt. ADOPT the procedure patterns instead: pre-read routine, VERIFIED/REASONED/ASSUMED evidence labels, hypothesis-before-fix, ordered verification. A prompt transfers workflow/format, not Fable's trained long-horizon autonomy."
+  },
+  {
+   "id": "autonomous_bible_orchestrator_recommendation",
+   "label": "Orchestrator recommendation",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Orchestrator REC: Fable 5 at effort high, token-thin, thin prompt from PUBLIC Fable snippets (not the leak); Opus 4.8 as refusal-fallback and cheaper-orch option; doctrine as an on-demand skill; the five-part spec is the only worker interface; workers guarded by deny-hook + constrained output + completion-contract launcher + verify-gate."
+  },
+  {
+   "id": "autonomous_bible_native_autonomy_primitives",
+   "label": "CC autonomy is mostly native",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Track A verdict: the unattended-but-escalating loop is MOSTLY NATIVE in Claude Code — auto mode + autoMode.environment, the defer hook decision (park->exit->resume), channels with two-way permission relay, /goal (work-until-condition), Routines, headless -p, session fork/resume, /fork and /subtask (both real; /subfork not). BUILD = orchestrator glue only (ticket->session map, DAG frontier, cost tracking)."
+  },
+  {
+   "id": "autonomous_bible_discord_skip",
+   "label": "Skip Discord mining",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Discord: SKIP mining. The official plugin is messaging not mining (bot API has no search, <=100 msg lookback); the only mining plugin needs a graphify admin bot or a ToS-risky user-token self-bot, and GitHub mining already covered the substance."
+  },
+  {
+   "id": "autonomous_bible_residual_risks",
+   "label": "Consciously-held residual risks",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Residual risks held consciously: a chain of subtly-wrong-but-green auto-merges is caught only post-hoc (event stream + review + git revert), not per-merge; Mac-local only (Cloud Routines cannot run the sync-full/ship gate); channels + observability are a real build surface separate from the core loop; knowledge poisoning is mitigated by provenance/confidence, not eliminated."
+  },
+  {
+   "id": "autonomous_bible_prior_art_in_repo",
+   "label": "In-repo prior art to reuse",
+   "file_type": "concept",
+   "source_file": "autonomous-execution-program-20260719.md",
+   "source_url": "local://dotfiles/.omc/plans/plan-20260719-autonomous-execution-program.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Do NOT reinvent existing in-repo mechanisms: agent-report-persistence + .omc/research/** (verbatim reports), notepad-enforcement, CC transcripts (per-session JSONL), command_audit/hook_guard (self-learning loop), tool-currency (staleness), research-doc-sources (the doc chain graphify-first prepends to), md_budget/agnix (doc linting)."
+  },
+  {
+   "id": "framework_plan_core_invariant_kb_only_search",
+   "label": "Core invariant: KB is the only search surface",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The single hardest invariant of the framework: agents have NO direct web access; every research lookup goes through one tool, kb_search(question). Consequence: no fact reaches an agent without being captured into the graph, so the KB compounds on every external lookup through one network-egress point (the library)."
+  },
+  {
+   "id": "framework_plan_kb_search_read_through",
+   "label": "kb_search read-through proxy",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The centerpiece component. kb_search queries graphify (staleness-scored) and on a hit returns the cited subgraph; on a miss/stale it does the web search (the only component with web egress), fetches, host-agent-extracts, ingests via kb-merge under the single-writer lock, then returns the freshly-ingested cited result. Every miss compounds the graph."
+  },
+  {
+   "id": "framework_plan_kb_search_two_tier_split",
+   "label": "kb_search two-tier split (R1)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review blocker R1: kb_search must split into a READ tier (deterministic kb-query, staleness-scored, 0-token, safe to hand any lane) and an INGEST tier. The miss-leg (web->fetch->host-agent-extract->kb-merge) is a Claude Task/Workflow step, not pure Python, so it cannot run inside a codex/antigravity lane; a miss enqueues an ingest job the Claude architect drains out-of-band."
+  },
+  {
+   "id": "framework_plan_eventually_synchronous_capture",
+   "label": "Eventually-synchronous capture",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Per review R1, the invariant softens from 'captured by construction' to 'eventually-captured': no research escapes the graph, but capture happens asynchronously because the miss-leg's host-agent extraction is a Claude step drained out-of-band, not runnable synchronously inside a lane."
+  },
+  {
+   "id": "framework_plan_g1_staleness_scorer",
+   "label": "G1 staleness scorer",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Build-first safety prerequisite (kb_setup/staleness.py). Scores kb-query result nodes by age and confidence and demotes stale/low-confidence nodes at query time, because graphify stores these fields but never scores them (#2051: stale nodes returned authoritative). Wired into kb-query as a default-on scored mode for the loop."
+  },
+  {
+   "id": "framework_plan_g1_rescope_r3",
+   "label": "G1 re-scope: confidence is not a truth signal (R3)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review blocker R3: graphify confidence is edge-only and captured_at is null on the free AST layer; worse, EXTRACTED=1.0 (verbatim web copy) scores HIGHEST, so naive G1 rewards the poisoning path. Fix: score real fields (captured_at where host-extraction set it, git/source mtime for age, node verification='unverified' as the low-confidence signal), control-armed on a real AST node with no captured_at."
+  },
+  {
+   "id": "framework_plan_single_writer_lock",
+   "label": "Single-writer graph lock (G2)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Build-first correctness prerequisite. graph.json merge is the ONE operation with a lost-update risk (kb-merge / full-build export have no flock; only update/watch self-lock via .rebuild.lock). A single serialized writer must guard the merge/export write so concurrent passes serialize on graph.json."
+  },
+  {
+   "id": "framework_plan_reuse_rebuild_lock_r4",
+   "label": "Reuse graphify _rebuild_lock, not a new flock (R4)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review blocker R4: graphify.watch._rebuild_lock on .rebuild.lock already exists; a separate kb_setup flock reinvents it (use-tool-builtins) AND fails to serialize against a concurrent graphify update. Acquire graphify's own lock and control-arm the real kb-merge vs graphify-update race."
+  },
+  {
+   "id": "framework_plan_quarantine_gate",
+   "label": "Write-path quarantine gate (component 7)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The poisoning fix for the 'staleness is not correctness' problem. New nodes from a read-through miss enter as PROVISIONAL/verification='unverified', excluded from authoritative query results and from becoming Louvain hubs until a second independent source corroborates or a human confirms in Obsidian. A provenance-origin tag makes amplification detectable. G1 scores recency; the quarantine gate scores trust/corroboration - orthogonal and both required."
+  },
+  {
+   "id": "framework_plan_lane_supervisor_thin_seam",
+   "label": "Lane supervisor as thin seam (R5)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review blocker R5 reverses the earlier 'port run-lane.sh to python' directive. run-lane.sh is a maintained third-party plugin and plugins/** is EXEMPT from zero-bash-logic, so mise run kb-lane should shell out to the vendored script (a wrapper, not new logic). New work is only the lanes run-lane.sh lacks: the antigravity lane and the Opus terminal fallback."
+  },
+  {
+   "id": "framework_plan_run_lane_supervisor",
+   "label": "run-lane.sh long-running supervisor",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The fable-orchestrator supervisor: start launches a detached CLI + watchdog that beats the harness 10-min cap with process-group discipline (kill -- -PID) and EXIT:/WATCHDOG: markers, wait uses bounded <=90s slices, reap cleans up. It is the launcher-wrapped shell-out with completion-contract the prior research prescribed, now maintained upstream."
+  },
+  {
+   "id": "framework_plan_egress_deny_hook_matrix",
+   "label": "Per-family egress deny-hook matrix (R2)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review blocker R2: enforcement is a per-family deny-hook matrix, NOT a tools: allowlist, because kb_search is a Bash command and Bash is superset egress (python3 urllib, nc) that tools: cannot scope. Per family: CC uses a PreToolUse deny-hook allowing Bash only for mise run kb-search; grok uses run_terminal_command with restricted --tools; codex uses tools.web_search=false + workspace-write; antigravity uses native deny lists in settings.json."
+  },
+  {
+   "id": "framework_plan_antigravity_native_enforcement",
+   "label": "Antigravity native fine-grained enforcement",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Corrected in review: the antigravity CLI HAS native fine-grained enforcement in ~/.gemini/antigravity-cli/settings.json with deny/ask/allow lists of action(target) rules. Locking KB-only via deny:[read_url(*),execute_url(*),mcp(*),command(*)] + allow:[command(mise run kb-search*)] keeps antigravity a full KB-only research lane; the review's 'un-strippable web' was the yuting0624 plugin's --yolo wrapper, not the CLI's own permission model."
+  },
+  {
+   "id": "framework_plan_research_compounding_loop",
+   "label": "Autonomous research-compounding loop",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The genuinely-new engine: the architect decomposes a research question, routes sub-questions to lanes (each queries the KB graph first, researches, returns a structured finding), findings are persisted, write-back is gated/auto per policy (kb-remember always; kb-merge re-cluster on batches), and the next pass stands on the compounded graph. The loop compounds knowledge and re-shapes graph topology on every pass."
+  },
+  {
+   "id": "framework_plan_research_pass_sequence",
+   "label": "One research pass (8-step sequence)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The repeating unit of the loop: Frame (pull a question) -> Ground (staleness-aware kb-query, decompose, route) -> Delegate (lanes via python/thin-seam supervisor, agents get NO web tool) -> Collect+persist (verbatim with provenance) -> Compound (kb-remember + locked kb-merge + Louvain re-cluster) -> Reflect (kb-reflect -> LESSONS.md) -> Surface (Obsidian export) -> Loop (native driver advances, SQLite claim table prevents double-work)."
+  },
+  {
+   "id": "framework_plan_decision_auto_compound_with_g1",
+   "label": "Decision: auto-compound every pass, G1 first",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked user decision: write-back auto-compounds every pass (the literal ask), BUT G1 query-time staleness scoring is built FIRST so stale/low-confidence nodes are down-weighted at query time. This consciously overrides the prior program's 'gated/batched' write-back decision #11; the gated fallback stays one flag away."
+  },
+  {
+   "id": "framework_plan_decision_native_substrate",
+   "label": "Decision: native CC primitives substrate",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked user decision: the long-running substrate is native CC primitives (/goal work-until-condition + /loop + Routines + background tasks + a SQLite claim/lease table + the run-lane.sh supervisor). No DBOS now - it stays the documented graduation path if multi-machine/contention earns it. /goal is the native outer-loop driver."
+  },
+  {
+   "id": "framework_plan_goal_primitive",
+   "label": "/goal native work-until-condition primitive",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "/goal <condition> keeps Claude working across turns until a fresh small-model evaluator (Haiku) confirms the condition after every turn - completion decided by a different model than the one working. It is a wrapper around a session-scoped prompt-based Stop hook, survives --resume/--continue, and headless `claude -p \"/goal ...\"` runs the whole loop to completion, so the outer-loop driver can BE this rather than a hand-rolled while loop."
+  },
+  {
+   "id": "framework_plan_goal_transcript_constraint",
+   "label": "/goal evaluator transcript-only constraint",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Load-bearing constraint: the /goal evaluator judges ONLY what Claude has surfaced in the transcript - it does not run tools or read files. So goal conditions must be transcript-provable, and deterministic gates (lint/pytest/verify) belong in a CUSTOM Stop hook, not the /goal evaluator. Requires workspace trust; unavailable under disableAllHooks/allowManagedHooksOnly."
+  },
+  {
+   "id": "framework_plan_zero_bash_logic_both_repos",
+   "label": "Zero-bash-logic extended to both repos",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked user decision: NO NEW BASH SCRIPTS - everything in python (dotfiles_setup and/or kb_setup) with mise tasks as thin seams only; the zero-bash-logic rule extends to both repos and the bash_budget-style gate extends to the KB repo. (Later softened by R5 for the vendored run-lane.sh, which is plugins/**-exempt.)"
+  },
+  {
+   "id": "framework_plan_fable5_orchestrator_doctrine",
+   "label": "Fable-5 orchestrator doctrine (adopted)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The cost-routed orchestrator is the adopted fable-orchestrator + antigravity plugins: an architect-only strong model (never types, deny-hook no-touch list) routes cheap executor lanes via a six-part spec, gated by the verify-gate. The plan adopts its doctrine (architect + six-part spec + orchestrator-routing skill + Opus fallback) but not its bash lane-launch."
+  },
+  {
+   "id": "framework_plan_verify_gate_oracle",
+   "label": "Verify-gate quality oracle",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The verify-gate (lint/pytest/verify) is the one load-bearing quality oracle the project already owns; it is a separate deterministic-under-agent control-armed gate, and every recurring failure becomes a permanent hk/suites.toml constraint. Executor-lane output passes through it before being accepted."
+  },
+  {
+   "id": "framework_plan_graphify_substrate",
+   "label": "Build on graphify substrate (not a graph-DB service)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Settled prior decision reused as-is: build ON graphify (hybrid), do NOT adopt a graph-DB memory service (Graphiti/Zep/mem0/cognee all lose on host-only + pay-twice re-ingest). graphify maturity risk is MEDIUM and well-mitigated by pinning, owning the portable JSON, and leaning on the free AST layer."
+  },
+  {
+   "id": "framework_plan_free_ingest_query",
+   "label": "Free structural ingest and deterministic query",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Verified building blocks: graphify update <path> is a free 0-token structural quick-scan (wikilinks->edges, flock-serialized via .rebuild.lock #1059); mise run kb-query is a free deterministic 0-token source-cited subgraph query, budget-capped and sub-second, the default grounding surface (no MCP schema tax). Plain `graphify <path>` routes to a PAID semantic pass that writes nothing on no-key failure - avoid."
+  },
+  {
+   "id": "framework_plan_topology_growth_louvain",
+   "label": "Topology growth via kb-merge Louvain re-cluster",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "New knowledge needs the expensive kb-merge/re-cluster (Louvain, no-LLM) which grows the graph and adjusts its topology (communities, god-nodes, edges). This graph.json merge is the ONE operation with lost-update risk, requiring the single serialized writer."
+  },
+  {
+   "id": "framework_plan_write_back_overlay",
+   "label": "Collision-safe write-back overlay (kb-remember/kb-reflect)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The low-risk write-back tier: kb-remember appends one memory/*.md per outcome (git-tracked, never touches graph.json, so it fans out freely and collision-free); kb-reflect aggregates into LESSONS.md + a .graphify_learning.json overlay tagging nodes preferred/tentative/contested so a 'Lesson:' hint surfaces on later queries."
+  },
+  {
+   "id": "framework_plan_obsidian_derived_view",
+   "label": "Obsidian as derived human-curation view (Model A)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Model A (adopted): the graph/library is the interface and the Obsidian vault is a DERIVED human read/curate view generated by kb-artifacts obsidian export; human edits round-trip into the graph via graphify update (export never overwrites files it didn't create, #1506). Agents write only through kb_search/kb-merge, never to the vault. Model B (agent 'hands' authoring notes directly) is rejected as a second write path bypassing the invariant."
+  },
+  {
+   "id": "framework_plan_obsidian_after_the_fact_r10",
+   "label": "Obsidian review is after-the-fact observability (R8/R10)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review R8/R10: under autonomy the Obsidian human-review surface is after-the-fact observability, NOT a write gate; the kepano/obsidian-skills 'hands' references are demoted to 'evaluated & rejected (Model B)'. Obsidian is a derived curation view, not 'the substrate agents use.'"
+  },
+  {
+   "id": "framework_plan_poisoning_risk_r8",
+   "label": "Auto-compound poisoning risk (narrowed claims, R8)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review R8 narrows the safety claims: staleness != correctness, so 'G1 makes auto-compounding safe' is deleted as a safety argument (a fresh-but-wrong node returns authoritative). Risks consciously held: amplification (a poisoned node gains corroborating edges -> Louvain hub), ingest's 12000-char truncation + #1758 ~35% chunk loss make a compounded node a distorted copy. Mitigated (not eliminated) by G1 + provenance + the quarantine gate + Obsidian review."
+  },
+  {
+   "id": "framework_plan_tool_availability_enforcement",
+   "label": "Enforcement = tool availability, not PTC allowed_callers",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The real enforcement is tool availability: give each research agent exactly ONE knowledge tool (kb_search) and no web tool at all; the library holds the sole network egress. PTC's allowed_callers is explicitly NOT a security boundary ('Do not rely on allowed_callers'), so PTC is not what prevents web search."
+  },
+  {
+   "id": "framework_plan_ptc_optional_accelerant",
+   "label": "PTC as optional efficiency accelerant",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Programmatic Tool Calling (PTC) is an Anthropic Messages-API feature where Claude writes Python that calls custom tools as async functions, keeping intermediate results out of context (20-40% fewer input tokens on 10-49-tool workloads). VERDICT: the KB-only read-through design is fully achievable NOW via tool allowlisting; PTC is an optional later accelerant for a Messages-API research worker (API-only; MCP tools cannot be PTC-called, so the KB library must be a non-MCP custom function)."
+  },
+  {
+   "id": "framework_plan_home_kb_repo",
+   "label": "Home: the knowledge-base repo",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Locked decision: the framework home is the knowledge-base repo (which already has every kb-* mise task: kb-build, kb-update, kb-query, kb-serve, kb-add, kb-merge, kb-label, kb-transcribe, kb-artifacts, kb-remember, kb-reflect). The compounding loop's primitives EXIST; what's missing is the autonomous outer loop that drives them pass after pass."
+  },
+  {
+   "id": "framework_plan_outer_loop_queue",
+   "label": "Autonomous outer loop + SQLite claim/lease queue",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Component 4: a questions/ file queue or a SQLite claim/lease table (kb_setup/queue.py) for in-flight tracking, double-work prevention, and pass-outcome logging, driven by native /loop / Routines / background tasks (no daemon). Escalation seam: park-and-continue on a pending question, fail-stop on an unfixable gate."
+  },
+  {
+   "id": "framework_plan_raga_validation",
+   "label": "RAGA Read-Search-Verify-Construct validates the design",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "External corroboration from RAGA (Read-Search-Verify-Construct KG-ingest loop, Vadim autonomous-KG + 2026 KG-memory surveys): Search-before-write against graphify = 'the library is the only search'; Verify-before-Construct = the write-time quarantine gate; CREATE-only + bi-temporal soft-invalidation = don't hard-delete provenance. Confirms kb_search + the quarantine gate are the right shape."
+  },
+  {
+   "id": "framework_plan_sequencing_fable5_first",
+   "label": "Sequencing: Fable-5 orchestrator ships first",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Research (Symphony/Augment/Sol) confirms the order: the Fable-5 orchestrator is the INNER per-task executor (architect + lanes + verify-gate + escalation) and the long-running autonomous OUTER loop layers on top and reuses those components verbatim. So Phase-1 (Fable-5) is a prerequisite, not a detour."
+  },
+  {
+   "id": "framework_plan_phased_build",
+   "label": "Phased build (Phase 0-3)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Phase 0 = dogfood-ingest the sources needed to build this (the invariant applied to ourselves) + post-review R1-R7 safety/enforcement foundations; Phase 1 = one compounding pass (the prototype) proving a miss ingests, the graph grows+re-clusters, the next query hits, the vault reflects it; Phase 2 = autonomy (outer loop + queue on native primitives); Phase 3 = hardening (cross-family review, observability event stream, PTC worker, DBOS graduation if earned)."
+  },
+  {
+   "id": "framework_plan_dogfood_ingest_step1",
+   "label": "Phase-0 dogfood ingest (invariant applied to ourselves)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Phase-0 step 1 applies the core invariant to the framework itself: ingest the primary sources needed to build it into graphify first (the PTC + code-execution docs, lucasrosati/claude-code-memory-setup, basicmachines-co/basic-memory, CC subagent tools: allowlist doc, antigravity CLI doc, cognee, and our own design docs) so the framework's rationale is graph-queryable. This is also the first live exercise of the read-through pipeline."
+  },
+  {
+   "id": "framework_plan_dbos_graduation_path",
+   "label": "DBOS durable workflows (documented graduation path)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "DBOS Transact durable workflows (in-process Postgres, zero new infra; SQLite -> containerized-Postgres, same code) are the documented graduation path for journal/replay durability, deferred to the Phase-2 design session and adopted only if multi-machine/contention earns it. It is the structural fix for the repo's Mac-side 'backgrounded task gets reaped' hazard - a durable pause is not a live process."
+  },
+  {
+   "id": "framework_plan_web_search_backend_r7",
+   "label": "Named web-search backend dependency (R7)",
+   "file_type": "concept",
+   "source_file": "framework-plan-ladybug.md",
+   "source_url": "local://dotfiles/.claude/plans/we-want-a-long-mighty-ladybug.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Review R7: the web-SEARCH backend must be named. graphify's add is URL-fetch only, so question->URL search is net-new work held solely inside the library, an external-service egress dependency that must be explicitly identified."
+  },
+  {
+   "id": "harness_research_harness_engineering_discipline",
+   "label": "Harness engineering (as a discipline)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Long-horizon autonomous orchestration is a HARNESS problem, not a model problem: reliability comes from scaffolding around the model (durable state, execution graphs, verification gates, context compaction, memory substrates) — 'every component exists because the model can't do it alone.' Rules include repo/KB as single source of truth ('anything the agent cannot access in-context effectively does not exist'), structured logging, file-size limits, shared utility packages, back-pressure/verification, and 'success is silent, only failures produce verbose output.' LangChain lifted Codex 52.8%->66.5% by fixing the harness with NO model change."
+  },
+  {
+   "id": "harness_research_p1_journal_replay_durability",
+   "label": "P1 — Journal + replay-boundary durability",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The resume substrate: give each run a stable run_id and each op a step_id, and treat every LLM call, tool call, shell command, file write, approval, and outbound message as a REPLAY BOUNDARY whose result is recorded and reused on recovery. On crash, replay completed steps from stored results and resume from the last boundary; mutations are NOT re-executed. Lightest fit is DBOS (in-process Postgres, zero new infra) or a LangGraph checkpointer; Symphony proves a DB-free filesystem+tracker recovery suffices for smaller DAGs. Directly kills the Mac-side 'backgrounded task gets reaped' hazard — a durable pause is not a live process."
+  },
+  {
+   "id": "harness_research_idempotent_outbox",
+   "label": "Idempotent tool wrappers + outbox pattern",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Wrap every mutating tool with a Stripe-style idempotency key + receipt + duplicate detection; write durable intent and local state in ONE transaction, then a separate dispatcher completes the external side effect exactly once (the Outbox pattern). Combined with the determinism split (Temporal: keep orchestration deterministic, push nondeterminism into Activities), this prevents double-writes across crash/API boundaries and is what makes replay-based resume possible at all."
+  },
+  {
+   "id": "harness_research_p2_persistent_workspace_resume",
+   "label": "P2 — Persistent per-task workspace + session-resume",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The context checkpoint: each task gets a deterministic per-issue workspace dir (e.g. ~/.cymphony/workspaces/<proj>/<issue-id>) that survives restarts, so a resumed lane 'keeps full context across rounds and never re-reads the corpus from scratch.' Multi-turn continuity uses the cheap resume primitive `claude -p --output-format stream-json --resume <session_id>`, where continuation turns send only NEW guidance, not the original prompt. Restart finds the same checkout+branch and continues."
+  },
+  {
+   "id": "harness_research_p3_state_machine_review_gate",
+   "label": "P3 — Typed state machine + review-gate lifecycle",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "'Done' is gated, never self-reported. A two-layer typed state machine (claim/scheduling states Unclaimed->Claimed->Running->RetryQueued->Released preventing duplicate dispatch, plus a run-attempt lifecycle PreparingWorkspace..Succeeded/Failed/TimedOut/Stalled/CanceledByReconciliation) gives precise vocabulary; a finished worker job moves to a REVIEW state (Sol), where the supervisor accepts, requests correction, or replaces (workflow_complete/retry). The SPEC rule 'user-input-required turn = HARD FAILURE' means an autonomous lane escalates to a gate state, never silently blocks on a prompt."
+  },
+  {
+   "id": "harness_research_p4_event_driven_scheduling",
+   "label": "P4 — Event-driven scheduling (reconcile/stall/backoff, wait-don't-poll)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Self-healing autonomy via a per-tick sequence (reconcile running issues -> validate -> fetch candidates -> sort by dispatch priority -> dispatch while slots remain), stall detection (kill a silent agent after ~5min, default 30s cadence), and exponential backoff (min(10000*2^(attempt-1), max) capped 300s). Reconciliation re-fetches tracker state each tick to stay consistent with a changing world. Prefer durable awakeables / event-waits (Restate agents_wait, goal_block) that survive process death over in-turn blocking; every mature design is event-driven — polling burns tokens and hides state."
+  },
+  {
+   "id": "harness_research_p5_raga_kb_memory",
+   "label": "P5 — Knowledge graph as compounding memory via RAGA",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The compounding memory substrate. RAGA = Read-Search-Verify-Construct, one agent owning the graph lifecycle: Read candidate edges with evidence spans; Search resolves endpoints to existing concepts (skip present edges); Verify checks grounding + closed-vocabulary schema + verbatim evidence span + a ~0.6 confidence gate; Construct emits CREATE-only. Every write is a function of current graph state, so correctness moves to WRITE TIME and the batch dedup pass is eliminated. This is the mechanism for the read-through KB where 'the library is the only search.'"
+  },
+  {
+   "id": "harness_research_read_through_kb",
+   "label": "Read-through KB ('the library is the only search')",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The graphify KB is the sole retrieval surface: before any external fetch or write, query the existing graph (RAGA's Search stage) and only Read/Construct what is genuinely new. Validated by Augment's Context Engine (structural codebase map + vector index that 'distills only relevant slices,' cutting tokens ~33%, re-indexed 'within seconds of every push' so agents never act on stale context) and OpenSymphony's memory.yaml+DuckDB with `sync-docs` that graduates stable knowledge into canonical docs — a model for how KB entries promote from scratch to canonical."
+  },
+  {
+   "id": "harness_research_bi_temporal_provenance",
+   "label": "Bi-temporal never-hard-delete provenance",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Every KB edge carries {confidence, reason, source, evidence} plus valid_at/recorded_at/invalid_at. Superseded facts are soft-invalidated (stamp invalid_at), never hard-deleted, so the graph keeps rollback/audit provenance. Construction is autonomous but publication is human-gated (advisory-by-default). Aligns with the repo's provenance-of-numbers discipline: a fact needs its source AND its condition."
+  },
+  {
+   "id": "harness_research_p6_cost_routing",
+   "label": "P6 — Cost routing as first-class component",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Per-stage model routing keyed by complexity/difficulty/risk: stokowski runs Opus-investigate / Sonnet-implement / Codex-review as per-state overrides in workflow.yaml; Sol uses profile tiers (Sol/Luna/Terra). Confidence-aware routing with live subtask reassignment reports 40-85% bill reduction; Augment measures 'outcomes per dollar, not output per dollar.' Symphony's SPEC explicitly PUNTS cost routing, so the design must OWN it as a first-class component, not an env-var afterthought. Caveat: static-feature routers (MasRouter) can't see lane load/saturation — add infra/load awareness (INFRAMIND), and treat self-reported confidence as a routing signal only, never a calibrated probability."
+  },
+  {
+   "id": "harness_research_p7_verification_gate",
+   "label": "P7 — Verification as separate control-armed gate",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Combine cheap deterministic gates (linters/type-checkers/schema-validators) UNDER agent-as-verifier checks (three-judge, self-review, agent-trace-triage loop detection + failure buckets). Symphony externalizes gates to CI/PR-review/complexity/walkthrough; INFRAMIND adds a static DAG-level verifier that rejects infeasible orchestration configs BEFORE any LLM call. Convert every one-off fix into a permanent reusable constraint (new lint rule / hk step / suites.toml contract). A completed job is a claim to be checked: 'skipped/finished != verified' — matching probes-need-a-control-arm."
+  },
+  {
+   "id": "harness_research_p8_four_tier_escalation",
+   "label": "P8 — Four-tier human escalation + async-durable approval",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A four-tier risk model (read-only / reversible / external / irreversible) reserves mandatory approval only where mistake-cost exceeds automation value. Read-only/reversible lanes run autonomously; external/irreversible actions (ship, land, merge, KB publish) require ASYNC-DURABLE approval that persists the exact artifact + version hash (so replay can't approve modified content); sync approval dies on timeouts/token-expiry. Review the decision, not the whole run. Progressive trust lowers approval frequency as an agent proves reliable — the explicit knob for increasing autonomy over time. Cheapest durable form: a 'needs-human' KB state whose resolution feeds back next tick, no bespoke UI."
+  },
+  {
+   "id": "harness_research_incremental_capture_invariant",
+   "label": "Incremental-capture invariant (write-time, never end-of-run)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The cross-cutting lesson all four clusters agree on: durability, verification, and provenance must be write-time and incremental, never end-of-run. The journal, the graph writes, the recovery-test crash-injection suite, and agent report persistence all fail if deferred to end-of-run. An agent that dies at 13/20 sources must leave 13, not 0. This makes the repo's existing agent-report-persistence discipline structural (journal-backed) rather than merely documented."
+  },
+  {
+   "id": "harness_research_symphony_conductor",
+   "label": "Symphony poll-loop conductor (issue-parallel worker pool)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "OpenAI Symphony and its ports (OpenSymphony, cymphony, stokowski) implement ONE pattern: a headless poll-loop 'conductor' watching a work source (a Linear board) that spawns a SINGLE coding agent per work item in an isolated persistent workspace, advancing it through a typed state machine with human gates. Crucially 'multi-agent' means multi-ISSUE concurrency (a worker pool across a board), NOT a team collaborating on one task — there is no internal fan-out or shared blackboard. Durability is deliberately database-free: re-derive live state on restart from the tracker + persistent workspaces + session resume."
+  },
+  {
+   "id": "harness_research_augment_five_stage_loop",
+   "label": "Augment five-stage loop engineering",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Augment Code's 'loop engineering': the atomic unit is a five-stage loop Trigger -> Execution -> Verification -> Outcome -> Improve, with a tight inner verify<->execute mini-loop that iterates until acceptance criteria are met OR the agent hits an explicit escalation boundary (the stop condition separating 'shipped' from 'spinning and burning tokens'). Loops compose into a DAG of small loops (one outcome triggers the next). The Improve stage persists every run's trace of what-worked/what-failed/where-human-corrected to refine prompts, tests, and escalation rules — the loop tunes itself over runs."
+  },
+  {
+   "id": "harness_research_sol_durable_goal_workflow",
+   "label": "Sol durable-goal / disposable-workflow split",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sol-Orchestrator is a delegating-supervisor where a DURABLE GOAL is decoupled from disposable WORKFLOW GRAPHS ('one goal, many workflows'): replanning via workflow_replace mints a new versioned graph without losing the goal or git state. The execution graph is a real DAG with explicit dependencies and parallelism; the supervisor synthesizes evidence from causally-unrelated jobs before cascading. Workers run in isolated context and their output lands in a REVIEW state, gated accept/correct/replace — 'done' is never silent."
+  },
+  {
+   "id": "harness_research_protected_context_agents_inspect",
+   "label": "Protected orchestrator context (agents_inspect narrow evidence)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sol keeps worker transcripts OUT of the supervisor's conversation; agents_inspect materializes only the specific diff/result/tool-output the supervisor asks for (the read-through-evidence discipline). The recurring failure mode this guards against is transcript-passing between lanes polluting the orchestrator's context ('context rot'); keep evidence materialization explicit and narrow so the Claude architect never ingests raw codex/antigravity transcripts."
+  },
+  {
+   "id": "harness_research_blackboard_volunteer",
+   "label": "Blackboard volunteer coordination",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A shared-state coordination pattern (arXiv 2510.01285): a control agent posts requests to shared state and autonomous subordinate agents VOLUNTEER based on current blackboard content, so the coordinator need not know each agent's expertise. Event-driven activation yields 13-57% end-to-end gains over baselines; PatchBoard adds schema-grounded state mutation for auditable/reliable writes. For the lane supervisor, lanes claim tasks by capability rather than being hard-dispatched, improving flexibility as lanes are added."
+  },
+  {
+   "id": "harness_research_entropy_management",
+   "label": "Harness entropy management (scheduled GC/refactor agent)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Part of harness engineering: schedule periodic refactor/GC agents that prevent long-running drift over both the KB (invalidate stale edges) and the orchestrator's own rules/config. Long-horizon unattended autonomy accumulates cruft and stale edges, and drift is the dominant failure mode — entropy management counters it structurally rather than reactively."
+  },
+  {
+   "id": "harness_research_fanout_bounds_wake_budgets",
+   "label": "Bounded fan-out + wake/spend budgets",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cap concurrent autonomous lanes with layered slot caps (Symphony: global max_concurrent_agents + per-state + per-project fairness; Augment ~10 parallel with resource reservations) and an explicit economic wake budget (agentops/agenticmail per-agent WAKE BUDGETS) so the outer loop can't runaway-spend. Pair with agentsatlas's fresh-subagent-per-plan (reset executor context every 3-5 tasks) to stop long-horizon quality decay rather than fighting context rot."
+  },
+  {
+   "id": "harness_research_fable5_first_sequencing",
+   "label": "Fable-5-first sequencing (inner executor / outer loop split)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The plan's sequencing: the Fable-5 orchestrator (Claude architect + codex/antigravity/Opus executor lanes + verify-gate + escalation boundary) is the INNER per-task executor and ships FIRST; the long-running autonomous OUTER loop is layered on top and reuses those components unchanged. Symphony/Augment/Sol all confirm the split — Symphony is issue-parallel while fable-orchestrator is within-task delegation, so they are COMPLEMENTARY: port Symphony's conductor as the outer long-running loop that feeds tasks to fable-orchestrator as the inner executor, adding durability + scheduling on top of existing delegation."
+  },
+  {
+   "id": "harness_research_marketplace_design_references",
+   "label": "Marketplace plugins as design references (borrow shapes, not deps)",
+   "file_type": "concept",
+   "source_file": "harness-engineering-research.json",
+   "source_url": "local://dotfiles/.omc/research/research-20260723-longrunning-framework/harness-engineering-research.json",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The claude-plugins-community marketplace (240+ entries) confirms a crowded, converging design space: dozens of plugins already implement pieces of the plan — agent-knowledge (typed KG, 11 edge types, BFS, confidence/decay), agent-memory (cross-agent memory bus + compression), agent-recall (SQLite KG), agentsatlas (fresh-subagent-per-plan waves), agent-trace-triage (loop detection + failure buckets), agent-handoff (disk-backed plan->execute->verify), agenticmail (SSE wake bus + wake budgets). Treat these as design references, NOT dependencies: most are single-author, overlapping, and inject schema/context cost — borrow proven shapes and vendor selectively. Enumeration caveat: only the alphabetical agent*/ai* front (~entries 1-140) was surfaced; a raw read of marketplace.json is needed for byte-complete d-z coverage."
+  },
+  {
+   "id": "second_brain_thesis",
+   "label": "graphify as persistent second brain for Fable-5",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Core finding: graphify CAN be the persistent second brain for the Fable-5 orchestrator, and most of the machinery already exists. A git-tracked plain-markdown vault (edited via Obsidian) is ingested by `graphify update` into a knowledge graph for free (wikilinks become edges, zero LLM tokens); the architect queries it at decision time via a deterministic CLI shell-out and writes outcomes back through the existing collision-safe learning overlay."
+  },
+  {
+   "id": "second_brain_plain_md_source_of_truth",
+   "label": "Plain markdown vault as source of truth",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Design invariant: the on-disk source of truth is plain `.md` files in git, NOT any editor's proprietary format. This makes the PKM front-end decision cheaply reversible — Obsidian, Foam, and a bare markdown vault are swappable editing layers over the same files. Rule: commit to no Obsidian-proprietary features in the source of truth so Foam/plain-md stay drop-in."
+  },
+  {
+   "id": "second_brain_obsidian_frontend",
+   "label": "Obsidian PKM front-end",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Decision: Obsidian wins as the human-facing PKM editor — free for personal use, huge ecosystem, and uniquely graphify has native round-trip (`--obsidian`) plus a 2026 Local REST API + MCP for AI write-back. Eliminated: Logseq (markdown frozen), Notion (hosted, can't --watch), SiYuan/Trilium/Anytype (non-markdown on disk), Dendron (abandoned 2023), org-roam (org≠md + Emacs lock-in)."
+  },
+  {
+   "id": "second_brain_graphify_update_free_structural",
+   "label": "graphify update free structural ingest",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CONFIRMED (Claim A): `graphify update <vault>` ingests a markdown vault's [[wikilinks]] as real EXTRACTED edges for FREE (no LLM/key, rc=0, 'Token cost: 0 input · 0 output'). This is the always-on backbone. Gotcha: frontmatter tags:/aliases: yield 0 nodes (structural pass ignores them); bare cross-folder [[Gamma]] yields no edge while path-qualified [[sub/gamma#h]] resolves."
+  },
+  {
+   "id": "second_brain_paid_semantic_layer",
+   "label": "Paid periodic semantic enrichment layer",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Genuinely new work: an optional paid keyed full build (GEMINI_API_KEY) that adds concept/INFERRED edges. Per #1915 semantic supersedes structure, so it can't run every save — cadence is an open DESIGN question. The plain `graphify <path>` build routes .md to a paid semantic pass that writes NOTHING on failure (no graph.json)."
+  },
+  {
+   "id": "second_brain_kb_query_deterministic",
+   "label": "kb-query deterministic CLI shell-out",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Decision: the architect grounds routing/fallback decisions via `mise run kb-query -- \"<q>\"` — a source-cited subgraph, deterministic (byte-identical twice, control-armed), 0 LLM tokens, budget-capped (default 2000), sub-second (0.78s on 3.2MB dotfiles graph, ~4-6s on 121MB KB graph). Pays no per-conversation MCP schema tax, aligning with the repo's mcp2cli-first rule."
+  },
+  {
+   "id": "second_brain_kb_serve_optin_mcp",
+   "label": "kb-serve opt-in MCP escalation",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Opt-in escalation only: the `kb-serve` MCP server (10 read-only tools, sub-second, graph resident) for query-heavy sessions — accept the schema tax deliberately, don't default to it. Treat returned node text as DATA because there is a documented prompt-injection surface in serve.py."
+  },
+  {
+   "id": "second_brain_no_global_search_gap",
+   "label": "graphify lacks community summaries + global search",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CONFIRMED (Claim D): graphify has NO per-community LLM summaries and NO map-reduce 'global search' — its biggest gap vs mature GraphRAG. Community prompt only asks for a 2-5 word name, no prose; global-search/map-reduce/community-report grep = 0. query/path/explain are local BFS/DFS only, so they can't answer corpus-wide 'what do we know about area X?'."
+  },
+  {
+   "id": "second_brain_graphrag_capability_to_build",
+   "label": "GraphRAG community summaries + global-search to build",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The #1 missing capability to build: LLM-written per-community summaries + a map-reduce global-search path, lazily/cached to stay near-free — the thing the architect most needs for corpus-wide questions a local subgraph can't answer. Study microsoft/graphrag + run-llama/llama_index GraphRAGStore for the retrieval shape."
+  },
+  {
+   "id": "second_brain_learning_writeback",
+   "label": "Curated git-reviewed learning write-back",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Design: adopt Reflexion + ExpeL + Voyager mapped onto existing structure (.claude/rules/ ≈ ExpeL insight-rules, .claude/skills/ ≈ Voyager skill library, memory/*.md ≈ Reflexion post-mortems). Mechanism is already present and collision-safe: kb-remember appends one memory/*.md per outcome (never touches graph.json); kb-reflect aggregates to LESSONS.md + a learning overlay tagging nodes preferred/tentative/contested."
+  },
+  {
+   "id": "second_brain_no_automatic_kg",
+   "label": "Never automatic KG-from-everything (contamination firewall)",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Invariant: never automatically extract-KG-from-everything — that path (Zep/Graphiti) measured 600k tokens/conversation and causes memory contamination. Human/git-diff review is the contamination firewall for all learning write-back."
+  },
+  {
+   "id": "second_brain_concurrency_single_writer",
+   "label": "Concurrency: flock-serialized updates, single writer for merge-graphs",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "NUANCED (Claim B): the 'no lock → lost updates' KB memory warning is looser than feared. watch.py holds a per-repo .rebuild.lock fcntl.flock guarding update/watch/hook (#1059), so concurrent `graphify update` is serialized + change-queued, NOT a lost update. Lost-update risk survives ONLY for merge-graphs/full-build export (bare write_json_atomic). So reads are free, outcome-writes are free, and only merge-graphs needs a named single serialized writer."
+  },
+  {
+   "id": "second_brain_logseq_deadend",
+   "label": "Logseq markdown is a dead-end foundation",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CONFIRMED with date nuance (Claim C): Logseq is moving to a SQLite DB; its OG markdown path is in maintenance ('no new features', security/Electron only), markdown-in-DB still researching. Announcement is April 2026 (not 2026-07-13) and OG is maintained-but-frozen, not dead. Conclusion holds: don't build a new foundation on Logseq markdown."
+  },
+  {
+   "id": "second_brain_prior_art_borrow_study_avoid",
+   "label": "Prior art: borrow / study / avoid",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Borrow patterns: GraphRAG community summaries + global search; curated git-reviewed write-back (Reflexion/ExpeL/Voyager); tri-modal query routing (cheapest sufficient primitive). Study closest analogs: basicmachines-co/basic-memory (local markdown+wikilink KG via MCP) and topoteretes/cognee (local-first ingest→graph→hybrid-retrieval). Avoid: hosted memory services (Zep/Mem0), full agent runtimes as memory (Letta/MemGPT), automatic extract-KG-from-everything, and the 'a vault alone is memory' fallacy."
+  },
+  {
+   "id": "second_brain_routing_grounding_novelty",
+   "label": "KG-grounded orchestration routing (the genuine novelty)",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The re-scoped genuine contribution: grounding an orchestrator's ROUTING/delegation decisions (Fable-5 architect → codex/antigravity lanes → Opus fallback) in the knowledge graph — not just Q&A or session memory. Neither reference repo does cross-vendor orchestration-routing, so the second-brain foundation is a solved forkable pattern and the delta is routing-grounding + cross-vendor lanes on top of it."
+  },
+  {
+   "id": "second_brain_open_questions_design",
+   "label": "Four DESIGN-phase open questions",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "DESIGN must resolve: (Q1) two-layer refresh cadence — per #1915 once a doc gets a paid semantic build, update won't re-scan its structure, so what triggers a paid rebuild and how do free structural + paid semantic layers coexist without clobbering; (Q2) full-semantic-build cost is UNMEASURED on a real vault; (Q3) does 'one graph spanning vault + codebase' actually connect (cross-doc INFERRED edges are thin, path returned 'No path found'); (Q4) where the vault lives + who is the single graph-writer."
+  },
+  {
+   "id": "second_brain_first_prototype",
+   "label": "Recommended first prototype",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Recommended first PROTOTYPE (retires Q2+Q3 cheaply): stand up a small real markdown vault (10-30 notes of actual project knowledge, path-qualified wikilinks), `graphify update` it (free) and inspect the structural graph; then run one keyed full build to MEASURE token cost and inspect whether concept edges connect vault notes to the codebase graph via a merge-graphs."
+  },
+  {
+   "id": "second_brain_capture_map_ask_writeback_loop",
+   "label": "Capture → Map → Ask → Write-back self-maintaining loop",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Addendum correction: the KB graph already held a NAMED, documented loop (Hyper Automation Labs, yt-rtutpoT4SYg) 'a second brain that maintains itself': Capture (`graphify add <url>` or Defuddle clip), Map updates itself (`graphify --watch` or git post-commit hook), Ask the graph (`graphify query`/shortest-path instead of re-reading files), Write-back (agent writes lessons as notes with [[wikilinks]]), next rebuild grows the map. This is precisely the write-back loop the main report derived from first principles — it already has a name."
+  },
+  {
+   "id": "second_brain_obsidian_skills_hands",
+   "label": "kepano/obsidian-skills as the write-back 'hands'",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The pairing is two tools: graphify = 'the map' (`graphify export obsidian` turns the graph into a real Obsidian vault with wikilinks + honesty tags + JSON Canvas), and kepano/obsidian-skills = 'the hands' — Obsidian CEO Steph Ango's official MIT cross-agent skills (Markdown, Bases, JSON Canvas, Obsidian CLI 100+ cmds, Defuddle) that let an agent write valid Obsidian. This is the concrete write-back mechanism the main report glossed, and it is explicitly cross-agent (Claude Code, Codex, OpenCode)."
+  },
+  {
+   "id": "second_brain_dropin_prior_art_refutes_novelty",
+   "label": "Drop-in prior art refutes 'novel whitespace' for memory layer",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "CONFIRMED correction: Thread D's 'novel whitespace, no drop-in prior art' is REFUTED for the memory/second-brain layer. Two working popular reference implementations of the exact graphify + Obsidian + Claude-Code pairing exist: lucasrosati/claude-code-memory-setup (centralized Obsidian vault as Claude's second brain, Zettelkasten, permanent/logs/graphify dirs — a ready vault template informing Q4) and albertludi/second-brain-claude. What stays novel is narrowed to orchestration-routing grounding, not the memory foundation."
+  },
+  {
+   "id": "second_brain_inherited_number_caveat",
+   "label": "'71.5× fewer tokens' is an unverified inherited number",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Control-arm rule 6 caveat: the headline '71.5× fewer tokens' (in the video, Rosati README, Medium reposts) is an unverified creator/vendor benchmark tracing to graphify's own token-reduction benchmark on a 52-file corpus, n=1, no independent control — do NOT bank it. CONFIRMED is the existence and shape of the pattern and tools, not the multiplier. Star counts likewise soft (video 42k vs web ~37k for obsidian-skills)."
+  },
+  {
+   "id": "second_brain_dogfood_process_lesson",
+   "label": "Process lesson: query the local substrate first",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A probes-need-a-control-arm failure of a new kind: the research sweep never queried the local substrate (the 121MB KB graph) that already indexed the answer — it researched 'graphify as a second brain' without querying the graphify second brain that already held sources on it. Standing lesson folded into the DESIGN handoff: before declaring external 'novel whitespace', query the in-house graph first — the cheapest control arm, one command away."
+  },
+  {
+   "id": "second_brain_research_method",
+   "label": "Research method: 4 parallel threads + Opus verification",
+   "file_type": "concept",
+   "source_file": "second-brain-report-20260722b.md",
+   "source_url": "local://dotfiles/.omc/research/research-20260722b-graphify-second-brain/report.md",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Method that produced this report (closing the RESEARCH phase of a RESEARCH→DESIGN→PROTOTYPE arc): 4 parallel research threads (general-purpose agents over web + local + installed-source) plus 1 Opus verification pass that independently re-probed every load-bearing claim with control arms. graphify 0.9.23 installed; the sibling knowledge-base repo already runs graphify as a substrate."
+  }
+ ],
+ "edges": [
+  {
+   "source": "autonomous_bible_foundation_first_sequencing",
+   "target": "autonomous_bible_graphify_foundation",
+   "relation": "sequences",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_graphify_foundation",
+   "target": "autonomous_bible_knowledge_layer",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_knowledge_layer",
+   "target": "autonomous_bible_specialists",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_specialists",
+   "target": "autonomous_bible_orchestrator",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_vision",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_program_vs_prd",
+   "target": "autonomous_bible_vision",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_knowledge_layer",
+   "target": "autonomous_bible_kb_search_readthrough",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_knowledge_layer",
+   "target": "autonomous_bible_writeback_gated",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_knowledge_layer",
+   "target": "autonomous_bible_provenance_confidence",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_provenance_confidence",
+   "target": "autonomous_bible_writeback_gated",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_specialists",
+   "target": "autonomous_bible_g3_expert_view",
+   "relation": "requires",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_kb_search_readthrough",
+   "target": "autonomous_bible_g2_lightweight_append",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_build_on_graphify_verdict",
+   "target": "autonomous_bible_staleness_scorer_g1",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_build_on_graphify_verdict",
+   "target": "autonomous_bible_g2_lightweight_append",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_build_on_graphify_verdict",
+   "target": "autonomous_bible_g3_expert_view",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_build_on_graphify_verdict",
+   "target": "autonomous_bible_kb_search_readthrough",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_build_on_graphify_verdict",
+   "target": "autonomous_bible_reject_graphdb_memory",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_prior_art_gate",
+   "target": "autonomous_bible_build_on_graphify_verdict",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_build_on_graphify_verdict",
+   "target": "autonomous_bible_graphify_maturity_risk",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_staleness_scorer_g1",
+   "target": "autonomous_bible_reject_graphdb_memory",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_ast_solid_semantic_risky",
+   "target": "autonomous_bible_graphify_foundation",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_no_auto_hook",
+   "target": "autonomous_bible_writeback_gated",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_single_writer_sqlite",
+   "relation": "requires",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_single_writer_sqlite",
+   "target": "autonomous_bible_postgres_flip_point",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_dbos_bridge",
+   "target": "autonomous_bible_single_writer_sqlite",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_dbos_bridge",
+   "target": "autonomous_bible_postgres_flip_point",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_iceoryx_out",
+   "target": "autonomous_bible_single_writer_sqlite",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_verify_gate_guardrail",
+   "target": "autonomous_bible_failure_handling",
+   "relation": "verifies",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_verify_gate_guardrail",
+   "target": "autonomous_bible_merge_boundary",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_rag_graph_into_workers",
+   "target": "autonomous_bible_knowledge_layer",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_litellm_routing_seam",
+   "target": "autonomous_bible_provider_ladder",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_provider_ladder",
+   "target": "autonomous_bible_zero_cost_ingestion",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator_dispatch_seams",
+   "target": "autonomous_bible_lane_supervisor",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_lane_supervisor",
+   "target": "autonomous_bible_verify_gate_guardrail",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_fable_architect_only",
+   "target": "autonomous_bible_lane_supervisor",
+   "relation": "defines",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_fable_architect_only",
+   "target": "autonomous_bible_verify_gate_guardrail",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator_recommendation",
+   "target": "autonomous_bible_fable_architect_only",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator_recommendation",
+   "target": "autonomous_bible_reject_leaked_fable_prompt",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator_recommendation",
+   "target": "autonomous_bible_orchestrator",
+   "relation": "defines",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_native_autonomy_primitives",
+   "target": "autonomous_bible_orchestrator",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_native_autonomy_primitives",
+   "target": "autonomous_bible_escalation_channels",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_autonomy_scope",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_merge_boundary",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_fork_policy",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_surprise_crosscheck",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_failure_handling",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_escalation_channels",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_orchestrator",
+   "target": "autonomous_bible_observability_event_stream",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_merge_boundary",
+   "target": "autonomous_bible_residual_risks",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_prior_art_gate",
+   "target": "autonomous_bible_prior_art_in_repo",
+   "relation": "routes_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_discord_skip",
+   "target": "autonomous_bible_escalation_channels",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_staleness_scorer_g1",
+   "target": "autonomous_bible_provenance_confidence",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "autonomous_bible_zero_cost_ingestion",
+   "target": "autonomous_bible_ast_solid_semantic_risky",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "autonomous-execution-program-20260719.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_core_invariant_kb_only_search",
+   "target": "framework_plan_kb_search_read_through",
+   "relation": "enforced_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_kb_search_read_through",
+   "target": "framework_plan_topology_growth_louvain",
+   "relation": "compounds_graph_via",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_kb_search_two_tier_split",
+   "target": "framework_plan_kb_search_read_through",
+   "relation": "revises",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_kb_search_two_tier_split",
+   "target": "framework_plan_eventually_synchronous_capture",
+   "relation": "results_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_eventually_synchronous_capture",
+   "target": "framework_plan_core_invariant_kb_only_search",
+   "relation": "softens",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_g1_staleness_scorer",
+   "target": "framework_plan_decision_auto_compound_with_g1",
+   "relation": "prerequisite_for",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_g1_rescope_r3",
+   "target": "framework_plan_g1_staleness_scorer",
+   "relation": "corrects",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_g1_staleness_scorer",
+   "target": "framework_plan_free_ingest_query",
+   "relation": "wires_into",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_reuse_rebuild_lock_r4",
+   "target": "framework_plan_single_writer_lock",
+   "relation": "revises",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_single_writer_lock",
+   "target": "framework_plan_topology_growth_louvain",
+   "relation": "serializes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_quarantine_gate",
+   "target": "framework_plan_poisoning_risk_r8",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_quarantine_gate",
+   "target": "framework_plan_g1_staleness_scorer",
+   "relation": "orthogonal_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_lane_supervisor_thin_seam",
+   "target": "framework_plan_run_lane_supervisor",
+   "relation": "wraps",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_lane_supervisor_thin_seam",
+   "target": "framework_plan_zero_bash_logic_both_repos",
+   "relation": "revises",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_egress_deny_hook_matrix",
+   "target": "framework_plan_tool_availability_enforcement",
+   "relation": "revises",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_egress_deny_hook_matrix",
+   "target": "framework_plan_core_invariant_kb_only_search",
+   "relation": "enforces",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_antigravity_native_enforcement",
+   "target": "framework_plan_egress_deny_hook_matrix",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_research_compounding_loop",
+   "target": "framework_plan_research_pass_sequence",
+   "relation": "repeats",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_research_pass_sequence",
+   "target": "framework_plan_kb_search_read_through",
+   "relation": "grounds_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_research_pass_sequence",
+   "target": "framework_plan_write_back_overlay",
+   "relation": "compounds_via",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_research_pass_sequence",
+   "target": "framework_plan_obsidian_derived_view",
+   "relation": "surfaces_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_research_compounding_loop",
+   "target": "framework_plan_fable5_orchestrator_doctrine",
+   "relation": "driven_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_fable5_orchestrator_doctrine",
+   "target": "framework_plan_verify_gate_oracle",
+   "relation": "gated_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_fable5_orchestrator_doctrine",
+   "target": "framework_plan_run_lane_supervisor",
+   "relation": "uses",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_decision_native_substrate",
+   "target": "framework_plan_goal_primitive",
+   "relation": "adopts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_decision_native_substrate",
+   "target": "framework_plan_dbos_graduation_path",
+   "relation": "defers_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_goal_transcript_constraint",
+   "target": "framework_plan_goal_primitive",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_goal_primitive",
+   "target": "framework_plan_outer_loop_queue",
+   "relation": "drives",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_decision_auto_compound_with_g1",
+   "target": "framework_plan_quarantine_gate",
+   "relation": "made_safe_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_free_ingest_query",
+   "target": "framework_plan_graphify_substrate",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_write_back_overlay",
+   "target": "framework_plan_topology_growth_louvain",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_obsidian_after_the_fact_r10",
+   "target": "framework_plan_obsidian_derived_view",
+   "relation": "clarifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_tool_availability_enforcement",
+   "target": "framework_plan_ptc_optional_accelerant",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_ptc_optional_accelerant",
+   "target": "framework_plan_kb_search_read_through",
+   "relation": "optionally_accelerates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_home_kb_repo",
+   "target": "framework_plan_research_compounding_loop",
+   "relation": "hosts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_outer_loop_queue",
+   "target": "framework_plan_research_pass_sequence",
+   "relation": "schedules",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_raga_validation",
+   "target": "framework_plan_core_invariant_kb_only_search",
+   "relation": "validates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_raga_validation",
+   "target": "framework_plan_quarantine_gate",
+   "relation": "validates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_sequencing_fable5_first",
+   "target": "framework_plan_fable5_orchestrator_doctrine",
+   "relation": "prioritizes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_phased_build",
+   "target": "framework_plan_dogfood_ingest_step1",
+   "relation": "begins_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_dogfood_ingest_step1",
+   "target": "framework_plan_core_invariant_kb_only_search",
+   "relation": "applies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_phased_build",
+   "target": "framework_plan_research_compounding_loop",
+   "relation": "delivers",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_web_search_backend_r7",
+   "target": "framework_plan_kb_search_read_through",
+   "relation": "required_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_kb_search_read_through",
+   "target": "framework_plan_core_invariant_kb_only_search",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_g1_staleness_scorer",
+   "target": "framework_plan_poisoning_risk_r8",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "framework_plan_dbos_graduation_path",
+   "target": "framework_plan_sequencing_fable5_first",
+   "relation": "layers_on",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "framework-plan-ladybug.md",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_harness_engineering_discipline",
+   "target": "harness_research_p7_verification_gate",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_harness_engineering_discipline",
+   "target": "harness_research_entropy_management",
+   "relation": "includes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p1_journal_replay_durability",
+   "target": "harness_research_idempotent_outbox",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p1_journal_replay_durability",
+   "target": "harness_research_incremental_capture_invariant",
+   "relation": "enforces",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p1_journal_replay_durability",
+   "target": "harness_research_p4_event_driven_scheduling",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p2_persistent_workspace_resume",
+   "target": "harness_research_read_through_kb",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p3_state_machine_review_gate",
+   "target": "harness_research_p7_verification_gate",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p3_state_machine_review_gate",
+   "target": "harness_research_p8_four_tier_escalation",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p4_event_driven_scheduling",
+   "target": "harness_research_p8_four_tier_escalation",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p5_raga_kb_memory",
+   "target": "harness_research_read_through_kb",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p5_raga_kb_memory",
+   "target": "harness_research_bi_temporal_provenance",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p5_raga_kb_memory",
+   "target": "harness_research_p7_verification_gate",
+   "relation": "applies",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p6_cost_routing",
+   "target": "harness_research_p7_verification_gate",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p6_cost_routing",
+   "target": "harness_research_fable5_first_sequencing",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_symphony_conductor",
+   "target": "harness_research_p3_state_machine_review_gate",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_symphony_conductor",
+   "target": "harness_research_p4_event_driven_scheduling",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_symphony_conductor",
+   "target": "harness_research_p2_persistent_workspace_resume",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_symphony_conductor",
+   "target": "harness_research_p6_cost_routing",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_augment_five_stage_loop",
+   "target": "harness_research_p7_verification_gate",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_augment_five_stage_loop",
+   "target": "harness_research_read_through_kb",
+   "relation": "supports",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_sol_durable_goal_workflow",
+   "target": "harness_research_p3_state_machine_review_gate",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_sol_durable_goal_workflow",
+   "target": "harness_research_protected_context_agents_inspect",
+   "relation": "includes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_sol_durable_goal_workflow",
+   "target": "harness_research_p6_cost_routing",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_protected_context_agents_inspect",
+   "target": "harness_research_read_through_kb",
+   "relation": "supports",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_blackboard_volunteer",
+   "target": "harness_research_p4_event_driven_scheduling",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_fable5_first_sequencing",
+   "target": "harness_research_symphony_conductor",
+   "relation": "borrows_from",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_fable5_first_sequencing",
+   "target": "harness_research_sol_durable_goal_workflow",
+   "relation": "borrows_from",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_fable5_first_sequencing",
+   "target": "harness_research_augment_five_stage_loop",
+   "relation": "borrows_from",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_fable5_first_sequencing",
+   "target": "harness_research_p1_journal_replay_durability",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_fable5_first_sequencing",
+   "target": "harness_research_marketplace_design_references",
+   "relation": "informed_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_fanout_bounds_wake_budgets",
+   "target": "harness_research_p6_cost_routing",
+   "relation": "supports",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_p8_four_tier_escalation",
+   "target": "harness_research_idempotent_outbox",
+   "relation": "requires",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "harness_research_read_through_kb",
+   "target": "harness_research_bi_temporal_provenance",
+   "relation": "requires",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "harness-engineering-research.json",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_thesis",
+   "target": "second_brain_graphify_update_free_structural",
+   "relation": "relies_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_thesis",
+   "target": "second_brain_kb_query_deterministic",
+   "relation": "relies_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_thesis",
+   "target": "second_brain_learning_writeback",
+   "relation": "relies_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_obsidian_frontend",
+   "target": "second_brain_plain_md_source_of_truth",
+   "relation": "constrained_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_graphify_update_free_structural",
+   "target": "second_brain_plain_md_source_of_truth",
+   "relation": "ingests",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_paid_semantic_layer",
+   "target": "second_brain_graphify_update_free_structural",
+   "relation": "supersedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_kb_serve_optin_mcp",
+   "target": "second_brain_kb_query_deterministic",
+   "relation": "escalates_from",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_graphrag_capability_to_build",
+   "target": "second_brain_no_global_search_gap",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_no_automatic_kg",
+   "target": "second_brain_learning_writeback",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_learning_writeback",
+   "target": "second_brain_capture_map_ask_writeback_loop",
+   "relation": "instance_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_obsidian_skills_hands",
+   "target": "second_brain_learning_writeback",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_obsidian_skills_hands",
+   "target": "second_brain_obsidian_frontend",
+   "relation": "writes_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_dropin_prior_art_refutes_novelty",
+   "target": "second_brain_routing_grounding_novelty",
+   "relation": "narrows_novelty_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_routing_grounding_novelty",
+   "target": "second_brain_kb_query_deterministic",
+   "relation": "grounds_decisions_via",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_concurrency_single_writer",
+   "target": "second_brain_open_questions_design",
+   "relation": "informs",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_first_prototype",
+   "target": "second_brain_open_questions_design",
+   "relation": "resolves",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_logseq_deadend",
+   "target": "second_brain_obsidian_frontend",
+   "relation": "eliminated_in_favor_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_dogfood_process_lesson",
+   "target": "second_brain_dropin_prior_art_refutes_novelty",
+   "relation": "surfaced",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_inherited_number_caveat",
+   "target": "second_brain_dropin_prior_art_refutes_novelty",
+   "relation": "qualifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_research_method",
+   "target": "second_brain_thesis",
+   "relation": "produced",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_prior_art_borrow_study_avoid",
+   "target": "second_brain_learning_writeback",
+   "relation": "sources_patterns_for",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_prior_art_borrow_study_avoid",
+   "target": "second_brain_graphrag_capability_to_build",
+   "relation": "sources_patterns_for",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_no_global_search_gap",
+   "target": "second_brain_kb_query_deterministic",
+   "relation": "limits",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  },
+  {
+   "source": "second_brain_capture_map_ask_writeback_loop",
+   "target": "second_brain_obsidian_skills_hands",
+   "relation": "uses",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "second-brain-report-20260722b.md",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [],
+ "input_tokens": 0,
+ "output_tokens": 0
+}

@@ -51,8 +51,58 @@ not just ingested).
 | 25 | [youtu.be/RGVXR0OFNzI](https://youtu.be/RGVXR0OFNzI) | media | T1 | prose | Ray-added video. Transcribed + extracted 2026-07-22. |
 | 26 | [youtu.be/mHSOsy_usAg](https://youtu.be/mHSOsy_usAg) | media | T1 | prose | Ray-added video. Transcribed + extracted 2026-07-22. |
 | 27 | [youtu.be/0CZtRw0KrXo](https://youtu.be/0CZtRw0KrXo) | media | T1 | prose | Ray-added video. Transcribed + extracted 2026-07-22. |
+| 28 | [openai/symphony](https://github.com/openai/symphony) | repo | T1 | code | Conductor + DB-free filesystem/tracker recovery; long-horizon orchestration. AST-ingested 2026-07-23. |
+| 29 | [kumanday/OpenSymphony](https://github.com/kumanday/OpenSymphony) | repo | T1 | code | Open port of the Symphony conductor pattern. AST 2026-07-23. |
+| 30 | [zaalipro/cymphony](https://github.com/zaalipro/cymphony) | repo | T2 | code | Symphony-family orchestration port. AST 2026-07-23. |
+| 31 | [Sugar-Coffee/stokowski](https://github.com/Sugar-Coffee/stokowski) | repo | T2 | code | Symphony-family conductor port. AST 2026-07-23. |
+| 32 | [ReyJ94/Sol-Orchestrator](https://github.com/ReyJ94/Sol-Orchestrator) | repo | T1 | code | Durable-goal/disposable-workflow split; blackboard volunteer pattern. AST 2026-07-23. |
+| 33 | [ai-boost/awesome-harness-engineering](https://github.com/ai-boost/awesome-harness-engineering) | repo | T2 | code | Harness-engineering catalog. AST 2026-07-23. |
+| 34 | [shareAI-lab/learn-claude-code](https://github.com/shareAI-lab/learn-claude-code) | repo | T2 | code | CC internals / harness-engineering notes. AST 2026-07-23. |
+| 35 | [MarcosNahuel/antigravity-plugin-cc](https://github.com/MarcosNahuel/antigravity-plugin-cc) | repo | T1 | code | antigravity lane wiring for CC. AST 2026-07-23. |
+| 36 | [simplybychris/antigravity-plugin-cc](https://github.com/simplybychris/antigravity-plugin-cc) | repo | T1 | code | antigravity lane wiring variant. AST 2026-07-23. |
+| 37 | [basicmachines-co/basic-memory](https://github.com/basicmachines-co/basic-memory) | repo | T1 | code | Read-through + MCP memory patterns; markdown substrate. AST 2026-07-23. |
+| 38 | [topoteretes/cognee](https://github.com/topoteretes/cognee) | repo | T2 | code | ingest→graph→retrieval memory engine (design ref). AST 2026-07-23. |
+| 39 | [lucasrosati/claude-code-memory-setup](https://github.com/lucasrosati/claude-code-memory-setup) | repo | T1 | code | Vault template + chat-import; second-brain prior art. AST 2026-07-23. |
+| 40 | [addyosmani — agent-harness-engineering](https://addyosmani.com/blog/agent-harness-engineering/) | article | T1 | prose | Harness = everything but the model; Agent=Model+Harness. Prose extracted 2026-07-23. |
+| 41 | [augmentcode — what is loop engineering](https://www.augmentcode.com/blog/what-is-loop-engineering-and-how-are-leading-software-engineering-teams-using-it) | article | T1 | prose | Loop engineering: Trigger→Execute→Verify→Outcome→Improve. Extracted 2026-07-23. |
+| 42 | [youmind — loop engineering guide](https://youmind.com/landing/x-viral-articles/loop-engineering-ai-agents-guide) | article | T1 | prose | Loop = recursive goal + verifiable stop condition. Extracted 2026-07-23. |
+| 43 | [martinfowler/Böckeler — harness engineering](https://martinfowler.com/articles/harness-engineering.html) | article | T1 | prose | Foundational harness-engineering overview (user-side). Extracted 2026-07-23. |
+| 44 | [agent-engineering.dev — harness engineering 2026](https://www.agent-engineering.dev/article/harness-engineering-in-2026-the-discipline-that-makes-ai-agents-production-ready) | article | T1 | prose | Harness = 3rd maturity phase; 5 layers. Extracted 2026-07-23. |
+| 45 | [humanlayer — skill-issue harness engineering](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents) | article | T1 | prose | Most agent failures = config skill-issues, not model weights. Extracted 2026-07-23. |
+| 46 | [platform.claude — code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) | docs | T1 | prose | Sandboxed Python/bash; powers PTC + dynamic filtering. Fetched via mintlify `.md`. Extracted 2026-07-23. |
+| 47 | [openai — harness engineering (Codex)](https://openai.com/index/harness-engineering/) | article | T1 | prose | Codex agent-first (Ryan Lopopolo): repo-knowledge as system of record, AGENTS.md-as-TOC, increasing autonomy, entropy GC / golden principles. FULL text recovered via logged-in Chrome (graphify fetch got TOC only; WebFetch 403'd). 2026-07-23. |
+| 48 | [platform.claude — programmatic tool calling (PTC)](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling) | docs | T1 | prose | PTC: Claude writes Python calling tools as async fns; 20-40% fewer tokens. Vendored + extracted 2026-07-23. |
+| 49 | framework plan — long-running autonomous framework (ladybug) | designdoc | T1 | prose | OUR design: kb_search read-through, G1 staleness, single-writer lock, quarantine gate, compounding loop. Vendored 2026-07-23. |
+| 50 | second-brain report (2026-07-22b) | designdoc | T1 | prose | OUR research: graphify update ingests md vault free; Capture→Map→Ask→Write-back. Vendored 2026-07-23. |
+| 51 | autonomous-execution program bible (2026-07-19) | designdoc | T1 | prose | OUR locked-decisions design for the graphify-substrate autonomous program. Vendored 2026-07-23. |
+| 52 | harness-engineering research (2026-07-23) | designdoc | T1 | prose | OUR research: P1-P8 patterns, RAGA, BORROW/AVOID. Vendored 2026-07-23. |
+| 53 | [claude-plugins-community — marketplace inventory (235 relevant)](https://github.com/anthropics/claude-plugins-community) | inventory | T2 | prose | Queryable 235-plugin harness/orchestration/memory inventory. Extracted 2026-07-23. |
+| 54 | [louisbouchard — Graph Engineering Explained](https://www.louisbouchard.ai/graph-engineering-explained/) | article | T1 | prose | Graph engineering = connecting agent loops; nodes now interpret tasks; Airflow/DAG lineage; organized-nonsense; reality anchors. Canonical home of the LinkedIn "graph-engineering-explained" post (LinkedIn URL = login wall). FULL text via logged-in Chrome. 2026-07-23. |
+| 55 | [antigravity.google/docs/cli/permissions](https://antigravity.google/docs/cli/permissions) | docs | T2 | deferred | BLOCKED: JS-rendered SPA — both graphify fetch and browser got marketing nav only, no doc body. R2 antigravity-deny detail lives in the framework plan (#49). |
+| 56 | [x.com/towards_AI — "what the hell is graph engineering"](https://x.com/towards_AI/article/2078892237287801283) | article | T1 | prose | Graph = map of who-does-what-next; loops-vs-graphs (graphs contain loops); DAGs vs cycles; reality anchors. RECOVERED via logged-in Chrome (X auth wall). 2026-07-23. |
 
 ## Progress log
+
+- **2026-07-23 — long-running-framework wave (sources #28–#56).** Staged ingestion for
+  the autonomous-framework program (plan: `we-want-a-long-mighty-ladybug.md`).
+  - **12 repos AST-ingested (free, no tokens)** via manifests + `kb-build`: openai/symphony
+    + ports (OpenSymphony, cymphony, stokowski), Sol-Orchestrator, awesome-harness-engineering,
+    learn-claude-code, both antigravity-plugin-cc, basic-memory, cognee, claude-code-memory-setup.
+    Graph 62k → ~120k nodes.
+  - **16 focus docs host-agent extracted** (two Claude `Workflow` fan-outs, 0 errors, ~1.78M
+    subagent tokens) → 3 combined chunks: `harness-loop-graph-engineering-docs.json` (265n/317e),
+    `framework-design-docs.json` (128n/156e — OUR plan + second-brain + autonomous bible + harness
+    research), `marketplace-inventory-docs.json` (234 plugin nodes / 219 category edges). Total new
+    doc content: 627 nodes / 692 edges.
+  - **Browser recovery (logged-in Chrome)** where graphify's fetcher hit walls/JS/12k-cap:
+    **openai/Codex harness** (TOC-only + WebFetch-403 → FULL), **X/@towards_AI graph-engineering**
+    (auth wall → FULL), **martinfowler/Böckeler** (truncated → FULL), **LinkedIn graph-engineering**
+    (login wall → recovered via canonical louisbouchard.ai). One dead-end: **antigravity CLI
+    /permissions** (JS SPA, no doc body in DOM either route) — covered by the vendored framework plan.
+  - Ingestion path: every source routed THROUGH graphify (`kb-add` fetch, or vendored + host-agent
+    extract → `kb-merge`/`kb-build`), per CLAUDE.md invariant 5. Committed = reproducible inputs
+    (manifests + extraction chunks + vendored `sources/media/` bodies + this REGISTRY); `graph.json`
+    derived/gitignored, reproduced by `kb-build`.
 
 - **2026-07-22 — code layer ingested (free AST, no tokens).** 10 repos code-ingested
   into the aggregate graph (60,893 nodes / 133,003 edges / 2,351 communities):

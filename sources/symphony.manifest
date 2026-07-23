@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# OpenAI Symphony — conductor + DB-free filesystem/tracker recovery; long-horizon multi-agent orchestration (T1).
+url = https://github.com/openai/symphony
+ref = main
+commit = 1f3219bb1ea5f69a1305dc594e79b0db57c113c5
+kind = code
+added = 2026-07-23

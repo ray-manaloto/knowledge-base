@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# antigravity plugin for Claude Code (Chris) — antigravity lane wiring variant (T1).
+url = https://github.com/simplybychris/antigravity-plugin-cc
+ref = main
+commit = 50d32eaef297d9bd5bdbfbb60a4c1a2b4bb8ed01
+kind = code
+added = 2026-07-23
