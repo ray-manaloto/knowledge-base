@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Harness-engineering catalog — curated links + concepts (T2).
+url = https://github.com/ai-boost/awesome-harness-engineering
+ref = main
+commit = 6e92165e75573531de2690e4464ff5a5bf9480ec
+kind = code
+added = 2026-07-23

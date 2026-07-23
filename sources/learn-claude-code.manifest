@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# learn-claude-code — CC internals / harness engineering notes (T2).
+url = https://github.com/shareAI-lab/learn-claude-code
+ref = main
+commit = a9cafe953aa714f9cb1171f217d96bd2734bbcc7
+kind = code
+added = 2026-07-23

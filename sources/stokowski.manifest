@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# stokowski — Symphony-family conductor port (T2).
+url = https://github.com/Sugar-Coffee/stokowski
+ref = main
+commit = 6e51bdf26c8cf6206893beb7c01b71297539469d
+kind = code
+added = 2026-07-23

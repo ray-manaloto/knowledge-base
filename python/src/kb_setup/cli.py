@@ -11,6 +11,8 @@ from pathlib import Path
 
 from kb_setup import __version__
 
+_ASSEMBLE_MIN_ARGS = 2  # <name> + at least one <chunk.json>
+
 
 def main(argv: list[str] | None = None) -> int:
     """Dispatch a kb-setup subcommand; returns the process exit code."""
@@ -81,15 +83,99 @@ def main(argv: list[str] | None = None) -> int:
         got = ensure_runtime_deps(repo_root)
         print(f"[deps] {'installed ' + ', '.join(got) if got else 'all output deps present'}")
         return 0
+    if cmd == "manifest-add":
+        return _manifest_add(repo_root, rest)
+    if cmd == "assemble":
+        return _assemble(repo_root, rest)
+    if cmd == "validate-chunks":
+        return _validate_chunks(rest)
 
     print(
         f"kb-setup: unknown command {cmd!r} "
         "(build | update [name] | merge <chunk> [root] | label [--missing-only] "
-        "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
-        "ensure-deps | version)",
+        "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | manifest-add <url> "
+        "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
+        "validate-chunks <chunk...> | ensure-deps | version)",
         file=sys.stderr,
     )
     return 2
+
+
+def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
+    """Read `--flag value` from a manual arg list (positional-friendly dispatch)."""
+    if flag in rest and rest.index(flag) + 1 < len(rest):
+        return rest[rest.index(flag) + 1]
+    return default
+
+
+def _manifest_add(repo_root: Path, rest: list[str]) -> int:
+    from kb_setup import manifest
+
+    urls = [a for a in rest if a.startswith(("http://", "https://", "git@"))]
+    if not urls:
+        print(
+            "kb-setup manifest-add <url> [--ref --kind --name --comment --force]", file=sys.stderr
+        )
+        return 2
+    source = manifest.NewSource(
+        url=urls[0],
+        ref=_opt(rest, "--ref", "main") or "main",
+        kind=_opt(rest, "--kind", "code") or "code",
+        name=_opt(rest, "--name"),
+        comment=_opt(rest, "--comment"),
+    )
+    try:
+        m = manifest.add(repo_root / "sources", source, force="--force" in rest)
+    except (FileExistsError, RuntimeError) as e:
+        print(f"[kb-manifest-add] {e}", file=sys.stderr)
+        return 1
+    print(f"[kb-manifest-add] wrote {m.path.relative_to(repo_root)} @ {m.commit}")
+    return 0
+
+
+def _assemble(repo_root: Path, rest: list[str]) -> int:
+    import json
+
+    from kb_setup import chunks
+
+    args = [a for a in rest if not a.startswith("--")]
+    if not args or len(args) < _ASSEMBLE_MIN_ARGS:
+        print("kb-setup assemble <name> <chunk.json>...", file=sys.stderr)
+        return 2
+    name, *chunk_strs = args
+    chunk_paths = [Path(a) for a in chunk_strs]
+    try:
+        out = chunks.assemble(repo_root, name, chunk_paths)
+    except ValueError as e:
+        print(f"[kb-assemble] {e}", file=sys.stderr)
+        return 1
+    combined = json.loads(out.read_text(encoding="utf-8"))
+    print(
+        f"[kb-assemble] wrote {out.relative_to(repo_root)}: "
+        f"{len(combined['nodes'])} nodes, {len(combined['edges'])} edges "
+        f"from {len(chunk_paths)} chunk(s)"
+    )
+    return 0
+
+
+def _validate_chunks(rest: list[str]) -> int:
+    from kb_setup import chunks
+
+    paths = [Path(a) for a in rest if not a.startswith("--")]
+    if not paths:
+        print("kb-setup validate-chunks <chunk.json>...", file=sys.stderr)
+        return 2
+    results = chunks.validate_files(paths)
+    bad = 0
+    for p, issues in results.items():
+        if issues:
+            bad += 1
+            print(f"✗ {p}:", file=sys.stderr)
+            for i in issues:
+                print(f"    {i}", file=sys.stderr)
+        else:
+            print(f"✓ {p}")
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":

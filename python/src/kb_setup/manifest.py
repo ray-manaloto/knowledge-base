@@ -84,3 +84,59 @@ def write_commit(m: Manifest, commit: str) -> Manifest:
             break
     m.path.write_text("".join(lines), encoding="utf-8")
     return replace(m, commit=commit)
+
+
+def name_from_url(url: str) -> str:
+    """Derive the manifest stem from a repo URL (last path segment, no `.git`)."""
+    return url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+
+
+@dataclass(frozen=True)
+class NewSource:
+    """A repo source to pin: url (required) + optional ref/kind/name/comment.
+
+    Bundled so `add()` stays a small (sources_dir, source, *, force) call. `name`
+    defaults to the URL's last path segment; set it to disambiguate two repos that
+    share a basename (e.g. two `antigravity-plugin-cc` forks).
+    """
+
+    url: str
+    ref: str = "main"
+    kind: str = "code"
+    name: str | None = None
+    comment: str | None = None
+
+    @property
+    def stem(self) -> str:
+        """The manifest file stem (explicit name, else derived from the url)."""
+        return self.name or name_from_url(self.url)
+
+
+def add(sources_dir: Path, source: NewSource, *, force: bool = False) -> Manifest:
+    """Create `sources/<stem>.manifest` for a new repo, SHA-pinned at upstream HEAD.
+
+    The reusable replacement for hand-writing a manifest: resolve the pinned commit
+    via `latest_commit` (a `git ls-remote`, no clone — same path `kb-update` uses),
+    then write the file. Raises `FileExistsError` if the manifest already exists
+    unless `force` (so re-adds don't silently clobber a deliberately-pinned SHA —
+    advance an existing source with `kb-update`).
+    """
+    stem = source.stem
+    path = sources_dir / f"{stem}.manifest"
+    if path.exists() and not force:
+        raise FileExistsError(f"{path} already exists (use kb-update to advance, or --force)")
+    probe = Manifest(
+        name=stem, path=path, url=source.url, ref=source.ref, commit="", kind=source.kind
+    )
+    commit = latest_commit(probe)
+    header = "# Source manifest — reproducible-by-reference (Invariant 3)."
+    body = f"# {source.comment}\n" if source.comment else ""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"{header}\n{body}url = {source.url}\nref = {source.ref}\n"
+        f"commit = {commit}\nkind = {source.kind}\n",
+        encoding="utf-8",
+    )
+    return Manifest(
+        name=stem, path=path, url=source.url, ref=source.ref, commit=commit, kind=source.kind
+    )

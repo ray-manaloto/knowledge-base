@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# cognee — ingest -> graph -> retrieval memory engine (design reference, T2).
+url = https://github.com/topoteretes/cognee
+ref = main
+commit = 90b4acaac937dc1c0aeffaead8b707c896ebf3db
+kind = code
+added = 2026-07-23

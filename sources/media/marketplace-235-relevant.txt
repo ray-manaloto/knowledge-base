@@ -1,0 +1,223 @@
+TOTAL: 2263 | STRONG-relevant: 235
+BEYOND agent*/ai* front: 219
+
+=== BEYOND-FRONT relevant plugins (the d–z gap) ===
+- 16minds — 16-minds summons agents modeled on 16 distinct personality types — each with its own values, thinking patterns, and tone — to debate, review
+- 8-habit-ai-dev — 8-habit-ai-dev replaces ad-hoc AI prompting with a structured 7-step workflow: Research → Requirements → Design → Breakdown → Build Brief → 
+- adversarial-spec — Iteratively refine product specs through multi-model debate until consensus. Claude actively participates alongside GPT, Gemini, Grok, and o
+- aeon-flux — Bash Loop operating mode for Claude Code — action over explanation. Eliminates verbose preamble and apologies, replacing them with tight do-
+- ag2-claude-plugins — A Claude Code plugin marketplace for building AG2 (AutoGen) agents and multi-agent workflows. Includes 5 plugins: agent scaffolding (Convers
+- al-development-collection-for-claude-code — ALDC (AL Development Collection) is a comprehensive AI-assisted development toolkit for Microsoft Dynamics 365 Business Central.  It provide
+- aldc-al-development-plugin-for-business-central — ALDC (AL Development Collection) transforms how you develop Business Central extensions with Claude Code. Instead of ad-hoc code generation,
+- anamnese-core — Secure, portable, cloud-persistent memory across every conversation. Store and retrieve your personal facts, decisions, tasks, goals, and no
+- anti-ai-writing — Edits any draft to remove the words, phrases, and structures that mark writing as AI output. Strips banned words like delve, unlock, leverag
+- aomi-build — Use this to build agents hosted by Aomi Labs. An Aomi app is a platform-specific Rust API client compiled into an agentic application and lo
+- aomi-transact — Use this skill to build natural-language crypto agents, web3 assistants, trading bots, blockchain MCPs, or Claude/Cowork plugins that read a
+- architecture-studio — Description:  Architecture Studio is a Claude plugin system for architects, designers, and AEC professionals. It includes 7 autonomous agent
+- atelier — Universal multi-agent project harness for Claude Code — run any project through a structured AI team from discovery to release.
+- atelier-pipeline — Atelier Pipeline has two core systems:  Multi-Agent Orchestration. Eleven specialized agent personas with clear responsibilities, strict bou
+- attacca — Attacca is a multi-agent coding orchestrator. Manager plans, Engineer builds, Security audits, you ship. Seven Specialists, one workplace.
+- audit-project — Multi-agent iterative code review until zero issues remain. Spawns up to 10 specialist reviewers (code quality, security, performance, test 
+- avicenna — Code knowledge graph MCP extension — semantic code search, symbol lookup, and dependency analysis powered by tree-sitter and vector embeddin
+- axme-code — Persistent memory, architectural decisions, and safety guardrails for Claude Code. Your agent starts every session with full project context
+- backpack-ontology — A persistent knowledge graph engine for Claude Code. Gives your AI agent structured, searchable memory that persists across sessions — store
+- belmont — A toolkit for running structured coding sessions with AI coding agents. Belmont manages a PRD (Product Requirements Document), orchestrates 
+- blue-collar-governance — Deterministic AI governance runtime for Claude Code. 22 JavaScript engines compute governance decisions before the AI agent sees them — no L
+- blueprint-sdlc — Blueprint SDLC — 27 slash commands that turn Claude Code into a disciplined engineering team. Full pipeline from /backlog through   /finish 
+- briefing — A Claude Code plugin that lets a subagent declare its required skills in frontmatter — and guarantees they are loaded before the agent think
+- browser-harness — Open-source browser agent driven via CDP — direct browser control, 79K stars, YC W25.  browser-harness gives Claude Code direct, low-level c
+- building-multiagent-systems — Architecture patterns for multi-agent systems with orchestrators, sub-agents, and tool coordination
+- cc-native — cc-native keeps your Claude Code configuration aware of weekly feature changes.  Bundles a Guide-and-Verify workflow: an always-current edit
+- cc-orchestrador-subagents — O cc-orchestrador-subagents transforma o Claude Code em um gerente técnico de execução, não em "mais um agente que programa". A skill assume
+- cc10x-router-owned-harness — Supercharge Claude Code with Orchestrated Skills, Subagents, Persistent Memory
+- challenger — Multi-agent adversarial plugin that stress-tests code decisions, architecture plans, and reasoning through evidence-backed challenge rounds.
+- chess-coach-ai — AI-powered chess coaching system with multi-agent cowork architecture. 4 specialized agents work together to provide comprehensive coaching:
+- chrome-extension-builder — Use when scaffolding, validating, testing, or publishing a Manifest V3 Chrome/Edge/Firefox extension. Builds end-to-end with WXT, Plasmo, or
+- claude-alloy — Multi-agent orchestration harness for Claude Code. Adds 11 specialized agents (Steel orchestrates, Mercury searches, Tungsten executes), 11 
+- claude-code-survival-kit — 10 slash commands and 3 agent definitions distilled from 6 months of daily Claude Code use. Not a framework -- just the patterns that surviv
+- claude-cognis — Persistent memory for Claude Code powered by Cognis. Automatically loads relevant context at the start of every session and saves session su
+- claude-context-optimizer — Audit and optimize Claude Code context window usage. Runs a 9-phase analysis covering plugins, hooks, CLAUDE.md cascade, MCP servers, enviro
+- claude-crew — Claude Crew — Mobile Agent Harness A Claude Code plugin for Android & iOS mobile teams. Installs 8 specialist agents, 5 slash commands, life
+- claude-handoff — Auto-generate handoff prompts and restart Claude Code with fresh context
+- claude-harness — Autonomous Plan → Work → Review cycle for Claude Code. Go-native engine with 25× faster hooks, runtime guardrails on .git/ / secrets / destr
+- claude-lens — Fast statusline for Claude Code with pace tracking. Shows quota remaining and whether you're ahead or behind ideal consumption pace -- green
+- claude-library — 23 reusable skills, 2 agents, and smart hooks for any project. Covers the full development cycle: architecture mapping, implementation plann
+- claude-mem — Persistent memory system for Claude Code - seamlessly preserve context across sessions
+- claude-perfectionist — Claude Perfectionist audits your Claude Code instruction harness — CLAUDE.md, rules, hooks, settings, MCP config — and finds   contradiction
+- claude-project-context-manager — A skill and agent plugin that reads your project's architecture documentation — README.md, architecture.md, and related files — and enforces
+- claude-review-loop — Automated code review and swarm remediation for large changesets. Spawns adversarial reviewer agents, presents findings interactively, then 
+- claude-skills-gov — Free, open-source Claude Skills purpose-built for local government work. 68 skills across 13 plugins covering council operations, clerk, fin
+- claude-train-prep — Claude Code plugin: AI consulting training material workflow (Word report + HTML slides) with multi-agent parallelism
+- claude2figma — A Design System compliance harness for Claude Code + Figma. Instead of generating hardcoded values, it enforces library-first component look
+- claudetokensap — ClaudeTokenSAP is a Claude Code plugin marketplace focused on reducing context waste and improving session efficiency.  Its first plugin, To
+- clawket — LLM-native work management plugin for Claude Code. 10 lifecycle hooks auto-track your entire workflow — PreToolUse blocks code changes unles
+- closedloop — Open-source Claude Code plugins for multi-agent software delivery. Plan-first SDLC workflow, code review, LLM quality judges, and self-learn
+- cloudplayplus — Channel plugin that bridges Claude Code to a running CloudPlayPlus Flutter app. Messages from remote CloudPlayPlus users are pushed into Cla
+- cmux-ultimate — Complete cmux integration for Claude Code. Includes full CLI reference (~130 commands), browser automation (~40 subcommands with element ref
+- co-dialectic — Co-Dialectic is a real-time prompt coaching system that activates automatically on every response. It shows a persistent status line trackin
+- code-review-harness — Code review skill using the Generator-Evaluator harness pattern. An independent Evaluator that actually runs the code to find bugs that code
+- codealive — CodeAlive context engine for semantic code search and AI-powered codebase Q&A. Enables AI coding agents to understand entire codebases beyon
+- codealive-context-engine — CodeAlive context engine for semantic code search and AI-powered codebase Q&A. Enables AI coding agents to understand entire codebases beyon
+- codeflash — Run Codeflash as a background agent in Claude Code to automatically optimize Python, Java, JavaScript, and TypeScript code for performance. 
+- codesmith — Codesmith is a Claude Code plugin that enforces the full dev lifecycle: spec refinement → TDD → implementation → parallel multi-agent review
+- colosseum — proven wrong by search results, and earn scores based on accuracy and independence — not agreement. A built-in Devil's Advocate challenges t
+- compounded — compounded turns Claude Code skills into a trust-gradient system: every skill earns its autonomy through demonstrated reliability. New skill
+- conductor — Teach Claude to orchestrate microservices and business processes with Conductor. This skill adds full workflow lifecycle management: define 
+- coremem — CoreMem gives Claude persistent memory across every session. Your preferences, project context, and working style live in mems — structured 
+- cost-guard — Real-time USD cost enforcement for Claude Code. Halts runaway agentic loops mid-step before they burn through your budget.  The plugin enfor
+- crowdcast — Multi-agent social simulation for prediction and creative exploration. Zero external dependencies — runs entirely within Claude Code.
+- csitrep-generator — Multi-agent Situation Report (SitRep) generator for any project type. Drops 25 specialist AI agents across 5 domains to read your project do
+- ddw — A development harness for Claude Code that enforces disciplined workflows — decisions before code, tasks before implementation. Includes arc
+- debate — Structured multi-round debate between AI tools with proposer / challenger roles and a final verdict. `/debate` orchestrates a back-and-forth
+- decibel-peers — Peer network patterns for Claude Code agent specialization. Peers gives Claude instances structured identity, discovery, messaging, and hand
+- decision-council — AI advisory panel for decisions that matter. Decision Council assembles a panel of independent AI advisors to debate your decision from mult
+- deep-research — Multi-agent deep research pipelines for Claude Code. Runs internet research, repository analysis, schema-driven structured research, and med
+- deeplake-hivemind — Cloud-backed persistent memory for Claude Code powered by Deeplake. Automatically captures all session activity: user prompts, assistant res
+- demo-stage — Deploy static sites and demos to demo.st from Claude Code. Reserve a subdomain, upload a zip of your build, and get a live link like yourpro
+- dev-forge — SQLite-backed multi-agent development team orchestration with sprint contracts, wiki knowledge management, and automatic bug council escalat
+- devils-advocate — A devil's advocate agent that delivers the final critical review on plans, designs, and integration reports. Designed to break groupthink in
+- dj-claude — Adds live music and multi-agent jam band capabilities to Claude Code. Slash commands and MCP tools for setting vibes, building layered jam s
+- drift-detect — Deep repository analysis to realign project plans with actual code reality. `/drift-detect` discovers drift between documented plans (CHANGE
+- enam — Persistent memory for Claude Code — at ~350 tokens ambient cost, with no Docker, no API keys, and no MCP servers.  Engram captures your sess
+- engram — Persistent memory for AI agents. Give Claude real memory that survives across sessions -- semantic recall, automatic consolidation, knowledg
+- epic-harness — A Claude Code plugin that replaces 30+ commands with 6, auto-triggers skills based on what you're doing, and evolves new skills from your ow
+- ergo — Two paired toolkits for building and operating distributed actor-based systems with Ergo Framework (v3.3+) in Go.  • framework — a design-ti
+- experimental-engineer — A Claude Code subagent that explores unconventional, first-principles solutions to hard technical problems, pushing Claude out of its normal
+- fde-os — FDEOS makes Claude operate like an experienced Forward Deployed Engineer.                                                                   
+- fellowship — A LotR-themed multi-agent system for solo product devs. Gandalf orchestrates nine companions across product, architecture, engineering, revi
+- flow — Flow turns Claude into a project partner who manages your backlog. Say "park this for later," and it queues the idea. Say "what's next?" and
+- formal-agent-contracts — Formal methods toolkit for multi-agent development. Define inter-agent contracts in VDM-SL, verify with VDMJ, prove with Z3, and generate Ty
+- fortytwo-mcp — Fortytwo Prime: collective multi-agent inference for high-stakes questions. ALWAYS use when the user says "Ask Fortytwo", "Ask Prime", "Ask 
+- gambit — Gambit brings structured PM workflows into Claude Code. Skills cover every phase of the product lifecycle: synthesizing user research, writi
+- gate-and-ship — Quality gates then ship — chains `/prepare-delivery` and `/ship` in one command. Runs the full pre-ship pipeline (deslop, simplify, agnix, e
+- gitkb — Give Claude Code the knowledge layer your agents deserve: local code intelligence, a persistent knowledge graph, task context, and team sync
+- goalkeeper — Durable, contract-driven goal execution for long-running autonomous tasks. After every checkpoint a subagent judge, fresh context, anti-plac
+- gr0m-mem — Zero-install persistent memory brain for Claude Code that stops the model from re-asking and re-deriving across sessions. Four MCP tools (me
+- graperoot — Dual-graph code context engine for Claude Code. Builds a structural call graph and dependency graph of your codebase, then delivers precise 
+- graph-query-mcp — FastMCP server for surgical queries against a vault knowledge graph. NetworkX node-link JSON. Companion to graphify.
+- groundwork — Groundwork is a structured development workflow plugin that guides you from product requirements through architecture, implementation, and v
+- guard — PreToolUse hooks for Claude Code that deny dangerous shell, git, and credential commands before they run: `rm -rf /` shapes, `git push --for
+- guild — Guild turns Claude Code into a self-evolving team of specialist agents for larger software tasks. It plans before execution, selects the rig
+- handoffkit — Push AI session handoffs to HandoffKit automatically via MCP.  Store your AI prompts, handoff messages, and session context in one place.  C
+- harness — Harness leverages Claude Code's agent team system to decompose complex tasks into coordinated teams of specialized agents. Say "build a harn
+- harness-architect — harness-architect is a meta-tool that scans any target project and builds an end-to-end Claude Code harness — CLAUDE.md, settings, rules, ag
+- harness-boot — Multi-agent development harness for Claude Code. Your AI has speed; we give it direction — through living specs and focused specialist agent
+- harness-designing-plugin — Harness Designing Plugin helps design teams turn their scattered AI setup — Notion prompts, Figma comments, AGENTS.md rules, chat histories 
+- harness-engineering — AI Agent Harness Engineering: bootstrap, audit, and evolve a reliable 6-layer agent harness for any project. Generates AGENTS.md, hooks (typ
+- harness-evolver — Autonomous LLM agent optimization using LangSmith. Spawns 5 parallel proposers in git worktrees, evaluates candidates via LangSmith experime
+- harness-init — Makes a repo agent-ready with AGENTS.md, boundary tests, CI pipeline, and GC scripts based on OpenAI's harness engineering methodology
+- harness-kit — HarnessKit is a professional-grade engineering framework that empowers AI agents with a robust 'harness' of structured controls and speciali
+- harness-sast-and-sca — The Harness SAST and SCA plugin for Claude Code enables Secure AI Coding, bringing real-time security into your AI-assisted development work
+- harnesskit — Adaptive harness for vibe coders — automatically detects your repo stack, applies experience-level guardrails (beginner/intermediate/advance
+- heimdall — Analyze video files: especially bug report screen recordings, directly in Claude Code. Extracts frames via ffmpeg, transcribes audio via whi
+- hipocampus — Persistent memory that survives across sessions. Hipocampus gives your agent a 3-tier memory system (hot/warm/cold) with a self-compressing 
+- hive — Bio-inspired swarm orchestrator for Claude Code. Breaks tasks into parallel subtasks, coordinates agents through stigmergy, learns across se
+- hivemind — Hivemind adds persistent memory, context sync, and a virtual filesystem to your coding agent. It captures session  history, generates AI wik
+- ido4specs — ido4specs is the bridge between a strategic spec and GitHub issues. It analyzes your codebase, decomposes capabilities into implementation t
+- indian-consumer-drafting — For every consumer counsel and medical-negligence advocate practising before India's three-tier Consumer Disputes Redressal Commissions — Di
+- infiniteclaud — Autonomous automation agent for Claude Code with 20 specialized MCP tools (Playwright web control, filesystem, macOS native via PyAutoGUI, A
+- ix-memory — Ix Memory connects Claude Code to Ix, a structured, persistent memory backend for codebases. Instead of reading raw source files to answer q
+- just-ship — Multi-agent framework for autonomous software development. A single ticket triggers a full pipeline: triage, planning, implementation, testi
+- karimo-harness-engineering-agent-orchestration — Harness engineering framework for Claude Code — plan mode on steroids. Product design-driven agent orchestration with sub-agents and agent t
+- kindex — Kindex is a persistent knowledge graph for Claude Code. It turns Claude from a session-scoped tool into a project-scoped collaborator — capt
+- larch — Larch is a multi-agent workflow automation plugin for Claude Code that orchestrates the full software development lifecycle — from design th
+- launchpad — The most comprehensive agentic coding harness for Claude Code that works for both greenfield and brownfield projects. Drops 38 slash command
+- lean-kg — Lightweight Knowledge Graph for AI-Assisted Development LeanKG is a local-first knowledge graph that gives AI coding tools accurate codebase
+- learning-planner — A Claude Code plugin that acts as your long-running learning companion — helps you plan, track, and review self-directed learning in structu
+- lightning-tv-expert-plugin — Lightning TV framework expertise for @lightningtv/solid Smart TV applications. Auto-triggers on @lightningtv/solid imports. Provides guardra
+- lightrun — Lightrun's runtime investigation toolkit for Claude Code. Guides deterministic, evidence-first debugging of live applications by capturing r
+- llm-secure-patterns — Secure design patterns for Claude Code LLM applications: external content ingestion, endpoint hardening, output validation, system prompt de
+- looper-loop — Agentic loop for a long-running task, where on each step agent's work is reviewed by another agent, to make sure it stays on track and does 
+- loreconvo — Cross-surface persistent memory for Claude sessions. Vault conversations from Code, Cowork, and Chat — recall decisions, artifacts, and cont
+- magellan — Enterprise knowledge discovery and process repository. Point Magellan at a folder of collected materials — code, documents, meeting transcri
+- magician — Comprehensive software development lifecycle plugin that takes task from the idea to merged PR autonomously. Core capabilities:  1. Dynamic 
+- make-documentation — Claude Code plugin that generates and updates technical documentation for GitHub projects, with an optional clean-context subagent for task 
+- marcopolo — MarcoPolo is a data computer that connects to your databases, warehouses, cloud storage, and SaaS applications, and provides a workspace whe
+- mash-multi-agent-software-harness — MASH (Multi-Agent Software Harness)  is a structured development framework for Claude Code that manages the full software lifecycle — from i
+- meeting-bots — A panel of AI personas that debate your decisions inside Claude Code. 3 to 10 participants across 5 teams (dev, design, product, business, l
+- mem0 — Connect Mem0 to Claude to give your agent persistent memory across sessions. Claude can store user preferences, project context, and convers
+- membase — Membase connects Claude Code to Membase Cloud, giving Claude persistent memory and wiki workflows across coding sessions. It can recall rele
+- memento — Memento gives Claude Code a real memory: persistent, searchable knowledge that survives across every session, every project, and every devic
+- memex-mcp — Persistent memory for AI coding agents. Builds a temporal knowledge graph of your codebase from commits and source files, then serves it thr
+- meta-harness-ygn — Meta-Harness-YGN is a Claude Code plugin (namespace /mh) that brings scientific rigor to harness engineering: every proposed change produces
+- mexus-agent-team — Standalone Markdown-only Agent Team plugin for Claude Code and Codex. Coordination happens through ordinary Markdown files in the current pr
+- mindwright — mindwright gives Claude Code persistent, per-agent memory. It captures what happens during a session, distills it into long-term facts via a
+- mister-anderson — Beads development for humans — a structured, human-controlled development pipeline with task tracking, code review gates, and multi-agent or
+- mmpm-cognitive-os — Constitutional multi-agent decision architecture for major programme governance. 16 agents across 4 layers (Programme Cognitive Chair, 7 Str
+- mosaic — DCVE methodology for systematic project planning, and Discuss for multi-perspective debate and decision-making — both powered by Claude Code
+- mumei — Quality Enforcement Layer for Claude Code. Uses Hooks to physically gate spec phases, Wave commits, and reviews at the OS boundary — not via
+- munin-memory — # Munin for Claude Code  > **Munin** is a long-term memory system for developers. Every time you work with Claude Code, Munin remembers your
+- neko-gundan — Multi-agent orchestration framework for Claude Code. Organizes Claude into a hierarchical cat team — Oyakata-neko (General/Opus) plans strat
+- neko-harness-doctor — Diagnose your Claude Code harness (CLAUDE.md, settings.json, .mcp.json, hooks, skills, memory, MCP servers, and workflow) against 25 anti-pa
+- nexo-brain — Cognitive co-operator that gives AI agents persistent memory, learning, and work continuity. Includes session management, episodic/semantic 
+- next-task — Autonomous workflow orchestrator that takes a task from discovery to production through 12 coordinated phases — exploration, planning, imple
+- nexus-the-cartographer — AI Cowork metabrain with Knowledge Graph, Thought Stack, Fuel Intelligence, and local AI Overseer. 20 native MCP tools for persistent sessio
+- notify-sounds — Plays system sounds in Claude Code when a task finishes or when permission is needed, so you don't have to keep watching the terminal. Cross
+- obsidian-knowledge — Self-evolving Claude Code plugin that manages an Obsidian knowledge vault: capture, organize, index, garden — plus a meta-skill that improve
+- oh-my-forge — oh-my-forge is a Claude Code workflow harness that prevents agent mistakes from repeating. Built on everything-claude-code, it adds an ontol
+- orchestrator — Generate ready-to-paste Claude Code prompts with the right agent, orchestration pattern, and safety rails. Orchestrator synthesises patterns
+- orchestrator-workflow-plugin — A multi-agent development framework that splits project builds into phases using three specialized roles: an Orchestrator (plans and coordin
+- patristic — Search and cite the Russian Orthodox patristic corpus (azbyka.ru) from any MCP-capable agent. Indexes ~2,100 works by 86 Church Fathers and 
+- personal-council — A 5-voice weighted think tank for founders, as a Claude Code plugin. Drop any idea, product, strategy, or decision on it; get a brutally hon
+- phone-a-friend — Phone a Friend is a CLI relay that lets AI coding agents collaborate by sending prompts and repository context to other AI backends. It supp
+- phone-a-friend-paf — Phone a Friend lets Claude Code call other AI coding backends for second opinions, code review, and multi-agent collaboration. It relays you
+- pownie — The agent harness for offsec. It's a plugin for Claude Code packed with skills, hooks, memory system that works best for using Claude Code t
+- pramana — Reference implementation of the semantic layer from "Knowledge   Engineering: The Future of AI-Assisted Software Engineering" (https://kn   
+- prd-to-kanban — transfer a PRD to a Kanban doc with provide specific project dev waves and point out parallel windows. Really useful for subagent driven dev
+- prepare-delivery — Pre-ship quality gates without the ship. Runs the full pre-merge pipeline — deslop (clean AI debris), simplify (de-bloat), agnix (lint agent
+- project-pilot — Project Pilot is a Claude Code plugin that gives Claude a persistent memory layer for your project. It captures your architecture decisions,
+- project-scaffolder-synaptic-edition — Generate a complete project knowledge base from a single brief, then orchestrate development with an AI project leader, quality pipeline, an
+- pushnotifime-human-in-the-loop — PushNotifiMe enables human-in-the-loop notifications and approvals for AI agents, developer workflows, and autonomous systems. Send real-tim
+- pydantic-ai — Write accurate Pydantic AI code from the start. Up-to-date patterns, decision trees, and common gotchas for agents, tools, structured output
+- qlik-agents — Multi-agent development pipeline for Qlik Sense. 9-phase workflow from requirements through documentation, powered by practitioner-authored 
+- quick-question — Unity Agent Harness for Claude Code. Auto-compiles C# on every edit, runs EditMode/PlayMode test pipelines with error checking, and performs
+- reflect — Session-local metacognition harness for long-running Claude Code work.  When suggestions get reverted 3+ times within 10 tool calls, reflect
+- review-all — Comprehensive, project-agnostic, multi-agent code review for Claude Code with verification to eliminate false positives.
+- rpm-relentless-product-manager — rpm persists project state across Claude Code sessions and prevents guidance and documentation drift.  It uses hooks to automate most of the
+- sabha-os — A local-first AI council for Claude — 9 C-suite roles, each a framework-grounded deep skill, in the Chanakya tradition.
+- scaffold — The only Claude Code framework with persistent memory backed by Obsidian. Every session resumes where you left off — no recap, no context lo
+- sciqlab-supply-chain — Three AI agents for supply chain operations — demand exception analysis, supplier risk scoring, and a multi-agent orchestrator for S&OP revi
+- self-improving-agent-pipeline — A pipeline of skills that implements two feedback loops for Claude Code. The inner loop (plan-interview, intent-framed-agent, context-surfin
+- session-handoff — A Claude Code plugin that lets you hand off an in-flight task from one AI tool to another — Claude Code → Codex, Codex → Cursor, Cursor → a 
+- session-orchestrator — Session-level orchestration for Claude Code - structures development work into 5 typed waves (Discovery → Core → Polish → Quality → Finaliza
+- shipwright — A la carte toolkit for Claude Code. Best practices, persistent memory, and agent-team planning — pick what fits your project.
+- shipwright-brain — Persistent memory for Claude Code. Markdown files, no database. Brain remembers ideas, decisions, features, and progress across sessions so 
+- shipyard — Turn your idea into working code — Shipyard runs Claude Code through a spec-driven agile sprint lifecycle: discuss features, plan sprints, b
+- simple-workflow — Complete development lifecycle plugin with built-in ticket management, Generator-Evaluator quality pipeline, and context conservation for lo
+- sindri — Sindri turns a one-line goal like "reduce bundle_bytes by 15%" into an autonomous, overnight experiment loop. It proposes candidates,applies
+- skill-picker — Compare AI coding skills head-to-head to find which one works best for your task. Run controlled A/B tests: same model (Claude Code), same t
+- spec-engine — Spec-driven development engine: turns feature specs into working code through structured requirements, wave-based parallel agent execution, 
+- stackpilot — Sprint orchestration for Claude Code. Describe a feature, get production-ready code through an automated design→spec→plan→code→QA pipeline. 
+- stash — Give Claude persistent cloud memory that survives beyond a single session. Developers can stash working state, share context between paralle
+- strands-sdk — Comprehensive Strands-agents SDK reference for Claude Code — tools, hooks, multi-agent patterns (A2A, swarms, agents-as-tools), prompt cachi
+- strategy-consultant — Runs a full strategy consulting engagement end-to-end — from sharpening a vague business question into a decision-oriented problem statement
+- superfast — You know that moment when you've finally convinced your coding agent to build exactly what you want, only for it to instantly get hopelessly
+- superpipelines — Multi-agent AI pipelines with structural write/review isolation, crash-safe state recovery, and spec-driven development. Run sequential, par
+- superpowers — It starts from the moment you fire up your coding agent. As soon as it sees that you're building something, it doesn't just jump into trying
+- sym-mesh-channel — Real-time Claude-to-Claude mesh communication. Turns Claude Code into a peer node on the SYM mesh — two sessions on the same wifi discover e
+- tdd-evolutionary-loop — Automate the TDD cycle with a collaborative agent team: two parallel coders and a devil's advocate, working on isolated files for rapid, saf
+- techknowmad-ai-skills — 20 enterprise-grade skills for autonomous AI/ML research lab operations. Includes 10 custom gap-analysis skills (research-commander, agent-d
+- the-courtroom — Cross-model deliberation plugin — Claude proposes an implementation plan, Codex CLI cross-examines it, they debate (ACCEPT/REJECT/COMPROMISE
+- three-pillars — Structured development framework for Claude Code with design-first pipelines, multi-persona deliberation, and session continuity. Includes a
+- tianluo — Keep Claude Code on a multi-hour task without it pinging you at 3am. Tianluo (田螺姑娘) is a methodology skill for multi-hour to multi-day auton
+- tradememory — Persistent memory + autonomous strategy evolution for AI traders. Records every trade with full context across 5 memory layers (episodic, se
+- train-prep — Prepare AI consulting training materials for any industry. Research client pain points, map AI solutions, generate a Word report and interac
+- trinity — Trinity is a three-agent harness for Claude Code that turns a one-to-four-sentence requirement into a reviewed pull request. /trinity:run sp
+- twining — Agent coordination — shared blackboard, decision tracking, and context assembly
+- tycono — AI team orchestration for Claude Code. Instead of one AI doing everything, Tycono gives you a team — CTO designs architecture, Engineer writ
+- understand-anything — Understand Anything is a Claude Code plugin that analyzes your project with a multi-agent pipeline, builds a knowledge graph of every file, 
+- using-cmux — A Claude Code plugin that teaches the agent to operate cmux, a terminal multiplexer with first-class agent integration. Provides skill patte
+- vector-md-context-injector — Vector-md-plugin provides hooks to automatically inject sub-tree scoped context files upon reading a file from said sub-tree. The injections
+- velixar — Velixar is a cognitive memory system for Claude Code. It gives Claude persistent memory, a knowledge graph, identity awareness, contradictio
+- versori-skills — The versori-skills plugin gives Claude Code the ability to create, build, deploy, and monitor production-grade data integrations, entirely f
+- vibe-flow — Orchestration skills for Vibe Kanban. Turn a spec into merged code using multi-agent waves: plan → ship → link → review → merge, with autono
+- vibe-test — Test coverage for vibe-coded apps that actually matters. vibe-test reads your app, classifies it by type and deployment risk, and generates 
+- waterfall — Multi-agent Specification-Driven Development (SDD) framework for Claude Code. Waterfall orchestrates a team of specialized agents (PM, OR, P
+- wave-planner — Transform project issues into execution-ready implementation plans with risk prediction, wave-based organization, and TDD workflow.
+- waves-exovian — Waves is a product development framework that turns ideas into production software through a structured sequence of AI-driven artifacts. It 
+- web-ctl — Browser automation toolkit for AI agents — navigate, authenticate, and interact with web pages through a single CLI. Agents drive headless b
+- wicked-garden — Wicked Garden — AI-Native SDLC  A full software development lifecycle as a single Claude Code plugin. 14 domains, 80 specialist agents, 152 
+- wiq — Bardeen wiq plugin — workflow automation with multi-agent orchestration and OAuth-secured remote MCP.
+- wmux-orchestrator — Multi-agent task orchestration for Claude Code. Decomposes complex development tasks into parallel Claude Code agents coordinated through de
+- wrightward — Multi-agent coordination. When two or more Claude Code sessions work in the same repo, wrightward blocks conflicting writes, injects awarene
+- writ — Hybrid RAG rule retrieval and workflow enforcement for Claude Code. A five-stage pipeline (BM25 + vector + graph traversal + two-pass rankin

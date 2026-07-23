@@ -162,3 +162,22 @@ description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the 
 # --graph groups lessons by community + tags nodes preferred/tentative/contested.
 # reflections/ + overlay are gitignored (regenerable); run each session.
 run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"
+
+# --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
+[tasks.kb-manifest-add]
+description = 'Pin a new repo source: mise run kb-manifest-add -- <url> [--ref R --kind K --name N --comment C --force]'
+# Resolves upstream HEAD via git ls-remote (no clone) + writes sources/<name>.manifest.
+# The reusable replacement for hand-writing a manifest. Logic in kb_setup.manifest.add.
+run = "uv run kb-setup manifest-add"
+
+[tasks.kb-assemble]
+description = 'Validate + combine host-agent extraction chunks: mise run kb-assemble -- <name> <chunk.json>...'
+# Union-merges per-source chunks (the kb-extract Workflow fan-out output) into one
+# committed sources/extractions/<name>-docs.json, failing loud on any schema/dangling/
+# id-collision problem. Logic in kb_setup.chunks.assemble.
+run = "uv run kb-setup assemble"
+
+[tasks.kb-validate-chunks]
+description = 'Schema-check extraction chunks (unique ids, no dangling edges): mise run kb-validate-chunks -- <chunk.json>...'
+# Standalone gate over sources/extractions/*.json (or scratch chunks). Logic in kb_setup.chunks.
+run = "uv run kb-setup validate-chunks"

@@ -36,11 +36,15 @@ directly. Drive it through the task; the PreToolUse guard (`kb_setup.hook_guard`
 wired in `.claude/settings.json`) DENIES raw graphify calls and redirects here.
 The task map:
 
-| Operation | mise task | not the raw command |
+| Operation | mise task | not the raw command / one-off |
 |---|---|---|
+| pin a NEW repo source | `mise run kb-manifest-add -- <url> [--name N --ref R --kind K]` | ~~hand-write a `.manifest`~~ |
 | add a URL (page/blog/article/video) | `mise run kb-add -- <url> [--author NAME]` | ~~`graphify add`~~ |
 | rebuild from committed inputs | `mise run kb-build` | ~~`graphify extract`/`merge-graphs`~~ |
 | advance a repo source | `mise run kb-update -- <name>` | ~~`graphify update`~~ |
+| host-agent extract N sources | the **`kb-extract` saved workflow** (`.claude/workflows/kb-extract.js`) | ~~an inline one-off Workflow~~ |
+| combine + validate extraction chunks | `mise run kb-assemble -- <name> <chunk.json>...` | ~~inline python assembly~~ |
+| schema-check chunks | `mise run kb-validate-chunks -- <chunk.json>...` | ~~inline python validation~~ |
 | merge one doc chunk | `mise run kb-merge -- <chunk.json> [root]` | ~~`_merge_docs.py`~~ |
 | (re)label communities | `mise run kb-label` | ~~`graphify label`~~ |
 | transcribe local audio | `mise run kb-transcribe -- <audio>` | ~~`graphify.transcribe`~~ |
@@ -60,7 +64,8 @@ so `kb-label` defaults to the deterministic hub labeler.
 **All ingestion goes through graphify's own tooling, never an ad-hoc fetch** — and
 via the task, per mandate 1. Entry points:
 
-- **GitHub repo** → `sources/<name>.manifest` + `mise run kb-build`.
+- **GitHub repo** → `mise run kb-manifest-add -- <url> [--name N]` (pins upstream HEAD
+  via `git ls-remote`, writes the manifest — never hand-write it) + `mise run kb-build`.
 - **Any URL** (docs page, blog, article) → `mise run kb-add -- <url>` — fetches to
   `./raw` (graphify writes `source_url`/`captured_at` frontmatter). `--author`/
   `--contributor` tag provenance. No-key `add` fetches but does NOT re-cluster, so
@@ -108,14 +113,20 @@ in `sources/REGISTRY.md`.
    - URL(s) → `mise run kb-add -- <url>` (batch all; no-key add fetches to `./raw`
      without re-clustering). Video → `mise run kb-add --` then
      `mise run kb-transcribe -- raw/<yt>.m4a`.
-   - Prose extraction = **Claude host-agent, and for N sources use a `Workflow`
-     fan-out** (proven 2026-07-22: 32 docs, 0 errors). Each `agent()` reads one raw
-     file and returns a schema-validated `{nodes, edges}`; assemble into ONE combined
-     chunk `sources/extractions/<name>-docs.json` with `source_url` + `captured_at`
-     per node. A single-shot source can be one `general-purpose` subagent instead.
-     Write incrementally / rely on Workflow resume — an agent dying at source 13 of
-     20 must leave 13 (`agent-report-persistence`). **This is the ONLY LLM path and
-     it is Claude — never Gemini** (mandate 2).
+   - Prose extraction = **Claude host-agent via the saved `kb-extract` workflow**
+     (`.claude/workflows/kb-extract.js`) — invoke it with the Workflow tool, passing
+     `args = {scratchDir, sources:[{key,path,url,kind,note}]}` (`kind` ∈
+     `article|doc|designdoc|research_json|inventory|article_partial`). Each `agent()`
+     reads one file, extracts a schema-valid `{nodes,edges}`, and WRITES it to
+     `<scratchDir>/<key>.json`. Do NOT hand-roll an inline Workflow — the saved one is
+     the reusable, resumable contract (an agent dying at source 13 of 20 leaves 13,
+     `agent-report-persistence`). **This is the ONLY LLM path and it is Claude** (mandate 2).
+   - **Assemble** the per-source chunks into one committed doc chunk:
+     `mise run kb-assemble -- <name> <scratchDir>/*.json` — it validates every chunk
+     (schema, unique ids, no dangling edges, no cross-chunk id collision) and writes
+     `sources/extractions/<name>-docs.json`, failing loud on any problem. Never
+     hand-assemble or hand-validate. (`mise run kb-validate-chunks -- <chunk...>` is
+     the standalone gate.)
 3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
    or `mise run kb-build` to replay all committed chunks. Both re-cluster; Louvain
    renumbers communities globally + non-deterministically → **every merge staleifies

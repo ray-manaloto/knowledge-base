@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# antigravity plugin for Claude Code (Marcos) — antigravity lane wiring (T1).
+url = https://github.com/MarcosNahuel/antigravity-plugin-cc
+ref = main
+commit = 82e03042611fee3dae25733a4b183d4924829940
+kind = code
+added = 2026-07-23

@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Sol-Orchestrator — durable-goal/disposable-workflow split; blackboard volunteer pattern (T1).
+url = https://github.com/ReyJ94/Sol-Orchestrator
+ref = main
+commit = a1dd6031d1db329803a8c6284b1312e3ee4fd5f2
+kind = code
+added = 2026-07-23

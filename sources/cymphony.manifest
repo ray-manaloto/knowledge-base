@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# cymphony — Symphony-family orchestration port (T2).
+url = https://github.com/zaalipro/cymphony
+ref = main
+commit = fb1660d282b26182eb45784f455416cefb048826
+kind = code
+added = 2026-07-23

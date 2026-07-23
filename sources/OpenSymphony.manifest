@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# OpenSymphony — open port of the Symphony conductor pattern (T1).
+url = https://github.com/kumanday/OpenSymphony
+ref = main
+commit = 0cc21ddda5d1853a8fbd11add578b43b6ebd6fcb
+kind = code
+added = 2026-07-23
