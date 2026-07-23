@@ -1,6 +1,0 @@
-# Source manifest — reproducible-by-reference (Invariant 3).
-# Ray's dotfiles: chezmoi-managed macOS dev env + devcontainer; the consumer repo of this KB.
-url = https://github.com/ray-manaloto/dotfiles
-ref = main
-commit = 99b6576203206bcc3451b726068fb0157c5b0ad5
-kind = code

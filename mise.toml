@@ -167,8 +167,8 @@ run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"
 [tasks.kb-ship]
 description = 'Gate (lint+test) → push → open PR for the current branch: mise run kb-ship [-- --title T]'
 # The ONLY sanctioned way to open a PR here — `gh pr create` is guard-denied.
-# Gates run BEFORE the push, so a red branch never becomes a PR. Deliberately
-# thinner than dotfiles' ship: this repo has no CI to watch. Logic in kb_setup.pr.
+# Gates run BEFORE the push, so a red branch never becomes a PR. This repo has no
+# CI, so the local gates are the only gates. Logic in kb_setup.pr.
 run = "uv run kb-setup ship"
 
 [tasks.kb-land]

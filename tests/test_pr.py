@@ -1,8 +1,7 @@
 """Tests for kb_setup.pr — the ship/land PR workflow.
 
 Every test drives the real functions with subprocess stubbed, and each
-assertion has a control arm: a check that can only pass is not a check
-(dotfiles `.claude/rules/probes-need-a-control-arm.md`).
+assertion has a control arm: a check that can only pass is not a check.
 """
 
 from __future__ import annotations

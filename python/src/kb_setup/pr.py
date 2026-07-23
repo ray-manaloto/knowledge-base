@@ -1,11 +1,11 @@
 """Ship and land a pull request for THIS repo.
 
-Deliberately thinner than the dotfiles equivalent (``dotfiles_setup.pr``). That
-one watches a main ``ci.yml`` run and then re-validates a devcontainer locally;
-this repo has **neither** — no ``.github/workflows/``, no container — so copying
-those steps would cargo-cult a gate with nothing to watch.
+Sized for what this repo actually is: no ``.github/workflows/`` and no
+container, so there is no main-CI run to watch and nothing to re-validate
+locally after a merge. A PR flow that waited on either would be a gate with
+nothing to watch.
 
-What survives the trim is the part that carries the safety:
+What it does keep is the part that carries the safety:
 
 * ``ship`` runs the same local gates CI would have run (``lint`` + ``test``)
   BEFORE the branch is pushed, so a red branch never becomes a PR;
