@@ -63,6 +63,12 @@ class ToolSpec:
     pypi: str = ""
     github: str = ""
     extras: tuple[str, ...] = ()
+    # Packages that must actually BE INSTALLED for the declared extras to mean
+    # anything. Deliberately author-chosen rather than derived: several of
+    # graphify's `[all]` deps auto-skip by PEP 508 marker on Python 3.14
+    # (graspologic/leidenalg/igraph → Louvain fallback, an accepted state), so a
+    # naive "every extra must import" check would report drift that is not drift.
+    extra_probes: tuple[str, ...] = ()
     manifest: str = ""
     artifact: str = ""
     stamp: str = ""
@@ -121,6 +127,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         pypi=_str("pypi"),
         github=_str("github"),
         extras=_tuple("extras"),
+        extra_probes=_tuple("extra_probes"),
         manifest=_str("manifest"),
         artifact=_str("artifact"),
         stamp=_str("stamp"),

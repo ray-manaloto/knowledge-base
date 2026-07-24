@@ -136,17 +136,27 @@ def load_previous(report_dir: Path, tool: str) -> dict[str, Observation]:
 def save_current(report_dir: Path, tool: str, observations: tuple[Observation, ...]) -> Path:
     """Persist this run's observations so the next run can diff against them.
 
-    Errored observations are dropped rather than stored: writing an error as the
-    new baseline would make the *next* run report spurious movement when the
-    fetch succeeds again.
+    An errored observation does not overwrite its entry — but its PRIOR value is
+    carried forward rather than dropped. Dropping it would silently erase the
+    baseline: the next run would see no previous value, treat the item as
+    first-ever-observed, and report no change even if the issue had moved. A
+    transient rate-limit would therefore hide exactly one real change, which is
+    the worst possible moment to be blind.
+
+    Items no longer in the config are pruned, so a removed watch entry does not
+    linger forever.
     """
     path = _state_path(report_dir, tool)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        o.key: {k: v for k, v in asdict(o).items() if k not in {"key", "error"}}
-        for o in observations
-        if not o.error
-    }
+    previous = load_previous(report_dir, tool)
+
+    payload: dict[str, dict[str, object]] = {}
+    for o in observations:
+        source = o if not o.error else previous.get(o.key)
+        if source is None:  # errored on its very first observation — nothing to keep
+            continue
+        payload[o.key] = {k: v for k, v in asdict(source).items() if k not in {"key", "error"}}
+
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 

@@ -56,7 +56,10 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
 
 
 def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
-    status = sync.check_sync(repo_root, spec)
+    # deep=True: the full workflow is already spending network calls, so it can
+    # afford the one `mise where` subprocess the extras probe needs when the
+    # binary resolves through a shim. The hook path stays subprocess-free.
+    status = sync.check_sync(repo_root, spec, deep=True)
     up = upstream.probe(pypi=spec.pypi, github=spec.github, current=status.pinned)
     observations = issues.observe_all(spec)
     report_root = repo_root / report.REPORT_DIR

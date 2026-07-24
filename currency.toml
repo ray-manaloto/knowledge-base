@@ -20,6 +20,12 @@ binary = "graphify"
 pypi = "graphifyy"
 github = "Graphify-Labs/graphify"
 extras = ["all"]
+# Packages the `all` extra must ACTUALLY deliver — comparing two config files
+# cannot tell you the install is intact. Deliberately NOT the full extra set:
+# graspologic/leidenalg/igraph auto-skip by PEP 508 marker on Python 3.14 (the
+# accepted Louvain fallback), so demanding them would report drift that is not
+# drift. Verified present on this host 2026-07-24.
+extra_probes = ["faster_whisper", "tree_sitter", "tree_sitter_cpp"]
 # The ingested corpus must describe the release we actually run.
 manifest = "sources/graphify.manifest"
 # graphify stamps no version into its own output (`export.to_json()` writes only

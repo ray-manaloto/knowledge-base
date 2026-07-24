@@ -152,10 +152,21 @@ def _stamp_build(repo_root: Path) -> None:
         spec = next((s for s in config.load(repo_root) if s.stamp), None)
         if spec is None:
             return
-        version = sync.observed_version(spec.binary) or sync.pinned_version(repo_root, spec)[0]
+        # NO fallback to the pin. Falling back would stamp the version we HOPED
+        # ran, turning an unreadable binary into a false "in sync" — the exact
+        # laundering this stamp exists to prevent. An empty version is written
+        # as empty, and `check_sync` then reports "built by an unknown version".
+        version = sync.observed_version(spec.binary)
         source_ref = sync.manifest_ref(repo_root, spec)
         path = sync.write_stamp(repo_root, spec, version=version, source_ref=source_ref)
-        print(f"[kb-build] stamped {path.name}: built by graphify {version or 'unknown'}")
+        if version:
+            print(f"[kb-build] stamped {path.name}: built by graphify {version}")
+        else:
+            print(
+                f"[kb-build] WARNING: stamped {path.name} with an UNKNOWN version — "
+                f"`{spec.binary} --version` could not be read, so currency step 1 "
+                f"will report the graph as not verifiably built by the pin."
+            )
     except (OSError, ValueError, ImportError) as e:
         print(f"[kb-build] WARNING: could not write the currency stamp: {e}")
 

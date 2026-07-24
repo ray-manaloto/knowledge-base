@@ -9,8 +9,11 @@ It found a live defect the day it was written: `MISE_ENV_CACHE=1` had baked a
 stale `.../installs/pipx-graphifyy/0.9.23/bin` into PATH *ahead* of the mise
 shims, so every bare `graphify` call ran 0.9.23 under a 0.9.25 pin.
 
-Everything here is offline and subprocess-free by design — the SessionStart hook
-runs it on every session, so it must cost milliseconds, not seconds.
+The DEFAULT path is offline and subprocess-free by design — the SessionStart
+hook runs it on every session, so it must cost milliseconds, not seconds. Two
+opt-in exceptions, never reached from the hook: `observed_version` (executes
+`--version`, used only when STAMPING a build) and `check_sync(deep=True)` (one
+`mise where`, so the extras probe can locate an install reached via a shim).
 """
 
 from __future__ import annotations
@@ -298,6 +301,88 @@ def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
     return Finding("extras", OK, f"pin declares the expected extras {list(spec.extras)}")
 
 
+def install_site_packages(binary: str, mise_key: str, *, deep: bool) -> Path | None:
+    """The resolved install's `site-packages`, or None when it cannot be located.
+
+    Free path: the binary resolves inside a mise install dir, so the root is a
+    path prefix. When it resolves through a shim that prefix is invisible, and
+    only `mise where` can supply it — a ~0.4s subprocess, so it is gated behind
+    `deep` and never runs in the per-session hook.
+    """
+    root = _pinned_install_root(mise_key) if deep else None
+    if root is None:
+        root = _install_root_from_path(binary)
+    if root is None or not root.is_dir():
+        return None
+    return next(iter(sorted(root.glob("*/lib/python*/site-packages"))), None)
+
+
+def _pinned_install_root(mise_key: str) -> Path | None:
+    """Install root of the PINNED version, via `mise where` (one subprocess).
+
+    Preferred in deep mode because the question is whether the *pinned* install
+    has its extras. PATH may reach a different, stale install — that is a
+    separate finding, already reported by the resolution check — and probing it
+    would answer the wrong question.
+    """
+    try:
+        res = subprocess.run(
+            ["mise", "where", mise_key],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except OSError, subprocess.TimeoutExpired:
+        return None
+    return Path(res.stdout.strip()) if res.returncode == 0 and res.stdout.strip() else None
+
+
+def _install_root_from_path(binary: str) -> Path | None:
+    """Install root inferred from the resolved binary's path — free, no subprocess.
+
+    Only works when the binary resolves inside a mise install dir; a shim hides
+    the prefix entirely.
+    """
+    found = shutil.which(binary)
+    if not found:
+        return None
+    parts = Path(found).absolute().parts
+    if "installs" not in parts:
+        return None
+    idx = parts.index("installs")
+    return Path(*parts[: idx + 3]) if len(parts) > idx + 2 else None
+
+
+def _check_extra_probes(spec: ToolSpec, *, deep: bool) -> Finding:
+    """Are the packages the extras are supposed to deliver actually installed?
+
+    This is the half of "extensions tools are in sync" that comparing two config
+    files cannot answer: `extras = ["all"]` in both files is satisfied even when
+    the install is missing every package the extra was meant to provide.
+    """
+    if not spec.extra_probes:
+        return Finding("extra-probes", SKIP, "no extra_probes declared for this tool")
+    site = install_site_packages(spec.binary, spec.mise_key, deep=deep)
+    if site is None:
+        return Finding(
+            "extra-probes",
+            SKIP,
+            "install path not resolvable here"
+            + ("" if deep else " without a subprocess (run the full workflow for a deep check)"),
+        )
+    missing = [p for p in spec.extra_probes if not (site / p).exists()]
+    if missing:
+        return Finding(
+            "extra-probes",
+            DRIFT,
+            f"declared extras {list(spec.extras)} did not deliver {missing} (looked in {site})",
+        )
+    return Finding(
+        "extra-probes", OK, f"all {len(spec.extra_probes)} probed extra package(s) present"
+    )
+
+
 def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not spec.manifest:
         return Finding("manifest", SKIP, "this repo pins no source manifest for the tool")
@@ -342,8 +427,14 @@ def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     return Finding("build-stamp", OK, f"artifacts were built by the pinned {pinned}")
 
 
-def check_sync(repo_root: Path, spec: ToolSpec) -> SyncStatus:
-    """Run every applicable step-1 check for one tool. Offline, no subprocesses."""
+def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncStatus:
+    """Run every applicable step-1 check for one tool.
+
+    Offline and subprocess-free by default, which is what lets the SessionStart
+    hook run it every session. `deep=True` additionally allows one `mise where`
+    subprocess so the extras probe can locate an install reached through a shim;
+    the full workflow uses it, the hook does not.
+    """
     if not spec.applies_here():
         return SyncStatus(
             tool=spec.name,
@@ -376,6 +467,7 @@ def check_sync(repo_root: Path, spec: ToolSpec) -> SyncStatus:
             Finding("pin", OK, f"mise.toml pins {spec.mise_key} at {pinned}"),
             resolution,
             _check_extras(spec, declared_extras),
+            _check_extra_probes(spec, deep=deep),
             _check_manifest(repo_root, spec, pinned),
             _check_stamp(repo_root, spec, pinned),
         ),

@@ -128,8 +128,22 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
     """Dispatch `kb-setup currency {check|run|stamp}` (see kb_setup.currency.run)."""
     from kb_setup.currency import run as currency_run
 
-    mode = next((a for a in rest if not a.startswith("-")), "check")
     only = _opt(rest, "--tool", "") or ""
+    # Skip the VALUES of value-taking flags when looking for the positional mode,
+    # or `currency --tool graphify` reads "graphify" as the mode and errors out.
+    value_flags = {"--tool", "--version", "--source-ref"}
+    positional: list[str] = []
+    skip_next = False
+    for arg in rest:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in value_flags:
+            skip_next = True
+            continue
+        if not arg.startswith("-"):
+            positional.append(arg)
+    mode = positional[0] if positional else "check"
     if mode == "check":
         return currency_run.check(repo_root, only=only, quiet="--verbose" not in rest)
     if mode == "run":

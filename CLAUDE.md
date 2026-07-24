@@ -123,9 +123,17 @@ mise run kb-currency          # the full loop; writes docs/currency/
   `graphify-out/`. It caught a live defect on day one: `MISE_ENV_CACHE=1` had a
   stale `pipx-graphifyy/0.9.23/bin` on PATH ahead of the mise shims.
 - **graphify stamps no version into its own output** — `export.to_json()` writes
-  only `built_at_commit` — so `kb-build` writes `graphify-out/.currency-stamp.json`.
-  A rebuild that bypasses `kb-build` is detected (the stamp's `artifact_commit`
-  stops matching) and reports *version unknown*, never a false green.
+  only `built_at_commit` — so `kb-build` writes `graphify-out/.currency-stamp.json`
+  recording the version that ACTUALLY RAN (never the pin, which would launder
+  drift). A rebuild that bypasses `kb-build` is detected (the stamp's
+  `artifact_commit` stops matching) and reports *version unknown*, never a false
+  green.
+- **`extra_probes` checks the install, not the config.** Two files agreeing that
+  `extras = ["all"]` says nothing about whether the extra delivered anything, so
+  the config also names packages that must be present. It is author-chosen on
+  purpose: `graspologic`/`leidenalg`/`igraph` auto-skip by PEP 508 marker on
+  Python 3.14 (the accepted Louvain fallback), so demanding every extra would
+  report drift that is not drift.
 - **Step 5 can never live in a hook.** A hook is a shell command; only the model
   can call `AskUserQuestion`. The SessionStart hook therefore runs step 1 only and
   is **silent unless something drifted** — always exiting 0, because a session must

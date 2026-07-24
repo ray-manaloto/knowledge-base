@@ -65,6 +65,9 @@ class RunRecord:
             or self.moved
             or self.verdict.ambiguities
             or self.answers
+            # A step-4 lookup that FAILED is content: without this, a run where
+            # every tracked issue errored is indistinguishable from a clean one.
+            or any(o.error for o in self.observations)
         )
 
 
@@ -191,8 +194,9 @@ Gates passed:
 
 ## Step 6 — process note
 
-This page is the committed record of the run. Amend it by hand only to add
-review notes; the generated sections above are rewritten by the next run.
+This page is the immutable record of ONE run — a later run writes its own new
+page rather than rewriting this one. Annotate it freely with review notes;
+nothing here is regenerated.
 """
 
 

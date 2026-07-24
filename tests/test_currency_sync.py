@@ -246,3 +246,130 @@ def test_config_without_mise_key_is_rejected(tmp_path) -> None:
     (tmp_path / "currency.toml").write_text('[tool.graphify]\nbinary = "graphify"\n')
     with pytest.raises(ValueError, match="mise_key"):
         config.load(tmp_path)
+
+
+# --------------------------------------------------- build-task stamping ----
+
+
+def test_build_stamp_records_the_version_that_ran_not_the_pin(tmp_path, monkeypatch) -> None:
+    """The stamp must never fall back to the pin when the binary is unreadable.
+
+    Falling back would record the version we HOPED ran, converting an unreadable
+    binary into a false "in sync" — precisely the laundering this stamp exists to
+    prevent. An unknown version is written as unknown and reported as drift.
+    """
+    from kb_setup import graph
+
+    root = _repo(tmp_path)
+    monkeypatch.setattr(sync, "observed_version", lambda _: "")
+    graph._stamp_build(root)
+
+    stamp = sync.read_stamp(root, _spec(root))
+    assert stamp["version"] == ""
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert finding.status == sync.DRIFT
+    assert "unknown version" in finding.detail
+
+
+def test_build_stamp_records_a_stale_binary_honestly(tmp_path, monkeypatch) -> None:
+    """Control arm: a readable binary is recorded verbatim, even when stale.
+
+    A build that silently ran 0.9.23 under a 0.9.25 pin must stamp 0.9.23 — the
+    stamp reports what happened, it does not assert what should have happened.
+    """
+    from kb_setup import graph
+
+    root = _repo(tmp_path)
+    monkeypatch.setattr(sync, "observed_version", lambda _: "0.9.23")
+    graph._stamp_build(root)
+
+    assert sync.read_stamp(root, _spec(root))["version"] == "0.9.23"
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    assert _finding(sync.check_sync(root, _spec(root)), "build-stamp").status == sync.DRIFT
+
+
+# --------------------------------------------------------- extra probes ----
+
+
+def _repo_with_probes(tmp_path, probes: str) -> Path:
+    root = _repo(tmp_path)
+    (root / "currency.toml").write_text(
+        "[tool.graphify]\n"
+        'mise_key = "pipx:graphifyy"\n'
+        'binary = "graphify"\n'
+        'extras = ["all"]\n'
+        f"extra_probes = [{probes}]\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_missing_extra_package_is_drift(tmp_path, monkeypatch) -> None:
+    """Two config files agreeing on `extras` says nothing about the INSTALL.
+
+    This is the half of "extensions tools are in sync" that a config comparison
+    cannot answer: the extra is declared everywhere and still delivered nothing.
+    """
+    site = tmp_path / "install" / "x" / "lib" / "python3.14" / "site-packages"
+    (site / "faster_whisper").mkdir(parents=True)
+    monkeypatch.setattr(sync, "install_site_packages", lambda *_a, **_k: site)
+
+    root = _repo_with_probes(tmp_path, '"faster_whisper", "graspologic"')
+    finding = _finding(sync.check_sync(root, _spec(root)), "extra-probes")
+    assert finding.status == sync.DRIFT
+    assert "graspologic" in finding.detail
+
+
+def test_present_extra_packages_are_ok(tmp_path, monkeypatch) -> None:
+    """Control arm: same code path, all probes satisfied."""
+    site = tmp_path / "install" / "x" / "lib" / "python3.14" / "site-packages"
+    (site / "faster_whisper").mkdir(parents=True)
+    (site / "tree_sitter").mkdir(parents=True)
+    monkeypatch.setattr(sync, "install_site_packages", lambda *_a, **_k: site)
+
+    root = _repo_with_probes(tmp_path, '"faster_whisper", "tree_sitter"')
+    assert _finding(sync.check_sync(root, _spec(root)), "extra-probes").status == sync.OK
+
+
+def test_unresolvable_install_is_skip_not_drift(tmp_path, monkeypatch) -> None:
+    """Cannot-locate-the-install is not missing-extras. Never invent a finding."""
+    monkeypatch.setattr(sync, "install_site_packages", lambda *_a, **_k: None)
+    root = _repo_with_probes(tmp_path, '"faster_whisper"')
+    assert _finding(sync.check_sync(root, _spec(root)), "extra-probes").status == sync.SKIP
+
+
+def test_no_probes_declared_is_skip(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo(tmp_path)
+    assert _finding(sync.check_sync(root, _spec(root)), "extra-probes").status == sync.SKIP
+
+
+def test_shallow_mode_never_shells_out(tmp_path, monkeypatch) -> None:
+    """The hook path must stay subprocess-free — it runs every session."""
+
+    def _explode(*_a: object, **_k: object) -> None:
+        msg = "check_sync(deep=False) must not spawn a subprocess"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(sync.subprocess, "run", _explode)
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo_with_probes(tmp_path, '"faster_whisper"')
+    sync.check_sync(root, _spec(root))  # must not raise
+
+
+def test_deep_mode_prefers_the_pinned_install_over_path(tmp_path, monkeypatch) -> None:
+    """PATH may reach a STALE install; the extras question is about the PIN.
+
+    Probing whatever PATH reaches would answer the wrong question — and on this
+    very host PATH reached 0.9.23 while the pin was 0.9.25.
+    """
+    pinned = tmp_path / "pinned"
+    (pinned / "g" / "lib" / "python3.14" / "site-packages").mkdir(parents=True)
+    monkeypatch.setattr(sync, "_pinned_install_root", lambda _: pinned)
+    monkeypatch.setattr(
+        sync, "_install_root_from_path", lambda _: tmp_path / "stale-should-not-be-used"
+    )
+    site = sync.install_site_packages("graphify", "pipx:graphifyy", deep=True)
+    assert site is not None
+    assert "pinned" in str(site)

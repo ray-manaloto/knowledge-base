@@ -152,6 +152,50 @@ def test_errored_observation_never_counts_as_movement(tmp_path) -> None:
     assert issues.changes(errored, previous) == ()
 
 
+def test_errored_observation_preserves_its_previous_baseline(tmp_path) -> None:
+    """A transient failure must not ERASE the baseline it could not refresh.
+
+    Dropping the entry entirely would make the next run see no previous value,
+    treat the item as first-ever-observed, and report NO change even if the issue
+    had moved — hiding exactly one real change, at the worst possible moment.
+    """
+    good = (Observation(key="issue:#2101", state="open", updated_at="t1"),)
+    issues.save_current(tmp_path, "graphify", good)
+
+    # A later run where the fetch failed.
+    errored = (Observation(key="issue:#2101", error="rate limited"),)
+    issues.save_current(tmp_path, "graphify", errored)
+
+    kept = issues.load_previous(tmp_path, "graphify")
+    assert kept["issue:#2101"].updated_at == "t1"
+
+    # And the run after that still detects the real movement.
+    moved = (Observation(key="issue:#2101", state="closed", updated_at="t2"),)
+    assert issues.changes(moved, kept) == moved
+
+
+def test_watch_item_removed_from_config_is_pruned(tmp_path) -> None:
+    """State must not accumulate entries for items no longer tracked."""
+    issues.save_current(tmp_path, "graphify", (Observation(key="issue:#1", state="open"),))
+    issues.save_current(tmp_path, "graphify", (Observation(key="issue:#2", state="open"),))
+    assert set(issues.load_previous(tmp_path, "graphify")) == {"issue:#2"}
+
+
+def test_failed_step4_lookup_earns_a_detail_page(tmp_path) -> None:
+    """A run where every issue lookup errored must not look like a clean run."""
+    record = _record()
+    with_errors = report.RunRecord(
+        tool=record.tool,
+        sync=record.sync,
+        upstream=record.upstream,
+        observations=(Observation(key="issue:#2101", error="rate limited"),),
+        moved=(),
+        verdict=record.verdict,
+    )
+    _, detail = report.write_run(tmp_path, with_errors)
+    assert detail is not None
+
+
 def test_errored_observations_are_not_written_as_the_new_baseline(tmp_path) -> None:
     """Storing an error would make the NEXT successful run look like movement."""
     observations = (
