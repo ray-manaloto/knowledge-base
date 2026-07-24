@@ -21,3 +21,19 @@ def test_svg_in_default_registry_but_gated_by_limit() -> None:
     names = [a[0] for a in artifacts._ARTIFACTS]
     assert "svg" in names
     assert artifacts._SVG_NODE_LIMIT == 5000
+
+
+def test_restamp_survives_a_malformed_currency_config(tmp_path) -> None:
+    """A broken currency.toml must not turn a successful kb-artifacts into a failure.
+
+    `config.load()` raises TypeError (not ValueError) when `[tool]` is not a
+    table; `_restamp` is best-effort and must swallow it with a warning.
+    """
+    (tmp_path / "currency.toml").write_text('tool = "not a table"\n', encoding="utf-8")
+    # Must not raise — the guarantee _restamp documents.
+    artifacts._restamp(tmp_path)
+
+
+def test_restamp_is_a_noop_without_a_config(tmp_path) -> None:
+    """Control arm: a repo with no currency.toml re-stamps nothing, cleanly."""
+    artifacts._restamp(tmp_path)

@@ -96,13 +96,20 @@ def resolve_tag(url: str, version: str) -> tuple[str, str]:
     `^{}` dereference line so a peeled annotated tag yields one clean SHA.
     """
     for ref in (f"v{version}", version):
-        out = subprocess.run(
-            ["git", "ls-remote", "--tags", "--refs", url, ref],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=60,
-        ).stdout.strip()
+        try:
+            out = subprocess.run(
+                ["git", "ls-remote", "--tags", "--refs", url, ref],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=60,
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            # An unreachable host, a bad URL, or a timeout is a resolution
+            # FAILURE, not a "tag not found" — but the currency engine's apply()
+            # catches RuntimeError, so surface every failure mode as one, or a
+            # raw traceback escapes instead of the clean "[currency] apply failed".
+            raise RuntimeError(f"git ls-remote failed for {url} @ {ref}: {e}") from e
         if out:
             return ref, out.split()[0]
     raise RuntimeError(f"no tag {version!r} (or v{version}) found at {url}")

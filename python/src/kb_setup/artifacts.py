@@ -106,5 +106,9 @@ def _restamp(repo_root: Path) -> None:
             path = sync.restamp_artifacts(repo_root, spec)
             if path is not None:
                 print(f"[kb-artifacts] re-stamped {path.name} for {spec.name}")
-    except (OSError, ValueError, ImportError) as e:
+    except (OSError, ValueError, TypeError, ImportError) as e:
+        # TypeError too: config.load() raises it (not ValueError) when a
+        # `[tool.*]` entry is not a proper table. A malformed currency.toml must
+        # not turn an otherwise-successful `kb-artifacts` into a hard failure —
+        # the re-stamp is best-effort by design.
         print(f"[kb-artifacts] WARNING: could not refresh the currency stamp: {e}")
