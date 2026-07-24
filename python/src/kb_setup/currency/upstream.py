@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -24,11 +25,13 @@ from urllib.parse import quote
 _TIMEOUT_S = 20.0
 _PYPI_HOST = "pypi.org"
 
-# Words that make a release note non-routine. Matched case-insensitively against
-# the note body; a hit forces the interview rather than an automatic bump.
+# Phrases that make a release note non-routine. A hit forces the interview rather
+# than an automatic bump. Matched against a NORMALIZED body (see `_normalize`),
+# because release notes in the wild decorate these phrases: `**BREAKING**`,
+# `BREAKING-CHANGE:`, `### Breaking changes`. A plain substring scan over the raw
+# body caught the first spelling and waved the others through.
 BREAKING_MARKERS = (
-    "breaking change",
-    "breaking:",
+    "breaking",
     "backwards incompatible",
     "backward incompatible",
     "incompatible change",
@@ -38,6 +41,19 @@ BREAKING_MARKERS = (
     "deprecation",
     "migration required",
 )
+
+# Conventional Commits marks a breaking change with `!` before the colon:
+# `feat!:`, `refactor(api)!:`. No keyword appears, so only a pattern can catch it.
+_BANG_RE = re.compile(r"^\s*\w+(\([^)]*\))?!\s*:", re.MULTILINE)
+
+# Markdown emphasis and the hyphen/underscore variants are decoration, not
+# meaning. Collapsing them lets ONE marker cover every spelling.
+_DECORATION = str.maketrans({"*": " ", "_": " ", "-": " ", "`": " "})
+
+
+def _normalize(body: str) -> str:
+    """Lower-case the body and strip the decoration that hides a marker."""
+    return " ".join(body.lower().translate(_DECORATION).split())
 
 
 @dataclass(frozen=True)
@@ -91,12 +107,23 @@ class UpstreamStatus:
     notes: str = ""
     reachable: bool = True
     error: str = ""
+    # Versions between the pin and `pypi_latest` whose notes could NOT be read.
+    # A jump of several patches must not be judged on the newest release alone.
+    unread_versions: tuple[str, ...] = ()
 
     @property
     def markers(self) -> tuple[str, ...]:
-        """Breaking-change markers present in the release notes."""
-        body = self.notes.lower()
-        return tuple(m for m in BREAKING_MARKERS if m in body)
+        """Breaking-change markers present in the release notes.
+
+        The gate's job is to ROUTE TO A HUMAN, not to classify precisely, so this
+        errs toward matching: a false stop costs one question, a false pass costs
+        an unreviewed unattended upgrade.
+        """
+        body = _normalize(self.notes)
+        found = [m for m in BREAKING_MARKERS if m in body]
+        if _BANG_RE.search(self.notes):
+            found.append("conventional-commits `!`")
+        return tuple(found)
 
 
 def latest_pypi(package: str) -> tuple[str, str]:
@@ -124,6 +151,40 @@ def latest_pypi(package: str) -> tuple[str, str]:
     info = data.get("info", {})
     version = str(info.get("version") or "") if isinstance(info, dict) else ""
     return version, "" if version else "pypi returned no version"
+
+
+def pypi_versions(package: str) -> tuple[str, ...]:
+    """Every version PyPI lists for `package` (unordered, "" on failure).
+
+    Needed to know which releases sit BETWEEN the pin and the latest: the engine
+    must not judge a multi-patch jump on the newest release's notes alone.
+    """
+    conn = http.client.HTTPSConnection(_PYPI_HOST, timeout=_TIMEOUT_S)
+    try:
+        conn.request("GET", f"/pypi/{quote(package, safe='')}/json")
+        resp = conn.getresponse()
+        if resp.status != HTTPStatus.OK:
+            return ()
+        data = json.loads(resp.read())
+    except OSError, TimeoutError, json.JSONDecodeError:
+        return ()
+    finally:
+        conn.close()
+    releases = data.get("releases") if isinstance(data, dict) else None
+    return tuple(str(v) for v in releases) if isinstance(releases, dict) else ()
+
+
+def versions_between(all_versions: tuple[str, ...], current: str, latest: str) -> tuple[str, ...]:
+    """Versions strictly after `current` and up to `latest`, oldest first."""
+    cur, top = Version.parse(current), Version.parse(latest)
+    if cur is None or top is None:
+        return ()
+    picked = [
+        v
+        for v in (Version.parse(raw) for raw in all_versions)
+        if v is not None and v > cur and not v > top
+    ]
+    return tuple(v.raw for v in sorted(picked, key=lambda v: v.parts))
 
 
 def _gh_api(path: str) -> tuple[dict[str, object], str]:
@@ -178,11 +239,16 @@ def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
 
 
 def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
-    """Fetch the upstream picture for one tool: latest release + its notes.
+    """Fetch the upstream picture for one tool: every release we would be adopting.
 
     Returns `reachable=False` rather than raising when the network or `gh` is
     unavailable, so an offline run reports "could not check" instead of
     manufacturing a finding.
+
+    Crucially this collects notes for EVERY version between the pin and the
+    latest, not just the newest. The patch gate accepts any distance within the
+    patch slot, so `0.9.25 -> 0.9.28` is auto-apply-eligible — and reading only
+    0.9.28's body would wave through a breaking change announced in 0.9.26.
     """
     if not pypi:
         return UpstreamStatus(reachable=False, error="no `pypi` name configured for this tool")
@@ -193,11 +259,28 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
     if latest == current or not github:
         return UpstreamStatus(pypi_latest=latest)
 
-    tag, body, tag_err = release_for_tag(github, latest)
+    pending = versions_between(pypi_versions(pypi), current, latest) or (latest,)
+    bodies: list[str] = []
+    unread: list[str] = []
+    newest_tag = ""
+    last_error = ""
+    for version in pending:
+        tag, body, tag_err = release_for_tag(github, version)
+        if tag_err or not tag:
+            unread.append(version)
+            last_error = tag_err or f"no release found for {version}"
+            continue
+        if version == latest:
+            newest_tag = tag
+        bodies.append(
+            f"## {tag}\n\n{body.strip()}" if body.strip() else f"## {tag}\n\n_(no notes)_"
+        )
+
     return UpstreamStatus(
         pypi_latest=latest,
-        github_tag=tag,
-        notes=body,
+        github_tag=newest_tag,
+        notes="\n\n".join(bodies),
         reachable=True,
-        error=tag_err,
+        error=last_error,
+        unread_versions=tuple(unread),
     )

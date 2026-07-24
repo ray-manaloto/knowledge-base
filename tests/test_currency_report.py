@@ -271,3 +271,42 @@ def test_a_pipe_in_a_finding_detail_is_escaped(tmp_path) -> None:
         line for line in detail.read_text(encoding="utf-8").splitlines() if "resolution" in line
     )
     assert row.replace(r"\|", "").count("|") == 4
+
+
+def test_degraded_success_does_not_wipe_the_baseline(tmp_path) -> None:
+    """A 200 whose body lacks `state` is not a good reading.
+
+    It parses cleanly and yields blanks, so keying carry-forward on `error` alone
+    let it overwrite a good baseline, report a spurious "issue moved", and then
+    report it a SECOND time on the next healthy run — because the baseline it
+    compared against had been wiped by the first.
+    """
+    good = Observation(key="issue:#1653", state="open", updated_at="t1")
+    issues.save_current(tmp_path, "graphify", (good,))
+
+    degraded = Observation(key="issue:#1653", state="", updated_at="")
+    assert not degraded.usable
+    assert issues.changes((degraded,), issues.load_previous(tmp_path, "graphify")) == ()
+    issues.save_current(tmp_path, "graphify", (degraded,))
+
+    kept = issues.load_previous(tmp_path, "graphify")
+    assert kept["issue:#1653"].state == "open"
+
+    # A genuine close is still detected afterwards — control arm.
+    closed = (Observation(key="issue:#1653", state="closed", updated_at="t2"),)
+    assert issues.changes(closed, kept) == closed
+
+
+def test_a_response_without_state_is_reported_as_an_error(monkeypatch) -> None:
+    """`observe` must name a degraded success rather than return silent blanks."""
+    import subprocess
+
+    class _Res:
+        returncode = 0
+        stdout = '{"state":null,"updated_at":null,"comments":null,"title":null}'
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_k: _Res())
+    observed = issues.observe(config.WatchItem(kind="issue", ref="1653"), default_repo="o/r")
+    assert observed.error
+    assert not observed.usable

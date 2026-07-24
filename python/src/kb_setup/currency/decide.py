@@ -108,6 +108,21 @@ def _gate_patch(current: str, latest: str) -> Ambiguity | None:
 
 
 def _gate_tag(upstream: UpstreamStatus, latest: str) -> Ambiguity | None:
+    if upstream.unread_versions:
+        # A multi-patch jump adopts EVERY release in between. Judging it on the
+        # ones we could read would be the absence-of-evidence trap again.
+        return Ambiguity(
+            gate=GATES[1],
+            question=(
+                f"Notes for {', '.join(upstream.unread_versions)} could not be read. "
+                f"Adopt {latest} anyway?"
+            ),
+            detail=(
+                "This bump adopts every release between the pin and the latest, so a "
+                "breaking change announced in one of the unread ones would be invisible."
+            ),
+            recommendation="Read the missing releases, or bump one release at a time.",
+        )
     if upstream.github_tag:
         return None
     return Ambiguity(
@@ -174,19 +189,43 @@ def _gate_issues(moved: tuple[Observation, ...]) -> Ambiguity | None:
     )
 
 
+# Checks that must have POSITIVELY passed before a bump proceeds unattended.
+# SKIP is fine for the hook (it is not a failure), but SKIP means "not checked",
+# and "nothing disagreed" is not "everything agreed" — reading it as consent for
+# an unattended action is the absence-of-evidence trap
+# (`probes-need-a-control-arm.md`). On a host where the tool is not installed at
+# all, four of six checks SKIP and the run would otherwise report itself green.
+_REQUIRED_OK = ("resolution", "build-stamp")
+
+
 def _gate_sync(sync: SyncStatus) -> Ambiguity | None:
     others = [f for f in sync.drifted if f.check != "extras"]
-    if not others:
-        return None
-    return Ambiguity(
-        gate=GATES[5],
-        question="The current install is already out of sync. Fix that before bumping?",
-        detail="; ".join(f"{f.check}: {f.detail}" for f in others),
-        recommendation=(
-            "Resolve the drift first — bumping on top of an unknown state makes the "
-            "result unattributable."
-        ),
-    )
+    if others:
+        return Ambiguity(
+            gate=GATES[5],
+            question="The current install is already out of sync. Fix that before bumping?",
+            detail="; ".join(f"{f.check}: {f.detail}" for f in others),
+            recommendation=(
+                "Resolve the drift first — bumping on top of an unknown state makes the "
+                "result unattributable."
+            ),
+        )
+    by_check = {f.check: f for f in sync.findings}
+    unverified = [
+        name for name in _REQUIRED_OK if name in by_check and by_check[name].status != "ok"
+    ]
+    if unverified:
+        return Ambiguity(
+            gate=GATES[5],
+            question="Step 1 could not actually verify this install. Bump anyway?",
+            detail=(
+                "Not checked: "
+                + "; ".join(f"{n} ({by_check[n].detail})" for n in unverified)
+                + ". Nothing disagreed, but almost nothing was checked."
+            ),
+            recommendation="Run where the tool is installed, so the bump is made on evidence.",
+        )
+    return None
 
 
 def decide(

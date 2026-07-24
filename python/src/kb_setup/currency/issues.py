@@ -38,6 +38,19 @@ class Observation:
     title: str = ""
     error: str = ""
 
+    @property
+    def usable(self) -> bool:
+        """Whether this observation is fit to become the next run's baseline.
+
+        NOT the same as "did not error". A 200 whose body lacks the watched
+        fields parses cleanly and yields blanks with `error=""`, so keying
+        carry-forward on `error` alone let a degraded success overwrite a good
+        baseline, report a spurious "issue moved", and then report it a SECOND
+        time on the next healthy run — because the baseline it compared against
+        had been wiped by the first.
+        """
+        return not self.error and bool(self.state)
+
     def differs_from(self, other: Observation | None) -> bool:
         """True when the fields we watch changed. An unreadable run never counts.
 
@@ -45,13 +58,50 @@ class Observation:
         offline run would otherwise manufacture movement on every tracked issue
         and drown the real signal.
         """
-        if other is None or self.error or other.error:
+        if other is None or not self.usable or other.error:
             return False
         return (
             self.state != other.state
             or self.updated_at != other.updated_at
             or self.comments != other.comments
         )
+
+
+def _as_int(value: object) -> int:
+    """Coerce an untyped JSON field to int; anything unusable becomes 0."""
+    try:
+        if isinstance(value, (int, str)):
+            return int(value)
+    except TypeError, ValueError:
+        return 0
+    return 0
+
+
+def _fetch_issue(repo: str, ref: str) -> tuple[dict[str, object], str]:
+    """One `gh api` issue read, as (payload, error)."""
+    try:
+        res = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{repo}/issues/{ref}",
+                "--jq",
+                "{state:.state,updated_at:.updated_at,comments:.comments,title:.title}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_TIMEOUT_S,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {}, f"gh api failed: {e}"
+    if res.returncode != 0:
+        return {}, res.stderr.strip()[:200] or "gh api failed"
+    try:
+        data = json.loads(res.stdout or "{}")
+    except json.JSONDecodeError as e:
+        return {}, f"non-JSON response: {e}"
+    return data if isinstance(data, dict) else {}, ""
 
 
 def observe(item: WatchItem, *, default_repo: str) -> Observation:
@@ -67,35 +117,20 @@ def observe(item: WatchItem, *, default_repo: str) -> Observation:
     if not repo:
         return Observation(key=item.key, error="no repo configured for this issue")
 
-    try:
-        res = subprocess.run(
-            [
-                "gh",
-                "api",
-                f"repos/{repo}/issues/{item.ref}",
-                "--jq",
-                "{state:.state,updated_at:.updated_at,comments:.comments,title:.title}",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_TIMEOUT_S,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return Observation(key=item.key, error=f"gh api failed: {e}")
+    data, err = _fetch_issue(repo, item.ref)
+    if err:
+        return Observation(key=item.key, error=err)
 
-    if res.returncode != 0:
-        return Observation(key=item.key, error=res.stderr.strip()[:200] or "gh api failed")
-    try:
-        data = json.loads(res.stdout or "{}")
-    except json.JSONDecodeError as e:
-        return Observation(key=item.key, error=f"non-JSON response: {e}")
-
+    state = str(data.get("state") or "")
+    if not state:
+        # A 200 with no `state` is a degraded success, not a good reading. Naming
+        # it an error keeps it out of the baseline AND out of the moved list.
+        return Observation(key=item.key, error="response lacked a `state` field")
     return Observation(
         key=item.key,
-        state=str(data.get("state") or ""),
+        state=state,
         updated_at=str(data.get("updated_at") or ""),
-        comments=int(data.get("comments", 0) or 0),
+        comments=_as_int(data.get("comments")),
         title=str(data.get("title") or ""),
     )
 
@@ -152,7 +187,7 @@ def save_current(report_dir: Path, tool: str, observations: tuple[Observation, .
 
     payload: dict[str, dict[str, object]] = {}
     for o in observations:
-        source = o if not o.error else previous.get(o.key)
+        source = o if o.usable else previous.get(o.key)
         if source is None:  # errored on its very first observation — nothing to keep
             continue
         payload[o.key] = {k: v for k, v in asdict(source).items() if k not in {"key", "error"}}
