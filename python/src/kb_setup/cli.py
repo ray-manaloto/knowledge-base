@@ -83,6 +83,18 @@ def main(argv: list[str] | None = None) -> int:
         got = ensure_runtime_deps(repo_root)
         print(f"[deps] {'installed ' + ', '.join(got) if got else 'all output deps present'}")
         return 0
+    if cmd == "ship":
+        from kb_setup import pr
+
+        return pr.ship_main(repo_root, title=_opt(rest, "--title"))
+    if cmd == "land":
+        from kb_setup import pr
+
+        positional = [a for a in rest if not a.startswith("-")]
+        if not positional or not positional[0].isdigit():
+            print("kb-setup land <PR#>", file=sys.stderr)
+            return 2
+        return pr.land_main(repo_root, int(positional[0]))
     if cmd == "manifest-add":
         return _manifest_add(repo_root, rest)
     if cmd == "assemble":
@@ -95,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         "(build | update [name] | merge <chunk> [root] | label [--missing-only] "
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
-        "validate-chunks <chunk...> | ensure-deps | version)",
+        "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,
     )
     return 2

@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# wshobson/agents — large agent/plugin monorepo; source of plugins/plugin-eval (skill+plugin scoring rubric, static checks, judge harness).
+url = https://github.com/wshobson/agents
+ref = main
+commit = c4b82b0ad771190355eb8e204b1329732a18449a
+kind = code

@@ -41,6 +41,26 @@ def _ensure_clone(m: mf.Manifest) -> None:
             check=True,
             timeout=600,
         )
+    # An EXISTING clone predates any pin advance, so the newly-pinned commit is
+    # simply not in it yet and `checkout` dies with "fatal: unable to read tree".
+    # Measured 2026-07-23: `kb-update -- claude-plugins-community` advanced the pin
+    # to 086db464, the local clone still sat at 07fb1efe, and the whole task
+    # aborted — i.e. update was broken for every source whose clone already
+    # existed, which is every source after its first build. Fetch when (and only
+    # when) the object is absent, so the common no-op path stays offline.
+    have = subprocess.run(
+        ["git", "-C", str(d), "cat-file", "-e", f"{m.commit}^{{commit}}"],
+        check=False,
+        capture_output=True,
+        timeout=60,
+    )
+    if have.returncode != 0:
+        print(f"  fetching {m.name} @ {m.commit[:10]} (not in local clone)")
+        subprocess.run(
+            ["git", "-C", str(d), "fetch", "--quiet", "origin", m.ref],
+            check=True,
+            timeout=600,
+        )
     subprocess.run(["git", "-C", str(d), "checkout", "--quiet", m.commit], check=True, timeout=120)
 
 

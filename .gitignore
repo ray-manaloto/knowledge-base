@@ -51,6 +51,9 @@ sources/media/*.pdf.txt   # regenerable from the committed .pdf via pypdf
 
 # OS / editor
 .DS_Store
+# Agent session state (OMC HUD etc.) — per-session scratch, never source. Left
+# untracked-but-unignored it is one `git add .` away from being committed.
+.omc/
 # reflect derived doc (regenerable via `graphify reflect`); memory/ IS tracked (authored)
 graphify-out/reflections/
 # graphify dated backup dirs (redundant with git history)

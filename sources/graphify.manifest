@@ -7,8 +7,27 @@
 # First corpus: graphify's own source, so the KB can answer "how does graphify
 # work?" (esp. whether add/write is exposed via MCP or the python API) from the
 # graph instead of guessing.
+#
+# ⚠️ INVARIANT: this pin MUST track the graphify version mise actually installs
+# (`"pipx:graphifyy"` in this repo's mise.toml AND in dotfiles' — both must agree).
+# Otherwise the corpus answers questions about code we are not running. That is
+# not hypothetical: until 2026-07-23 this sat at e32c9f43, PREDATING both 0.9.24
+# and 0.9.25, while mise ran 0.9.25 — so every "how does graphify work?" answer
+# came from the wrong source, and several were wrong.
+#
+# Pin the RELEASE TAG, never a branch head:
+#   - `ref = v8` (the old value) is a BRANCH — it drifts ahead of the release, so
+#     the corpus would describe unreleased code.
+#   - The newest tag is also wrong: `v1.0.0` is tagged on GitHub but is NOT on
+#     PyPI (PyPI latest = 0.9.25, verified 2026-07-23), and mise installs from
+#     PyPI — so tracking newest-tag would ingest code we cannot run.
+# The correct ref is `v<version>` for the version mise resolves.
+#
+# To bump: change the mise pin, then set ref/commit here to the matching tag
+#   git ls-remote --tags --refs https://github.com/Graphify-Labs/graphify | grep v<version>
+# and re-run `mise run kb-build`.
 url = https://github.com/Graphify-Labs/graphify
-ref = v8
-commit = e32c9f431c5ed7ed8c980f6d34dc3fe6c99a389b
+ref = v0.9.25
+commit = 2fa6cd3d5548577f8c5f591b713f0bf80c1af183
 kind = code
 added = 2026-07-21
