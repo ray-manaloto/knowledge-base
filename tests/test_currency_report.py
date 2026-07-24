@@ -310,3 +310,28 @@ def test_a_response_without_state_is_reported_as_an_error(monkeypatch) -> None:
     observed = issues.observe(config.WatchItem(kind="issue", ref="1653"), default_repo="o/r")
     assert observed.error
     assert not observed.usable
+
+
+def test_missing_config_says_so_instead_of_passing_silently(tmp_path, capsys) -> None:
+    """Silence is this design's definition of "clean", so it must never mean "absent".
+
+    A renamed config, a wrong `-C` in the hook, or a consumer repo copying the
+    hook without the config would otherwise disable the check forever while
+    looking green — the top-level "check that can only pass".
+    """
+    from kb_setup.currency import run as currency_run
+
+    assert currency_run.check(tmp_path) == 0
+    assert "did NOT run" in capsys.readouterr().err
+
+
+def test_unknown_tool_filter_is_an_error_not_silence(tmp_path, capsys) -> None:
+    """A typo'd --tool matched nothing and exited 0 with no output."""
+    from kb_setup.currency import run as currency_run
+
+    (tmp_path / "mise.toml").write_text('[tools]\nx = "1"\n', encoding="utf-8")
+    (tmp_path / "currency.toml").write_text(
+        '[tool.graphify]\nmise_key = "pipx:graphifyy"\n', encoding="utf-8"
+    )
+    assert currency_run.check(tmp_path, only="graphifyy") == 2
+    assert "unknown tool" in capsys.readouterr().err

@@ -19,6 +19,7 @@ opt-in exceptions, never reached from the hook: `observed_version` (executes
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -70,13 +71,27 @@ class SyncStatus:
         """True when nothing drifted. SKIPs do not make a run red."""
         return not self.drifted
 
+    @property
+    def verified(self) -> bool:
+        """True when at least one check actually ran and agreed.
+
+        A run of nothing-but-SKIPs is not a pass. Distinguishing it is the whole
+        point of the three-state model: without this, a foreign platform rendered
+        as `graphify : in sync` — the green wording, an empty version, and not a
+        single check performed.
+        """
+        return any(f.status == OK for f in self.findings)
+
     def summary(self) -> str:
         """One line, suitable for a hook nudge or a landing-page row."""
-        if self.ok:
-            return f"{self.tool} {self.pinned}: in sync"
-        first = self.drifted[0]
-        extra = f" (+{len(self.drifted) - 1} more)" if len(self.drifted) > 1 else ""
-        return f"{self.tool}: {first.check} — {first.detail}{extra}"
+        if self.drifted:
+            first = self.drifted[0]
+            extra = f" (+{len(self.drifted) - 1} more)" if len(self.drifted) > 1 else ""
+            return f"{self.tool}: {first.check} — {first.detail}{extra}"
+        if not self.verified:
+            reason = self.findings[0].detail if self.findings else "no checks configured"
+            return f"{self.tool}: not verifiable here — {reason}"
+        return f"{self.tool} {self.pinned}: in sync"
 
 
 # ---------------------------------------------------------------- mise pin ----
@@ -135,15 +150,40 @@ def resolve_from_path(binary: str) -> tuple[str, str]:
     # itself, so following it turns `.../shims/graphify` into `.../bin/mise` and
     # destroys the one fact this function exists to read. Caught by the control
     # arm on 2026-07-23 — the clean-PATH case reported "outside mise".
-    parts = Path(found).absolute().parts
-    if "shims" in parts:
+    resolved = Path(found).absolute()
+    parts = resolved.parts
+    if _is_mise_shim(resolved):
         return "", "shim"
     if "installs" in parts:
-        idx = parts.index("installs")
+        # rindex, not index: a path can contain an earlier directory called
+        # `installs` (a cache root, a nested checkout), and taking the first
+        # match reads the "version" from the wrong segment entirely.
+        idx = len(parts) - 1 - parts[::-1].index("installs")
         # .../installs/<backend-tool>/<version>/... — the version is two along.
         if len(parts) > idx + 2:
             return parts[idx + 2], "install-dir"
     return "", f"outside-mise:{found}"
+
+
+def _mise_shim_dirs() -> tuple[Path, ...]:
+    """Directories that are genuinely mise's shims, honouring MISE_DATA_DIR."""
+    roots = []
+    data_dir = os.environ.get("MISE_DATA_DIR")
+    if data_dir:
+        roots.append(Path(data_dir).expanduser() / "shims")
+    roots.append(Path.home() / ".local" / "share" / "mise" / "shims")
+    return tuple(roots)
+
+
+def _is_mise_shim(resolved: Path) -> bool:
+    """Whether `resolved` sits in MISE's shim dir — not merely in some `shims/`.
+
+    pyenv, asdf and rbenv all use a directory called `shims`, so a bare segment
+    test hands them a free pass: the caller then reports the PIN as the resolved
+    version, a value nothing ever read from the binary. That is the same
+    false-green this module exists to catch.
+    """
+    return any(resolved.is_relative_to(root) for root in _mise_shim_dirs())
 
 
 def observed_version(binary: str) -> str:
@@ -299,7 +339,15 @@ def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
             pinned,
         )
     if how == "absent":
-        return Finding("resolution", SKIP, f"{spec.binary} is not on PATH here"), ""
+        # DRIFT, not SKIP. `applies_here()` has already answered "should this tool
+        # exist on this host?" — so once we are past that, a missing binary is a
+        # fact about the install, not something we were unable to check. Reporting
+        # it as SKIP made a fresh clone (or a failed `mise install`) read as
+        # "graphify 0.9.25: in sync" while there was no binary at all.
+        return (
+            Finding("resolution", DRIFT, f"{spec.binary} is not installed on this host"),
+            "",
+        )
     if how.startswith("outside-mise"):
         return (
             Finding(
@@ -324,6 +372,15 @@ def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
 
 def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
     if not spec.extras:
+        if declared:
+            # One-directional checking hid a real supply-surface change: the pin
+            # installing extras nobody declared is as much a drift as the reverse.
+            return Finding(
+                "extras",
+                DRIFT,
+                f"the mise pin installs extras {list(declared)} that currency.toml "
+                f"does not declare",
+            )
         return Finding("extras", SKIP, "no extras declared for this tool")
     if tuple(sorted(declared)) != tuple(sorted(spec.extras)):
         return Finding(

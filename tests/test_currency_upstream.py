@@ -35,9 +35,12 @@ def test_real_body_survives(monkeypatch) -> None:
     assert upstream.release_for_tag("x/y", "0.9.26")[1] == "Routine fixes."
 
 
-def test_null_tag_name_falls_back_to_the_candidate(monkeypatch) -> None:
+def test_null_tag_name_is_an_error_not_an_invented_tag(monkeypatch) -> None:
+    """Defaulting to the tag we ASKED for fabricates a release nobody confirmed."""
     _fake_gh(monkeypatch, {"tag_name": None, "body": "notes"})
-    assert upstream.release_for_tag("x/y", "0.9.26")[0] == "0.9.26"
+    tag, _body, err = upstream.release_for_tag("x/y", "0.9.26")
+    assert tag == ""
+    assert err
 
 
 def test_unreachable_upstream_reports_error_not_a_verdict(monkeypatch) -> None:
@@ -131,3 +134,23 @@ def test_routine_notes_yield_no_markers() -> None:
     """Control arm: the matcher must not have become unconditional."""
     assert upstream.UpstreamStatus(notes="Routine: faster BFS and a docs typo fix.").markers == ()
     assert upstream.UpstreamStatus(notes="Fixed a crash when the cache is cold.").markers == ()
+
+
+def test_a_release_payload_without_a_tag_name_is_not_invented(monkeypatch) -> None:
+    """`.get("tag_name", candidate)` fabricated a release that was never confirmed.
+
+    `_gh_api` returns ({}, "") for any exit-0 response whose JSON is not an object,
+    so defaulting to the tag we ASKED for made `github_tag` truthy and passed
+    gate 2 on a release nobody had seen.
+    """
+    monkeypatch.setattr(upstream, "_gh_api", lambda _p: ({}, ""))
+    tag, body, err = upstream.release_for_tag("o/r", "0.9.26")
+    assert tag == ""
+    assert body == ""
+    assert err
+
+
+def test_a_real_payload_still_yields_its_tag(monkeypatch) -> None:
+    """Control arm: the guard must not blank out genuine releases."""
+    monkeypatch.setattr(upstream, "_gh_api", lambda _p: ({"tag_name": "v0.9.26", "body": "x"}, ""))
+    assert upstream.release_for_tag("o/r", "0.9.26")[0] == "v0.9.26"

@@ -37,6 +37,25 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
     prompt echoes, 0 loads), so a nudge that fires every session would train the
     reader to skip the one session it matters.
     """
+    configured = config.load(repo_root)
+    if not configured:
+        # NOT silent. Silence is this design's definition of "clean", so a
+        # renamed/moved config, a wrong `-C` in the hook, or a consumer repo that
+        # copies the hook without the config would disable the check forever while
+        # looking green. A check that cannot run must say so.
+        print(
+            f"[currency] no {config.CONFIG_NAME} at {repo_root} — step 1 did NOT run",
+            file=sys.stderr,
+        )
+        return 0
+    if only and not any(s.name == only for s in configured):
+        names = ", ".join(s.name for s in configured)
+        print(
+            f"[currency] unknown tool {only!r}; configured: {names}",
+            file=sys.stderr,
+        )
+        return 2
+
     drifted: list[sync.SyncStatus] = []
     for spec in _specs(repo_root, only):
         status = sync.check_sync(repo_root, spec)
@@ -65,7 +84,7 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     report_root = repo_root / report.REPORT_DIR
     previous = issues.load_previous(report_root, spec.name)
     moved = issues.changes(observations, previous)
-    verdict = decide(sync=status, upstream=up, moved=moved)
+    verdict = decide(sync=status, upstream=up, moved=moved, observations=observations)
     return report.RunRecord(
         tool=spec.name,
         sync=status,
@@ -83,10 +102,20 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
     daily job into noise the moment upstream ships anything, which is exactly how
     a currency check stops being read.
     """
+    configured = config.load(repo_root)
+    if not configured:
+        print(
+            f"[currency] no {config.CONFIG_NAME} at {repo_root} — nothing to do",
+            file=sys.stderr,
+        )
+        return 0
     specs = _specs(repo_root, only)
     if not specs:
-        print(f"[currency] no tools configured in {config.CONFIG_NAME}", file=sys.stderr)
-        return 0
+        # The config exists and is fine; the FILTER matched nothing. Saying "no
+        # tools configured" here would be a lie, and a silent 0 would hide a typo.
+        names = ", ".join(s.name for s in configured)
+        print(f"[currency] unknown tool {only!r}; configured: {names}", file=sys.stderr)
+        return 2
 
     payloads: list[dict[str, object]] = []
     lines: list[str] = []

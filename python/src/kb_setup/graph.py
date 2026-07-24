@@ -13,11 +13,19 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kb_setup import manifest as mf
 from kb_setup.graphify_env import clean_env, graphify_python
 
+if TYPE_CHECKING:
+    from kb_setup.currency.config import ToolSpec
+
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
+
+# The tool whose artifacts `kb-build` produces. Named explicitly so a
+# multi-tool currency.toml cannot silently stamp the wrong tool.
+_STAMPED_TOOL = "graphify"
 
 
 def _run(cmd: list[str], cwd: Path) -> None:
@@ -97,6 +105,13 @@ def build(repo_root: Path) -> None:
     if not manifests:
         raise SystemExit("no sources/*.manifest found")
 
+    # Invalidate the stamp BEFORE anything touches graph.json. `build()` overwrites
+    # the artifact at the seed step but only stamps at the very end, so any abort in
+    # between — a merge failure, Ctrl-C — used to leave a NEW artifact under the OLD
+    # stamp, which then asserted it was built by the pinned version. Clearing first
+    # makes every abort fail closed as "never stamped".
+    _clear_stamp(repo_root)
+
     print(f"[kb-build] {len(manifests)} source(s)")
     for m in manifests:
         _ensure_clone(m)
@@ -133,6 +148,34 @@ def build(repo_root: Path) -> None:
     print("[kb-build] done — graphify-out/graph.json reproduced")
 
 
+def _currency_spec(repo_root: Path) -> ToolSpec | None:
+    """The tool whose build artifacts THIS repo stamps, or None.
+
+    Selected by NAME, not by "first spec that declares a stamp". `currency.toml`
+    is explicitly multi-tool, so taking the first stamped entry would write
+    `graphify --version` into whichever tool happened to sort first.
+    """
+    from kb_setup.currency import config
+
+    return next((s for s in config.load(repo_root) if s.name == _STAMPED_TOOL and s.stamp), None)
+
+
+def _clear_stamp(repo_root: Path) -> None:
+    """Remove the build stamp so an aborted build cannot leave a stale one."""
+    try:
+        from kb_setup.currency import sync
+
+        spec = _currency_spec(repo_root)
+        if spec is None:
+            return
+        path = sync.stamp_path(repo_root, spec)
+        if path is not None and path.exists():
+            path.unlink()
+            print(f"[kb-build] cleared {path.name} — it is rewritten only on success")
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-build] WARNING: could not clear the currency stamp: {e}")
+
+
 def _stamp_build(repo_root: Path) -> None:
     """Record which graphify version built these artifacts (currency step 1).
 
@@ -147,9 +190,9 @@ def _stamp_build(repo_root: Path) -> None:
     this is meant to expose. Best-effort — a build must not fail over its stamp.
     """
     try:
-        from kb_setup.currency import config, sync
+        from kb_setup.currency import sync
 
-        spec = next((s for s in config.load(repo_root) if s.stamp), None)
+        spec = _currency_spec(repo_root)
         if spec is None:
             return
         # NO fallback to the pin. Falling back would stamp the version we HOPED

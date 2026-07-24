@@ -249,3 +249,57 @@ def test_positively_verified_step_one_still_authorizes() -> None:
         ),
     )
     assert decide(sync=status, upstream=_clean_upstream(), moved=()).auto_apply
+
+
+# --------------------- gate 5 must distinguish "did not move" from "unread" ----
+
+
+def _errored_observations() -> tuple[Observation, ...]:
+    return tuple(
+        Observation(key=f"issue:{n}", error="gh: HTTP 403 rate limit")
+        for n in (2101, 2086, 1653, 1824)
+    )
+
+
+def test_unreadable_tracked_issues_do_not_pass_gate_five() -> None:
+    """The gate whose entire job is to stop a bump was passing on unread issues.
+
+    `differs_from` rightly refuses to call an errored observation movement — a
+    rate limit must not manufacture movement on every item — so `moved` is empty
+    for BOTH "provably did not move" and "could not be read". decide() saw only
+    `moved`, so it could not tell them apart. An expired gh token, a rate limit,
+    or one transferred issue was enough to auto-apply with all four tracked
+    issues unread.
+    """
+    observations = _errored_observations()
+    moved = tuple(o for o in observations if o.differs_from(None))
+    assert moved == ()  # the input that made this invisible
+
+    verdict = decide(
+        sync=_sync(), upstream=_clean_upstream(), moved=moved, observations=observations
+    )
+    assert not verdict.auto_apply
+    assert any(a.gate == GATES[4] for a in verdict.ambiguities)
+    assert GATES[4] not in verdict.gates_passed
+
+
+def test_readable_and_unmoved_issues_still_pass_gate_five() -> None:
+    """Control arm: successfully-read, genuinely-unmoved issues must still pass."""
+    observations = (Observation(key="issue:2101", state="open", updated_at="t1"),)
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(), moved=(), observations=observations)
+    assert verdict.auto_apply
+    assert GATES[4] in verdict.gates_passed
+
+
+def test_unreachable_upstream_never_prints_the_word_current() -> None:
+    """The landing row is committed; "current" would assert a fact never checked."""
+    verdict = decide(
+        sync=_sync(), upstream=UpstreamStatus(reachable=False, error="pypi down"), moved=()
+    )
+    assert "current" not in verdict.summary()
+    assert "UNKNOWN" in verdict.summary()
+    # Control arm: a genuinely-current run still says so.
+    assert (
+        "current"
+        in decide(sync=_sync(), upstream=UpstreamStatus(pypi_latest="0.9.25"), moved=()).summary()
+    )

@@ -84,16 +84,49 @@ def test_missing_pin_is_drift_not_a_crash(tmp_path) -> None:
 # ----------------------------------------------------------- resolution ----
 
 
-def test_shim_resolution_is_in_sync_by_construction(tmp_path, monkeypatch) -> None:
+def test_mise_shim_resolution_is_in_sync_by_construction(tmp_path, monkeypatch) -> None:
     """A mise shim applies the pin at call time, so it cannot be stale.
 
     Regression guard: this path once reported DRIFT because `.resolve()` followed
     the shim symlink to the `mise` binary itself.
     """
-    monkeypatch.setattr(sync.shutil, "which", lambda _: "/Users/x/.local/share/mise/shims/graphify")
+    shim = tmp_path / "mise" / "shims" / "graphify"
+    shim.parent.mkdir(parents=True)
+    shim.touch()
+    monkeypatch.setattr(sync, "_mise_shim_dirs", lambda: (shim.parent,))
+    monkeypatch.setattr(sync.shutil, "which", lambda _: str(shim))
     version, how = sync.resolve_from_path("graphify")
     assert how == "shim"
     assert version == ""
+
+
+def test_a_pyenv_or_asdf_shim_is_not_a_mise_shim(tmp_path, monkeypatch) -> None:
+    """pyenv, asdf and rbenv all use a directory literally called `shims`.
+
+    A bare segment test handed them a free pass, and `_check_resolution` then
+    reported the PIN as the resolved version — a value nothing ever read from the
+    binary. Same false-green class this module was written to catch.
+    """
+    mise_shims = tmp_path / "mise" / "shims"
+    mise_shims.mkdir(parents=True)
+    monkeypatch.setattr(sync, "_mise_shim_dirs", lambda: (mise_shims,))
+    for foreign in ("/Users/x/.pyenv/shims/graphify", "/Users/x/.asdf/shims/graphify"):
+        monkeypatch.setattr(sync.shutil, "which", lambda _, _f=foreign: _f)
+        _version, how = sync.resolve_from_path("graphify")
+        assert how.startswith("outside-mise"), foreign
+
+
+def test_the_last_installs_segment_wins(tmp_path, monkeypatch) -> None:
+    """A path can contain an earlier directory called `installs`.
+
+    `index()` took the first, reading the "version" from the wrong segment.
+    """
+    monkeypatch.setattr(
+        sync.shutil,
+        "which",
+        lambda _: "/opt/installs/cache/share/mise/installs/pipx-graphifyy/0.9.25/bin/graphify",
+    )
+    assert sync.resolve_from_path("graphify") == ("0.9.25", "install-dir")
 
 
 def test_stale_install_dir_ahead_of_shims_is_drift(tmp_path, monkeypatch) -> None:
@@ -129,11 +162,41 @@ def test_binary_outside_mise_is_drift(tmp_path, monkeypatch) -> None:
     assert _finding(sync.check_sync(root, _spec(root)), "resolution").status == sync.DRIFT
 
 
-def test_absent_binary_is_skip_not_drift(tmp_path, monkeypatch) -> None:
-    """Not-installed-here is not installed-wrong — CI must not fail on it."""
+def test_absent_binary_on_an_applicable_host_is_drift(tmp_path, monkeypatch) -> None:
+    """`applies_here()` has already answered "should this exist here?".
+
+    Past that point a missing binary is a fact about the install, not something
+    we could not check. Calling it SKIP made a fresh clone — or a failed
+    `mise install` — render as "graphify 0.9.25: in sync" with no binary at all.
+    Platform-inapplicable hosts are handled earlier and still SKIP.
+    """
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     root = _repo(tmp_path)
-    assert _finding(sync.check_sync(root, _spec(root)), "resolution").status == sync.SKIP
+    status = sync.check_sync(root, _spec(root))
+    assert _finding(status, "resolution").status == sync.DRIFT
+    assert not status.ok
+
+
+def test_a_run_of_nothing_but_skips_is_not_in_sync(tmp_path) -> None:
+    """A foreign platform rendered as `graphify : in sync` — green, and unchecked."""
+    root = _repo(tmp_path)
+    (root / "currency.toml").write_text(
+        '[tool.graphify]\nmise_key = "pipx:graphifyy"\nos = ["plan9"]\n', encoding="utf-8"
+    )
+    status = sync.check_sync(root, _spec(root))
+    assert not status.verified
+    assert "not verifiable here" in status.summary()
+    assert "in sync" not in status.summary()
+
+
+def test_undeclared_extras_in_the_pin_are_drift(tmp_path, monkeypatch) -> None:
+    """The pin installing extras nobody declared is a real supply-surface change."""
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo(tmp_path)
+    (root / "currency.toml").write_text(
+        '[tool.graphify]\nmise_key = "pipx:graphifyy"\nbinary = "graphify"\n', encoding="utf-8"
+    )
+    assert _finding(sync.check_sync(root, _spec(root)), "extras").status == sync.DRIFT
 
 
 # --------------------------------------------------------------- extras ----
@@ -441,3 +504,43 @@ def test_declared_but_absent_artifact_is_drift(tmp_path, monkeypatch) -> None:
     finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
     assert finding.status == sync.DRIFT
     assert "missing" in finding.detail
+
+
+def test_build_clears_the_stamp_before_touching_the_artifact(tmp_path, monkeypatch) -> None:
+    """An aborted build must fail closed, not leave a NEW artifact under an OLD stamp.
+
+    `build()` overwrites graph.json at the seed step but stamps only at the end,
+    so any failure in between left the previous stamp asserting it had built the
+    new bytes — and `built_at_commit` is a repo commit, so a same-commit rebuild
+    by a stale binary was undetectable.
+    """
+    from kb_setup import graph
+
+    root = _repo(tmp_path)
+    sync.write_stamp(root, _spec(root), version="0.9.25")
+    stamp = root / "graphify-out" / ".currency-stamp.json"
+    assert stamp.exists()
+
+    graph._clear_stamp(root)
+    assert not stamp.exists()
+
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert finding.status == sync.DRIFT
+    assert "never been stamped" in finding.detail
+
+
+def test_the_stamped_tool_is_chosen_by_name_not_by_sort_order(tmp_path) -> None:
+    """currency.toml is explicitly multi-tool; "first spec with a stamp" picks the wrong one."""
+    from kb_setup import graph
+
+    root = _repo(tmp_path)
+    (root / "currency.toml").write_text(
+        '[tool.aardvark]\nmise_key = "x"\nstamp = "graphify-out/.a.json"\n\n'
+        '[tool.graphify]\nmise_key = "pipx:graphifyy"\nbinary = "graphify"\n'
+        'artifact = "graphify-out/graph.json"\nstamp = "graphify-out/.currency-stamp.json"\n',
+        encoding="utf-8",
+    )
+    spec = graph._currency_spec(root)
+    assert spec is not None
+    assert spec.name == "graphify"

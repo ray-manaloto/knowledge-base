@@ -77,9 +77,14 @@ class Verdict:
         """
         if self.auto_apply:
             return f"{self.tool} {self.current} → {self.latest}: auto-applying (6/6 gates)"
-        version = (
-            f"{self.current} → {self.latest}" if self.has_upgrade else f"{self.current}, current"
-        )
+        if self.has_upgrade:
+            version = f"{self.current} → {self.latest}"
+        elif self.latest:
+            version = f"{self.current}, current"
+        else:
+            # We never reached upstream. "current" would be a committed assertion
+            # that this IS the newest version, made by a run that never asked.
+            version = f"{self.current}, latest UNKNOWN"
         if self.ambiguities:
             return f"{self.tool} {version}: {len(self.ambiguities)} question(s) for review"
         return f"{self.tool} {version}: clean"
@@ -177,7 +182,31 @@ def _gate_extras(sync: SyncStatus) -> Ambiguity | None:
     )
 
 
-def _gate_issues(moved: tuple[Observation, ...]) -> Ambiguity | None:
+def _gate_issues(
+    moved: tuple[Observation, ...], observations: tuple[Observation, ...]
+) -> Ambiguity | None:
+    """Gate 5. Needs BOTH the movers and the raw observations.
+
+    `moved` alone cannot express "we could not read it". `differs_from` rightly
+    refuses to call an errored observation movement — a rate-limit must not
+    manufacture movement on every item — so an unreadable issue and an issue that
+    provably did not move both arrive here as absence. Reading that absence as a
+    PASS is the inversion of this module's contract: gate 5's entire job is to
+    stop a bump, and it was passing on issues nobody had read.
+    """
+    unread = [o for o in observations if o.error]
+    if unread:
+        return Ambiguity(
+            gate=GATES[4],
+            question=(
+                f"{len(unread)} tracked item(s) could not be read. Bump without checking them?"
+            ),
+            detail="; ".join(f"{o.key}: {o.error}" for o in unread),
+            recommendation=(
+                "Retry when GitHub is reachable — an expired token or a rate limit "
+                "leaves this gate blind, not satisfied."
+            ),
+        )
     if not moved:
         return None
     names = ", ".join(o.key for o in moved)
@@ -233,6 +262,7 @@ def decide(
     sync: SyncStatus,
     upstream: UpstreamStatus,
     moved: tuple[Observation, ...],
+    observations: tuple[Observation, ...] = (),
 ) -> Verdict:
     """Apply the six gates and return what should happen next.
 
@@ -242,7 +272,9 @@ def decide(
     current = sync.pinned
     latest = upstream.pypi_latest
 
-    always = [g for g in (_gate_extras(sync), _gate_issues(moved), _gate_sync(sync)) if g]
+    always = [
+        g for g in (_gate_extras(sync), _gate_issues(moved, observations), _gate_sync(sync)) if g
+    ]
 
     if not upstream.reachable:
         always.append(

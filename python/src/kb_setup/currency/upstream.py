@@ -229,11 +229,15 @@ def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
             # PRESENT with a JSON **null** for a release published without notes, so
             # the default never fires and `str(None)` yields the 4-char string "None"
             # — which is non-empty and therefore sails past the empty-notes gate.
-            return (
-                str(payload.get("tag_name") or candidate),
-                str(payload.get("body") or ""),
-                "",
-            )
+            # Default to "", NEVER to `candidate`: `_gh_api` returns ({}, "")
+            # for any exit-0 response whose JSON is not an object, so defaulting
+            # to the tag we asked for INVENTS a release that was never confirmed
+            # to exist — and a truthy `github_tag` then passes gate 2.
+            tag_name = str(payload.get("tag_name") or "")
+            if not tag_name:
+                last_error = f"release payload for {candidate} had no tag_name"
+                continue
+            return tag_name, str(payload.get("body") or ""), ""
         last_error = err
     return "", "", last_error
 
