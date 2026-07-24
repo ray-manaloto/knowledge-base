@@ -28,11 +28,29 @@ export const meta = {
   phases: [{ title: 'Extract', detail: 'one agent per source -> schema-valid chunk written to scratchDir' }],
 }
 
-const cfg = args || {}
+// Accept args as an object OR as a JSON-encoded string. The Workflow tool documents
+// that objects should be passed verbatim, but some invocation paths serialize args
+// to a string before the script sees it — in which case `cfg.sources` is undefined
+// and the guard below fires with a message that (misleadingly) blames the caller's
+// shape. Parsing a string arg first makes the contract hold either way.
+// Observed 2026-07-24: two consecutive `name: 'kb-extract'` invocations with a
+// well-formed object both arrived as strings and threw here.
+let cfg = args || {}
+if (typeof cfg === 'string') {
+  try {
+    cfg = JSON.parse(cfg)
+  } catch (e) {
+    throw new Error(`kb-extract: args arrived as a string that is not valid JSON: ${e.message}`)
+  }
+}
 const scratchDir = cfg.scratchDir
 const sources = cfg.sources
 if (!scratchDir || !Array.isArray(sources) || sources.length === 0) {
-  throw new Error('kb-extract: args must be {scratchDir, sources:[{key,path,url,kind?,note?}]}')
+  throw new Error(
+    `kb-extract: args must be {scratchDir, sources:[{key,path,url,kind?,note?}]} ` +
+      `(got typeof=${typeof cfg}, scratchDir=${JSON.stringify(scratchDir)}, ` +
+      `sources=${Array.isArray(sources) ? `array(${sources.length})` : typeof sources})`,
+  )
 }
 
 const SCHEMA = {

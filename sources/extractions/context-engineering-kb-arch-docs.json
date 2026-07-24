@@ -1,0 +1,2947 @@
+{
+ "nodes": [
+  {
+   "id": "blog-context-engineering-claude5_context_engineering",
+   "label": "Context engineering",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "When you send a message to Claude, the prompt is only a small part of the context it receives; most of it is assembled from the system prompt, Skills, CLAUDE.md files, memory, and other sources. Shaping that assembled context is called context engineering, and it materially affects results in Claude Code and in custom agents."
+  },
+  {
+   "id": "blog-context-engineering-claude5_context_vs_prompt",
+   "label": "Context is general, prompts are specific",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Unlike a prompt, context is reused across many requests, so it cannot be as specific. The central difficulty of context engineering is writing general prompts and guidance for Claude without knowing what any given user prompt will be."
+  },
+  {
+   "id": "blog-context-engineering-claude5_system_prompt_80_percent_removal",
+   "label": "80% of Claude Code's system prompt removed with no eval loss",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Anthropic removed over 80% of Claude Code's system prompt for models like Claude Opus 5 and Claude Fable 5 with no measurable loss on their coding evaluations. This is the headline evidence that the older, heavily-constrained context engineering practices had become myths for the Claude 5 generation."
+  },
+  {
+   "id": "blog-context-engineering-claude5_overconstraining",
+   "label": "Overconstraining Claude",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Anthropic found they were overconstraining Claude Code through the system prompt, CLAUDE.md files, and skills. Constraints that were once needed to avoid worst-case scenarios can now largely be deleted, letting the model use surrounding context and judgement instead."
+  },
+  {
+   "id": "blog-context-engineering-claude5_conflicting_instructions",
+   "label": "Conflicting instructions across context sources",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Transcripts of Anthropic's own internal Claude Code usage showed several conflicting messages in a single request — e.g. 'leave documentation as appropriate' alongside 'DO NOT add comments' — as system prompt, skills, and user requests clashed. Claude can usually infer intent, but must think more carefully about overlapping and conflicting messages before deciding what to do."
+  },
+  {
+   "id": "blog-context-engineering-claude5_inversion_rules_to_judgement",
+   "label": "Then: give rules / Now: let Claude use judgement",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Early Claude Code shipped strong guardrail rules that were not always true (e.g. never write multi-line comment blocks) because older models produced incorrect output without them. Newer models have better judgement and handle these decisions well without explicit rules, so the rules can be replaced with context-sensitive guidance."
+  },
+  {
+   "id": "blog-context-engineering-claude5_comment_density_guidance",
+   "label": "Comment guidance rewritten to match surrounding code",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "The old system prompt said 'In code: default to writing no comments. Never write multi-paragraph docstrings or multi-line comment blocks — one short line max.' The new system prompt says 'Write code that reads like the surrounding code: match its comment density, naming, and idiom.' — the worked example of replacing a rule with judgement."
+  },
+  {
+   "id": "blog-context-engineering-claude5_inversion_examples_to_interfaces",
+   "label": "Then: give examples / Now: design interfaces",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "The former number-one rule for tool usage was to give Claude examples; with the newest models, examples actually constrain Claude to a particular exploration space. Instead, invest in the design of tools, scripts and files — what parameters Claude has and how expressive they can be."
+  },
+  {
+   "id": "blog-context-engineering-claude5_todo_tool_enum_design",
+   "label": "Todo tool status enum as interface design",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "In the Todo tool, simply typing status as an enumeration of pending, in_progress, and completed hints to Claude how to use the tool, and the instruction to keep one item in_progress defines the requested behavior — expressive parameters replacing worked examples."
+  },
+  {
+   "id": "blog-context-engineering-claude5_inversion_upfront_to_progressive",
+   "label": "Then: put it all upfront / Now: use progressive disclosure",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Claude Code's system prompt used to carry detailed code-review and verification instructions that were rarely needed but crucial when they were. Claude Code is now very competent at progressive disclosure, so that material moved into skills it can selectively call."
+  },
+  {
+   "id": "blog-context-engineering-claude5_progressive_disclosure",
+   "label": "Progressive disclosure",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Progressive disclosure means loading the right context at the right time rather than upfront. It applies to skills, to tools (via deferred loading), and to CLAUDE.md and SKILL.md files, which should be trees of files loaded when needed rather than one central repository."
+  },
+  {
+   "id": "blog-context-engineering-claude5_verification_review_skills",
+   "label": "Verification and code review moved into skills",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Anthropic moved verification and code review out of the Claude Code system prompt and into their own skills that Claude Code can selectively call — a concrete instance of progressive disclosure that contributed to shrinking the system prompt."
+  },
+  {
+   "id": "blog-context-engineering-claude5_deferred_tool_loading",
+   "label": "Deferred tool loading",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Some Claude Code tools are 'deferred loading': the agent must search for their full definitions before using them. This lets the product ship more tools (such as the Task tools) without their definitions consuming context until they are actually needed."
+  },
+  {
+   "id": "blog-context-engineering-claude5_tool_search",
+   "label": "ToolSearch",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "ToolSearch is the mechanism by which the agent retrieves the full definitions of deferred-loading tools before using them, making progressive disclosure work at the tool layer."
+  },
+  {
+   "id": "blog-context-engineering-claude5_tree_of_context_files",
+   "label": "Tree of context files instead of one central repository",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "A common myth is that CLAUDE.md and SKILL.md must be a central repository of every practice, because Claude would not otherwise find them. Instead, use a tree of files that can be loaded at the right time."
+  },
+  {
+   "id": "blog-context-engineering-claude5_inversion_repetition_to_tool_descriptions",
+   "label": "Then: repeat yourself / Now: simple tool descriptions",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Earlier Claude models sometimes needed repeated instructions and weighted end-of-context instructions over the start, so tool guidance appeared both in the system prompt and in the tool description. Those repeats could be deleted, keeping instructions on how to use a tool in the tool description rather than the system prompt."
+  },
+  {
+   "id": "blog-context-engineering-claude5_inversion_claudemd_memory_to_auto_memory",
+   "label": "Then: memory in CLAUDE.md / Now: auto-memory",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Users were previously encouraged to save things to Claude's memory with the # hotkey, which wrote to their CLAUDE.md automatically. Claude now automatically saves memories relevant to the work and to the user, so CLAUDE.md no longer has to serve as the memory store."
+  },
+  {
+   "id": "blog-context-engineering-claude5_auto_memory",
+   "label": "Auto-memory",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Auto-memory is Claude automatically saving memories that are relevant to the work and to the user, replacing the manual # hotkey write-to-CLAUDE.md workflow. It is one of the newer surfaces (with artifacts and skills) that ended CLAUDE.md's role as the single source of memory, information, and guidance."
+  },
+  {
+   "id": "blog-context-engineering-claude5_inversion_specs_to_rich_references",
+   "label": "Then: simple specs / Now: rich references",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Plan mode and long-project workflows relied on plain markdown plan and spec files stored in the codebase. Claude can now handle increasingly complicated references, so specs can be HTML artifacts, test suites, functions in another codebase to port, or rubrics — not just markdown."
+  },
+  {
+   "id": "blog-context-engineering-claude5_rich_references",
+   "label": "Rich references",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "A reference is in-depth material Claude can consult about the current plan — spec files, mockups, or entire codebases — attached by @ mentioning files. Rich references replace simple markdown specs and can be artifacts, code, test suites, or rubrics."
+  },
+  {
+   "id": "blog-context-engineering-claude5_artifacts_as_references",
+   "label": "HTML artifacts as references",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Instead of simple markdown files, Claude can reference HTML artifacts created by the artifacts feature — a richer form of spec than a plan document."
+  },
+  {
+   "id": "blog-context-engineering-claude5_code_as_reference",
+   "label": "Prefer references that are code",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "References given as code provide clear, high-fidelity instructions in a language Claude knows very well: a spec may be a detailed test suite or a function in another codebase to port, and an HTML mockup of a design generally produces better results than a prose description or a screenshot."
+  },
+  {
+   "id": "blog-context-engineering-claude5_rubrics_as_references",
+   "label": "Rubrics as references",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Rubrics are another form of reference: they let Claude try to verify your taste in a particular field (e.g. what good API design looks like) by using dynamic workflows and spinning up verifier agents carrying those rubrics."
+  },
+  {
+   "id": "blog-context-engineering-claude5_verifier_agents",
+   "label": "Verifier agents driven by rubrics",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Dynamic workflows can spin up verifier agents that carry a rubric, so subjective taste (design quality, API shape) becomes something Claude can check rather than something that must be pre-specified as rules."
+  },
+  {
+   "id": "blog-context-engineering-claude5_surface_system_prompt",
+   "label": "Surface guidance: system prompt",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "The system prompt is heavily tied to product context: it tells Claude what product it is operating in and what it is doing. Claude Code users will likely never modify it, but builders of their own agent harness should spend a lot of time there."
+  },
+  {
+   "id": "blog-context-engineering-claude5_surface_claude_md",
+   "label": "Surface guidance: CLAUDE.md",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Keep CLAUDE.md lightweight: briefly describe what the repo is for and spend most tokens on codebase gotchas (e.g. all types live in one monolithic file). Avoid stating the obvious that Claude could learn from the file system or repo, and use progressive disclosure heavily — e.g. put unique verification instructions in a verification skill referenced from CLAUDE.md."
+  },
+  {
+   "id": "blog-context-engineering-claude5_surface_skills",
+   "label": "Surface guidance: skills",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Treat skills as lightweight guides that let Claude find information when needed; avoid overconstraining them except in highly important areas. Long skills should be split into many files via progressive disclosure, and skills are best when they encode opinions, knowledge, or practices particular to you, your team, or your product."
+  },
+  {
+   "id": "blog-context-engineering-claude5_surface_references",
+   "label": "Surface guidance: references",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "References are included by @ mentioning files and give Claude in-depth information about the current plan — spec files, mockups, or entire codebases. Prefer references that are code, since they are clear, high-fidelity instructions in a language Claude knows well."
+  },
+  {
+   "id": "blog-context-engineering-claude5_claude_doctor",
+   "label": "claude doctor / /doctor",
+   "file_type": "concept",
+   "source_file": "blog-context-engineering-claude5.md",
+   "source_url": "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models",
+   "captured_at": "2026-07-23",
+   "author": "Thariq Shihipar (member of technical staff, Anthropic)",
+   "contributor": null,
+   "rationale": "Anthropic encoded these best practices into `claude doctor`; running /doctor in Claude Code rightsizes your skills and CLAUDE.md files, automating the simplification pass across system prompt, skills, and CLAUDE.md."
+  },
+  {
+   "id": "blog-claude-models-explained_start_smart_default",
+   "label": "Start-smart default recommendation",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Anthropic's default recommendation is to start with the most intelligent generally available model and use effort level to dial in performance and cost. Latency- or cost-sensitive use cases can then be tested down through lower tier models until an ideal fit is found."
+  },
+  {
+   "id": "blog-claude-models-explained_effort_level_dial",
+   "label": "Effort level as the quality/speed/cost dial",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Effort level impacts the balance of quality, speed, and cost. Higher-class models at higher efforts offer the best possible performance, while higher-class models at LOWER efforts can sometimes be more efficient than smaller models."
+  },
+  {
+   "id": "blog-claude-models-explained_cost_per_task_vs_price_per_token",
+   "label": "Cost-per-task often lower for smarter models",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Cost-per-task is often lower for more intelligent models — especially at lower effort levels — even when their price-per-token is higher, because more capable models take fewer turns and less thinking time to get most tasks right."
+  },
+  {
+   "id": "blog-claude-models-explained_smaller_model_failure_ambiguity",
+   "label": "Small-model start blurs model vs setup failure",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Starting with a smaller model can make it harder to distinguish between model failures and setup failures — a second argument, beyond cost-per-task, for beginning with the most intelligent model."
+  },
+  {
+   "id": "blog-claude-models-explained_bottom_up_alternative",
+   "label": "Bottom-up alternative: start cheapest, move up",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Some organizations instead start with the most cost effective model and move up model classes until the quality bar is met. Anthropic documents both directional approaches in its model-selection guidance."
+  },
+  {
+   "id": "blog-claude-models-explained_class_mythos_fable",
+   "label": "Mythos / Fable model class",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Mythos is Anthropic's most capable model class with frontier capabilities across domains, especially strong at coding, long-running agent tasks, and problems AI has not reliably handled before. It ships in two packages of the same underlying model: Claude Mythos for trusted organizations doing dual-use cybersecurity and biology work, and Claude Fable packaged with additional safeguards for general public use; both require limited data retention."
+  },
+  {
+   "id": "blog-claude-models-explained_project_glasswing_access",
+   "label": "Project Glasswing access constraint on Mythos",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Mythos is only available to organizations under Project Glasswing, and not all organizations make all model classes available to all roles — availability, not just capability, constrains model choice."
+  },
+  {
+   "id": "blog-claude-models-explained_class_opus",
+   "label": "Opus model class",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Opus is the powerful model class for reasoning-intensive enterprise tasks, consistently ranking among leading models on key industry benchmarks such as GDPval-AA for knowledge work and Terminal-Bench 2.1 for agentic coding."
+  },
+  {
+   "id": "blog-claude-models-explained_opus_vs_fable_rule_of_thumb",
+   "label": "Opus-vs-Fable rule of thumb",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Opus and Fable both excel at coding, long-running agents, and knowledge work, but in real-world situations larger models such as Fable tend to show more wisdom, creativity, and writing skill despite similar benchmark scores. Rule of thumb: if evals or internal testing show Opus struggling on some tasks, Fable is the answer; if Opus already clears the quality bar, its speed and price profile may make it the better choice."
+  },
+  {
+   "id": "blog-claude-models-explained_class_sonnet",
+   "label": "Sonnet model class",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sonnet is the versatile model class for everyday tasks, balancing performance, cost, and speed across the widest set of general purpose use cases. It is also the class named for high-frequency customer-facing workloads where latency matters."
+  },
+  {
+   "id": "blog-claude-models-explained_sonnet_high_volume_subagents",
+   "label": "Sonnet for high-volume sub-agents in multi-agent orchestration",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sonnet's stated general-purpose use cases explicitly include high-volume sub-agents in multi-agent orchestration setups — the named role for the worker tier of an orchestrated system."
+  },
+  {
+   "id": "blog-claude-models-explained_class_haiku",
+   "label": "Haiku model class",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Haiku is the lowest cost and fastest model class, designed for high-frequency workloads where latency and cost matter."
+  },
+  {
+   "id": "blog-claude-models-explained_no_domain_specialization",
+   "label": "Model classes do not specialize by domain",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Anthropic does not recommend one model class for finance and another for science; every Claude model is trained to excel at coding, agentic tasks, and knowledge work. The main difference across classes is how hard a problem they can reliably carry and what that capability costs in price and speed."
+  },
+  {
+   "id": "blog-claude-models-explained_q_task_hardness",
+   "label": "Selection question: how hard is this task?",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "First selection question: if a task typically takes a lot of time, involves multiple steps, or is previously unsolved, a more capable model class is appropriate."
+  },
+  {
+   "id": "blog-claude-models-explained_q_latency_needs",
+   "label": "Selection question: what are the latency needs?",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Second selection question: if the model sits in high-frequency customer-facing workloads, Sonnet is often the best choice."
+  },
+  {
+   "id": "blog-claude-models-explained_q_access_constraints",
+   "label": "Selection question: what are the access constraints?",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Third selection question: access is a real constraint — Mythos is only available to organizations under Project Glasswing, and not all organizations make all model classes available to all roles."
+  },
+  {
+   "id": "blog-claude-models-explained_q_unit_economics",
+   "label": "Selection question: what are the unit economics?",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Fourth selection question: higher production volumes may suit lower model classes, particularly where evaluations show those tasks are completed satisfactorily. Models are priced differently per token and carry different price-per-task costs depending on capability and effort level."
+  },
+  {
+   "id": "blog-claude-models-explained_advisor_strategy",
+   "label": "Advisor strategy",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The advisor strategy lets faster, lower-cost worker models call more intelligent models to check their plan and evaluate their work. Coaching the executor model only when needed improves performance by a substantial amount."
+  },
+  {
+   "id": "blog-claude-models-explained_advisor_swebench_pro_result",
+   "label": "SWE-bench Pro advisor result: within 10% at 63% of price",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Quantified example of the advisor strategy: on SWE-bench Pro, Sonnet 5 with a Fable 5 advisor lands within 10% of Fable 5's score at 63% of the price of using Fable 5 for the whole task."
+  },
+  {
+   "id": "blog-claude-models-explained_standard_benchmarks",
+   "label": "Standard benchmarks as directional guides",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Benchmarks are pre-determined tasks or scenarios, often domain-specific, with known solutions. They are helpful directional guides for comparing capabilities across model classes and providers — one of the two common ways to judge whether a model is sufficient."
+  },
+  {
+   "id": "blog-claude-models-explained_benchmark_saturation",
+   "label": "Benchmark saturation on frontier models",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The challenge with benchmarks arises when evaluating powerful models such as Opus and Fable, which can solve almost all questions on the test — a condition referred to as saturation, which destroys the benchmark's ability to discriminate between them."
+  },
+  {
+   "id": "blog-claude-models-explained_custom_evaluations",
+   "label": "Custom evaluations drawn from production",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Where benchmarks saturate, Anthropic recommends running models on real workloads or testing with custom evaluations: a curated set of problems drawn from production, including difficult tasks where current tools fall short, with success criteria the team defines. This is where the capability and creativity of frontier models separate from the pack and from one another."
+  },
+  {
+   "id": "blog-claude-models-explained_no_one_size_fits_all",
+   "label": "No one-size-fits-all model selection",
+   "file_type": "concept",
+   "source_file": "blog-claude-models-explained.md",
+   "source_url": "https://claude.com/blog/claude-models-explained-choosing-the-best-model-for-your-use-case",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "There is no one-size-fits-all approach to AI model selection, which is why multiple model classes exist. The best selection method is to understand the basics of each class plus your use case in depth — which means building, maintaining, and deploying strong evaluations."
+  },
+  {
+   "id": "blog-verification-loops-skills_verification_loop",
+   "label": "Verification loop",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A verification loop is a repeating cycle where an AI agent checks its own work — running tests, linters, or custom checks — and fixes what fails before moving on. In Claude Code it is an iterative process where Claude checks and attempts to fix the work."
+  },
+  {
+   "id": "blog-verification-loops-skills_agentic_coding_loop",
+   "label": "Agentic coding loop (context → action → verify → loop back)",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Most agentic coding sessions follow a loop: you ask for a change, Claude gathers context, takes action, verifies the results, and if needed loops back to gather additional context. Verification is the step where the agent checks its work before responding."
+  },
+  {
+   "id": "blog-verification-loops-skills_deterministic_signals",
+   "label": "Deterministic signals Claude already reads",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude already performs some verification by observing the deterministic signals present in your codebase — type checkers, linters, tests, and runtime errors. These require no authoring; they are inferred from the existing toolchain."
+  },
+  {
+   "id": "blog-verification-loops-skills_manual_check_gap",
+   "label": "Manual check gap (what Claude can't infer)",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Whatever Claude cannot infer from deterministic signals becomes the steps you take to manually check a feature. These manual steps are exactly the material that can be transformed into verification loops."
+  },
+  {
+   "id": "blog-verification-loops-skills_loop_as_skill",
+   "label": "Packaging a verification loop as a skill",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "In Claude Code, verification loops can be packaged as skills so every session applies the same checks automatically instead of relying on a human to remember them. Write it by installing the skill-creator plugin and letting Claude interview you, or hand-write a markdown file in .claude/skills/ (frontmatter plus a body)."
+  },
+  {
+   "id": "blog-verification-loops-skills_plain_english_procedure",
+   "label": "Write the procedure in plain English",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "When you find yourself making the same small corrections every time Claude implements a feature, write down everything you do every time — the best-practices version in plain English, the way you'd hand it to a new teammate on day one. If you struggle to articulate the check, ask Claude for best practices first and edit from there."
+  },
+  {
+   "id": "blog-verification-loops-skills_project_specific_rule",
+   "label": "Project-specific deterministic rule",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A check does not have to be qualitative to belong in a verification loop. 'Reject any migration that drops a column without a backfill step' is a deterministic rule that no generic linter will catch but a project-specific one will."
+  },
+  {
+   "id": "blog-verification-loops-skills_builtin_mechanisms",
+   "label": "Built-in verification loops",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude Code ships common built-in verification features and approaches: the /verify skill, toolchain error codes and warnings, Code Review (research preview), GitHub Actions jobs, spec validation, and rubrics in Claude Managed Agents (beta)."
+  },
+  {
+   "id": "blog-verification-loops-skills_verify_skill",
+   "label": "/verify skill",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The built-in /verify skill builds, runs, and observes the changes in your application. The creation process recommends trying /verify first before authoring a custom loop, to see if it already helps your process."
+  },
+  {
+   "id": "blog-verification-loops-skills_toolchain_error_codes",
+   "label": "Toolchain error codes and warnings",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude aims to catch and act on error codes and warnings from any tool you provide, such as a linter — the toolchain itself is a built-in verification mechanism."
+  },
+  {
+   "id": "blog-verification-loops-skills_code_review_preview",
+   "label": "Code Review (research preview)",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Code Review is a managed multi-agent service, in research preview, that runs an automated review pass on PRs in the repos you enable."
+  },
+  {
+   "id": "blog-verification-loops-skills_github_actions",
+   "label": "GitHub Actions verification job",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Define a GitHub Actions job that invokes Claude with a verification skill, and the same checks you run locally fire on every push or PR."
+  },
+  {
+   "id": "blog-verification-loops-skills_spec_validation",
+   "label": "Spec validation skill",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Spec validation is a skill that helps verify each change against a markdown spec kept in the repo and looks to fix violations."
+  },
+  {
+   "id": "blog-verification-loops-skills_managed_agents_rubrics",
+   "label": "Rubrics in Claude Managed Agents (beta)",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude Managed Agents (beta) is a managed agentic service that allows you to verify outcomes against a rubric using a separate grader agent."
+  },
+  {
+   "id": "blog-verification-loops-skills_kickoff_selection",
+   "label": "Match the check to where it runs (kickoff selection)",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "After writing the check, the next thing to determine is how the verification loop kicks off: standalone, embedded, chained, or tied to PR. Each mode has a distinct fit and cost."
+  },
+  {
+   "id": "blog-verification-loops-skills_mode_standalone",
+   "label": "Kickoff mode: standalone",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "A standalone loop is invoked deliberately after the artifact exists. It earns its place for cross-cutting checks that don't apply every time — a pre-commit security scan, a pre-PR accessibility audit, license-header verification across a repo. The cost is that each invocation is still a turn you have to remember to take."
+  },
+  {
+   "id": "blog-verification-loops-skills_mode_embedded",
+   "label": "Kickoff mode: embedded",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "An embedded check fires automatically as part of the producing skill: the check belongs to one specific workflow, and the workflow now runs it without you asking. Its constraint is that embedding only works on skills you can edit — ones you wrote yourself, or ones installed at project level where the SKILL.md is under your control."
+  },
+  {
+   "id": "blog-verification-loops-skills_mode_chained",
+   "label": "Kickoff mode: chained",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Chaining has one skill call another at its end so several verified handoffs run end-to-end; what started as a habit becomes a contract and the chain runs the whole dev cycle on its own, with you stepping in only when something escalates back. Chaining is also how you add verification to a skill you can't modify: build a custom wrapper skill that invokes the original, then invokes your verification skill."
+  },
+  {
+   "id": "blog-verification-loops-skills_mode_on_every_pr",
+   "label": "Kickoff mode: on every PR",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Once the chain is solid for your own changes, the same procedure can run on every PR, so a teammate's change passes the same gates yours did — whether or not they remembered to invoke the chain."
+  },
+  {
+   "id": "blog-verification-loops-skills_escalation_signal_standalone",
+   "label": "Escalation signal: running it after every change",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "The signal that you've outgrown standalone invocation is when you're running the check after every change — at that point the remembered turn should become an automatic one (embedded, or chained when the producing skill isn't editable)."
+  },
+  {
+   "id": "blog-verification-loops-skills_creation_process",
+   "label": "The verification loop creation process",
+   "file_type": "concept",
+   "source_file": "blog-verification-loops-skills.md",
+   "source_url": "https://claude.com/blog/building-verification-loops-in-claude-code-with-skills",
+   "captured_at": "2026-07-23",
+   "author": null,
+   "contributor": null,
+   "rationale": "Six steps: pick the manual follow-up you did most often this week; try the built-in /verify skill first; write the procedure in plain English; hand it to skill-creator or drop the markdown in .claude/skills/; invoke it on a new task and confirm the check runs in the output, iterating as needed; then experiment with skill chaining for an end-to-end flow. The more you encode for Claude to follow, the more often its first try lands closer to what you want."
+  },
+  {
+   "id": "cerebras-knowledge-base_meet_data_where_it_lives",
+   "label": "Meet data where it lives",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The founding design principle: the recurring 'single source of truth' fix 'rarely works in practice' because information is generated wherever it is convenient (docs, Slack threads, GitHub, Jira). The system therefore requires minimal change to existing behavior and extracts from each platform directly rather than migrating data into one rigid system."
+  },
+  {
+   "id": "cerebras-knowledge-base_three_part_anatomy",
+   "label": "Three-part anatomy of the knowledge base",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The system is decomposed into exactly three things: a platform for collecting and storing internal data, a platform for querying that data, and a layer enforcing authentication and authorization with auditing and analytics."
+  },
+  {
+   "id": "cerebras-knowledge-base_auth_authz_audit_layer",
+   "label": "Auth/authz + auditing and analytics layer",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "A distinct layer of the architecture enforces authentication and authorization over the corpus, with auditing and analytics attached. It is named as one of the three top-level components alongside storage and query."
+  },
+  {
+   "id": "cerebras-knowledge-base_single_embeddings_table",
+   "label": "Single Postgres embeddings table",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "At the core sits a single Postgres table holding embeddings, raw summaries, and metadata from many sources. Every source — from Slack threads to netlists — lands in that same embeddings table and is immediately queryable through the same interface."
+  },
+  {
+   "id": "cerebras-knowledge-base_one_connector_per_source",
+   "label": "One connector per source",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Ingestion is structured as one connector per source (Slack, wiki/Confluence, code repos, netlists, PRM docs, custom databases). Each data source declares what the data is, how to connect to it, and how often to fetch it."
+  },
+  {
+   "id": "cerebras-knowledge-base_shared_row_schema",
+   "label": "Shared row schema: document · embedding · metadata · source + timestamps",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Every embedding row follows the same interface regardless of origin: document, embedding, metadata, plus source and timestamps. This uniform schema is what lets heterogeneous sources share one query surface."
+  },
+  {
+   "id": "cerebras-knowledge-base_pgvector_hnsw_3072",
+   "label": "pgvector 3072-dim HNSW index",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The embeddings stage of the pipeline is pgvector with 3072-dimensional vectors indexed by HNSW (Malkov & Yashunin). Vector storage lives in the same Postgres database as the rest of the pipeline state."
+  },
+  {
+   "id": "cerebras-knowledge-base_postgres_gin_fulltext_index",
+   "label": "Postgres full-text (GIN) index over raw text",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Raw Slack text is keyword-searchable immediately via a Postgres full-text GIN index, independent of and ahead of the LLM distillation that feeds vector search. Keyword availability is therefore not gated on distillation latency."
+  },
+  {
+   "id": "cerebras-knowledge-base_slack_socket_mode_ingest",
+   "label": "Slack Socket Mode real-time ingest",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "A Slack bot runs in Socket Mode: Slack pushes every message event over a persistent WebSocket, giving real-time updates without polling and without burning Web API rate limits. Events are acknowledged immediately."
+  },
+  {
+   "id": "cerebras-knowledge-base_event_id_dedup",
+   "label": "Deduplication by stable Slack event ID",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Incoming Slack events are deduplicated by their stable event ID, so redelivery over the WebSocket does not produce duplicate ingestion work or duplicate rows."
+  },
+  {
+   "id": "cerebras-knowledge-base_whole_thread_refetch_upsert",
+   "label": "Whole-thread re-fetch and single-row upsert",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The ingest consumer never saves a message in isolation: it resolves the thread the message belongs to, re-fetches the entire conversation (parent plus every reply), and writes the whole thread back as one row. Stored content, participant list, and last-activity timestamp therefore always reflect the complete conversation."
+  },
+  {
+   "id": "cerebras-knowledge-base_per_channel_data_source",
+   "label": "Every Slack channel is its own data source",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Each Slack channel is modelled as an independent data source, which gives fine-grained freshness tuning — a busy incident channel can be ingested more frequently than a quiet one."
+  },
+  {
+   "id": "cerebras-knowledge-base_llm_distillation",
+   "label": "LLM distillation of threads into structured artifacts",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "For vector search, an LLM extracts structured data from the full thread: a one-line question an engineer would actually search for, a short summary, the resolution, and the systems and code references mentioned. These fields are embedded and written to the shared table."
+  },
+  {
+   "id": "cerebras-knowledge-base_embed_artifact_not_transcript",
+   "label": "Embed the distilled artifact, not the raw transcript",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The original transcript is deliberately not embedded directly — 'accuracy increased significantly when the thread was normalized into a consistent format.' The extracted metadata also gives the semantic match more signal to work with."
+  },
+  {
+   "id": "cerebras-knowledge-base_bursting",
+   "label": "Bursting — runs of consecutive same-author messages",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Important messages inside long threads were not always represented in the thread-level summary. A 'burst' is a run of consecutive messages from the same author, embedded separately so an answer living in one tangent message stays findable."
+  },
+  {
+   "id": "cerebras-knowledge-base_burst_thresholds",
+   "label": "Burst weighted threshold: IDF ≥ 4.0, ≥ 200 chars, reactions",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Each burst must clear a weighted threshold before being embedded: it contains a relatively rare token (IDF at least 4.0), the combined burst is at least 200 characters, and one or more of its messages carry reactions as a social boost."
+  },
+  {
+   "id": "cerebras-knowledge-base_thread_topic_prepending",
+   "label": "Thread-topic prepending (contextual retrieval)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Bursts are embedded with the thread topic prepended as context — the contextual-retrieval technique — because a message's meaning often depends on the surrounding conversation and would otherwise be unintelligible in isolation."
+  },
+  {
+   "id": "cerebras-knowledge-base_hybrid_four_scorers",
+   "label": "Four-scorer hybrid retrieval",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Initial testing showed simple embeddings over raw text were insufficient and vector search alone inadequate, so retrieval uses four complementary scorers — full-text, embedding, inverse document frequency, and age decay. 'No single scorer is trusted on its own'; each produces its own ranked view, fused at query time."
+  },
+  {
+   "id": "cerebras-knowledge-base_full_text_scorer",
+   "label": "Full-text scorer (exact tokens)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Full-text search catches the exact tokens embeddings blur: error strings, flag names, host names. A pasted literal error is almost always the best evidence, and no amount of semantic similarity should outrank it."
+  },
+  {
+   "id": "cerebras-knowledge-base_embedding_scorer",
+   "label": "Embedding scorer (paraphrase)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Embedding search catches paraphrase — 'restore hangs after manifest load' versus 'checkpoint stalls on the NFS mount' share no vocabulary yet describe the same failure."
+  },
+  {
+   "id": "cerebras-knowledge-base_idf_scorer",
+   "label": "Inverse document frequency scorer",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Inverse document frequency separates signal from filler: a short message built on a rare token deserves to rank, while 'sounds good, thanks!' scores near zero once term rarity is applied. It counters the observation that shorter messages frequently beat longer, more detailed ones in cosine similarity."
+  },
+  {
+   "id": "cerebras-knowledge-base_age_decay_scorer",
+   "label": "Age-decay scorer",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Age decay encodes that Slack answers expire: when relevance is otherwise equal, the newer thread wins."
+  },
+  {
+   "id": "cerebras-knowledge-base_cocoindex_chunking",
+   "label": "CocoIndex language-aware recursive chunking (coarse to fine)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "CocoIndex, an open-source document-embedding framework specializing in codebases, splits code using language-specific regex boundaries ordered coarse to fine: classes first, falling back to method boundaries and then smaller blocks when a chunk is still too large. Some repos exceed 40 GB."
+  },
+  {
+   "id": "cerebras-knowledge-base_multi_level_embeddings",
+   "label": "Multi-level per-file embeddings",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "A single source file may generate multiple embeddings at different levels of specificity — file-level and function-level — so both broad and narrow queries can match the right granularity."
+  },
+  {
+   "id": "cerebras-knowledge-base_incremental_reembed",
+   "label": "Incremental re-embed of changed chunks on commit",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "CocoIndex tracks sync metadata in Postgres and on each commit re-embeds only the changed chunks instead of recomputing the repository — made practical by sync state and the embedding store living in the same database."
+  },
+  {
+   "id": "cerebras-knowledge-base_repo_onboarding_config",
+   "label": "Config-file repo onboarding with allow/deny lists",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "As codebases grew, repository onboarding moved into config files that teams submit themselves, including path-level allowlists and denylists — self-service scoping rather than central curation."
+  },
+  {
+   "id": "cerebras-knowledge-base_custom_source_plugins",
+   "label": "Custom data sources as PR-submitted Python plugin scripts",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Teams with their own databases participate without migrating data: they open a PR with a small Python module that reads their system and emits rows shaped like the embeddings table, plus a data-source entry. As long as it writes the shared schema, the rest of the stack works unchanged."
+  },
+  {
+   "id": "cerebras-knowledge-base_planner_pass",
+   "label": "Short LLM planning pass over an index description",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Every query first runs a short planning pass in which an LLM decides which tools and data sources matter. The planner works over a compact description of what is indexed — which projects exist, which sources are in each, and what each source is good at answering — and emits tool selections."
+  },
+  {
+   "id": "cerebras-knowledge-base_parallel_tool_fanout",
+   "label": "Executor parallel tool fan-out with normalized evidence",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The executor fans the planner's tool selections out in parallel, normalizes the results into a common evidence format carrying scores, recency and source hints, and passes them to a final synthesis LLM."
+  },
+  {
+   "id": "cerebras-knowledge-base_tool_subsystem_index",
+   "label": "Tool: subsystem_index",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "subsystem_index serves per-file LLM summaries, giving the planner and agent a map of subsystems rather than raw retrieval hits."
+  },
+  {
+   "id": "cerebras-knowledge-base_tool_search",
+   "label": "Tool: search (unified vector pipeline)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "search is the unified vector pipeline across Slack, wiki, code and other sources, merged and reranked internally. Its output is 'a rich packet of evidence': fused from different retrievers, deduplicated at the source level, reranked against the actual question, and only then expanded with surrounding context."
+  },
+  {
+   "id": "cerebras-knowledge-base_tool_search_slack",
+   "label": "Tool: search_slack",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "search_slack provides direct Slack retrieval, bypassing the unified merge when the caller specifically wants Slack evidence."
+  },
+  {
+   "id": "cerebras-knowledge-base_tool_search_code",
+   "label": "Tool: search_code (ripgrep over repos)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "search_code runs ripgrep over the source repositories — a literal grep primitive kept alongside, not replaced by, semantic code embeddings."
+  },
+  {
+   "id": "cerebras-knowledge-base_tool_recent_prs",
+   "label": "Tool: recent_prs",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "recent_prs surfaces recent pull requests relevant to the question, giving the planner a recency-biased change-log view of the codebase."
+  },
+  {
+   "id": "cerebras-knowledge-base_tool_who_knows",
+   "label": "Tool: who_knows (expertise routing)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "who_knows returns people with demonstrated expertise on a topic, answering the 'who is the expert in Y?' class of question directly instead of via documents."
+  },
+  {
+   "id": "cerebras-knowledge-base_rrf_fusion_k60",
+   "label": "Reciprocal rank fusion, weight 1.0 and k = 60",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Incompatible result lists are combined with reciprocal rank fusion: for every document, add weight / (60 + rank) for each list it appears in, with default weight 1.0 and smoothing constant k = 60. The smoothing constant 'makes consensus matter more than a single strong vote' — a document near the top across several retrievers beats one ranked first in only one."
+  },
+  {
+   "id": "cerebras-knowledge-base_dedup_and_per_file_cap",
+   "label": "Source-level dedup and per-file contribution cap to top twenty",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "After fusion, duplicate chunks are merged back to one source and a cap limits how many results any single file may contribute, yielding a more diverse top twenty to hand to the reranker."
+  },
+  {
+   "id": "cerebras-knowledge-base_llm_reranker_0_10",
+   "label": "Small reranker model scoring 0–10, keep top ten",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The diverse top twenty go with the original query to a small reranker model that scores each result 0–10, and only the top ten are kept. This exists because a document can surface high merely by sharing vocabulary while answering a different question."
+  },
+  {
+   "id": "cerebras-knowledge-base_post_rank_context_expansion",
+   "label": "Post-ranking context expansion (neighboring sections)",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Only once ranking is final is context added back to the winners: matching a wiki section pulls in the two neighboring sections, so the heading, preconditions and caveats that chunking split apart are not lost. Expansion deliberately happens after ranking, not before."
+  },
+  {
+   "id": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "label": "MCP exposes LLM-free retrieval primitives, not an answer endpoint",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The MCP integration exposes retrieval building blocks as direct tools rather than hiding them behind one 'answer this question' endpoint. Each MCP tool maps to one retrieval primitive (search_slack, search_code, search, who_knows); the tools are 'intentionally simple and as LLM-free as possible', with narrow, structured, stable inputs and outputs."
+  },
+  {
+   "id": "cerebras-knowledge-base_claude_code_orchestrator",
+   "label": "Claude Code as the orchestration engine",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Claude Code, or any MCP-compatible agent, becomes the orchestration engine: it decides which tools to call, in what order, and how to assemble results. The retrieval layer does not depend on those LLM decisions to serve requests."
+  },
+  {
+   "id": "cerebras-knowledge-base_web_ui_server_side_pipeline",
+   "label": "Web UI owns planner → executor → synthesis server-side",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The web UI exposes the same tools but connected to a complete pipeline that runs end to end server-side: the UI agent owns planner (lightweight LLM pass over query plus active project), executor (parallel fan-out and normalization), and synthesis (final LLM pass producing an answer with citations, caveats and cross-source synthesis). MCP clients can recreate the same pattern explicitly."
+  },
+  {
+   "id": "cerebras-knowledge-base_synthesis_with_citations",
+   "label": "Synthesis pass: answer with citations and caveats",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "The final stage of the pipeline is a synthesis LLM pass that produces the answer with citations, caveats, and cross-source synthesis over the normalized evidence."
+  },
+  {
+   "id": "cerebras-knowledge-base_projects_scoped_search",
+   "label": "Projects as lightweight scoped-search bundles",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "As the corpus grew, 'search everything everywhere' stopped being useful — compiler engineers did not want infrastructure runbooks in results. A project is a named bundle of data sources (Slack channels, code repos, internal databases, document spaces), intentionally lightweight so the same source can be referenced by multiple projects instead of duplicated."
+  },
+  {
+   "id": "cerebras-knowledge-base_default_project_per_user",
+   "label": "Per-user default project scoping queries automatically",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "During onboarding a user selects or creates a default project matching how they work (ML training infra, Compiler, Data Center Ops). It is stored on the user profile and scopes queries automatically, so a new engineer gets high-signal answers without first learning which channels, repos and spaces matter."
+  },
+  {
+   "id": "cerebras-knowledge-base_adoption_scale",
+   "label": "Adoption: 15,000+ questions per day within 3 months",
+   "file_type": "concept",
+   "source_file": "cerebras-knowledge-base.md",
+   "source_url": "https://www.cerebras.ai/blog/how-we-built-our-knowledge-base",
+   "captured_at": "2026-07-23",
+   "author": "Isaac Tai, Daniel Kim, Mike Gao",
+   "contributor": null,
+   "rationale": "Employees ask the internal knowledge base more than 15,000 questions every day, and it became one of the most widely adopted internal tools at Cerebras within 3 months of launch — used by humans, automations, and agents alike."
+  }
+ ],
+ "edges": [
+  {
+   "source": "blog-context-engineering-claude5_context_engineering",
+   "target": "blog-context-engineering-claude5_context_vs_prompt",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_overconstraining",
+   "target": "blog-context-engineering-claude5_conflicting_instructions",
+   "relation": "causes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_conflicting_instructions",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_overconstraining",
+   "target": "blog-context-engineering-claude5_system_prompt_80_percent_removal",
+   "relation": "motivates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_rules_to_judgement",
+   "target": "blog-context-engineering-claude5_overconstraining",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_rules_to_judgement",
+   "target": "blog-context-engineering-claude5_comment_density_guidance",
+   "relation": "exemplified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_comment_density_guidance",
+   "target": "blog-context-engineering-claude5_conflicting_instructions",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_examples_to_interfaces",
+   "target": "blog-context-engineering-claude5_todo_tool_enum_design",
+   "relation": "exemplified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_examples_to_interfaces",
+   "target": "blog-context-engineering-claude5_overconstraining",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_upfront_to_progressive",
+   "target": "blog-context-engineering-claude5_progressive_disclosure",
+   "relation": "adopts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_upfront_to_progressive",
+   "target": "blog-context-engineering-claude5_verification_review_skills",
+   "relation": "exemplified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_progressive_disclosure",
+   "target": "blog-context-engineering-claude5_deferred_tool_loading",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_deferred_tool_loading",
+   "target": "blog-context-engineering-claude5_tool_search",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_progressive_disclosure",
+   "target": "blog-context-engineering-claude5_tree_of_context_files",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_tree_of_context_files",
+   "target": "blog-context-engineering-claude5_surface_claude_md",
+   "relation": "applies_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_tree_of_context_files",
+   "target": "blog-context-engineering-claude5_surface_skills",
+   "relation": "applies_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_verification_review_skills",
+   "target": "blog-context-engineering-claude5_system_prompt_80_percent_removal",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_deferred_tool_loading",
+   "target": "blog-context-engineering-claude5_system_prompt_80_percent_removal",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_repetition_to_tool_descriptions",
+   "target": "blog-context-engineering-claude5_system_prompt_80_percent_removal",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_repetition_to_tool_descriptions",
+   "target": "blog-context-engineering-claude5_inversion_examples_to_interfaces",
+   "relation": "complements",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_claudemd_memory_to_auto_memory",
+   "target": "blog-context-engineering-claude5_auto_memory",
+   "relation": "adopts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_auto_memory",
+   "target": "blog-context-engineering-claude5_surface_claude_md",
+   "relation": "unburdens",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_specs_to_rich_references",
+   "target": "blog-context-engineering-claude5_rich_references",
+   "relation": "adopts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_rich_references",
+   "target": "blog-context-engineering-claude5_artifacts_as_references",
+   "relation": "exemplified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_rich_references",
+   "target": "blog-context-engineering-claude5_code_as_reference",
+   "relation": "exemplified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_rich_references",
+   "target": "blog-context-engineering-claude5_rubrics_as_references",
+   "relation": "exemplified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_rubrics_as_references",
+   "target": "blog-context-engineering-claude5_verifier_agents",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_verifier_agents",
+   "target": "blog-context-engineering-claude5_rubrics_as_references",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_verifier_agents",
+   "target": "blog-context-engineering-claude5_inversion_rules_to_judgement",
+   "relation": "supports",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_code_as_reference",
+   "target": "blog-context-engineering-claude5_surface_references",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_references",
+   "target": "blog-context-engineering-claude5_rich_references",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_system_prompt",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_claude_md",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_skills",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_references",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_claude_md",
+   "target": "blog-context-engineering-claude5_progressive_disclosure",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_skills",
+   "target": "blog-context-engineering-claude5_progressive_disclosure",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_skills",
+   "target": "blog-context-engineering-claude5_overconstraining",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_surface_system_prompt",
+   "target": "blog-context-engineering-claude5_system_prompt_80_percent_removal",
+   "relation": "scoped_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_claude_doctor",
+   "target": "blog-context-engineering-claude5_surface_claude_md",
+   "relation": "rightsizes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_claude_doctor",
+   "target": "blog-context-engineering-claude5_surface_skills",
+   "relation": "rightsizes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_claude_doctor",
+   "target": "blog-context-engineering-claude5_overconstraining",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_rules_to_judgement",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_examples_to_interfaces",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_upfront_to_progressive",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_repetition_to_tool_descriptions",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_claudemd_memory_to_auto_memory",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_inversion_specs_to_rich_references",
+   "target": "blog-context-engineering-claude5_context_engineering",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_context_vs_prompt",
+   "target": "blog-context-engineering-claude5_inversion_rules_to_judgement",
+   "relation": "motivates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-context-engineering-claude5_todo_tool_enum_design",
+   "target": "blog-context-engineering-claude5_inversion_repetition_to_tool_descriptions",
+   "relation": "supports",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-context-engineering-claude5.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_start_smart_default",
+   "target": "blog-claude-models-explained_effort_level_dial",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_cost_per_task_vs_price_per_token",
+   "target": "blog-claude-models-explained_start_smart_default",
+   "relation": "justifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_smaller_model_failure_ambiguity",
+   "target": "blog-claude-models-explained_start_smart_default",
+   "relation": "justifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_effort_level_dial",
+   "target": "blog-claude-models-explained_cost_per_task_vs_price_per_token",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_bottom_up_alternative",
+   "target": "blog-claude-models-explained_start_smart_default",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_mythos_fable",
+   "target": "blog-claude-models-explained_no_domain_specialization",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_opus",
+   "target": "blog-claude-models-explained_no_domain_specialization",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_sonnet",
+   "target": "blog-claude-models-explained_no_domain_specialization",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_haiku",
+   "target": "blog-claude-models-explained_no_domain_specialization",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_project_glasswing_access",
+   "target": "blog-claude-models-explained_class_mythos_fable",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_opus_vs_fable_rule_of_thumb",
+   "target": "blog-claude-models-explained_class_opus",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_opus_vs_fable_rule_of_thumb",
+   "target": "blog-claude-models-explained_class_mythos_fable",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_opus_vs_fable_rule_of_thumb",
+   "target": "blog-claude-models-explained_custom_evaluations",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_sonnet",
+   "target": "blog-claude-models-explained_sonnet_high_volume_subagents",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_q_task_hardness",
+   "target": "blog-claude-models-explained_no_domain_specialization",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_q_latency_needs",
+   "target": "blog-claude-models-explained_class_sonnet",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_q_access_constraints",
+   "target": "blog-claude-models-explained_project_glasswing_access",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_q_unit_economics",
+   "target": "blog-claude-models-explained_effort_level_dial",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_q_unit_economics",
+   "target": "blog-claude-models-explained_custom_evaluations",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_q_task_hardness",
+   "target": "blog-claude-models-explained_q_latency_needs",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_advisor_strategy",
+   "target": "blog-claude-models-explained_class_sonnet",
+   "relation": "uses_as_worker",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_advisor_strategy",
+   "target": "blog-claude-models-explained_class_mythos_fable",
+   "relation": "uses_as_advisor",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_advisor_swebench_pro_result",
+   "target": "blog-claude-models-explained_advisor_strategy",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_advisor_strategy",
+   "target": "blog-claude-models-explained_q_unit_economics",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_advisor_strategy",
+   "target": "blog-claude-models-explained_sonnet_high_volume_subagents",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_benchmark_saturation",
+   "target": "blog-claude-models-explained_standard_benchmarks",
+   "relation": "limits",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_benchmark_saturation",
+   "target": "blog-claude-models-explained_class_opus",
+   "relation": "affects",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_benchmark_saturation",
+   "target": "blog-claude-models-explained_class_mythos_fable",
+   "relation": "affects",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_custom_evaluations",
+   "target": "blog-claude-models-explained_benchmark_saturation",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_standard_benchmarks",
+   "target": "blog-claude-models-explained_class_opus",
+   "relation": "evaluates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_no_one_size_fits_all",
+   "target": "blog-claude-models-explained_custom_evaluations",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_no_one_size_fits_all",
+   "target": "blog-claude-models-explained_no_domain_specialization",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_haiku",
+   "target": "blog-claude-models-explained_q_latency_needs",
+   "relation": "routes_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-claude-models-explained_class_mythos_fable",
+   "target": "blog-claude-models-explained_q_task_hardness",
+   "relation": "routes_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-claude-models-explained.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_verification_loop",
+   "target": "blog-verification-loops-skills_agentic_coding_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_deterministic_signals",
+   "target": "blog-verification-loops-skills_verification_loop",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_manual_check_gap",
+   "target": "blog-verification-loops-skills_deterministic_signals",
+   "relation": "complements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_manual_check_gap",
+   "target": "blog-verification-loops-skills_verification_loop",
+   "relation": "transforms_into",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_loop_as_skill",
+   "target": "blog-verification-loops-skills_verification_loop",
+   "relation": "packages",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_plain_english_procedure",
+   "target": "blog-verification-loops-skills_loop_as_skill",
+   "relation": "precedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_project_specific_rule",
+   "target": "blog-verification-loops-skills_plain_english_procedure",
+   "relation": "exemplifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_project_specific_rule",
+   "target": "blog-verification-loops-skills_deterministic_signals",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_verify_skill",
+   "target": "blog-verification-loops-skills_builtin_mechanisms",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_toolchain_error_codes",
+   "target": "blog-verification-loops-skills_builtin_mechanisms",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_code_review_preview",
+   "target": "blog-verification-loops-skills_builtin_mechanisms",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_github_actions",
+   "target": "blog-verification-loops-skills_builtin_mechanisms",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_spec_validation",
+   "target": "blog-verification-loops-skills_builtin_mechanisms",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_managed_agents_rubrics",
+   "target": "blog-verification-loops-skills_builtin_mechanisms",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_builtin_mechanisms",
+   "target": "blog-verification-loops-skills_verification_loop",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_toolchain_error_codes",
+   "target": "blog-verification-loops-skills_deterministic_signals",
+   "relation": "provides",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_github_actions",
+   "target": "blog-verification-loops-skills_mode_on_every_pr",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_managed_agents_rubrics",
+   "target": "blog-verification-loops-skills_project_specific_rule",
+   "relation": "verifies",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_kickoff_selection",
+   "target": "blog-verification-loops-skills_mode_standalone",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_kickoff_selection",
+   "target": "blog-verification-loops-skills_mode_embedded",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_kickoff_selection",
+   "target": "blog-verification-loops-skills_mode_chained",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_kickoff_selection",
+   "target": "blog-verification-loops-skills_mode_on_every_pr",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_kickoff_selection",
+   "target": "blog-verification-loops-skills_loop_as_skill",
+   "relation": "follows",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_mode_standalone",
+   "target": "blog-verification-loops-skills_escalation_signal_standalone",
+   "relation": "escalates_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_escalation_signal_standalone",
+   "target": "blog-verification-loops-skills_mode_embedded",
+   "relation": "routes_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_mode_embedded",
+   "target": "blog-verification-loops-skills_mode_standalone",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_mode_chained",
+   "target": "blog-verification-loops-skills_mode_embedded",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_mode_chained",
+   "target": "blog-verification-loops-skills_mode_on_every_pr",
+   "relation": "precedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_mode_on_every_pr",
+   "target": "blog-verification-loops-skills_code_review_preview",
+   "relation": "relates_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_creation_process",
+   "target": "blog-verification-loops-skills_verify_skill",
+   "relation": "recommends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_creation_process",
+   "target": "blog-verification-loops-skills_plain_english_procedure",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_creation_process",
+   "target": "blog-verification-loops-skills_loop_as_skill",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "blog-verification-loops-skills_creation_process",
+   "target": "blog-verification-loops-skills_mode_chained",
+   "relation": "culminates_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "blog-verification-loops-skills.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_meet_data_where_it_lives",
+   "target": "cerebras-knowledge-base_one_connector_per_source",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_three_part_anatomy",
+   "target": "cerebras-knowledge-base_auth_authz_audit_layer",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_single_embeddings_table",
+   "target": "cerebras-knowledge-base_three_part_anatomy",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_one_connector_per_source",
+   "target": "cerebras-knowledge-base_single_embeddings_table",
+   "relation": "writes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_single_embeddings_table",
+   "target": "cerebras-knowledge-base_shared_row_schema",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_shared_row_schema",
+   "target": "cerebras-knowledge-base_one_connector_per_source",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_single_embeddings_table",
+   "target": "cerebras-knowledge-base_pgvector_hnsw_3072",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_pgvector_hnsw_3072",
+   "target": "cerebras-knowledge-base_embedding_scorer",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_postgres_gin_fulltext_index",
+   "target": "cerebras-knowledge-base_full_text_scorer",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_postgres_gin_fulltext_index",
+   "target": "cerebras-knowledge-base_llm_distillation",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_slack_socket_mode_ingest",
+   "target": "cerebras-knowledge-base_event_id_dedup",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_slack_socket_mode_ingest",
+   "target": "cerebras-knowledge-base_whole_thread_refetch_upsert",
+   "relation": "triggers",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_whole_thread_refetch_upsert",
+   "target": "cerebras-knowledge-base_single_embeddings_table",
+   "relation": "writes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_whole_thread_refetch_upsert",
+   "target": "cerebras-knowledge-base_age_decay_scorer",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_per_channel_data_source",
+   "target": "cerebras-knowledge-base_one_connector_per_source",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_per_channel_data_source",
+   "target": "cerebras-knowledge-base_projects_scoped_search",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_whole_thread_refetch_upsert",
+   "target": "cerebras-knowledge-base_llm_distillation",
+   "relation": "feeds",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_llm_distillation",
+   "target": "cerebras-knowledge-base_embed_artifact_not_transcript",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_embed_artifact_not_transcript",
+   "target": "cerebras-knowledge-base_hybrid_four_scorers",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_bursting",
+   "target": "cerebras-knowledge-base_llm_distillation",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_bursting",
+   "target": "cerebras-knowledge-base_burst_thresholds",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_bursting",
+   "target": "cerebras-knowledge-base_thread_topic_prepending",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_burst_thresholds",
+   "target": "cerebras-knowledge-base_idf_scorer",
+   "relation": "reuses",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_hybrid_four_scorers",
+   "target": "cerebras-knowledge-base_full_text_scorer",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_hybrid_four_scorers",
+   "target": "cerebras-knowledge-base_embedding_scorer",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_hybrid_four_scorers",
+   "target": "cerebras-knowledge-base_idf_scorer",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_hybrid_four_scorers",
+   "target": "cerebras-knowledge-base_age_decay_scorer",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_hybrid_four_scorers",
+   "target": "cerebras-knowledge-base_rrf_fusion_k60",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_cocoindex_chunking",
+   "target": "cerebras-knowledge-base_multi_level_embeddings",
+   "relation": "produces",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_cocoindex_chunking",
+   "target": "cerebras-knowledge-base_incremental_reembed",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_incremental_reembed",
+   "target": "cerebras-knowledge-base_single_embeddings_table",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_repo_onboarding_config",
+   "target": "cerebras-knowledge-base_cocoindex_chunking",
+   "relation": "configures",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_custom_source_plugins",
+   "target": "cerebras-knowledge-base_shared_row_schema",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_custom_source_plugins",
+   "target": "cerebras-knowledge-base_meet_data_where_it_lives",
+   "relation": "instantiates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_parallel_tool_fanout",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_tool_subsystem_index",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_tool_search",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_tool_search_slack",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_tool_search_code",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_tool_recent_prs",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_tool_who_knows",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_planner_pass",
+   "target": "cerebras-knowledge-base_projects_scoped_search",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_tool_search",
+   "target": "cerebras-knowledge-base_hybrid_four_scorers",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_tool_search_slack",
+   "target": "cerebras-knowledge-base_llm_distillation",
+   "relation": "queries",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_tool_search_code",
+   "target": "cerebras-knowledge-base_cocoindex_chunking",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_rrf_fusion_k60",
+   "target": "cerebras-knowledge-base_dedup_and_per_file_cap",
+   "relation": "precedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_dedup_and_per_file_cap",
+   "target": "cerebras-knowledge-base_llm_reranker_0_10",
+   "relation": "precedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_llm_reranker_0_10",
+   "target": "cerebras-knowledge-base_post_rank_context_expansion",
+   "relation": "precedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_post_rank_context_expansion",
+   "target": "cerebras-knowledge-base_cocoindex_chunking",
+   "relation": "mitigates",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_post_rank_context_expansion",
+   "target": "cerebras-knowledge-base_tool_search",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "target": "cerebras-knowledge-base_tool_search",
+   "relation": "exposes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "target": "cerebras-knowledge-base_tool_search_slack",
+   "relation": "exposes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "target": "cerebras-knowledge-base_tool_search_code",
+   "relation": "exposes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "target": "cerebras-knowledge-base_tool_who_knows",
+   "relation": "exposes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "target": "cerebras-knowledge-base_claude_code_orchestrator",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_mcp_retrieval_primitives",
+   "target": "cerebras-knowledge-base_web_ui_server_side_pipeline",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_web_ui_server_side_pipeline",
+   "target": "cerebras-knowledge-base_planner_pass",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_web_ui_server_side_pipeline",
+   "target": "cerebras-knowledge-base_parallel_tool_fanout",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_web_ui_server_side_pipeline",
+   "target": "cerebras-knowledge-base_synthesis_with_citations",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_parallel_tool_fanout",
+   "target": "cerebras-knowledge-base_synthesis_with_citations",
+   "relation": "precedes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_projects_scoped_search",
+   "target": "cerebras-knowledge-base_default_project_per_user",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_default_project_per_user",
+   "target": "cerebras-knowledge-base_adoption_scale",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_projects_scoped_search",
+   "target": "cerebras-knowledge-base_one_connector_per_source",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  },
+  {
+   "source": "cerebras-knowledge-base_meet_data_where_it_lives",
+   "target": "cerebras-knowledge-base_adoption_scale",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "cerebras-knowledge-base.md",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [],
+ "input_tokens": 0,
+ "output_tokens": 0
+}

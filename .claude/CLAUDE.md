@@ -5,7 +5,13 @@ When the user types `/graphify`, use the installed graphify skill or instruction
 
 # Cross-vendor orchestration (Fable-5 architect + executor lanes)
 
-fable-orchestrator: implementation lane = codex
+- When the session model is Fable, without being reminded: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
+- fable-orchestrator: implementation lane = codex
+
+The first line is the **trigger**, Fable-gated by design (sessions on other models skip the
+flow). Until 2026-07-24 only the mode line existed, which the plugin's setup wizard calls
+"inert without the trigger". Default `/model` is **Opus 5**; switch to **Fable 5** to arm
+this flow. `grok` CLI is not installed → `codex` is the only viable fixed mode.
 
 Adopted plugins (enabled in `.claude/settings.json`): `fable-orchestrator@fable-orchestrator`
 (Claude/Fable-5 architect + `codex` implementer lane + cross-family reviewers + supervisor + terminal
