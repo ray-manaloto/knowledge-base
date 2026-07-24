@@ -25,9 +25,11 @@ Design (see dotfiles `.omc/specs/second-brain-design.md`):
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
-from collections import defaultdict
+import sys
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -370,6 +372,272 @@ def audit(repo_root: Path) -> int:
     return 0
 
 
+# --- transcript-mining audit (advisory; the (b) half of §4a-3) -------------
+#
+# The contract (`validate_record`/`record`) guarantees a record cannot CLOSE
+# without its outcome; :func:`audit` catches corrupt or hand-edited records.
+# Neither catches the harder gap the design names (§4a-3b, research open-Q #1):
+# a delegation that was VERIFIED done but whose outcome was never recorded at
+# all. That evidence lives only in the session transcript, so this scanner
+# mines it — the same 100%-native capture pattern as dotfiles' command-audit
+# (every Agent/Bash call is already in the session JSONL; no logging hook).
+#
+# It is ADVISORY, never a gate. It runs from a SessionEnd hook — which *cannot*
+# block by design (the 104-agent enforcement research was unanimous: a blocking
+# hook fires before verification exists, so it structurally cannot capture the
+# verdict). The blocking ship-gate stays :func:`audit` (the closed-record
+# precondition). Output-only logs cannot perfectly tell "verified but
+# unrecorded" from "abandoned / never verified" (~21% miss, open-Q #1), so the
+# verdict is GRADUATED by confidence and the low-confidence class is labelled as
+# such rather than raised as an alarm.
+#
+# Delegation signal = an Agent/Task tool_use to an IMPLEMENTATION lane
+# (codex/grok implementer, antigravity delegate) — the schema is probe-verified
+# (`name:"Agent"`, `input.subagent_type`). Review/research/advisor lanes are
+# deliberately excluded: they produce no routing outcome to record. A
+# write-capable `codex exec` run through Bash counts too (read-only research
+# invocations do not).
+
+#: Most-recent sessions to scan by default (mirrors command-audit's cap).
+DEFAULT_SESSION_LIMIT = 50
+
+#: An Agent/Task subagent_type that is an IMPLEMENTATION delegation. `-reviewer`,
+#: `-researcher`, `advisor`, and `general-purpose` are NOT — they close no record.
+_IMPL_SUBAGENT_RE = re.compile(r"implementer|antigravity-delegate")
+
+#: A write-capable `codex exec` run through Bash (an implementation delegation).
+#: Read-only/ephemeral research invocations are excluded — they record no outcome.
+_CLI_DELEGATE_RE = re.compile(
+    r"\bcodex\s+exec\b.*(?:--full-auto|--sandbox\s+workspace-write)", re.DOTALL
+)
+
+#: A record was written this session: `mise run brain-remember` / `brain record`.
+_RECORD_RE = re.compile(r"\bbrain[- ](?:remember|record)\b")
+
+#: Verification activity: the gates the architect runs to earn a verdict.
+_VERIFY_RE = re.compile(
+    r"\bmise\s+run\s+(?:lint|test|verify|brain-audit)\b|\bpytest\b|\bgh\s+pr\s+checks\b"
+)
+
+
+def _transcripts_base(env: dict[str, str] | None = None, home: Path | None = None) -> Path:
+    """The Claude Code projects dir (env-aware; never hardcoded)."""
+    env = env if env is not None else dict(os.environ)
+    home = home if home is not None else Path.home()
+    config_dir = env.get("CLAUDE_CONFIG_DIR")
+    base = Path(config_dir) if config_dir else home / ".claude"
+    return base / "projects"
+
+
+def _encode_cwd(cwd: Path) -> str:
+    """Claude Code's project-dir encoding of an absolute path (``/``, ``.`` -> ``-``)."""
+    return re.sub(r"[/.]", "-", str(cwd))
+
+
+def _project_transcripts(base: Path, cwd: Path, *, limit: int) -> list[Path]:
+    """The ``limit`` most-recent transcript files for ``cwd`` (newest first)."""
+    project_dir = base / _encode_cwd(cwd)
+    if not project_dir.is_dir():
+        return []
+    files = [p for p in project_dir.glob("*.jsonl") if p.is_file()]
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return files[:limit]
+
+
+@dataclass
+class _SessionTally:
+    """Running per-session counts of the three transcript signals."""
+
+    delegations: int = 0
+    records: int = 0
+    verifications: int = 0
+
+
+def _apply_tool_use(block: object, tally: _SessionTally) -> None:
+    """Fold one ``tool_use`` block's routing signal into the session tally."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return
+    name = block.get("name")
+    inp = block.get("input")
+    inp = inp if isinstance(inp, dict) else {}
+    if name in ("Agent", "Task"):
+        sub = inp.get("subagent_type")
+        if isinstance(sub, str) and _IMPL_SUBAGENT_RE.search(sub):
+            tally.delegations += 1
+        return
+    if name != "Bash":
+        return
+    cmd = inp.get("command")
+    if not isinstance(cmd, str):
+        return
+    if _CLI_DELEGATE_RE.search(cmd):
+        tally.delegations += 1
+    if _RECORD_RE.search(cmd):
+        tally.records += 1
+    if _VERIFY_RE.search(cmd):
+        tally.verifications += 1
+
+
+def _tally_line(obj: dict[str, object], tallies: dict[str, _SessionTally]) -> None:
+    """Fold one assistant transcript line's tool calls into its session tally."""
+    if obj.get("type") != "assistant":
+        return
+    message = obj.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return
+    session = str(obj.get("sessionId", "")) or "(unknown)"
+    tally = tallies.setdefault(session, _SessionTally())
+    for block in content:
+        _apply_tool_use(block, tally)
+
+
+def _session_verdict(t: _SessionTally) -> str:
+    """Graduated-confidence verdict for one session (see module docstring)."""
+    if t.delegations == 0:
+        return "none"  # no implementation delegation — nothing to record
+    if t.records >= t.delegations:
+        return "recorded"  # a record for every delegation — closed
+    if t.records == 0 and t.verifications > 0:
+        return "verified-unrecorded"  # THE alarm: verified work, zero records
+    if t.verifications > 0:
+        return "under-recorded"  # advisory: fewer records than delegations
+    return "unverified"  # cannot confirm (abandoned OR logs-missed, open-Q #1)
+
+
+@dataclass(frozen=True)
+class TranscriptAudit:
+    """The classified outcome of a transcript scan."""
+
+    #: verdict -> number of sessions
+    counts: dict[str, int]
+    #: (session, delegations, records, verifications, verdict) for every non-``none`` session
+    sessions: list[tuple[str, int, int, int, str]]
+    scanned: int
+
+
+#: verdicts that name a real gap, most-serious first (drives the report ordering).
+_FLAGGED = ("verified-unrecorded", "under-recorded", "unverified")
+
+
+def _scan(paths: list[Path]) -> dict[str, _SessionTally]:
+    """Fold every transcript's tool calls into per-session tallies (one pass, defensive)."""
+    tallies: dict[str, _SessionTally] = {}
+    for path in paths:
+        try:
+            raw = path.read_text(errors="replace")
+        except OSError:
+            continue
+        for line in raw.splitlines():
+            if not line.strip():
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict):
+                _tally_line(obj, tallies)
+    return tallies
+
+
+def audit_transcripts(paths: list[Path]) -> TranscriptAudit:
+    """Tally delegations/records/verifications per session and classify each."""
+    tallies = _scan(paths)
+    counts: Counter[str] = Counter()
+    rows: list[tuple[str, int, int, int, str]] = []
+    for session, t in tallies.items():
+        verdict = _session_verdict(t)
+        counts[verdict] += 1
+        if verdict != "none":
+            rows.append((session, t.delegations, t.records, t.verifications, verdict))
+    order = {v: i for i, v in enumerate((*_FLAGGED, "recorded"))}
+    rows.sort(key=lambda r: (order.get(r[4], 99), -r[1]))
+    return TranscriptAudit(
+        counts=dict(counts),
+        sessions=[(s, d, rec, v, verdict) for s, d, rec, v, verdict in rows],
+        scanned=len(paths),
+    )
+
+
+def render_transcript_report(result: TranscriptAudit) -> str:
+    """Render an advisory markdown report for human review of the routing loop."""
+    c = result.counts
+    alarm = c.get("verified-unrecorded", 0)
+    lines = [
+        "# Brain audit — verified delegations missing a routing record",
+        "",
+        f"Scanned **{result.scanned}** recent session transcript(s). "
+        "ADVISORY only — this never blocks (SessionEnd cannot); the ship-gate is "
+        "`mise run brain-audit` (the closed-record precondition).",
+        "",
+        "| verdict | sessions | meaning |",
+        "|---|---:|---|",
+        f"| verified-unrecorded | {alarm} | delegated + verified but recorded "
+        "NOTHING — record the outcome with `mise run brain-remember` |",
+        f"| under-recorded | {c.get('under-recorded', 0)} | fewer records than "
+        "delegations (some may be review lanes — check) |",
+        f"| unverified | {c.get('unverified', 0)} | delegated, no verification seen "
+        "— cannot tell abandoned from logs-missed (~21%, open-Q #1) |",
+        f"| recorded | {c.get('recorded', 0)} | a record for every delegation — closed |",
+        f"| none | {c.get('none', 0)} | no implementation delegation this session |",
+        "",
+    ]
+    if alarm:
+        lines += [f"## 🚨 {alarm} session(s) verified work without recording it", ""]
+    flagged = [row for row in result.sessions if row[4] in _FLAGGED]
+    if flagged:
+        lines += [
+            "| session | delegations | records | verifications | verdict |",
+            "|---|---:|---:|---:|---|",
+            *(
+                f"| `{s[:12]}` | {d} | {rec} | {v} | {verdict} |"
+                for s, d, rec, v, verdict in flagged
+            ),
+            "",
+        ]
+    else:
+        lines += ["_No gaps — every delegating session recorded its outcomes._", ""]
+    lines += [
+        "Record a verified delegation with "
+        "`mise run brain-remember -- --task-class T --lane L --effort E "
+        "--verdict clean|rework|failed --session S`. See "
+        "`.omc/specs/second-brain-design.md` §4a-3 and the enforcement research "
+        "open-Q #1.",
+        "",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def transcript_audit(
+    repo_root: Path, *, limit: int = DEFAULT_SESSION_LIMIT, output: Path | None = None
+) -> int:
+    """Scan this project's recent transcripts for unrecorded verified delegations.
+
+    Always rc 0 — advisory, never a gate. ``--output`` is what the SessionEnd
+    hook writes to (``.omc/brain-audit.md``), making the loop recurring rather
+    than remember-to-run. No transcripts (e.g. a CI runner) is a clean no-op.
+    """
+    base = _transcripts_base()
+    transcripts = _project_transcripts(base, repo_root, limit=limit)
+    if not transcripts:
+        sys.stdout.write(f"brain transcript-audit: no transcripts for {repo_root} under {base}\n")
+        return 0
+    result = audit_transcripts(transcripts)
+    text = render_transcript_report(result)
+    if output is None:
+        sys.stdout.write(text)
+        return 0
+    dest = output if output.is_absolute() else repo_root / output
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text, encoding="utf-8")
+    sys.stdout.write(
+        f"brain transcript-audit: wrote {dest} "
+        f"({result.counts.get('verified-unrecorded', 0)} verified-unrecorded, "
+        f"{result.counts.get('under-recorded', 0)} under-recorded)\n"
+    )
+    return 0
+
+
 # --- dispatch --------------------------------------------------------------
 
 
@@ -379,29 +647,46 @@ def _flag(rest: list[str], name: str, default: str = "") -> str:
     return default
 
 
+def _record_cmd(repo_root: Path, args: list[str]) -> int:
+    return record(
+        repo_root,
+        RecordRequest(
+            task_class=_flag(args, "--task-class"),
+            lane=_flag(args, "--lane"),
+            effort=_flag(args, "--effort"),
+            verdict=_flag(args, "--verdict"),
+            session=_flag(args, "--session"),
+            note=_flag(args, "--note"),
+        ),
+    )
+
+
+def _transcript_audit_cmd(repo_root: Path, args: list[str]) -> int:
+    limit = _flag(args, "--limit")
+    out = _flag(args, "--output")
+    return transcript_audit(
+        repo_root,
+        limit=int(limit) if limit.isdigit() else DEFAULT_SESSION_LIMIT,
+        output=Path(out) if out else None,
+    )
+
+
 def dispatch(repo_root: Path, rest: list[str]) -> int:
-    """Dispatch ``kb-setup brain {record|reflect|audit}``."""
+    """Dispatch ``kb-setup brain {query|record|reflect|audit|transcript-audit}``."""
+    usage = "kb-setup brain query|record|reflect|audit|transcript-audit"
     if not rest:
-        print("kb-setup brain query|record|reflect|audit")
+        print(usage)
         return 2
     sub, args = rest[0], rest[1:]
-    if sub == "query":
-        return query(repo_root, args)
-    if sub == "record":
-        return record(
-            repo_root,
-            RecordRequest(
-                task_class=_flag(args, "--task-class"),
-                lane=_flag(args, "--lane"),
-                effort=_flag(args, "--effort"),
-                verdict=_flag(args, "--verdict"),
-                session=_flag(args, "--session"),
-                note=_flag(args, "--note"),
-            ),
-        )
-    if sub == "reflect":
-        return reflect(repo_root)
-    if sub == "audit":
-        return audit(repo_root)
-    print(f"kb-setup brain: unknown subcommand {sub!r} (query | record | reflect | audit)")
-    return 2
+    handlers = {
+        "query": lambda: query(repo_root, args),
+        "record": lambda: _record_cmd(repo_root, args),
+        "reflect": lambda: reflect(repo_root),
+        "audit": lambda: audit(repo_root),
+        "transcript-audit": lambda: _transcript_audit_cmd(repo_root, args),
+    }
+    handler = handlers.get(sub)
+    if handler is None:
+        print(f"kb-setup brain: unknown subcommand {sub!r} ({usage})")
+        return 2
+    return handler()
