@@ -280,7 +280,7 @@ def test_rebuild_outside_the_build_task_reports_version_unknown(tmp_path, monkey
     artifact.write_text('{"nodes": [1, 2, 3], ' + head + "}", encoding="utf-8")
     finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
     assert finding.status == sync.DRIFT
-    assert "rebuilt outside the build task" in finding.detail
+    assert "graphify-out/graph.json (changed)" in finding.detail
 
 
 def test_artifact_commit_is_read_without_parsing_the_whole_graph(tmp_path) -> None:
@@ -505,20 +505,25 @@ def test_commit_is_found_whether_metadata_is_first_or_last(tmp_path) -> None:
     assert sync._artifact_commit(first) == sha
 
 
-def test_v1_stamp_admits_it_cannot_prove_anything(tmp_path, monkeypatch) -> None:
-    """An old stamp must not inherit a guarantee it was never able to make."""
+def test_a_pre_v3_stamp_admits_it_cannot_prove_the_generated_outputs(tmp_path, monkeypatch) -> None:
+    """An old stamp must not inherit a guarantee it was never able to make.
+
+    A pre-v3 stamp fingerprinted at most the primary graph, so it cannot testify
+    that the wiki/graphml match — it must say so, not stay green.
+    """
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     root = _repo(tmp_path)
     sync.write_stamp(root, _spec(root), version="0.9.25")
     path = root / "graphify-out" / ".currency-stamp.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    data["stamp_version"] = 1
-    del data["artifact_fingerprint"]
+    data["stamp_version"] = 2
+    data.pop("artifact_fingerprints", None)
+    data["artifact_fingerprint"] = "old-single"
     path.write_text(json.dumps(data), encoding="utf-8")
 
     finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
     assert finding.status == sync.DRIFT
-    assert "predates artifact fingerprinting" in finding.detail
+    assert "predates generated-output fingerprinting" in finding.detail
 
 
 def test_declared_but_absent_artifact_is_drift(tmp_path, monkeypatch) -> None:
@@ -569,3 +574,161 @@ def test_the_stamped_tool_is_chosen_by_name_not_by_sort_order(tmp_path) -> None:
     spec = graph._currency_spec(root)
     assert spec is not None
     assert spec.name == "graphify"
+
+
+# ----------------------------------------- presence-only tool (ffmpeg) ----
+
+
+def _ffmpeg_repo(tmp_path, *, present: bool) -> Path:
+    (tmp_path / "mise.toml").write_text('[tools]\n"conda:ffmpeg" = "8.1.2"\n', encoding="utf-8")
+    (tmp_path / "currency.toml").write_text(
+        '[tool.ffmpeg]\nmise_key = "conda:ffmpeg"\nbinary = "ffmpeg"\n',
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_a_present_ffmpeg_is_in_sync_with_no_manifest_or_stamp(tmp_path, monkeypatch) -> None:
+    """A presence-only tool: pin resolves, binary reachable, everything else SKIP.
+
+    ffmpeg has no manifest, artifact, stamp, or upstream — so the absence of
+    those checks is correct, not a gap. This is the whole point of every ToolSpec
+    field being optional.
+    """
+    root = _ffmpeg_repo(tmp_path, present=True)
+    install = tmp_path / "installs" / "conda-ffmpeg" / "8.1.2" / ".mise-bins" / "ffmpeg"
+    install.parent.mkdir(parents=True, exist_ok=True)
+    install.write_text("#!/bin/sh\n", encoding="utf-8")
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: str(install))
+
+    status = sync.check_sync(root, config.load(root)[0])
+    assert status.ok
+    assert status.verified  # something actually ran; not an all-SKIP no-op
+    assert _finding(status, "resolution").status == sync.OK
+    assert {f.check for f in status.findings if f.status == sync.SKIP} == {
+        "extras",
+        "extra-probes",
+        "manifest",
+        "build-stamp",
+    }
+
+
+def test_an_absent_ffmpeg_is_drift_not_silence(tmp_path, monkeypatch) -> None:
+    """The founding motivation: a missing ffmpeg breaks youtube ingest silently.
+
+    Control arm for the test above — the same machinery must report DRIFT when
+    the binary is gone, or the presence check is decoration.
+    """
+    root = _ffmpeg_repo(tmp_path, present=False)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: None)
+    status = sync.check_sync(root, config.load(root)[0])
+    assert not status.ok
+    assert _finding(status, "resolution").status == sync.DRIFT
+    assert "not installed" in _finding(status, "resolution").detail
+
+
+# --------------------------------------- generated-output fingerprinting ----
+
+
+def _repo_with_generated(tmp_path) -> Path:
+    """A graphify repo that also declares two derived outputs."""
+    (tmp_path / "mise.toml").write_text(
+        '[tools]\n"pipx:graphifyy" = { version = "0.9.25", extras = ["all"] }\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        "[tool.graphify]\n"
+        'mise_key = "pipx:graphifyy"\n'
+        'binary = "graphify"\n'
+        'artifact = "graphify-out/graph.json"\n'
+        'artifacts = ["graphify-out/GRAPH_REPORT.md", "graphify-out/wiki"]\n'
+        'stamp = "graphify-out/.currency-stamp.json"\n',
+        encoding="utf-8",
+    )
+    out = tmp_path / "graphify-out"
+    (out).mkdir(parents=True, exist_ok=True)
+    (out / "graph.json").write_text('{"nodes": []}', encoding="utf-8")
+    (out / "GRAPH_REPORT.md").write_text("# report\n", encoding="utf-8")
+    wiki = out / "wiki"
+    wiki.mkdir()
+    (wiki / "_index.md").write_text("index\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_a_generated_output_that_changed_after_stamping_is_drift(tmp_path, monkeypatch) -> None:
+    """The founding ask: 'in sync with the graph AND generated outputs'.
+
+    A stamp that only fingerprinted graph.json would call a run clean while the
+    committed GRAPH_REPORT.md was regenerated by a different graphify — the same
+    silent-staleness the single-artifact stamp had for graph.json.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo_with_generated(tmp_path)
+    sync.write_stamp(root, config.load(root)[0], version="0.9.25")
+    assert _finding(sync.check_sync(root, config.load(root)[0]), "build-stamp").status == sync.OK
+
+    time.sleep(0.01)
+    (root / "graphify-out" / "GRAPH_REPORT.md").write_text("# regenerated\n", encoding="utf-8")
+    finding = _finding(sync.check_sync(root, config.load(root)[0]), "build-stamp")
+    assert finding.status == sync.DRIFT
+    assert "GRAPH_REPORT.md (changed)" in finding.detail
+
+
+def test_a_newly_declared_output_never_stamped_is_drift(tmp_path, monkeypatch) -> None:
+    """Adding a path to `artifacts` after a build must not silently pass.
+
+    An output nobody fingerprinted cannot be asserted to match the graph — the
+    control arm for 'present + matching' being the ONLY green state.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo_with_generated(tmp_path)
+    sync.write_stamp(root, config.load(root)[0], version="0.9.25")
+    # A new derived output appears on disk but was not part of the stamp.
+    (root / "graphify-out" / "graph.graphml").write_text("<graphml/>", encoding="utf-8")
+    (root / "currency.toml").write_text(
+        (root / "currency.toml")
+        .read_text(encoding="utf-8")
+        .replace(
+            '"graphify-out/wiki"]',
+            '"graphify-out/wiki", "graphify-out/graph.graphml"]',
+        ),
+        encoding="utf-8",
+    )
+    finding = _finding(sync.check_sync(root, config.load(root)[0]), "build-stamp")
+    assert finding.status == sync.DRIFT
+    assert "graph.graphml (never stamped)" in finding.detail
+
+
+def test_restamp_refreshes_fingerprints_without_a_rebuild(tmp_path, monkeypatch) -> None:
+    """`kb-artifacts` regenerates derived outputs, then re-stamps them clean.
+
+    Without the re-stamp, every `kb-artifacts` run would leave step 1 reporting
+    the outputs it just legitimately regenerated as 'changed'.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo_with_generated(tmp_path)
+    spec = config.load(root)[0]
+    sync.write_stamp(root, spec, version="0.9.25", source_ref="v0.9.25")
+
+    time.sleep(0.01)
+    (root / "graphify-out" / "GRAPH_REPORT.md").write_text("# regenerated\n", encoding="utf-8")
+    assert _finding(sync.check_sync(root, spec), "build-stamp").status == sync.DRIFT
+
+    path = sync.restamp_artifacts(root, spec)
+    assert path is not None
+    # The version the build recorded is preserved — a re-stamp is not a rebuild.
+    assert sync.read_stamp(root, spec)["version"] == "0.9.25"
+    assert sync.read_stamp(root, spec)["source_ref"] == "v0.9.25"
+    assert _finding(sync.check_sync(root, spec), "build-stamp").status == sync.OK
+
+
+def test_restamp_is_a_noop_when_no_build_stamp_exists(tmp_path, monkeypatch) -> None:
+    """Control arm: a re-stamp must not INVENT a stamp the build never wrote.
+
+    Otherwise `kb-artifacts` on a never-built repo would fabricate a currency
+    stamp with an empty version — a false green for a graph that does not exist.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo_with_generated(tmp_path)
+    assert sync.restamp_artifacts(root, config.load(root)[0]) is None
+    assert not (root / "graphify-out" / ".currency-stamp.json").exists()

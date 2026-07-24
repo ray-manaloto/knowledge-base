@@ -181,3 +181,121 @@ def test_probe_fetches_the_pypi_document_exactly_once(monkeypatch) -> None:
     monkeypatch.setattr(upstream, "release_for_tag", lambda _r, v: (f"v{v}", f"notes for {v}", ""))
     upstream.probe(pypi="graphifyy", github="o/r", current="0.9.25")
     assert calls == ["graphifyy"]
+
+
+# ---------------------------------------------- three upstream sources ----
+
+
+def test_a_tool_with_no_upstream_is_untracked_not_unreachable() -> None:
+    """Ffmpeg is presence-tracked: neither pypi nor github, so nothing to chase.
+
+    The OLD two-state model returned reachable=False here, which `decide` then
+    read as an ambiguity — a permanent, unanswerable "upstream could not be
+    checked" on every run of a tool that was never version-tracked.
+    """
+    status = upstream.probe(pypi="", github="", current="8.1.2")
+    assert status.source == "none"
+    assert not status.tracked
+    # NOT reachable=False: an untracked tool has no upstream to be unreachable.
+    assert status.reachable
+    assert status.error == ""
+
+
+def test_github_is_the_version_source_when_there_is_no_pypi(monkeypatch) -> None:
+    """mise/hk ship on GitHub, not PyPI — the case that makes the config claim true."""
+
+    def _releases(_path: str) -> tuple[list[object], str]:
+        return [
+            {"tag_name": "v2026.7.10", "draft": False, "prerelease": False},
+            {"tag_name": "v2026.7.12", "draft": False, "prerelease": False},
+            {"tag_name": "v2026.8.0-rc1", "draft": False, "prerelease": True},
+        ], ""
+
+    monkeypatch.setattr(upstream, "_gh_api_list", _releases)
+    monkeypatch.setattr(upstream, "release_for_tag", lambda _r, v: (v, f"notes for {v}", ""))
+    status = upstream.probe(pypi="", github="jdx/mise", current="2026.7.10")
+    assert status.source == "github"
+    assert status.tracked
+    # The prerelease is excluded, so the newest STABLE wins — never the rc.
+    assert status.latest == "v2026.7.12"
+
+
+def test_github_latest_is_by_version_not_publish_time(monkeypatch) -> None:
+    """A backport patch published last must not become 'latest'.
+
+    `/releases/latest` orders by publish time and would pick the backport; this
+    orders by version, so the genuinely newest line wins.
+    """
+
+    def _releases(_path: str) -> tuple[list[object], str]:
+        # 1.9.1 (a backport) is listed FIRST, as if most-recently published.
+        return [
+            {"tag_name": "1.9.1", "draft": False, "prerelease": False},
+            {"tag_name": "2.0.0", "draft": False, "prerelease": False},
+        ], ""
+
+    monkeypatch.setattr(upstream, "_gh_api_list", _releases)
+    latest, _all, err = upstream.github_versions("o/r")
+    assert err == ""
+    assert latest == "2.0.0"
+
+
+def test_github_source_with_no_stable_releases_fails_closed(monkeypatch) -> None:
+    """Only prereleases → no installable version, reported as an error not a pick."""
+    monkeypatch.setattr(
+        upstream,
+        "_gh_api_list",
+        lambda _p: ([{"tag_name": "v1.0.0-rc1", "draft": False, "prerelease": True}], ""),
+    )
+    latest, versions, err = upstream.github_versions("o/r")
+    assert latest == ""
+    assert versions == ()
+    assert err
+
+
+def test_pypi_wins_when_both_sources_are_declared(monkeypatch) -> None:
+    """Mise installs from PyPI, so a GitHub-only version can never be pinned."""
+    monkeypatch.setattr(upstream, "_pypi_json", lambda _p: (_PYPI_PAYLOAD, ""))
+    called = {"github": False}
+
+    def _never(_p: str) -> tuple[list[object], str]:
+        called["github"] = True
+        return [], ""
+
+    monkeypatch.setattr(upstream, "_gh_api_list", _never)
+    status = upstream.probe(pypi="graphifyy", github="o/r", current="0.9.28")
+    assert status.source == "pypi"
+    assert not called["github"]  # github must not even be consulted for the version
+
+
+# ------------------------------------------------ feature highlights ----
+
+
+def test_feature_lines_are_surfaced_for_review() -> None:
+    """A new capability should reach the human even when no breaking marker fired.
+
+    Step 3's other half — the "should we adopt this?" signal.
+    """
+    notes = (
+        "## v0.9.26\n\n"
+        "- feat: add a `--backend openai` flag for self-hosted models\n"
+        "- fix: cold-cache crash\n"
+        "- You can now ingest sitemap.xml directly\n"
+    )
+    highlights = upstream.UpstreamStatus(notes=notes).feature_highlights
+    assert any("backend openai" in h for h in highlights)
+    assert any("sitemap.xml" in h for h in highlights)
+    # A plain fix is not a feature.
+    assert not any("cold-cache" in h for h in highlights)
+
+
+def test_routine_notes_surface_no_features() -> None:
+    """Control arm: the extractor must not flag every line as a feature."""
+    notes = "## v0.9.26\n\n- fix: a typo\n- chore: bump deps\n- docs: clarify README\n"
+    assert upstream.UpstreamStatus(notes=notes).feature_highlights == ()
+
+
+def test_feature_highlights_are_capped() -> None:
+    """A giant changelog must not flood the interview."""
+    notes = "\n".join(f"- feat: feature number {i}" for i in range(50))
+    assert len(upstream.UpstreamStatus(notes=notes).feature_highlights) <= 12

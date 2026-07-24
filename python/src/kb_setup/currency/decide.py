@@ -56,6 +56,12 @@ class Verdict:
     auto_apply: bool
     gates_passed: tuple[str, ...]
     ambiguities: tuple[Ambiguity, ...]
+    tracked: bool = True
+    # Advisory (step 3): new-capability lines from the release notes. NEVER gates
+    # a bump — surfaced so "should we adopt this?" reaches the human even when no
+    # breaking marker fired. Empty when there is no upgrade or the notes announce
+    # nothing feature-shaped.
+    feature_review: tuple[str, ...] = ()
 
     @property
     def has_upgrade(self) -> bool:
@@ -64,7 +70,11 @@ class Verdict:
 
     @property
     def needs_interview(self) -> bool:
-        """True when the model must run AskUserQuestion before anything proceeds."""
+        """True when the model must run AskUserQuestion before anything proceeds.
+
+        `feature_review` is deliberately NOT here: a feature to consider is an
+        FYI, not a blocker, so an otherwise-clean auto-apply stays auto-apply.
+        """
         return bool(self.ambiguities)
 
     def summary(self) -> str:
@@ -81,6 +91,11 @@ class Verdict:
             version = f"{self.current} → {self.latest}"
         elif self.latest:
             version = f"{self.current}, current"
+        elif not self.tracked:
+            # A presence-only tool (ffmpeg): installed and checked, but with no
+            # upstream version to chase. "UNKNOWN" would wrongly imply a failed
+            # lookup; there is nothing to look up.
+            version = f"{self.current or 'present'}, not version-tracked"
         else:
             # We never reached upstream. "current" would be a committed assertion
             # that this IS the newest version, made by a run that never asked.
@@ -301,13 +316,18 @@ def decide(
     install or a moved issue is worth surfacing whether or not a bump is pending.
     """
     current = sync.pinned
-    latest = upstream.pypi_latest
+    latest = upstream.latest
 
     always = [
         g for g in (_gate_extras(sync), _gate_issues(moved, observations), _gate_sync(sync)) if g
     ]
 
-    if not upstream.reachable:
+    # A presence-only tool (ffmpeg: source="none") has no version to chase, so an
+    # unread upstream is a NON-event, not an ambiguity. This is the whole reason
+    # `tracked` exists: the old model returned reachable=False here and
+    # manufactured a permanent "upstream could not be checked" for a tool that
+    # was never version-tracked to begin with.
+    if upstream.tracked and not upstream.reachable:
         always.append(
             Ambiguity(
                 gate="upstream reachable",
@@ -323,6 +343,7 @@ def decide(
             auto_apply=False,
             gates_passed=(),
             ambiguities=tuple(always),
+            tracked=upstream.tracked,
         )
 
     if not latest or latest == current:
@@ -333,6 +354,7 @@ def decide(
             auto_apply=False,
             gates_passed=(),
             ambiguities=tuple(always),
+            tracked=upstream.tracked,
         )
 
     upgrade_gates = [
@@ -355,4 +377,6 @@ def decide(
         auto_apply=not ambiguities,
         gates_passed=passed,
         ambiguities=ambiguities,
+        tracked=upstream.tracked,
+        feature_review=upstream.feature_highlights,
     )

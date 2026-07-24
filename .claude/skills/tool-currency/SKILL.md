@@ -43,6 +43,12 @@ For a fast, offline, step-1-only answer: `mise run kb-currency-check`.
 - `auto_apply: true` — all six gates passed. Proceed to step 4 below.
 - `ambiguities: [...]` — **stop and ask**. Each entry already carries the
   `question`, the `detail` (evidence), and a `recommendation`.
+- `feature_review: [...]` — **advisory, never blocking**. New-capability lines
+  the release notes announced. Present these to the user even on a clean
+  auto-apply (step 3a) — "should we adopt this?" is the other half of step 3 —
+  but do NOT hold the bump for them.
+- `tracked: false` — a presence-only tool (ffmpeg): there is no version to
+  chase, so "latest UNKNOWN" is expected, not a failure.
 
 ### 3. Step 5 — interview the user
 
@@ -57,23 +63,34 @@ behalf — the whole point of an ambiguity is that the engine refused to guess.
 Then record what they said, in the run's detail page under the matching
 `### Gate:` heading, replacing `_not yet answered_`.
 
+### 3a. Surface features to adopt (advisory)
+
+If `feature_review` is non-empty, show it to the user as an FYI — one
+AskUserQuestion, "these shipped; adopt any config change now, or note for
+later?" — **separate from the gates and non-blocking**. A clean auto-apply still
+proceeds; this only makes sure a new capability (a new flag, a new backend) does
+not slip by unread. The detail page already lists them under "Features to
+consider adopting".
+
 ### 4. Apply, only if the verdict authorized it
 
-An auto-apply is a **patch** bump whose six gates passed. Apply it as:
+An auto-apply is a **patch** bump whose six gates passed. The engine does the
+edits; you branch and ship.
 
 1. Branch first — never commit to `main` (dotfiles
    `.claude/rules/do-not.md` #9; the same rule applies here).
-2. Update the `mise.toml` pin **and** `sources/graphify.manifest`, so the corpus
-   describes the release we actually run. Re-pin the manifest with the existing
-   task, never a hand-rolled git command:
+2. Let the engine edit the committable files:
 
    ```bash
-   mise run kb-manifest-add -- <url> --ref v<version> --force
+   mise run kb-currency -- --tool <name> apply
    ```
 
-   It resolves the tag's SHA itself (`kb_setup.manifest.latest_commit`, a
-   `git ls-remote` with no clone) and rewrites the manifest. `--force` is
-   required because re-pinning an existing source is a deliberate clobber.
+   `apply` re-checks the six gates and **refuses** an unauthorized verdict, then
+   moves the `mise.toml` pin **and** re-pins `sources/<name>.manifest` (`ref` →
+   the new tag, `commit` → its SHA via `git ls-remote`). It never rebuilds the
+   graph and never opens the PR — that stays with you (H3/G8). It guards the
+   v1.0.0-tagged-but-not-on-PyPI trap: a tag that resolves nowhere aborts before
+   any file is touched.
 3. `mise run kb-ship` — the only sanctioned way to open a PR here.
 
 **The graph rebuild is NOT part of the PR.** `graphify-out/graph.json` is

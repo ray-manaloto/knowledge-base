@@ -14,6 +14,7 @@ into graph edges, making the process itself queryable alongside everything else.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -152,10 +153,12 @@ def _reachable_line(upstream: UpstreamStatus) -> str:
     clean bill of health over a real `gh api ... exited 1`, which is the same
     absence-of-evidence shape this engine exists to refuse.
     """
+    if not upstream.tracked:
+        return "n/a — presence-tracked, no upstream version to chase"
     if not upstream.reachable:
         return f"**no** — {upstream.error}"
     if upstream.error:
-        return f"partially — PyPI answered, but: {upstream.error}"
+        return f"partially — the version source answered, but: {upstream.error}"
     return "yes"
 
 
@@ -173,6 +176,25 @@ def _release_line(record: RunRecord) -> str:
     return f"none found{f' ({record.upstream.error})' if record.upstream.error else ''}"
 
 
+def _feature_section(verdict: Verdict) -> str:
+    """The 'should we adopt this?' list — step 3's advisory half.
+
+    Rendered only when the notes announced something feature-shaped, so a routine
+    patch does not grow an empty heading. These never gated the bump; they are
+    here for a human to skim and decide whether a new capability is worth a config
+    change.
+    """
+    if not verdict.feature_review:
+        return ""
+    lines = "\n".join(f"- {item}" for item in verdict.feature_review)
+    return (
+        "### Features to consider adopting\n\n"
+        "_Advisory — these did not block the bump. Skim for a new capability "
+        "worth a config change._\n\n"
+        f"{lines}"
+    )
+
+
 def render_detail(record: RunRecord, when: datetime) -> str:
     """The full per-run detail page."""
     v = record.verdict
@@ -185,7 +207,7 @@ def render_detail(record: RunRecord, when: datetime) -> str:
         else "_No gate was evaluated (no upgrade pending, or upstream unreadable)._"
     )
 
-    return f"""# Currency run — {record.tool} — {when.isoformat(timespec="seconds")}
+    body = f"""# Currency run — {record.tool} — {when.isoformat(timespec="seconds")}
 
 **Verdict:** {v.summary()}
 
@@ -199,13 +221,15 @@ Pinned `{record.sync.pinned or "—"}` · resolved `{record.sync.resolved or "�
 
 ## Steps 2-3 — upstream
 
-- PyPI latest: `{record.upstream.pypi_latest or "unknown"}`
+- Latest ({record.upstream.source}): `{record.upstream.latest or "unknown"}`
 - GitHub release: `{_release_line(record)}`
 - Reachable: {_reachable_line(record.upstream)}
 
 ### Release notes
 
 {excerpt or "_No release notes retrieved._"}
+
+{_feature_section(v)}
 
 ## Step 4 — tracked issues and watch items
 
@@ -225,6 +249,11 @@ This page is the immutable record of ONE run — a later run writes its own new
 page rather than rewriting this one. Annotate it freely with review notes;
 nothing here is regenerated.
 """
+    # Optional sections (feature review, ambiguities) leave a blank when absent,
+    # which stacks into the MD012 consecutive-blank-line violation that fails the
+    # repo's own markdown gate. Collapse any run of blank lines to one, so an
+    # empty section never makes a report the engine cannot commit.
+    return re.sub(r"\n{3,}", "\n\n", body)
 
 
 def _ensure_landing(path: Path) -> list[str]:

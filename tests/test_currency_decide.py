@@ -30,7 +30,7 @@ def _sync(*, pinned="0.9.25", findings=()) -> SyncStatus:
 
 
 def _clean_upstream(latest="0.9.26", notes="Routine fixes.") -> UpstreamStatus:
-    return UpstreamStatus(pypi_latest=latest, github_tag=f"v{latest}", notes=notes)
+    return UpstreamStatus(latest=latest, github_tag=f"v{latest}", notes=notes)
 
 
 # ------------------------------------------------------- the happy path ----
@@ -44,7 +44,7 @@ def test_all_six_gates_passing_authorizes_auto_apply() -> None:
 
 
 def test_no_upgrade_available_is_not_an_auto_apply() -> None:
-    verdict = decide(sync=_sync(), upstream=UpstreamStatus(pypi_latest="0.9.25"), moved=())
+    verdict = decide(sync=_sync(), upstream=UpstreamStatus(latest="0.9.25"), moved=())
     assert not verdict.has_upgrade
     assert not verdict.auto_apply
 
@@ -66,7 +66,7 @@ def test_major_bump_stops_for_review() -> None:
 
 def test_pypi_version_with_no_github_release_stops() -> None:
     """The live v1.0.0-tagged-but-not-on-PyPI trap, in its mirror form."""
-    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="", error="404")
+    upstream = UpstreamStatus(latest="0.9.26", github_tag="", error="404")
     verdict = decide(sync=_sync(), upstream=upstream, moved=())
     assert not verdict.auto_apply
     assert any(a.gate == GATES[1] for a in verdict.ambiguities)
@@ -124,7 +124,7 @@ def test_unparsable_version_is_ambiguity_not_consent() -> None:
 def test_findings_are_reported_even_with_no_upgrade_pending() -> None:
     """Drift is worth surfacing whether or not a bump is waiting."""
     status = _sync(findings=(Finding("build-stamp", DRIFT, "rebuild pending"),))
-    verdict = decide(sync=status, upstream=UpstreamStatus(pypi_latest="0.9.25"), moved=())
+    verdict = decide(sync=status, upstream=UpstreamStatus(latest="0.9.25"), moved=())
     assert verdict.needs_interview
 
 
@@ -161,20 +161,20 @@ def test_empty_release_body_is_not_a_clean_bill_of_health() -> None:
     "nothing to worry about". Found by adversarially probing decide() rather
     than by a test — the original gate happily auto-applied here.
     """
-    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="")
+    upstream = UpstreamStatus(latest="0.9.26", github_tag="v0.9.26", notes="")
     verdict = decide(sync=_sync(), upstream=upstream, moved=())
     assert not verdict.auto_apply
     assert any(a.gate == GATES[2] for a in verdict.ambiguities)
 
 
 def test_whitespace_only_release_body_also_stops() -> None:
-    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="   \n\t ")
+    upstream = UpstreamStatus(latest="0.9.26", github_tag="v0.9.26", notes="   \n\t ")
     assert not decide(sync=_sync(), upstream=upstream, moved=()).auto_apply
 
 
 def test_a_real_release_body_with_no_markers_still_auto_applies() -> None:
     """Control arm: the gate must not have become unconditional."""
-    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="Routine fixes.")
+    upstream = UpstreamStatus(latest="0.9.26", github_tag="v0.9.26", notes="Routine fixes.")
     assert decide(sync=_sync(), upstream=upstream, moved=()).auto_apply
 
 
@@ -199,7 +199,7 @@ def test_json_null_release_body_does_not_defeat_the_empty_notes_gate() -> None:
     straight through the empty-notes gate. The whole protection was bypassed by
     the single most likely way a release ends up without notes.
     """
-    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="None")
+    upstream = UpstreamStatus(latest="0.9.26", github_tag="v0.9.26", notes="None")
     verdict = decide(sync=_sync(), upstream=upstream, moved=())
     # "None" is still literally non-empty text, so the gate cannot catch it — the
     # fix belongs upstream in release_for_tag, asserted in test_currency_upstream.
@@ -331,7 +331,7 @@ def test_unreachable_upstream_never_prints_the_word_current() -> None:
     # Control arm: a genuinely-current run still says so.
     assert (
         "current"
-        in decide(sync=_sync(), upstream=UpstreamStatus(pypi_latest="0.9.25"), moved=()).summary()
+        in decide(sync=_sync(), upstream=UpstreamStatus(latest="0.9.25"), moved=()).summary()
     )
 
 
@@ -363,7 +363,7 @@ def test_a_local_watch_item_does_not_interrupt_a_run_with_no_bump() -> None:
     """
     verdict = decide(
         sync=_sync(),
-        upstream=UpstreamStatus(pypi_latest="0.9.25"),
+        upstream=UpstreamStatus(latest="0.9.25"),
         moved=(),
         observations=(_LOCAL,),
     )
@@ -376,3 +376,77 @@ def test_an_issue_observation_alone_does_not_trip_the_local_gate() -> None:
     issue = Observation(key="issue:2101", state="open", updated_at="2026-07-22T00:00:00Z")
     verdict = decide(sync=_sync(), upstream=_clean_upstream(), moved=(), observations=(issue,))
     assert verdict.auto_apply
+
+
+# ------------------------------------------ presence-only (untracked) ----
+
+
+def test_an_untracked_tool_produces_no_upstream_ambiguity() -> None:
+    """ffmpeg: source='none'. An absent upstream is a non-event, not a question.
+
+    Adversarial: the whole hazard is that "I could not read upstream" gets read
+    as consent OR as a blocking ambiguity. For a tool with no upstream to read,
+    it must be NEITHER — the run is simply clean.
+    """
+    untracked = UpstreamStatus(source="none")
+    verdict = decide(sync=_sync(), upstream=untracked, moved=())
+    assert not verdict.auto_apply  # nothing to apply
+    assert not verdict.tracked
+    assert verdict.ambiguities == ()  # and nothing to ask
+    assert not verdict.needs_interview
+
+
+def test_an_untracked_tool_still_surfaces_a_real_sync_drift() -> None:
+    """Control arm: 'no upstream' must not suppress a genuine step-1 finding."""
+    status = _sync(findings=(Finding("resolution", DRIFT, "not on PATH"),))
+    verdict = decide(sync=status, upstream=UpstreamStatus(source="none"), moved=())
+    assert verdict.needs_interview
+    assert any(a.gate == GATES[5] for a in verdict.ambiguities)
+
+
+def test_untracked_summary_does_not_claim_an_unknown_latest() -> None:
+    """'not version-tracked' is the honest phrasing; 'UNKNOWN' implies a failed look."""
+    summary = decide(sync=_sync(), upstream=UpstreamStatus(source="none"), moved=()).summary()
+    assert "UNKNOWN" not in summary
+    assert "not version-tracked" in summary
+
+
+def test_a_tracked_unreachable_upstream_is_still_an_ambiguity() -> None:
+    """Control arm: the untracked exemption must not swallow a real outage.
+
+    A tool that DOES declare an upstream (tracked) which could not be read must
+    still fail closed — otherwise the exemption becomes a hole for every
+    rate-limited run.
+    """
+    unreachable = UpstreamStatus(source="pypi", reachable=False, error="pypi down")
+    verdict = decide(sync=_sync(), upstream=unreachable, moved=())
+    assert not verdict.auto_apply
+    assert verdict.needs_interview
+
+
+# --------------------------------------------- feature review (step 3) ----
+
+
+def test_a_clean_auto_apply_still_surfaces_features_without_blocking() -> None:
+    """The whole point of gap 4: features reach the interview even on auto-apply.
+
+    Adversarial: a feature note must NOT convert an authorized bump into a
+    blocked one — `needs_interview` stays False — while `feature_review` still
+    carries the capability for a human to skim.
+    """
+    upstream = UpstreamStatus(
+        latest="0.9.26",
+        github_tag="v0.9.26",
+        notes="- feat: add a `--backend openai` flag\n- fix: a crash",
+    )
+    verdict = decide(sync=_sync(), upstream=upstream, moved=())
+    assert verdict.auto_apply
+    assert not verdict.needs_interview
+    assert any("backend openai" in f for f in verdict.feature_review)
+
+
+def test_a_routine_bump_carries_no_feature_review() -> None:
+    """Control arm: no feature-shaped note ⇒ an empty review, not noise."""
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(notes="- fix: a typo"), moved=())
+    assert verdict.auto_apply
+    assert verdict.feature_review == ()

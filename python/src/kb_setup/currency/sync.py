@@ -43,7 +43,9 @@ SKIP = "skip"  # nothing configured to check — genuinely not applicable
 # trap (`probes-need-a-control-arm.md`), one status wide.
 BLIND = "blind"
 
-_STAMP_VERSION = 2  # v2 adds artifact_fingerprint (v1 stamps still read)
+# v1: version only · v2: single artifact_fingerprint · v3: artifact_fingerprints
+# map covering the primary graph AND the generated outputs (wiki/graphml/svg/…).
+_STAMP_VERSION = 3
 _SCAN_WINDOW = 4096
 # A SHA-shaped VALUE is required, so a node merely NAMED "built_at_commit"
 # cannot masquerade as the metadata key.
@@ -239,6 +241,23 @@ def stamp_path(repo_root: Path, spec: ToolSpec) -> Path | None:
     return repo_root / spec.stamp if spec.stamp else None
 
 
+def artifact_fingerprints(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
+    """`{relpath: fingerprint}` for every declared output that currently exists.
+
+    Keyed by the config-relative path (not absolute) so the stamp is portable
+    across clones. A declared-but-absent output is simply omitted here; the
+    identity check treats it as "regenerate pending" rather than silently
+    passing, because a missing generated output IS drift the moment it is
+    declared.
+    """
+    prints: dict[str, str] = {}
+    for rel in spec.all_artifacts:
+        fp = artifact_fingerprint(repo_root / rel)
+        if fp:
+            prints[rel] = fp
+    return prints
+
+
 def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: str = "") -> Path:
     """Record which version built the artifacts, next to them.
 
@@ -247,6 +266,10 @@ def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: st
     against 0.9.25 source). So "which version built this graph?" is unanswerable
     from the artifact, and this sidecar is the answer. Written by the build task,
     never by a check.
+
+    Fingerprints the PRIMARY graph and every declared generated output, so step 1
+    catches a stale wiki/svg/GRAPH_REPORT.md the same way it catches a stale
+    graph — Ray's "in sync with the graph AND generated outputs".
     """
     path = stamp_path(repo_root, spec)
     if path is None:
@@ -259,11 +282,33 @@ def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: st
         "source_ref": source_ref,
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "artifact_commit": _artifact_commit(artifact),
-        "artifact_fingerprint": artifact_fingerprint(artifact),
+        "artifact_fingerprints": artifact_fingerprints(repo_root, spec),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def restamp_artifacts(repo_root: Path, spec: ToolSpec) -> Path | None:
+    """Refresh only the fingerprints after `kb-artifacts` regenerated outputs.
+
+    The derived outputs (wiki/svg/…) are generated FROM graph.json AFTER the
+    build, so at build time they either don't exist or are stale. `kb-artifacts`
+    calls this once it has regenerated them, updating the fingerprint map while
+    preserving the version and source_ref the build recorded — those describe who
+    built the GRAPH, which regenerating a derived view does not change. Returns
+    None when there is no stamp to refresh (the build must run first).
+    """
+    path = stamp_path(repo_root, spec)
+    if path is None or not path.exists():
+        return None
+    existing = read_stamp(repo_root, spec)
+    return write_stamp(
+        repo_root,
+        spec,
+        version=str(existing.get("version", "")),
+        source_ref=str(existing.get("source_ref", "")),
+    )
 
 
 def _artifact_commit(artifact: Path | None) -> str:
@@ -316,8 +361,13 @@ def artifact_fingerprint(artifact: Path | None) -> str:
     return f"{st.st_size}:{st.st_mtime_ns}"
 
 
-def read_stamp(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
-    """The recorded stamp, or an empty dict when absent/unreadable."""
+def read_stamp(repo_root: Path, spec: ToolSpec) -> dict[str, object]:
+    """The recorded stamp, or an empty dict when absent/unreadable.
+
+    Values are NOT string-coerced: the stamp now carries a nested
+    `artifact_fingerprints` map, and flattening it to `str(dict)` would make it
+    unreadable on the way back in. Callers `str(...)` the scalar fields they use.
+    """
     path = stamp_path(repo_root, spec)
     if path is None or not path.exists():
         return {}
@@ -325,7 +375,20 @@ def read_stamp(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
         return {}
-    return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    return {str(k): v for k, v in data.items()} if isinstance(data, dict) else {}
+
+
+def stamped_fingerprints(stamp: dict[str, object]) -> dict[str, str]:
+    """The `{relpath: fingerprint}` map from a stamp, defended against bad shapes.
+
+    A stamp hand-edited or written by an older engine may carry a non-dict here;
+    that must read as "no fingerprints recorded" (⇒ the identity check reports
+    a re-stamp is due), never raise.
+    """
+    raw = stamp.get("artifact_fingerprints")
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items()}
 
 
 # ------------------------------------------------------------ the manifest ----
@@ -507,39 +570,52 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     return Finding("manifest", OK, f"{spec.manifest} tracks the installed {ref}")
 
 
-def _check_artifact_identity(stamp: dict[str, str], artifact: Path | None) -> Finding | None:
-    """Are the artifacts still the ones this stamp describes? None when they are.
+def _check_artifact_identity(
+    repo_root: Path, spec: ToolSpec, stamp: dict[str, object]
+) -> Finding | None:
+    """Are ALL declared outputs still the ones this stamp describes? None when yes.
 
-    The FINGERPRINT is the authority. `built_at_commit` cannot answer this — it is
-    the git HEAD, identical across every rebuild at one commit, which is the
-    normal development rhythm. Keying the detector off it meant it almost never
-    had a chance to fire, while the docs claimed it would.
+    The FINGERPRINT map is the authority. `built_at_commit` cannot answer this —
+    it is the git HEAD, identical across every rebuild at one commit, which is
+    the normal development rhythm. Keying the detector off it meant it almost
+    never had a chance to fire, while the docs claimed it would.
+
+    Every declared output must be present AND match. A declared output the stamp
+    never fingerprinted (added to `artifacts` after the last build, or a v2 stamp
+    that only fingerprinted the primary graph) is itself drift — "regenerate and
+    re-stamp" — because a generated view nobody has fingerprinted cannot be
+    asserted to match the graph.
     """
     try:
-        stamped_with = int(stamp.get("stamp_version", 1))
+        stamped_with = int(str(stamp.get("stamp_version", 1)))
     except ValueError:
         stamped_with = 1
     if stamped_with < _STAMP_VERSION:
-        # A v1 stamp predates fingerprinting, so it cannot prove the artifacts are
-        # the ones it describes. Say so rather than inheriting a guarantee it was
-        # never able to make.
+        # A pre-v3 stamp fingerprinted at most the primary graph, so it cannot
+        # prove the generated outputs match. Say so rather than inheriting a
+        # guarantee it was never able to make.
         return Finding(
             "build-stamp",
             DRIFT,
-            "stamp predates artifact fingerprinting and cannot prove the artifacts "
-            "are the ones it describes — rebuild to re-stamp",
+            "stamp predates generated-output fingerprinting and cannot prove the "
+            "wiki/graphml/svg match the graph — rebuild to re-stamp",
         )
-    if artifact is None:
-        return None
-    live = artifact_fingerprint(artifact)
-    if not live:
-        return Finding("build-stamp", DRIFT, "the stamped artifact is missing — rebuild pending")
-    if live != stamp.get("artifact_fingerprint", ""):
+    recorded = stamped_fingerprints(stamp)
+    stale: list[str] = []
+    for rel in spec.all_artifacts:
+        live = artifact_fingerprint(repo_root / rel)
+        if not live:
+            stale.append(f"{rel} (missing)")
+        elif rel not in recorded:
+            stale.append(f"{rel} (never stamped)")
+        elif live != recorded[rel]:
+            stale.append(f"{rel} (changed)")
+    if stale:
         return Finding(
             "build-stamp",
             DRIFT,
-            "artifacts changed since they were stamped, so they were rebuilt "
-            "outside the build task — version unknown",
+            "generated outputs out of sync with the stamp — regenerate "
+            f"(`mise run kb-artifacts`) or rebuild: {', '.join(stale)}",
         )
     return None
 
@@ -551,12 +627,11 @@ def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not stamp:
         return Finding("build-stamp", DRIFT, "artifacts have never been stamped — rebuild pending")
 
-    artifact = repo_root / spec.artifact if spec.artifact else None
-    mismatch = _check_artifact_identity(stamp, artifact)
+    mismatch = _check_artifact_identity(repo_root, spec, stamp)
     if mismatch is not None:
         return mismatch
 
-    built_with = stamp.get("version", "")
+    built_with = str(stamp.get("version", ""))
     if built_with != pinned:
         return Finding(
             "build-stamp",

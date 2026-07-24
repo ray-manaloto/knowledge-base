@@ -31,7 +31,7 @@ def _record(*, drifted=False, latest="", moved=(), ambiguities=()) -> report.Run
     return report.RunRecord(
         tool="graphify",
         sync=status,
-        upstream=UpstreamStatus(pypi_latest=latest or "0.9.25"),
+        upstream=UpstreamStatus(latest=latest or "0.9.25"),
         observations=(),
         moved=moved,
         verdict=verdict,
@@ -349,7 +349,7 @@ def test_a_partial_upstream_read_is_not_rendered_as_reachable_yes() -> None:
     for a question that was only half asked.
     """
     line = report._reachable_line(
-        UpstreamStatus(pypi_latest="0.9.26", reachable=True, error="gh api ... exited 1")
+        UpstreamStatus(latest="0.9.26", reachable=True, error="gh api ... exited 1")
     )
     assert line != "yes"
     assert "gh api ... exited 1" in line
@@ -357,7 +357,7 @@ def test_a_partial_upstream_read_is_not_rendered_as_reachable_yes() -> None:
 
 def test_a_fully_clean_upstream_read_still_says_yes() -> None:
     """Control arm: the line must not have become unconditionally hedged."""
-    assert report._reachable_line(UpstreamStatus(pypi_latest="0.9.26")) == "yes"
+    assert report._reachable_line(UpstreamStatus(latest="0.9.26")) == "yes"
 
 
 def test_an_unreachable_upstream_still_says_no() -> None:
@@ -401,3 +401,47 @@ def test_a_complete_200_is_still_recorded(monkeypatch) -> None:
     assert not observed.error
     assert observed.usable
     assert observed.comments == 0
+
+
+# ----------------------------------------- feature review rendering ----
+
+
+def test_feature_review_is_rendered_when_present(tmp_path) -> None:
+    verdict = Verdict(
+        tool="graphify",
+        current="0.9.25",
+        latest="0.9.26",
+        auto_apply=True,
+        gates_passed=(),
+        ambiguities=(),
+        feature_review=("feat: add a --backend openai flag",),
+    )
+    record = report.RunRecord(
+        tool="graphify",
+        sync=SyncStatus(
+            tool="graphify",
+            pinned="0.9.25",
+            resolved="0.9.25",
+            findings=(Finding("pin", OK, "pinned"),),
+        ),
+        upstream=UpstreamStatus(latest="0.9.26", notes="feat: add a --backend openai flag"),
+        observations=(),
+        moved=(),
+        verdict=verdict,
+    )
+    _, detail = report.write_run(tmp_path, record)
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "Features to consider adopting" in body
+    assert "backend openai" in body
+    # The MD012 guard must hold even with the extra optional section.
+    assert "\n\n\n" not in body
+
+
+def test_no_feature_section_and_no_blank_pileup_when_absent(tmp_path) -> None:
+    """Control arm: an empty feature review renders NO heading and no MD012 breach."""
+    _, detail = report.write_run(tmp_path, _record(latest="0.9.26"))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "Features to consider adopting" not in body
+    assert "\n\n\n" not in body

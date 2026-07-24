@@ -82,4 +82,29 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
         print(f"[kb-artifacts] {len(failures)} failed: {', '.join(failures)}")
         return 1
     print("[kb-artifacts] all artifacts generated")
+    _restamp(repo_root)
     return 0
+
+
+def _restamp(repo_root: Path) -> None:
+    """Refresh the currency stamp's fingerprints for the freshly-generated outputs.
+
+    Without this, step 1 would report every generated output as "changed since
+    stamped" the moment `kb-artifacts` ran — the outputs it just legitimately
+    regenerated. Best-effort and version-preserving: regenerating a derived view
+    does not change who built the graph, so a missing stamp (build not yet run)
+    is left for `kb-build`, not invented here. A partial `only=` run still
+    re-stamps the whole declared set, which is correct: the fingerprint map
+    always reflects what is on disk now.
+    """
+    try:
+        from kb_setup.currency import config, sync
+
+        for spec in config.load(repo_root):
+            if not spec.stamp:
+                continue
+            path = sync.restamp_artifacts(repo_root, spec)
+            if path is not None:
+                print(f"[kb-artifacts] re-stamped {path.name} for {spec.name}")
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-artifacts] WARNING: could not refresh the currency stamp: {e}")

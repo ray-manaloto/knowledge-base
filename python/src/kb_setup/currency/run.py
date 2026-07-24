@@ -154,6 +154,48 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
     return 0
 
 
+def apply(repo_root: Path, *, only: str, as_json: bool = False) -> int:
+    """Apply the authorized bump for ONE tool (steps 2's "and update").
+
+    Requires `--tool`: applying a version change is never a fan-out over every
+    configured tool, and an unauthorized verdict must fail loudly, not be one of
+    several statuses. Returns 2 if the tool is unknown or its verdict does not
+    authorize a bump, 0 on a successful edit. Opening the PR is the ship task's
+    job (H3), so this only edits and reports.
+    """
+    from kb_setup.currency import apply as apply_mod
+
+    if not only:
+        print("[currency] apply requires --tool <name>", file=sys.stderr)
+        return 2
+    specs = _specs(repo_root, only)
+    if not specs:
+        configured = ", ".join(s.name for s in config.load(repo_root))
+        print(f"[currency] unknown tool {only!r}; configured: {configured}", file=sys.stderr)
+        return 2
+
+    spec = specs[0]
+    record = _run_one(repo_root, spec)
+    try:
+        result = apply_mod.apply(repo_root, spec, record.verdict)
+    except apply_mod.NotAuthorizedError as e:
+        print(f"[currency] not applied — {e}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
+        print(f"[currency] apply failed — {e}", file=sys.stderr)
+        return 2
+
+    if as_json:
+        print(json.dumps(asdict(result), indent=2))
+    else:
+        print(
+            f"[currency] {result.tool} {result.from_version} → {result.to_version}: "
+            f"edited {', '.join(result.changed)} — {result.note}"
+        )
+        print("[currency] open the PR with `mise run kb-ship` (auto-merge on).")
+    return 0
+
+
 def stamp(repo_root: Path, *, tool: str, version: str, source_ref: str = "") -> int:
     """Record which version built this repo's artifacts for `tool`."""
     specs = _specs(repo_root, tool)

@@ -153,6 +153,8 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
             as_json="--json" in rest,
             write="--no-write" not in rest,
         )
+    if mode == "apply":
+        return currency_run.apply(repo_root, only=only, as_json="--json" in rest)
     if mode == "stamp":
         if not only:
             print(
@@ -166,7 +168,9 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
             version=_opt(rest, "--version", "") or "",
             source_ref=_opt(rest, "--source-ref", "") or "",
         )
-    print(f"kb-setup currency: unknown mode {mode!r} (check | run | stamp)", file=sys.stderr)
+    print(
+        f"kb-setup currency: unknown mode {mode!r} (check | run | apply | stamp)", file=sys.stderr
+    )
     return 2
 
 

@@ -1,8 +1,10 @@
 """Declarative per-tool currency config (`currency.toml`, one per repo).
 
-One `[tool.<name>]` table per tracked tool. graphify is the pilot; mise, hk, uv,
-ruff and ty adopt the same shape with no engine change — which is the whole
-reason this is a config file rather than hard-coded checks.
+One `[tool.<name>]` table per tracked tool. graphify is the pilot; adding mise,
+hk, uv, ruff or ty is a config edit, not an engine change — the version source
+is inferred from the fields (`pypi` → PyPI, `github` only → GitHub releases,
+neither → presence-only like ffmpeg), which is the whole reason this is a config
+file rather than hard-coded checks.
 
 Each repo carries its own config and runs independently (decided 2026-07-23):
 there is deliberately NO cross-repo assertion, so this repo never learns
@@ -70,10 +72,30 @@ class ToolSpec:
     # naive "every extra must import" check would report drift that is not drift.
     extra_probes: tuple[str, ...] = ()
     manifest: str = ""
+    # `artifact` is the PRIMARY build output — the one whose `built_at_commit` is
+    # read for identity (graphify writes it only into graph.json). `artifacts` is
+    # the wider set of GENERATED outputs (wiki/graphml/svg/GRAPH_REPORT.md) that
+    # `kb-artifacts` regenerates from it. Ray's step 1 said "in sync with the
+    # graph AND generated outputs", so the stamp fingerprints all of them — a
+    # stat, so covering the derived set is cheap.
     artifact: str = ""
+    artifacts: tuple[str, ...] = ()
     stamp: str = ""
     os: tuple[str, ...] = ()
     watch: tuple[WatchItem, ...] = ()
+
+    @property
+    def all_artifacts(self) -> tuple[str, ...]:
+        """Every output to fingerprint: the primary graph plus the derived set.
+
+        De-duplicated and order-stable, so a config that lists `graph.json` in
+        both `artifact` and `artifacts` fingerprints it once.
+        """
+        seen: dict[str, None] = {}
+        for path in (self.artifact, *self.artifacts):
+            if path:
+                seen.setdefault(path, None)
+        return tuple(seen)
 
     def applies_here(self) -> bool:
         """Whether this tool is expected to exist on the current host.
@@ -130,6 +152,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         extra_probes=_tuple("extra_probes"),
         manifest=_str("manifest"),
         artifact=_str("artifact"),
+        artifacts=_tuple("artifacts"),
         stamp=_str("stamp"),
         os=_tuple("os"),
         watch=_watch_items(table.get("watch")),

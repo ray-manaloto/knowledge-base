@@ -4,12 +4,21 @@ Deliberately split from judgment: this module *fetches*, it never decides. The
 adopt/hold call is `decide.py`'s (mechanically, for the unambiguous case) or the
 skill's (via the interview, for everything else).
 
-Two upstreams are consulted because they disagree, and the disagreement matters:
-mise installs from **PyPI**, while release notes live on **GitHub**. On
-2026-07-23 graphify had `v1.0.0` tagged on GitHub while PyPI's latest was
-0.9.25 — tracking the newest tag would have pinned a version mise cannot
-install. Every check here treats PyPI as the installable truth and GitHub as the
-narrative.
+THREE version sources, picked in `_resolve_source`:
+
+* **PyPI** — the installable truth for pip/pipx tools (graphify). mise installs
+  from PyPI, so a version tagged on GitHub but absent from PyPI cannot be pinned:
+  on 2026-07-23 graphify had `v1.0.0` tagged while PyPI's latest was 0.9.25.
+  PyPI wins whenever a package name is declared.
+* **GitHub releases** — for tools that ship on GitHub, not PyPI (mise, hk). The
+  latest STABLE release by version order, never `/releases/latest` (which orders
+  by publish time and points at a backport).
+* **none** — a presence-only tool (ffmpeg) with no version to chase. Not an
+  error and not an ambiguity; step 1 still checks it resolves.
+
+Release NOTES always come from GitHub when a repo is declared — PyPI carries no
+changelog — so PyPI is the installable truth and GitHub is the narrative even
+when GitHub is not the version source.
 """
 
 from __future__ import annotations
@@ -45,6 +54,29 @@ BREAKING_MARKERS = (
 # Conventional Commits marks a breaking change with `!` before the colon:
 # `feat!:`, `refactor(api)!:`. No keyword appears, so only a pattern can catch it.
 _BANG_RE = re.compile(r"^\s*\w+(\([^)]*\))?!\s*:", re.MULTILINE)
+
+# Phrases that mark a note line as ANNOUNCING A FEATURE — the "should we adopt
+# this?" signal (step 3). Unlike the breaking markers these never block a bump;
+# they only surface a line to the interview so a human can decide whether the new
+# capability is worth a config change. Matched against a raw (not decoration-
+# stripped) line so `feat:` / `feat(x):` are caught by the anchored pattern below
+# and prose like "you can now" by substring.
+_FEATURE_PHRASES = (
+    "you can now",
+    "now supports",
+    "now support",
+    "new option",
+    "new flag",
+    "new command",
+    "new subcommand",
+    "adds support",
+    "added support",
+    "introduces",
+    "introduce ",
+)
+# Conventional-commits `feat:` / `feat(scope):` at the start of a line.
+_FEAT_RE = re.compile(r"^\s*[-*]?\s*feat(\([^)]*\))?\s*:", re.IGNORECASE | re.MULTILINE)
+_MAX_FEATURE_LINES = 12
 
 # Markdown emphasis and the hyphen/underscore variants are decoration, not
 # meaning. Collapsing them lets ONE marker cover every spelling.
@@ -100,16 +132,34 @@ class Version:
 
 @dataclass(frozen=True)
 class UpstreamStatus:
-    """What upstream currently offers, and whether we could read it at all."""
+    """What upstream currently offers, and whether we could read it at all.
 
-    pypi_latest: str = ""
+    THREE states, not two — the distinction is safety-critical:
+
+    * `source == "none"` — the tool declares no upstream to chase (ffmpeg is
+      presence-tracked, not version-tracked). This is NOT an ambiguity: there is
+      simply no bump channel, and `decide` must not manufacture a question from
+      it. The old two-state model returned `reachable=False` here, so every run
+      of such a tool produced a permanent "upstream could not be checked".
+    * `source != "none"` and `reachable is False` — configured, but this run
+      could not read it. Fail closed: this IS an ambiguity.
+    * `source != "none"` and `reachable is True` — read successfully.
+    """
+
+    latest: str = ""
     github_tag: str = ""
     notes: str = ""
+    source: str = "pypi"  # "pypi" | "github" | "none"
     reachable: bool = True
     error: str = ""
-    # Versions between the pin and `pypi_latest` whose notes could NOT be read.
+    # Versions between the pin and `latest` whose notes could NOT be read.
     # A jump of several patches must not be judged on the newest release alone.
     unread_versions: tuple[str, ...] = ()
+
+    @property
+    def tracked(self) -> bool:
+        """Whether this tool has an upstream version to chase at all."""
+        return self.source != "none"
 
     @property
     def markers(self) -> tuple[str, ...]:
@@ -124,6 +174,29 @@ class UpstreamStatus:
         if _BANG_RE.search(self.notes):
             found.append("conventional-commits `!`")
         return tuple(found)
+
+    @property
+    def feature_highlights(self) -> tuple[str, ...]:
+        """Note lines announcing a NEW capability worth a look — step 3's other half.
+
+        Purely advisory: these never gate a bump (that is `markers`' job). They
+        exist so "should we adopt this?" reaches the human even on a clean bump
+        that no breaking marker stopped — the release-note review Ray asked for.
+        A line qualifies via a `feat:` prefix or an adoption phrase; the raw line
+        is returned (trimmed of list bullets) so the reader sees the real wording,
+        capped so a huge changelog does not flood the interview.
+        """
+        highlights: list[str] = []
+        for raw in self.notes.splitlines():
+            line = raw.strip().lstrip("-*").strip()
+            if not line:
+                continue
+            low = line.lower()
+            if _FEAT_RE.match(raw) or any(p in low for p in _FEATURE_PHRASES):
+                highlights.append(line)
+            if len(highlights) >= _MAX_FEATURE_LINES:
+                break
+        return tuple(highlights)
 
 
 def _pypi_json(package: str) -> tuple[dict[str, object], str]:
@@ -220,6 +293,65 @@ def _gh_api(path: str) -> tuple[dict[str, object], str]:
     return payload if isinstance(payload, dict) else {}, ""
 
 
+def _gh_api_list(path: str) -> tuple[list[object], str]:
+    """One `gh api` call that returns a JSON array, as (items, error).
+
+    Separate from `_gh_api` because the releases endpoint returns a list, and a
+    list arriving where a dict is expected must read as "empty + error", never as
+    an exception that a caller might mistake for "no releases".
+    """
+    try:
+        res = subprocess.run(
+            ["gh", "api", path],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_TIMEOUT_S,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return [], f"gh api {path} failed: {e}"
+    if res.returncode != 0:
+        return [], f"gh api {path} exited {res.returncode}: {res.stderr.strip()[:200]}"
+    try:
+        payload = json.loads(res.stdout or "[]")
+    except json.JSONDecodeError as e:
+        return [], f"gh api {path} returned non-JSON: {e}"
+    return payload if isinstance(payload, list) else [], ""
+
+
+def github_versions(repo: str) -> tuple[str, tuple[str, ...], str]:
+    """Latest stable release version and every release version, as (latest, all, err).
+
+    The version source for tools that ship on GitHub but not PyPI — mise and hk,
+    which is what makes `currency.toml`'s "same shape, no engine change" claim
+    true rather than aspirational.
+
+    "Latest" is the greatest by VERSION order among non-draft, non-prerelease
+    releases — deliberately NOT `/releases/latest`, which GitHub orders by
+    publish TIME and will therefore point at a backport patch to an older line
+    the day one is published. Draft and prerelease releases are excluded so a
+    release-candidate never auto-applies. Fail closed: any read error yields
+    `("", (), error)` so `probe` reports unreachable rather than inventing a
+    version.
+    """
+    items, err = _gh_api_list(f"repos/{repo}/releases?per_page=100")
+    if err:
+        return "", (), err
+    stable: list[Version] = []
+    raw: list[str] = []
+    for item in items:
+        if not isinstance(item, dict) or item.get("draft") or item.get("prerelease"):
+            continue
+        tag = str(item.get("tag_name") or "")
+        parsed = Version.parse(tag)
+        if parsed is not None:
+            stable.append(parsed)
+            raw.append(tag)
+    if not stable:
+        return "", (), f"no stable, version-shaped releases found for {repo}"
+    return max(stable).raw, tuple(raw), ""
+
+
 def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
     """GitHub release for `tag`, as (tag_name, body, error).
 
@@ -248,31 +380,53 @@ def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
     return "", "", last_error
 
 
+def _resolve_source(pypi: str, github: str) -> tuple[str, str, tuple[str, ...], str]:
+    """Pick the version source and read it: (source, latest, all_versions, error).
+
+    PyPI wins when both are declared, because mise installs from PyPI — a version
+    on GitHub but not PyPI cannot be pinned (graphify's v1.0.0 on 2026-07-23).
+    GitHub releases are the source only when there is no PyPI package, which is
+    the mise/hk case. `source == "none"` means neither is declared: a
+    presence-only tool with nothing to chase, not an error.
+    """
+    if pypi:
+        payload, err = _pypi_json(pypi)
+        if err:
+            return "pypi", "", (), err
+        latest, err = latest_version(payload)
+        return "pypi", latest, all_versions(payload), err
+    if github:
+        latest, versions, err = github_versions(github)
+        return "github", latest, versions, err
+    return "none", "", (), ""
+
+
 def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
     """Fetch the upstream picture for one tool: every release we would be adopting.
 
-    Returns `reachable=False` rather than raising when the network or `gh` is
-    unavailable, so an offline run reports "could not check" instead of
-    manufacturing a finding.
+    Three shapes, matching `UpstreamStatus`'s three states:
 
-    Crucially this collects notes for EVERY version between the pin and the
-    latest, not just the newest. The patch gate accepts any distance within the
-    patch slot, so `0.9.25 -> 0.9.28` is auto-apply-eligible — and reading only
-    0.9.28's body would wave through a breaking change announced in 0.9.26.
+    * neither `pypi` nor `github` declared — `source="none"`, tracked=False. A
+      presence-only tool (ffmpeg). Not an error, not an ambiguity.
+    * a source declared but unreadable — `reachable=False` with the error. Fail
+      closed.
+    * a source read — the latest, and notes for EVERY version between the pin and
+      it (not just the newest: the patch gate accepts any distance within the
+      patch slot, so `0.9.25 -> 0.9.28` is auto-apply-eligible, and reading only
+      0.9.28's body would wave through a breaking change announced in 0.9.26).
+
+    Release NOTES always come from GitHub when `github` is set, regardless of
+    which source supplied the version list — PyPI carries no changelog.
     """
-    if not pypi:
-        return UpstreamStatus(reachable=False, error="no `pypi` name configured for this tool")
-
-    payload, err = _pypi_json(pypi)
+    source, latest, versions, err = _resolve_source(pypi, github)
+    if source == "none":
+        return UpstreamStatus(source="none")
     if err:
-        return UpstreamStatus(reachable=False, error=err)
-    latest, err = latest_version(payload)
-    if err:
-        return UpstreamStatus(reachable=False, error=err)
+        return UpstreamStatus(source=source, reachable=False, error=err)
     if latest == current or not github:
-        return UpstreamStatus(pypi_latest=latest)
+        return UpstreamStatus(latest=latest, source=source)
 
-    pending = versions_between(all_versions(payload), current, latest) or (latest,)
+    pending = versions_between(versions, current, latest) or (latest,)
     bodies: list[str] = []
     unread: list[str] = []
     newest_tag = ""
@@ -290,9 +444,10 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
         )
 
     return UpstreamStatus(
-        pypi_latest=latest,
+        latest=latest,
         github_tag=newest_tag,
         notes="\n\n".join(bodies),
+        source=source,
         reachable=True,
         error=last_error,
         unread_versions=tuple(unread),
