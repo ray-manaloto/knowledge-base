@@ -71,11 +71,30 @@ def test_run_json_parses_an_array_in_list_shape(monkeypatch) -> None:
     assert payload == [1, 2]
 
 
-def test_run_json_empty_stdout_is_the_empty_container_not_an_error(monkeypatch) -> None:
-    """A clean exit with no output means 'nothing', not a parse failure."""
+def test_run_json_empty_stdout_is_an_error_not_a_clean_empty(monkeypatch) -> None:
+    """Exit 0 with NO output is unreadable, not 'nothing found'.
+
+    Every probe emits a JSON body on success (`mise outdated` prints `{}` when
+    clean), so blank stdout is anomalous — coercing it to {}/[] with no error
+    would be a false 'nothing found' (the absence-of-evidence trap). The control
+    arm below proves a genuine empty container (`{}`) still reads as clean.
+    """
     monkeypatch.setattr(_proc.subprocess, "run", _run(0, stdout=""))
+    payload, err = _proc.run_json(["x"], timeout=1, label="mise outdated")
+    assert payload == {}
+    assert "empty output" in err
+
+    monkeypatch.setattr(_proc.subprocess, "run", _run(0, stdout="   \n"))
+    payload_l, err_l = _proc.run_json(["x"], list_shape=True, timeout=1, label="x")
+    assert payload_l == []
+    assert "empty output" in err_l
+
+
+def test_run_json_explicit_empty_container_reads_as_clean(monkeypatch) -> None:
+    """Control arm: an explicit `{}` / `[]` body is a real empty result, no error."""
+    monkeypatch.setattr(_proc.subprocess, "run", _run(0, stdout="{}"))
     assert _proc.run_json(["x"], timeout=1, label="x") == ({}, "")
-    monkeypatch.setattr(_proc.subprocess, "run", _run(0, stdout=""))
+    monkeypatch.setattr(_proc.subprocess, "run", _run(0, stdout="[]"))
     assert _proc.run_json(["x"], list_shape=True, timeout=1, label="x") == ([], "")
 
 

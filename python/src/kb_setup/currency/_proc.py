@@ -86,8 +86,16 @@ def run_json(
     if proc.returncode != 0:
         detail = proc.stderr.strip()[:200] or f"exit {proc.returncode}"
         return empty, f"{label} exited {proc.returncode}: {detail}"
+    if not proc.stdout.strip():
+        # Exit 0 with NO output is an unreadable response, not an empty result:
+        # every probe here emits a JSON body on success (`mise outdated` prints
+        # `{}` when clean — verified, even for an unknown tool — and `gh api`
+        # returns the object/array). Coercing blank stdout to {}/[] would render
+        # it as a false "nothing found" — the absence-of-evidence trap this engine
+        # exists to avoid — so surface it as an error instead.
+        return empty, f"{label} returned empty output"
     try:
-        payload = json.loads(proc.stdout or ("[]" if list_shape else "{}"))
+        payload = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
         return empty, f"{label} returned non-JSON: {e}"
     expected: type = list if list_shape else dict
