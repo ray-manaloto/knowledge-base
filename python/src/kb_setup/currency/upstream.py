@@ -26,10 +26,11 @@ from __future__ import annotations
 import http.client
 import json
 import re
-import subprocess
 from dataclasses import dataclass
 from http import HTTPStatus
 from urllib.parse import quote
+
+from kb_setup.currency import _proc
 
 _TIMEOUT_S = 20.0
 _PYPI_HOST = "pypi.org"
@@ -274,23 +275,7 @@ def _gh_api(path: str) -> tuple[dict[str, object], str]:
     exception, because an unreachable upstream must read as SKIP and not as a
     finding about the tool.
     """
-    try:
-        res = subprocess.run(
-            ["gh", "api", path],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_TIMEOUT_S,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return {}, f"gh api {path} failed: {e}"
-    if res.returncode != 0:
-        return {}, f"gh api {path} exited {res.returncode}: {res.stderr.strip()[:200]}"
-    try:
-        payload = json.loads(res.stdout or "{}")
-    except json.JSONDecodeError as e:
-        return {}, f"gh api {path} returned non-JSON: {e}"
-    return payload if isinstance(payload, dict) else {}, ""
+    return _proc.run_json(["gh", "api", path], timeout=_TIMEOUT_S, label=f"gh api {path}")
 
 
 def _gh_api_list(path: str) -> tuple[list[object], str]:
@@ -300,23 +285,9 @@ def _gh_api_list(path: str) -> tuple[list[object], str]:
     list arriving where a dict is expected must read as "empty + error", never as
     an exception that a caller might mistake for "no releases".
     """
-    try:
-        res = subprocess.run(
-            ["gh", "api", path],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_TIMEOUT_S,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return [], f"gh api {path} failed: {e}"
-    if res.returncode != 0:
-        return [], f"gh api {path} exited {res.returncode}: {res.stderr.strip()[:200]}"
-    try:
-        payload = json.loads(res.stdout or "[]")
-    except json.JSONDecodeError as e:
-        return [], f"gh api {path} returned non-JSON: {e}"
-    return payload if isinstance(payload, list) else [], ""
+    return _proc.run_json(
+        ["gh", "api", path], list_shape=True, timeout=_TIMEOUT_S, label=f"gh api {path}"
+    )
 
 
 def github_versions(repo: str) -> tuple[str, tuple[str, ...], str]:

@@ -76,10 +76,13 @@ def test_a_clean_sweep_renders_the_note(monkeypatch) -> None:
 def test_mise_outdated_bad_json_is_an_error_not_a_crash(monkeypatch) -> None:
     import subprocess
 
+    from kb_setup.currency import _proc
+
     def _fake_run(*_a: object, **_k: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess([], 0, stdout="not json", stderr="")
 
-    monkeypatch.setattr(broad.subprocess, "run", _fake_run)
+    # The subprocess now runs inside the shared `_proc` helper, so patch it there.
+    monkeypatch.setattr(_proc.subprocess, "run", _fake_run)
     data, err = broad.mise_outdated(Path("/x"))
     assert data == {}
     assert "non-JSON" in err

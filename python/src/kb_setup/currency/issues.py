@@ -14,9 +14,10 @@ clone.
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
+
+from kb_setup.currency import _proc
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -79,29 +80,17 @@ def _as_int(value: object) -> int:
 
 def _fetch_issue(repo: str, ref: str) -> tuple[dict[str, object], str]:
     """One `gh api` issue read, as (payload, error)."""
-    try:
-        res = subprocess.run(
-            [
-                "gh",
-                "api",
-                f"repos/{repo}/issues/{ref}",
-                "--jq",
-                "{state:.state,updated_at:.updated_at,comments:.comments,title:.title}",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_TIMEOUT_S,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return {}, f"gh api failed: {e}"
-    if res.returncode != 0:
-        return {}, res.stderr.strip()[:200] or "gh api failed"
-    try:
-        data = json.loads(res.stdout or "{}")
-    except json.JSONDecodeError as e:
-        return {}, f"non-JSON response: {e}"
-    return data if isinstance(data, dict) else {}, ""
+    return _proc.run_json(
+        [
+            "gh",
+            "api",
+            f"repos/{repo}/issues/{ref}",
+            "--jq",
+            "{state:.state,updated_at:.updated_at,comments:.comments,title:.title}",
+        ],
+        timeout=_TIMEOUT_S,
+        label=f"gh api repos/{repo}/issues/{ref}",
+    )
 
 
 def observe(item: WatchItem, *, default_repo: str) -> Observation:
