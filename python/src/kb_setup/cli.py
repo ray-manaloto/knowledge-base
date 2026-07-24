@@ -113,6 +113,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         return _assemble(repo_root, rest)
     if cmd == "validate-chunks":
         return _validate_chunks(rest)
+    if cmd == "fetch":
+        return _fetch(repo_root, rest)
 
     print(
         f"kb-setup: unknown command {cmd!r} "
@@ -125,6 +127,22 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         file=sys.stderr,
     )
     return 2
+
+
+def _fetch(repo_root: Path, rest: list[str]) -> int:
+    """`kb-setup fetch <url> [--stem NAME]` — lossless fetch into sources/."""
+    from kb_setup import fetch as fetch_mod
+
+    flags = {"--stem"}
+    positional = [
+        a
+        for i, a in enumerate(rest)
+        if not a.startswith("--") and (i == 0 or rest[i - 1] not in flags)
+    ]
+    if not positional:
+        print("kb-setup fetch: need a URL", file=sys.stderr)
+        return 2
+    return fetch_mod.fetch_main(repo_root, positional[0], stem=_opt(rest, "--stem"))
 
 
 def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
