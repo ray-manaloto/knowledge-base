@@ -192,6 +192,13 @@ run = "uv run kb-setup brain reflect"
 description = "Fail if any recorded routing outcome is not a closed record (ship-gate precondition)"
 run = "uv run kb-setup brain audit"
 
+[tasks.brain-transcript-audit]
+description = "ADVISORY: flag sessions that delegated + verified but recorded no routing outcome"
+# Mines native session transcripts (no logging hook). Never a gate (rc always 0) —
+# the blocking ship-gate is brain-audit. Refreshed each session by a SessionEnd hook
+# (-- --output .omc/brain-audit.md). Logic in kb_setup.brain.transcript_audit.
+run = "uv run kb-setup brain transcript-audit"
+
 # --- tool currency (the shared engine; see currency.toml + kb_setup.currency) ---
 [tasks.kb-currency-check]
 description = "Offline drift check: is the installed tooling in sync with the pins? (step 1)"
