@@ -10,4 +10,11 @@ useDefault = true
 
 [allowlist]
 description = "gitignored research corpus + derived artifacts (never committed)"
-paths = ['''^sources/''', '''^graphify-out/''', '''^raw/''']
+# brain/graphify-out/ is the second-brain vault's DERIVED graph (gitignored, same as
+# the root graphify-out/): its stat-index content-hashes read as generic-api-key noise.
+paths = [
+  '''^sources/''',
+  '''^graphify-out/''',
+  '''^brain/graphify-out/''',
+  '''^raw/''',
+]

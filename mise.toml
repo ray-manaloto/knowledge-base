@@ -163,6 +163,35 @@ description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the 
 # reflections/ + overlay are gitignored (regenerable); run each session.
 run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"
 
+# --- second brain (routing seam; see dotfiles .omc/specs/second-brain-design.md) ---
+# The brain/ vault is its OWN graph (separate from the aggregate — a vault note never
+# connects to code structurally, measured). Keys stripped so update stays the FREE
+# AST pass and never triggers a paid backend (feedback_kb_graphify_claude_only).
+[tasks.brain-update]
+description = "Rebuild the brain vault graph from its notes (FREE, no LLM)"
+dir = "{{config_root}}/brain"
+env = { GEMINI_API_KEY = "", GOOGLE_API_KEY = "", OPENAI_API_KEY = "", ANTHROPIC_API_KEY = "", AWS_REGION = "" }
+run = "graphify update ."
+
+[tasks.brain-query]
+description = 'Query the brain vault: mise run brain-query -- "<question>" [--budget N]'
+# Wrapped: graphify honours --graph only when the question precedes it, but mise
+# appends user args LAST — so the wrapper reorders (question first). Logic in kb_setup.brain.
+run = "uv run kb-setup brain query"
+
+[tasks.brain-remember]
+description = 'Record a verified delegation outcome: mise run brain-remember -- --task-class T --lane L --effort E --verdict clean|rework|failed --session S [--note N]'
+# Contract: refuses (rc=2) any record missing a field. Logic in kb_setup.brain.
+run = "uv run kb-setup brain record"
+
+[tasks.brain-reflect]
+description = "Aggregate outcomes into ROUTING-LESSONS.md (deterministic, >=3 consistent + session-dedup, advisory)"
+run = "uv run kb-setup brain reflect"
+
+[tasks.brain-audit]
+description = "Fail if any recorded routing outcome is not a closed record (ship-gate precondition)"
+run = "uv run kb-setup brain audit"
+
 # --- tool currency (the shared engine; see currency.toml + kb_setup.currency) ---
 [tasks.kb-currency-check]
 description = "Offline drift check: is the installed tooling in sync with the pins? (step 1)"

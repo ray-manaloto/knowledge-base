@@ -67,8 +67,8 @@ def working_tree_clean(repo_root: Path) -> bool:
 
 
 def run_gates(repo_root: Path) -> bool:
-    """Run the local gates (lint, test); return True only if every one passes."""
-    for gate in ("lint", "test"):
+    """Run the local gates (lint, test, brain-audit); return True only if every one passes."""
+    for gate in ("lint", "test", "brain-audit"):
         print(f"==> gate: {gate}")
         rc = _stream(["mise", "run", gate], cwd=repo_root)
         status = "PASS" if rc == 0 else "FAIL"
