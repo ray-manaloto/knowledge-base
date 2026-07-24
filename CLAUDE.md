@@ -140,12 +140,23 @@ mise run kb-currency          # the full loop; writes docs/currency/
 - **Step 5 can never live in a hook.** A hook is a shell command; only the model
   can call `AskUserQuestion`. The SessionStart hook therefore runs step 1 only and
   is **silent unless something drifted** — always exiting 0, because a session must
-  not be blocked over a version pin.
+  not be blocked over a version pin. Two things it does NOT stay silent about: a
+  missing `currency.toml` (silence is this design's "clean", so an absent config
+  must announce that step 1 did not run) and an unknown `--tool` (exit 2).
 - **An unambiguous bump may apply itself**, where unambiguous means all six gates
   pass: patch-level · PyPI latest has a matching GitHub tag · no breaking marker ·
   extras unchanged · no tracked issue moved · step 1 green. It **fails closed** —
   anything unreadable is ambiguity, not consent. PyPI is the installable truth
   (mise installs from it); GitHub is only the narrative.
+- **"Could not check" is never rendered as green.** Three distinct states, kept
+  distinct because collapsing them is how every defect in this engine's review
+  happened: DRIFT (checked, disagrees) · SKIP (not applicable here) · OK. A run of
+  nothing-but-SKIPs reports *not verifiable here*, never "in sync"; an unreachable
+  upstream reports *latest UNKNOWN*, never "current"; a tracked issue whose lookup
+  failed blocks gate 5 rather than passing it; and a binary that is simply not
+  installed on a host where it *should* be is DRIFT, not SKIP.
+- **`mise run kb-currency` always exits 0** and can never serve as a CI gate — an
+  out-of-date tool is a signal, not a failure. Read the report, not the rc.
 
 ## Layout
 

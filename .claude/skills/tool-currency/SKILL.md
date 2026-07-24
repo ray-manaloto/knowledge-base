@@ -61,8 +61,8 @@ Then record what they said, in the run's detail page under the matching
 
 An auto-apply is a **patch** bump whose six gates passed. Apply it as:
 
-1. Branch first — never commit to `main` (`do-not.md` #9 in dotfiles; same rule
-   here).
+1. Branch first — never commit to `main` (dotfiles
+   `.claude/rules/do-not.md` #9; the same rule applies here).
 2. Update the `mise.toml` pin **and** `sources/graphify.manifest` (`ref` to the
    matching `v<version>` tag, `commit` to that tag's SHA via
    `git ls-remote --tags --refs <url>`).

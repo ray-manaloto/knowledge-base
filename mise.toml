@@ -177,6 +177,8 @@ description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency
 # bar, and writes the committed report under docs/currency/. Step 5 (the
 # AskUserQuestion interview) belongs to the tool-currency skill: only the model can
 # ask, so it can never live in a hook or a task. Logic in kb_setup.currency.run.
+# ALWAYS exits 0 — an out-of-date tool is a signal, not a failure — so this can
+# never serve as a CI gate. Read docs/currency/, not the rc.
 run = "uv run kb-setup currency run"
 
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
