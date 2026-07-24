@@ -143,6 +143,22 @@ def _ambiguity_section(verdict: Verdict, answers: tuple[tuple[str, str], ...]) -
     return "\n".join(blocks).rstrip()
 
 
+def _reachable_line(upstream: UpstreamStatus) -> str:
+    """Whether upstream was read — and, crucially, how COMPLETELY it was read.
+
+    `reachable` and `error` are not opposites here. `probe()` returns
+    `reachable=True` with `error` set for a PARTIAL read: PyPI answered, but a
+    GitHub release lookup failed. Rendering that as a bare "yes" published a
+    clean bill of health over a real `gh api ... exited 1`, which is the same
+    absence-of-evidence shape this engine exists to refuse.
+    """
+    if not upstream.reachable:
+        return f"**no** — {upstream.error}"
+    if upstream.error:
+        return f"partially — PyPI answered, but: {upstream.error}"
+    return "yes"
+
+
 def _release_line(record: RunRecord) -> str:
     """How to describe the GitHub release, distinguishing 'skipped' from 'missing'.
 
@@ -185,7 +201,7 @@ Pinned `{record.sync.pinned or "—"}` · resolved `{record.sync.resolved or "�
 
 - PyPI latest: `{record.upstream.pypi_latest or "unknown"}`
 - GitHub release: `{_release_line(record)}`
-- Reachable: {"yes" if record.upstream.reachable else f"**no** — {record.upstream.error}"}
+- Reachable: {_reachable_line(record.upstream)}
 
 ### Release notes
 

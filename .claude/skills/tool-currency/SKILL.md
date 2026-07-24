@@ -63,9 +63,17 @@ An auto-apply is a **patch** bump whose six gates passed. Apply it as:
 
 1. Branch first — never commit to `main` (dotfiles
    `.claude/rules/do-not.md` #9; the same rule applies here).
-2. Update the `mise.toml` pin **and** `sources/graphify.manifest` (`ref` to the
-   matching `v<version>` tag, `commit` to that tag's SHA via
-   `git ls-remote --tags --refs <url>`).
+2. Update the `mise.toml` pin **and** `sources/graphify.manifest`, so the corpus
+   describes the release we actually run. Re-pin the manifest with the existing
+   task, never a hand-rolled git command:
+
+   ```bash
+   mise run kb-manifest-add -- <url> --ref v<version> --force
+   ```
+
+   It resolves the tag's SHA itself (`kb_setup.manifest.latest_commit`, a
+   `git ls-remote` with no clone) and rewrites the manifest. `--force` is
+   required because re-pinning an existing source is a deliberate clobber.
 3. `mise run kb-ship` — the only sanctioned way to open a PR here.
 
 **The graph rebuild is NOT part of the PR.** `graphify-out/graph.json` is

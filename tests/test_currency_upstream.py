@@ -61,6 +61,13 @@ def test_markers_are_case_insensitive() -> None:
 # ------------------------------------------------- multi-release coverage ----
 
 _ALL = ("0.9.24", "0.9.25", "0.9.26", "0.9.27", "0.9.28", "0.10.0")
+# One PyPI document serves both the latest version and the release list — the
+# shape `_pypi_json` returns, so `probe` is exercised through the real readers
+# rather than through two separately-stubbed helpers that could drift apart.
+_PYPI_PAYLOAD: dict[str, object] = {
+    "info": {"version": "0.9.28"},
+    "releases": {version: [] for version in _ALL},
+}
 
 
 def test_versions_between_is_exclusive_below_and_inclusive_above() -> None:
@@ -83,8 +90,7 @@ def test_probe_collects_notes_for_every_intermediate_release(monkeypatch) -> Non
     `0.9.25 -> 0.9.28` is a patch bump and auto-apply-eligible; reading only
     0.9.28's body would wave through a breaking change announced in 0.9.26.
     """
-    monkeypatch.setattr(upstream, "latest_pypi", lambda _p: ("0.9.28", ""))
-    monkeypatch.setattr(upstream, "pypi_versions", lambda _p: _ALL)
+    monkeypatch.setattr(upstream, "_pypi_json", lambda _p: (_PYPI_PAYLOAD, ""))
     seen: list[str] = []
 
     def _release(_repo: str, version: str) -> tuple[str, str, str]:
@@ -101,8 +107,7 @@ def test_probe_collects_notes_for_every_intermediate_release(monkeypatch) -> Non
 
 
 def test_probe_records_versions_whose_notes_could_not_be_read(monkeypatch) -> None:
-    monkeypatch.setattr(upstream, "latest_pypi", lambda _p: ("0.9.28", ""))
-    monkeypatch.setattr(upstream, "pypi_versions", lambda _p: _ALL)
+    monkeypatch.setattr(upstream, "_pypi_json", lambda _p: (_PYPI_PAYLOAD, ""))
 
     def _release(_repo: str, version: str) -> tuple[str, str, str]:
         if version == "0.9.28":
@@ -154,3 +159,25 @@ def test_a_real_payload_still_yields_its_tag(monkeypatch) -> None:
     """Control arm: the guard must not blank out genuine releases."""
     monkeypatch.setattr(upstream, "_gh_api", lambda _p: ({"tag_name": "v0.9.26", "body": "x"}, ""))
     assert upstream.release_for_tag("o/r", "0.9.26")[0] == "v0.9.26"
+
+
+# ------------------------------------------------ one payload, one fetch ----
+
+
+def test_probe_fetches_the_pypi_document_exactly_once(monkeypatch) -> None:
+    """`latest` and the release list live in ONE document, so fetch it once.
+
+    Two call sites each doing `GET /pypi/<pkg>/json` meant two identical
+    round-trips per run for one payload — and, worse, two chances for the two
+    readings to disagree mid-run.
+    """
+    calls: list[str] = []
+
+    def _json(package: str) -> tuple[dict[str, object], str]:
+        calls.append(package)
+        return _PYPI_PAYLOAD, ""
+
+    monkeypatch.setattr(upstream, "_pypi_json", _json)
+    monkeypatch.setattr(upstream, "release_for_tag", lambda _r, v: (f"v{v}", f"notes for {v}", ""))
+    upstream.probe(pypi="graphifyy", github="o/r", current="0.9.25")
+    assert calls == ["graphifyy"]

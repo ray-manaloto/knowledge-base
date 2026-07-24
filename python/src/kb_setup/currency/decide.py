@@ -218,16 +218,51 @@ def _gate_issues(
     )
 
 
-# Checks that must have POSITIVELY passed before a bump proceeds unattended.
-# SKIP is fine for the hook (it is not a failure), but SKIP means "not checked",
-# and "nothing disagreed" is not "everything agreed" — reading it as consent for
-# an unattended action is the absence-of-evidence trap
-# (`probes-need-a-control-arm.md`). On a host where the tool is not installed at
-# all, four of six checks SKIP and the run would otherwise report itself green.
-_REQUIRED_OK = ("resolution", "build-stamp")
+def _gate_local(observations: tuple[Observation, ...]) -> Ambiguity | None:
+    """Gate 5, second half — local watch items, which movement can never surface.
+
+    A `kind = "local"` item is a finding of ours with no upstream ticket, so it
+    observes as itself every run: same key, same `state="local"`, no timestamp.
+    `differs_from` therefore returns False forever, and gate 5 could never block
+    on one — while `currency.toml`'s founding local item says in as many words
+    "Re-probe on each bump". The claim and the machinery disagreed, and the
+    machinery was silent, which is the worse of the two failure directions.
+
+    Resolved in favour of the claim: a local item is an OPEN question by
+    construction (it exists precisely because nobody has closed it), so a pending
+    bump always stops for it. Only reached on the upgrade path — a local item is
+    not a reason to interrupt a run with no bump pending.
+    """
+    local = [o for o in observations if o.state == "local"]
+    if not local:
+        return None
+    return Ambiguity(
+        gate=GATES[4],
+        question=f"{len(local)} local watch item(s) must be re-probed against this release. Done?",
+        detail="; ".join(f"{o.key}: {o.title}".replace("\n", " ") for o in local),
+        recommendation=(
+            "Re-probe each against the new version, then record the result in "
+            "currency.toml — an untested local finding is folklore, not a finding."
+        ),
+    )
 
 
 def _gate_sync(sync: SyncStatus) -> Ambiguity | None:
+    """Gate 6. Blocks on drift, and equally on a check that never got to run.
+
+    This used to name the checks that had to pass (`("resolution", "build-stamp")`)
+    and let everything else SKIP. Two things were wrong with that. It omitted
+    `extra-probes` and `manifest`, so a run that could not locate the install at
+    all still auto-applied. And the fix cannot be "add those two names": `manifest`
+    and `build-stamp` SKIP legitimately in a repo that declares neither, so
+    demanding them would have permanently blocked a repo with nothing to check —
+    a false stop replacing a false pass.
+
+    The distinction that actually holds is not WHICH check but WHY it is silent,
+    which is why `sync.py` splits SKIP ("nothing configured to check") from BLIND
+    ("configured, and this run could not read it"). Only BLIND is disqualifying,
+    and it disqualifies whatever check it lands on.
+    """
     others = [f for f in sync.drifted if f.check != "extras"]
     if others:
         return Ambiguity(
@@ -239,18 +274,14 @@ def _gate_sync(sync: SyncStatus) -> Ambiguity | None:
                 "result unattributable."
             ),
         )
-    by_check = {f.check: f for f in sync.findings}
-    unverified = [
-        name for name in _REQUIRED_OK if name in by_check and by_check[name].status != "ok"
-    ]
-    if unverified:
+    if blind := sync.blind:
         return Ambiguity(
             gate=GATES[5],
             question="Step 1 could not actually verify this install. Bump anyway?",
             detail=(
                 "Not checked: "
-                + "; ".join(f"{n} ({by_check[n].detail})" for n in unverified)
-                + ". Nothing disagreed, but almost nothing was checked."
+                + "; ".join(f"{f.check} ({f.detail})" for f in blind)
+                + ". Nothing disagreed, but these checks never ran."
             ),
             recommendation="Run where the tool is installed, so the bump is made on evidence.",
         )
@@ -310,6 +341,7 @@ def decide(
             _gate_patch(current, latest),
             _gate_tag(upstream, latest),
             _gate_markers(upstream),
+            _gate_local(observations),
         )
         if gate
     ]

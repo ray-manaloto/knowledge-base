@@ -296,15 +296,21 @@ def test_artifact_commit_is_read_without_parsing_the_whole_graph(tmp_path) -> No
 # ------------------------------------------------------------- platform ----
 
 
-def test_tool_declared_for_another_os_is_skip_never_fail(tmp_path, monkeypatch) -> None:
-    """A macOS-only tool on a Linux runner is unverifiable, not broken."""
+def test_tool_declared_for_another_os_is_blind_never_fail(tmp_path, monkeypatch) -> None:
+    """A macOS-only tool on a Linux runner is unverifiable, not broken.
+
+    BLIND rather than SKIP: the tool IS configured here, so "this host cannot
+    check it" is a check that never ran, not a check with nothing to do. It
+    still must not make the run red — `status.ok` is the assertion that matters
+    for CI — but it must never read as consent for an unattended bump.
+    """
     root = _repo(tmp_path)
     (root / "currency.toml").write_text(
         '[tool.graphify]\nmise_key = "pipx:graphifyy"\nos = ["plan9"]\n', encoding="utf-8"
     )
     status = sync.check_sync(root, _spec(root))
     assert status.ok
-    assert _finding(status, "platform").status == sync.SKIP
+    assert _finding(status, "platform").status == sync.BLIND
 
 
 def test_applies_here_is_true_when_no_os_restriction(tmp_path) -> None:
@@ -407,17 +413,36 @@ def test_present_extra_packages_are_ok(tmp_path, monkeypatch) -> None:
     assert _finding(sync.check_sync(root, _spec(root)), "extra-probes").status == sync.OK
 
 
-def test_unresolvable_install_is_skip_not_drift(tmp_path, monkeypatch) -> None:
-    """Cannot-locate-the-install is not missing-extras. Never invent a finding."""
+def test_unresolvable_install_is_blind_not_drift(tmp_path, monkeypatch) -> None:
+    """Cannot-locate-the-install is not missing-extras. Never invent a finding.
+
+    BLIND, not SKIP: probes ARE declared, so this is the check failing to run.
+    That distinction is what stops an auto-apply here (`decide._gate_sync`).
+    """
     monkeypatch.setattr(sync, "install_site_packages", lambda *_a, **_k: None)
     root = _repo_with_probes(tmp_path, '"faster_whisper"')
-    assert _finding(sync.check_sync(root, _spec(root)), "extra-probes").status == sync.SKIP
+    status = sync.check_sync(root, _spec(root))
+    assert _finding(status, "extra-probes").status == sync.BLIND
+    assert "extra-probes" in {f.check for f in status.blind}
+    # Deliberately NOT asserting `status.ok` here: `_check_resolution` reads the
+    # real PATH, so on a host with a stale install ahead of the mise shims this
+    # status legitimately carries an unrelated `resolution` drift. That the
+    # BLIND status itself is not red is asserted by the platform test above,
+    # which short-circuits before any PATH lookup.
 
 
 def test_no_probes_declared_is_skip(tmp_path, monkeypatch) -> None:
+    """Control arm for the split: nothing declared is SKIP, and is NOT blind.
+
+    Without this, "blind" could quietly widen to mean "not OK" and permanently
+    block every repo that declares no extras — a false stop replacing a false
+    pass.
+    """
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     root = _repo(tmp_path)
-    assert _finding(sync.check_sync(root, _spec(root)), "extra-probes").status == sync.SKIP
+    status = sync.check_sync(root, _spec(root))
+    assert _finding(status, "extra-probes").status == sync.SKIP
+    assert not status.blind
 
 
 def test_shallow_mode_never_shells_out(tmp_path, monkeypatch) -> None:

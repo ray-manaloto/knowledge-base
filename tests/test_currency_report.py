@@ -335,3 +335,69 @@ def test_unknown_tool_filter_is_an_error_not_silence(tmp_path, capsys) -> None:
     )
     assert currency_run.check(tmp_path, only="graphifyy") == 2
     assert "unknown tool" in capsys.readouterr().err
+
+
+# -------------------------------------------- partial upstream readings ----
+
+
+def test_a_partial_upstream_read_is_not_rendered_as_reachable_yes() -> None:
+    """`reachable` and `error` are not opposites — a partial read sets BOTH.
+
+    `probe()` returns `reachable=True` with `error` set when PyPI answered but a
+    GitHub release lookup failed. The report used to print a bare `Reachable:
+    yes` over a real `gh api ... exited 1`, publishing a clean bill of health
+    for a question that was only half asked.
+    """
+    line = report._reachable_line(
+        UpstreamStatus(pypi_latest="0.9.26", reachable=True, error="gh api ... exited 1")
+    )
+    assert line != "yes"
+    assert "gh api ... exited 1" in line
+
+
+def test_a_fully_clean_upstream_read_still_says_yes() -> None:
+    """Control arm: the line must not have become unconditionally hedged."""
+    assert report._reachable_line(UpstreamStatus(pypi_latest="0.9.26")) == "yes"
+
+
+def test_an_unreachable_upstream_still_says_no() -> None:
+    status = UpstreamStatus(reachable=False, error="pypi lookup failed")
+    assert report._reachable_line(status).startswith("**no**")
+
+
+def test_a_200_with_null_metadata_is_rejected_not_recorded(monkeypatch) -> None:
+    """`updated_at` and `comments` are DIFFED, so a null in either is unread.
+
+    Only `state` used to be validated. A 200 carrying `state="open"` with a null
+    `updated_at` parsed to a blank string with no error, counted as usable,
+    overwrote a good baseline, and reported "moved" — then reported it a SECOND
+    time on the next healthy run, because the value it should have compared
+    against had already been wiped.
+    """
+    monkeypatch.setattr(
+        issues,
+        "_fetch_issue",
+        lambda _r, _n: ({"state": "open", "updated_at": None, "comments": None}, ""),
+    )
+    item = config.WatchItem(kind="issue", ref="2101", repo="o/r")
+    observed = issues.observe(item, default_repo="o/r")
+    assert observed.error
+    assert not observed.usable
+
+
+def test_a_complete_200_is_still_recorded(monkeypatch) -> None:
+    """Control arm: the guard must not reject healthy readings.
+
+    `comments: 0` is the trap in the other direction — a legitimate value that a
+    truthiness check would have thrown away.
+    """
+    monkeypatch.setattr(
+        issues,
+        "_fetch_issue",
+        lambda _r, _n: ({"state": "open", "updated_at": "2026-07-22T00:00:00Z", "comments": 0}, ""),
+    )
+    item = config.WatchItem(kind="issue", ref="2101", repo="o/r")
+    observed = issues.observe(item, default_repo="o/r")
+    assert not observed.error
+    assert observed.usable
+    assert observed.comments == 0

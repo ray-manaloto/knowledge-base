@@ -121,10 +121,17 @@ def observe(item: WatchItem, *, default_repo: str) -> Observation:
     if err:
         return Observation(key=item.key, error=err)
 
+    # EVERY diffed field must be readable, not just `state`. A 200 carrying
+    # `state="open"` with a null `updated_at` used to parse into a blank string
+    # with no error, so it counted as usable, overwrote a good baseline, and
+    # reported "moved" — then reported it a SECOND time on the next healthy run,
+    # because the value it should have compared against had been wiped. A
+    # partially-read issue is an unread issue.
+    missing = [field for field in ("state", "updated_at", "comments") if data.get(field) is None]
+    if missing:
+        return Observation(key=item.key, error=f"response lacked {', '.join(missing)}")
     state = str(data.get("state") or "")
     if not state:
-        # A 200 with no `state` is a degraded success, not a good reading. Naming
-        # it an error keeps it out of the baseline AND out of the moved list.
         return Observation(key=item.key, error="response lacked a `state` field")
     return Observation(
         key=item.key,

@@ -126,52 +126,58 @@ class UpstreamStatus:
         return tuple(found)
 
 
-def latest_pypi(package: str) -> tuple[str, str]:
-    """Latest version of `package` on PyPI, as (version, error).
+def _pypi_json(package: str) -> tuple[dict[str, object], str]:
+    """One `GET /pypi/<package>/json`, as (payload, error).
+
+    Both the latest version and the full release list live in this single
+    document, and `probe()` needs both — so fetching it once per call site meant
+    two identical round-trips per run for one payload.
+
+    HTTPSConnection rather than urlopen(url): the scheme is then a property of
+    the class, not of an interpolated string, so a package name can never steer
+    the request to `file:` or another scheme. Structural, not asserted.
+    """
+    conn = http.client.HTTPSConnection(_PYPI_HOST, timeout=_TIMEOUT_S)
+    try:
+        conn.request("GET", f"/pypi/{quote(package, safe='')}/json")
+        resp = conn.getresponse()
+        if resp.status != HTTPStatus.OK:
+            return {}, f"pypi returned HTTP {resp.status} for {package}"
+        data = json.loads(resp.read())
+    except (OSError, TimeoutError, json.JSONDecodeError) as e:
+        return {}, f"pypi lookup failed: {e}"
+    finally:
+        conn.close()
+    if not isinstance(data, dict):
+        return {}, "pypi returned an unexpected payload"
+    return data, ""
+
+
+def latest_version(payload: dict[str, object]) -> tuple[str, str]:
+    """Latest version from a PyPI payload, as (version, error).
 
     PyPI is the installable truth: mise's pipx backend resolves from here, so a
     version absent from PyPI cannot be pinned no matter what GitHub has tagged.
     """
-    # HTTPSConnection rather than urlopen(url): the scheme is then a property of
-    # the class, not of an interpolated string, so a package name can never steer
-    # the request to `file:` or another scheme. Structural, not asserted.
-    conn = http.client.HTTPSConnection(_PYPI_HOST, timeout=_TIMEOUT_S)
-    try:
-        conn.request("GET", f"/pypi/{quote(package, safe='')}/json")
-        resp = conn.getresponse()
-        if resp.status != HTTPStatus.OK:
-            return "", f"pypi returned HTTP {resp.status} for {package}"
-        data = json.loads(resp.read())
-    except (OSError, TimeoutError, json.JSONDecodeError) as e:
-        return "", f"pypi lookup failed: {e}"
-    finally:
-        conn.close()
-    if not isinstance(data, dict):
-        return "", "pypi returned an unexpected payload"
-    info = data.get("info", {})
+    info = payload.get("info", {})
     version = str(info.get("version") or "") if isinstance(info, dict) else ""
     return version, "" if version else "pypi returned no version"
 
 
-def pypi_versions(package: str) -> tuple[str, ...]:
-    """Every version PyPI lists for `package` (unordered, "" on failure).
+def all_versions(payload: dict[str, object]) -> tuple[str, ...]:
+    """Every version a PyPI payload lists (unordered, empty when absent).
 
     Needed to know which releases sit BETWEEN the pin and the latest: the engine
     must not judge a multi-patch jump on the newest release's notes alone.
     """
-    conn = http.client.HTTPSConnection(_PYPI_HOST, timeout=_TIMEOUT_S)
-    try:
-        conn.request("GET", f"/pypi/{quote(package, safe='')}/json")
-        resp = conn.getresponse()
-        if resp.status != HTTPStatus.OK:
-            return ()
-        data = json.loads(resp.read())
-    except OSError, TimeoutError, json.JSONDecodeError:
-        return ()
-    finally:
-        conn.close()
-    releases = data.get("releases") if isinstance(data, dict) else None
+    releases = payload.get("releases")
     return tuple(str(v) for v in releases) if isinstance(releases, dict) else ()
+
+
+def latest_pypi(package: str) -> tuple[str, str]:
+    """Fetch-and-read convenience for a single latest-version lookup."""
+    payload, err = _pypi_json(package)
+    return ("", err) if err else latest_version(payload)
 
 
 def versions_between(all_versions: tuple[str, ...], current: str, latest: str) -> tuple[str, ...]:
@@ -257,13 +263,16 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
     if not pypi:
         return UpstreamStatus(reachable=False, error="no `pypi` name configured for this tool")
 
-    latest, err = latest_pypi(pypi)
+    payload, err = _pypi_json(pypi)
+    if err:
+        return UpstreamStatus(reachable=False, error=err)
+    latest, err = latest_version(payload)
     if err:
         return UpstreamStatus(reachable=False, error=err)
     if latest == current or not github:
         return UpstreamStatus(pypi_latest=latest)
 
-    pending = versions_between(pypi_versions(pypi), current, latest) or (latest,)
+    pending = versions_between(all_versions(payload), current, latest) or (latest,)
     bodies: list[str] = []
     unread: list[str] = []
     newest_tag = ""

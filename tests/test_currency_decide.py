@@ -9,7 +9,7 @@ the failure mode that matters here.
 
 from kb_setup.currency.decide import GATES, decide
 from kb_setup.currency.issues import Observation
-from kb_setup.currency.sync import DRIFT, OK, SKIP, Finding, SyncStatus
+from kb_setup.currency.sync import BLIND, DRIFT, OK, SKIP, Finding, SyncStatus
 from kb_setup.currency.upstream import UpstreamStatus, Version
 
 
@@ -209,17 +209,24 @@ def test_json_null_release_body_does_not_defeat_the_empty_notes_gate() -> None:
 # ------------------------------------ SKIP is not consent for an unattended act ----
 
 
-def _sync_all_skipped() -> SyncStatus:
-    """What step 1 looks like on a host where the tool is not installed at all."""
+def _sync_blind_probe() -> SyncStatus:
+    """Step 1 on a host that could not locate the install to probe its extras.
+
+    Everything readable agreed; the one check that would have disagreed never
+    ran. This is the realistic shape of the hole: the old `_REQUIRED_OK` list
+    named only `resolution` and `build-stamp`, so an unreadable `extra-probes`
+    sailed through and the bump auto-applied.
+    """
     return SyncStatus(
         tool="graphify",
         pinned="0.9.25",
-        resolved="",
+        resolved="0.9.25",
         findings=(
             Finding("pin", OK, "pinned"),
-            Finding("resolution", SKIP, "not on PATH here"),
+            Finding("resolution", OK, "reaches the pin"),
             Finding("extras", OK, "declared"),
-            Finding("build-stamp", SKIP, "no stamp"),
+            Finding("extra-probes", BLIND, "install path not resolvable here"),
+            Finding("build-stamp", OK, "built by the pin"),
         ),
     )
 
@@ -227,13 +234,36 @@ def _sync_all_skipped() -> SyncStatus:
 def test_a_run_that_checked_almost_nothing_is_not_green() -> None:
     """Nothing-disagreed is not everything-agreed.
 
-    On a host without the tool, four of six checks SKIP. SKIP staying non-red is
-    right for the hook; counting it as consent for an UNATTENDED bump is the
-    absence-of-evidence trap.
+    A BLIND check is a check that never ran; counting it as consent for an
+    UNATTENDED bump is the absence-of-evidence trap.
     """
-    verdict = decide(sync=_sync_all_skipped(), upstream=_clean_upstream(), moved=())
+    verdict = decide(sync=_sync_blind_probe(), upstream=_clean_upstream(), moved=())
     assert not verdict.auto_apply
     assert any(a.gate == GATES[5] for a in verdict.ambiguities)
+
+
+def test_a_skip_with_nothing_configured_still_authorizes() -> None:
+    """Control arm for the SKIP/BLIND split, in the direction that costs the most.
+
+    Widening the gate to "any status that is not OK" would be the easy fix and
+    the wrong one: `manifest` and `build-stamp` SKIP legitimately in a repo that
+    declares neither, so it would block every such repo forever — a false stop
+    replacing a false pass. Only BLIND may block.
+    """
+    status = SyncStatus(
+        tool="graphify",
+        pinned="0.9.25",
+        resolved="0.9.25",
+        findings=(
+            Finding("pin", OK, "pinned"),
+            Finding("resolution", OK, "reaches the pin"),
+            Finding("extras", SKIP, "no extras declared for this tool"),
+            Finding("extra-probes", SKIP, "no extra_probes declared for this tool"),
+            Finding("manifest", SKIP, "this repo pins no source manifest for the tool"),
+            Finding("build-stamp", OK, "built by the pin"),
+        ),
+    )
+    assert decide(sync=status, upstream=_clean_upstream(), moved=()).auto_apply
 
 
 def test_positively_verified_step_one_still_authorizes() -> None:
@@ -303,3 +333,46 @@ def test_unreachable_upstream_never_prints_the_word_current() -> None:
         "current"
         in decide(sync=_sync(), upstream=UpstreamStatus(pypi_latest="0.9.25"), moved=()).summary()
     )
+
+
+# ---------------------------------------------- gate 5, the local half ----
+
+
+_LOCAL = Observation(key="local:schema-gap", state="local", title="re-probe on each bump")
+
+
+def test_a_local_watch_item_stops_a_pending_bump() -> None:
+    """A `kind = "local"` item can never MOVE, so movement could never surface it.
+
+    It observes as itself every run — same key, same `state="local"`, no
+    timestamp — so `differs_from` is False forever and gate 5 was structurally
+    unable to block on one, while `currency.toml`'s founding local item said in
+    as many words "Re-probe on each bump". The claim and the machinery
+    disagreed; this pins the resolution.
+    """
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(), moved=(), observations=(_LOCAL,))
+    assert not verdict.auto_apply
+    assert any(a.gate == GATES[4] for a in verdict.ambiguities)
+
+
+def test_a_local_watch_item_does_not_interrupt_a_run_with_no_bump() -> None:
+    """Control arm: an open local finding is not a reason to interrupt every run.
+
+    Without this the gate would fire on every SessionStart forever, which is how
+    a real signal becomes noise nobody reads.
+    """
+    verdict = decide(
+        sync=_sync(),
+        upstream=UpstreamStatus(pypi_latest="0.9.25"),
+        moved=(),
+        observations=(_LOCAL,),
+    )
+    assert not verdict.has_upgrade
+    assert verdict.ambiguities == ()
+
+
+def test_an_issue_observation_alone_does_not_trip_the_local_gate() -> None:
+    """Control arm: only `state == "local"` counts, not any observation."""
+    issue = Observation(key="issue:2101", state="open", updated_at="2026-07-22T00:00:00Z")
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(), moved=(), observations=(issue,))
+    assert verdict.auto_apply

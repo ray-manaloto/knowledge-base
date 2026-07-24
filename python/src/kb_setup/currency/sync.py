@@ -34,7 +34,14 @@ if TYPE_CHECKING:
 
 OK = "ok"
 DRIFT = "drift"
-SKIP = "skip"  # not applicable / not verifiable here — never a failure
+SKIP = "skip"  # nothing configured to check — genuinely not applicable
+# Configured, but this run could not read it. Split out of SKIP because the two
+# are opposites for an unattended decision: "no manifest is declared" means there
+# is nothing to disagree with, while "the install path is not resolvable here"
+# means the check that WOULD have disagreed never ran. Collapsing them let a bump
+# auto-apply on a host that had verified almost nothing — the absence-of-evidence
+# trap (`probes-need-a-control-arm.md`), one status wide.
+BLIND = "blind"
 
 _STAMP_VERSION = 2  # v2 adds artifact_fingerprint (v1 stamps still read)
 _SCAN_WINDOW = 4096
@@ -45,7 +52,7 @@ _COMMIT_RE = re.compile(rb'"built_at_commit"\s*:\s*"([0-9a-fA-F]{7,40})"')
 
 @dataclass(frozen=True)
 class Finding:
-    """One check's outcome. `status` is OK / DRIFT / SKIP; `detail` is the evidence."""
+    """One check's outcome. `status` is OK / DRIFT / SKIP / BLIND; `detail` is the evidence."""
 
     check: str
     status: str
@@ -70,6 +77,16 @@ class SyncStatus:
     def ok(self) -> bool:
         """True when nothing drifted. SKIPs do not make a run red."""
         return not self.drifted
+
+    @property
+    def blind(self) -> tuple[Finding, ...]:
+        """Checks that were configured but could not be read on this run.
+
+        Not red — a blind check has found nothing wrong — but it is the exact
+        opposite of consent, so `decide._gate_sync` refuses to auto-apply while
+        any of these is present.
+        """
+        return tuple(f for f in self.findings if f.status == BLIND)
 
     @property
     def verified(self) -> bool:
@@ -458,7 +475,7 @@ def _check_extra_probes(spec: ToolSpec, *, deep: bool) -> Finding:
     if site is None:
         return Finding(
             "extra-probes",
-            SKIP,
+            BLIND,
             "install path not resolvable here"
             + ("" if deep else " without a subprocess (run the full workflow for a deep check)"),
         )
@@ -566,7 +583,7 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
             findings=(
                 Finding(
                     "platform",
-                    SKIP,
+                    BLIND,
                     f"{spec.name} is declared for {list(spec.os)}; this host cannot check it",
                 ),
             ),
