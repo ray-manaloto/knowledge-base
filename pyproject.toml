@@ -8,8 +8,18 @@ dependencies = []
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
 
+[project.optional-dependencies]
+# Article-body extraction for the rendered-page fetch path (kb_setup.fetch).
+# Apache-2.0 — the same licence as graphify, which matters: graphify removed
+# html2text purely on copyleft grounds (PR #586), so a GPL extractor would be
+# unproposable upstream. Optional because the upstream-source path needs no
+# extractor at all.
+fetch = ["trafilatura>=2.0"]
+
 [dependency-groups]
-dev = ["ruff>=0.11", "ty>=0.0.1a1", "pytest>=8"]
+# trafilatura is in dev too so `ty` can resolve the optional import rather than
+# reporting an unresolved module (this repo forbids inline suppressions).
+dev = ["ruff>=0.11", "ty>=0.0.1a1", "pytest>=8", "trafilatura>=2.0"]
 
 [build-system]
 requires = ["hatchling"]

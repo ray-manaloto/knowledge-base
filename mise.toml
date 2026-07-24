@@ -119,6 +119,16 @@ description = 'Add a URL source then rebuild: mise run kb-add -- <url> [--author
 env = { GEMINI_API_KEY = "", GOOGLE_API_KEY = "" }
 run = "graphify add"
 
+[tasks.kb-fetch]
+description = 'Losslessly fetch a URL into sources/: mise run kb-fetch -- <url> [--stem NAME]'
+# Bypasses `graphify add <url>`, which truncates at markdown[:12000] after a
+# no-boilerplate markdownify pass (graphify 0.9.25 ingest.py:159) — measured to
+# discard 86-89% of a long reference page, silently, exiting 0. This task prefers
+# the upstream authored source, falls back to the rendered page via trafilatura,
+# writes a file, and reports the verbatim-token roundtrip verdict. Hand the
+# resulting file to `graphify add <file>`, whose slicing is lossless.
+run = "uv run --extra fetch kb-setup fetch"
+
 [tasks.kb-merge]
 description = 'Merge one host-agent extraction chunk into the graph: mise run kb-merge -- <chunk.json> [source_root]'
 # Wraps _merge_docs.py under graphify's interpreter (Gemini-free env). No LLM —
