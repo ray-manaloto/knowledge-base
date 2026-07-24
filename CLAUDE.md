@@ -105,6 +105,37 @@ source backlog. See `docs/graphify-reference.md` for the graphify mental model.
 
 Deep graphify operational reference: `docs/graphify-reference.md`.
 
+## Tool currency
+
+`currency.toml` declares what to keep current; `kb_setup.currency` is the shared
+engine (dotfiles consumes the same package). Six steps: **1** in-sync check,
+**2–3** new version + release notes, **4** tracked-issue movement, **5** the
+AskUserQuestion interview, **6** a committed report under `docs/currency/`.
+
+```bash
+mise run kb-currency-check    # step 1 only — offline, ~10ms, silent when clean
+mise run kb-currency          # the full loop; writes docs/currency/
+```
+
+- **Step 1 is the new part.** Bumps were already covered (Renovate,
+  `mise outdated --bump`); what nothing checked was whether the binary a shell
+  actually reaches matches the pin, and whether the *installed* version built
+  `graphify-out/`. It caught a live defect on day one: `MISE_ENV_CACHE=1` had a
+  stale `pipx-graphifyy/0.9.23/bin` on PATH ahead of the mise shims.
+- **graphify stamps no version into its own output** — `export.to_json()` writes
+  only `built_at_commit` — so `kb-build` writes `graphify-out/.currency-stamp.json`.
+  A rebuild that bypasses `kb-build` is detected (the stamp's `artifact_commit`
+  stops matching) and reports *version unknown*, never a false green.
+- **Step 5 can never live in a hook.** A hook is a shell command; only the model
+  can call `AskUserQuestion`. The SessionStart hook therefore runs step 1 only and
+  is **silent unless something drifted** — always exiting 0, because a session must
+  not be blocked over a version pin.
+- **An unambiguous bump may apply itself**, where unambiguous means all six gates
+  pass: patch-level · PyPI latest has a matching GitHub tag · no breaking marker ·
+  extras unchanged · no tracked issue moved · step 1 green. It **fails closed** —
+  anything unreadable is ambiguity, not consent. PyPI is the installable truth
+  (mise installs from it); GitHub is only the narrative.
+
 ## Layout
 
 | Path | Purpose |
@@ -113,7 +144,9 @@ Deep graphify operational reference: `docs/graphify-reference.md`.
 | `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
 | `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (at aggregate scale 119MB+ exceeds git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
-| `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic). |
+| `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
+| `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
+| `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |
 | `.claude/workflows/` | Saved Claude workflows the skills compose — `kb-extract.js` (host-agent extraction fan-out). |
 | `tests/` | Pytest (`uv run pytest tests/`); config in the root `pyproject.toml`. |
 | `mise.toml` | Tool pins + tasks: `kb-build`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`. |

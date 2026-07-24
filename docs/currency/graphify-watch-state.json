@@ -1,0 +1,32 @@
+{
+  "issue:1653": {
+    "comments": 0,
+    "state": "open",
+    "title": "Feature: carry community labels over re-clustering via member-overlap matching (invalidation exists, carry-over does not)",
+    "updated_at": "2026-07-04T16:21:58Z"
+  },
+  "issue:1824": {
+    "comments": 3,
+    "state": "open",
+    "title": "Feature request: no way to control the output language of LLM-generated community labels",
+    "updated_at": "2026-07-13T05:21:33Z"
+  },
+  "issue:2086": {
+    "comments": 0,
+    "state": "open",
+    "title": "Community-label split-retry starves its own base case: max_tokens shrinks with batch size, single-community retries get only 88 tokens",
+    "updated_at": "2026-07-21T14:26:56Z"
+  },
+  "issue:2101": {
+    "comments": 0,
+    "state": "open",
+    "title": "Step 5 community labeling: sampling truncated member lists causes systematic mislabeling on large communities",
+    "updated_at": "2026-07-22T11:04:36Z"
+  },
+  "local:label-communities-schema-gap": {
+    "comments": 0,
+    "state": "local",
+    "title": "`label_communities` (llm.py) has no JSON-schema constant, unlike\n`_EXTRACTION_JSON_SCHEMA`. Extraction is fixed; LABELLING is still broken \u2014\nprobed on 0.9.25, 42/42 batches failed. Community names come from the free\ndeterministic `label_communities_by_hub` instead. Re-probe on each bump.",
+    "updated_at": ""
+  }
+}

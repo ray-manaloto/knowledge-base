@@ -1,0 +1,59 @@
+# Tool-currency config — what `kb-setup currency` checks in THIS repo.
+#
+# One `[tool.<name>]` table per tracked tool. graphify is the pilot; mise, hk,
+# uv, ruff and ty adopt the same shape with no engine change, which is the whole
+# reason this is config and not code.
+#
+# Each repo carries its own config and runs independently (decided 2026-07-23).
+# There is deliberately NO cross-repo assertion here: this repo must never learn
+# anything about a consumer, which is the same rule that had
+# `sources/dotfiles.manifest` reverted.
+
+[tool.graphify]
+# The mise pin this tool is installed from. Both the bare-string and table forms
+# of a pin are read, because both are in use across these repos.
+mise_key = "pipx:graphifyy"
+binary = "graphify"
+# mise's pipx backend installs from PyPI, so PyPI — not the newest GitHub tag —
+# is the installable truth. On 2026-07-23 v1.0.0 was tagged on GitHub while PyPI
+# was still 0.9.25; tracking the tag would have pinned something uninstallable.
+pypi = "graphifyy"
+github = "Graphify-Labs/graphify"
+extras = ["all"]
+# The ingested corpus must describe the release we actually run.
+manifest = "sources/graphify.manifest"
+# graphify stamps no version into its own output (`export.to_json()` writes only
+# `built_at_commit`), so the build task writes this sidecar instead — otherwise
+# "which version built this graph?" is unanswerable from the artifact.
+artifact = "graphify-out/graph.json"
+stamp = "graphify-out/.currency-stamp.json"
+# graphify is host-only here. On a Linux CI runner these checks must report
+# NOT-APPLICABLE rather than fail: "cannot check here" and "checked and wrong"
+# are different answers.
+os = ["macos"]
+
+# ---- Step 4: what we are tracking upstream, and what we owe ourselves --------
+
+[[tool.graphify.watch]]
+kind = "local"
+ref = "label-communities-schema-gap"
+note = """`label_communities` (llm.py) has no JSON-schema constant, unlike
+`_EXTRACTION_JSON_SCHEMA`. Extraction is fixed; LABELLING is still broken —
+probed on 0.9.25, 42/42 batches failed. Community names come from the free
+deterministic `label_communities_by_hub` instead. Re-probe on each bump."""
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2101"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2086"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "1653"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "1824"

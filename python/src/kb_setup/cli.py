@@ -22,7 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args:
         print(
             "kb-setup: build | update <name> | merge <chunk> | label | "
-            "transcribe <audio> | artifacts | ensure-deps | version"
+            "transcribe <audio> | artifacts | currency [check|run|stamp] | "
+            "ensure-deps | version"
         )
         return 0
 
@@ -95,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
             print("kb-setup land <PR#>", file=sys.stderr)
             return 2
         return pr.land_main(repo_root, int(positional[0]))
+    if cmd == "currency":
+        return _currency(repo_root, rest)
     if cmd == "manifest-add":
         return _manifest_add(repo_root, rest)
     if cmd == "assemble":
@@ -105,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"kb-setup: unknown command {cmd!r} "
         "(build | update [name] | merge <chunk> [root] | label [--missing-only] "
-        "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | manifest-add <url> "
+        "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
+        "currency [check|run|stamp] [--tool T --json --no-write] | manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,
@@ -118,6 +122,38 @@ def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
     if flag in rest and rest.index(flag) + 1 < len(rest):
         return rest[rest.index(flag) + 1]
     return default
+
+
+def _currency(repo_root: Path, rest: list[str]) -> int:
+    """Dispatch `kb-setup currency {check|run|stamp}` (see kb_setup.currency.run)."""
+    from kb_setup.currency import run as currency_run
+
+    mode = next((a for a in rest if not a.startswith("-")), "check")
+    only = _opt(rest, "--tool", "") or ""
+    if mode == "check":
+        return currency_run.check(repo_root, only=only, quiet="--verbose" not in rest)
+    if mode == "run":
+        return currency_run.run(
+            repo_root,
+            only=only,
+            as_json="--json" in rest,
+            write="--no-write" not in rest,
+        )
+    if mode == "stamp":
+        if not only:
+            print(
+                "kb-setup currency stamp --tool <name> [--version V --source-ref R]",
+                file=sys.stderr,
+            )
+            return 2
+        return currency_run.stamp(
+            repo_root,
+            tool=only,
+            version=_opt(rest, "--version", "") or "",
+            source_ref=_opt(rest, "--source-ref", "") or "",
+        )
+    print(f"kb-setup currency: unknown mode {mode!r} (check | run | stamp)", file=sys.stderr)
+    return 2
 
 
 def _manifest_add(repo_root: Path, rest: list[str]) -> int:

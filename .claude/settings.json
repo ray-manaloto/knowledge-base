@@ -40,6 +40,18 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- uv run kb-setup currency check",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
