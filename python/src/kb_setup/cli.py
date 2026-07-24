@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "kb-setup: build | update <name> | merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp] | "
-            "ensure-deps | version"
+            "brain [record|reflect|audit] | ensure-deps | version"
         )
         return 0
 
@@ -70,10 +70,19 @@ def main(argv: list[str] | None = None) -> int:
             print("kb-setup transcribe <audio-file>", file=sys.stderr)
             return 2
         return graphify_ops.transcribe(repo_root, rest[0])
+    return _dispatch_ops(repo_root, cmd, rest)
+
+
+def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
+    """Dispatch the operational subcommands (hooks, brain, ship/land, currency, chunks)."""
     if cmd == "hookguard":
         from kb_setup import hook_guard
 
         return hook_guard.run()
+    if cmd == "brain":
+        from kb_setup import brain
+
+        return brain.dispatch(repo_root, rest)
     if cmd == "no-lint-skip":
         from kb_setup import lint_checks
 
@@ -111,6 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
         "currency [check|run|stamp] [--tool T --json --no-write] | manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
+        "brain [query|record|reflect|audit] | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,
     )
