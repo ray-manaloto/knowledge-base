@@ -144,3 +144,28 @@ def test_version_parse_rejects_non_numeric() -> None:
     assert Version.parse("") is None
     # Control arm: the same parser must accept the real thing.
     assert _v("v0.9.25").parts == (0, 9, 25)
+
+
+def test_empty_release_body_is_not_a_clean_bill_of_health() -> None:
+    """A missing document cannot testify that nothing is wrong.
+
+    This is the absence-of-evidence trap: an empty release body cannot be
+    scanned, so a passing marker gate would mean "nothing was read", not
+    "nothing to worry about". Found by adversarially probing decide() rather
+    than by a test — the original gate happily auto-applied here.
+    """
+    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="")
+    verdict = decide(sync=_sync(), upstream=upstream, moved=())
+    assert not verdict.auto_apply
+    assert any(a.gate == GATES[2] for a in verdict.ambiguities)
+
+
+def test_whitespace_only_release_body_also_stops() -> None:
+    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="   \n\t ")
+    assert not decide(sync=_sync(), upstream=upstream, moved=()).auto_apply
+
+
+def test_a_real_release_body_with_no_markers_still_auto_applies() -> None:
+    """Control arm: the gate must not have become unconditional."""
+    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="Routine fixes.")
+    assert decide(sync=_sync(), upstream=upstream, moved=()).auto_apply

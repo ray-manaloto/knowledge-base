@@ -124,6 +124,21 @@ def _gate_tag(upstream: UpstreamStatus, latest: str) -> Ambiguity | None:
 
 
 def _gate_markers(upstream: UpstreamStatus) -> Ambiguity | None:
+    # An EMPTY release body is not a clean bill of health. "No breaking marker
+    # found" in a document that does not exist is the absence-of-evidence trap
+    # (`probes-need-a-control-arm.md`: a 0-result search is not an answer), and
+    # it contradicts this module's own fail-closed rule. A release published
+    # with no notes is precisely a release nobody has described, so it stops.
+    if not upstream.notes.strip():
+        return Ambiguity(
+            gate=GATES[2],
+            question="The release has no notes at all. Adopt it unreviewed?",
+            detail=(
+                "An empty release body cannot be scanned for breaking changes, so "
+                "'no marker found' here means 'nothing was read', not 'nothing to worry about'."
+            ),
+            recommendation="Read the upstream diff or changelog before adopting.",
+        )
     markers = upstream.markers
     if not markers:
         return None
