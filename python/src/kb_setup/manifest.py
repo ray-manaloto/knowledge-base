@@ -86,6 +86,54 @@ def write_commit(m: Manifest, commit: str) -> Manifest:
     return replace(m, commit=commit)
 
 
+def resolve_tag(url: str, version: str) -> tuple[str, str]:
+    """Resolve a release version to its (ref, commit) via `git ls-remote --tags`.
+
+    Tries `v<version>` then the bare `<version>` — projects tag both ways. Raises
+    if NEITHER tag exists at the remote, so the currency engine can never pin a
+    manifest to a version that was published to PyPI but tagged nowhere in git
+    (the mirror of graphify's v1.0.0-tagged-not-on-PyPI trap). `--refs` strips the
+    `^{}` dereference line so a peeled annotated tag yields one clean SHA.
+    """
+    for ref in (f"v{version}", version):
+        try:
+            out = subprocess.run(
+                ["git", "ls-remote", "--tags", "--refs", url, ref],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=60,
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            # An unreachable host, a bad URL, or a timeout is a resolution
+            # FAILURE, not a "tag not found" — but the currency engine's apply()
+            # catches RuntimeError, so surface every failure mode as one, or a
+            # raw traceback escapes instead of the clean "[currency] apply failed".
+            raise RuntimeError(f"git ls-remote failed for {url} @ {ref}: {e}") from e
+        if out:
+            return ref, out.split()[0]
+    raise RuntimeError(f"no tag {version!r} (or v{version}) found at {url}")
+
+
+def write_pin(m: Manifest, *, ref: str, commit: str) -> Manifest:
+    """Rewrite BOTH the `ref =` and `commit =` lines in place; return the update.
+
+    `write_commit` moves only the SHA, which is right for advancing a branch
+    source. A version bump also moves the tag the manifest tracks, so both lines
+    change together — otherwise the manifest would claim a new SHA under the old
+    tag name, an internally inconsistent pin.
+    """
+    lines = m.path.read_text(encoding="utf-8").splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        nl = "\n" if line.endswith("\n") else ""
+        if line.lstrip().startswith("ref"):
+            lines[i] = f"ref = {ref}{nl}"
+        elif line.lstrip().startswith("commit"):
+            lines[i] = f"commit = {commit}{nl}"
+    m.path.write_text("".join(lines), encoding="utf-8")
+    return replace(m, ref=ref, commit=commit)
+
+
 def name_from_url(url: str) -> str:
     """Derive the manifest stem from a repo URL (last path segment, no `.git`)."""
     return url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")

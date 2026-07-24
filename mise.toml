@@ -163,6 +163,24 @@ description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the 
 # reflections/ + overlay are gitignored (regenerable); run each session.
 run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"
 
+# --- tool currency (the shared engine; see currency.toml + kb_setup.currency) ---
+[tasks.kb-currency-check]
+description = "Offline drift check: is the installed tooling in sync with the pins? (step 1)"
+# Subprocess-free and ~10ms, which is what lets the SessionStart hook run it every
+# session. Prints NOTHING when clean, and always exits 0 — a session must never be
+# blocked over a version pin. Logic in kb_setup.currency.sync.
+run = "uv run kb-setup currency check"
+
+[tasks.kb-currency]
+description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency [-- --tool T --json]'
+# Fetches upstream + release notes + tracked-issue movement, applies the six-gate
+# bar, and writes the committed report under docs/currency/. Step 5 (the
+# AskUserQuestion interview) belongs to the tool-currency skill: only the model can
+# ask, so it can never live in a hook or a task. Logic in kb_setup.currency.run.
+# ALWAYS exits 0 — an out-of-date tool is a signal, not a failure — so this can
+# never serve as a CI gate. Read docs/currency/, not the rc.
+run = "uv run kb-setup currency run"
+
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
 [tasks.kb-ship]
 description = 'Gate (lint+test) → push → open PR for the current branch: mise run kb-ship [-- --title T]'

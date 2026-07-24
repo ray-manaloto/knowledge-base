@@ -1,0 +1,101 @@
+# Tool-currency config — what `kb-setup currency` checks in THIS repo.
+#
+# One `[tool.<name>]` table per tracked tool. graphify is the pilot; mise, hk,
+# uv, ruff and ty adopt the same shape with no engine change, which is the whole
+# reason this is config and not code.
+#
+# Each repo carries its own config and runs independently (decided 2026-07-23).
+# There is deliberately NO cross-repo assertion here: this repo must never learn
+# anything about a consumer, which is the same rule that had
+# `sources/dotfiles.manifest` reverted.
+
+[tool.graphify]
+# The mise pin this tool is installed from. Both the bare-string and table forms
+# of a pin are read, because both are in use across these repos.
+mise_key = "pipx:graphifyy"
+binary = "graphify"
+# mise's pipx backend installs from PyPI, so PyPI — not the newest GitHub tag —
+# is the installable truth. On 2026-07-23 v1.0.0 was tagged on GitHub while PyPI
+# was still 0.9.25; tracking the tag would have pinned something uninstallable.
+pypi = "graphifyy"
+github = "Graphify-Labs/graphify"
+extras = ["all"]
+# Packages the `all` extra must ACTUALLY deliver — comparing two config files
+# cannot tell you the install is intact. Deliberately NOT the full extra set:
+# graspologic/leidenalg/igraph auto-skip by PEP 508 marker on Python 3.14 (the
+# accepted Louvain fallback), so demanding them would report drift that is not
+# drift. Verified present on this host 2026-07-24.
+extra_probes = ["faster_whisper", "tree_sitter", "tree_sitter_cpp"]
+# The ingested corpus must describe the release we actually run.
+manifest = "sources/graphify.manifest"
+# graphify stamps no version into its own output (`export.to_json()` writes only
+# `built_at_commit`), so the build task writes this sidecar instead — otherwise
+# "which version built this graph?" is unanswerable from the artifact.
+artifact = "graphify-out/graph.json"
+# The GENERATED outputs `kb-artifacts` derives from the graph. Ray's step 1 said
+# "in sync with the graph AND generated outputs", so the stamp fingerprints
+# these too (a stat, so it is cheap) and step 1 flags a stale wiki/graphml/svg/
+# report the same way it flags a stale graph. `kb-artifacts` re-stamps them.
+# Directories (wiki/) are fingerprinted by their own mtime/size — a regeneration
+# that adds or removes a page changes the directory stat, which is the signal we
+# want without walking thousands of files in a per-session hook.
+#
+# svg is DELIBERATELY absent, though the handoff suggested it. `kb-artifacts`
+# skips svg above 5,000 nodes (unreadable hairball + a mathtext `$` crash), and
+# this graph is ~128k nodes — so svg is never regenerated here. Declaring it
+# would make step 1 report a permanent "missing/stale svg" for an output the
+# build correctly never produces: the exact absence-of-evidence false-drift this
+# engine exists to avoid. Re-add it only for a repo whose graph stays under the
+# limit. (Control-armed 2026-07-24: graph.json is 128,205 nodes.)
+artifacts = [
+  "graphify-out/GRAPH_REPORT.md",
+  "graphify-out/graph.graphml",
+  "graphify-out/wiki",
+]
+stamp = "graphify-out/.currency-stamp.json"
+# graphify is host-only here. On a Linux CI runner these checks must report
+# NOT-APPLICABLE rather than fail: "cannot check here" and "checked and wrong"
+# are different answers.
+os = ["macos"]
+
+# ---- Step 4: what we are tracking upstream, and what we owe ourselves --------
+
+[[tool.graphify.watch]]
+kind = "local"
+ref = "label-communities-schema-gap"
+note = """`label_communities` (llm.py) has no JSON-schema constant, unlike
+`_EXTRACTION_JSON_SCHEMA`. Extraction is fixed; LABELLING is still broken —
+probed on 0.9.25, 42/42 batches failed. Community names come from the free
+deterministic `label_communities_by_hub` instead. Re-probe on each bump."""
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2101"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2086"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "1653"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "1824"
+
+# ---- ffmpeg: graphify's video extra depends on it, but it is not a pip dep ----
+#
+# `graphify add <youtube-url>` shells out to ffmpeg (via faster-whisper) to
+# extract audio before transcription. It ships from conda, not PyPI, so nothing
+# in graphify's own currency picture covers it — a missing or downgraded ffmpeg
+# silently breaks youtube ingestion with no signal. Tracked here as a
+# PRESENCE-ONLY tool: no `pypi`/`github`, so step 1 checks the pin resolves and
+# the binary is reachable, and the upstream probe reports "not version-tracked"
+# rather than manufacturing a permanent unreachable-upstream ambiguity.
+[tool.ffmpeg]
+mise_key = "conda:ffmpeg"
+binary = "ffmpeg"
+# Host-only, like graphify: on a Linux CI runner this reports not-applicable
+# rather than failing, since the conda install lives on the Mac host.
+os = ["macos"]
