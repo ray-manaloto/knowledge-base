@@ -71,6 +71,17 @@ class RunRecord:
         )
 
 
+def _cell(value: object) -> str:
+    """Escape a value for a markdown table cell.
+
+    A single `|` anywhere in a cell silently splits it into two columns and
+    corrupts the whole table — and these cells carry upstream-controlled text
+    (issue titles, error strings, paths). Newlines do the same to the row.
+    """
+    text = str(value)
+    return text.replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+
+
 def _slug(when: datetime, tool: str) -> str:
     return f"{when.date().isoformat()}-{tool}"
 
@@ -89,7 +100,7 @@ def _findings_table(sync: SyncStatus) -> str:
     rows = [
         "| check | status | detail |",
         "|---|---|---|",
-        *(f"| {f.check} | {f.status} | {f.detail} |" for f in sync.findings),
+        *(f"| {_cell(f.check)} | {_cell(f.status)} | {_cell(f.detail)} |" for f in sync.findings),
     ]
     return "\n".join(rows)
 
@@ -105,8 +116,8 @@ def _watch_table(observations: tuple[Observation, ...], moved: tuple[Observation
     for o in observations:
         state = o.error or o.state or "?"
         rows.append(
-            f"| {o.key} | {state} | {o.updated_at or '—'} | {o.comments} | "
-            f"{'**yes**' if o.key in moved_keys else 'no'} |"
+            f"| {_cell(o.key)} | {_cell(state)} | {_cell(o.updated_at or '—')} | "
+            f"{o.comments} | {'**yes**' if o.key in moved_keys else 'no'} |"
         )
     return "\n".join(rows)
 
@@ -212,7 +223,7 @@ def append_row(report_root: Path, *, when: datetime, verdict: Verdict, detail: P
     lines = _ensure_landing(path)
     link = f"[{detail.stem}]({RUNS_DIR}/{detail.name})" if detail else "—"
     stamp = when.isoformat(timespec="minutes")
-    row = f"| {stamp} | {verdict.tool} | {verdict.summary()} | {link} |"
+    row = f"| {stamp} | {_cell(verdict.tool)} | {_cell(verdict.summary())} | {link} |"
 
     if _TABLE_RULE in lines:
         idx = lines.index(_TABLE_RULE) + 1

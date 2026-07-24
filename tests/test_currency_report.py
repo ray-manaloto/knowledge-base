@@ -6,6 +6,7 @@ readable and one nobody opens.
 """
 
 import json
+from datetime import UTC, datetime
 
 from kb_setup.currency import config, issues, report
 from kb_setup.currency.decide import Ambiguity, Verdict
@@ -221,3 +222,52 @@ def test_round_trip_through_saved_state(tmp_path) -> None:
     issues.save_current(tmp_path, "graphify", observations)
     loaded = issues.load_previous(tmp_path, "graphify")
     assert issues.changes(observations, loaded) == ()
+
+
+def test_a_pipe_in_any_cell_cannot_corrupt_the_table(tmp_path) -> None:
+    """One `|` silently splits a cell into two columns and wrecks the table.
+
+    These cells carry upstream-controlled text — issue titles, `gh` error
+    strings, filesystem paths — so the escaping is not hypothetical hygiene.
+    """
+    verdict = Verdict(
+        tool="evil|tool",
+        current="a|b",
+        latest="",
+        auto_apply=False,
+        gates_passed=(),
+        ambiguities=(),
+    )
+    report.append_row(
+        tmp_path, when=datetime(2026, 7, 24, tzinfo=UTC), verdict=verdict, detail=None
+    )
+    line = next(
+        line
+        for line in (tmp_path / report.LANDING).read_text(encoding="utf-8").splitlines()
+        if "evil" in line
+    )
+    assert line.replace(r"\|", "").count("|") == 5
+
+
+def test_a_pipe_in_a_finding_detail_is_escaped(tmp_path) -> None:
+    record = _record(drifted=True)
+    piped = SyncStatus(
+        tool="graphify",
+        pinned="0.9.25",
+        resolved="0.9.25",
+        findings=(Finding("resolution", DRIFT, "reached /a|b/graphify"),),
+    )
+    with_pipe = report.RunRecord(
+        tool=record.tool,
+        sync=piped,
+        upstream=record.upstream,
+        observations=record.observations,
+        moved=record.moved,
+        verdict=record.verdict,
+    )
+    _, detail = report.write_run(tmp_path, with_pipe)
+    assert detail is not None
+    row = next(
+        line for line in detail.read_text(encoding="utf-8").splitlines() if "resolution" in line
+    )
+    assert row.replace(r"\|", "").count("|") == 4
