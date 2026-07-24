@@ -19,20 +19,32 @@ def _o(task_class: str, lane: str, verdict: str, session: str) -> Outcome:
 # --- contract --------------------------------------------------------------
 
 
+def _req(
+    task_class: str = "migration",
+    lane: str = "codex",
+    effort: str = "high",
+    verdict: str = "clean",
+    session: str = "s1",
+) -> RecordRequest:
+    return RecordRequest(
+        task_class=task_class, lane=lane, effort=effort, verdict=verdict, session=session
+    )
+
+
 def test_validate_record_rejects_missing_field() -> None:
-    assert brain.validate_record("migration", "codex", "high", "", "s1") is not None
-    assert brain.validate_record("migration", "codex", "high", "clean", "") is not None
-    assert brain.validate_record("", "codex", "high", "clean", "s1") is not None
+    assert brain.validate_record(_req(verdict="")) is not None
+    assert brain.validate_record(_req(session="")) is not None
+    assert brain.validate_record(_req(task_class="")) is not None
 
 
 def test_validate_record_rejects_unknown_verdict() -> None:
-    err = brain.validate_record("migration", "codex", "high", "great", "s1")
+    err = brain.validate_record(_req(verdict="great"))
     assert err is not None
     assert "verdict" in err
 
 
 def test_validate_record_accepts_complete() -> None:
-    assert brain.validate_record("migration", "codex", "high", "clean", "s1") is None
+    assert brain.validate_record(_req()) is None
 
 
 def test_record_refuses_incomplete_with_rc2(tmp_path: Path) -> None:
