@@ -196,6 +196,45 @@ def apply(repo_root: Path, *, only: str, as_json: bool = False) -> int:
     return 0
 
 
+def daily(repo_root: Path) -> int:
+    """The daily standing-issue report: deep signal + broad sweep, one markdown doc.
+
+    Prints markdown to stdout for the workflow to upsert as the standing issue
+    (dotfiles' `tool-currency` job). Deep-tracked tools that MOVED get a one-line
+    verdict; every other outdated pin gets a broad-table row. Host-only tools that
+    do not apply here (graphify on an Ubuntu runner) are skipped from the deep
+    signal, never failed — the hard constraint from the handoff.
+
+    Renders only — it never writes the committed per-run pages (that is the
+    session `run`) and never applies (H4: the daily job reports, never bumps).
+    Always exits 0: an out-of-date tool is a signal, not a failure.
+    """
+    from kb_setup.currency import broad
+
+    specs = config.load(repo_root)
+    deep_lines: list[str] = []
+    for spec in specs:
+        if not spec.applies_here():
+            continue  # e.g. graphify on the Ubuntu daily runner — not a failure
+        record = _run_one(repo_root, spec)
+        v = record.verdict
+        if v.has_upgrade or v.ambiguities or record.sync.drifted:
+            deep_lines.append(f"- {v.summary()}")
+
+    deep_body = "\n".join(deep_lines) if deep_lines else "_No deep-tracked tool needs attention._"
+    broad_body = broad.broad_section(repo_root, exclude=broad.deep_tracked_keys(repo_root))
+    print(
+        "# Tool currency (daily)\n\n"
+        "Deep due-diligence on the fast-movers, a broad `mise outdated` sweep on "
+        "the rest. Review the deep section via the `tool-currency` skill; the "
+        "broad table is a signal, not a verdict.\n\n"
+        "## Deep-tracked — needs review\n\n"
+        f"{deep_body}\n\n"
+        f"{broad_body}\n"
+    )
+    return 0
+
+
 def stamp(repo_root: Path, *, tool: str, version: str, source_ref: str = "") -> int:
     """Record which version built this repo's artifacts for `tool`."""
     specs = _specs(repo_root, tool)
