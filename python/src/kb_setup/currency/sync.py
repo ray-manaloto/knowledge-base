@@ -29,6 +29,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup.currency import _proc
+
 if TYPE_CHECKING:
     from kb_setup.currency.config import ToolSpec
 
@@ -496,17 +498,10 @@ def _pinned_install_root(mise_key: str) -> Path | None:
     separate finding, already reported by the resolution check — and probing it
     would answer the wrong question.
     """
-    try:
-        res = subprocess.run(
-            ["mise", "where", mise_key],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=30,
-        )
-    except OSError, subprocess.TimeoutExpired:
+    proc, _ = _proc.run_capture(["mise", "where", mise_key], timeout=30)
+    if proc is None or proc.returncode != 0 or not proc.stdout.strip():
         return None
-    return Path(res.stdout.strip()) if res.returncode == 0 and res.stdout.strip() else None
+    return Path(proc.stdout.strip())
 
 
 def _install_root_from_path(binary: str) -> Path | None:

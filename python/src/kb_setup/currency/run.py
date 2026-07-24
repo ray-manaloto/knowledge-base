@@ -213,15 +213,27 @@ def daily(repo_root: Path) -> int:
 
     specs = config.load(repo_root)
     deep_lines: list[str] = []
+    na_lines: list[str] = []
     for spec in specs:
         if not spec.applies_here():
-            continue  # e.g. graphify on the Ubuntu daily runner — not a failure
+            # e.g. graphify on the Ubuntu daily runner — not a failure, but not
+            # silence either: a bare `continue` made a host-only tool vanish from
+            # the report, so "skipped here" was indistinguishable from "nothing to
+            # report". Emit an explicit not-applicable line so the reader sees the
+            # tool was deliberately not checked, not silently dropped.
+            na_lines.append(
+                f"- {spec.name}: not checked on this host "
+                f"(declared for {', '.join(spec.os) or 'any platform'})"
+            )
+            continue
         record = _run_one(repo_root, spec)
         v = record.verdict
         if v.has_upgrade or v.ambiguities or record.sync.drifted:
             deep_lines.append(f"- {v.summary()}")
 
     deep_body = "\n".join(deep_lines) if deep_lines else "_No deep-tracked tool needs attention._"
+    if na_lines:
+        deep_body += "\n\n_Not applicable on this host:_\n" + "\n".join(na_lines)
     broad_body = broad.broad_section(repo_root, exclude=broad.deep_tracked_keys(repo_root))
     print(
         "# Tool currency (daily)\n\n"
@@ -245,9 +257,21 @@ def stamp(repo_root: Path, *, tool: str, version: str, source_ref: str = "") -> 
     if not spec.stamp:
         print(f"[currency] [tool.{tool}] declares no `stamp` path", file=sys.stderr)
         return 2
-    resolved = version or sync.pinned_version(repo_root, spec)[0]
+    # NO fallback to the PIN. Stamping the pinned version without reading the
+    # binary records the version we HOPED ran, not the one that did — the exact
+    # false green G3 forbids ("never a false green"). Mirror the build path
+    # (`graph._stamp_build`): fall back to what ACTUALLY resolves on PATH, and if
+    # neither an explicit --version nor the binary can supply a version, refuse
+    # rather than stamp an unverified one (a manual stamp has not just rebuilt, so
+    # writing an empty stamp would only clobber a good one).
+    resolved = version or sync.observed_version(spec.binary)
     if not resolved:
-        print(f"[currency] cannot determine a version to stamp for {tool}", file=sys.stderr)
+        print(
+            f"[currency] cannot determine a version to stamp for {tool} — pass "
+            f"--version, or make `{spec.binary} --version` readable (refusing to "
+            f"stamp the pin, which nothing verified actually ran)",
+            file=sys.stderr,
+        )
         return 2
     path = sync.write_stamp(repo_root, spec, version=resolved, source_ref=source_ref)
     print(f"[currency] stamped {path.relative_to(repo_root)} at {resolved}")

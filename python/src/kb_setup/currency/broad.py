@@ -18,11 +18,9 @@ anything (control-armed 2026-07-20: it said "up to date" while graphify sat at
 
 from __future__ import annotations
 
-import json
-import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from kb_setup.currency import config
+from kb_setup.currency import _proc, config
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -58,24 +56,16 @@ def mise_outdated(repo_root: Path) -> tuple[dict[str, dict[str, str]], str]:
     project config (root + conf.d), which is what a bare project-scoped run reads.
     Runs with cwd=repo_root so the project's mise.toml is the one consulted.
     """
-    try:
-        res = subprocess.run(
-            ["mise", "outdated", "--bump", "--json"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_OUTDATED_TIMEOUT_S,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return {}, f"mise outdated failed: {e}"
-    if res.returncode != 0:
-        return {}, res.stderr.strip() or "mise outdated failed"
-    try:
-        data = json.loads(res.stdout or "{}")
-    except json.JSONDecodeError as e:
-        return {}, f"mise outdated returned non-JSON: {e}"
-    return (data, "") if isinstance(data, dict) else ({}, "mise outdated returned a non-object")
+    data, err = _proc.run_json(
+        ["mise", "outdated", "--bump", "--json"],
+        cwd=repo_root,
+        timeout=_OUTDATED_TIMEOUT_S,
+        label="mise outdated",
+    )
+    # `mise outdated --json` is a `{key: {current, latest, …}}` object; the shared
+    # helper only guarantees a dict[str, object]. render_broad reads it defensively
+    # (`.get` with "?" fallbacks), so narrow the untyped JSON to the schema it expects.
+    return cast("dict[str, dict[str, str]]", data), err
 
 
 def render_broad(outdated: dict[str, dict[str, str]], *, exclude: set[str]) -> str:
