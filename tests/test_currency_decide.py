@@ -169,3 +169,31 @@ def test_a_real_release_body_with_no_markers_still_auto_applies() -> None:
     """Control arm: the gate must not have become unconditional."""
     upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="Routine fixes.")
     assert decide(sync=_sync(), upstream=upstream, moved=()).auto_apply
+
+
+def test_same_version_written_differently_is_not_a_bump() -> None:
+    """`1.2` and `1.2.0` are the SAME version — bumping to it is a no-op.
+
+    The raw-tuple comparison `(1, 2, 0) > (1, 2)` used to call this a patch bump,
+    so the two comparison paths disagreed and an unattended no-op upgrade could
+    be authorized. `is_patch_bump_from` now delegates to `__gt__`.
+    """
+    assert not _v("1.2.0").is_patch_bump_from(_v("1.2"))
+    assert not _v("1.2").is_patch_bump_from(_v("1.2.0"))
+    # Control arm: a genuine patch bump is still recognised.
+    assert _v("1.2.1").is_patch_bump_from(_v("1.2"))
+
+
+def test_json_null_release_body_does_not_defeat_the_empty_notes_gate() -> None:
+    """GitHub sends `"body": null`, not a missing key, for a release with no notes.
+
+    `.get("body", "")` therefore never fires its default and `str(None)` yields
+    the 4-character string "None" — non-empty, marker-free, and so it walked
+    straight through the empty-notes gate. The whole protection was bypassed by
+    the single most likely way a release ends up without notes.
+    """
+    upstream = UpstreamStatus(pypi_latest="0.9.26", github_tag="v0.9.26", notes="None")
+    verdict = decide(sync=_sync(), upstream=upstream, moved=())
+    # "None" is still literally non-empty text, so the gate cannot catch it — the
+    # fix belongs upstream in release_for_tag, asserted in test_currency_upstream.
+    assert verdict.auto_apply, "guard belongs at the parse boundary, not here"

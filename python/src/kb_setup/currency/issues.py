@@ -93,10 +93,10 @@ def observe(item: WatchItem, *, default_repo: str) -> Observation:
 
     return Observation(
         key=item.key,
-        state=str(data.get("state", "")),
-        updated_at=str(data.get("updated_at", "")),
+        state=str(data.get("state") or ""),
+        updated_at=str(data.get("updated_at") or ""),
         comments=int(data.get("comments", 0) or 0),
-        title=str(data.get("title", "")),
+        title=str(data.get("title") or ""),
     )
 
 
@@ -125,10 +125,10 @@ def load_previous(report_dir: Path, tool: str) -> dict[str, Observation]:
         if isinstance(value, dict):
             out[str(key)] = Observation(
                 key=str(key),
-                state=str(value.get("state", "")),
-                updated_at=str(value.get("updated_at", "")),
+                state=str(value.get("state") or ""),
+                updated_at=str(value.get("updated_at") or ""),
                 comments=int(value.get("comments", 0) or 0),
-                title=str(value.get("title", "")),
+                title=str(value.get("title") or ""),
             )
     return out
 

@@ -65,8 +65,13 @@ class Version:
 
         Pre-1.0 projects use the MINOR slot as their breaking channel, so
         0.9.x -> 0.10.0 is deliberately NOT a patch bump here.
+
+        The "is greater" half delegates to `__gt__` so the two comparisons cannot
+        disagree. Comparing `self.parts > other.parts` directly did disagree:
+        `1.2 -> 1.2.0` is the SAME version, but the raw tuples `(1, 2, 0) > (1, 2)`
+        made it look like a patch bump, which would auto-apply a no-op upgrade.
         """
-        return self.parts[:2] == other.parts[:2] and self.parts > other.parts
+        return self.parts[:2] == other.parts[:2] and self > other
 
     def __gt__(self, other: Version) -> bool:
         """Compare numerically, padding the shorter version with zeros."""
@@ -117,7 +122,7 @@ def latest_pypi(package: str) -> tuple[str, str]:
     if not isinstance(data, dict):
         return "", "pypi returned an unexpected payload"
     info = data.get("info", {})
-    version = str(info.get("version", "")) if isinstance(info, dict) else ""
+    version = str(info.get("version") or "") if isinstance(info, dict) else ""
     return version, "" if version else "pypi returned no version"
 
 
@@ -159,7 +164,15 @@ def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
     for candidate in (tag, f"v{tag}"):
         payload, err = _gh_api(f"repos/{repo}/releases/tags/{candidate}")
         if not err:
-            return str(payload.get("tag_name", candidate)), str(payload.get("body", "")), ""
+            # `... or <default>`, never `.get(k, default)`: GitHub returns the key
+            # PRESENT with a JSON **null** for a release published without notes, so
+            # the default never fires and `str(None)` yields the 4-char string "None"
+            # — which is non-empty and therefore sails past the empty-notes gate.
+            return (
+                str(payload.get("tag_name") or candidate),
+                str(payload.get("body") or ""),
+                "",
+            )
         last_error = err
     return "", "", last_error
 

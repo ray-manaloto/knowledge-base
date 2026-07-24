@@ -96,7 +96,7 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
     if isinstance(entry, str):
         return entry, ()
     if isinstance(entry, dict):
-        version = str(entry.get("version", ""))
+        version = str(entry.get("version") or "")
         raw = entry.get("extras", [])
         extras = tuple(str(e) for e in raw) if isinstance(raw, list) else ()
         return version, extras
