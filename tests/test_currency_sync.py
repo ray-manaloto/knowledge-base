@@ -12,6 +12,7 @@ reported a correctly-pinned tool as "outside mise".
 """
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,14 @@ def _repo(tmp_path, *, pin='"pipx:graphifyy" = { version = "0.9.25", extras = ["
         'manifest = "sources/graphify.manifest"\n'
         'artifact = "graphify-out/graph.json"\n'
         'stamp = "graphify-out/.currency-stamp.json"\n',
+        encoding="utf-8",
+    )
+    # The declared artifact must exist: a stamp now fingerprints it, and a
+    # DECLARED-but-absent artifact is legitimately drift ("nothing was built").
+    artifact = tmp_path / "graphify-out" / "graph.json"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(
+        '{"nodes": [], "built_at_commit": "aaaaaaaa1111bbbb2222cccc3333dddd4444eeee"}',
         encoding="utf-8",
     )
     return tmp_path
@@ -190,22 +199,25 @@ def test_stamp_from_an_older_version_is_drift(tmp_path, monkeypatch) -> None:
 def test_rebuild_outside_the_build_task_reports_version_unknown(tmp_path, monkeypatch) -> None:
     """The stamp's whole value is that it can detect its own staleness.
 
-    A hand-run `graphify update` rewrites graph.json without touching the stamp,
-    so the stamp would otherwise keep asserting a version that no longer built
-    the artifacts. Comparing `built_at_commit` catches exactly that.
+    Crucially this mutates CONTENT while holding `built_at_commit` CONSTANT.
+    `built_at_commit` is the git HEAD, so every rebuild at one commit writes the
+    same value — and rebuilding repeatedly at one commit is the normal rhythm.
+    Relying on it made this detector almost never able to fire while claiming it
+    could; the fingerprint is what actually answers the question.
     """
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     root = _repo(tmp_path)
     artifact = root / "graphify-out" / "graph.json"
-    artifact.parent.mkdir(parents=True, exist_ok=True)
-    artifact.write_text(json.dumps({"nodes": [], "built_at_commit": "aaaa1111"}), encoding="utf-8")
+    head = '"built_at_commit": "aaaaaaaa1111bbbb2222cccc3333dddd4444eeee"'
+    artifact.write_text("{" + head + "}", encoding="utf-8")
     sync.write_stamp(root, _spec(root), version="0.9.25")
+    assert _finding(sync.check_sync(root, _spec(root)), "build-stamp").status == sync.OK
 
-    # Simulate a rebuild that bypassed the build task.
-    artifact.write_text(json.dumps({"nodes": [], "built_at_commit": "bbbb2222"}), encoding="utf-8")
+    time.sleep(0.01)
+    artifact.write_text('{"nodes": [1, 2, 3], ' + head + "}", encoding="utf-8")
     finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
     assert finding.status == sync.DRIFT
-    assert "version unknown" in finding.detail
+    assert "rebuilt outside the build task" in finding.detail
 
 
 def test_artifact_commit_is_read_without_parsing_the_whole_graph(tmp_path) -> None:
@@ -373,3 +385,59 @@ def test_deep_mode_prefers_the_pinned_install_over_path(tmp_path, monkeypatch) -
     site = sync.install_site_packages("graphify", "pipx:graphifyy", deep=True)
     assert site is not None
     assert "pinned" in str(site)
+
+
+def test_a_node_named_built_at_commit_cannot_impersonate_the_metadata_key(tmp_path) -> None:
+    """This corpus ingests graphify's own source, which contains that identifier.
+
+    A bare `rfind(b'"built_at_commit"')` matched a node NAMED `built_at_commit`
+    just as readily as the real key, then partitioned on the next unrelated `:`
+    and returned confident nonsense. Requiring a SHA-shaped VALUE fixes it.
+    """
+    real = "abcdef0123456789abcdef0123456789abcdef01"
+    artifact = tmp_path / "decoy.json"
+    filler = ",\n".join(f'    {{"id": "n{i}"}}' for i in range(200))
+    artifact.write_text(
+        f'{{\n  "built_at_commit": "{real}",\n  "nodes": [\n{filler},\n'
+        '    {"name": "built_at_commit", "type": "attribute"}\n  ]\n}}\n',
+        encoding="utf-8",
+    )
+    assert sync._artifact_commit(artifact) == real
+
+
+def test_commit_is_found_whether_metadata_is_first_or_last(tmp_path) -> None:
+    """Metadata-last is graphify's convention, not a guarantee."""
+    sha = "abcdef0123456789abcdef0123456789abcdef01"
+    filler = ",".join(f'"n{i}"' for i in range(600))
+    last = tmp_path / "last.json"
+    last.write_text(f'{{"nodes": [{filler}], "built_at_commit": "{sha}"}}', encoding="utf-8")
+    first = tmp_path / "first.json"
+    first.write_text(f'{{"built_at_commit": "{sha}", "nodes": [{filler}]}}', encoding="utf-8")
+    assert sync._artifact_commit(last) == sha
+    assert sync._artifact_commit(first) == sha
+
+
+def test_v1_stamp_admits_it_cannot_prove_anything(tmp_path, monkeypatch) -> None:
+    """An old stamp must not inherit a guarantee it was never able to make."""
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo(tmp_path)
+    sync.write_stamp(root, _spec(root), version="0.9.25")
+    path = root / "graphify-out" / ".currency-stamp.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["stamp_version"] = 1
+    del data["artifact_fingerprint"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert finding.status == sync.DRIFT
+    assert "predates artifact fingerprinting" in finding.detail
+
+
+def test_declared_but_absent_artifact_is_drift(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo(tmp_path)
+    sync.write_stamp(root, _spec(root), version="0.9.25")
+    (root / "graphify-out" / "graph.json").unlink()
+    finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert finding.status == sync.DRIFT
+    assert "missing" in finding.detail

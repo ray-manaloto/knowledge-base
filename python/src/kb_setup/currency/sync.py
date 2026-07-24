@@ -19,6 +19,7 @@ opt-in exceptions, never reached from the hook: `observed_version` (executes
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tomllib
@@ -34,7 +35,11 @@ OK = "ok"
 DRIFT = "drift"
 SKIP = "skip"  # not applicable / not verifiable here — never a failure
 
-_STAMP_VERSION = 1
+_STAMP_VERSION = 2  # v2 adds artifact_fingerprint (v1 stamps still read)
+_SCAN_WINDOW = 4096
+# A SHA-shaped VALUE is required, so a node merely NAMED "built_at_commit"
+# cannot masquerade as the metadata key.
+_COMMIT_RE = re.compile(rb'"built_at_commit"\s*:\s*"([0-9a-fA-F]{7,40})"')
 
 
 @dataclass(frozen=True)
@@ -197,6 +202,7 @@ def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: st
         "source_ref": source_ref,
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "artifact_commit": _artifact_commit(artifact),
+        "artifact_fingerprint": artifact_fingerprint(artifact),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -206,23 +212,51 @@ def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: st
 def _artifact_commit(artifact: Path | None) -> str:
     """`built_at_commit` from a graphify graph.json, or "" when unavailable.
 
-    Read with a streaming scan rather than json.load: these graphs run to hundreds
+    Read with a bounded scan rather than json.load: these graphs run to hundreds
     of megabytes and a session-start hook must not parse one.
+
+    The pattern requires a SHA-SHAPED VALUE, not just the token. A bare
+    `rfind(b'"built_at_commit"')` matches a node *named* `built_at_commit` just as
+    readily as the real metadata key — and this corpus ingests graphify's own
+    source, which contains that identifier. It would then partition on the next
+    unrelated `:` and return confident nonsense. Both ends of the file are checked
+    because "metadata last" is graphify's convention, not a guarantee.
     """
     if artifact is None or not artifact.exists():
         return ""
-    needle = b'"built_at_commit"'
     try:
+        size = artifact.stat().st_size
         with artifact.open("rb") as fh:
-            fh.seek(max(0, artifact.stat().st_size - 4096))
-            tail = fh.read()
+            fh.seek(max(0, size - _SCAN_WINDOW))
+            window = fh.read()
+            if not _COMMIT_RE.search(window):
+                fh.seek(0)
+                window = fh.read(_SCAN_WINDOW)
     except OSError:
         return ""
-    idx = tail.rfind(needle)
-    if idx < 0:
+    matches = _COMMIT_RE.findall(window)
+    return matches[-1].decode("utf-8", "replace") if matches else ""
+
+
+def artifact_fingerprint(artifact: Path | None) -> str:
+    """A cheap identity for the artifact's CONTENT state: `<size>:<mtime_ns>`.
+
+    `built_at_commit` cannot do this job. It is the git HEAD at build time
+    (graphify's `export.to_json` calls `_git_head()`), so every rebuild at the
+    same commit writes the identical value — and rebuilding repeatedly at one
+    commit is the normal development rhythm. The "rebuilt outside the build task"
+    detector was therefore almost never able to fire, while claiming it could.
+
+    A stat rather than a digest: these graphs are hundreds of megabytes and this
+    runs in a per-session hook.
+    """
+    if artifact is None or not artifact.exists():
         return ""
-    _, _, rest = tail[idx:].partition(b":")
-    return rest.strip().strip(b",\n }").strip(b'"').decode("utf-8", "replace")
+    try:
+        st = artifact.stat()
+    except OSError:
+        return ""
+    return f"{st.st_size}:{st.st_mtime_ns}"
 
 
 def read_stamp(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
@@ -399,24 +433,56 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     return Finding("manifest", OK, f"{spec.manifest} tracks the installed {ref}")
 
 
+def _check_artifact_identity(stamp: dict[str, str], artifact: Path | None) -> Finding | None:
+    """Are the artifacts still the ones this stamp describes? None when they are.
+
+    The FINGERPRINT is the authority. `built_at_commit` cannot answer this — it is
+    the git HEAD, identical across every rebuild at one commit, which is the
+    normal development rhythm. Keying the detector off it meant it almost never
+    had a chance to fire, while the docs claimed it would.
+    """
+    try:
+        stamped_with = int(stamp.get("stamp_version", 1))
+    except ValueError:
+        stamped_with = 1
+    if stamped_with < _STAMP_VERSION:
+        # A v1 stamp predates fingerprinting, so it cannot prove the artifacts are
+        # the ones it describes. Say so rather than inheriting a guarantee it was
+        # never able to make.
+        return Finding(
+            "build-stamp",
+            DRIFT,
+            "stamp predates artifact fingerprinting and cannot prove the artifacts "
+            "are the ones it describes — rebuild to re-stamp",
+        )
+    if artifact is None:
+        return None
+    live = artifact_fingerprint(artifact)
+    if not live:
+        return Finding("build-stamp", DRIFT, "the stamped artifact is missing — rebuild pending")
+    if live != stamp.get("artifact_fingerprint", ""):
+        return Finding(
+            "build-stamp",
+            DRIFT,
+            "artifacts changed since they were stamped, so they were rebuilt "
+            "outside the build task — version unknown",
+        )
+    return None
+
+
 def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not spec.stamp:
         return Finding("build-stamp", SKIP, "this tool declares no build stamp")
     stamp = read_stamp(repo_root, spec)
     if not stamp:
         return Finding("build-stamp", DRIFT, "artifacts have never been stamped — rebuild pending")
-    built_with = stamp.get("version", "")
+
     artifact = repo_root / spec.artifact if spec.artifact else None
-    live_commit = _artifact_commit(artifact)
-    recorded_commit = stamp.get("artifact_commit", "")
-    if live_commit and recorded_commit and live_commit != recorded_commit:
-        return Finding(
-            "build-stamp",
-            DRIFT,
-            f"artifacts were rebuilt outside the build task "
-            f"(stamp says {recorded_commit[:8]}, artifact says {live_commit[:8]}) "
-            f"— version unknown",
-        )
+    mismatch = _check_artifact_identity(stamp, artifact)
+    if mismatch is not None:
+        return mismatch
+
+    built_with = stamp.get("version", "")
     if built_with != pinned:
         return Finding(
             "build-stamp",

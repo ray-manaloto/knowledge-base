@@ -125,9 +125,12 @@ mise run kb-currency          # the full loop; writes docs/currency/
 - **graphify stamps no version into its own output** — `export.to_json()` writes
   only `built_at_commit` — so `kb-build` writes `graphify-out/.currency-stamp.json`
   recording the version that ACTUALLY RAN (never the pin, which would launder
-  drift). A rebuild that bypasses `kb-build` is detected (the stamp's
-  `artifact_commit` stops matching) and reports *version unknown*, never a false
-  green.
+  drift). A rebuild that bypasses `kb-build` is detected via a **content
+  fingerprint** (`size:mtime_ns`) and reports *version unknown*, never a false
+  green. It deliberately does NOT key off `built_at_commit`: that is the git HEAD,
+  so every rebuild at one commit writes the same value — and rebuilding repeatedly
+  at one commit is the normal rhythm, which made the old check almost never able
+  to fire while claiming it could.
 - **`extra_probes` checks the install, not the config.** Two files agreeing that
   `extras = ["all"]` says nothing about whether the extra delivered anything, so
   the config also names packages that must be present. It is author-chosen on
