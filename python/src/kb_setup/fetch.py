@@ -75,7 +75,6 @@ MIN_BODY_CHARS = 200
 
 # Named so the gate reads as intent, not a magic literal.
 HTTP_OK = 200
-_REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
 
 # graphify's own caps, named so a drift in either shows up as a diff here.
 GRAPHIFY_URL_CAP = 12_000
@@ -277,54 +276,51 @@ _UPSTREAM_RULES: dict[str, _UpstreamRule] = {
 }
 
 
-def http_fetcher(url: str, *, max_redirects: int = 5) -> tuple[int, str, str]:
+def http_fetcher(url: str) -> tuple[int, str, str]:
     """The real network boundary. Kept out of the pure core so tests inject.
 
-    Uses :class:`http.client.HTTPSConnection` directly rather than
-    ``urllib.request.urlopen``. That is a structural choice, not a stylistic
-    one: ``urlopen`` accepts ``file:`` and other schemes, which is why linters
-    audit it, and this repo forbids inline suppressions. An https-only
-    connection cannot open a local file at all, so the property is enforced by
-    construction instead of by a silenced warning.
+    Two layers restrict the scheme, and neither is a silenced warning:
+
+    * an explicit ``startswith`` guard — ruff S310's *documented* fix; and
+    * a **scheme-restricted opener**, built from only the http/https handlers.
+      The default opener carries a ``FileHandler``; this one does not, so
+      ``file:`` cannot be opened at all. The property holds by construction.
+
+    The second layer is load-bearing, and finding that out took a probe rather
+    than a guess. Ruff's own documented fix does NOT silence S310 in 0.15.22 —
+    copying the doc's "Recommended Fix" example verbatim still raises it
+    (control arm: `--select S` correctly flagged a genuinely-unguarded file, so
+    the probe discriminates). Upstream astral-sh/ruff#7918, "Avoid raising S310
+    if user explicitly checks for URL scheme", is still OPEN. So the docs
+    describe an intended behaviour the implementation has not shipped.
+
+    Uses urllib rather than a bespoke ``HTTPSConnection`` loop: urllib already
+    follows redirects and handles keep-alive/chunked correctly, and
+    `use-tool-builtins` says reimplementing that is the wrong trade.
 
     A non-200 is RETURNED, never raised, so :func:`gate` decides — and so the
     observed status reaches the caller's error message intact.
     """
-    import http.client
-    from urllib.parse import urlsplit
+    import urllib.error
+    import urllib.request
 
-    seen = url
-    for _ in range(max_redirects + 1):
-        parts = urlsplit(seen)
-        if parts.scheme != "https":
-            msg = f"{seen}: refused (https:// required)"
-            raise FetchRejectedError(msg)
-        conn = http.client.HTTPSConnection(parts.netloc, timeout=60)
-        try:
-            target = parts.path or "/"
-            if parts.query:
-                target = f"{target}?{parts.query}"
-            conn.request(
-                "GET",
-                target,
-                headers={"User-Agent": _USER_AGENT, "Accept-Encoding": "identity"},
+    if not url.startswith(("http:", "https:")):
+        msg = f"{url}: refused (http/https only)"
+        raise FetchRejectedError(msg)
+    opener = urllib.request.build_opener(urllib.request.HTTPHandler, urllib.request.HTTPSHandler)
+    opener.addheaders = [("User-Agent", _USER_AGENT)]
+    try:
+        with opener.open(url, timeout=60) as resp:
+            return (
+                resp.status,
+                resp.read().decode("utf-8", errors="replace"),
+                resp.headers.get("Content-Type", ""),
             )
-            resp = conn.getresponse()
-            status = resp.status
-            body = resp.read()
-            location = resp.getheader("Location")
-            ctype = resp.getheader("Content-Type") or ""
-        except OSError as exc:
-            msg = f"{seen}: unreachable ({exc})"
-            raise FetchRejectedError(msg) from exc
-        finally:
-            conn.close()
-        if status in _REDIRECT_CODES and location:
-            seen = location if location.startswith("http") else f"https://{parts.netloc}{location}"
-            continue
-        return status, body.decode("utf-8", errors="replace"), ctype
-    msg = f"{url}: too many redirects (>{max_redirects})"
-    raise FetchRejectedError(msg)
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8", errors="replace"), ""
+    except urllib.error.URLError as exc:
+        msg = f"{url}: unreachable ({exc.reason})"
+        raise FetchRejectedError(msg) from exc
 
 
 def extract_markdown(html: str) -> str:
