@@ -67,8 +67,10 @@ def working_tree_clean(repo_root: Path) -> bool:
 
 
 #: The local gates every PR must pass before it is pushed. `eval` is tiers 1+2 —
-#: reachability probes plus the guard fixture table, offline only, so it costs
-#: nothing here; its live half runs on demand via `mise run eval -- --live`.
+#: reachability probes plus the guard fixture table, offline and fast only, so it
+#: costs nothing here. Its two opt-in halves run on demand: `-- --live` for the
+#: lane doctor (one API call per installed lane) and `-- --slow` for the golden
+#: retrieval set (~3 min, advisory — it reports recall@k, it does not gate).
 GATES = ("lint", "test", "brain-audit", "eval")
 
 

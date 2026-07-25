@@ -23,7 +23,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "kb-setup: build | update <name> | merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp] | "
-            "brain [record|reflect|audit] | md-budget | eval [--live] | ensure-deps | version"
+            "brain [record|reflect|audit] | md-budget | eval [--live] [--slow] | "
+            "ensure-deps | version"
         )
         return 0
 
@@ -94,7 +95,9 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     if cmd == "eval":
         from kb_setup import eval_cases, evals
 
-        rc, report = evals.run(eval_cases.cases(repo_root), live="--live" in rest)
+        rc, report = evals.run(
+            eval_cases.cases(repo_root), live="--live" in rest, slow="--slow" in rest
+        )
         print(report)
         return rc
     if cmd == "ensure-deps":
@@ -132,7 +135,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
         "currency [check|run|stamp] [--tool T --json --no-write] | manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
-        "brain [query|record|reflect|audit] | md-budget | eval [--live] | "
+        "brain [query|record|reflect|audit] | md-budget | eval [--live] [--slow] | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,
     )
