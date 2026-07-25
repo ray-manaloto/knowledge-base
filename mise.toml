@@ -83,15 +83,25 @@ description = "Run the Python test suite"
 run = "uv run pytest tests/ -x -q"
 
 [tasks.eval]
-description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` adds the lane doctor"
+description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor, `-- --slow` retrieval"
 # Tier 0 is `hk`/contracts. Tier 1 — does what we DECLARE actually RESOLVE?
 # Tier 2 — does the WIRED guard DECIDE correctly? (a fixture table of
-# (command, expected decision) rows, both directions). One command per ENGINE:
-# tiers 1+2 share the runner, so they share the command. Offline by default so
-# it can join the ship gates for free; `--live` shells out to the
-# fable-orchestrator plugin's doctor.sh, which has no offline mode and spends
-# one real API call per installed lane. Logic in kb_setup.evals (shared with
-# dotfiles) + kb_setup.eval_cases (this repo's cases).
+# (command, expected decision) rows, both directions), and does the graph
+# RETRIEVE what it holds? (a golden set of query pairs, recall@k). One command
+# per ENGINE: tiers 1+2 share the runner, so they share the command. Offline and
+# fast by default so it can join the ship gates for free. Two opt-in axes, on
+# purpose: `--live` shells out to the fable-orchestrator plugin's doctor.sh,
+# which has no offline mode and spends one real API call per installed lane;
+# `--slow` runs the free-but-~3-minute golden retrieval set (advisory — it
+# reports recall@k against the live graph, it does not gate on it). Logic in
+# kb_setup.evals (shared with dotfiles) + kb_setup.eval_cases (this repo's cases).
+#
+# READING THE RETRIEVAL NUMBERS: measured 2026-07-25, `mise run` output on this
+# host masks some literal strings as `[redacted]` — including the digit `1`
+# (`16` prints as `[redacted]6`) — while the SAME run through `uv run kb-setup
+# eval --slow` printed identical figures unmasked. Cause not established (a mise
+# `[env]` value was probed and is NOT what gets masked), so: when a digit comes
+# back masked, re-read the figures from `uv run`, never guess them.
 run = "uv run kb-setup eval"
 
 [tasks.lint-docs]

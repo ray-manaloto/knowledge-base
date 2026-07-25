@@ -27,8 +27,12 @@ and drive the same code path against it.
 
 from __future__ import annotations
 
+import datetime as dt
+import json
+import re
 import shutil
 import tempfile
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from kb_setup import evals, hook_guard
@@ -139,6 +143,283 @@ GUARD_FIXTURES: tuple[evals.GuardFixture, ...] = (
 )
 
 
+_NATURAL = evals.Phrasing.NATURAL
+_ECHO = evals.Phrasing.ECHO
+_ABSENT = evals.Phrasing.ABSENT
+_G = evals.GoldenQuery
+
+#: How far down the returned list a hit counts. `graphify query` prints roughly
+#: 20-60 nodes under its token budget and applies NO relevance score — the
+#: printed order is seed-then-BFS — so this window grades what a reader actually
+#: sees first, which is the thing KB #12 is about.
+GOLDEN_K = 10
+
+#: A source declared absent that is one character-class away from a source that
+#: IS present (`cerebras-knowledge-base.md`). The negative direction has to be
+#: able to FAIL, and the realistic way it would is a sloppy matcher — a
+#: substring or `endswith` comparison — quietly counting the real document as a
+#: hit for this name.
+NEAR_MISS_TARGET = "cerebras-knowledge-base-v2.md"
+
+#: The golden retrieval set — 8 hand-written PAIRS plus both negatives.
+#:
+#: HAND-WRITTEN, not derived from the nodes under test. Generating queries by
+#: paraphrasing the target labels grades paraphrase distance and reports a win
+#: that is not there (`tests/AGENTS.md`, and measured here 2026-07-24). Each
+#: NATURAL query is phrased the way someone who has NOT read the document would
+#: ask; its ECHO twin deliberately borrows the document's own label text. THE
+#: GAP BETWEEN THE TWO IS THE FINDING.
+#:
+#: ADVISORY. There is no floor: the baseline this exists to make citable is
+#: 0/119 relevant nodes on two on-topic queries (knowledge-base#12), and a floor
+#: of zero is the check that can only pass. The floor lands once P0 scoping
+#: moves the number.
+GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
+    _G(
+        "hooks-blocking",
+        _NATURAL,
+        "if a script needs to stop a tool call from running, what should it exit "
+        "with and where does its message end up?",
+        ("code.claude.com_docs_en_hooks.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "hooks-blocking",
+        _ECHO,
+        "hook exit codes: 2 is a blocking error whose stderr is fed back to Claude",
+        ("code.claude.com_docs_en_hooks.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "model-vs-effort",
+        _NATURAL,
+        "is it better to move up to a stronger model, or to make the one I have think harder?",
+        ("platform.claude.com_docs_en_about-claude_models_choosing-a-model.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "model-vs-effort",
+        _ECHO,
+        "the effort parameter trades intelligence for latency and cost within a "
+        "single model, and xhigh is the best setting for coding",
+        ("platform.claude.com_docs_en_about-claude_models_choosing-a-model.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "unattended-work",
+        _NATURAL,
+        "what has to be in place before I can leave something working on its own "
+        "for days without watching it?",
+        ("www_anthropic_com_research_long-running-Claude.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "unattended-work",
+        _ECHO,
+        "long-running autonomous work depends on a test oracle and a progress "
+        "file as portable long-term memory across sessions",
+        ("www_anthropic_com_research_long-running-Claude.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "beyond-similarity",
+        _NATURAL,
+        "why is comparing meaning alone not enough to find the right passage, and "
+        "what do people add on top of it?",
+        ("cerebras-knowledge-base.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "beyond-similarity",
+        _ECHO,
+        "four-scorer hybrid retrieval with reciprocal rank fusion and contextual "
+        "retrieval by prepending the thread topic",
+        ("cerebras-knowledge-base.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "delegate-unavailable",
+        _NATURAL,
+        "what is supposed to happen when the cheaper command-line tool I hand "
+        "work to turns out not to be installed?",
+        ("fable-orchestrator.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "delegate-unavailable",
+        _ECHO,
+        "the lane fallback chain and announced substitution, with Claude Opus as "
+        "the terminal fallback",
+        ("fable-orchestrator.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "repeated-corrections",
+        _NATURAL,
+        "how do I stop having to make the same small corrections after every "
+        "change that gets written for me?",
+        ("claude_com_blog_building-verification-loops-in-claude-code-with-skills.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "repeated-corrections",
+        _ECHO,
+        "encode the repeated manual checks you already run as a skill so the "
+        "agent closes its own verification feedback loop",
+        ("claude_com_blog_building-verification-loops-in-claude-code-with-skills.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "many-agents-one-repo",
+        _NATURAL,
+        "can a lot of helpers sweep an entire repository at once, and how do I "
+        "avoid having to take each of their claims on faith?",
+        ("claude_com_blog_introducing-dynamic-workflows-in-claude-code.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "many-agents-one-repo",
+        _ECHO,
+        "dynamic workflows fan out parallel subagents with a convergence loop and "
+        "independent per-finding verification",
+        ("claude_com_blog_introducing-dynamic-workflows-in-claude-code.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "capability-not-loading",
+        _NATURAL,
+        "the packaged capability I wrote is never picked up when I run the SDK — "
+        "what decides whether it gets loaded?",
+        ("code.claude.com_docs_en_agent-sdk_skills.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "capability-not-loading",
+        _ECHO,
+        "skills are filesystem SKILL.md artifacts discovered at startup and loaded "
+        "when setting_sources includes user or project",
+        ("code.claude.com_docs_en_agent-sdk_skills.md",),
+        GOLDEN_K,
+    ),
+    # --- the negative direction: relevant nodes ABSENT must come back absent
+    _G(
+        "absent-off-topic",
+        _ABSENT,
+        "how do I tune the JVM garbage collector to cut tail latency in a "
+        "low-latency trading system?",
+        ("jvm-garbage-collection-tuning-guide.md",),
+        GOLDEN_K,
+    ),
+    _G(
+        "absent-near-miss",
+        _ABSENT,
+        "why is comparing meaning alone not enough to find the right passage, and "
+        "what do people add on top of it?",
+        (NEAR_MISS_TARGET,),
+        GOLDEN_K,
+    ),
+)
+
+#: `NODE <label> [src=<source> loc=<L..> community=<name>]` — `graphify query`'s
+#: line format. The label may itself contain brackets, so the source is taken
+#: from the LAST `[src=` on the line.
+_NODE_LINE = re.compile(r"^NODE .*\[src=(?P<src>.*?) loc=")
+
+#: A retrieval query reloads the whole ~350 MB graph, measured at ~10s each. The
+#: 60s default is for reachability probes; this needs its own headroom without
+#: being unbounded.
+RETRIEVAL_TIMEOUT = 180
+
+
+def _graph_path(repo_root: Path) -> Path:
+    return repo_root / "graphify-out" / "graph.json"
+
+
+def _retrieval(repo_root: Path) -> evals.Retrieve:
+    """Bind the retriever to THIS repo's graph, and return it.
+
+    Shells out to `graphify query` exactly as the tier-1 canary does, rather
+    than reimplementing traversal: what is being measured is the retrieval a
+    session actually gets, and anything else would measure a different program.
+
+    PINNED with an explicit ``--graph``, not left to resolve against the process
+    cwd (caught in review of PR #30). The corpus stamp and the fixture-integrity
+    scan both read ``repo_root/graphify-out/graph.json``; a query resolving
+    somewhere else would print recall figures stamped with a corpus they were
+    not measured against — the precise failure the stamp exists to prevent.
+    """
+
+    def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
+        rc, out = evals.run_command(
+            ["graphify", "query", query.query, "--graph", str(_graph_path(repo_root))],
+            cwd=repo_root,
+            timeout=RETRIEVAL_TIMEOUT,
+        )
+        if rc != 0:
+            return rc, []
+        return rc, [m.group("src") for line in out.splitlines() if (m := _NODE_LINE.match(line))]
+
+    return retrieve
+
+
+def _corpus_stamp(repo_root: Path) -> str:
+    """Build date + node count + graphify version for the graph being measured.
+
+    Mandatory, not decoration. This case runs against the live local graph, so
+    its numbers move when the graph is rebuilt or the tool is bumped; a figure
+    repeated without the corpus it came from is not a measurement
+    (`probes-need-a-control-arm.md` rule 6). Node count comes from graphify's
+    own read-only `diagnose`, which is authoritative and costs ~15s — parsing
+    the graph here would cost gigabytes of resident memory for one integer.
+    """
+    graph = _graph_path(repo_root)
+    built = dt.datetime.fromtimestamp(graph.stat().st_mtime, tz=dt.UTC).date().isoformat()
+    rc, out = evals.run_command(
+        ["graphify", "diagnose", "multigraph", "--json", "--graph", str(graph)],
+        cwd=repo_root,
+        timeout=RETRIEVAL_TIMEOUT,
+    )
+    nodes = f"node count UNAVAILABLE (diagnose rc={rc})"
+    if rc == 0:
+        try:
+            nodes = f"{json.loads(out)['summary']['node_count']:,} nodes"
+        except (ValueError, KeyError, TypeError) as exc:
+            nodes = f"node count UNPARSABLE ({type(exc).__name__})"
+    version_rc, version_out = evals.run_command(["graphify", "--version"], timeout=30)
+    version = version_out.strip() if version_rc == 0 else f"graphify version rc={version_rc}"
+    return f"{nodes}, built {built}, {version}"
+
+
+def _corpus_membership(repo_root: Path) -> evals.Membership:
+    """Bind the fixture-integrity oracle to this repo's graph."""
+
+    def present(names: Sequence[str]) -> Mapping[str, bool]:
+        return evals.corpus_has(_graph_path(repo_root), names)
+
+    return present
+
+
+def _broken_retrieval() -> evals.Outcome:
+    """Control arm: the same scorer, driven by a retriever that returns the absent target.
+
+    Declared even though the runner does not REQUIRE one for an advisory case.
+    The failure this defends against is the whole reason the negative direction
+    exists — a matcher that reports a hit for a document the corpus does not
+    contain — and it runs offline in microseconds, against a miniature golden
+    set of the same shape rather than the real one.
+    """
+    queries = (
+        _G("t", _NATURAL, "q", ("present.md",), 5),
+        _G("t", _ECHO, "q", ("present.md",), 5),
+        _G("absent", _ABSENT, "q", ("absent.md",), 5),
+    )
+    return evals.retrieval_recall(
+        queries,
+        lambda _q: (0, ["present.md", "absent.md"]),
+        stamp="synthetic control-arm corpus",
+    )
+
+
 def _broken_graph_canary() -> evals.Outcome:
     """Control arm: drive the canary against a graph that cannot answer.
 
@@ -183,6 +464,24 @@ def _graphify_installed() -> evals.Outcome | None:
             "the consuming repo) — the canary cannot look, which is not the same "
             "as the graph having nothing to say"
         )
+    return None
+
+
+def _retrieval_precondition(repo_root: Path) -> evals.Outcome | None:
+    """Environment gate: needs both the CLI and a built graph to measure anything.
+
+    The graph is gitignored and derived, so its absence on a fresh clone is
+    expected. Same reasoning as :func:`_graphify_installed`: this belongs in a
+    precondition rather than inside the probe, because "we could not look" and
+    "retrieval found nothing" are different answers and collapsing them is the
+    defect this whole harness exists to catch.
+    """
+    installed = _graphify_installed()
+    if installed is not None:
+        return installed
+    graph = _graph_path(repo_root)
+    if not graph.is_file():
+        return evals.skip(f"no graph at {graph} — run `mise run kb-build` first")
     return None
 
 
@@ -240,6 +539,33 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # fires a real API call. So this is the live half, entirely, and can
             # never join the free gated tier — it runs only under --live.
             live=True,
+        ),
+        evals.Case(
+            name="tier2.kb-retrieval",
+            description=(
+                "golden retrieval set: recall@k for 8 hand-written query pairs "
+                "(natural vs label-echoing) plus both negative directions, "
+                "measured against the live local graph"
+            ),
+            probe=lambda: evals.retrieval_recall(
+                GOLDEN_QUERIES,
+                _retrieval(repo_root),
+                stamp=_corpus_stamp(repo_root),
+                present=_corpus_membership(repo_root),
+            ),
+            control=_broken_retrieval,
+            # ADVISORY, and deliberately so: the baseline is 0/119 relevant nodes
+            # (knowledge-base#12), so a gated floor would be red on arrival and a
+            # floor of zero is the check that can only pass. The floor lands when
+            # P0 scoping moves the number. What this case DOES fail on is a
+            # broken query path, a silent graph, fixture rot, or the negative
+            # direction coming back positive — harness defects, not recall.
+            gated=False,
+            # 18 queries, each reloading a ~350 MB graph, plus a `diagnose` for
+            # the corpus stamp: ~3 minutes. Far too slow to sit on every ship,
+            # and an advisory case that cannot block has no claim on one.
+            slow=True,
+            precondition=lambda: _retrieval_precondition(repo_root),
         ),
         evals.guard_table_case(
             "tier2.guard-fixtures",

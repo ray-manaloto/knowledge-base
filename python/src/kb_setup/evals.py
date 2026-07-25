@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from pathlib import Path
@@ -110,6 +110,11 @@ class Case:
         gated: Whether a FAIL makes the run red.
         live: Whether the case spends a real API call. Off by default; the
             offline set is what joins the ship gates.
+        slow: Whether the case costs minutes rather than seconds. Off by
+            default, and a SEPARATE axis from ``live``: a case can be free and
+            still far too slow to sit on every ship (the golden retrieval set
+            reloads a ~350 MB graph once per query). A slow gate is one people
+            learn to skip, so it stays behind its own flag.
         precondition: Optional environment gate. Return a SKIP :class:`Outcome`
             when this case CANNOT APPLY here; return ``None`` to run normally.
             "Does not apply in this environment" is a third state, distinct
@@ -123,6 +128,7 @@ class Case:
     control: Callable[[], Outcome] | None = None
     gated: bool = True
     live: bool = False
+    slow: bool = False
     precondition: Callable[[], Outcome | None] | None = None
 
 
@@ -460,6 +466,314 @@ def guard_table_case(
     )
 
 
+# --- tier 2: golden retrieval sets --------------------------------------------
+
+
+class Phrasing(StrEnum):
+    """How a golden query is worded — which is the whole experiment.
+
+    ``NATURAL`` is how someone who has NOT read the target would ask.
+    ``ECHO`` deliberately borrows the target's own label text. The pair is
+    reported side by side because THE GAP BETWEEN THEM IS THE FINDING: measured
+    2026-07-24, a label-echoing query surfaced prose nodes that its natural twin
+    did not, so a set built only of echoes grades lexical overlap and reports a
+    retrieval win that is not there.
+
+    ``ABSENT`` is the negative direction: a query whose declared target is not
+    in the corpus at all, so the target must NOT be among what comes back.
+    Without it the set measures "returns something" rather than "returns the
+    right thing".
+
+    Read that precisely — an ABSENT row must come back with **no HITS**, not
+    with no RESULTS. It still asks the graph a real question and the graph still
+    answers; a row that returned nothing at all is a broken query path, and it
+    fails (see :func:`retrieval_recall`). Exempting ABSENT rows from that check
+    was proposed in review of PR #30 and rejected: a retriever that returns
+    nothing would then satisfy every negative row trivially, which is the
+    can-only-pass shape the negative direction exists to prevent.
+    """
+
+    NATURAL = auto()
+    ECHO = auto()
+    ABSENT = auto()
+
+
+@dataclass(frozen=True)
+class GoldenQuery:
+    """One golden query: what was asked, what must come back, how far down we look.
+
+    Args:
+        topic: Pair identifier. The ``NATURAL`` and ``ECHO`` rows of one topic
+            must declare the SAME targets and the same ``k`` — otherwise the
+            two numbers are not comparable and their difference means nothing.
+        phrasing: See :class:`Phrasing`.
+        query: The question, verbatim as it is sent to the retriever.
+        must_appear: The relevant units, as the retriever names them. Node
+            **ids** are not usable here: this graph's ids are 300+ characters of
+            repeated repo name and are not printed by ``graphify query``, while
+            the source document is stable and IS printed. A prose chunk's
+            identity is its source, so a hit means "some node from this
+            document came back".
+        k: How far down the returned list a hit counts. Per-query, because a
+            broad question and a pointed one do not deserve the same window.
+    """
+
+    topic: str
+    phrasing: Phrasing
+    query: str
+    must_appear: tuple[str, ...]
+    k: int = 10
+
+    @property
+    def expects_absent(self) -> bool:
+        """True for the negative direction, where a hit is the failure."""
+        return self.phrasing is Phrasing.ABSENT
+
+
+@dataclass(frozen=True)
+class RetrievalRow:
+    """One golden query's measurement — the raw counts, never a prose summary."""
+
+    query: GoldenQuery
+    rc: int
+    returned: int
+    hits: tuple[str, ...]
+
+    @property
+    def recall(self) -> float:
+        """Fraction of declared targets that appeared in the top ``k``."""
+        if not self.query.must_appear:
+            return 0.0
+        return len(self.hits) / len(self.query.must_appear)
+
+    @property
+    def summary(self) -> str:
+        """``1/2`` — hits over declared targets, at this query's ``k``."""
+        return f"{len(self.hits)}/{len(self.query.must_appear)}"
+
+
+#: A retriever: given a golden query, return ``(rc, the units it returned, in
+#: rank order)``. The caller supplies it — the live one shells out to graphify,
+#: and the tests supply a fake, which is how the scorer itself gets a control arm.
+Retrieve = Callable[[GoldenQuery], tuple[int, Sequence[str]]]
+
+#: A corpus-membership oracle: which of these target names exist in the graph at
+#: all? Used only for fixture integrity — see :func:`retrieval_recall`.
+Membership = Callable[[Sequence[str]], Mapping[str, bool]]
+
+
+def corpus_has(
+    graph_path: Path, needles: Sequence[str], *, chunk: int = 1 << 22
+) -> dict[str, bool]:
+    """Which of ``needles`` appear as a ``source_file`` value in the graph file?
+
+    A streaming substring scan rather than ``json.load``: the graph is ~350 MB
+    of pretty-printed JSON and parsing it costs gigabytes of resident memory for
+    an answer this shape does not need. Measured at 0.3s over 128k nodes.
+
+    Matches the KEYED form (``"source_file": "<needle>"``) in both the spaced
+    and compact separator styles, so a bare mention of the filename inside some
+    document's prose does NOT read as membership. That precision is load-bearing
+    in one direction: a positive target that is merely *mentioned* would make
+    fixture rot look like a retrieval failure.
+    """
+    keyed = {n: (f'"source_file": "{n}"', f'"source_file":"{n}"') for n in needles}
+    found = dict.fromkeys(needles, False)
+    overlap = max((len(v) for pair in keyed.values() for v in pair), default=0)
+    tail = ""
+    with graph_path.open(encoding="utf-8", errors="replace") as fh:
+        while block := fh.read(chunk):
+            buf = tail + block
+            for needle, forms in keyed.items():
+                if not found[needle] and any(form in buf for form in forms):
+                    found[needle] = True
+            if all(found.values()):
+                break
+            tail = buf[-overlap:] if overlap else ""
+    return found
+
+
+def score_retrieval(query: GoldenQuery, retrieve: Retrieve) -> RetrievalRow:
+    """Run one golden query and count which declared targets came back in top-k."""
+    rc, returned = retrieve(query)
+    top = list(returned)[: query.k]
+    hits = tuple(t for t in query.must_appear if t in top)
+    return RetrievalRow(query=query, rc=rc, returned=len(returned), hits=hits)
+
+
+def _golden_set_shape(queries: Sequence[GoldenQuery]) -> str:
+    """Structural defects that make a golden set unable to measure. '' when sound.
+
+    Enforced in the engine, exactly as ``run_guard_table`` refuses a
+    single-direction table, and for the same reason: these are the shapes where
+    a degenerate retriever passes.
+
+    * No ABSENT query — a retriever that returns the whole corpus scores a
+      perfect recall on every positive row.
+    * A topic missing one of its phrasings — the pair IS the measurement; one
+      number alone cannot show the lexical-overlap gap.
+    * A pair whose halves declare different targets or a different ``k`` — then
+      the two numbers are answers to different questions and their difference
+      is noise.
+    """
+    if not queries:
+        return "golden set is EMPTY — nothing was measured"
+    if not any(q.expects_absent for q in queries):
+        return (
+            "golden set has NO negative direction (no ABSENT query) — it can only "
+            "measure that something came back, so a retriever that returns the "
+            "whole corpus would score perfectly"
+        )
+    pairs: dict[str, dict[Phrasing, GoldenQuery]] = {}
+    for q in (q for q in queries if not q.expects_absent):
+        pairs.setdefault(q.topic, {})[q.phrasing] = q
+    for topic, halves in sorted(pairs.items()):
+        missing = {Phrasing.NATURAL, Phrasing.ECHO} - set(halves)
+        if missing:
+            return (
+                f"topic {topic!r} is missing its "
+                f"{', '.join(sorted(p.name for p in missing))} half — the pair is "
+                f"the measurement, since a lone number cannot show the gap"
+            )
+        natural, echo = halves[Phrasing.NATURAL], halves[Phrasing.ECHO]
+        if natural.must_appear != echo.must_appear or natural.k != echo.k:
+            return (
+                f"topic {topic!r}: the two phrasings declare different targets or "
+                f"a different k, so their recall figures are not comparable"
+            )
+    return ""
+
+
+def _fixture_integrity(queries: Sequence[GoldenQuery], present: Membership) -> str:
+    """Do the declared targets exist (positives) / not exist (ABSENT)? '' when sound.
+
+    Fixture rot is indistinguishable from a retrieval failure without this: a
+    positive target that has been renamed out of the corpus reports recall 0
+    forever and reads as "retrieval is broken", while an ABSENT target that has
+    since been ingested makes the negative direction unfalsifiable.
+    """
+    names = sorted({t for q in queries for t in q.must_appear})
+    seen = present(names)
+    rotten = [
+        f"{q.topic}/{q.phrasing.name}: {target!r} is "
+        f"{'PRESENT but declared absent' if q.expects_absent else 'NOT in the corpus'}"
+        for q in queries
+        for target in q.must_appear
+        if seen.get(target, False) is q.expects_absent
+    ]
+    if rotten:
+        return "fixture rot — " + "; ".join(rotten)
+    return ""
+
+
+def _pair_lines(rows: Sequence[RetrievalRow]) -> list[str]:
+    """The per-topic table: natural and echo side by side, then the negatives."""
+    by_topic: dict[str, dict[Phrasing, RetrievalRow]] = {}
+    for row in rows:
+        by_topic.setdefault(row.query.topic, {})[row.query.phrasing] = row
+    lines = []
+    for topic, halves in sorted(by_topic.items()):
+        natural, echo = halves.get(Phrasing.NATURAL), halves.get(Phrasing.ECHO)
+        if natural is not None and echo is not None:
+            k = natural.query.k
+            gap = len(echo.hits) - len(natural.hits)
+            lines.append(
+                f"  {topic:<22} natural@{k} {natural.summary}   echo@{k} {echo.summary}   "
+                f"gap {gap:+d}"
+            )
+        lines.extend(
+            f"  {topic:<22} ABSENT@{row.query.k} {row.summary} returned (0 is required)"
+            for row in halves.values()
+            if row.query.expects_absent
+        )
+    return lines
+
+
+def retrieval_recall(
+    queries: Sequence[GoldenQuery],
+    retrieve: Retrieve,
+    *,
+    stamp: str,
+    present: Membership | None = None,
+) -> Outcome:
+    """Measure recall@k over a golden set. ADVISORY by design — see the caller.
+
+    There is no recall FLOOR here, deliberately: at the measured 0/119 baseline
+    a floor would be red on arrival, and a floor of zero is the check that can
+    only pass. What this DOES fail on is everything that would make the number a
+    lie — a broken query path, a graph that answers nothing, a rotten fixture,
+    and the negative direction coming back positive. Those are harness defects,
+    not retrieval quality, and they must never be reported as a recall figure.
+
+    Args:
+        queries: The golden set. Its shape is checked (:func:`_golden_set_shape`).
+        retrieve: Runs one query. See :data:`Retrieve`.
+        stamp: The corpus stamp — build date and node count. Carried into the
+            detail because a retrieval number without the corpus it was measured
+            against is not a measurement (``probes-need-a-control-arm.md`` rule 6).
+        present: Optional corpus-membership oracle for the fixture-integrity
+            check. Omitted only where the graph is not the thing under test.
+    """
+    shape = _golden_set_shape(queries)
+    if shape:
+        return fail(shape)
+    if present is not None:
+        rot = _fixture_integrity(queries, present)
+        if rot:
+            return fail(rot)
+
+    rows = [score_retrieval(q, retrieve) for q in queries]
+
+    broken = [f"{r.query.topic}/{r.query.phrasing.name} rc={r.rc}" for r in rows if r.rc != 0]
+    if broken:
+        return fail(f"{len(broken)} query/queries did not run: {', '.join(broken)}")
+    # EVERY row, ABSENT included — `returned` counts what came back, not what
+    # matched. An ABSENT row that returned nothing has not demonstrated the
+    # target is absent; it has demonstrated the query path is dead, and it would
+    # let a retriever that returns nothing pass every negative row.
+    silent = [f"{r.query.topic}/{r.query.phrasing.name}" for r in rows if r.returned == 0]
+    if silent:
+        return fail(
+            f"{len(silent)} query/queries returned NOTHING at all "
+            f"({', '.join(silent)}) — that is a graph that resolves and knows nothing"
+        )
+    leaked = [r for r in rows if r.query.expects_absent and r.hits]
+    if leaked:
+        return fail(
+            "the NEGATIVE direction came back positive: "
+            + "; ".join(f"{r.query.topic} returned {', '.join(r.hits)}" for r in leaked)
+            + " — the target is declared absent from the corpus, so this is the "
+            "matcher or the fixture lying, not a retrieval win"
+        )
+
+    positives = [r for r in rows if not r.query.expects_absent]
+    natural = [r for r in positives if r.query.phrasing is Phrasing.NATURAL]
+    echo = [r for r in positives if r.query.phrasing is Phrasing.ECHO]
+    hit_pairs = sum(1 for r in natural if r.hits), sum(1 for r in echo if r.hits)
+    detail = "\n".join(
+        [
+            f"corpus: {stamp}",
+            *_pair_lines(rows),
+            f"  SUITE: {len(natural)} pair(s) — natural scored on {hit_pairs[0]}, "
+            f"echo on {hit_pairs[1]}; mean recall natural "
+            f"{_mean(r.recall for r in natural):.2f} vs echo "
+            f"{_mean(r.recall for r in echo):.2f}",
+        ]
+    )
+    if hit_pairs == (0, 0):
+        detail += (
+            "\n  NOTE: nothing scored at all, so this run alone cannot show the "
+            "matcher discriminates — that is proven by its unit tests, not here"
+        )
+    return ok(detail)
+
+
+def _mean(values: Iterable[float]) -> float:
+    """Mean of an iterable of floats, 0.0 when empty."""
+    seq = list(values)
+    return sum(seq) / len(seq) if seq else 0.0
+
+
 # --- the runner ---------------------------------------------------------------
 
 
@@ -484,21 +798,61 @@ def _control_verdict(case: Case) -> tuple[bool, str]:
     )
 
 
-def run_cases(cases: Sequence[Case], *, live: bool = False) -> Report:
+def _cost_skip(case: Case, *, live: bool, slow: bool) -> Outcome | None:
+    """The opt-in cost filters. Two independent axes: API spend, and wall clock."""
+    if case.live and not live:
+        return skip("live case — pass --live to run it")
+    if case.slow and not slow:
+        return skip("slow case — pass --slow to run it")
+    return None
+
+
+def _environment_skip(case: Case) -> Outcome | None:
+    """Evaluate the ``precondition``, turning a raising gate into a FAIL."""
+    if case.precondition is None:
+        return None
+    try:
+        return case.precondition()
+    except Exception as exc:
+        return fail(f"precondition raised {type(exc).__name__}: {exc}")
+
+
+def _advisory_detail(case: Case) -> str:
+    """What to record about an advisory case's control arm.
+
+    An advisory case is not REQUIRED to carry one — but when it declares one,
+    run it and say so. "Advisory" waives the requirement, and must not become
+    the loophole that exempts a case from ever demonstrating it can say no; a
+    result reported without its control arm is an opinion
+    (``probes-need-a-control-arm.md`` rule 5). A control that fails to fail is
+    surfaced here rather than reddening the run, since an advisory case cannot
+    turn the run red by construction.
+    """
+    if case.control is None:
+        return "advisory — control arm not required"
+    armed, detail = _control_verdict(case)
+    return f"advisory — {detail}" if armed else f"advisory — NOT ARMED: {detail}"
+
+
+def run_cases(cases: Sequence[Case], *, live: bool = False, slow: bool = False) -> Report:
     """Run every in-scope case, applying the control-arm rule first.
 
-    Order of the three gates matters and is pinned by tests: live-filter, then
-    ``precondition``, then the control-arm rule.
+    Order of the gates matters and is pinned by tests: the cost filters
+    (``live``, then ``slow``), then ``precondition``, then the control-arm rule.
 
     Args:
         cases: The repo's declared cases.
         live: Include cases that spend real API calls. Off by default, because
             the offline set is what joins the ship gates.
+        slow: Include cases that cost minutes. Off by default for the same
+            reason and on a separate axis — free but slow is still too
+            expensive to run on every ship.
     """
     report = Report()
     for case in cases:
-        if case.live and not live:
-            report.results.append(Result(case, skip("live case — pass --live to run it")))
+        cost = _cost_skip(case, live=live, slow=slow)
+        if cost is not None:
+            report.results.append(Result(case, cost))
             continue
 
         # The environment gate comes BEFORE the control-arm rule, and that
@@ -512,14 +866,10 @@ def run_cases(cases: Sequence[Case], *, live: bool = False) -> Report:
         # Learned from a real failure: dotfiles' graphify canary is host-only,
         # and inside the devcontainer it failed with rc=-2 (no such file),
         # turning the whole devcontainer smoke red.
-        if case.precondition is not None:
-            try:
-                gate = case.precondition()
-            except Exception as exc:
-                gate = fail(f"precondition raised {type(exc).__name__}: {exc}")
-            if gate is not None:
-                report.results.append(Result(case, gate))
-                continue
+        gate = _environment_skip(case)
+        if gate is not None:
+            report.results.append(Result(case, gate))
+            continue
 
         if case.gated:
             armed, detail = _control_verdict(case)
@@ -531,7 +881,7 @@ def run_cases(cases: Sequence[Case], *, live: bool = False) -> Report:
                 )
                 continue
         else:
-            detail = "advisory — control arm not required"
+            detail = _advisory_detail(case)
 
         try:
             outcome = case.probe()
@@ -541,13 +891,18 @@ def run_cases(cases: Sequence[Case], *, live: bool = False) -> Report:
     return report
 
 
-def render(report: Report, *, live: bool = False) -> str:
+def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
     """Render the case table plus the summary line."""
-    lines = [f"eval: {len(report.results)} case(s), live={'on' if live else 'off'}"]
+    lines = [
+        f"eval: {len(report.results)} case(s), live={'on' if live else 'off'}, "
+        f"slow={'on' if slow else 'off'}"
+    ]
     for r in report.results:
         flag = "gated" if r.case.gated else "advisory"
         lines.append(f"  {r.outcome.verdict.name:<8} {r.case.name} [{flag}]")
-        lines.append(f"           {r.outcome.detail}")
+        # A multi-line detail (the retrieval table) keeps its own alignment
+        # under a common indent rather than breaking out of the case block.
+        lines.extend(f"           {line}" for line in r.outcome.detail.splitlines() or [""])
         if r.outcome.verdict is Verdict.UNARMED:
             lines.append(
                 "           REFUSED TO COUNT: a gated case with no working control "
@@ -570,10 +925,10 @@ def render(report: Report, *, live: bool = False) -> str:
     return "\n".join(lines)
 
 
-def run(cases: Sequence[Case], *, live: bool = False) -> tuple[int, str]:
+def run(cases: Sequence[Case], *, live: bool = False, slow: bool = False) -> tuple[int, str]:
     """Run the cases and return ``(exit_code, report)``."""
-    report = run_cases(cases, live=live)
-    text = render(report, live=live)
+    report = run_cases(cases, live=live, slow=slow)
+    text = render(report, live=live, slow=slow)
     if report.nothing_verifiable:
         # Nothing was checked. Not a pass, and not a silent one either.
         return 1, text
