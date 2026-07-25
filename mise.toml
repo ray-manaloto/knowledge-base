@@ -28,6 +28,10 @@ typos = "1.48.0"
 taplo = "0.10.0"
 rumdl = "v0.2.40"
 gitleaks = "8.30.1"
+# agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
+# Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
+# on warnings-only, so without it every warning is invisible (dotfiles #250).
+"github:agent-sh/agnix" = "0.40.0"
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
 # (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
@@ -77,6 +81,12 @@ run = "hk fix"
 [tasks.test]
 description = "Run the Python test suite"
 run = "uv run pytest tests/ -x -q"
+
+[tasks.lint-docs]
+description = "Validate agent documentation (agnix)"
+# --strict: warnings-as-errors — parity with the hk `agnix` step. agnix exits 0
+# on warnings-only, so without it a warning never fails anything (dotfiles #250).
+run = "agnix . --strict"
 
 [tasks.check]
 description = "Full quality check (lint + test)"

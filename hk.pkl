@@ -77,6 +77,50 @@ local lintSteps: Mapping<String, Step> = new {
     glob = pyGlob
     check = "uv run kb-setup no-lint-skip"
   }
+
+  // --- Agent documentation (agnix) ---
+  //     --strict: warnings-as-errors. agnix exits 0 on warnings-only, so
+  //     without it every warning is invisible (dotfiles #250). Parity with
+  //     `mise run lint-docs`. Known false positives + by-design patterns are
+  //     scoped in .agnix.toml. settings.json is in the glob so a hook-config
+  //     change triggers agnix locally — it is the file agnix most often flags.
+  ["agnix"] = new Step {
+    check = "agnix . --strict"
+    glob = List(
+      "CLAUDE.md",
+      ".claude/**/*.md",
+      ".claude/settings.json",
+      ".agnix.toml",
+    )
+  }
+
+  // --- Markdown instruction-file budgets, BY LOAD CLASS ---
+  //     The ONE documented figure is "target under 200 lines per CLAUDE.md
+  //     file" (code.claude.com/docs/en/memory § Write effective instructions)
+  //     — a SOFT guideline about a gradient, NOT a truncation point ("CLAUDE.md
+  //     files are loaded in full regardless of length").
+  //
+  //     Budgets differ by LOAD CLASS because that is the docs' own cost model
+  //     — what matters is WHEN the bytes are spent:
+  //       eager (root CLAUDE.md + @import closure; .claude/CLAUDE.md; unscoped
+  //         .claude/rules/*, at "the same priority as .claude/CLAUDE.md") → 200
+  //       lazy  (nested CLAUDE.md: "included when Claude reads files in those
+  //         subdirectories", not re-injected on /compact)                 → 400
+  //       cond  (paths:-scoped rules: load "only when Claude works with
+  //         matching files")                                              → 400
+  //       skill (SKILL.md: "Keep under 500 lines")                        → 500,
+  //         plus description ≤ 1536 chars — a REAL hard truncation that
+  //         silently strips the keywords Claude matches on.
+  //     The byte ceilings are SELF-IMPOSED anti-gaming backstops, sized never
+  //     to bind before the documented line limit. Do not re-attribute them
+  //     upstream: the ≤12,000-char figure is WINDSURF's (agnix AGM-003), and
+  //     citing it as Anthropic's is the error this step replaced.
+  //
+  //     Logic lives in kb_setup.md_budget (zero-bash) — the SHARED engine
+  //     dotfiles also consumes, on the kb_setup.currency precedent.
+  ["md_size_budget"] = new Step {
+    check = "uv run kb-setup md-budget"
+  }
 }
 
 hooks {

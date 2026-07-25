@@ -1,0 +1,69 @@
+# Zero-Skip Policy: No Warning/Error/Issue Shall Be Dismissed
+
+Every warning, error, lint violation, test failure, or diagnostic output MUST be investigated
+and resolved. This policy applies to all phases of development: coding, building, testing,
+linting, ingestion, and code review.
+
+## Rules
+
+1. **No suppression without approval**: Never add ignore rules, `# noqa`, `# type: ignore`,
+   `--ignore`, `--no-verify`, an `.agnix.toml` `disabled_rules` entry, or equivalent suppress
+   flags without explicit user approval. Each suppression must be justified with a documented
+   reason.
+
+2. **Research before deferring**: If a warning or error is encountered, research the root cause.
+   Check official documentation, changelog, and issue trackers. Attempt at least one fix.
+
+3. **Escalate to human**: If resolution is unclear after investigation, ask the user via
+   AskUserQuestion with: the exact error, what you tried, root cause guess, proposed next steps.
+   Do not silently skip or defer.
+
+4. **Track deferred items**: If the user explicitly approves deferring an issue, create a
+   GitHub Issue via `gh issue create` with the full context, reproduction steps, and
+   references to the diagnostic output.
+
+5. **Green means clean**: A passing gate with suppressed warnings is not "green."
+   All diagnostics must be clean, not silenced.
+
+## Local Validation Gate
+
+Before ANY git commit, you MUST run local validation:
+
+1. Run `mise run lint` and verify exit 0
+2. If any check fails: research root cause, attempt fix, re-run
+3. Only escalate to user via AskUserQuestion after 2 failed fix attempts
+4. Do NOT commit until all hk checks pass
+5. Do NOT push until `mise run lint` and `mise run test` pass
+
+## Examples of Violations
+
+- Adding an `.agnix.toml` `disabled_rules` entry without documenting why
+- Skipping an hk step because the tool isn't installed instead of pinning it in `mise.toml`
+- Suppressing a ruff error with `# noqa` instead of fixing the code (the `no_lint_skip`
+  step rejects this outright — all suppressions live in the ONE root `pyproject.toml`)
+- Ignoring a `kb-build` / `kb-merge` stderr warning because the graph still wrote
+- Committing without running `mise run lint`
+- Pushing to trigger a check to "see if it passes" instead of validating locally
+
+## Applies To
+
+All tools in this project: ruff, ty, pytest, hk, taplo, rumdl, gitleaks, typos, pkl, agnix,
+graphify, and any future additions.
+
+## See also
+
+- `verify-before-advancing.md` — the sibling gate: every applicable check
+  must be green *with evidence* before advancing to the next task,
+  committing, opening/merging a PR, or claiming done.
+
+## Why this rule is eager (never `paths:`-scoped)
+
+It has no `paths:` frontmatter deliberately. Path-scoped rules "trigger when
+Claude **reads** files matching the pattern"
+(<https://code.claude.com/docs/en/memory>) — but this rule fires the moment a
+warning is about to be *dismissed*, which no glob can predict. In the sibling
+dotfiles repo it was scoped to `**/*.py`/`hk.pkl`/workflows until 2026-07-15,
+so a session editing only markdown never loaded the rule forbidding skipped
+warnings — absent from exactly the sessions it exists to govern. Rules that
+guard **judgment** stay eager; only rules whose trigger IS a file (e.g.
+`ci-local-parity.md`) are safe to scope. See `md-size-budgets.md`.
