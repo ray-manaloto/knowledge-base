@@ -21,6 +21,7 @@ and drive the same code path against it.
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -79,6 +80,24 @@ def _broken_doctor() -> evals.Outcome:
         return evals.doctor_health(script, timeout=30)
 
 
+def _graphify_installed() -> evals.Outcome | None:
+    """Environment gate: the canary cannot run where graphify is not installed.
+
+    graphify is host-only in the sibling dotfiles repo, so inside its
+    devcontainer this case asserts something that cannot be true. That is "does
+    not apply here", not "the graph is broken" — and it must be a precondition
+    rather than a SKIP inside the probe, because the control arm drives the same
+    code path and would skip too, leaving the case UNARMED.
+    """
+    if shutil.which("graphify") is None:
+        return evals.skip(
+            "graphify is not installed in this environment (it is host-only in "
+            "the consuming repo) — the canary cannot look, which is not the same "
+            "as the graph having nothing to say"
+        )
+    return None
+
+
 def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.Case]:
     """Build this repo's tier-1 cases."""
     doctor = doctor_script if doctor_script is not None else DOCTOR_SCRIPT
@@ -119,6 +138,7 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             ),
             probe=lambda: evals.graphify_canary(repo_root, CANARY_QUESTION),
             control=_broken_graph_canary,
+            precondition=_graphify_installed,
         ),
         evals.Case(
             name="tier1.lane-health",
