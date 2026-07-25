@@ -66,9 +66,9 @@ def working_tree_clean(repo_root: Path) -> bool:
     return rc == 0 and not out.strip()
 
 
-#: The local gates every PR must pass before it is pushed. `eval` is the tier-1
-#: reachability set — offline only, so it costs nothing here; its live half runs
-#: on demand via `mise run eval -- --live`.
+#: The local gates every PR must pass before it is pushed. `eval` is tiers 1+2 —
+#: reachability probes plus the guard fixture table, offline only, so it costs
+#: nothing here; its live half runs on demand via `mise run eval -- --live`.
 GATES = ("lint", "test", "brain-audit", "eval")
 
 

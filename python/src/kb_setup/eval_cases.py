@@ -1,10 +1,16 @@
-"""This repo's tier-1 eval cases.
+"""This repo's eval cases — tier 1 (reachability) and tier 2 (guard fixtures).
 
 The runner (:mod:`kb_setup.evals`) is shared; the CASES are per-repo, because
 what "resolves" means differs. Here it means: the orchestration lanes the
 doctrine names are reachable or their degradation is written down, the plugin's
 own lane doctor can be reached, and the graph — this repo's entire reason to
 exist — actually answers.
+
+Tier 2 asks the next question again: not *does the guard exist* (tier 0's
+contract) and not *is it wired* (the settings.json hook), but **does the wired
+guard DECIDE correctly?** :data:`GUARD_FIXTURES` is the corpus, and its
+must-ALLOW half is not decoration — it found two live false positives in
+`kb_setup.hook_guard` on the day it was written (see that module).
 
 Every gated case below carries a ``control``: the same probe logic pointed at
 deliberately-broken input, which MUST come back FAIL. The runner refuses to
@@ -25,7 +31,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from kb_setup import evals
+from kb_setup import evals, hook_guard
 
 #: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
 #: NOT installed — the doctrine says availability is discovered at run time, so
@@ -49,6 +55,88 @@ DOCTOR_SCRIPT = Path.home().joinpath(
 CANARY_QUESTION = "how are sources added to this knowledge base?"
 
 _MISSING_BINARY = "definitely-not-a-real-binary-xyz"
+
+_D = evals.GuardFixture
+_DENY = evals.Decision.DENY
+_ALLOW = evals.Decision.ALLOW
+
+#: The tier-2 corpus for `kb_setup.hook_guard`: every row a real command shape,
+#: with the decision it MUST get. Both halves are mandatory (the engine fails a
+#: single-direction table), and the control arm runs this same table inverted.
+#:
+#: The must-ALLOW half is the load-bearing one. `_ALLOWED_READONLY`
+#: (path/explain/god-nodes/affected/diagnose) is the surface a careless pattern
+#: breaks, and the grep rows below are not hypothetical — both DENIED before the
+#: fix that shipped with this table.
+GUARD_FIXTURES: tuple[evals.GuardFixture, ...] = (
+    # --- must DENY: every mutating / LLM-spending / task-equivalent subcommand
+    _D("graphify add https://example.com/a", _DENY, "ingest goes through kb-add"),
+    _D("graphify update mysource", _DENY, "re-ingest goes through kb-update"),
+    _D('graphify query "how does x work"', _DENY, "retrieval goes through kb-query"),
+    _D("graphify extract", _DENY, "extraction goes through kb-build"),
+    _D("graphify merge-graphs", _DENY, "merges go through kb-build/kb-merge"),
+    _D("graphify label", _DENY, "clustering goes through kb-label"),
+    _D("graphify install --project", _DENY, "install mutates config — never by hand"),
+    _D("graphify watch", _DENY, "watch is a do-not in this repo"),
+    _D("graphify hook install", _DENY, "hook install is a do-not in this repo"),
+    _D("graphify frobnicate", _DENY, "an UNKNOWN subcommand denies — the generic arm"),
+    _D("cd /tmp && graphify extract", _DENY, "a cd prefix does not launder it"),
+    _D("for f in a b; do graphify update $f; done", _DENY, "`do` is a command position"),
+    _D("FOO=1 graphify add https://example.com/a", _DENY, "an env prefix does not launder it"),
+    _D(
+        "python python/src/kb_setup/_merge_docs.py chunk",
+        _DENY,
+        "the merge helper is kb-merge's job, not a hand-run script",
+    ),
+    _D(
+        "~/.local/share/mise/installs/pipx-graphifyy/0.9.26/bin/python -c 'print(1)'",
+        _DENY,
+        "graphify's BUNDLED interpreter at command position",
+    ),
+    _D(
+        'python -c "import graphify; print(graphify.__file__)"',
+        _DENY,
+        "a python head driving graphify — the payload is quoted here, on purpose",
+    ),
+    # --- must ALLOW: read-only introspection, the canonical tasks, and prose
+    _D("graphify path a b", _ALLOW, "_ALLOWED_READONLY — no task equivalent"),
+    _D("graphify explain kb_setup", _ALLOW, "_ALLOWED_READONLY — no task equivalent"),
+    _D("graphify god-nodes", _ALLOW, "_ALLOWED_READONLY — no task equivalent"),
+    _D("graphify affected python/src/kb_setup/evals.py", _ALLOW, "_ALLOWED_READONLY"),
+    _D("graphify diagnose", _ALLOW, "_ALLOWED_READONLY"),
+    _D(
+        "graphify --help",
+        _ALLOW,
+        "allowed by FALL-THROUGH (the subcommand group needs a letter), not by "
+        "_ALLOWED_READONLY — whose --help/-h/--version entries are unreachable",
+    ),
+    _D('mise run kb-query -- "how are sources added?"', _ALLOW, "the canonical task"),
+    _D("mise run kb-build", _ALLOW, "the canonical task"),
+    _D(
+        'grep -rn "import graphify" python/',
+        _ALLOW,
+        "FALSE POSITIVE, measured 2026-07-25 — grepping FOR the pattern denied",
+    ),
+    _D(
+        'rg "_merge_docs.py" .',
+        _ALLOW,
+        "FALSE POSITIVE, measured 2026-07-25 — same shape, same fix",
+    ),
+    _D('rg "graphify add" docs/', _ALLOW, "a quoted mention is not a command position"),
+    _D('echo "do not run graphify add by hand"', _ALLOW, "prose describing the ban"),
+    _D(
+        'git commit -m "docs: explain why graphify update is denied"',
+        _ALLOW,
+        "a commit message describing the ban — dotfiles hit exactly this in #176",
+    ),
+    _D(
+        'rg "import graphify" . ; python -c "print(1)"',
+        _ALLOW,
+        "the python head and the payload are in DIFFERENT segments",
+    ),
+    _D("uv run pytest tests/ -x -q", _ALLOW, "an ordinary uv command is untouched"),
+    _D("git status --short", _ALLOW, "an unrelated command is untouched"),
+)
 
 
 def _broken_graph_canary() -> evals.Outcome:
@@ -152,5 +240,13 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # fires a real API call. So this is the live half, entirely, and can
             # never join the free gated tier — it runs only under --live.
             live=True,
+        ),
+        evals.guard_table_case(
+            "tier2.guard-fixtures",
+            "the PreToolUse graphify guard decides every fixture row as declared "
+            "— both directions, since false positives are the only defect class "
+            "ever measured in it",
+            GUARD_FIXTURES,
+            hook_guard.decide,
         ),
     ]

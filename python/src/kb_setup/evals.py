@@ -1,4 +1,4 @@
-"""Eval runner — tier-1 reachability probes, with control arms enforced.
+"""Eval runner — tier-1 reachability probes and tier-2 fixtures, control arms enforced.
 
 The SHARED runner both this repo and ``ray-manaloto/dotfiles`` use (the
 ``kb_setup.currency`` / ``kb_setup.md_budget`` precedent: one implementation,
@@ -101,7 +101,7 @@ class Case:
     """One eval case.
 
     Args:
-        name: Stable identifier, ``tier1.<what>``.
+        name: Stable identifier, ``tier<N>.<what>``.
         description: What the case asserts, in one line.
         probe: The real check.
         control: The FAIL-direction arm. Runs the same logic against broken
@@ -332,6 +332,132 @@ def doctor_health(script: Path, *, timeout: int = LIVE_TIMEOUT) -> Outcome:
     if rc != 0:
         return fail(f"doctor.sh rc={rc}: {tail}")
     return ok(f"doctor.sh rc=0: {tail}")
+
+
+# --- tier 2: guard fixture tables ---------------------------------------------
+
+
+class Decision(StrEnum):
+    """What a guard is expected to do with one command.
+
+    An enum rather than a bool: a fixture table is read far more often than it
+    is written, and ``("npx agnix", True)`` does not say which direction ``True``
+    is. (It also keeps 30-odd rows out of ruff's boolean-positional rule without
+    spelling ``deny=`` on every one.)
+    """
+
+    DENY = auto()
+    ALLOW = auto()
+
+    @property
+    def inverted(self) -> Decision:
+        """The other decision — the table-level control arm's whole mechanism."""
+        return Decision.ALLOW if self is Decision.DENY else Decision.DENY
+
+
+@dataclass(frozen=True)
+class GuardFixture:
+    """One ``(command, expected decision)`` row of a guard fixture table.
+
+    Args:
+        command: The Bash command string, exactly as a session would issue it.
+        expected: :attr:`Decision.DENY` or :attr:`Decision.ALLOW`.
+        why: One line saying what this row is defending. It is printed on a
+            mismatch, so a future reader learns what broke rather than only
+            which string moved.
+    """
+
+    command: str
+    expected: Decision
+    why: str
+
+
+def run_guard_table(
+    fixtures: Sequence[GuardFixture],
+    decide: Callable[[str], str | None],
+    *,
+    invert: bool = False,
+) -> Outcome:
+    """Drive every row through ``decide`` and report the rows that disagreed.
+
+    ``decide`` is the guard's decision function: a redirect reason for a denied
+    command, ``None`` for an allowed one. Each repo passes its own.
+
+    THE MUST-ALLOW HALF IS MANDATORY, and it is enforced here rather than left
+    to authorial discipline: a single-direction table FAILS. False positives are
+    the only defect class ever measured in these guards (dotfiles #265: 2 of the
+    3 denials it had ever issued were false positives; bypasses all-time **0**),
+    so a deny-only corpus grades the guard on the direction that has never
+    failed — and, worse, an always-deny guard would pass it.
+
+    THE CONTROL ARM IS TABLE-LEVEL (``invert=True``), not per-row. Inverting
+    every expectation makes each row the other rows' control: an always-deny
+    guard passes the deny rows and fails the allow rows, an always-allow guard
+    does the inverse, so only a *discriminating* guard can pass the table while
+    failing its inversion. Per-row cases were rejected — N controls to maintain,
+    several of which could only be unrealistic mutations of the rule table.
+
+    Args:
+        fixtures: The repo's declared rows.
+        decide: The guard's pure decision function.
+        invert: Flip every expectation. This is the control arm, and it MUST
+            come back FAIL for the case to count.
+    """
+    if not fixtures:
+        return fail("guard fixture table is EMPTY — nothing was checked")
+
+    denies = sum(1 for f in fixtures if f.expected is Decision.DENY)
+    allows = len(fixtures) - denies
+    if not denies or not allows:
+        missing = "must-ALLOW" if not allows else "must-DENY"
+        degenerate = "always-deny" if not allows else "always-allow"
+        return fail(
+            f"guard fixture table is single-direction ({denies} deny, {allows} "
+            f"allow) — it has no {missing} half, so a degenerate {degenerate} "
+            f"guard would pass it"
+        )
+
+    mismatches = []
+    for fixture in fixtures:
+        expected = fixture.expected.inverted if invert else fixture.expected
+        reason = decide(fixture.command)
+        actual = Decision.DENY if reason is not None else Decision.ALLOW
+        if actual is expected:
+            continue
+        saw = f"DENIED ({reason.splitlines()[0][:60]})" if reason else "ALLOWED"
+        mismatches.append(
+            f"{fixture.command[:70]!r} expected {expected.name}, saw {saw} [{fixture.why}]"
+        )
+
+    scope = f"{len(fixtures)} row(s) ({denies} deny, {allows} allow)"
+    if mismatches:
+        return fail(
+            f"{len(mismatches)}/{len(fixtures)} row(s) mismatched"
+            f"{' (inverted table)' if invert else ''}: " + "; ".join(mismatches)
+        )
+    return ok(f"{scope} decided as declared{' (inverted table)' if invert else ''}")
+
+
+def guard_table_case(
+    name: str,
+    description: str,
+    fixtures: Sequence[GuardFixture],
+    decide: Callable[[str], str | None],
+) -> Case:
+    """A gated :class:`Case` for one guard's fixture table, control arm attached.
+
+    The control is the same table with every expectation inverted, so the
+    control-arm rule in :func:`run_cases` polices this table by construction
+    instead of the table being exempted from principle 1 — which was the one
+    thing that could not be allowed here, since this table is the single place
+    false positives have actually been measured.
+    """
+    return Case(
+        name=name,
+        description=description,
+        probe=lambda: run_guard_table(fixtures, decide),
+        control=lambda: run_guard_table(fixtures, decide, invert=True),
+    )
 
 
 # --- the runner ---------------------------------------------------------------
