@@ -82,6 +82,12 @@ ignore = [
 ]
 # Intentional catch-all fail-open: a crashed PreToolUse guard must NEVER brick Bash.
 "python/src/kb_setup/hook_guard.py" = ["BLE001"]
+# Same fail-safe rationale, opposite direction: the eval runner catches whatever a
+# repo-supplied probe or control arm raises and RECORDS it as that case's failure.
+# Narrowing this would let one bad case abort the whole run, which is the failure
+# mode the runner exists to prevent — a harness that stops early reports fewer
+# cases, and fewer cases reads as green.
+"python/src/kb_setup/evals.py" = ["BLE001"]
 # Best-effort report block (BLE001); `G` is the standard NetworkX graph name (N806).
 "python/src/kb_setup/_merge_docs.py" = ["BLE001", "N806"]
 # The CLI main() is a flat command dispatch — branchy by nature, not complex logic.
