@@ -18,7 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard search"
+            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard search",
+            "timeout": 15
           }
         ]
       },
@@ -27,7 +28,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base/python kb-setup hookguard"
+            "command": "uv run --project /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base/python kb-setup hookguard",
+            "timeout": 20
           }
         ]
       },
@@ -36,7 +38,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard read"
+            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard read",
+            "timeout": 15
           }
         ]
       }

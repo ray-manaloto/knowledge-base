@@ -1,0 +1,53 @@
+# Clean Git State Before Validation
+
+Divergence between what hk checked and what a reviewer (or a fresh clone) sees
+is the #1 cause of "passes locally, fails for someone else." Ensure git state
+is clean before running validation or committing.
+
+## Before Running hk Checks
+
+1. Run `git status --short` to identify unstaged changes
+2. Stage ALL file deletions: `git add <deleted-file>`
+   - A deleted-but-unstaged file still exists in a fresh checkout
+3. Stage ALL file modifications you intend to commit
+4. Then run `mise run lint`
+
+## Before Every Commit
+
+Verify what hk checked locally matches what lands in the commit:
+
+1. `git diff --name-only` — should show no unstaged changes for hk-checked files
+2. `git diff --cached --name-only` — should show all intended changes
+3. New files must be `git add`-ed before hk runs, or hk won't check them
+
+## Common Divergence Patterns
+
+| Local State | What others get | Fix |
+|-------------|-----------------|-----|
+| File deleted on disk, not staged | File still exists | `git add <deleted-file>` |
+| File modified, not staged | Old content | `git add <file>` or stash |
+| Globally-installed tool | Tool missing | Pin it in `mise.toml` |
+| `npx` resolves a cached package | `npx` re-downloads a different version | Use the mise binary name |
+
+## The corpus adds one more pattern, and it is the expensive one
+
+`graphify-out/` is DERIVED and gitignored except for `memory/`. `sources/<name>/`
+clones are gitignored too — a source is reproduced from its `.manifest` pin.
+So a green local state can rest on bytes nobody else will ever have:
+
+| Local state | What a fresh clone gets | Fix |
+|---|---|---|
+| A graph built from an un-committed extraction chunk | A graph missing those nodes | commit the chunk under `sources/extractions/` |
+| A source clone advanced past its manifest SHA | The pinned SHA | `mise run kb-update -- <name>` so the manifest moves too |
+| Hand-edited `graphify-out/` artifacts | Regenerated output | re-derive via `kb-build` / `kb-artifacts`; never hand-edit |
+
+**`mise run kb-build` from a clean tree is the control arm.** If the graph you
+are reasoning about cannot be reproduced from committed inputs, it does not
+exist for anyone else.
+
+## Why this rule is eager (never `paths:`-scoped)
+
+Same class as `zero-skip-policy.md`: it fires when validation is about to run,
+not when a given file is read, so no glob predicts it. In dotfiles it was
+scoped until 2026-07-15, which meant validating after a python-only edit never
+loaded it. See `md-size-budgets.md` § "Scoping: the trigger test".
