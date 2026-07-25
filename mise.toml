@@ -82,6 +82,15 @@ run = "hk fix"
 description = "Run the Python test suite"
 run = "uv run pytest tests/ -x -q"
 
+[tasks.eval]
+description = "Eval harness: tier-1 reachability probes (offline, gated). `-- --live` adds the lane doctor"
+# Tier 0 is `hk`/contracts; this is tier 1 — does what we DECLARE actually
+# RESOLVE? Offline by default so it can join the ship gates for free; `--live`
+# shells out to the fable-orchestrator plugin's doctor.sh, which has no offline
+# mode and spends one real API call per installed lane. Logic in kb_setup.evals
+# (shared with dotfiles) + kb_setup.eval_cases (this repo's cases).
+run = "uv run kb-setup eval"
+
 [tasks.lint-docs]
 description = "Validate agent documentation (agnix)"
 # --strict: warnings-as-errors — parity with the hk `agnix` step. agnix exits 0

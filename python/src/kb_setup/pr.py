@@ -66,9 +66,15 @@ def working_tree_clean(repo_root: Path) -> bool:
     return rc == 0 and not out.strip()
 
 
+#: The local gates every PR must pass before it is pushed. `eval` is the tier-1
+#: reachability set — offline only, so it costs nothing here; its live half runs
+#: on demand via `mise run eval -- --live`.
+GATES = ("lint", "test", "brain-audit", "eval")
+
+
 def run_gates(repo_root: Path) -> bool:
-    """Run the local gates (lint, test, brain-audit); return True only if every one passes."""
-    for gate in ("lint", "test", "brain-audit"):
+    """Run every local gate in :data:`GATES`; True only if all of them pass."""
+    for gate in GATES:
         print(f"==> gate: {gate}")
         rc = _stream(["mise", "run", gate], cwd=repo_root)
         status = "PASS" if rc == 0 else "FAIL"
