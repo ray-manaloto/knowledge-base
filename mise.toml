@@ -192,7 +192,7 @@ description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the 
 # reflections/ + overlay are gitignored (regenerable); run each session.
 run = "graphify reflect --graph {{config_root}}/graphify-out/graph.json"
 
-# --- second brain (routing seam; see dotfiles .omc/specs/second-brain-design.md) ---
+# --- second brain (routing seam; see dotfiles docs/specs/second-brain-design.md) ---
 # The brain/ vault is its OWN graph (separate from the aggregate — a vault note never
 # connects to code structurally, measured). Keys stripped so update stays the FREE
 # AST pass and never triggers a paid backend (feedback_kb_graphify_claude_only).
@@ -225,7 +225,7 @@ run = "uv run kb-setup brain audit"
 description = "ADVISORY: flag sessions that delegated + verified but recorded no routing outcome"
 # Mines native session transcripts (no logging hook). Never a gate (rc always 0) —
 # the blocking ship-gate is brain-audit. Refreshed each session by a SessionEnd hook
-# (-- --output .omc/brain-audit.md). Logic in kb_setup.brain.transcript_audit.
+# (-- --output .agent/brain-audit.md). Logic in kb_setup.brain.transcript_audit.
 run = "uv run kb-setup brain transcript-audit"
 
 # --- tool currency (the shared engine; see currency.toml + kb_setup.currency) ---

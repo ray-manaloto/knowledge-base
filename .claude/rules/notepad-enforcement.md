@@ -5,7 +5,7 @@ MUST write findings to the notepad immediately — not at session end.
 
 ## The notepad is a file, not a tool
 
-The notepad is **`.omc/notepad.md`** (gitignored). Write to it with the ordinary
+The notepad is **`.agent/notepad.md`** (gitignored). Write to it with the ordinary
 Write/Edit tools, appending as you go.
 
 Do not reach for an MCP "notepad" tool: the tools that name once carried ship
@@ -15,7 +15,7 @@ unfollowable — name the file.
 
 ## This repo has a SECOND, durable memory: use both
 
-`.omc/notepad.md` is scratch and gitignored. The knowledge graph's
+`.agent/notepad.md` is scratch and gitignored. The knowledge graph's
 work-memory is committed and is what makes the corpus self-improving:
 
 - `mise run kb-remember -- --question "Q" --answer "A" --outcome useful`
@@ -32,7 +32,7 @@ private to a transcript nobody will read again.
 ## Rules
 
 1. **Write findings as you go**: After each significant discovery, append it to
-   `.omc/notepad.md`. Mark critical items so they survive a skim.
+   `.agent/notepad.md`. Mark critical items so they survive a skim.
 
 2. **What to record**: Root causes found, design decisions made, dead ends
    explored, verification results, and any context the next agent will need.
@@ -52,7 +52,7 @@ private to a transcript nobody will read again.
 
 ## Verification
 
-After an agent completes work, check `.omc/notepad.md` for findings. If it is
+After an agent completes work, check `.agent/notepad.md` for findings. If it is
 empty or stale relative to the work performed, the agent did not comply.
 
 ## See also

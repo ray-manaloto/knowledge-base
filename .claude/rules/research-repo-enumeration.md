@@ -42,16 +42,16 @@ Rules:
 
 ## Applies to
 
-- `.omc/kb/reports/**/*.md` — persisted agent reports.
-- `.omc/research/**/*.md` — agent working research.
+- `.agent/kb/reports/**/*.md` — persisted agent reports.
+- `.agent/research/**/*.md` — agent working research.
 - Any other markdown artifact produced by a research workflow (deep
   review, spec delta, dependency audit, etc.).
 
 ## Not applies to
 
-- Plans (`.omc/plans/**`) — plans describe intended work, not research
+- Plans (`.agent/plans/**`) — plans describe intended work, not research
   findings.
-- Session handoffs (`.omc/plans/session-*.md`) — the repos touched are
+- Session handoffs (`.agent/plans/session-*.md`) — the repos touched are
   implied by the commits in the session.
 - Rule files, skill files, CLAUDE.md.
 - Ingested corpus content under `sources/` — a source's provenance is its
@@ -59,7 +59,7 @@ Rules:
 
 ## Enforcement
 
-Documented, not machine-enforced: `.omc/**` is gitignored, so an hk check on
+Documented, not machine-enforced: `.agent/**` is gitignored, so an hk check on
 staged artifacts would be a no-op. This rule relies on reviewer enforcement
 and on `agent-report-persistence.md`, which requires the artifact to exist on
 disk in the first place.

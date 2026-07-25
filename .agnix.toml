@@ -9,7 +9,7 @@ exclude = [
   "node_modules/**",
   ".git/**",
   ".venv/**",
-  ".omc/**",
+  ".agent/**",
   # Corpus + derived graph output.
   "sources/**",
   "raw/**",

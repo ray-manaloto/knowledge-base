@@ -53,6 +53,14 @@ sources/media/*.pdf.txt   # regenerable from the committed .pdf via pypdf
 .DS_Store
 # Agent session state (OMC HUD etc.) — per-session scratch, never source. Left
 # untracked-but-unignored it is one `git add .` away from being committed.
+.agent/
+# `.omc/` stays ignored even though the convention moved to `.agent/`: the
+# statusline HUD configured in the USER-level ~/.claude/settings.json
+# (`node $HOME/.claude/hud/omc-hud.mjs`) still writes `.omc/state/` into
+# whichever repo is cwd, and it recreates the directory within seconds of
+# deletion. Dropping this line would dirty the tree on every session. Removing
+# it for real is a ~/.claude/settings.json change — user-level config this repo
+# does not edit.
 .omc/
 # reflect derived doc (regenerable via `graphify reflect`); memory/ IS tracked (authored)
 graphify-out/reflections/

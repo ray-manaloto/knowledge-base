@@ -26,15 +26,15 @@ it twice.
 
 ## Rules
 
-1. **Persist at receipt, into `.omc/kb/`.** When a findings-bearing agent's
+1. **Persist at receipt, into `.agent/kb/`.** When a findings-bearing agent's
    final report arrives, write it verbatim to
-   `.omc/kb/reports/agents/<agent-name>.md` in the SAME turn — before acting on
-   its content. Sources the agent fetched go to `.omc/kb/raw/<slug>.md`.
+   `.agent/kb/reports/agents/<agent-name>.md` in the SAME turn — before acting on
+   its content. Sources the agent fetched go to `.agent/kb/raw/<slug>.md`.
 
    **Extraction chunks are the exception, and go somewhere better:** a
    `{nodes,edges}` chunk is corpus input, not a report. Assemble it with
    `mise run kb-assemble -- <name> <chunk...>` and commit it under
-   `sources/extractions/` — a tracked, reproducible location. `.omc/**` is
+   `sources/extractions/` — a tracked, reproducible location. `.agent/**` is
    gitignored and does not survive a fresh clone.
 
 2. **Verbatim means verbatim.** Keep the agent's tables, evidence links,
@@ -76,4 +76,4 @@ agents, audit agents — regardless of which skill or workflow launched them.
 - `research-repo-enumeration.md` — every persisted report ends with its
   repos-touched enumeration.
 - `omc-directory-conventions.md` — where each artifact type lives, and why
-  corpus content does not live under `.omc/`.
+  corpus content does not live under `.agent/`.
