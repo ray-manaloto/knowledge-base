@@ -4,7 +4,7 @@ Every budget assertion here is paired with its FAIL direction, per
 `.claude/rules/probes-need-a-control-arm.md`: a gate verified only on a clean
 tree is decoration. The figures asserted are the ones established in the
 dotfiles research artifact
-`.omc/research/research-20260715-md-size-limits/report.md`.
+`docs/research/runs/research-20260715-md-size-limits/report.md`.
 
 This module is the SHARED engine — dotfiles consumes the same package — so the
 tests cover both repos' shapes: this repo is Claude-only (a self-contained

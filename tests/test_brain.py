@@ -358,9 +358,9 @@ def test_transcript_audit_writes_report_and_rc0(
         _line("s1", _agent(_CODEX)),
         _line("s1", _bash("mise run test")),
     )
-    rc = brain.transcript_audit(repo, output=Path(".omc/brain-audit.md"))
+    rc = brain.transcript_audit(repo, output=Path(".agent/brain-audit.md"))
     assert rc == 0
-    report = (repo / ".omc" / "brain-audit.md").read_text(encoding="utf-8")
+    report = (repo / ".agent" / "brain-audit.md").read_text(encoding="utf-8")
     assert "verified-unrecorded" in report
 
 

@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" brain-transcript-audit -- --output .omc/brain-audit.md",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" brain-transcript-audit -- --output .agent/brain-audit.md",
             "timeout": 120
           }
         ]

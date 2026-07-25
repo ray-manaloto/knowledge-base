@@ -53,7 +53,7 @@ version installed. The pin was fine; the environment lied.
 
 Here, the equivalent trap is **your working tree vs a fresh clone**:
 
-- an extraction chunk that exists only in `.omc/` or untracked;
+- an extraction chunk that exists only in `.agent/` or untracked;
 - a `sources/<name>/` clone advanced past its manifest SHA;
 - a `graphify-out/` carrying nodes from a source you later removed.
 

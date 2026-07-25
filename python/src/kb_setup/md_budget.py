@@ -7,7 +7,7 @@ implementation both this repo and ``ray-manaloto/dotfiles`` run, on the
 replaces the old ``claude_md_size_limit`` one-liner, which enforced a uniform
 200-line/12000-byte cap on every ``CLAUDE.md``/``AGENTS.md``. That gate had
 three defects, each established against primary sources in the dotfiles
-research artifact ``.omc/research/research-20260715-md-size-limits/report.md``:
+research artifact ``docs/research/runs/research-20260715-md-size-limits/report.md``:
 
 1. **The 12000-byte half was MISATTRIBUTED, not invented.** The figure is real
    — it is **Windsurf's**, not Anthropic's. Windsurf's own docs

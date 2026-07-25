@@ -5,7 +5,7 @@ This module lets it (1) RECORD a verified outcome per delegation, (2) AGGREGATE 
 outcomes deterministically into advisory routing lessons, and (3) AUDIT that every
 record is complete ("closed").
 
-Design (see dotfiles `.omc/specs/second-brain-design.md`):
+Design (see dotfiles `docs/specs/second-brain-design.md`):
 
 * Store — REUSE ``graphify save-result`` (no new store). Outcomes land in
   ``brain/graphify-out/memory/*.md``; this module derives (task_class, lane, verdict,
@@ -601,7 +601,7 @@ def render_transcript_report(result: TranscriptAudit) -> str:
         "Record a verified delegation with "
         "`mise run brain-remember -- --task-class T --lane L --effort E "
         "--verdict clean|rework|failed --session S`. See "
-        "`.omc/specs/second-brain-design.md` §4a-3 and the enforcement research "
+        "`docs/specs/second-brain-design.md` §4a-3 and the enforcement research "
         "open-Q #1.",
         "",
     ]
@@ -614,7 +614,7 @@ def transcript_audit(
     """Scan this project's recent transcripts for unrecorded verified delegations.
 
     Always rc 0 — advisory, never a gate. ``--output`` is what the SessionEnd
-    hook writes to (``.omc/brain-audit.md``), making the loop recurring rather
+    hook writes to (``.agent/brain-audit.md``), making the loop recurring rather
     than remember-to-run. No transcripts (e.g. a CI runner) is a clean no-op.
     """
     base = _transcripts_base()
