@@ -13,9 +13,14 @@ time. That is the difference between a red gate and a red gate you understand.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kb_setup import eval_cases, evals
+
+if TYPE_CHECKING:
+    import pytest
 
 _ROOT = Path(__file__).parent.parent.absolute()
 
@@ -217,3 +222,32 @@ def test_the_real_offline_run_is_green_on_this_tree() -> None:
     """
     rc, report = evals.run(_cases(), live=False)
     assert rc == 0, report
+
+
+def test_the_retriever_pins_the_query_to_this_repos_graph(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A bare `graphify query` resolves the graph against the process cwd.
+
+    Caught in review of PR #30. The corpus stamp and the fixture-integrity scan
+    both read `repo_root/graphify-out/graph.json`; if the query resolved
+    somewhere else, the printed recall would carry a stamp for a corpus it was
+    never measured against — exactly what the stamp exists to prevent. Binds the
+    real argv, so a refactor that drops the flag fails here.
+    """
+    calls: list[tuple[list[str], object]] = []
+
+    def fake_run(argv: Sequence[str], **kwargs: object) -> tuple[int, str]:
+        calls.append((list(argv), kwargs.get("cwd")))
+        return 0, "NODE Some label [src=wanted.md loc=L12 community=c]\nEDGE a --x--> b\n"
+
+    monkeypatch.setattr(eval_cases.evals, "run_command", fake_run)
+    retrieve = eval_cases._retrieval(tmp_path)
+    rc, sources = retrieve(eval_cases.GOLDEN_QUERIES[0])
+
+    assert rc == 0
+    assert sources == ["wanted.md"]
+    argv, cwd = calls[0]
+    assert cwd == tmp_path
+    assert "--graph" in argv
+    assert argv[argv.index("--graph") + 1] == str(tmp_path / "graphify-out" / "graph.json")

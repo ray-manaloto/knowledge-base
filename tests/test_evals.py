@@ -854,3 +854,22 @@ def test_corpus_has_ignores_a_bare_mention_that_is_not_a_source(tmp_path: Path) 
     graph = tmp_path / "graph.json"
     graph.write_text('{"label": "see also cerebras.md", "source_file": "other.md"}')
     assert evals.corpus_has(graph, ["cerebras.md"]) == {"cerebras.md": False}
+
+
+def test_an_absent_row_that_returned_nothing_still_fails() -> None:
+    """An ABSENT row must come back with no HITS, never with no RESULTS.
+
+    Exempting the negative rows from the emptiness check was proposed in review
+    of PR #30 and rejected here in code: a retriever that returns nothing would
+    then satisfy every negative row trivially — the can-only-pass shape the
+    negative direction exists to prevent. This pins the distinction, since the
+    two readings are one word apart in prose and opposite in effect.
+    """
+
+    def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
+        return (0, []) if query.expects_absent else (0, ["wanted.md"])
+
+    outcome = evals.retrieval_recall(_golden(), retrieve, stamp="test corpus")
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "returned NOTHING" in outcome.detail
+    assert "gone/ABSENT" in outcome.detail

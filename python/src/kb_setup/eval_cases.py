@@ -331,21 +331,35 @@ _NODE_LINE = re.compile(r"^NODE .*\[src=(?P<src>.*?) loc=")
 RETRIEVAL_TIMEOUT = 180
 
 
-def _retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
-    """Run one golden query against the LIVE local graph, in rank order.
+def _graph_path(repo_root: Path) -> Path:
+    return repo_root / "graphify-out" / "graph.json"
+
+
+def _retrieval(repo_root: Path) -> evals.Retrieve:
+    """Bind the retriever to THIS repo's graph, and return it.
 
     Shells out to `graphify query` exactly as the tier-1 canary does, rather
     than reimplementing traversal: what is being measured is the retrieval a
     session actually gets, and anything else would measure a different program.
+
+    PINNED with an explicit ``--graph``, not left to resolve against the process
+    cwd (caught in review of PR #30). The corpus stamp and the fixture-integrity
+    scan both read ``repo_root/graphify-out/graph.json``; a query resolving
+    somewhere else would print recall figures stamped with a corpus they were
+    not measured against — the precise failure the stamp exists to prevent.
     """
-    rc, out = evals.run_command(["graphify", "query", query.query], timeout=RETRIEVAL_TIMEOUT)
-    if rc != 0:
-        return rc, []
-    return rc, [m.group("src") for line in out.splitlines() if (m := _NODE_LINE.match(line))]
 
+    def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
+        rc, out = evals.run_command(
+            ["graphify", "query", query.query, "--graph", str(_graph_path(repo_root))],
+            cwd=repo_root,
+            timeout=RETRIEVAL_TIMEOUT,
+        )
+        if rc != 0:
+            return rc, []
+        return rc, [m.group("src") for line in out.splitlines() if (m := _NODE_LINE.match(line))]
 
-def _graph_path(repo_root: Path) -> Path:
-    return repo_root / "graphify-out" / "graph.json"
+    return retrieve
 
 
 def _corpus_stamp(repo_root: Path) -> str:
@@ -535,7 +549,7 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             ),
             probe=lambda: evals.retrieval_recall(
                 GOLDEN_QUERIES,
-                _retrieve,
+                _retrieval(repo_root),
                 stamp=_corpus_stamp(repo_root),
                 present=_corpus_membership(repo_root),
             ),

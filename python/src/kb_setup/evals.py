@@ -479,9 +479,18 @@ class Phrasing(StrEnum):
     did not, so a set built only of echoes grades lexical overlap and reports a
     retrieval win that is not there.
 
-    ``ABSENT`` is the negative direction: a query whose relevant nodes are not
-    in the corpus at all, which must come back with nothing. Without it the set
-    measures "returns something" rather than "returns the right thing".
+    ``ABSENT`` is the negative direction: a query whose declared target is not
+    in the corpus at all, so the target must NOT be among what comes back.
+    Without it the set measures "returns something" rather than "returns the
+    right thing".
+
+    Read that precisely — an ABSENT row must come back with **no HITS**, not
+    with no RESULTS. It still asks the graph a real question and the graph still
+    answers; a row that returned nothing at all is a broken query path, and it
+    fails (see :func:`retrieval_recall`). Exempting ABSENT rows from that check
+    was proposed in review of PR #30 and rejected: a retriever that returns
+    nothing would then satisfy every negative row trivially, which is the
+    can-only-pass shape the negative direction exists to prevent.
     """
 
     NATURAL = auto()
@@ -718,6 +727,10 @@ def retrieval_recall(
     broken = [f"{r.query.topic}/{r.query.phrasing.name} rc={r.rc}" for r in rows if r.rc != 0]
     if broken:
         return fail(f"{len(broken)} query/queries did not run: {', '.join(broken)}")
+    # EVERY row, ABSENT included — `returned` counts what came back, not what
+    # matched. An ABSENT row that returned nothing has not demonstrated the
+    # target is absent; it has demonstrated the query path is dead, and it would
+    # let a retriever that returns nothing pass every negative row.
     silent = [f"{r.query.topic}/{r.query.phrasing.name}" for r in rows if r.returned == 0]
     if silent:
         return fail(
