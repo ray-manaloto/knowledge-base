@@ -131,6 +131,102 @@ def test_live_cases_run_when_requested() -> None:
     assert report.results[0].outcome.verdict is evals.Verdict.PASS
 
 
+# --- the environment gate (precondition) --------------------------------------
+
+
+def test_a_precondition_skip_short_circuits_the_case() -> None:
+    """A case that does not apply here is a third state, checked FIRST."""
+    case = evals.Case(
+        name="tier1.x",
+        description="d",
+        probe=lambda: evals.fail("would have failed"),
+        control=lambda: evals.fail("armed"),
+        precondition=lambda: evals.skip("tool is host-only"),
+    )
+    report = evals.run_cases([case])
+    assert report.results[0].outcome.verdict is evals.Verdict.SKIP
+    assert "host-only" in report.results[0].outcome.detail
+    assert not report.red
+
+
+def test_a_precondition_is_checked_before_the_control_arm_rule() -> None:
+    """THE reason this state exists, and the ordering is the whole fix.
+
+    A case that cannot apply here also cannot have a working control arm — the
+    control drives the same code path, so it skips too. If the control-arm rule
+    ran first, such a case would be reported UNARMED and turn the run RED for a
+    question that was never asked. This is a real failure, not a hypothetical:
+    dotfiles' graphify canary is host-only and went rc=-2 inside its
+    devcontainer, taking the whole smoke run with it.
+    """
+    case = evals.Case(
+        name="tier1.x",
+        description="d",
+        probe=lambda: evals.ok("f"),
+        control=lambda: evals.skip("control cannot run here either"),
+        precondition=lambda: evals.skip("does not apply here"),
+    )
+    report = evals.run_cases([case])
+    assert report.results[0].outcome.verdict is evals.Verdict.SKIP
+    assert report.unarmed == 0
+    assert not report.red
+
+
+def test_a_precondition_returning_none_runs_the_case_normally() -> None:
+    """CONTROL ARM: without this, an always-skip precondition passes above."""
+    case = evals.Case(
+        name="tier1.x",
+        description="d",
+        probe=lambda: evals.ok("ran"),
+        control=lambda: evals.fail("armed"),
+        precondition=lambda: None,
+    )
+    report = evals.run_cases([case])
+    assert report.results[0].outcome.verdict is evals.Verdict.PASS
+
+
+def test_a_precondition_that_raises_fails_the_case() -> None:
+    """An environment gate we cannot evaluate must not silently let the case run."""
+
+    def boom() -> evals.Outcome | None:
+        raise RuntimeError("gate blew up")
+
+    case = evals.Case(
+        name="tier1.x",
+        description="d",
+        probe=lambda: evals.ok("f"),
+        control=lambda: evals.fail("armed"),
+        precondition=boom,
+    )
+    report = evals.run_cases([case])
+    assert report.results[0].outcome.verdict is evals.Verdict.FAIL
+    assert "RuntimeError" in report.results[0].outcome.detail
+
+
+def test_the_live_filter_still_wins_over_the_precondition() -> None:
+    """A live case is skipped without ever evaluating its environment gate.
+
+    Otherwise `mise run eval` could pay a probe's cost for a case it is not
+    going to run.
+    """
+    calls: list[int] = []
+
+    def gate() -> evals.Outcome | None:
+        calls.append(1)
+        return None
+
+    case = evals.Case(
+        name="tier1.x",
+        description="d",
+        probe=lambda: evals.ok("f"),
+        control=lambda: evals.fail("armed"),
+        live=True,
+        precondition=gate,
+    )
+    evals.run_cases([case])
+    assert calls == []
+
+
 # --- SKIP is never green ------------------------------------------------------
 
 

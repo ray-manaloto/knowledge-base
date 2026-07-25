@@ -110,6 +110,11 @@ class Case:
         gated: Whether a FAIL makes the run red.
         live: Whether the case spends a real API call. Off by default; the
             offline set is what joins the ship gates.
+        precondition: Optional environment gate. Return a SKIP :class:`Outcome`
+            when this case CANNOT APPLY here; return ``None`` to run normally.
+            "Does not apply in this environment" is a third state, distinct
+            from both "the probe failed" and "this case is live", and it must
+            be checked BEFORE the control-arm rule — see :func:`run_cases`.
     """
 
     name: str
@@ -118,6 +123,7 @@ class Case:
     control: Callable[[], Outcome] | None = None
     gated: bool = True
     live: bool = False
+    precondition: Callable[[], Outcome | None] | None = None
 
 
 @dataclass
@@ -355,6 +361,9 @@ def _control_verdict(case: Case) -> tuple[bool, str]:
 def run_cases(cases: Sequence[Case], *, live: bool = False) -> Report:
     """Run every in-scope case, applying the control-arm rule first.
 
+    Order of the three gates matters and is pinned by tests: live-filter, then
+    ``precondition``, then the control-arm rule.
+
     Args:
         cases: The repo's declared cases.
         live: Include cases that spend real API calls. Off by default, because
@@ -365,6 +374,26 @@ def run_cases(cases: Sequence[Case], *, live: bool = False) -> Report:
         if case.live and not live:
             report.results.append(Result(case, skip("live case — pass --live to run it")))
             continue
+
+        # The environment gate comes BEFORE the control-arm rule, and that
+        # ordering is load-bearing. A case that cannot apply here also cannot
+        # have a working control arm — the control drives the same code path, so
+        # it would skip too, the runner would mark the case UNARMED, and the run
+        # would go red for a case that was never asked. Checking the
+        # precondition first keeps "does not apply here" from masquerading as
+        # "this gate is decoration".
+        #
+        # Learned from a real failure: dotfiles' graphify canary is host-only,
+        # and inside the devcontainer it failed with rc=-2 (no such file),
+        # turning the whole devcontainer smoke red.
+        if case.precondition is not None:
+            try:
+                gate = case.precondition()
+            except Exception as exc:
+                gate = fail(f"precondition raised {type(exc).__name__}: {exc}")
+            if gate is not None:
+                report.results.append(Result(case, gate))
+                continue
 
         if case.gated:
             armed, detail = _control_verdict(case)
