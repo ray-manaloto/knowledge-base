@@ -22,14 +22,41 @@ import json
 import re
 import sys
 
-# Command-position matcher: `graphify` as a command word (line start or after a
-# shell separator), not the substring inside a URL/arg. Captures the subcommand.
-_GRAPHIFY_CMD = re.compile(
-    r"(?:^|[;&|]|&&|\|\||\bthen\b|\bdo\b)\s*graphify\s+([a-z][a-z-]*)", re.IGNORECASE
-)
-# graphify's bundled interpreter, or any python running _merge_docs / import graphify.
-_GRAPHIFY_PY = re.compile(
-    r"(graphifyy/[^\s]*/bin/python|_merge_docs\.py|import\s+graphify|graphify\.transcribe)"
+# Command position: start of string or just after a shell separator, tolerating
+# an `env`/`VAR=x` prefix so `FOO=1 graphify add …` cannot slip past (it did
+# before — `_GRAPHIFY_CMD` required `graphify` to sit immediately after the
+# separator). Shared by every pattern below so they cannot drift apart.
+_CMD_POS = r"(?:^|[;&|]|&&|\|\||\bthen\b|\bdo\b)\s*(?:(?:env\s+)?(?:\w+=\S*\s+)*)"
+
+# `graphify` as a command word, not the substring inside a URL/arg or a quoted
+# mention. Captures the subcommand.
+_GRAPHIFY_CMD = re.compile(_CMD_POS + r"graphify\s+([a-z][a-z-]*)", re.IGNORECASE)
+
+# graphify's bundled interpreter, invoked as the command.
+_GRAPHIFY_PYBIN = re.compile(_CMD_POS + r"\S*graphifyy/\S*/bin/python\b")
+
+# A python-ish command head DRIVING graphify — the head and the payload must sit
+# in the same segment (`[^;&|\n]*` stops at the next separator).
+#
+# The command head is what makes this precise, and it is the whole fix (found by
+# this repo's own tier-2 fixture table, 2026-07-25). The pattern used to be a
+# bare payload search with NO anchoring, so grepping FOR it tripped it:
+# `grep -rn "import graphify" python/` and `rg "_merge_docs.py" .` both DENIED.
+# That is dotfiles #265 one level down — false positives are the only defect
+# class ever measured in either guard, and both rows are now pinned.
+#
+# Masking quoted spans (dotfiles' `_inert_masked` fix for the same class) is the
+# WRONG fix here and was rejected on evidence: the real deny,
+# `python -c "import graphify"`, carries its payload legitimately quoted, so
+# blanking quoted content would break the very denial the rule exists for. The
+# discriminator between the two is the command head, not the quoting.
+#
+# Documented fail-open, consistent with the rest of this guard: `python -m
+# kb_setup._merge_docs` (no `.py`) is not matched, and a `mise run kb-…` anywhere
+# in the command short-circuits the whole guard (see `decide`).
+_PY_DRIVES_GRAPHIFY = re.compile(
+    _CMD_POS + r"(?:\S*/)?(?:python[\d.]*|uv\s+run)\b[^;&|\n]*"
+    r"(?:_merge_docs\.py|import\s+graphify|graphify\.transcribe)"
 )
 
 # subcommand -> the mise task (or None = not allowed at all) that replaces it.
@@ -85,10 +112,21 @@ def _deny(reason: str) -> None:
     )
 
 
-def _verdict(command: str) -> str | None:
-    """Return a deny-reason if `command` runs graphify by hand, else None."""
+def decide(command: str) -> str | None:
+    """Return a deny-reason if `command` runs graphify by hand, else None.
+
+    The guard's decision function, and its introspection surface: the tier-2
+    fixture table in :mod:`kb_setup.eval_cases` drives every row through THIS
+    call, so the function that denies a command is the one the corpus grades.
+    Public (it was `_verdict`) for exactly that reason — a gate reaching through
+    a private name is a gate that can be refactored out from under.
+    """
     # A mise task legitimately shells out to graphify inside itself — allow it.
     # (The guard only sees the Bash command Claude issues, not the task's children.)
+    # Fail-open by design, and deliberately not narrowed: it matches anywhere in
+    # the command, so `mise run kb-build && graphify query "x"` is allowed. Same
+    # class as dotfiles' documented `$(…)`/`sh -c`/`eval` holes — this is a
+    # redirect guard, not a sandbox.
     if re.search(r"\bmise\s+run\s+kb-", command):
         return None
 
@@ -110,7 +148,7 @@ def _verdict(command: str) -> str | None:
             "kb-query/kb-artifacts). Enforced by kb_setup.hook_guard."
         )
 
-    if _GRAPHIFY_PY.search(command):
+    if _GRAPHIFY_PYBIN.search(command) or _PY_DRIVES_GRAPHIFY.search(command):
         return _REASON_PY
     return None
 
@@ -130,7 +168,7 @@ def run() -> int:
     if not isinstance(command, str) or not command.strip():
         return 0
     try:
-        reason = _verdict(command)
+        reason = decide(command)
     except Exception:
         return 0
     if reason:

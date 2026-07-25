@@ -449,3 +449,117 @@ def test_render_names_an_unarmed_case_as_refused() -> None:
     text = evals.render(report)
     assert "UNARMED" in text
     assert "REFUSED TO COUNT" in text
+
+
+# --- tier 2: guard fixture tables ---------------------------------------------
+#
+# The engine's whole job is to catch a guard that cannot discriminate, so these
+# tests drive it with the two degenerate guards explicitly. Both must produce a
+# RED run — an always-deny guard passes the deny rows, an always-allow guard
+# passes the allow rows, and each looks healthy from its own half of the table.
+
+_DENY = evals.Decision.DENY
+_ALLOW = evals.Decision.ALLOW
+
+_TABLE = (
+    evals.GuardFixture("gh pr create --fill", _DENY, "has a canonical task"),
+    evals.GuardFixture("git status --short", _ALLOW, "an ordinary command"),
+)
+
+
+def _discriminating(command: str) -> str | None:
+    return "use the task" if command.startswith("gh pr create") else None
+
+
+def _always_deny(_command: str) -> str | None:
+    return "denied"
+
+
+def _always_allow(_command: str) -> str | None:
+    return None
+
+
+def test_a_discriminating_guard_passes_its_table() -> None:
+    outcome = evals.run_guard_table(_TABLE, _discriminating)
+    assert outcome.verdict is evals.Verdict.PASS
+    assert "1 deny, 1 allow" in outcome.detail
+
+
+def test_a_discriminating_guard_fails_the_inverted_table() -> None:
+    """The control arm, stated directly: inverting the expectations must FAIL.
+
+    This is what makes the table-level arm legitimate rather than an exemption
+    from principle 1 — each row is the other rows' control.
+    """
+    outcome = evals.run_guard_table(_TABLE, _discriminating, invert=True)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "inverted table" in outcome.detail
+
+
+def test_an_always_deny_guard_fails_the_table_on_its_allow_row() -> None:
+    """False positives are the only defect class ever measured in these guards."""
+    outcome = evals.run_guard_table(_TABLE, _always_deny)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "git status --short" in outcome.detail
+    assert "expected ALLOW, saw DENIED" in outcome.detail
+
+
+def test_an_always_allow_guard_fails_the_table_on_its_deny_row() -> None:
+    outcome = evals.run_guard_table(_TABLE, _always_allow)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "gh pr create --fill" in outcome.detail
+    assert "expected DENY, saw ALLOWED" in outcome.detail
+
+
+def test_a_mismatch_reports_the_reason_it_actually_saw() -> None:
+    """Principle 8: surface the status seen, never a prose summary of it."""
+    outcome = evals.run_guard_table(_TABLE, _always_deny)
+    assert "denied" in outcome.detail  # the guard's own reason, echoed back
+    assert "an ordinary command" in outcome.detail  # the row's `why`
+
+
+def test_a_deny_only_table_is_rejected() -> None:
+    """The must-ALLOW half is enforced, not merely recommended.
+
+    Without this the always-deny guard above would pass a deny-only corpus and
+    the harness would certify the one direction that has never failed.
+    """
+    deny_only = tuple(f for f in _TABLE if f.expected is _DENY)
+    outcome = evals.run_guard_table(deny_only, _always_deny)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "single-direction" in outcome.detail
+    assert "must-ALLOW" in outcome.detail
+
+
+def test_an_allow_only_table_is_rejected() -> None:
+    allow_only = tuple(f for f in _TABLE if f.expected is _ALLOW)
+    outcome = evals.run_guard_table(allow_only, _always_allow)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "single-direction" in outcome.detail
+    assert "must-DENY" in outcome.detail
+
+
+def test_an_empty_table_is_rejected() -> None:
+    """An empty table is a probe that cannot fail — the shape principle 1 bans."""
+    outcome = evals.run_guard_table((), _discriminating)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "EMPTY" in outcome.detail
+
+
+def test_guard_table_case_is_armed_and_green_on_a_real_guard() -> None:
+    case = evals.guard_table_case("tier2.x", "d", _TABLE, _discriminating)
+    report = evals.run_cases([case])
+    assert not report.red, evals.render(report)
+    assert report.passed == 1
+
+
+def test_guard_table_case_goes_red_for_both_degenerate_guards() -> None:
+    """The composite property, end to end through the runner.
+
+    Neither degenerate guard may reach a green run, and neither may reach it by
+    the back door of being marked UNARMED-but-ignored: `Report.red` is true for
+    UNARMED too, so both paths are covered by the same assertion.
+    """
+    for guard in (_always_deny, _always_allow):
+        report = evals.run_cases([evals.guard_table_case("tier2.x", "d", _TABLE, guard)])
+        assert report.red, f"{guard.__name__} reached a green run"
