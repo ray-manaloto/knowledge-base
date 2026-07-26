@@ -37,6 +37,7 @@ review happened.
 
 from __future__ import annotations
 
+import itertools
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -827,6 +828,31 @@ def _delta_line(baseline: _ArmResult, other: _ArmResult) -> str:
     )
 
 
+#: Below this many arms, the consecutive comparison IS the cumulative one, so a
+#: cumulative line would repeat the consecutive line verbatim.
+_ARMS_WITH_ONE_DELTA = 2
+
+
+def _delta_lines(results: Sequence[_ArmResult]) -> list[str]:
+    """Every delta the report owes the reader, and no duplicates.
+
+    With two arms there is one comparison and it is both consecutive and
+    cumulative, so exactly one line is printed — unchanged from PR #30.
+
+    With three or more, printing only baseline→arm would leave the newest arm's
+    OWN contribution unstated: `unscoped -> prose+idf` folds P0 and P1 together,
+    and a reader wanting P1 alone would have to subtract two printed numbers by
+    hand. That is precisely the inherited-number trap :func:`_delta_line` exists
+    to close (`probes-need-a-control-arm.md` rule 6) — a figure nobody re-derived,
+    with its provenance lost the moment it is restated. So each arm is also
+    compared to its PREDECESSOR, which is the change that arm actually made.
+    """
+    consecutive = [_delta_line(a, b) for a, b in itertools.pairwise(results)]
+    if len(results) <= _ARMS_WITH_ONE_DELTA:
+        return consecutive
+    return [*consecutive, _delta_line(results[0], results[-1])]
+
+
 def retrieval_recall(
     queries: Sequence[GoldenQuery],
     arms: Sequence[Arm],
@@ -846,8 +872,12 @@ def retrieval_recall(
 
     Args:
         queries: The golden set. Its shape is checked (:func:`_golden_set_shape`).
-        arms: The corpora to measure, in order. The first is the baseline and
-            every later one is reported as a delta against it. See :class:`Arm`.
+        arms: The corpora to measure, in order, each one the previous plus a
+            single change. Every arm is reported as a delta against its
+            PREDECESSOR — which is the change that arm actually made — and with
+            three or more arms a cumulative first-to-last line is printed as
+            well. With two arms those coincide and exactly one line is emitted.
+            See :class:`Arm` and :func:`_delta_lines`.
         stamp: The corpus stamp — build date and node count. Carried into the
             detail because a retrieval number without the corpus it was measured
             against is not a measurement (``probes-need-a-control-arm.md`` rule 6).
@@ -872,7 +902,7 @@ def retrieval_recall(
         [
             f"corpus: {stamp}",
             *(line for r in results for line in _arm_lines(r)),
-            *(_delta_line(results[0], r) for r in results[1:]),
+            *_delta_lines(results),
         ]
     )
     if all(r.scored == (0, 0) for r in results):

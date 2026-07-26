@@ -184,3 +184,104 @@ def test_the_attached_graph_form_is_rejected_alongside_prose(
     )
     assert rc == 2
     assert argv is None
+
+
+# --- the `--idf` form (knowledge-base#12 P1) ----------------------------------
+#
+# `--idf` never shells out, so `_Recorder` cannot observe it. What matters
+# instead is ARGUMENT HANDLING: this path silently ignoring a flag it cannot
+# honour is exactly the "answer read as if the flag applied" failure the whole
+# wrapper exists to prevent.
+
+
+def test_the_idf_flag_is_not_forwarded_to_graphify(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`--idf` is ours, not graphify's — it must never reach the subprocess."""
+    recorder = _Recorder()
+    monkeypatch.setattr(subprocess, "run", recorder)
+    graphify_ops.query(_repo(tmp_path), ["q", "--prose"])
+    assert recorder.argv is not None
+    assert graphify_ops.IDF_FLAG not in recorder.argv
+
+
+def test_top_is_validated_by_the_conversion_that_consumes_it() -> None:
+    """REGRESSION (CodeRabbit, PR #33): `--top ²` raised instead of erroring.
+
+    `str.isdigit()` is True for any Numeric_Type=Digit character, including
+    superscripts, while `int()` accepts only Numeric_Type=Decimal — so
+    validating with one predicate and converting with another leaves a gap that
+    escapes as an unhandled `ValueError` rather than the parser's message.
+    Measured: `"²".isdigit()` is True and `int("²")` raises.
+
+    The fix is to let the conversion BE the validation. Pinned here in both
+    directions, because a parser that raises where it should explain is
+    indistinguishable from a crash to whoever typed the flag.
+    """
+    assert "²".isdigit()  # the trap, stated so the fixture cannot rot
+    assert isinstance(graphify_ops._parse_idf_args(["q", "--top", "²"]), str)
+
+
+def test_top_rejects_zero_and_non_numbers_and_accepts_a_positive_integer() -> None:
+    parse = graphify_ops._parse_idf_args
+    assert isinstance(parse(["q", "--top", "0"]), str)
+    assert isinstance(parse(["q", "--top", "abc"]), str)
+    assert isinstance(parse(["q", "--top"]), str)
+    parsed = parse(["q", "--top", "8"])
+    assert not isinstance(parsed, str)
+    assert parsed.top == 8
+
+
+def test_a_graphify_only_flag_is_rejected_rather_than_ignored() -> None:
+    """`--budget` steers graphify's traversal, and this path has no traversal.
+
+    Forwarding it is impossible and ignoring it is worse than failing: the
+    caller would read a ranked list as though a budget had shaped it.
+    """
+    error = graphify_ops._parse_idf_args(["q", "--budget", "3000"])
+    assert isinstance(error, str)
+    assert "--budget" in error
+
+
+def test_the_question_is_required() -> None:
+    assert isinstance(graphify_ops._parse_idf_args([]), str)
+    assert isinstance(graphify_ops._parse_idf_args(["--top", "5"]), str)
+
+
+def test_the_words_of_an_unquoted_question_are_rejoined() -> None:
+    """A shell that split the question must not change what was asked."""
+    parsed = graphify_ops._parse_idf_args(["how", "does", "X", "work"])
+    assert not isinstance(parsed, str)
+    assert parsed.question == "how does X work"
+
+
+def test_an_explicit_graph_is_honoured_by_the_idf_path() -> None:
+    parsed = graphify_ops._parse_idf_args(["q", "--graph", "/somewhere/other.json"])
+    assert not isinstance(parsed, str)
+    assert parsed.graph == Path("/somewhere/other.json")
+
+
+def test_a_missing_default_corpus_names_the_task_that_derives_it(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    rc = graphify_ops.query(_repo(tmp_path, prose_graph=False), ["q", graphify_ops.IDF_FLAG])
+    assert rc == 2
+    assert "kb-prose" in capsys.readouterr().err
+
+
+def test_a_missing_explicit_graph_does_not_name_that_task(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """REGRESSION (CodeRabbit, PR #33): the hint named a task that cannot help.
+
+    `mise run kb-prose` writes the DEFAULT corpus. Telling someone who passed
+    their own `--graph` to run it points at a command that would not produce the
+    file they asked for — a remediation hint that sends the reader somewhere
+    else entirely.
+    """
+    missing = str(tmp_path / "nope.json")
+    rc = graphify_ops.query(_repo(tmp_path), ["q", graphify_ops.IDF_FLAG, "--graph", missing])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "kb-prose" not in err
+    assert missing in err

@@ -43,10 +43,10 @@ graphify's surface splits by transport AND by liveness:
 ### Querying (any consumer, e.g. the dotfiles repo)
 
 - CLI: `mise run kb-query -- "how does X work?"` (deterministic, no LLM,
-  source-cited). **Add `--prose` for any question about the DOCUMENTS**: it reads
-  the derived prose-only graph (2,105 nodes) not all 128,333, of which 126,228
-  are code AST crowding prose out of the query's token budget (natural-phrasing
-  recall 1/8 -> 3/8 pairs; #12, 2026-07-25). Also `graphify path`/`explain`.
+  source-cited). Asking about the DOCUMENTS? **`--prose`** reads the prose-only
+  graph (2,105 nodes, not 128,445 of which 126k are code AST crowding prose out
+  of the budget); **`--idf`** also ranks it by BM25/IDF rather than graphify's
+  unscored BFS — the best arm, natural recall 1/8 -> 3/8 -> 5/8 (#12 P0/P1).
 - MCP: `mise run kb-serve` starts the read-only server pinned to this graph.
   A consumer repo reaches it via `mcp2cli` (one-off) or a `.mcp.json`
   registration (frequent use). All MCP tools are graph reads and spend **zero

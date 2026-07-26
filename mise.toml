@@ -137,7 +137,7 @@ description = "Derive graphify-out/graph-prose.json (the graph minus the code-AS
 run = "uv run kb-setup prose"
 
 [tasks.kb-query]
-description = 'Query the graph: mise run kb-query -- "<question>" [--prose] [--budget N]'
+description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N] | --idf [--top N]]'
 # Deterministic BFS/DFS over the graph — no LLM, source-cited. Thin wrapper over
 # `graphify query` (kb_setup.graphify_ops.query) for two reasons: it PINS --graph
 # instead of letting graphify resolve it against the process cwd, and it adds
@@ -151,6 +151,15 @@ description = 'Query the graph: mise run kb-query -- "<question>" [--prose] [--b
 # target on the full graph was absent from the ENTIRE returned list, not merely
 # ranked low. Queries also drop from ~9.5s to ~0.3s. Use the unscoped form when
 # the question is about the source repos' code.
+#
+# --idf IS THE BEST ARM as of #12 P1 (2026-07-26). It reads the same prose graph
+# --prose does, but ranks it with our own BM25/IDF scorer (kb_setup.lexical) over
+# each node's label + rationale, instead of graphify's printed order — which is
+# seed-then-BFS and applies NO relevance score at all. Measured over the golden
+# set: natural phrasings 3 of 8 pairs prose-scoped -> 5 of 8 with the scorer
+# (mean 0.38 -> 0.62), echo unchanged at 8 of 8, both negatives still clean. It
+# never shells out to graphify, so graphify's own flags (--budget, --depth) are
+# REJECTED rather than ignored. `--top N` sets how many ranked hits print.
 run = "uv run kb-setup query"
 
 [tasks.kb-serve]

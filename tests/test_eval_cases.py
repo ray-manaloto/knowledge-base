@@ -13,6 +13,7 @@ time. That is the difference between a red gate and a red gate you understand.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -254,14 +255,18 @@ def test_the_retriever_pins_the_query_to_this_repos_graph(
     assert argv[argv.index("--graph") + 1] == str(graph)
 
 
-def test_the_two_arms_query_different_graphs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """CONTROL ARM for the whole before/after: two arms, two corpora.
+def test_each_arm_reads_its_own_corpus(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """CONTROL ARM for the whole before/after: three arms, and no two are the same run.
 
-    If both arms resolved the same graph the report would still print a table, a
-    SUITE line per arm and a DELTA of zero — a before/after that structurally
-    cannot show a difference. So the argv each arm actually sends is bound here.
+    If two arms resolved the same corpus with the same retriever the report would
+    still print a table, a SUITE line per arm and a DELTA of zero — a before/after
+    that structurally cannot show a difference. So what each arm actually does is
+    bound here.
+
+    The P1 arm differs from the other two along the OTHER axis: it reads the same
+    file as `prose` but does not shell out at all, which is why it must not
+    appear in ``seen``. Scoping and scoring are separate changes, and an arm that
+    quietly re-ran graphify would report P0's number under P1's name.
     """
     seen: list[str] = []
 
@@ -274,11 +279,56 @@ def test_the_two_arms_query_different_graphs(
     for arm in arms:
         arm.retrieve(eval_cases.GOLDEN_QUERIES[0])
 
-    assert [a.name for a in arms] == [eval_cases.UNSCOPED_ARM, eval_cases.PROSE_ARM]
+    assert [a.name for a in arms] == [
+        eval_cases.UNSCOPED_ARM,
+        eval_cases.PROSE_ARM,
+        eval_cases.IDF_ARM,
+    ]
+    # Only the two graphify-backed arms shell out, and they name different graphs.
     assert seen == [
         str(tmp_path / "graphify-out" / "graph.json"),
         str(tmp_path / "graphify-out" / prose.PROSE_GRAPH_NAME),
     ]
+
+
+def test_the_lexical_arm_reports_a_real_rc_when_it_cannot_read_its_corpus(tmp_path: Path) -> None:
+    """The P1 arm's ``rc`` must be earned, not hardcoded.
+
+    It is the first arm whose retriever does not shell out, so `_arm_defect`'s
+    ``rc != 0`` check has no subprocess exit code to inherit — and a check that
+    cannot fire is not a check. Here the prose graph does not exist, which is a
+    genuinely reachable state (the graphs are gitignored and derived), and the
+    arm must surface it rather than reporting an honest-looking empty result.
+    """
+    retrieve = eval_cases._LexicalRetriever(tmp_path / "graphify-out" / prose.PROSE_GRAPH_NAME)
+    rc, returned = retrieve(eval_cases.GOLDEN_QUERIES[0])
+    assert rc == eval_cases._LexicalRetriever.UNREADABLE
+    assert rc != 0
+    assert returned == []
+
+
+def test_the_lexical_arm_builds_its_index_once_across_queries(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """18 queries, one index build. Rebuilt per query, the arm would time JSON parsing."""
+    graph = tmp_path / "prose.json"
+    graph.write_text(
+        json.dumps({"nodes": [{"id": "a", "label": "alpha beta", "source_file": "a.md"}]}),
+        encoding="utf-8",
+    )
+    builds = 0
+    real_load = eval_cases.lexical.load_index
+
+    def counting_load(path: Path) -> object:
+        nonlocal builds
+        builds += 1
+        return real_load(path)
+
+    monkeypatch.setattr(eval_cases.lexical, "load_index", counting_load)
+    retrieve = eval_cases._LexicalRetriever(graph)
+    for query in eval_cases.GOLDEN_QUERIES[:3]:
+        retrieve(query)
+    assert builds == 1
 
 
 def test_every_arm_carries_its_own_membership_oracle() -> None:
