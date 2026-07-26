@@ -470,7 +470,10 @@ class _LexicalRetriever:
         if self._index is None and not self._broken:
             try:
                 self._index = lexical.load_index(self._graph)
-            except OSError, ValueError, json.JSONDecodeError:
+            # JSONDecodeError is a ValueError subclass, so it needs no arm of
+            # its own. The unparenthesised form is valid here (PEP 758, py3.14)
+            # and is what ruff normalises to; parens are only REQUIRED with `as`.
+            except OSError, ValueError:
                 self._broken = True
         if self._index is None:
             return self.UNREADABLE, []

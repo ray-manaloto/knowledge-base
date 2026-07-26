@@ -12,7 +12,6 @@ auto-detected Gemini/OpenAI key.
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
@@ -211,10 +210,18 @@ def _parse_idf_args(rest: Sequence[str]) -> _IdfArgs | str:
             i += 2
             if arg == GRAPH_FLAG:
                 graph = Path(value)
-            elif value.isdigit() and int(value) >= 1:
-                top = int(value)
-            else:
+                continue
+            # Validated by the conversion itself, not by `isdigit()`: that
+            # predicate accepts superscripts and other Numeric_Type=Digit
+            # characters that `int()` then REJECTS, so `--top ²` would raise
+            # instead of returning this message.
+            try:
+                parsed_top = int(value)
+            except ValueError:
                 return f"{_IDF_TOP} needs a positive integer, got {value!r}"
+            if parsed_top < 1:
+                return f"{_IDF_TOP} needs a positive integer, got {value!r}"
+            top = parsed_top
             continue
         if arg.startswith("-"):
             return (
@@ -246,13 +253,18 @@ def _idf_query(repo_root: Path, rest: Sequence[str]) -> int:
         print(f"[kb-query] {parsed}", file=sys.stderr)
         return 2
 
-    graph = parsed.graph if parsed.graph is not None else prose.prose_graph_path(repo_root)
+    explicit = parsed.graph is not None
+    graph = parsed.graph if explicit else prose.prose_graph_path(repo_root)
     if not graph.is_file():
-        print(f"[kb-query] no graph at {graph} — run `mise run kb-prose` first", file=sys.stderr)
+        # Only the DEFAULT corpus has a task that creates it. Telling someone who
+        # passed their own --graph to run `kb-prose` names a command that would
+        # not produce the file they asked for.
+        fix = "check the path" if explicit else "run `mise run kb-prose` first"
+        print(f"[kb-query] no graph at {graph} — {fix}", file=sys.stderr)
         return 2
     try:
         index = lexical.load_index(graph)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         print(f"[kb-query] could not index {graph}: {exc}", file=sys.stderr)
         return 1
 

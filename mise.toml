@@ -137,7 +137,7 @@ description = "Derive graphify-out/graph-prose.json (the graph minus the code-AS
 run = "uv run kb-setup prose"
 
 [tasks.kb-query]
-description = 'Query the graph: mise run kb-query -- "<question>" [--prose|--idf] [--budget N]'
+description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N] | --idf [--top N]]'
 # Deterministic BFS/DFS over the graph — no LLM, source-cited. Thin wrapper over
 # `graphify query` (kb_setup.graphify_ops.query) for two reasons: it PINS --graph
 # instead of letting graphify resolve it against the process cwd, and it adds

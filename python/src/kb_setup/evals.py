@@ -872,8 +872,12 @@ def retrieval_recall(
 
     Args:
         queries: The golden set. Its shape is checked (:func:`_golden_set_shape`).
-        arms: The corpora to measure, in order. The first is the baseline and
-            every later one is reported as a delta against it. See :class:`Arm`.
+        arms: The corpora to measure, in order, each one the previous plus a
+            single change. Every arm is reported as a delta against its
+            PREDECESSOR — which is the change that arm actually made — and with
+            three or more arms a cumulative first-to-last line is printed as
+            well. With two arms those coincide and exactly one line is emitted.
+            See :class:`Arm` and :func:`_delta_lines`.
         stamp: The corpus stamp — build date and node count. Carried into the
             detail because a retrieval number without the corpus it was measured
             against is not a measurement (``probes-need-a-control-arm.md`` rule 6).
