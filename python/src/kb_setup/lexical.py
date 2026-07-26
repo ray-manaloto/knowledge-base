@@ -149,7 +149,30 @@ class Index:
         in more than half the corpus, which lets a common term *subtract* from a
         document's score and can rank a document below one that matched nothing.
         The ``1 +`` inside the log is the standard fix and floors the weight at
-        zero: a term everywhere is worth nothing, never worth less than nothing.
+        zero, so a ubiquitous term is worth very little and never less than
+        nothing.
+
+        IT IS A FLOOR, NOT A CLAMP, AND THAT IS DELIBERATE. At ``df == size`` the
+        smoothed formula returns a small positive number (0.047 over 10
+        documents) rather than exactly 0, so in principle a query made only of
+        everywhere-terms still orders documents — by length, via the ``b``
+        normalisation. Returning a hard 0.0 there was tried and REVERTED
+        (CodeRabbit, PR #33); measuring both sides is what settled it:
+
+        * In this corpus the branch is unreachable. **No term reaches
+          ``df == size``** — the commonest, "the", is 1,418 of 2,105 (67%). So
+          the clamp buys nothing where the scorer actually runs.
+        * It is actively harmful on a small corpus, because ``df == size`` is
+          not a rare pathology there but the NORMAL case: in a one-document
+          index every term is ubiquitous, so a clamp makes the document
+          unfindable by any of its own words. Measured at n = 1, 2, 3 and 10,
+          every query returned nothing, and four existing tests went red for
+          that reason rather than a fixture reason.
+
+        The real defect this exchange found was in the previous docstring, which
+        promised "worth nothing" — a claim the arithmetic never made. Fixing the
+        sentence is the correct repair; deviating from standard BM25 to satisfy
+        a sentence is not.
         """
         df = self.document_frequency.get(term, 0)
         return math.log(1 + (self.size - df + 0.5) / (df + 0.5))
@@ -198,17 +221,52 @@ def build_index(nodes: Iterable[dict[str, object]]) -> Index:
     )
 
 
+def _schema_problem(graph: object) -> str:
+    """What is wrong with this parsed JSON as a graph, or '' if nothing is.
+
+    Returns a message rather than raising, so the caller owns the exception type.
+    That matters here: the natural reading of a bad type is ``TypeError``, but
+    every caller of :func:`load_index` catches ``OSError``/``ValueError`` — the
+    CLI to print a diagnostic, `eval_cases._LexicalRetriever` to report its arm
+    unreadable with a real ``rc``. A ``TypeError`` would sail past both and turn
+    a defective corpus into a stack trace, which is the very failure this check
+    was added to close.
+    """
+    if not isinstance(graph, dict):
+        return f"its root is a {type(graph).__name__}, not an object"
+    nodes = graph.get("nodes", [])
+    if not isinstance(nodes, list):
+        return f"its `nodes` is a {type(nodes).__name__}, not a list"
+    if not all(isinstance(node, dict) for node in nodes):
+        return "its `nodes` is not a list of objects"
+    return ""
+
+
 def load_index(graph_path: Path) -> Index:
     """Build an index from a graph file on disk.
 
     Raises:
-        ValueError: if the file parses but holds no indexable node. An empty
-            index answers every query with nothing, which is indistinguishable
-            from the retrieval failure this module exists to fix — so it is
-            refused loudly rather than served (same rule as `prose.derive`).
+        ValueError: if the file is not a graph — either structurally (the root is
+            not an object, or ``nodes`` is not a list of objects) or in substance
+            (it parses and holds no indexable node). An empty index answers every
+            query with nothing, which is indistinguishable from the retrieval
+            failure this module exists to fix — so it is refused loudly rather
+            than served (same rule as `prose.derive`).
+
+    THE SHAPE CHECKS EXIST TO KEEP THE FAILURE INSIDE THE DOCUMENTED CHANNEL
+    (CodeRabbit, PR #33). Callers catch ``OSError`` and ``ValueError`` — the CLI
+    to print a diagnostic, `eval_cases._LexicalRetriever` to report its arm
+    unreadable with a real ``rc``. Valid JSON of the wrong shape used to raise
+    ``AttributeError`` (a root array, a non-object node) or ``TypeError``
+    (``{"nodes": null}``), all three of which sailed straight past those handlers
+    — so a malformed graph crashed the eval run instead of being reported as a
+    defective arm. Probed before fixing; all three now raise ``ValueError``.
     """
     with graph_path.open(encoding="utf-8") as fh:
         graph = json.load(fh)
+    problem = _schema_problem(graph)
+    if problem:
+        raise ValueError(f"{graph_path} is not a graph — {problem}")
     nodes = graph.get("nodes", [])
     index = build_index(nodes)
     if not index.size:

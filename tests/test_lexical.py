@@ -147,14 +147,49 @@ def test_a_term_in_every_document_cannot_decide_the_ranking() -> None:
 
 
 def test_idf_never_goes_negative_for_a_term_in_most_documents() -> None:
-    """The BM25+ ``1 +`` floor. A ubiquitous term is worth zero, never less.
+    """The BM25+ ``1 +`` floor. A common term is worth little, never less than nothing.
 
     Without it the classic formula goes negative past 50% document frequency, so
     a common term could SUBTRACT from a score and rank a matching document below
-    one that matched nothing.
+    one that matched nothing. Measured at 60% document frequency, where the
+    unsmoothed form is already negative.
     """
-    index = lexical.build_index([_node(str(i), "everywhere", source=f"{i}.md") for i in range(10)])
+    nodes = [_node(str(i), "everywhere", source=f"{i}.md") for i in range(6)]
+    nodes += [_node(f"x{i}", "other", source=f"x{i}.md") for i in range(4)]
+    index = lexical.build_index(nodes)
     assert index.idf("everywhere") >= 0
+
+
+def test_a_ubiquitous_term_is_worth_far_less_than_a_discriminating_one() -> None:
+    """The property the scorer actually has — asserted as a RATIO, not as zero.
+
+    CodeRabbit (PR #33) asked for an exact 0.0 at ``df == size``. That was tried
+    and reverted; the reasoning is in `Index.idf`. Short version: the branch is
+    unreachable in this corpus (no term reaches ``df == size``; the commonest is
+    1,418 of 2,105) and it makes a SMALL corpus unsearchable, because there
+    ``df == size`` is the normal case rather than a pathology.
+
+    So this pins what is true and useful: a term almost everywhere is worth
+    ORDERS less than a term almost nowhere, which is the whole mechanism.
+    Measured here at roughly 40x.
+    """
+    nodes = [_node("a", "rare common", source="a.md")]
+    nodes += [_node(str(i), "common", source=f"{i}.md") for i in range(29)]
+    index = lexical.build_index(nodes)
+    assert index.idf("common") >= 0
+    assert index.idf("rare") > index.idf("common") * 10
+
+
+def test_a_one_document_index_can_still_find_its_own_document() -> None:
+    """REGRESSION GUARD for the reverted clamp (CodeRabbit, PR #33).
+
+    With one document every term has ``df == size``. A hard zero there made the
+    document unfindable by any of its own words — a scorer that indexes
+    something and then cannot retrieve it. Cheap to assert, and it is the case
+    that caught the mistake.
+    """
+    index = lexical.build_index([_node("only", "alpha beta")])
+    assert _sources(lexical.search(index, "alpha")) == ["a.md"]
 
 
 def test_a_rarer_term_outweighs_a_commoner_one() -> None:
@@ -251,6 +286,33 @@ def test_loading_malformed_json_raises_rather_than_returning_an_empty_index(tmp_
     graph = tmp_path / "g.json"
     graph.write_text("not a graph", encoding="utf-8")
     with pytest.raises(json.JSONDecodeError):
+        lexical.load_index(graph)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param("[]", id="the-root-is-an-array"),
+        pytest.param('{"nodes": null}', id="nodes-is-null"),
+        pytest.param('{"nodes": [1, 2]}', id="a-node-is-not-an-object"),
+    ],
+)
+def test_valid_json_of_the_wrong_shape_is_reported_as_a_value_error(
+    tmp_path: Path, payload: str
+) -> None:
+    """REGRESSION (CodeRabbit, PR #33): these escaped the documented failure path.
+
+    Callers catch `OSError` and `ValueError` — the CLI to print a diagnostic,
+    `eval_cases._LexicalRetriever` to report its arm unreadable with a real
+    ``rc``. Measured before the fix, these three raised `AttributeError`,
+    `TypeError` and `AttributeError` respectively, none of which those handlers
+    see. So a graph file that parsed but was not a graph CRASHED the eval run
+    instead of being reported as a defective arm — the difference between a
+    finding and a stack trace.
+    """
+    graph = tmp_path / "g.json"
+    graph.write_text(payload, encoding="utf-8")
+    with pytest.raises(ValueError, match=r"is not a graph"):
         lexical.load_index(graph)
 
 
