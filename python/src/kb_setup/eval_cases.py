@@ -35,7 +35,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from kb_setup import evals, hook_guard, lexical, prose
+from kb_setup import evals, fusion, hook_guard, lexical, prose
 
 #: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
 #: NOT installed — the doctrine says availability is discovered at run time, so
@@ -172,10 +172,11 @@ NEAR_MISS_TARGET = "cerebras-knowledge-base-v2.md"
 #: ask; its ECHO twin deliberately borrows the document's own label text. THE
 #: GAP BETWEEN THE TWO IS THE FINDING.
 #:
-#: ADVISORY. There is no floor: the baseline this exists to make citable is
-#: 0/119 relevant nodes on two on-topic queries (knowledge-base#12), and a floor
-#: of zero is the check that can only pass. The floor lands once P0 scoping
-#: moves the number.
+#: GATED since P2, at :data:`RETRIEVAL_FLOOR` — but only on an explicit `--slow`
+#: run, which `kb-ship` does not pass, so ship does NOT check retrieval. It was
+#: advisory until P0-P2 moved the number: the baseline this exists to make citable
+#: is 0/119 relevant nodes on two on-topic queries (knowledge-base#12), and a
+#: floor at or below zero is the check that can only pass.
 GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
     _G(
         "hooks-blocking",
@@ -337,7 +338,7 @@ def _graph_path(repo_root: Path) -> Path:
     return repo_root / "graphify-out" / "graph.json"
 
 
-#: The three retrieval configurations the golden set is measured against, in
+#: The four retrieval configurations the golden set is measured against, in
 #: report order. Each is the previous one plus ONE change, so every arm's own
 #: contribution is the delta from its predecessor (knowledge-base#12):
 #:
@@ -345,9 +346,28 @@ def _graph_path(repo_root: Path) -> Path:
 #: * `prose` — P0: the same retriever over the AST-free corpus. Scoping only.
 #: * `prose+idf` — P1: the same corpus, ranked by our BM25/IDF scorer instead of
 #:   graphify's unscored seed-then-BFS order. Scoring only.
+#: * `prose+rrf` — P2: reciprocal rank fusion of the two orderings above.
+#:   Fusion only.
+#:
+#: THE LAST ARM IS NOT THE BEST ARM, and it is kept anyway. `prose+rrf` scores
+#: BELOW `prose+idf` (4 of 8 natural pairs against 5), for a structural reason
+#: `kb_setup.fusion` documents in full. It stays in the report because the arm IS
+#: the evidence: a negative result that lives only in an issue comment stops
+#: being re-derived, and this one bounds where the next gain can come from —
+#: fusion needs a genuine second scorer (P3/P5), not a tuned weight.
 UNSCOPED_ARM = "unscoped"
 PROSE_ARM = "prose"
 IDF_ARM = "prose+idf"
+RRF_ARM = "prose+rrf"
+
+#: Minimum natural-phrasing pairs the BEST arm must score for the case to stay
+#: green. Locked with Ray 2026-07-27 at ONE BELOW the measured 5, on purpose: it
+#: guards regression rather than asserting aspiration, and leaves enough headroom
+#: that a corpus rebuild moving a single topic does not redden the run for a
+#: reason unrelated to the code. Pairs and not mean recall, because pairs is the
+#: unit every comment on knowledge-base#12 reports in — so the gate and the
+#: thread stay comparable.
+RETRIEVAL_FLOOR = 4
 
 
 def _retrieval(repo_root: Path, graph: Path) -> evals.Retrieve:
@@ -480,13 +500,46 @@ class _LexicalRetriever:
         return 0, [hit.source_file for hit in lexical.search(self._index, query.query)]
 
 
-def _retrieval_arms(repo_root: Path) -> tuple[evals.Arm, ...]:
-    """The three arms — unscoped baseline, P0 scoping, P1 scoring — one golden set.
+class _FusedRetriever:
+    """The P2 arm's retriever: RRF over the two orderings its inputs produce.
 
-    The membership oracle is per-arm (see :func:`_corpus_membership`). The P1 arm
-    shares the P0 arm's FILE but not its oracle instance, which is deliberate:
-    they are separate arms, and a future change that gives `prose+idf` its own
-    corpus must not silently inherit the other's fixture verdict.
+    Fuses whatever its input retrievers return, by rank alone — `graphify query`
+    publishes no relevance figure, so one input is a bare order while the other
+    carries BM25 scores, and RRF is the instrument that combines exactly that
+    asymmetry (`kb_setup.fusion`).
+
+    RETURNS A REAL ``rc``, inherited from whichever input failed FIRST, and
+    returns no rows when it does. Fusing a healthy ranking with an empty one
+    would otherwise print a plausible fused list built from half the evidence —
+    a defective arm reporting a recall number instead of a defect, which is what
+    `evals._arm_defect` exists to prevent.
+    """
+
+    def __init__(self, retrievers: Sequence[evals.Retrieve]) -> None:
+        self._retrievers = tuple(retrievers)
+
+    def __call__(self, query: evals.GoldenQuery) -> tuple[int, list[str]]:
+        """Rank this arm's corpus by fusing every input retriever's order."""
+        rankings = []
+        for retrieve in self._retrievers:
+            rc, returned = retrieve(query)
+            if rc != 0:
+                return rc, []
+            rankings.append(list(returned))
+        return 0, fusion.fuse(rankings)
+
+
+def _retrieval_arms(repo_root: Path) -> tuple[evals.Arm, ...]:
+    """The four arms — baseline, P0 scoping, P1 scoring, P2 fusion — one golden set.
+
+    The membership oracle is per-arm (see :func:`_corpus_membership`). The three
+    prose arms share a FILE but not an oracle instance, which is deliberate: they
+    are separate arms, and a future change giving one of them its own corpus must
+    not silently inherit another's fixture verdict.
+
+    The P2 arm builds its OWN `_LexicalRetriever` rather than reusing the P1
+    arm's, for the same reason and at the cost of one 2.4 MB JSON parse: sharing
+    the object would make one arm's numbers depend on another arm's state.
     """
     prose_graph = prose.prose_graph_path(repo_root)
     return (
@@ -505,17 +558,31 @@ def _retrieval_arms(repo_root: Path) -> tuple[evals.Arm, ...]:
             _LexicalRetriever(prose_graph),
             present=_corpus_membership(prose_graph),
         ),
+        evals.Arm(
+            RRF_ARM,
+            _FusedRetriever((_retrieval(repo_root, prose_graph), _LexicalRetriever(prose_graph))),
+            present=_corpus_membership(prose_graph),
+        ),
     )
 
 
 def _broken_retrieval() -> evals.Outcome:
     """Control arm: the same scorer, driven by a retriever that returns the absent target.
 
-    Declared even though the runner does not REQUIRE one for an advisory case.
-    The failure this defends against is the whole reason the negative direction
-    exists — a matcher that reports a hit for a document the corpus does not
-    contain — and it runs offline in microseconds, against a miniature golden
-    set of the same shape rather than the real one.
+    Now REQUIRED, since the case is gated (P2) — the runner refuses to count a
+    gated case whose control does not fail. The failure it arms is the whole
+    reason the negative direction exists: a matcher that reports a hit for a
+    document the corpus does not contain. It runs offline in microseconds,
+    against a miniature golden set of the same shape rather than the real one.
+
+    IT ARMS THE LEAK AND NOT THE FLOOR, deliberately. A control can only
+    demonstrate one failure, and the leak is the one that would otherwise print a
+    false WIN; the floor's failure direction is trivially reachable and is
+    control-armed in both directions by unit test instead
+    (`tests/test_evals.py`). No ``floor`` is passed here for a second reason —
+    this miniature set has ONE positive pair, so any floor above 1 would be
+    rejected as unreachable and the control would then fail for a reason that has
+    nothing to do with the defect it exists to catch.
 
     TWO arms, matching the probe's shape: the defect has to be caught in the
     SECOND arm as well, or a broken scoped corpus could hide behind the
@@ -671,27 +738,40 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             description=(
                 "golden retrieval set: recall@k for 8 hand-written query pairs "
                 "(natural vs label-echoing) plus both negative directions, "
-                "measured against the live local graph — unscoped and "
-                "prose-scoped side by side"
+                "measured against the live local graph — unscoped, prose-scoped, "
+                "IDF-ranked and RRF-fused side by side"
             ),
             probe=lambda: evals.retrieval_recall(
                 GOLDEN_QUERIES,
                 _retrieval_arms(repo_root),
                 stamp=_corpus_stamp(repo_root),
+                floor=RETRIEVAL_FLOOR,
             ),
             control=_broken_retrieval,
-            # ADVISORY, and deliberately so: the baseline is 0/119 relevant nodes
-            # (knowledge-base#12), so a gated floor would be red on arrival and a
-            # floor of zero is the check that can only pass. The floor lands when
-            # P0 scoping moves the number. What this case DOES fail on is a
+            # GATED since P2 (2026-07-27). It was advisory from PR #30 through P1
+            # because the baseline it exists to make citable is 0/119 relevant
+            # nodes (knowledge-base#12) and a floor at or below zero is the check
+            # that can only pass; P0-P2 moved the number far enough for
+            # RETRIEVAL_FLOOR to mean something. Besides the floor it fails on a
             # broken query path, a silent graph, fixture rot, or the negative
             # direction coming back positive — harness defects, not recall.
-            gated=False,
-            # 18 queries per arm plus a `diagnose` per corpus: ~3.5 minutes,
+            #
+            # BUT READ THIS BEFORE TRUSTING THE GATE: it bites only on an
+            # explicit `--slow` run. `kb-ship`'s eval gate does not pass --slow,
+            # so this case is SKIPPED on every PR (its logs read `4 passed, 2
+            # skipped`) and SHIP DOES NOT CHECK RETRIEVAL. Gating alone changed
+            # nothing on the ship path. That is accepted — the slow arm reloads a
+            # ~350 MB graph 18 times for ~4 minutes, and a gate that slow is one
+            # people route around — on the condition that it is stated wherever
+            # the floor is described, which is what this paragraph is for. A
+            # floor everyone believes is enforced per-PR and is not would be
+            # exactly the inert declaration dotfiles#354 exists to catch; this
+            # one is inert BY DESIGN, so it says so.
+            gated=True,
+            # 18 queries per arm plus a `diagnose` per corpus: ~4 minutes,
             # essentially all of it the unscoped arm (each of its queries
-            # reloads a ~350 MB graph at ~10s; the 2.7 MB prose graph answers in
-            # ~0.3s). Far too slow to sit on every ship, and an advisory case
-            # that cannot block has no claim on one.
+            # reloads a ~350 MB graph at ~10s; the 2.4 MB prose graph answers in
+            # ~0.3s, and the fused arm pays a second pass over it).
             slow=True,
             precondition=lambda: _retrieval_precondition(repo_root),
         ),

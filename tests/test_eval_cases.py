@@ -16,12 +16,9 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from kb_setup import eval_cases, evals, prose
-
-if TYPE_CHECKING:
-    import pytest
 
 _ROOT = Path(__file__).parent.parent.absolute()
 
@@ -118,18 +115,76 @@ def test_the_measured_false_positives_are_pinned_as_allow_rows() -> None:
 # --- the tier-2 golden retrieval set ------------------------------------------
 
 
-def test_the_retrieval_case_is_advisory_and_slow() -> None:
-    """Both flags are decisions, not defaults, and both were locked 2026-07-25.
+def test_the_retrieval_case_is_gated_and_slow() -> None:
+    """Both flags are decisions, not defaults, and the first one flipped in P2.
 
-    ADVISORY because the baseline it exists to make citable is 0/119 relevant
-    nodes (knowledge-base#12) and a floor of zero is the check that can only
-    pass. SLOW because 18 queries each reload a ~350 MB graph, and a gate that
-    takes minutes is one people learn to skip.
+    GATED since 2026-07-27: it was advisory while the number it exists to make
+    citable was 0/119 (knowledge-base#12), because a floor at or below zero is
+    the check that can only pass, and P0-P2 moved it far enough for
+    `RETRIEVAL_FLOOR` to mean something. STILL SLOW, which is what keeps the
+    gating off the ship path — see the next test.
     """
     case = next(c for c in _cases() if c.name == "tier2.kb-retrieval")
-    assert not case.gated
+    assert case.gated
     assert case.slow
     assert not case.live
+
+
+def test_the_gated_retrieval_case_still_does_not_bite_on_ship() -> None:
+    """The inert-by-design property, asserted rather than merely written down.
+
+    `kb-ship`'s eval gate does not pass --slow, so this case is SKIPPED on every
+    PR and SHIP DOES NOT CHECK RETRIEVAL. That was accepted when the floor landed
+    (~4 minutes is a gate people route around), on condition it is stated
+    explicitly — and a stated property nothing checks is exactly the inert
+    declaration dotfiles#354 exists to catch. So the claim is pinned here: gated
+    AND slow, and a default run skips it.
+    """
+    case = next(c for c in _cases() if c.name == "tier2.kb-retrieval")
+    assert case.gated
+    assert case.slow
+    report = evals.run_cases(_cases())
+    row = next(r for r in report.results if r.case.name == "tier2.kb-retrieval")
+    assert row.outcome.verdict is evals.Verdict.SKIP
+    assert not report.failed
+
+
+def test_the_gated_case_really_passes_its_floor_to_the_engine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CONTROL ARM for the floor, at the CASE level rather than the engine's.
+
+    `test_evals.py` proves the engine compares a floor it is given. What it cannot
+    prove is that this case hands one over — a probe that dropped the ``floor=``
+    argument would leave every engine test green and the gate silently advisory
+    again, which is the inert-declaration defect one level up.
+
+    The mutation is the realistic regression: arms that find nothing, i.e. recall
+    collapsing below the floor. They still return a non-empty list, so the
+    silent-corpus defect does not fire first and the floor is what is being
+    measured. Both stand-ins are needed because the real ones shell out to
+    graphify for minutes; nothing else about the case is replaced.
+    """
+    flat = (evals.Arm("stand-in", lambda _q: (0, ["filler.md"])),)
+    monkeypatch.setattr(eval_cases, "_retrieval_arms", lambda _root: flat)
+    monkeypatch.setattr(eval_cases, "_corpus_stamp", lambda _root: "stand-in corpus")
+    case = next(c for c in _cases() if c.name == "tier2.kb-retrieval")
+    outcome = case.probe()
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "REGRESSED below the floor" in outcome.detail
+    assert f"floor is {eval_cases.RETRIEVAL_FLOOR}" in outcome.detail
+
+
+def test_the_retrieval_floor_is_one_below_the_measured_best() -> None:
+    """Pinned so raising it to the measured value is a visible diff.
+
+    4, against a measured 5 for `prose+idf` on the 2026-07-26 corpus. It guards
+    regression rather than asserting aspiration: at 5 a corpus rebuild that moved
+    one topic would redden the run for a reason unrelated to the code.
+    """
+    assert eval_cases.RETRIEVAL_FLOOR == 4
+    pairs = {q.topic for q in eval_cases.GOLDEN_QUERIES if not q.expects_absent}
+    assert 1 <= eval_cases.RETRIEVAL_FLOOR < len(pairs)
 
 
 def test_the_retrieval_case_declares_a_control_arm_that_fails() -> None:
@@ -256,17 +311,20 @@ def test_the_retriever_pins_the_query_to_this_repos_graph(
 
 
 def test_each_arm_reads_its_own_corpus(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """CONTROL ARM for the whole before/after: three arms, and no two are the same run.
+    """CONTROL ARM for the whole before/after: four arms, and no two are the same run.
 
     If two arms resolved the same corpus with the same retriever the report would
     still print a table, a SUITE line per arm and a DELTA of zero — a before/after
     that structurally cannot show a difference. So what each arm actually does is
     bound here.
 
-    The P1 arm differs from the other two along the OTHER axis: it reads the same
-    file as `prose` but does not shell out at all, which is why it must not
-    appear in ``seen``. Scoping and scoring are separate changes, and an arm that
-    quietly re-ran graphify would report P0's number under P1's name.
+    The P1 arm differs from the first two along the OTHER axis: it reads the same
+    file as `prose` but does not shell out at all, which is why it contributes no
+    ``seen`` entry. Scoping and scoring are separate changes, and an arm that
+    quietly re-ran graphify would report P0's number under P1's name. The P2 arm
+    shells out ONCE more, against the prose graph — it fuses graphify's order with
+    the lexical one, so a fused arm that had lost its graphify input would leave
+    ``seen`` two entries long and still print a plausible table.
     """
     seen: list[str] = []
 
@@ -283,10 +341,13 @@ def test_each_arm_reads_its_own_corpus(monkeypatch: pytest.MonkeyPatch, tmp_path
         eval_cases.UNSCOPED_ARM,
         eval_cases.PROSE_ARM,
         eval_cases.IDF_ARM,
+        eval_cases.RRF_ARM,
     ]
-    # Only the two graphify-backed arms shell out, and they name different graphs.
+    # The graphify-backed arms shell out and name different graphs; the fused arm
+    # adds the third call, against the prose graph it shares with P0/P1.
     assert seen == [
         str(tmp_path / "graphify-out" / "graph.json"),
+        str(tmp_path / "graphify-out" / prose.PROSE_GRAPH_NAME),
         str(tmp_path / "graphify-out" / prose.PROSE_GRAPH_NAME),
     ]
 
@@ -329,6 +390,48 @@ def test_the_lexical_arm_builds_its_index_once_across_queries(
     for query in eval_cases.GOLDEN_QUERIES[:3]:
         retrieve(query)
     assert builds == 1
+
+
+def _ranks(*sources: str) -> evals.Retrieve:
+    """An input retriever for the fused arm: always returns this ranked list."""
+    return lambda _query: (0, list(sources))
+
+
+def test_the_fused_arm_combines_both_inputs() -> None:
+    """The direction that must work: consensus from two orders, not one passed through.
+
+    `both.md` is 3rd in the first input and 2nd in the second; `solo.md` is 1st in
+    the first and absent from the second. A retriever that forwarded either input
+    unchanged would put `solo.md` (or `x.md`) first.
+    """
+    retrieve = eval_cases._FusedRetriever(
+        (_ranks("solo.md", "a.md", "both.md"), _ranks("x.md", "both.md"))
+    )
+    rc, returned = retrieve(eval_cases.GOLDEN_QUERIES[0])
+    assert rc == 0
+    assert returned[0] == "both.md"
+
+
+@pytest.mark.parametrize("failing", [0, 1])
+def test_the_fused_arm_reports_a_real_rc_from_either_input(failing: int) -> None:
+    """BOTH directions, because "checks the first input" also passes one of them.
+
+    A fused arm that swallowed one input's failure would print a plausible ranking
+    built from half the evidence — a defective arm reporting a recall number
+    instead of a defect. The rc must be the input's own, and no rows may come back
+    with it.
+    """
+    inputs = [_ranks("a.md"), _ranks("b.md")]
+    inputs[failing] = lambda _query: (7, [])
+    rc, returned = eval_cases._FusedRetriever(inputs)(eval_cases.GOLDEN_QUERIES[0])
+    assert rc == 7
+    assert returned == []
+
+
+def test_the_fused_arm_returns_nothing_when_its_inputs_do() -> None:
+    """No padding, or `_arm_defect`'s silent-corpus check stops being able to fire."""
+    retrieve = eval_cases._FusedRetriever((_ranks(), _ranks()))
+    assert retrieve(eval_cases.GOLDEN_QUERIES[0]) == (0, [])
 
 
 def test_every_arm_carries_its_own_membership_oracle() -> None:
