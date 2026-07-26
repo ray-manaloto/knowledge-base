@@ -12,9 +12,11 @@ auto-detected Gemini/OpenAI key.
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -95,6 +97,27 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
 #: it resolves to graphify's own `--graph`, pointed at the derived prose graph.
 PROSE_FLAG = "--prose"
 
+#: Selects the BM25/IDF lexical scorer (`kb_setup.lexical`) instead of
+#: `graphify query`. A THIRD retrieval path, not a replacement for `--prose`
+#: (knowledge-base#12 P1): the golden set measures `unscoped` / `prose` /
+#: `prose+idf` side by side, so the scorer's effect stays attributable to the
+#: scorer. It reads the same derived prose graph `--prose` selects, so the two
+#: together are redundant rather than contradictory and are allowed.
+IDF_FLAG = "--idf"
+
+#: The only flags the `--idf` path understands. Everything else is REJECTED
+#: rather than ignored: this path never shells out to graphify, so a
+#: graphify-only flag (`--budget`, `--depth`) alongside it would have no effect
+#: whatsoever — and a flag that silently does nothing is worse than one that
+#: errors, because the caller reads the answer as if the flag applied.
+GRAPH_FLAG = "--graph"
+_IDF_TOP = "--top"
+
+#: How many ranked hits `--idf` prints. Chosen to sit just above the golden
+#: set's `k=10` window so a human reading the output can see what fell just
+#: outside it; the eval calls the library directly and is not affected.
+IDF_DEFAULT_TOP = 20
+
 #: The attached form of graphify's own flag, which graphify DOES NOT SUPPORT.
 #: Probed 2026-07-25 from a scratch directory: `graphify query q
 #: --graph=<abs path>` exits 1 with `graph file not found:
@@ -120,8 +143,9 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
     precedence rule: the whole point of the flag is which corpus answered, so
     "one of them quietly wins" is the one behaviour that must not exist.
     """
-    rest = [a for a in args if a != PROSE_FLAG]
+    rest = [a for a in args if a not in {PROSE_FLAG, IDF_FLAG}]
     wants_prose = PROSE_FLAG in args
+    wants_idf = IDF_FLAG in args
     attached = [a for a in rest if a.startswith(ATTACHED_GRAPH)]
     if attached:
         print(
@@ -131,14 +155,16 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
             file=sys.stderr,
         )
         return 2
-    if wants_prose and "--graph" in rest:
+    if wants_prose and GRAPH_FLAG in rest:
         print(
             f"[kb-query] {PROSE_FLAG} and --graph both given — they name different "
             f"corpora and there is no sensible winner. Pass one.",
             file=sys.stderr,
         )
         return 2
-    if "--graph" not in rest:
+    if wants_idf:
+        return _idf_query(repo_root, rest)
+    if GRAPH_FLAG not in rest:
         graph = prose.prose_graph_path(repo_root) if wants_prose else _full_graph(repo_root)
         if not graph.is_file():
             missing = "mise run kb-prose" if wants_prose else "mise run kb-build"
@@ -153,6 +179,96 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
 def _full_graph(repo_root: Path) -> Path:
     """The unscoped graph — every node, code AST included."""
     return repo_root / "graphify-out" / "graph.json"
+
+
+@dataclass(frozen=True)
+class _IdfArgs:
+    """A parsed `--idf` invocation: the question, the corpus, how many to show."""
+
+    question: str
+    graph: Path | None
+    top: int
+
+
+def _parse_idf_args(rest: Sequence[str]) -> _IdfArgs | str:
+    """Parse `--idf`'s arguments, or return the error message to print.
+
+    Split out of :func:`_idf_query` so each half does one thing: this one only
+    reads arguments and never touches the filesystem or prints, which is what
+    lets it be tested without a graph on disk.
+    """
+    words: list[str] = []
+    graph: Path | None = None
+    top = IDF_DEFAULT_TOP
+    args = list(rest)
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in {GRAPH_FLAG, _IDF_TOP}:
+            if i + 1 >= len(args):
+                return f"{arg} needs a value"
+            value = args[i + 1]
+            i += 2
+            if arg == GRAPH_FLAG:
+                graph = Path(value)
+            elif value.isdigit() and int(value) >= 1:
+                top = int(value)
+            else:
+                return f"{_IDF_TOP} needs a positive integer, got {value!r}"
+            continue
+        if arg.startswith("-"):
+            return (
+                f"{IDF_FLAG} does not understand {arg!r}. It runs our own scorer, "
+                f"not `graphify query`, so a graphify flag would have no effect at "
+                f"all — which is why this is an error and not a warning. "
+                f"Supported: {GRAPH_FLAG} <path>, {_IDF_TOP} <n>."
+            )
+        words.append(arg)
+        i += 1
+    if not words:
+        return f'{IDF_FLAG} needs a question, e.g. kb-query -- "…" {IDF_FLAG}'
+    return _IdfArgs(question=" ".join(words), graph=graph, top=top)
+
+
+def _idf_query(repo_root: Path, rest: Sequence[str]) -> int:
+    """`kb-query --idf` — rank the prose graph with the BM25/IDF scorer.
+
+    Never shells out to graphify: this is our own scorer over the same derived
+    corpus (`kb_setup.lexical`). It therefore accepts only the flags it can
+    honour and REJECTS everything else, rather than forwarding or ignoring it —
+    a `--budget` silently doing nothing here would let a caller read the answer
+    as if a budget had applied.
+    """
+    from kb_setup import lexical
+
+    parsed = _parse_idf_args(rest)
+    if isinstance(parsed, str):
+        print(f"[kb-query] {parsed}", file=sys.stderr)
+        return 2
+
+    graph = parsed.graph if parsed.graph is not None else prose.prose_graph_path(repo_root)
+    if not graph.is_file():
+        print(f"[kb-query] no graph at {graph} — run `mise run kb-prose` first", file=sys.stderr)
+        return 2
+    try:
+        index = lexical.load_index(graph)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"[kb-query] could not index {graph}: {exc}", file=sys.stderr)
+        return 1
+
+    hits = lexical.search(index, parsed.question)
+    print(f"[kb-query] {IDF_FLAG}: {index.size:,} indexed node(s) from {graph.name}")
+    if not hits:
+        print(
+            f"[kb-query] no node shares a term with {parsed.question!r} — that is a "
+            f"real empty result, not a truncated one."
+        )
+        return 0
+    for rank, hit in enumerate(hits[: parsed.top], start=1):
+        print(f"{rank:>3}  {hit.score:6.2f}  {hit.label}  [src={hit.source_file}]")
+    if len(hits) > parsed.top:
+        print(f"     … {len(hits) - parsed.top:,} more scoring above zero (raise {_IDF_TOP})")
+    return 0
 
 
 def transcribe(repo_root: Path, audio: str) -> int:

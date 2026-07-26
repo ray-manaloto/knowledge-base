@@ -35,7 +35,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from kb_setup import evals, hook_guard, prose
+from kb_setup import evals, hook_guard, lexical, prose
 
 #: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
 #: NOT installed — the doctrine says availability is discovered at run time, so
@@ -337,11 +337,17 @@ def _graph_path(repo_root: Path) -> Path:
     return repo_root / "graphify-out" / "graph.json"
 
 
-#: The two corpora the golden set is measured against, in report order. The
-#: first is the baseline; the second is the P0 scoping change under test
-#: (knowledge-base#12) and is reported as a delta against it.
+#: The three retrieval configurations the golden set is measured against, in
+#: report order. Each is the previous one plus ONE change, so every arm's own
+#: contribution is the delta from its predecessor (knowledge-base#12):
+#:
+#: * `unscoped` — the baseline: `graphify query` over the whole graph.
+#: * `prose` — P0: the same retriever over the AST-free corpus. Scoping only.
+#: * `prose+idf` — P1: the same corpus, ranked by our BM25/IDF scorer instead of
+#:   graphify's unscored seed-then-BFS order. Scoring only.
 UNSCOPED_ARM = "unscoped"
 PROSE_ARM = "prose"
+IDF_ARM = "prose+idf"
 
 
 def _retrieval(repo_root: Path, graph: Path) -> evals.Retrieve:
@@ -432,14 +438,70 @@ def _corpus_membership(graph: Path) -> evals.Membership:
     return present
 
 
+class _LexicalRetriever:
+    """The P1 arm's retriever: our BM25/IDF scorer, in-process, over one graph.
+
+    A callable object rather than a closure because the index must be built ONCE
+    and reused across the golden set's 18 queries — rebuilt per query, the arm's
+    wall clock would be a measurement of JSON parsing rather than of retrieval.
+    It is built lazily, on the first query, so constructing the arm list stays
+    free: `cases()` runs before the precondition that checks the graph exists.
+
+    RETURNS A REAL ``rc``, never a hardcoded 0. This is the first arm whose
+    retriever does not shell out, so `evals._arm_defect`'s ``rc != 0`` check has
+    no subprocess to inherit an exit code from — and a check that cannot fire is
+    not a check. The failure it reports is genuinely reachable: a graph file that
+    is absent, unreadable, malformed JSON, or that yields an empty index all end
+    here as ``rc=2`` with the arm's rows empty, which the engine then reports as
+    a defect instead of as recall 0.
+    """
+
+    #: `rc` for "this arm could not read its corpus". Mirrors the CLI's
+    #: convention, where 2 is a precondition/usage failure rather than a crash.
+    UNREADABLE = 2
+
+    def __init__(self, graph: Path) -> None:
+        self._graph = graph
+        self._index: lexical.Index | None = None
+        self._broken = False
+
+    def __call__(self, query: evals.GoldenQuery) -> tuple[int, list[str]]:
+        """Rank this arm's corpus against one golden query."""
+        if self._index is None and not self._broken:
+            try:
+                self._index = lexical.load_index(self._graph)
+            except OSError, ValueError, json.JSONDecodeError:
+                self._broken = True
+        if self._index is None:
+            return self.UNREADABLE, []
+        return 0, [hit.source_file for hit in lexical.search(self._index, query.query)]
+
+
 def _retrieval_arms(repo_root: Path) -> tuple[evals.Arm, ...]:
-    """The unscoped baseline and the prose-scoped arm, over the same golden set."""
-    return tuple(
-        evals.Arm(name, _retrieval(repo_root, path), present=_corpus_membership(path))
-        for name, path in (
-            (UNSCOPED_ARM, _graph_path(repo_root)),
-            (PROSE_ARM, prose.prose_graph_path(repo_root)),
-        )
+    """The three arms — unscoped baseline, P0 scoping, P1 scoring — one golden set.
+
+    The membership oracle is per-arm (see :func:`_corpus_membership`). The P1 arm
+    shares the P0 arm's FILE but not its oracle instance, which is deliberate:
+    they are separate arms, and a future change that gives `prose+idf` its own
+    corpus must not silently inherit the other's fixture verdict.
+    """
+    prose_graph = prose.prose_graph_path(repo_root)
+    return (
+        evals.Arm(
+            UNSCOPED_ARM,
+            _retrieval(repo_root, _graph_path(repo_root)),
+            present=_corpus_membership(_graph_path(repo_root)),
+        ),
+        evals.Arm(
+            PROSE_ARM,
+            _retrieval(repo_root, prose_graph),
+            present=_corpus_membership(prose_graph),
+        ),
+        evals.Arm(
+            IDF_ARM,
+            _LexicalRetriever(prose_graph),
+            present=_corpus_membership(prose_graph),
+        ),
     )
 
 
