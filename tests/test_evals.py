@@ -7,6 +7,7 @@ control-arm rule is itself control-armed here, in both directions.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from kb_setup import evals
@@ -685,10 +686,22 @@ def _returns(*sources: str) -> evals.Retrieve:
     return lambda _query: (0, list(sources))
 
 
+def _one(
+    retrieve: evals.Retrieve, present: evals.Membership | None = None
+) -> tuple[evals.Arm, ...]:
+    """The single-arm case — what most of these tests exercise.
+
+    Named rather than inlined so the multi-arm tests below stand out as the ones
+    measuring the before/after, and the rest read as scorer tests that happen to
+    need one corpus.
+    """
+    return (evals.Arm("only", retrieve, present=present),)
+
+
 def test_a_hit_inside_k_is_counted() -> None:
     """The direction that must work, or every 0 below means nothing."""
     outcome = evals.retrieval_recall(
-        _golden(), _returns("noise.py", "wanted.md", "more.py"), stamp="test corpus"
+        _golden(), _one(_returns("noise.py", "wanted.md", "more.py")), stamp="test corpus"
     )
     assert outcome.verdict is evals.Verdict.PASS, outcome.detail
     assert "natural@3 1/1" in outcome.detail
@@ -698,7 +711,7 @@ def test_a_hit_inside_k_is_counted() -> None:
 def test_a_hit_below_k_is_a_miss() -> None:
     """CONTROL ARM for the above: k is a real window, not decoration."""
     outcome = evals.retrieval_recall(
-        _golden(k=2), _returns("a.py", "b.py", "wanted.md"), stamp="test corpus"
+        _golden(k=2), _one(_returns("a.py", "b.py", "wanted.md")), stamp="test corpus"
     )
     assert outcome.verdict is evals.Verdict.PASS, outcome.detail
     assert "natural@2 0/1" in outcome.detail
@@ -710,7 +723,7 @@ def test_the_pair_gap_is_reported() -> None:
     def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
         return 0, (["wanted.md"] if query.phrasing is _ECH else ["noise.py"])
 
-    outcome = evals.retrieval_recall(_golden(), retrieve, stamp="test corpus")
+    outcome = evals.retrieval_recall(_golden(), _one(retrieve), stamp="test corpus")
     assert "natural@3 0/1" in outcome.detail
     assert "echo@3 1/1" in outcome.detail
     assert "gap +1" in outcome.detail
@@ -718,14 +731,14 @@ def test_the_pair_gap_is_reported() -> None:
 
 def test_an_all_zero_run_says_it_cannot_show_discrimination() -> None:
     """Honesty about what a flat 0 does and does not establish."""
-    outcome = evals.retrieval_recall(_golden(), _returns("noise.py"), stamp="test corpus")
+    outcome = evals.retrieval_recall(_golden(), _one(_returns("noise.py")), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.PASS
     assert "nothing scored at all" in outcome.detail
 
 
 def test_a_negative_query_that_comes_back_positive_fails() -> None:
     """The matcher lying is a harness defect, and never a retrieval win."""
-    outcome = evals.retrieval_recall(_golden(), _returns("gone.md"), stamp="test corpus")
+    outcome = evals.retrieval_recall(_golden(), _one(_returns("gone.md")), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.FAIL
     assert "NEGATIVE direction" in outcome.detail
 
@@ -733,7 +746,7 @@ def test_a_negative_query_that_comes_back_positive_fails() -> None:
 def test_a_golden_set_with_no_negative_direction_is_rejected() -> None:
     """The sibling of the single-direction guard table, and the same defect."""
     outcome = evals.retrieval_recall(
-        _golden(absent=False), _returns("wanted.md"), stamp="test corpus"
+        _golden(absent=False), _one(_returns("wanted.md")), stamp="test corpus"
     )
     assert outcome.verdict is evals.Verdict.FAIL
     assert "NO negative direction" in outcome.detail
@@ -745,7 +758,7 @@ def test_a_topic_missing_a_phrasing_is_rejected() -> None:
         evals.GoldenQuery("topic", _NAT, "q", ("wanted.md",), 3),
         evals.GoldenQuery("gone", _ABS, "q", ("gone.md",), 3),
     )
-    outcome = evals.retrieval_recall(queries, _returns("wanted.md"), stamp="test corpus")
+    outcome = evals.retrieval_recall(queries, _one(_returns("wanted.md")), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.FAIL
     assert "missing its ECHO half" in outcome.detail
 
@@ -757,34 +770,34 @@ def test_a_pair_whose_halves_disagree_is_rejected() -> None:
     checked, because either one silently turns the reported gap into noise.
     """
     different_targets = evals.retrieval_recall(
-        _golden(echo_targets=("other.md",)), _returns("wanted.md"), stamp="test corpus"
+        _golden(echo_targets=("other.md",)), _one(_returns("wanted.md")), stamp="test corpus"
     )
     assert different_targets.verdict is evals.Verdict.FAIL
     assert "not comparable" in different_targets.detail
 
     different_k = evals.retrieval_recall(
-        _golden(echo_k=9), _returns("wanted.md"), stamp="test corpus"
+        _golden(echo_k=9), _one(_returns("wanted.md")), stamp="test corpus"
     )
     assert different_k.verdict is evals.Verdict.FAIL
     assert "not comparable" in different_k.detail
 
 
 def test_an_empty_golden_set_is_rejected() -> None:
-    outcome = evals.retrieval_recall((), _returns("x"), stamp="test corpus")
+    outcome = evals.retrieval_recall((), _one(_returns("x")), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.FAIL
     assert "EMPTY" in outcome.detail
 
 
 def test_a_query_that_did_not_run_fails_rather_than_scoring_zero() -> None:
     """A broken query path reported as recall 0 would be a fabricated number."""
-    outcome = evals.retrieval_recall(_golden(), lambda _q: (-2, []), stamp="test corpus")
+    outcome = evals.retrieval_recall(_golden(), _one(lambda _q: (-2, [])), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.FAIL
     assert "rc=-2" in outcome.detail
 
 
 def test_a_graph_that_returns_nothing_fails() -> None:
     """rc=0 with an empty list is a corpus that resolves and knows nothing."""
-    outcome = evals.retrieval_recall(_golden(), _returns(), stamp="test corpus")
+    outcome = evals.retrieval_recall(_golden(), _one(_returns()), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.FAIL
     assert "returned NOTHING" in outcome.detail
 
@@ -794,18 +807,16 @@ def test_fixture_rot_is_caught_in_both_directions() -> None:
     queries = _golden()
     missing_positive = evals.retrieval_recall(
         queries,
-        _returns("wanted.md"),
+        _one(_returns("wanted.md"), present=lambda names: {n: n != "wanted.md" for n in names}),
         stamp="test corpus",
-        present=lambda names: {n: n != "wanted.md" for n in names},
     )
     assert missing_positive.verdict is evals.Verdict.FAIL
     assert "NOT in the corpus" in missing_positive.detail
 
     ingested_negative = evals.retrieval_recall(
         queries,
-        _returns("wanted.md"),
+        _one(_returns("wanted.md"), present=lambda names: dict.fromkeys(names, True)),
         stamp="test corpus",
-        present=lambda names: dict.fromkeys(names, True),
     )
     assert ingested_negative.verdict is evals.Verdict.FAIL
     assert "PRESENT but declared absent" in ingested_negative.detail
@@ -815,9 +826,8 @@ def test_a_sound_fixture_passes_the_integrity_check() -> None:
     """CONTROL ARM: without this, an always-FAIL integrity check passes above."""
     outcome = evals.retrieval_recall(
         _golden(),
-        _returns("wanted.md"),
+        _one(_returns("wanted.md"), present=lambda names: {n: n != "gone.md" for n in names}),
         stamp="test corpus",
-        present=lambda names: {n: n != "gone.md" for n in names},
     )
     assert outcome.verdict is evals.Verdict.PASS, outcome.detail
 
@@ -869,7 +879,144 @@ def test_an_absent_row_that_returned_nothing_still_fails() -> None:
     def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
         return (0, []) if query.expects_absent else (0, ["wanted.md"])
 
-    outcome = evals.retrieval_recall(_golden(), retrieve, stamp="test corpus")
+    outcome = evals.retrieval_recall(_golden(), _one(retrieve), stamp="test corpus")
     assert outcome.verdict is evals.Verdict.FAIL
     assert "returned NOTHING" in outcome.detail
     assert "gone/ABSENT" in outcome.detail
+
+
+# --- multi-arm runs: the before/after IS the measurement ----------------------
+#
+# One run, one query set, N corpora. The tests below are about the property that
+# makes that trustworthy: every arm is scored and CHECKED independently, so a
+# second corpus cannot ride the first one's numbers.
+
+
+def _sound(names: Sequence[str]) -> dict[str, bool]:
+    """A membership oracle agreeing with `_golden()`: positives in, negative out."""
+    return {n: n != "gone.md" for n in names}
+
+
+def _arm(name: str, *sources: str) -> evals.Arm:
+    """An arm whose retriever always returns the same ranked list."""
+    return evals.Arm(name, _returns(*sources))
+
+
+def test_two_arms_are_reported_side_by_side_with_a_delta() -> None:
+    """The shape knowledge-base#12 needs: before, after, and the difference.
+
+    Hand-comparing two separate runs is the inherited-number trap — a later
+    session cannot reproduce a subtraction that was never written down. So the
+    delta is produced by the run that measured both sides.
+    """
+    outcome = evals.retrieval_recall(
+        _golden(),
+        (_arm("full", "noise.py"), _arm("scoped", "wanted.md")),
+        stamp="test corpus",
+    )
+    assert outcome.verdict is evals.Verdict.PASS, outcome.detail
+    assert "[full]" in outcome.detail
+    assert "[scoped]" in outcome.detail
+    assert "DELTA full -> scoped: natural 0 -> 1 of 1 pair(s)" in outcome.detail
+
+
+def test_a_single_arm_run_prints_no_delta() -> None:
+    """CONTROL ARM: the delta line is a comparison, not decoration.
+
+    An implementation that always printed one would satisfy the test above while
+    subtracting an arm from itself.
+    """
+    outcome = evals.retrieval_recall(_golden(), _one(_returns("wanted.md")), stamp="test corpus")
+    assert outcome.verdict is evals.Verdict.PASS, outcome.detail
+    assert "DELTA" not in outcome.detail
+
+
+def test_a_defect_in_either_arm_fails_the_whole_run() -> None:
+    """Both directions, because "checks the last arm" also passes one of them.
+
+    A second corpus that leaks the absent target — or a first one that does —
+    must be named. Whichever arm is silently unchecked, the number printed for
+    it is a lie, and it is the arm under test that is most likely to be the new
+    one.
+    """
+    second_leaks = evals.retrieval_recall(
+        _golden(),
+        (_arm("full", "wanted.md"), _arm("scoped", "gone.md")),
+        stamp="test corpus",
+    )
+    assert second_leaks.verdict is evals.Verdict.FAIL
+    assert "[scoped]" in second_leaks.detail
+
+    first_leaks = evals.retrieval_recall(
+        _golden(),
+        (_arm("full", "gone.md"), _arm("scoped", "wanted.md")),
+        stamp="test corpus",
+    )
+    assert first_leaks.verdict is evals.Verdict.FAIL
+    assert "[full]" in first_leaks.detail
+
+
+def test_a_silent_second_corpus_is_not_hidden_by_a_healthy_first() -> None:
+    """A graph that resolves and knows nothing, in the arm nobody was watching."""
+    outcome = evals.retrieval_recall(
+        _golden(),
+        (_arm("full", "wanted.md"), _arm("scoped")),
+        stamp="test corpus",
+    )
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "[scoped]" in outcome.detail
+    assert "returned NOTHING" in outcome.detail
+
+
+def test_each_arm_checks_fixture_rot_against_its_own_corpus() -> None:
+    """A target present in one corpus and absent from the other is rot in one.
+
+    With a single shared oracle the scoped arm would be checked against the
+    unscoped graph, where every target trivially exists — so a positive target
+    the scoping filter dropped would report recall 0 forever and read as a
+    retrieval failure rather than the fixture defect it is.
+    """
+    outcome = evals.retrieval_recall(
+        _golden(),
+        (
+            evals.Arm("full", _returns("wanted.md"), present=_sound),
+            evals.Arm(
+                "scoped", _returns("wanted.md"), present=lambda names: dict.fromkeys(names, False)
+            ),
+        ),
+        stamp="test corpus",
+    )
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "[scoped]" in outcome.detail
+    assert "NOT in the corpus" in outcome.detail
+
+
+def test_both_arms_sound_passes_the_per_arm_integrity_check() -> None:
+    """CONTROL ARM for the above: an always-FAIL integrity check would pass it."""
+    outcome = evals.retrieval_recall(
+        _golden(),
+        (
+            evals.Arm("full", _returns("wanted.md"), present=_sound),
+            evals.Arm("scoped", _returns("wanted.md"), present=_sound),
+        ),
+        stamp="test corpus",
+    )
+    assert outcome.verdict is evals.Verdict.PASS, outcome.detail
+
+
+def test_a_run_with_no_arms_is_rejected() -> None:
+    """Zero corpora is zero measurements, and must never print a table."""
+    outcome = evals.retrieval_recall(_golden(), (), stamp="test corpus")
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "no retrieval arm" in outcome.detail
+
+
+def test_two_arms_sharing_a_name_are_rejected() -> None:
+    """Unattributable rows are worse than no comparison — they still print."""
+    outcome = evals.retrieval_recall(
+        _golden(),
+        (_arm("same", "wanted.md"), _arm("same", "noise.py")),
+        stamp="test corpus",
+    )
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "share a name" in outcome.detail

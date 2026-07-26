@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import manifest as mf
+from kb_setup import prose
 from kb_setup.graphify_env import clean_env, graphify_python
 
 if TYPE_CHECKING:
@@ -144,8 +145,15 @@ def build(repo_root: Path) -> None:
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
 
+    # The prose-only derived graph, from the graph we just built. Here and not in
+    # a separate task-you-must-remember: it is a pure function of graph.json, so
+    # any build that does not refresh it leaves a scoped corpus describing an
+    # older one — and a retrieval figure measured against a stale corpus is the
+    # inherited-number trap with extra steps. `kb-prose` re-derives it alone.
+    prose.derive_for(repo_root)
+
     _stamp_build(repo_root)
-    print("[kb-build] done — graphify-out/graph.json reproduced")
+    print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 
 
 def _currency_spec(repo_root: Path) -> ToolSpec | None:

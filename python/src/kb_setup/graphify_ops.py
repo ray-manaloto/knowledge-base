@@ -16,8 +16,13 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from kb_setup import prose
 from kb_setup.graphify_env import clean_env, graphify_python
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 
@@ -84,6 +89,50 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         file=sys.stderr,
     )
     return _run(base, "deterministic fallback")
+
+
+#: The flag `kb-query` adds on top of `graphify query`. Not a graphify flag —
+#: it resolves to graphify's own `--graph`, pointed at the derived prose graph.
+PROSE_FLAG = "--prose"
+
+
+def query(repo_root: Path, args: Sequence[str]) -> int:
+    """`kb-query` — `graphify query`, with `--prose` selecting the prose-only graph.
+
+    The graph is ALWAYS pinned with an explicit `--graph`, never left to resolve
+    against the process cwd. graphify's default is `graphify-out/graph.json`
+    *relative to where it runs*, which silently agrees when invoked from the repo
+    root and silently answers from some other corpus when it is not — the same
+    trap that was caught in review of the retrieval eval (knowledge-base#30).
+
+    `--prose` alongside an explicit `--graph` is an error rather than a
+    precedence rule: the whole point of the flag is which corpus answered, so
+    "one of them quietly wins" is the one behaviour that must not exist.
+    """
+    rest = [a for a in args if a != PROSE_FLAG]
+    wants_prose = PROSE_FLAG in args
+    if wants_prose and "--graph" in rest:
+        print(
+            f"[kb-query] {PROSE_FLAG} and --graph both given — they name different "
+            f"corpora and there is no sensible winner. Pass one.",
+            file=sys.stderr,
+        )
+        return 2
+    if "--graph" not in rest:
+        graph = prose.prose_graph_path(repo_root) if wants_prose else _full_graph(repo_root)
+        if not graph.is_file():
+            missing = "mise run kb-prose" if wants_prose else "mise run kb-build"
+            print(f"[kb-query] no graph at {graph} — run `{missing}` first", file=sys.stderr)
+            return 2
+        rest = [*rest, "--graph", str(graph)]
+    return subprocess.run(
+        ["graphify", "query", *rest], cwd=repo_root, env=clean_env(), check=False
+    ).returncode
+
+
+def _full_graph(repo_root: Path) -> Path:
+    """The unscoped graph — every node, code AST included."""
+    return repo_root / "graphify-out" / "graph.json"
 
 
 def transcribe(repo_root: Path, audio: str) -> int:

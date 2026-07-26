@@ -21,7 +21,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args:
         print(
-            "kb-setup: build | update <name> | merge <chunk> | label | "
+            "kb-setup: build | update <name> | prose | query <question> [--prose] | "
+            "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp] | "
             "brain [record|reflect|audit] | md-budget | eval [--live] [--slow] | "
             "ensure-deps | version"
@@ -45,6 +46,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             graph.update(repo_root, rest[0])
         return 0
+    if cmd == "prose":
+        from kb_setup import prose
+
+        prose.derive_for(repo_root)
+        return 0
+    if cmd == "query":
+        from kb_setup import graphify_ops
+
+        return graphify_ops.query(repo_root, rest)
     if cmd == "artifacts":
         from kb_setup import artifacts
 
@@ -131,7 +141,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
     print(
         f"kb-setup: unknown command {cmd!r} "
-        "(build | update [name] | merge <chunk> [root] | label [--missing-only] "
+        "(build | update [name] | prose | query <question> [--prose] | "
+        "merge <chunk> [root] | label [--missing-only] "
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
         "currency [check|run|stamp] [--tool T --json --no-write] | manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "

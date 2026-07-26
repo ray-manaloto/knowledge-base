@@ -562,6 +562,33 @@ Retrieve = Callable[[GoldenQuery], tuple[int, Sequence[str]]]
 Membership = Callable[[Sequence[str]], Mapping[str, bool]]
 
 
+@dataclass(frozen=True)
+class Arm:
+    """One retrieval configuration the golden set is run against.
+
+    An arm is a CORPUS plus the retriever that reads it, which is why the
+    membership oracle lives here and not on the run: a target present in one
+    arm's corpus and absent from another's is fixture rot in the second arm
+    only, and a single shared oracle would report the first arm's answer for
+    both.
+
+    Two or more arms are run over the SAME queries and reported side by side,
+    so the difference between them is attributable to the arm and nothing else.
+    That is the whole design: the first arm is the baseline and each later one
+    is a change whose effect is the delta (knowledge-base#12 — the prose-scoped
+    corpus against the unscoped one).
+
+    Args:
+        name: How the arm is labelled in the report. Must be unique in a run.
+        retrieve: Runs one query against this arm's corpus. See :data:`Retrieve`.
+        present: Optional corpus-membership oracle for THIS arm's corpus.
+    """
+
+    name: str
+    retrieve: Retrieve
+    present: Membership | None = None
+
+
 def corpus_has(
     graph_path: Path, needles: Sequence[str], *, chunk: int = 1 << 22
 ) -> dict[str, bool]:
@@ -678,25 +705,135 @@ def _pair_lines(rows: Sequence[RetrievalRow]) -> list[str]:
             k = natural.query.k
             gap = len(echo.hits) - len(natural.hits)
             lines.append(
-                f"  {topic:<22} natural@{k} {natural.summary}   echo@{k} {echo.summary}   "
+                f"    {topic:<22} natural@{k} {natural.summary}   echo@{k} {echo.summary}   "
                 f"gap {gap:+d}"
             )
         lines.extend(
-            f"  {topic:<22} ABSENT@{row.query.k} {row.summary} returned (0 is required)"
+            f"    {topic:<22} ABSENT@{row.query.k} {row.summary} returned (0 is required)"
             for row in halves.values()
             if row.query.expects_absent
         )
     return lines
 
 
+@dataclass(frozen=True)
+class _ArmResult:
+    """One arm's scored rows plus the two headline counts the delta line reads."""
+
+    arm: Arm
+    rows: tuple[RetrievalRow, ...]
+
+    @property
+    def natural(self) -> list[RetrievalRow]:
+        """The NATURAL half of every positive pair."""
+        return [
+            r
+            for r in self.rows
+            if not r.query.expects_absent and r.query.phrasing is Phrasing.NATURAL
+        ]
+
+    @property
+    def echo(self) -> list[RetrievalRow]:
+        """The ECHO half of every positive pair."""
+        return [
+            r for r in self.rows if not r.query.expects_absent and r.query.phrasing is Phrasing.ECHO
+        ]
+
+    @property
+    def scored(self) -> tuple[int, int]:
+        """How many pairs scored at all, ``(natural, echo)``."""
+        return sum(1 for r in self.natural if r.hits), sum(1 for r in self.echo if r.hits)
+
+
+def _arms_shape(arms: Sequence[Arm]) -> str:
+    """Structural defects in the ARM list. '' when sound.
+
+    The sibling of :func:`_golden_set_shape`, and the same reasoning: a run with
+    no arm measures nothing, and two arms sharing a name produce a report whose
+    rows cannot be attributed — which is worse than no comparison, because it
+    still prints numbers.
+    """
+    if not arms:
+        return "no retrieval arm was declared — there is nothing to measure with"
+    names = [a.name for a in arms]
+    duplicates = sorted({n for n in names if names.count(n) > 1})
+    if duplicates:
+        return (
+            f"two or more arms share a name ({', '.join(duplicates)}) — the report "
+            f"rows could not be attributed to a corpus"
+        )
+    return ""
+
+
+def _arm_defect(result: _ArmResult) -> str:
+    """Everything that would make this arm's number a lie. '' when sound."""
+    rows, name = result.rows, result.arm.name
+    broken = [f"{r.query.topic}/{r.query.phrasing.name} rc={r.rc}" for r in rows if r.rc != 0]
+    if broken:
+        return f"[{name}] {len(broken)} query/queries did not run: {', '.join(broken)}"
+    # EVERY row, ABSENT included — `returned` counts what came back, not what
+    # matched. An ABSENT row that returned nothing has not demonstrated the
+    # target is absent; it has demonstrated the query path is dead, and it would
+    # let a retriever that returns nothing pass every negative row.
+    silent = [f"{r.query.topic}/{r.query.phrasing.name}" for r in rows if r.returned == 0]
+    if silent:
+        return (
+            f"[{name}] {len(silent)} query/queries returned NOTHING at all "
+            f"({', '.join(silent)}) — that is a graph that resolves and knows nothing"
+        )
+    leaked = [r for r in rows if r.query.expects_absent and r.hits]
+    if leaked:
+        return (
+            f"[{name}] the NEGATIVE direction came back positive: "
+            + "; ".join(f"{r.query.topic} returned {', '.join(r.hits)}" for r in leaked)
+            + " — the target is declared absent from the corpus, so this is the "
+            "matcher or the fixture lying, not a retrieval win"
+        )
+    return ""
+
+
+def _arm_lines(result: _ArmResult) -> list[str]:
+    """One arm's report block: its header, its table, and its SUITE summary."""
+    natural, echo, scored = result.natural, result.echo, result.scored
+    return [
+        f"  [{result.arm.name}]",
+        *_pair_lines(result.rows),
+        f"    SUITE: {len(natural)} pair(s) — natural scored on {scored[0]}, "
+        f"echo on {scored[1]}; mean recall natural "
+        f"{_mean(r.recall for r in natural):.2f} vs echo "
+        f"{_mean(r.recall for r in echo):.2f}",
+    ]
+
+
+def _delta_line(baseline: _ArmResult, other: _ArmResult) -> str:
+    """The before/after line: what changed between two arms, in both phrasings.
+
+    Printed by the runner rather than compared by hand across two invocations. A
+    comparison a later session cannot reproduce is the inherited-number trap
+    (``probes-need-a-control-arm.md`` rule 6) — so the two figures are produced
+    by ONE run, over one query set, and their difference is stated here.
+    """
+    base_n, base_e = baseline.scored
+    other_n, other_e = other.scored
+    total = len(baseline.natural)
+    return (
+        f"  DELTA {baseline.arm.name} -> {other.arm.name}: "
+        f"natural {base_n} -> {other_n} of {total} pair(s) "
+        f"(mean {_mean(r.recall for r in baseline.natural):.2f} -> "
+        f"{_mean(r.recall for r in other.natural):.2f}), "
+        f"echo {base_e} -> {other_e} "
+        f"(mean {_mean(r.recall for r in baseline.echo):.2f} -> "
+        f"{_mean(r.recall for r in other.echo):.2f})"
+    )
+
+
 def retrieval_recall(
     queries: Sequence[GoldenQuery],
-    retrieve: Retrieve,
+    arms: Sequence[Arm],
     *,
     stamp: str,
-    present: Membership | None = None,
 ) -> Outcome:
-    """Measure recall@k over a golden set. ADVISORY by design — see the caller.
+    """Measure recall@k over a golden set, once per arm. ADVISORY — see the caller.
 
     There is no recall FLOOR here, deliberately: at the measured 0/119 baseline
     a floor would be red on arrival, and a floor of zero is the check that can
@@ -704,63 +841,41 @@ def retrieval_recall(
     lie — a broken query path, a graph that answers nothing, a rotten fixture,
     and the negative direction coming back positive. Those are harness defects,
     not retrieval quality, and they must never be reported as a recall figure.
+    They are checked PER ARM: a second corpus that answers nothing must not hide
+    behind the first one's numbers.
 
     Args:
         queries: The golden set. Its shape is checked (:func:`_golden_set_shape`).
-        retrieve: Runs one query. See :data:`Retrieve`.
+        arms: The corpora to measure, in order. The first is the baseline and
+            every later one is reported as a delta against it. See :class:`Arm`.
         stamp: The corpus stamp — build date and node count. Carried into the
             detail because a retrieval number without the corpus it was measured
             against is not a measurement (``probes-need-a-control-arm.md`` rule 6).
-        present: Optional corpus-membership oracle for the fixture-integrity
-            check. Omitted only where the graph is not the thing under test.
     """
-    shape = _golden_set_shape(queries)
+    shape = _golden_set_shape(queries) or _arms_shape(arms)
     if shape:
         return fail(shape)
-    if present is not None:
-        rot = _fixture_integrity(queries, present)
-        if rot:
-            return fail(rot)
 
-    rows = [score_retrieval(q, retrieve) for q in queries]
+    results = []
+    for arm in arms:
+        if arm.present is not None:
+            rot = _fixture_integrity(queries, arm.present)
+            if rot:
+                return fail(f"[{arm.name}] {rot}")
+        results.append(_ArmResult(arm, tuple(score_retrieval(q, arm.retrieve) for q in queries)))
 
-    broken = [f"{r.query.topic}/{r.query.phrasing.name} rc={r.rc}" for r in rows if r.rc != 0]
-    if broken:
-        return fail(f"{len(broken)} query/queries did not run: {', '.join(broken)}")
-    # EVERY row, ABSENT included — `returned` counts what came back, not what
-    # matched. An ABSENT row that returned nothing has not demonstrated the
-    # target is absent; it has demonstrated the query path is dead, and it would
-    # let a retriever that returns nothing pass every negative row.
-    silent = [f"{r.query.topic}/{r.query.phrasing.name}" for r in rows if r.returned == 0]
-    if silent:
-        return fail(
-            f"{len(silent)} query/queries returned NOTHING at all "
-            f"({', '.join(silent)}) — that is a graph that resolves and knows nothing"
-        )
-    leaked = [r for r in rows if r.query.expects_absent and r.hits]
-    if leaked:
-        return fail(
-            "the NEGATIVE direction came back positive: "
-            + "; ".join(f"{r.query.topic} returned {', '.join(r.hits)}" for r in leaked)
-            + " — the target is declared absent from the corpus, so this is the "
-            "matcher or the fixture lying, not a retrieval win"
-        )
+    for defect in (_arm_defect(r) for r in results):
+        if defect:
+            return fail(defect)
 
-    positives = [r for r in rows if not r.query.expects_absent]
-    natural = [r for r in positives if r.query.phrasing is Phrasing.NATURAL]
-    echo = [r for r in positives if r.query.phrasing is Phrasing.ECHO]
-    hit_pairs = sum(1 for r in natural if r.hits), sum(1 for r in echo if r.hits)
     detail = "\n".join(
         [
             f"corpus: {stamp}",
-            *_pair_lines(rows),
-            f"  SUITE: {len(natural)} pair(s) — natural scored on {hit_pairs[0]}, "
-            f"echo on {hit_pairs[1]}; mean recall natural "
-            f"{_mean(r.recall for r in natural):.2f} vs echo "
-            f"{_mean(r.recall for r in echo):.2f}",
+            *(line for r in results for line in _arm_lines(r)),
+            *(_delta_line(results[0], r) for r in results[1:]),
         ]
     )
-    if hit_pairs == (0, 0):
+    if all(r.scored == (0, 0) for r in results):
         detail += (
             "\n  NOTE: nothing scored at all, so this run alone cannot show the "
             "matcher discriminates — that is proven by its unit tests, not here"

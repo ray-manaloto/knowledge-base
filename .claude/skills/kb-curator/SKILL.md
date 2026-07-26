@@ -48,7 +48,8 @@ The task map:
 | merge one doc chunk | `mise run kb-merge -- <chunk.json> [root]` | ~~`_merge_docs.py`~~ |
 | (re)label communities | `mise run kb-label` | ~~`graphify label`~~ |
 | transcribe local audio | `mise run kb-transcribe -- <audio>` | ~~`graphify.transcribe`~~ |
-| query | `mise run kb-query -- "<q>"` | ~~`graphify query`~~ |
+| query | `mise run kb-query -- "<q>"`, plus `--prose` for a DOCUMENT question | ~~`graphify query`~~ |
+| re-derive the prose graph alone | `mise run kb-prose` (`kb-build` already writes it) | — |
 | record / reflect | `mise run kb-remember` / `mise run kb-reflect` | ~~`graphify save-result`/`reflect`~~ |
 | artifacts | `mise run kb-artifacts` | — |
 
