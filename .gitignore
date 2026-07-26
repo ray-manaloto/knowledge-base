@@ -36,6 +36,15 @@ graphify-out/wiki/
 graphify-out/obsidian/
 graphify-out/GRAPH_REPORT.md
 graphify-out/.graphify_*
+# .currency-stamp.json fingerprints THIS machine's last build (version + artifact
+# stats), so it is per-clone state, not a shared input: committing it would make
+# every rebuild a diff and every parallel clone a conflict, and a fresh clone
+# would inherit a stamp asserting a build that never happened there. Its absence
+# is the correct first-run state — `kb-setup currency check` reports "rebuild
+# pending" until a local `kb-build` writes it. Added 2026-07-26, the first run
+# that actually produced the file (the stamp mechanism shipped without its own
+# ignore rule, so nothing had revealed the gap).
+graphify-out/.currency-stamp.json
 # committed under graphify-out/: ONLY memory/ (authored work-memory).
 # graph.json / manifest.json / .graphify_* (labels, learning overlay) are derived.
 
