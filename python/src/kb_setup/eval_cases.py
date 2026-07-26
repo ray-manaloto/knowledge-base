@@ -35,7 +35,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from kb_setup import evals, hook_guard
+from kb_setup import evals, hook_guard, prose
 
 #: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
 #: NOT installed — the doctrine says availability is discovered at run time, so
@@ -115,7 +115,9 @@ GUARD_FIXTURES: tuple[evals.GuardFixture, ...] = (
         "_ALLOWED_READONLY — whose --help/-h/--version entries are unreachable",
     ),
     _D('mise run kb-query -- "how are sources added?"', _ALLOW, "the canonical task"),
+    _D('mise run kb-query -- "how are sources added?" --prose', _ALLOW, "the prose-scoped form"),
     _D("mise run kb-build", _ALLOW, "the canonical task"),
+    _D("mise run kb-prose", _ALLOW, "the canonical task for the derived prose graph"),
     _D(
         'grep -rn "import graphify" python/',
         _ALLOW,
@@ -335,23 +337,30 @@ def _graph_path(repo_root: Path) -> Path:
     return repo_root / "graphify-out" / "graph.json"
 
 
-def _retrieval(repo_root: Path) -> evals.Retrieve:
-    """Bind the retriever to THIS repo's graph, and return it.
+#: The two corpora the golden set is measured against, in report order. The
+#: first is the baseline; the second is the P0 scoping change under test
+#: (knowledge-base#12) and is reported as a delta against it.
+UNSCOPED_ARM = "unscoped"
+PROSE_ARM = "prose"
+
+
+def _retrieval(repo_root: Path, graph: Path) -> evals.Retrieve:
+    """Bind the retriever to ONE graph, and return it.
 
     Shells out to `graphify query` exactly as the tier-1 canary does, rather
     than reimplementing traversal: what is being measured is the retrieval a
     session actually gets, and anything else would measure a different program.
 
     PINNED with an explicit ``--graph``, not left to resolve against the process
-    cwd (caught in review of PR #30). The corpus stamp and the fixture-integrity
-    scan both read ``repo_root/graphify-out/graph.json``; a query resolving
-    somewhere else would print recall figures stamped with a corpus they were
-    not measured against — the precise failure the stamp exists to prevent.
+    cwd (caught in review of PR #30). That was already load-bearing with one
+    corpus; with two it is the entire experiment — an unpinned query would
+    answer from whichever graph the cwd happens to hold and both arms would
+    report the same number.
     """
 
     def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
         rc, out = evals.run_command(
-            ["graphify", "query", query.query, "--graph", str(_graph_path(repo_root))],
+            ["graphify", "query", query.query, "--graph", str(graph)],
             cwd=repo_root,
             timeout=RETRIEVAL_TIMEOUT,
         )
@@ -362,41 +371,76 @@ def _retrieval(repo_root: Path) -> evals.Retrieve:
     return retrieve
 
 
-def _corpus_stamp(repo_root: Path) -> str:
-    """Build date + node count + graphify version for the graph being measured.
+def _node_count(graph: Path, repo_root: Path) -> str:
+    """``N nodes`` for one graph, via graphify's own read-only `diagnose`.
 
-    Mandatory, not decoration. This case runs against the live local graph, so
-    its numbers move when the graph is rebuilt or the tool is bumped; a figure
-    repeated without the corpus it came from is not a measurement
-    (`probes-need-a-control-arm.md` rule 6). Node count comes from graphify's
-    own read-only `diagnose`, which is authoritative and costs ~15s — parsing
-    the graph here would cost gigabytes of resident memory for one integer.
+    `diagnose` is authoritative and costs ~15s on the full graph; parsing the
+    graph here would cost gigabytes of resident memory for one integer.
     """
-    graph = _graph_path(repo_root)
-    built = dt.datetime.fromtimestamp(graph.stat().st_mtime, tz=dt.UTC).date().isoformat()
     rc, out = evals.run_command(
         ["graphify", "diagnose", "multigraph", "--json", "--graph", str(graph)],
         cwd=repo_root,
         timeout=RETRIEVAL_TIMEOUT,
     )
-    nodes = f"node count UNAVAILABLE (diagnose rc={rc})"
-    if rc == 0:
-        try:
-            nodes = f"{json.loads(out)['summary']['node_count']:,} nodes"
-        except (ValueError, KeyError, TypeError) as exc:
-            nodes = f"node count UNPARSABLE ({type(exc).__name__})"
+    if rc != 0:
+        return f"node count UNAVAILABLE (diagnose rc={rc})"
+    try:
+        return f"{json.loads(out)['summary']['node_count']:,} nodes"
+    except (ValueError, KeyError, TypeError) as exc:
+        return f"node count UNPARSABLE ({type(exc).__name__})"
+
+
+def _corpus_stamp(repo_root: Path) -> str:
+    """Build date + node count + graphify version, for EVERY graph being measured.
+
+    Mandatory, not decoration. This case runs against the live local graphs, so
+    its numbers move when they are rebuilt or the tool is bumped; a figure
+    repeated without the corpus it came from is not a measurement
+    (`probes-need-a-control-arm.md` rule 6). Both arms are stamped, because the
+    delta between them is only meaningful if the prose graph was derived from
+    the graph the baseline arm queried — and a stale one is invisible otherwise.
+    """
     version_rc, version_out = evals.run_command(["graphify", "--version"], timeout=30)
     version = version_out.strip() if version_rc == 0 else f"graphify version rc={version_rc}"
-    return f"{nodes}, built {built}, {version}"
+    stamps = [
+        f"{name} {_node_count(path, repo_root)}, built {_built(path)}"
+        for name, path in (
+            (UNSCOPED_ARM, _graph_path(repo_root)),
+            (PROSE_ARM, prose.prose_graph_path(repo_root)),
+        )
+    ]
+    return f"{'; '.join(stamps)}; {version}"
 
 
-def _corpus_membership(repo_root: Path) -> evals.Membership:
-    """Bind the fixture-integrity oracle to this repo's graph."""
+def _built(graph: Path) -> str:
+    """The graph file's mtime as a date — when this corpus was written."""
+    return dt.datetime.fromtimestamp(graph.stat().st_mtime, tz=dt.UTC).date().isoformat()
+
+
+def _corpus_membership(graph: Path) -> evals.Membership:
+    """Bind the fixture-integrity oracle to ONE graph.
+
+    Per-arm, not per-run: a target that survives into the prose graph and one
+    that does not are different facts, and a positive target dropped by the
+    scoping filter would otherwise report recall 0 forever and read as a
+    retrieval failure rather than as the fixture rot it is.
+    """
 
     def present(names: Sequence[str]) -> Mapping[str, bool]:
-        return evals.corpus_has(_graph_path(repo_root), names)
+        return evals.corpus_has(graph, names)
 
     return present
+
+
+def _retrieval_arms(repo_root: Path) -> tuple[evals.Arm, ...]:
+    """The unscoped baseline and the prose-scoped arm, over the same golden set."""
+    return tuple(
+        evals.Arm(name, _retrieval(repo_root, path), present=_corpus_membership(path))
+        for name, path in (
+            (UNSCOPED_ARM, _graph_path(repo_root)),
+            (PROSE_ARM, prose.prose_graph_path(repo_root)),
+        )
+    )
 
 
 def _broken_retrieval() -> evals.Outcome:
@@ -407,6 +451,12 @@ def _broken_retrieval() -> evals.Outcome:
     exists — a matcher that reports a hit for a document the corpus does not
     contain — and it runs offline in microseconds, against a miniature golden
     set of the same shape rather than the real one.
+
+    TWO arms, matching the probe's shape: the defect has to be caught in the
+    SECOND arm as well, or a broken scoped corpus could hide behind the
+    baseline's numbers. The leak is placed in the second arm for exactly that
+    reason — a one-armed control would pass a scorer that only ever checks the
+    first.
     """
     queries = (
         _G("t", _NATURAL, "q", ("present.md",), 5),
@@ -415,7 +465,10 @@ def _broken_retrieval() -> evals.Outcome:
     )
     return evals.retrieval_recall(
         queries,
-        lambda _q: (0, ["present.md", "absent.md"]),
+        (
+            evals.Arm(UNSCOPED_ARM, lambda _q: (0, ["present.md"])),
+            evals.Arm(PROSE_ARM, lambda _q: (0, ["present.md", "absent.md"])),
+        ),
         stamp="synthetic control-arm corpus",
     )
 
@@ -468,20 +521,28 @@ def _graphify_installed() -> evals.Outcome | None:
 
 
 def _retrieval_precondition(repo_root: Path) -> evals.Outcome | None:
-    """Environment gate: needs both the CLI and a built graph to measure anything.
+    """Environment gate: needs the CLI and BOTH graphs to measure anything.
 
-    The graph is gitignored and derived, so its absence on a fresh clone is
+    The graphs are gitignored and derived, so their absence on a fresh clone is
     expected. Same reasoning as :func:`_graphify_installed`: this belongs in a
     precondition rather than inside the probe, because "we could not look" and
     "retrieval found nothing" are different answers and collapsing them is the
     defect this whole harness exists to catch.
+
+    A missing prose graph skips the WHOLE case rather than quietly dropping its
+    arm. Dropping it would print the baseline's numbers under a report that
+    still claims to be a before/after — a comparison silently reduced to one
+    side, which reads as "scoping changed nothing".
     """
     installed = _graphify_installed()
     if installed is not None:
         return installed
-    graph = _graph_path(repo_root)
-    if not graph.is_file():
-        return evals.skip(f"no graph at {graph} — run `mise run kb-build` first")
+    for graph, task in (
+        (_graph_path(repo_root), "kb-build"),
+        (prose.prose_graph_path(repo_root), "kb-prose"),
+    ):
+        if not graph.is_file():
+            return evals.skip(f"no graph at {graph} — run `mise run {task}` first")
     return None
 
 
@@ -545,13 +606,13 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             description=(
                 "golden retrieval set: recall@k for 8 hand-written query pairs "
                 "(natural vs label-echoing) plus both negative directions, "
-                "measured against the live local graph"
+                "measured against the live local graph — unscoped and "
+                "prose-scoped side by side"
             ),
             probe=lambda: evals.retrieval_recall(
                 GOLDEN_QUERIES,
-                _retrieval(repo_root),
+                _retrieval_arms(repo_root),
                 stamp=_corpus_stamp(repo_root),
-                present=_corpus_membership(repo_root),
             ),
             control=_broken_retrieval,
             # ADVISORY, and deliberately so: the baseline is 0/119 relevant nodes
@@ -561,9 +622,11 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # broken query path, a silent graph, fixture rot, or the negative
             # direction coming back positive — harness defects, not recall.
             gated=False,
-            # 18 queries, each reloading a ~350 MB graph, plus a `diagnose` for
-            # the corpus stamp: ~3 minutes. Far too slow to sit on every ship,
-            # and an advisory case that cannot block has no claim on one.
+            # 18 queries per arm plus a `diagnose` per corpus: ~3.5 minutes,
+            # essentially all of it the unscoped arm (each of its queries
+            # reloads a ~350 MB graph at ~10s; the 2.7 MB prose graph answers in
+            # ~0.3s). Far too slow to sit on every ship, and an advisory case
+            # that cannot block has no claim on one.
             slow=True,
             precondition=lambda: _retrieval_precondition(repo_root),
         ),

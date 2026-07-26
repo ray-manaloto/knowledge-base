@@ -15,7 +15,8 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `graphify extract` / `clone` / `merge-graphs` | `mise run kb-build` |
 | `graphify update` | `mise run kb-update -- <name>` |
 | `graphify add <url>` | `mise run kb-add -- <url>` |
-| `graphify query "…"` | `mise run kb-query -- "<question>"` |
+| `graphify query "…"` | `mise run kb-query -- "<question>"` (add `--prose` for a question about the DOCUMENTS) |
+| `graphify query --graph …/graph-prose.json` | `mise run kb-query -- "<question>" --prose` |
 | `graphify cluster` / `label` | `mise run kb-label` |
 | `graphify save-result` | `mise run kb-remember -- --question Q --answer A --outcome useful` |
 | `graphify reflect` | `mise run kb-reflect` |

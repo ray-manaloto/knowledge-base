@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import eval_cases, evals
+from kb_setup import eval_cases, evals, prose
 
 if TYPE_CHECKING:
     import pytest
@@ -242,7 +242,8 @@ def test_the_retriever_pins_the_query_to_this_repos_graph(
         return 0, "NODE Some label [src=wanted.md loc=L12 community=c]\nEDGE a --x--> b\n"
 
     monkeypatch.setattr(eval_cases.evals, "run_command", fake_run)
-    retrieve = eval_cases._retrieval(tmp_path)
+    graph = tmp_path / "graphify-out" / "graph.json"
+    retrieve = eval_cases._retrieval(tmp_path, graph)
     rc, sources = retrieve(eval_cases.GOLDEN_QUERIES[0])
 
     assert rc == 0
@@ -250,4 +251,80 @@ def test_the_retriever_pins_the_query_to_this_repos_graph(
     argv, cwd = calls[0]
     assert cwd == tmp_path
     assert "--graph" in argv
-    assert argv[argv.index("--graph") + 1] == str(tmp_path / "graphify-out" / "graph.json")
+    assert argv[argv.index("--graph") + 1] == str(graph)
+
+
+def test_the_two_arms_query_different_graphs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """CONTROL ARM for the whole before/after: two arms, two corpora.
+
+    If both arms resolved the same graph the report would still print a table, a
+    SUITE line per arm and a DELTA of zero — a before/after that structurally
+    cannot show a difference. So the argv each arm actually sends is bound here.
+    """
+    seen: list[str] = []
+
+    def fake_run(argv: Sequence[str], **_kwargs: object) -> tuple[int, str]:
+        seen.append(argv[argv.index("--graph") + 1])
+        return 0, "NODE L [src=wanted.md loc=L1 community=c]\n"
+
+    monkeypatch.setattr(eval_cases.evals, "run_command", fake_run)
+    arms = eval_cases._retrieval_arms(tmp_path)
+    for arm in arms:
+        arm.retrieve(eval_cases.GOLDEN_QUERIES[0])
+
+    assert [a.name for a in arms] == [eval_cases.UNSCOPED_ARM, eval_cases.PROSE_ARM]
+    assert seen == [
+        str(tmp_path / "graphify-out" / "graph.json"),
+        str(tmp_path / "graphify-out" / prose.PROSE_GRAPH_NAME),
+    ]
+
+
+def test_every_arm_carries_its_own_membership_oracle() -> None:
+    """Fixture rot is per-corpus: a target dropped by scoping is rot in that arm.
+
+    Shared, the prose arm would be checked against the full graph, where every
+    target trivially exists — so a positive target the scoping filter removed
+    would report recall 0 forever and read as a retrieval failure.
+    """
+    arms = eval_cases._retrieval_arms(Path("/nonexistent"))
+    assert all(arm.present is not None for arm in arms)
+
+
+def test_the_retrieval_case_skips_when_the_prose_graph_is_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A half-present pair of corpora must skip the case, never drop the arm.
+
+    Dropping it would print the baseline alone under a report still shaped like
+    a before/after — which reads as "scoping changed nothing".
+
+    The CLI gate is PINNED. `_retrieval_precondition` checks for graphify first,
+    so on a host without it the SKIP that comes back is the install one — a
+    green assertion here would then be measuring the wrong absence entirely
+    (caught in review of PR #31).
+    """
+    monkeypatch.setattr(eval_cases.shutil, "which", lambda _name: "/usr/bin/graphify")
+    (tmp_path / "graphify-out").mkdir()
+    (tmp_path / "graphify-out" / "graph.json").write_text("{}")
+    outcome = eval_cases._retrieval_precondition(tmp_path)
+    assert outcome is not None
+    assert outcome.verdict is evals.Verdict.SKIP
+    assert "kb-prose" in outcome.detail
+
+
+def test_the_retrieval_case_skips_when_graphify_is_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """CONTROL ARM: the two SKIP reasons are different and must not collapse.
+
+    "graphify is not installed here" and "the prose graph has not been derived"
+    have different fixes, and one of them is not a defect in this repo at all.
+    """
+    monkeypatch.setattr(eval_cases.shutil, "which", lambda _name: None)
+    outcome = eval_cases._retrieval_precondition(tmp_path)
+    assert outcome is not None
+    assert outcome.verdict is evals.Verdict.SKIP
+    assert "not installed" in outcome.detail
+    assert "kb-prose" not in outcome.detail

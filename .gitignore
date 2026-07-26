@@ -20,6 +20,10 @@ __pycache__/
 # derived/coupled and gitignored. COMMITTED = reproducible inputs + authored
 # graphify-out/memory/ (work-memory). Other views regenerate via `kb-artifacts`.
 graphify-out/graph.json
+# graph-prose.json is a pure function of graph.json (kb_setup.prose), so it is
+# derived twice over — committing it would pin a scoped corpus to whatever the
+# unscoped one looked like on the day of the commit.
+graphify-out/graph-prose.json
 graphify-out/manifest.json
 graphify-out/cache/
 graphify-out/transcripts/

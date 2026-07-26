@@ -42,9 +42,11 @@ graphify's surface splits by transport AND by liveness:
 
 ### Querying (any consumer, e.g. the dotfiles repo)
 
-- CLI: `mise run kb-query -- "how does X work?"` (deterministic BFS/DFS, no LLM,
-  source-cited). Also `graphify path "A" "B"`, `graphify explain "X"`,
-  `graphify god-nodes`.
+- CLI: `mise run kb-query -- "how does X work?"` (deterministic, no LLM,
+  source-cited). **Add `--prose` for any question about the DOCUMENTS**: it reads
+  the derived prose-only graph (2,105 nodes) not all 128,333, of which 126,228
+  are code AST crowding prose out of the query's token budget (natural-phrasing
+  recall 1/8 -> 3/8 pairs; #12, 2026-07-25). Also `graphify path`/`explain`.
 - MCP: `mise run kb-serve` starts the read-only server pinned to this graph.
   A consumer repo reaches it via `mcp2cli` (one-off) or a `.mcp.json`
   registration (frequent use). All MCP tools are graph reads and spend **zero
@@ -55,8 +57,8 @@ graphify's surface splits by transport AND by liveness:
 Two hard mandates (Ray, 2026-07-22, machine-enforced):
 
 1. **Never run graphify by hand — drive it through a mise task.** `kb-add` /
-   `kb-build` / `kb-update` / `kb-merge` / `kb-label` / `kb-transcribe` / `kb-query` /
-   `kb-remember` / `kb-reflect` / `kb-artifacts`. The PreToolUse guard
+   `kb-build` / `kb-prose` / `kb-update` / `kb-merge` / `kb-label` / `kb-transcribe` /
+   `kb-query` / `kb-remember` / `kb-reflect` / `kb-artifacts`. The PreToolUse guard
    `kb_setup.hook_guard` (wired in `.claude/settings.json`) DENIES a raw `graphify …`
    / `_merge_docs.py` / graphify-bundled-python call and prints the task to use. See
    `.claude/skills/kb-curator` for the full workflow.
@@ -165,13 +167,13 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `sources/*.manifest` | github-repo pins (url+SHA); the clone `sources/<name>/` is gitignored, re-fetched on build. |
 | `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
-| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (at aggregate scale 119MB+ exceeds git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
+| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (at aggregate scale 119MB+ exceeds git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (`kb-build`, or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
 | `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
 | `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
 | `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |
 | `.claude/workflows/` | Saved Claude workflows the skills compose — `kb-extract.js` (host-agent extraction fan-out). |
 | `tests/` | Pytest (`uv run pytest tests/`); config in the root `pyproject.toml`. |
-| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`. |
+| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-prose`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`. |
 | `pyproject.toml` | The ONE python config (repo root): `[project]` + ruff (`select=ALL`) + ty + pytest. `uv run` uses it for `python/src` AND `tests/`. |
 | `hk.pkl` | Git-hook lint: ruff/ty (python), taplo (toml), rumdl (md), gitleaks (secrets), typos, pkl, hygiene + `no-lint-skip`. All logic in `kb_setup` (zero-bash). |
 | `docs/graphify-reference.md` | Expert operational reference for graphify itself. |
