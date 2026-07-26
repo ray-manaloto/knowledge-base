@@ -66,7 +66,15 @@ ref = "label-communities-schema-gap"
 note = """`label_communities` (llm.py) has no JSON-schema constant, unlike
 `_EXTRACTION_JSON_SCHEMA`. Extraction is fixed; LABELLING is still broken —
 probed on 0.9.25, 42/42 batches failed. Community names come from the free
-deterministic `label_communities_by_hub` instead. Re-probe on each bump."""
+deterministic `label_communities_by_hub` instead. Re-probe on each bump.
+
+STILL PRESENT on 0.9.26 (re-probed 2026-07-26). The cheap re-probe is a file
+diff, not a batch run: `llm.py` is BYTE-IDENTICAL across the two installs, so
+the gap cannot have moved. Counts agree in both — `_EXTRACTION_JSON_SCHEMA` x2,
+label-side schema constant x0, `def label_communities` x1 — and a bogus symbol
+greps to 0 in the same file, so the zero is an absence rather than a broken
+probe. Do the diff first on the next bump; only run the 42-batch probe if the
+file actually changed."""
 
 [[tool.graphify.watch]]
 kind = "issue"
