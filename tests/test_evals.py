@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
 from kb_setup import evals
 
 _ARMED = evals.fail("armed")
@@ -1020,3 +1021,119 @@ def test_two_arms_sharing_a_name_are_rejected() -> None:
     )
     assert outcome.verdict is evals.Verdict.FAIL
     assert "share a name" in outcome.detail
+
+
+# --- the recall floor (knowledge-base#12, P2) ---------------------------------
+
+
+def _pairs(count: int) -> tuple[evals.GoldenQuery, ...]:
+    """``count`` positive pairs, each with its own target, plus one negative.
+
+    `_golden()` yields a single pair, which cannot express "the best arm cleared
+    a floor of 2" — so the floor tests get a set they can actually breach.
+    """
+    return (
+        *(
+            evals.GoldenQuery(f"t{i}", phrasing, f"q{i}", (f"want{i}.md",), 3)
+            for i in range(count)
+            for phrasing in (_NAT, _ECH)
+        ),
+        evals.GoldenQuery("gone", _ABS, "q", ("gone.md",), 3),
+    )
+
+
+def _scores(name: str, topics: int) -> evals.Arm:
+    """An arm that finds the target of the first ``topics`` pairs and nothing else.
+
+    Always returns a non-empty list, so `_arm_defect`'s silent-corpus check does
+    not fire and the floor is the only thing under test.
+    """
+
+    def retrieve(query: evals.GoldenQuery) -> tuple[int, list[str]]:
+        if query.expects_absent:
+            return 0, ["filler.md"]
+        findable = {f"want{i}.md" for i in range(topics)}
+        return 0, [*(t for t in query.must_appear if t in findable), "filler.md"]
+
+    return evals.Arm(name, retrieve)
+
+
+def test_the_floor_passes_when_the_best_arm_clears_it() -> None:
+    """The direction that must work, or every FAIL below means nothing."""
+    outcome = evals.retrieval_recall(_pairs(2), (_scores("only", 2),), stamp="c", floor=2)
+    assert outcome.verdict is evals.Verdict.PASS, outcome.detail
+    assert "FLOOR: best arm [only] scored 2 of 2 natural pair(s), floor is 2" in outcome.detail
+
+
+def test_the_floor_fails_when_no_arm_clears_it() -> None:
+    """CONTROL ARM for the above: the floor is a gate, not a printed number.
+
+    Without this the test above would pass for an implementation that computed
+    the line and never compared it.
+    """
+    outcome = evals.retrieval_recall(_pairs(2), (_scores("only", 1),), stamp="c", floor=2)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "REGRESSED below the floor" in outcome.detail
+
+
+def test_the_floor_reads_the_best_arm_not_the_last() -> None:
+    """P2 is why: the newest arm is not the best one, and the floor guards the best.
+
+    `prose+rrf` scores below `prose+idf` on the real corpus, so a floor read off
+    the LAST arm would redden a run whose best retrieval path never regressed.
+    The weaker arm is placed last here for exactly that reason — an
+    implementation reading ``results[-1]`` fails this test.
+    """
+    outcome = evals.retrieval_recall(
+        _pairs(2), (_scores("best", 2), _scores("newest", 0)), stamp="c", floor=2
+    )
+    assert outcome.verdict is evals.Verdict.PASS, outcome.detail
+    assert "best arm [best]" in outcome.detail
+
+
+def test_a_floor_breach_is_reported_with_the_table_that_produced_it() -> None:
+    """A bare "recall regressed" costs the next session a 4-minute re-run."""
+    outcome = evals.retrieval_recall(_pairs(2), (_scores("only", 0),), stamp="c", floor=1)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "[only]" in outcome.detail
+    assert "natural@3 0/1" in outcome.detail
+
+
+def test_an_arm_defect_outranks_a_floor_breach() -> None:
+    """A broken arm must never be reported as a recall regression.
+
+    Both conditions hold here — the retriever returns nothing, so it breaches any
+    floor AND is a dead query path. Reporting the floor would send the reader
+    hunting for a topic that moved when the real answer is that nothing ran.
+    """
+    outcome = evals.retrieval_recall(_pairs(2), _one(_returns()), stamp="c", floor=1)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "returned NOTHING at all" in outcome.detail
+    assert "REGRESSED" not in outcome.detail
+
+
+def test_no_floor_reports_without_asserting() -> None:
+    """CONTROL ARM for the floor existing at all: None must not gate.
+
+    This is the shape the case shipped with from PR #30 through P1, and it has to
+    stay reachable — an engine that always applied a floor would have made the
+    0/119 baseline unreportable.
+    """
+    outcome = evals.retrieval_recall(_pairs(2), (_scores("only", 0),), stamp="c")
+    assert outcome.verdict is evals.Verdict.PASS, outcome.detail
+    assert "FLOOR" not in outcome.detail
+
+
+@pytest.mark.parametrize("floor", [0, -1])
+def test_a_floor_below_one_is_rejected(floor: int) -> None:
+    """The check that can only pass: a run returning nothing would clear it."""
+    outcome = evals.retrieval_recall(_pairs(2), (_scores("only", 2),), stamp="c", floor=floor)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "can only pass" in outcome.detail
+
+
+def test_a_floor_above_the_pair_count_is_rejected() -> None:
+    """The same defect wearing the opposite sign: a check that can only fail."""
+    outcome = evals.retrieval_recall(_pairs(2), (_scores("only", 2),), stamp="c", floor=3)
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "no run can ever clear it" in outcome.detail

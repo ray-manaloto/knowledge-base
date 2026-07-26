@@ -853,22 +853,102 @@ def _delta_lines(results: Sequence[_ArmResult]) -> list[str]:
     return [*consecutive, _delta_line(results[0], results[-1])]
 
 
+def _floor_problem(floor: int, queries: Sequence[GoldenQuery]) -> str:
+    """Is this floor capable of both verdicts? '' when it is.
+
+    Both directions are rejected, because both produce a check that prints a
+    number and decides nothing:
+
+    * ``floor < 1`` — every run clears it, including one where retrieval returned
+      nothing at all. The check that can only pass.
+    * ``floor`` above the number of positive pairs — no run can ever clear it.
+      The check that can only fail, which is the same defect wearing the
+      opposite sign (`hk.pkl`'s ``no_grep_q_under_pipefail`` is the local
+      instance of it).
+    """
+    pairs = len({q.topic for q in queries if not q.expects_absent})
+    if floor < 1:
+        return (
+            f"a natural-recall floor of {floor} is a check that can only pass — "
+            f"a run returning nothing at all would clear it"
+        )
+    if floor > pairs:
+        return (
+            f"a natural-recall floor of {floor} exceeds the {pairs} positive "
+            f"pair(s) in the golden set, so no run can ever clear it"
+        )
+    return ""
+
+
+def _floor_verdict(floor: int, results: Sequence[_ArmResult]) -> tuple[str, str]:
+    """``(the report line, the failure or '')`` for the recall floor.
+
+    Asserted on the BEST arm rather than the last one, and that is the whole
+    decision (locked with Ray 2026-07-27). What the floor guards is regression in
+    the best retrieval path the KB actually has; the arm holding that path is not
+    guaranteed to be the newest one, and this run is the proof — P2's `prose+rrf`
+    scores BELOW `prose+idf`, so a floor on the last arm would have had zero
+    headroom while the thing it exists to protect had one pair of it. Naming an
+    arm instead would hard-code a string into the gate, so retiring or renaming
+    that arm later would silently change what is being enforced.
+    """
+    best = max(results, key=lambda r: r.scored[0])
+    scored, total = best.scored[0], len(best.natural)
+    line = (
+        f"  FLOOR: best arm [{best.arm.name}] scored {scored} of {total} natural "
+        f"pair(s), floor is {floor}"
+    )
+    if scored < floor:
+        return line, (
+            f"natural-phrasing recall REGRESSED below the floor: the best arm "
+            f"[{best.arm.name}] scored {scored} of {total} pair(s), floor is {floor}"
+        )
+    return line, ""
+
+
+def _measure_arms(
+    queries: Sequence[GoldenQuery], arms: Sequence[Arm]
+) -> tuple[tuple[_ArmResult, ...], str]:
+    """Score every arm. ``(results, '')`` when sound, ``((), problem)`` when not.
+
+    The two checks run at deliberately different times, and the difference is not
+    incidental:
+
+    * **Fixture rot is checked before that arm is scored**, so a rotten first arm
+      short-circuits before the expensive later ones run. Its targets are wrong,
+      so nothing measured after it could be interpreted anyway.
+    * **Arm defects are checked only once EVERY arm has been scored**, so the
+      message can name all of them. Bailing on the first would report one broken
+      arm and leave a second one to be discovered on the next 4-minute run.
+    """
+    results = []
+    for arm in arms:
+        if arm.present is not None:
+            rot = _fixture_integrity(queries, arm.present)
+            if rot:
+                return (), f"[{arm.name}] {rot}"
+        results.append(_ArmResult(arm, tuple(score_retrieval(q, arm.retrieve) for q in queries)))
+    for defect in (_arm_defect(r) for r in results):
+        if defect:
+            return (), defect
+    return tuple(results), ""
+
+
 def retrieval_recall(
     queries: Sequence[GoldenQuery],
     arms: Sequence[Arm],
     *,
     stamp: str,
+    floor: int | None = None,
 ) -> Outcome:
-    """Measure recall@k over a golden set, once per arm. ADVISORY — see the caller.
+    """Measure recall@k over a golden set, once per arm.
 
-    There is no recall FLOOR here, deliberately: at the measured 0/119 baseline
-    a floor would be red on arrival, and a floor of zero is the check that can
-    only pass. What this DOES fail on is everything that would make the number a
-    lie — a broken query path, a graph that answers nothing, a rotten fixture,
-    and the negative direction coming back positive. Those are harness defects,
-    not retrieval quality, and they must never be reported as a recall figure.
-    They are checked PER ARM: a second corpus that answers nothing must not hide
-    behind the first one's numbers.
+    Beyond the optional ``floor``, this fails on everything that would make the
+    number a lie — a broken query path, a graph that answers nothing, a rotten
+    fixture, and the negative direction coming back positive. Those are harness
+    defects, not retrieval quality, and they must never be reported as a recall
+    figure. They are checked PER ARM: a second corpus that answers nothing must
+    not hide behind the first one's numbers.
 
     Args:
         queries: The golden set. Its shape is checked (:func:`_golden_set_shape`).
@@ -881,30 +961,41 @@ def retrieval_recall(
         stamp: The corpus stamp — build date and node count. Carried into the
             detail because a retrieval number without the corpus it was measured
             against is not a measurement (``probes-need-a-control-arm.md`` rule 6).
+        floor: Minimum natural-phrasing pairs the BEST arm must score, or None to
+            report without asserting. It stayed None from PR #30 through P1 for a
+            reason worth keeping written down: the baseline this case exists to
+            make citable is 0/119 relevant nodes (knowledge-base#12), and a floor
+            set at or below a baseline of zero is the check that can only pass.
+            A floor became meaningful only once P0-P2 had moved the number.
+            See :func:`_floor_verdict` for why the best arm and not the last.
     """
     shape = _golden_set_shape(queries) or _arms_shape(arms)
+    if not shape and floor is not None:
+        shape = _floor_problem(floor, queries)
     if shape:
         return fail(shape)
 
-    results = []
-    for arm in arms:
-        if arm.present is not None:
-            rot = _fixture_integrity(queries, arm.present)
-            if rot:
-                return fail(f"[{arm.name}] {rot}")
-        results.append(_ArmResult(arm, tuple(score_retrieval(q, arm.retrieve) for q in queries)))
+    results, problem = _measure_arms(queries, arms)
+    if problem:
+        return fail(problem)
 
-    for defect in (_arm_defect(r) for r in results):
-        if defect:
-            return fail(defect)
+    floor_line, breach = ("", "")
+    if floor is not None:
+        floor_line, breach = _floor_verdict(floor, results)
 
     detail = "\n".join(
         [
             f"corpus: {stamp}",
             *(line for r in results for line in _arm_lines(r)),
             *_delta_lines(results),
+            *([floor_line] if floor_line else []),
         ]
     )
+    # AFTER the detail is assembled, so a breach is reported WITH the per-arm
+    # table that produced it. A bare "recall regressed" line would leave the next
+    # session re-running the 4-minute case just to see which topic moved.
+    if breach:
+        return fail(f"{breach}\n{detail}")
     if all(r.scored == (0, 0) for r in results):
         detail += (
             "\n  NOTE: nothing scored at all, so this run alone cannot show the "
