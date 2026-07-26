@@ -95,6 +95,17 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
 #: it resolves to graphify's own `--graph`, pointed at the derived prose graph.
 PROSE_FLAG = "--prose"
 
+#: The attached form of graphify's own flag, which graphify DOES NOT SUPPORT.
+#: Probed 2026-07-25 from a scratch directory: `graphify query q
+#: --graph=<abs path>` exits 1 with `graph file not found:
+#: /private/tmp/graphify-out/graph.json` — it ignores the argument entirely and
+#: falls back to the cwd-relative default. So the form can neither be forwarded
+#: (graphify drops it) nor read as "the caller pinned a corpus" (they did not,
+#: as far as graphify is concerned). It is rejected instead, because the
+#: alternative is an answer from a corpus nobody chose — which is the one
+#: failure this wrapper exists to prevent.
+ATTACHED_GRAPH = "--graph="
+
 
 def query(repo_root: Path, args: Sequence[str]) -> int:
     """`kb-query` — `graphify query`, with `--prose` selecting the prose-only graph.
@@ -111,6 +122,15 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
     """
     rest = [a for a in args if a != PROSE_FLAG]
     wants_prose = PROSE_FLAG in args
+    attached = [a for a in rest if a.startswith(ATTACHED_GRAPH)]
+    if attached:
+        print(
+            f"[kb-query] graphify does not support the attached form "
+            f"({attached[0]}) — it ignores the argument and answers from the "
+            f"cwd-relative default instead. Use `--graph <path>`, or --prose.",
+            file=sys.stderr,
+        )
+        return 2
     if wants_prose and "--graph" in rest:
         print(
             f"[kb-query] {PROSE_FLAG} and --graph both given — they name different "

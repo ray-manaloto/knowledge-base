@@ -148,3 +148,39 @@ def test_a_missing_full_graph_names_the_build_task(
     assert rc == 2
     assert argv is None
     assert "kb-build" in capsys.readouterr().err
+
+
+def test_the_attached_graph_form_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--graph=<path>` is not a graphify flag, and forwarding it answers wrong.
+
+    Probed 2026-07-25 from a scratch directory: `graphify query q
+    --graph=<abs path>` exits 1 with `graph file not found:
+    /private/tmp/graphify-out/graph.json`. graphify DROPS the argument and falls
+    back to the cwd-relative default — so a caller who writes the attached form
+    and happens to be in a directory holding a `graphify-out/` gets a confident
+    answer from a corpus they did not name. Rejected rather than forwarded.
+    """
+    rc, argv = _run(monkeypatch, _repo(tmp_path), ["q", "--graph=/elsewhere/graph.json"])
+    assert rc == 2
+    assert argv is None
+    assert "attached form" in capsys.readouterr().err
+
+
+def test_the_attached_graph_form_is_rejected_alongside_prose(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The combination the standalone-only check used to wave through.
+
+    `--prose --graph=/x` read as prose-only, so the wrapper appended a SECOND
+    graph selection and the ambiguity error never fired (caught in review of
+    PR #31).
+    """
+    rc, argv = _run(
+        monkeypatch,
+        _repo(tmp_path),
+        ["q", graphify_ops.PROSE_FLAG, "--graph=/elsewhere/graph.json"],
+    )
+    assert rc == 2
+    assert argv is None

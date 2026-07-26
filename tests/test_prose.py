@@ -192,3 +192,32 @@ def test_deriving_without_a_built_graph_says_which_task_builds_it(tmp_path: Path
     """A "could not look" answer must name the fix, not read as "no prose here"."""
     with pytest.raises(SystemExit, match="kb-build"):
         prose.derive_for(tmp_path)
+
+
+def test_a_failed_derivation_removes_the_previous_prose_graph(tmp_path: Path) -> None:
+    """Fail closed: an aborted derive must leave NO prose graph, not a stale one.
+
+    Nothing downstream can tell the two apart — `kb-query --prose` and the eval
+    precondition both ask only whether the file exists — so a surviving artifact
+    would go on answering from a corpus derived before the rebuild that just
+    failed. Same rule as `graph._clear_stamp` (caught in review of PR #31).
+    """
+    out = tmp_path / prose.PROSE_GRAPH_NAME
+    out.write_text('{"nodes": [{"id": "yesterday"}]}', encoding="utf-8")
+    src = tmp_path / "graph.json"
+    src.write_text(json.dumps(_graph(nodes=[_node("sym", _origin="ast")])), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="no non-AST nodes"):
+        prose.derive(src, out)
+    assert not out.exists(), "a stale prose graph outlived the derivation that failed"
+
+
+def test_a_successful_derivation_replaces_the_previous_prose_graph(tmp_path: Path) -> None:
+    """CONTROL ARM: clearing first must not turn a good derive into a deletion."""
+    out = tmp_path / prose.PROSE_GRAPH_NAME
+    out.write_text('{"nodes": [{"id": "yesterday"}]}', encoding="utf-8")
+    src = tmp_path / "graph.json"
+    src.write_text(json.dumps(_graph()), encoding="utf-8")
+
+    prose.derive(src, out)
+    assert _ids(_key(json.loads(out.read_text(encoding="utf-8")), "nodes")) == ["doc"]

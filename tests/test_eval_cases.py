@@ -292,15 +292,39 @@ def test_every_arm_carries_its_own_membership_oracle() -> None:
     assert all(arm.present is not None for arm in arms)
 
 
-def test_the_retrieval_case_skips_when_the_prose_graph_is_missing(tmp_path: Path) -> None:
+def test_the_retrieval_case_skips_when_the_prose_graph_is_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """A half-present pair of corpora must skip the case, never drop the arm.
 
     Dropping it would print the baseline alone under a report still shaped like
     a before/after — which reads as "scoping changed nothing".
+
+    The CLI gate is PINNED. `_retrieval_precondition` checks for graphify first,
+    so on a host without it the SKIP that comes back is the install one — a
+    green assertion here would then be measuring the wrong absence entirely
+    (caught in review of PR #31).
     """
+    monkeypatch.setattr(eval_cases.shutil, "which", lambda _name: "/usr/bin/graphify")
     (tmp_path / "graphify-out").mkdir()
     (tmp_path / "graphify-out" / "graph.json").write_text("{}")
     outcome = eval_cases._retrieval_precondition(tmp_path)
     assert outcome is not None
     assert outcome.verdict is evals.Verdict.SKIP
     assert "kb-prose" in outcome.detail
+
+
+def test_the_retrieval_case_skips_when_graphify_is_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """CONTROL ARM: the two SKIP reasons are different and must not collapse.
+
+    "graphify is not installed here" and "the prose graph has not been derived"
+    have different fixes, and one of them is not a defect in this repo at all.
+    """
+    monkeypatch.setattr(eval_cases.shutil, "which", lambda _name: None)
+    outcome = eval_cases._retrieval_precondition(tmp_path)
+    assert outcome is not None
+    assert outcome.verdict is evals.Verdict.SKIP
+    assert "not installed" in outcome.detail
+    assert "kb-prose" not in outcome.detail

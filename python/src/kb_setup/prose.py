@@ -119,11 +119,19 @@ def derive(graph_path: Path, out_path: Path) -> ProseStats:
     reference to a node that is not in the file, which is a corrupt graph rather
     than a smaller one.
 
+    Any previous output is removed FIRST, so an aborted derivation leaves no
+    prose graph rather than a stale one. Nothing downstream can tell the
+    difference otherwise: `kb-query --prose` and the eval precondition both ask
+    only whether the file exists, so a failed derive would go on serving a
+    corpus derived from a `graph.json` that has since been rebuilt. Same
+    fail-closed rule, and the same reasoning, as `graph._clear_stamp`.
+
     Raises:
         ValueError: if nothing survives. An empty graph resolves, answers
             nothing, and would report recall 0 for every query — i.e. it would
             look exactly like the retrieval failure this artifact exists to fix.
     """
+    out_path.unlink(missing_ok=True)
     with graph_path.open(encoding="utf-8") as fh:
         graph = json.load(fh)
 
@@ -172,7 +180,14 @@ def derive(graph_path: Path, out_path: Path) -> ProseStats:
 
 
 def derive_for(repo_root: Path) -> ProseStats:
-    """Derive this repo's prose graph from its built graph, and report the counts."""
+    """Derive this repo's prose graph from its built graph, and report the counts.
+
+    A MISSING `graph.json` exits without touching the prose graph — deliberately
+    the other side of :func:`derive`'s fail-closed rule. There the artifact was
+    being replaced and a half-replacement is stale; here nothing is being
+    replaced, and an existing prose graph is the last derivation that really
+    happened. Deleting it would destroy a valid corpus over an absent input.
+    """
     graph = repo_root / "graphify-out" / "graph.json"
     if not graph.is_file():
         raise SystemExit(f"no graph at {graph} — run `mise run kb-build` first")
