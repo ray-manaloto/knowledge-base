@@ -884,5 +884,15 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
     #   * it lets this function return the launcher's real exit code instead of
     #     never returning, which is what makes the failure path testable.
     # stdio is inherited, so the interactive session behaves identically.
+    # `os.environ` and NOT `graphify_env.clean_env()`, decided deliberately. That
+    # helper strips mise's `__MISE_*` blob because a graphify subprocess WRITES the
+    # corpus, so a leaked env becomes a committed artifact. Neither reason holds
+    # here. This launches the user's own interactive session from a shell that
+    # already carries those variables, so a plain `claude` typed at the same prompt
+    # has identical exposure — the launcher creates none. And `__MISE_DIFF` is
+    # live activation state a shell reverses on deactivate; removing it from an
+    # interactive session changes mise's behaviour in ways nothing here has
+    # measured, which is precisely how the `get_env(name='PATH')` mistake happened
+    # (see `session_path`). Strip it here only with a measurement in hand.
     env = {**os.environ, "PATH": checked.path}
     return subprocess.run(argv_out, env=env, check=False).returncode

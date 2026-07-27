@@ -1,17 +1,24 @@
-"""Tests for `kb_setup.graphify_env.graphify_exe` — the PATH-independent resolver.
+"""Tests for `kb_setup.graphify_env` — the PATH-independent resolver and clean_env.
 
-This is the durable half of #40. The launcher can verify a PATH and still not
-deliver it (tmux hands a pane the CLIENT's PATH), so corpus correctness must not
-depend on PATH ordering at all. `graphify_exe` asks mise, which answers from the
-repo's config and therefore follows the pin by construction.
+`graphify_exe` is the durable half of #40. The launcher can verify a PATH and
+still not deliver it (tmux hands a pane the CLIENT's PATH), so corpus correctness
+must not depend on PATH ordering at all. `graphify_exe` asks mise, which answers
+from the repo's config and therefore follows the pin by construction.
+
+`clean_env` is what every graphify subprocess runs under, and it strips for two
+unrelated reasons — backend triggers by name, mise's secret-bearing `__MISE_*`
+blob by prefix.
 
 Every check is armed in both directions: a resolver that can only return the
-mise answer would hide a mise-less machine, and one that can only fall back
-would silently reintroduce the PATH dependency this exists to remove.
+mise answer would hide a mise-less machine, one that can only fall back would
+silently reintroduce the PATH dependency this exists to remove, and an
+"is it absent from clean_env?" assertion passes trivially on any host where mise
+never set the variable — so each strip arm SETS the variable first.
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -136,3 +143,90 @@ def test_a_successful_resolve_is_quiet(
     graphify_env.graphify_exe(Path("/repo"))
 
     assert capsys.readouterr().err == ""
+
+
+# --- clean_env: two independent strips ---------------------------------------
+#
+# Every arm below sets the variable in the fixture environment and asserts it is
+# PRESENT in os.environ before asserting it is absent from clean_env(). Without
+# that first half the test passes on a host where mise never ran — a check that
+# can only pass (`probes-need-a-control-arm.md`).
+
+
+def test_the_mise_secret_blob_is_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """THE point of the second strip: `__MISE_DIFF` must not reach a subprocess.
+
+    It carries the *values* of the credentials `_STRIP_BACKEND_ENV` removes by
+    *name*, gzip+base64'd past any secret scanner. Asserted on presence/absence of
+    the KEY only — never decode the blob to inspect it; doing that is what put
+    live credentials into a session transcript.
+    """
+    monkeypatch.setenv("__MISE_DIFF", "sentinel-not-a-real-blob")
+    monkeypatch.setenv("__MISE_SESSION", "sentinel-session")
+    assert "__MISE_DIFF" in os.environ  # arm: the fixture really set it
+    assert "__MISE_SESSION" in os.environ
+
+    env = graphify_env.clean_env()
+
+    assert "__MISE_DIFF" not in env
+    assert "__MISE_SESSION" not in env
+
+
+def test_the_strip_is_a_prefix_not_a_spelling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A name list would cover today's two blobs and fail open on a third.
+
+    This arm is the difference between the rule as written and the rule the
+    handoff proposed: an unknown future `__MISE_*` must be stripped too, without
+    anyone editing this module.
+    """
+    monkeypatch.setenv("__MISE_FUTURE_BLOB", "sentinel-unknown-to-us")
+    assert "__MISE_FUTURE_BLOB" in os.environ
+
+    assert "__MISE_FUTURE_BLOB" not in graphify_env.clean_env()
+
+
+def test_public_mise_config_survives(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CONTROL ARM: the prefix must be `__MISE_`, not `MISE_`.
+
+    A strip that also ate single-underscore `MISE_*` would pass every arm above
+    and break real configuration — `kb_setup.currency.sync` reads `MISE_DATA_DIR`.
+    Proves the rule discriminates rather than deleting anything mise-shaped.
+    """
+    monkeypatch.setenv("MISE_DATA_DIR", "sentinel-data-dir")
+    monkeypatch.setenv("MISE_ENV_CACHE", "1")
+
+    env = graphify_env.clean_env()
+
+    assert env["MISE_DATA_DIR"] == "sentinel-data-dir"
+    assert env["MISE_ENV_CACHE"] == "1"
+
+
+def test_backend_triggers_are_still_stripped_and_claude_is_kept(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CONTROL ARM for the FIRST strip, which the new prefix must not disturb.
+
+    `ANTHROPIC_API_KEY` surviving is the other half: a clean_env that dropped
+    everything would pass "the secret is gone" while silently killing the one
+    backend this repo is allowed to use (`do-not.md` #4).
+    """
+    monkeypatch.setenv("GEMINI_API_KEY", "sentinel-forbidden")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "sentinel-forbidden")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sentinel-kept")
+    assert "GEMINI_API_KEY" in os.environ
+
+    env = graphify_env.clean_env()
+
+    assert "GEMINI_API_KEY" not in env
+    assert "AWS_SECRET_ACCESS_KEY" not in env
+    assert env["ANTHROPIC_API_KEY"] == "sentinel-kept"
+
+
+def test_extra_still_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CONTROL ARM: `extra` is applied AFTER the strips, so callers can override."""
+    monkeypatch.setenv("__MISE_DIFF", "sentinel-not-a-real-blob")
+
+    env = graphify_env.clean_env({"GRAPHIFY_TEST": "on", "__MISE_DIFF": "explicit"})
+
+    assert env["GRAPHIFY_TEST"] == "on"
+    assert env["__MISE_DIFF"] == "explicit"
