@@ -33,6 +33,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
+from kb_setup.graphify_env import graphify_exe
+
 # --- vocab -----------------------------------------------------------------
 
 VERDICTS = ("clean", "rework", "failed")
@@ -130,7 +132,7 @@ def record(repo_root: Path, req: RecordRequest) -> int:
     if req.note:
         answer += f"; note={req.note}"
     cmd = [
-        "graphify",
+        graphify_exe(repo_root),
         "save-result",
         "--question",
         question,
@@ -335,7 +337,9 @@ def query(repo_root: Path, args: list[str]) -> int:
         print('kb-setup brain query "<question>" [--budget N]')
         return 2
     proc = subprocess.run(
-        ["graphify", "query", *args, "--graph", str(graph)], cwd=repo_root, check=False
+        [graphify_exe(repo_root), "query", *args, "--graph", str(graph)],
+        cwd=repo_root,
+        check=False,
     )
     return proc.returncode
 

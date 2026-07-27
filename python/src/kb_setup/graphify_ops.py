@@ -12,7 +12,6 @@ auto-detected Gemini/OpenAI key.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -20,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import prose
-from kb_setup.graphify_env import clean_env, graphify_python
+from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -62,11 +61,22 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     future graphify fix can be re-probed through the task. clean_env() strips
     GEMINI/GOOGLE either way, so Gemini can never be auto-selected.
     """
-    if not shutil.which("graphify"):
-        print("[kb-label] graphify not on PATH — run `mise install`", file=sys.stderr)
+    # Gate on the binary we are ABOUT TO RUN, not on PATH. The old
+    # `shutil.which("graphify")` check sat directly in front of a
+    # PATH-independent invocation and could abort with `mise which` resolving
+    # perfectly well — refusing to run a binary it had already found. A bare
+    # name is `graphify_exe`'s last resort, and `Path("graphify").is_file()` is
+    # False, so the genuinely-absent case still refuses.
+    exe = graphify_exe(repo_root)
+    if not Path(exe).is_file():
+        print(
+            "[kb-label] graphify not found — neither `mise which graphify` nor PATH "
+            "resolved it. Run `mise install`.",
+            file=sys.stderr,
+        )
         return 2
 
-    base = ["graphify", "label", "."]
+    base = [exe, "label", "."]
     if missing_only:
         base.append("--missing-only")
 
@@ -171,7 +181,7 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
             return 2
         rest = [*rest, "--graph", str(graph)]
     return subprocess.run(
-        ["graphify", "query", *rest], cwd=repo_root, env=clean_env(), check=False
+        [graphify_exe(repo_root), "query", *rest], cwd=repo_root, env=clean_env(), check=False
     ).returncode
 
 
