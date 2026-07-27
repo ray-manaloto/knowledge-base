@@ -330,6 +330,14 @@ description = 'Validate + combine host-agent extraction chunks: mise run kb-asse
 # id-collision problem. Logic in kb_setup.chunks.assemble.
 run = "uv run kb-setup assemble"
 
+[tasks.kb-goal-check]
+description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'
+# ADVISORY — always exits 0. A goal document is authored input, not repo source, so a
+# WARN-level heuristic must never block a PR (same posture as kb-currency: read the
+# report, not the rc). Owns only the tests decidable WITHOUT a model; the judgement
+# tests live in the `goal-engineering` skill. Logic in kb_setup.goal.
+run = "uv run kb-setup goal-check"
+
 [tasks.kb-validate-chunks]
 description = 'Schema-check extraction chunks (unique ids, no dangling edges): mise run kb-validate-chunks -- <chunk.json>...'
 # Standalone gate over sources/extractions/*.json (or scratch chunks). Logic in kb_setup.chunks.

@@ -20,7 +20,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from kb_setup.currency import config, issues, report, sync, upstream
+from kb_setup.currency import config, docs, issues, report, sync, upstream
 from kb_setup.currency.decide import decide
 
 
@@ -56,6 +56,18 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
         )
         return 2
 
+    # OFFLINE docs check: report pages nobody has verified lately. It cannot say
+    # a page CHANGED — that needs a fetch, which belongs in the full run, not on
+    # the SessionStart path this mode serves (offline, ~10ms, silent when clean).
+    # "Not verified since <date>" is a different and honest finding.
+    docs_store = docs.load(repo_root)
+    stale: list[tuple[str, docs.DocsFinding]] = [
+        (spec.name, finding)
+        for spec in _specs(repo_root, only)
+        if spec.docs_watch
+        for finding in docs.staleness(spec.docs_watch, docs_store)
+    ]
+
     drifted: list[sync.SyncStatus] = []
     unverifiable: list[sync.SyncStatus] = []
     for spec in _specs(repo_root, only):
@@ -78,6 +90,10 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
             print(f"[currency] {status.summary()}")
 
     _report_check(drifted, unverifiable)
+    if stale:
+        print("[currency] tracked docs pages not verified recently (this is not drift):")
+        for tool, finding in stale:
+            print(f"[currency]   {tool}: {finding.detail} — {finding.url}")
     return 0
 
 
@@ -98,6 +114,28 @@ def _report_check(drifted: list[sync.SyncStatus], unverifiable: list[sync.SyncSt
         for status in unverifiable:
             for finding in status.findings:
                 print(f"[currency]   {status.tool}: {finding.check} — {finding.detail}")
+
+
+def _verify_docs(repo_root: Path, specs: tuple[config.ToolSpec, ...]) -> None:
+    """NETWORK half of the docs check — only ever from the full run.
+
+    Kept out of `check()` on purpose: that path is the SessionStart hook and must
+    stay offline and ~10ms. Here we are already spending round trips on PyPI and
+    GitHub, so two more are free by comparison.
+    """
+    watched = [s for s in specs if s.docs_watch]
+    if not watched:
+        return
+    store = docs.load(repo_root)
+    for spec in watched:
+        findings, store = docs.verify(spec.docs_watch, store)
+        for f in findings:
+            if f.drifted:
+                print(f"[currency] {spec.name}: DOCS DRIFT — {f.url}")
+                print(f"[currency]   {f.detail}")
+            elif not f.verified:
+                print(f"[currency] {spec.name}: {f.detail} — {f.url}")
+    docs.save(repo_root, store)
 
 
 def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
@@ -142,6 +180,12 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
         names = ", ".join(s.name for s in configured)
         print(f"[currency] unknown tool {only!r}; configured: {names}", file=sys.stderr)
         return 2
+
+    # Before the per-tool records, because a docs revision changes how you READ
+    # the version findings that follow: a page that moved under you is the
+    # likelier explanation for surprising behaviour than any pin.
+    if write:
+        _verify_docs(repo_root, specs)
 
     payloads: list[dict[str, object]] = []
     lines: list[str] = []

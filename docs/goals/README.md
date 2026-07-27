@@ -37,7 +37,13 @@ That is the limit `/goal` enforces on the objective text. Both Claude Code and C
 refuse longer input and tell you to *"put longer instructions in a file and refer to
 that file in the goal"* — **the rider is that file**. Ceccarelli's corpus runs
 3,929–4,112 characters; past ~4,100 means the goal is doing work that belongs in the
-rider. Check with `wc -c` before committing.
+rider.
+
+Check it with `mise run kb-goal-check`, **not `wc -c`**. The cap is stated in
+*characters* and `wc -c` counts *bytes* — they disagree by the number of multi-byte
+characters, and this convention's prose is full of em dashes. The first goal written
+here measures 3,729 bytes but 3,703 characters, so `wc -c` would have you trimming a
+goal that already fits. (`wc -m` counts characters and agrees with the checker.)
 
 ## The one constraint that shapes every goal written here
 

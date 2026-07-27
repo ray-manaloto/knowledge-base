@@ -24,7 +24,8 @@ def main(argv: list[str] | None = None) -> int:
             "kb-setup: build | update <name> | prose | query <question> [--prose] | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp] | "
-            "brain [record|reflect|audit] | md-budget | cc | cc-doctor | eval [--live] [--slow] | "
+            "brain [record|reflect|audit] | md-budget | goal-check <path|--text ...> | "
+            "cc | cc-doctor | eval [--live] [--slow] | "
             "ensure-deps | version"
         )
         return 0
@@ -102,6 +103,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import md_budget
 
         return md_budget.md_budget_main(repo_root)
+    if cmd == "goal-check":
+        from kb_setup import goal
+
+        return goal.main(rest, repo_root)
     if cmd == "cc":
         from kb_setup import launch
 

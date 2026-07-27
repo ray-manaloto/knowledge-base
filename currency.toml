@@ -161,3 +161,31 @@ note = """mise moved templates from Tera v1 to v2 in v2026.7.1 (#10756) with a
 `tera_v1` / `MISE_TERA_V1` escape hatch scheduled for REMOVAL in 2027.4.0
 (#10817). This repo sets neither, so it is already on v2 — the item is here so
 the 2027.4.0 release is not read as routine."""
+
+[tool.claude-code]
+# The harness itself. Tracked NOT for a mise pin — Claude Code manages its own
+# updates and is not in `[tools]` — but because `docs_watch` below is the only
+# mechanism that notices when a FEATURE's semantics change. `/goal` lives
+# entirely in its docs page: Anthropic can revise it any day without a release
+# that looks relevant, and every goal+rider pair under `docs/goals/` plus the
+# `goal-engineering` skill is built on what that page says.
+#
+# `expected` (self-managed, like mise) rather than `mise_key`: pinning the
+# harness that runs the session is not a thing this repo can or should do. Bump
+# it after reviewing the release notes — that act IS the gap analysis.
+expected = "2.1.220"
+binary = "claude"
+github = "anthropics/claude-code"
+# `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
+# is `Code)` — the same trap mise's `2026.7.15 macos-arm64 (2026-07-27)` set,
+# where the default heuristic returned the build DATE. Capture explicitly.
+version_pattern = '^(\d+\.\d+\.\d+)'
+# Fingerprinted pages. goal.md is the primary interface for the goal-engineering
+# skill; hooks.md defines the Stop-hook contract /goal is built on (it is "a
+# built-in shortcut for a session-scoped prompt-based Stop hook"), so a change
+# there can alter goal behaviour without goal.md moving at all.
+docs_watch = [
+  "https://code.claude.com/docs/en/goal.md",
+  "https://code.claude.com/docs/en/hooks.md",
+  "https://code.claude.com/docs/en/skills.md",
+]
