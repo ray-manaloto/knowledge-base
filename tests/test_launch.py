@@ -202,7 +202,7 @@ def test_the_tmux_form_injects_the_verified_path(tmp_path: Path) -> None:
     assert argv[0] == "tmux"
     assert "-e" in argv
     assert "PATH=/clean/bin" in argv
-    assert argv[-3:] == ["claude", "--add-dir", str(tmp_path / "sib")]
+    assert argv[-5:] == ["claude", "--permission-mode", "auto", "--add-dir", str(tmp_path / "sib")]
 
 
 def test_inside_tmux_it_execs_claude_directly(tmp_path: Path) -> None:
@@ -212,6 +212,10 @@ def test_inside_tmux_it_execs_claude_directly(tmp_path: Path) -> None:
     )
     assert argv[0] == "claude"
     assert "tmux" not in argv
+    # The flag rides on BOTH paths: Claude Code ignores a project-settings
+    # `defaultMode: "auto"` as repo-controllable, so the flag is the only source
+    # this repo can supply.
+    assert "--permission-mode" in argv
 
 
 def test_a_root_without_mise_toml_refuses(tmp_path: Path) -> None:

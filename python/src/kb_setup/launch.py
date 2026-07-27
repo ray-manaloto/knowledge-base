@@ -260,7 +260,12 @@ def launch_argv(
     Already inside tmux, we exec claude directly: nesting a server inside a pane
     gives split-pane teammates nowhere useful to go.
     """
-    claude = ["claude", "--add-dir", str(sibling)]
+    # `--permission-mode auto` is a FLAG, not a setting, and that is the whole
+    # point: Claude Code ignores `permissions.defaultMode: "auto"` from project
+    # settings — "only policy, user, and CLI-flag sources may grant auto mode
+    # (projectSettings and localSettings are repo-controllable)". So the project
+    # file cannot grant it and the flag can. Unattended goal turns need it.
+    claude = ["claude", "--permission-mode", "auto", "--add-dir", str(sibling)]
     if in_tmux:
         return claude
     return [

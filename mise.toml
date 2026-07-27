@@ -321,6 +321,11 @@ run = "uv run kb-setup validate-chunks"
 
 [tasks.cc]
 description = "Launch Claude Code rooted in THIS repo with a VERIFIED environment (tmux, --add-dir dotfiles, auto mode)"
+# raw: mise normally captures a task's output to prefix it with [cc], which leaves
+# the child with NO TTY — tmux then dies with "open terminal failed: not a
+# terminal".  connects stdin/stdout/stderr straight through, which an
+# interactive session requires. Without it this task can never attach.
+raw = true
 # Thin BY DESIGN. Every decision — PATH hygiene, the tmux env injection, and a
 # preflight that can REFUSE — lives in `kb_setup.launch`, shared by both repos so
 # the two launchers cannot drift. That module's docstring carries the
