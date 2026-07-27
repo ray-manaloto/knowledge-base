@@ -74,6 +74,88 @@ def test_stripping_is_version_agnostic() -> None:
         assert launch.clean_path(path) == ""
 
 
+# --- session_path -------------------------------------------------------------
+#
+# The session's PATH is NOT this process's whenever mise sat between them, and
+# under `mise run cc-doctor` it always does (install dirs injected for the task,
+# then re-prepended by the `uv` shim). It is also not reconstructable from the
+# environment: `__MISE_ORIG_PATH` is frozen at activate time and `__MISE_SHIM` is
+# unset under `mise run`. So the session is IDENTIFIED, via Claude Code's own
+# exported `CLAUDE_PID`, and its PATH read from the OS.
+
+
+def test_the_session_is_found_through_claude_pid() -> None:
+    """The session is identified, not reconstructed.
+
+    CLAUDE_PID is an ordinary variable, so it survives every PATH-mangling layer
+    intact — which is exactly why it can name a session those layers hid.
+    """
+    seen: list[str] = []
+    assert (
+        launch.session_path(
+            {"PATH": _DIRTY_PATH, "CLAUDE_PID": "4242"},
+            read_env_path=lambda pid: seen.append(pid) or "/session/bin",
+        )
+        == "/session/bin"
+    )
+    assert seen == ["4242"]
+
+
+def test_our_own_path_is_never_the_fallback() -> None:
+    """THE regression, stated as an absence.
+
+    Falling back to `os.environ["PATH"]` is what the bug WAS: under the task it
+    is mise's PATH, and judging it made the graphify check unable to report
+    green. Not-readable must degrade to None (-> UNKNOWN), never to ours.
+    """
+    for env in ({"PATH": _DIRTY_PATH}, {"PATH": _DIRTY_PATH, "CLAUDE_PID": "not-a-pid"}):
+        assert launch.session_path(env, read_env_path=lambda _p: None) is None
+    # CLAUDE_PID present but the environment unreadable — measured: an
+    # intermediate /bin/zsh yields no PATH= at all while its parent does.
+    assert (
+        launch.session_path(
+            {"PATH": _DIRTY_PATH, "CLAUDE_PID": "4242"}, read_env_path=lambda _p: None
+        )
+        is None
+    )
+
+
+def test_real_drift_in_the_session_still_survives_the_selection() -> None:
+    """This picks WHICH PATH to judge; it must not clean the one it picks.
+
+    `clean_path` strips install dirs from whatever it is handed, which is why the
+    doctor must never use it (#40). A session that genuinely has a shadowing
+    install dir must still come back dirty.
+    """
+    got = launch.session_path(
+        {"PATH": "/irrelevant", "CLAUDE_PID": "4242"}, read_env_path=lambda _p: _DIRTY_PATH
+    )
+    assert got == _DIRTY_PATH
+    assert "installs" in got
+
+
+def test_the_ps_parser_is_exact_on_a_process_whose_path_we_know() -> None:
+    """CONTROL ARM for the macOS reader, run against ground truth: ourselves.
+
+    A whitespace split would be wrong on any PATH containing a space, and this
+    machine's really does (`…/Application Support/JetBrains/Toolbox/scripts`).
+    Skipped on Linux, where `/proc/<pid>/environ` is NUL-separated and the regex
+    is never reached.
+    """
+    if Path("/proc").is_dir() or shutil.which("ps") is None:
+        pytest.skip("macOS-only: Linux reads /proc/<pid>/environ instead")
+    assert launch._env_path_of(str(os.getpid())) == os.environ["PATH"]
+
+
+def test_the_ps_parser_stops_at_the_next_variable_not_the_next_space() -> None:
+    """The parse rule in isolation: a space-bearing entry must survive whole."""
+    spaced = "/usr/bin:/opt/Application Support/bin"
+    line = f"/some/cmd --flag HOME=/home/u PATH={spaced} SHELL=/bin/zsh"
+    match = launch._PS_PATH_RE.search(line)
+    assert match is not None
+    assert match.group(1) == spaced
+
+
 # --- pinned_version -----------------------------------------------------------
 
 
@@ -571,6 +653,122 @@ def test_the_two_session_only_facts_are_never_claimed(tmp_path: Path) -> None:
     assert got["permission-mode"].status == launch.UNKNOWN
     assert "kb-curator" in got["skills"].detail
     assert "pr-workflow" in got["skills"].detail
+
+
+# --- doctor_main: the wiring the tests above cannot see -----------------------
+#
+# Every `_doctor` test injects `path=` and REAL probes are never used, so the one
+# line that chooses which PATH to judge was covered by nothing. That is exactly
+# where the defect lived: `doctor_main` passed `os.environ["PATH"]`, which under
+# `mise run cc-doctor` is the `uv` shim's fabrication. These two drive the real
+# entry point end to end, with real `shutil.which` over real files on disk.
+
+
+def _graphify_at(directory: Path, version: str = "0.9.27") -> Path:
+    """A runnable `graphify --version` so the REAL `_version_of` probe works."""
+    directory.mkdir(parents=True, exist_ok=True)
+    binary = directory / "graphify"
+    binary.write_text(f'#!/bin/sh\necho "graphify {version}"\n', encoding="utf-8")
+    binary.chmod(0o755)
+    return binary
+
+
+def _shim_and_install(tmp_path: Path) -> tuple[str, str]:
+    """Return (session PATH, shim-fabricated PATH) over two real directories."""
+    shims = tmp_path / "mise" / "shims"
+    installs = tmp_path / "mise" / "installs" / "pipx-graphifyy" / "0.9.27" / "bin"
+    _graphify_at(shims)
+    _graphify_at(installs)
+    return str(shims), os.pathsep.join([str(installs), str(shims)])
+
+
+def _run_doctor_main(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    task_path: str,
+    session: str | None,
+    extra_argv: list[str] | None = None,
+) -> int:
+    """Drive the real entry point with both PATHs controlled.
+
+    ``task_path`` is the mise-mangled PATH this process holds; ``session`` is
+    what the OS reports for `CLAUDE_PID`.
+    """
+    repo = _pinned_repo(tmp_path)
+    sibling = tmp_path / "sibling"
+    sibling.mkdir(exist_ok=True)
+    monkeypatch.setenv("PATH", task_path)
+    monkeypatch.setenv("CLAUDE_PID", "4242")
+    monkeypatch.setattr(launch, "_env_path_of", lambda _pid: session)
+    return launch.doctor_main(repo, ["--sibling", str(sibling), *(extra_argv or [])])
+
+
+def test_doctor_main_judges_the_session_not_the_path_mise_handed_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """THE regression.
+
+    A clean session must report clean even though THIS process holds a PATH with
+    the install dir in front — which is what `mise run` plus the `uv` shim do,
+    unconditionally, to every invocation of this task.
+    """
+    session, task_path = _shim_and_install(tmp_path)
+    rc = _run_doctor_main(tmp_path, monkeypatch, task_path=task_path, session=session)
+    assert rc == 0
+    assert "via the shims" in capsys.readouterr().out
+
+
+def test_doctor_main_still_fails_when_the_session_itself_is_dirty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CONTROL ARM: drift that is really in the session must still be caught.
+
+    The session's own PATH carries the install dir here — the state `cc-fresh`
+    exists for. If this passed, the fix would have replaced a check that could
+    not pass with one that cannot fail.
+    """
+    _, task_path = _shim_and_install(tmp_path)
+    rc = _run_doctor_main(tmp_path, monkeypatch, task_path=task_path, session=task_path)
+    assert rc == 1
+    assert "an install dir ahead of the shims" in capsys.readouterr().out
+
+
+def test_doctor_main_reports_unknown_rather_than_judging_its_own_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An unreadable session is "not checked", never a pass.
+
+    And never a verdict on this process's PATH either.
+
+    Falling back to `os.environ["PATH"]` is precisely the bug: the fallback value
+    here is dirty, so a regression would surface as a FAIL. UNKNOWN must not fail
+    the run either — an unreadable session is not a broken one.
+    """
+    _, task_path = _shim_and_install(tmp_path)
+    rc = _run_doctor_main(tmp_path, monkeypatch, task_path=task_path, session=None)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "could not be read, so this was NOT checked" in out
+    assert "an install dir ahead of the shims" not in out
+    assert "via the shims" not in out
+
+
+def test_an_explicit_path_argument_wins_over_everything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An explicit answer beats every inferred one.
+
+    `--path "$PATH"` from the session's shell is exact and needs no process
+    introspection, so it must beat both this process's PATH and the CLAUDE_PID
+    read — including when the latter is unavailable.
+    """
+    session, task_path = _shim_and_install(tmp_path)
+    rc = _run_doctor_main(
+        tmp_path, monkeypatch, task_path=task_path, session=None, extra_argv=["--path", session]
+    )
+    assert rc == 0
+    assert "via the shims" in capsys.readouterr().out
 
 
 def _fresh_run(

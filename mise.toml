@@ -355,6 +355,28 @@ description = "Verify the CURRENT session's environment (graphify resolution, si
 # how #40 stayed invisible to `preflight` (that one cleans first, correctly, because
 # it is about to hand a cleaned PATH to a child; this one reports reality).
 #
+# Raw, but of the SESSION's PATH — never this task's. `mise run` injects every tool
+# install dir into a task's environment and `uv` then resolves to a mise shim, which
+# re-prepends them; judging our own PATH made the graphify check unable to report
+# green here, ever. The session is found via `CLAUDE_PID` and its environment read
+# from the OS (`kb_setup.launch.session_path`); when that cannot be read the check
+# is UNKNOWN, not a guess. `--path "$PATH"` from a shell overrides it explicitly.
+#
+# DO NOT "simplify" this to mise's own `{{ get_env(name='PATH') }}` in a task `env`
+# block. It is documented as returning "the original process environment" and it
+# does — but it is bound to PRISTINE_ENV, which reverses __MISE_DIFF and REMOVES
+# every path mise added. Under an activated shell that is precisely the install
+# dirs this check hunts, so it launders the drift away. Measured 2026-07-27 with a
+# caller PATH carrying both a sentinel and a stale install dir:
+#
+#   activated shell : entries 5, installs 0, sentinel present   <- laundered
+#   env -i          : entries 5, installs 1, sentinel present   <- intact
+#
+# The published proof of `get_env` used `env -i`, where there is no __MISE_DIFF to
+# reverse and nothing is stripped. The CONDITION was the whole finding: correct
+# where it was measured, wrong here. Same defect class as `clean_path` in this
+# position — a check that cannot fail.
+#
 # Two of the five checks print `?`, not `✔`: which skills a session can see and
 # which permission mode it is in are facts only the session holds, and asserting
 # them from a subprocess would be a probe with one face. Non-zero on any FAIL;
