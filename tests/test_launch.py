@@ -271,6 +271,166 @@ def test_a_spawned_pane_inherits_the_callers_path(tmp_path: Path) -> None:
     )
 
 
+# --- shim_free ----------------------------------------------------------------
+
+_MISE_TMUX = "/home/u/.local/share/mise/installs/tmux/latest/tmux"
+_SHIM_TMUX = "/home/u/.local/share/mise/shims/tmux"
+
+
+def test_a_mise_managed_tool_resolves_to_its_install_binary(tmp_path: Path) -> None:
+    """`mise which` wins, because it names the version this repo pins.
+
+    Not the first entry on an activated PATH — that may be the stale install dir
+    mechanism 1 is about, and preferring it would make the launcher pick exactly
+    the binary the rest of this module exists to distrust.
+    """
+    got = launch.shim_free(
+        "tmux", repo_root=tmp_path, path=_DIRTY_PATH, lookup=lambda _t, _r: _MISE_TMUX
+    )
+    assert got == _MISE_TMUX
+
+
+def test_a_shim_is_never_returned_while_a_real_binary_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """THE POINT. A shim re-prepends every install dir onto the cleaned PATH.
+
+    Returning one would undo `clean_path` at the moment of launch — which is the
+    defect this function was added for, and which every earlier version of this
+    module shipped with.
+    """
+    monkeypatch.setattr(launch.shutil, "which", lambda _t, **_k: "/opt/bin/tmux")
+    got = launch.shim_free(
+        "tmux", repo_root=tmp_path, path=_DIRTY_PATH, lookup=lambda _t, _r: _SHIM_TMUX
+    )
+    assert got == "/opt/bin/tmux", "a shim from `mise which` must fall through to PATH"
+    assert launch._SHIMS_SEGMENT not in got
+
+
+def test_a_tool_mise_does_not_manage_falls_through_to_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM for the lookup order: `claude` is not a mise tool.
+
+    `mise which claude` exits non-zero, which is not an error — without this
+    fallback the launcher would resolve nothing for the one binary it must run.
+    """
+    monkeypatch.setattr(launch.shutil, "which", lambda _t, **_k: "/home/u/.local/bin/claude")
+    got = launch.shim_free(
+        "claude", repo_root=tmp_path, path=_DIRTY_PATH, lookup=lambda _t, _r: None
+    )
+    assert got == "/home/u/.local/bin/claude"
+
+
+def test_an_unresolvable_tool_degrades_to_the_bare_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It must not raise, and must not return None.
+
+    Refusing here would brick the launcher over a resolution the preflight has
+    already checked and reported on properly. The bare name is what the shell
+    would have done anyway.
+    """
+    monkeypatch.setattr(launch.shutil, "which", lambda _t, **_k: None)
+    got = launch.shim_free("tmux", repo_root=tmp_path, path="", lookup=lambda _t, _r: None)
+    assert got == "tmux"
+
+
+def test_a_shim_is_still_returned_when_it_is_the_only_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Degradation, stated so it is a decision rather than an accident.
+
+    A shim runs the right tool; it only re-pollutes PATH. Launching beats
+    refusing, and `doctor` reports the consequence inside the session.
+    """
+    monkeypatch.setattr(launch.shutil, "which", lambda _t, **_k: _SHIM_TMUX)
+    got = launch.shim_free(
+        "tmux", repo_root=tmp_path, path=_DIRTY_PATH, lookup=lambda _t, _r: _SHIM_TMUX
+    )
+    assert got == _SHIM_TMUX
+
+
+def test_the_resolved_binaries_reach_the_argv(tmp_path: Path) -> None:
+    """Resolution is worthless if `launch_argv` still emits the bare names."""
+    argv = launch.launch_argv(
+        tmp_path,
+        tmp_path / "sib",
+        session="kb",
+        in_tmux=False,
+        binaries=launch.Binaries(tmux=_MISE_TMUX, claude="/home/u/.local/bin/claude"),
+    )
+    assert argv[0] == _MISE_TMUX
+    assert "/home/u/.local/bin/claude" in argv
+    assert "tmux" not in argv[:1], "the bare name must not survive resolution"
+
+
+@pytest.mark.skipif(
+    shutil.which("mise") is None or shutil.which("tmux") is None,
+    reason="needs real mise + tmux to observe a pane's PATH",
+)
+def test_a_spawned_pane_gets_no_install_dirs_and_the_shim_form_proves_it_can(
+    tmp_path: Path,
+) -> None:
+    """The fix, observed end-to-end — with the arm that shows the probe can fail.
+
+    This is an ABSENCE assertion, and that is the whole lesson of the defect it
+    guards: `test_a_spawned_pane_inherits_the_callers_path` asserts a sentinel
+    ARRIVED, and it does arrive — a mise shim PREPENDS install dirs, it does not
+    discard what was there. So a "did my value reach the pane?" test passes at
+    installs=154 exactly as it does at installs=0, and could never have caught
+    this. Only "and nothing else arrived in front of it" can.
+
+    Both arms run against the same tmux, the same command, the same cleaned
+    PATH — the ONLY difference is which tmux binary is invoked:
+
+    * through the SHIM  -> install dirs come back (the pre-fix behaviour);
+    * through `shim_free` -> they do not.
+
+    Without the first arm this test would pass on a machine where nothing ever
+    polluted PATH, i.e. it would be a check that cannot fail.
+    """
+    shim_tmux = Path.home() / ".local/share/mise/shims/tmux"
+    if not shim_tmux.is_file():
+        pytest.skip("no mise shim for tmux on this host")
+
+    cleaned = launch.clean_path(os.environ["PATH"])
+    assert "/mise/installs/" not in cleaned, "the cleaned PATH is the fixture; it must be clean"
+
+    def pane_path(tmux_bin: str, name: str) -> str:
+        out = tmp_path / f"{name}.txt"
+        argv = [
+            tmux_bin, "new-session", "-d", "-s", name, "-c", str(tmp_path),
+            "/bin/sh", "-c", f'printf "%s" "$PATH" > {out}',
+        ]  # fmt: skip
+        subprocess.run(argv, check=True, timeout=60, env={**os.environ, "PATH": cleaned})
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline and not out.is_file():
+            time.sleep(0.1)
+        subprocess.run([tmux_bin, "kill-session", "-t", name], check=False, timeout=30)
+        assert out.is_file(), f"pane never wrote {out}"
+        return out.read_text(encoding="utf-8")
+
+    tag = os.getpid()
+
+    # FAIL ARM: the pre-fix path. A shim re-enters mise, which prepends the
+    # install dirs straight back onto the PATH we just cleaned.
+    via_shim = pane_path(str(shim_tmux), f"kbshim-{tag}")
+    assert "/mise/installs/" in via_shim, (
+        "the shim no longer re-injects install dirs — if this fails, mise "
+        "changed and `shim_free` may be obsolete; re-measure before deleting it"
+    )
+
+    # PASS ARM: the fix.
+    resolved = launch.shim_free("tmux", repo_root=Path.cwd(), path=os.environ["PATH"])
+    assert launch._SHIMS_SEGMENT not in resolved
+    via_resolved = pane_path(resolved, f"kbfree-{tag}")
+    assert "/mise/installs/" not in via_resolved, (
+        "the pane still inherited install dirs — a bare `graphify` in the "
+        "launched session would resolve to a frozen install dir again"
+    )
+
+
 def test_inside_tmux_it_execs_claude_directly(tmp_path: Path) -> None:
     """CONTROL ARM: no nested server, and therefore no tmux flags at all."""
     argv = launch.launch_argv(tmp_path, tmp_path / "sib", session="kb", in_tmux=True)
@@ -426,6 +586,12 @@ def _fresh_run(
             path="/clean/bin", problems=() if preflight_ok else ("sibling repo not found",)
         ),
     )
+    # Stubbed so this test stays about ORDERING. Unstubbed, `cc_main` resolves
+    # both binaries through `shim_free`, which shells out to `mise which` and
+    # would put two more commands in `ran` — noise that has its own tests below.
+    # The sentinel paths are deliberately shim-free: asserting the kill and the
+    # launch use the SAME resolved binary is part of the contract.
+    monkeypatch.setattr(launch, "shim_free", lambda tool, **_k: f"/abs/{tool}")
     monkeypatch.setattr(
         launch.subprocess,
         "run",
@@ -467,7 +633,10 @@ def test_fresh_does_kill_the_server_once_preflight_passes(
     rc, ran = _fresh_run(tmp_path, monkeypatch, preflight_ok=True)
 
     assert rc == 0
-    assert [c[:2] for c in ran] == [["tmux", "kill-server"], ["tmux", "new-session"]]
+    assert [c[:2] for c in ran] == [
+        ["/abs/tmux", "kill-server"],
+        ["/abs/tmux", "new-session"],
+    ]
 
 
 def test_fresh_refuses_inside_tmux(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
