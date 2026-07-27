@@ -56,17 +56,54 @@ _STRIP_BACKEND_ENV = (
     "OLLAMA_HOST",
 )
 
+# A SECOND, unrelated reason to strip — do not merge this into the tuple above.
+# Everything in _STRIP_BACKEND_ENV goes because it would flip graphify's
+# detect_backend(); mise is not a backend and never could be. These go because
+# they SMUGGLE THE VALUES the list above removes by name.
+#
+# `__MISE_DIFF` is mise's env snapshot: gzip + base64 + msgpack, carrying the
+# full new/old env maps — every value mise's `[env]` resolved, including
+# SOPS/age-decrypted secrets. So stripping `AWS_SECRET_ACCESS_KEY` by name while
+# leaving `__MISE_DIFF` beside it removes the label and keeps the contents. Two
+# things make it worse than an ordinary variable: gitleaks cannot pattern-match a
+# gzip'd blob, and mise's own redaction is a *stdout line filter*
+# (`docs/environments/index.md:170`) that never touches the environment handed to
+# a child. v2026.5.6 widened the blast radius by propagating it to children. This
+# is expected upstream behaviour with no fix pending — evidence, control arms and
+# the release-note sweep in `docs/research/reports/mise-path-research.md` § Q4.
+#
+# A PREFIX and not a name list, deliberately. A name list is a token-spelling
+# bound (`probes-need-a-control-arm.md`): it protects against the two blobs that
+# exist today and silently fails open the day mise adds a third. `__MISE_` is
+# mise's private namespace — the same report measured `__MISE_ORIG_PATH` at 0
+# hits across mise's `docs/` (vs 32-file controls), i.e. `__`-prefixed means
+# internal and unsupported. The known members are `__MISE_DIFF` and
+# `__MISE_SESSION`; the rest is shell-activation bookkeeping a graphify
+# subprocess has no use for either.
+#
+# The doubled underscore is load-bearing: PUBLIC mise config is `MISE_*` with one
+# underscore (`MISE_DATA_DIR`, which `kb_setup.currency.sync` reads), and
+# stripping that would break real configuration. Arm both directions when
+# changing this.
+_STRIP_MISE_ENV_PREFIX = "__MISE_"
+
 
 def clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
-    """A copy of os.environ with every non-Claude backend trigger removed.
+    """A copy of os.environ with backend triggers AND mise's secret blob removed.
 
-    Use for EVERY graphify subprocess. With these stripped, graphify's
-    detect_backend() finds nothing (unless ANTHROPIC_API_KEY is set, which is the
-    Claude path we keep) and labeling uses the deterministic no-LLM hub labeler —
-    never Gemini/Bedrock/etc., and with no failed backend attempts. Pass ``extra``
-    to set additional vars.
+    Use for EVERY graphify subprocess. Two independent strips, for two unrelated
+    reasons (see the comments on each constant): `_STRIP_BACKEND_ENV` stops
+    graphify's detect_backend() picking a non-Claude backend, so labeling uses the
+    deterministic no-LLM hub labeler with no failed backend attempts;
+    `_STRIP_MISE_ENV_PREFIX` stops mise's `__MISE_DIFF` carrying the *values* of
+    the credentials the first list removes by *name* into a process that writes
+    the corpus. Pass ``extra`` to set additional vars.
     """
-    env = {k: v for k, v in os.environ.items() if k not in _STRIP_BACKEND_ENV}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in _STRIP_BACKEND_ENV and not k.startswith(_STRIP_MISE_ENV_PREFIX)
+    }
     if extra:
         env.update(extra)
     return env
@@ -99,6 +136,13 @@ def graphify_exe(repo_root: Path | None = None) -> str:
     """
     root = repo_root or Path.cwd()
     try:
+        # NOT clean_env(), on purpose. This is the one subprocess here that is
+        # mise itself, and `__MISE_DIFF` is mise's own session state — it reverses
+        # the diff to recover the pristine env. Hiding that from mise changes what
+        # mise resolves (the same mechanism that made `{{ get_env(name='PATH') }}`
+        # launder away every install dir; see `session_path` in launch.py). It
+        # also writes nothing: stdout is captured and used as a path, never logged
+        # into the corpus, which is the exposure clean_env() exists to close.
         out = subprocess.run(
             ["mise", "which", "graphify"],
             capture_output=True,
