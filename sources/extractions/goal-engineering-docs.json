@@ -178,7 +178,7 @@
   },
   {
    "id": "ceccarelli_cap_as_forcing_function",
-   "label": "The cap's real value is as a forcing function: 'it forces me to decide what the goal is before I write it.' Ceccarelli runs `wc -c` on the goal as a pre-commit habit; corpus precedents run 3,929 to 4,112 characters, and anything past 4,100 signals the goal is doing work that belongs in the rider.",
+   "label": "The cap's real value is as a forcing function: 'it forces me to decide what the goal is before I write it.' Ceccarelli runs `wc -c` on the goal as a pre-commit habit; corpus precedents run 3,929 to 4,112 characters, and anything past 4,100 signals the goal is doing work that belongs in the rider. The authoring procedure follows from it: sketch the goal in a throwaway file, and if it will not fit, 'narrow the scope until you can. THE NARROWING IS THE POINT. The cap is a forcing function; it teaches you what one round looks like.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
    "source_location": "lines 157, 1032",
@@ -1431,17 +1431,6 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_sketch_then_narrow",
-   "label": "The recommended authoring order: sketch the goal first in a throwaway text file and try to keep it under the cap; 'if you can't, NARROW THE SCOPE until you can. The narrowing is the point. The cap is a forcing function; it teaches you what one round looks like.'",
-   "file_type": "concept",
-   "source_file": "goal-engineering-ceccarelli.md",
-   "source_location": "line 719",
-   "source_url": "https://www.gregceccarelli.com/goal-engineering",
-   "captured_at": "2026-07-27",
-   "author": "Greg Ceccarelli",
-   "contributor": null
-  },
-  {
    "id": "ceccarelli_try_it_recipe",
    "label": "The try-it-tomorrow recipe: start with one round; sketch the goal in a throwaway file under the cap; pick a headline word (if you can't, you're still trying to do two rounds); write the goal properly into docs/goals/<YYYY-MM-DD>-<HHMM>-<project>-<topic>-goal.md using the skeleton (Read first, Posture, domain body, Phases, Verification, Stop when) — 'Put ABSOLUTE PATHS under Read first. Put NEGATIONS under Posture.' Then write the rider.",
    "file_type": "concept",
@@ -1458,17 +1447,6 @@
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
    "source_location": "lines 729-741",
-   "source_url": "https://www.gregceccarelli.com/goal-engineering",
-   "captured_at": "2026-07-27",
-   "author": "Greg Ceccarelli",
-   "contributor": null
-  },
-  {
-   "id": "ceccarelli_commit_the_pair",
-   "label": "The pair itself is committed before execution begins: 'Run the validator. Commit the pair as `docs(goals): add <topic> goal+rider`. Then hand it to the agent.'",
-   "file_type": "concept",
-   "source_file": "goal-engineering-ceccarelli.md",
-   "source_location": "line 745",
    "source_url": "https://www.gregceccarelli.com/goal-engineering",
    "captured_at": "2026-07-27",
    "author": "Greg Ceccarelli",
@@ -1777,17 +1755,6 @@
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
    "source_location": "lines 1207-1216",
-   "source_url": "https://www.gregceccarelli.com/goal-engineering",
-   "captured_at": "2026-07-27",
-   "author": "Greg Ceccarelli",
-   "contributor": null
-  },
-  {
-   "id": "ceccarelli_discipline_travels",
-   "label": "The skill's final claim: 'The discipline travels: the pattern works the same across Rust, Go, TypeScript, Python, and mixed stacks. Only the toolchain commands change.'",
-   "file_type": "concept",
-   "source_file": "goal-engineering-ceccarelli.md",
-   "source_location": "lines 1218-1219",
    "source_url": "https://www.gregceccarelli.com/goal-engineering",
    "captured_at": "2026-07-27",
    "author": "Greg Ceccarelli",
@@ -4946,16 +4913,6 @@
    "weight": 1.0
   },
   {
-   "source": "ceccarelli_sketch_then_narrow",
-   "target": "ceccarelli_cap_as_forcing_function",
-   "relation": "explains",
-   "confidence": "EXTRACTED",
-   "confidence_score": 1,
-   "source_file": "goal-engineering-ceccarelli.md",
-   "source_location": null,
-   "weight": 1.0
-  },
-  {
    "source": "ceccarelli_try_it_recipe",
    "target": "ceccarelli_five_section_skeleton",
    "relation": "references",
@@ -4989,16 +4946,6 @@
    "source": "ceccarelli_rider_section_order",
    "target": "ceccarelli_try_it_recipe",
    "relation": "part_of",
-   "confidence": "EXTRACTED",
-   "confidence_score": 1,
-   "source_file": "goal-engineering-ceccarelli.md",
-   "source_location": null,
-   "weight": 1.0
-  },
-  {
-   "source": "ceccarelli_commit_the_pair",
-   "target": "ceccarelli_skill_validator_five_checks",
-   "relation": "follows",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "goal-engineering-ceccarelli.md",
@@ -5377,8 +5324,8 @@
   },
   {
    "source": "ceccarelli_pair_commit_message",
-   "target": "ceccarelli_commit_the_pair",
-   "relation": "refines",
+   "target": "ceccarelli_skill_validator_five_checks",
+   "relation": "follows",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "goal-engineering-ceccarelli.md",
@@ -5389,16 +5336,6 @@
    "source": "ceccarelli_reference_exemplars",
    "target": "ceccarelli_dont_invent_precedent",
    "relation": "refines",
-   "confidence": "EXTRACTED",
-   "confidence_score": 1,
-   "source_file": "goal-engineering-ceccarelli.md",
-   "source_location": null,
-   "weight": 1.0
-  },
-  {
-   "source": "ceccarelli_discipline_travels",
-   "target": "ceccarelli_portability",
-   "relation": "restates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "goal-engineering-ceccarelli.md",
@@ -6478,7 +6415,7 @@
   {
    "source": "ccgoal_evaluator_calls_no_tools",
    "target": "ccgoal_write_what_output_demonstrates",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6488,7 +6425,7 @@
   {
    "source": "ccgoal_write_what_output_demonstrates",
    "target": "ccgoal_transcript_evidence_example",
-   "relation": "references",
+   "relation": "exemplified_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6508,7 +6445,7 @@
   {
    "source": "ccgoal_evaluator_calls_no_tools",
    "target": "ccgoal_bound_is_self_reported",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6518,7 +6455,7 @@
   {
    "source": "ccgoal_evaluator_calls_no_tools",
    "target": "ccgoal_part_stated_check",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6528,7 +6465,7 @@
   {
    "source": "ccgoal_evaluator_calls_no_tools",
    "target": "ccgoal_verification_loop_prerequisite",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6538,7 +6475,7 @@
   {
    "source": "ccgoal_three_part_condition",
    "target": "ccgoal_part_measurable_end_state",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6548,7 +6485,7 @@
   {
    "source": "ccgoal_three_part_condition",
    "target": "ccgoal_part_stated_check",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6558,7 +6495,7 @@
   {
    "source": "ccgoal_three_part_condition",
    "target": "ccgoal_part_constraints_that_matter",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6568,7 +6505,7 @@
   {
    "source": "ccgoal_three_part_condition",
    "target": "ccgoal_char_limit_4000",
-   "relation": "references",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6578,7 +6515,7 @@
   {
    "source": "ccgoal_part_stated_check",
    "target": "ccgoal_transcript_evidence_example",
-   "relation": "references",
+   "relation": "exemplified_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6588,7 +6525,7 @@
   {
    "source": "ccgoal_part_measurable_end_state",
    "target": "ccgoal_what_goals_are_for",
-   "relation": "references",
+   "relation": "exemplified_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6598,7 +6535,7 @@
   {
    "source": "ccgoal_example_set_command",
    "target": "ccgoal_three_part_condition",
-   "relation": "references",
+   "relation": "exemplified_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6608,7 +6545,7 @@
   {
    "source": "ccgoal_new_goal_replaces_active",
    "target": "ccgoal_one_per_session",
-   "relation": "references",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6638,7 +6575,7 @@
   {
    "source": "ccgoal_setting_starts_a_turn",
    "target": "ccgoal_char_limit_4000",
-   "relation": "references",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6658,7 +6595,7 @@
   {
    "source": "ccgoal_is_session_scoped_stop_hook",
    "target": "ccgoal_prompt_hook_three_steps",
-   "relation": "references",
+   "relation": "implemented_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6668,7 +6605,7 @@
   {
    "source": "ccgoal_is_session_scoped_stop_hook",
    "target": "ccgoal_stop_event_when_it_runs",
-   "relation": "references",
+   "relation": "implemented_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6678,7 +6615,7 @@
   {
    "source": "ccgoal_prompt_hook_three_steps",
    "target": "ccgoal_response_schema_ok_reason",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6688,7 +6625,7 @@
   {
    "source": "ccgoal_response_schema_ok_reason",
    "target": "ccgoal_ok_false_reason_becomes_next_instruction",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6708,7 +6645,7 @@
   {
    "source": "ccgoal_evaluator_returns_yes_no_and_reason",
    "target": "ccgoal_response_schema_ok_reason",
-   "relation": "references",
+   "relation": "implemented_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6728,7 +6665,7 @@
   {
    "source": "ccgoal_evaluator_is_small_fast_model",
    "target": "ccgoal_prompt_hook_model_field",
-   "relation": "references",
+   "relation": "implemented_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6768,7 +6705,7 @@
   {
    "source": "ccgoal_response_schema_ok_reason",
    "target": "ccgoal_continue_on_block_field",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6798,7 +6735,7 @@
   {
    "source": "ccgoal_stop_event_when_it_runs",
    "target": "ccgoal_stop_decision_block_fields",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6818,7 +6755,7 @@
   {
    "source": "ccgoal_loop_summary",
    "target": "ccgoal_evaluator_returns_yes_no_and_reason",
-   "relation": "references",
+   "relation": "implemented_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6828,7 +6765,7 @@
   {
    "source": "ccgoal_bound_with_turn_or_time_clause",
    "target": "ccgoal_bound_is_self_reported",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6838,7 +6775,7 @@
   {
    "source": "ccgoal_bound_with_turn_or_time_clause",
    "target": "ccgoal_runs_until_met_or_cleared",
-   "relation": "references",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6858,7 +6795,7 @@
   {
    "source": "ccgoal_clear_command",
    "target": "ccgoal_clear_aliases",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -6988,7 +6925,7 @@
   {
    "source": "ccgoal_bare_goal_shows_status",
    "target": "ccgoal_status_fields",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7048,7 +6985,7 @@
   {
    "source": "ccgoal_resume_resets_counters",
    "target": "ccgoal_bound_is_self_reported",
-   "relation": "references",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7088,7 +7025,7 @@
   {
    "source": "ccgoal_requires_trust_dialog",
    "target": "ccgoal_is_session_scoped_stop_hook",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7098,7 +7035,7 @@
   {
    "source": "ccgoal_does_not_change_permissions",
    "target": "ccgoal_pair_with_auto_mode",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7108,7 +7045,7 @@
   {
    "source": "ccgoal_pair_with_auto_mode",
    "target": "ccgoal_auto_mode_complementary",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7138,7 +7075,7 @@
   {
    "source": "ccgoal_comparison_pick_by_trigger",
    "target": "ccgoal_row_goal",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7148,7 +7085,7 @@
   {
    "source": "ccgoal_comparison_pick_by_trigger",
    "target": "ccgoal_row_loop",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7158,7 +7095,7 @@
   {
    "source": "ccgoal_comparison_pick_by_trigger",
    "target": "ccgoal_row_stop_hook",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7188,7 +7125,7 @@
   {
    "source": "ccgoal_row_stop_hook",
    "target": "ccgoal_is_session_scoped_stop_hook",
-   "relation": "references",
+   "relation": "implemented_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7198,7 +7135,7 @@
   {
    "source": "ccgoal_surfaces_headless_desktop_remote",
    "target": "ccgoal_p_flag_runs_to_completion",
-   "relation": "references",
+   "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7228,7 +7165,7 @@
   {
    "source": "ccgoal_slash_stacking_expansion_rules",
    "target": "ccgoal_forked_skill_terminates_expansion",
-   "relation": "references",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7248,7 +7185,7 @@
   {
    "source": "ccgoal_verification_loop_prerequisite",
    "target": "ccgoal_part_stated_check",
-   "relation": "references",
+   "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
@@ -7259,6 +7196,736 @@
    "source": "ccgoal_runs_until_met_or_cleared",
    "target": "ccgoal_eight_consecutive_block_cap",
    "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_eight_consecutive_block_cap",
+   "target": "ccgoal_runs_until_met_or_cleared",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_evaluator_calls_no_tools",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_write_what_output_demonstrates",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_transcript_evidence_example",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_three_part_condition",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_part_measurable_end_state",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_part_stated_check",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_part_constraints_that_matter",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_char_limit_4000",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_one_per_session",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_new_goal_replaces_active",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_setting_starts_a_turn",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_active_indicator",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_example_set_command",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_what_goals_are_for",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_loop_summary",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_version_requirement",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_is_session_scoped_stop_hook",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_evaluator_is_small_fast_model",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_evaluator_returns_yes_no_and_reason",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_evaluator_uses_session_provider",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_eval_token_billing",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_reason_visible_each_turn",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_hooks_tip_goal_is_shortcut",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_prompt_hook_three_steps",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_response_schema_ok_reason",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_ok_false_reason_becomes_next_instruction",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_prompt_hook_timeout_30s",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_continue_on_block_field",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_prompt_hook_model_field",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_stop_event_when_it_runs",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_api_error_fires_stopfailure",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_stop_hook_active_field",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_stop_decision_block_fields",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_additionalcontext_same_loop_protections",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_bound_with_turn_or_time_clause",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_bound_is_self_reported",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_runs_until_met_or_cleared",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_eight_consecutive_block_cap",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_cap_disagreement_unreconciled",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_clear_command",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_clear_aliases",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_slash_clear_removes_goal",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_bare_goal_shows_status",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_status_fields",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_status_after_first_evaluation",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_status_shows_achieved_goal",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_resume_restores_condition",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_resume_resets_counters",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_achieved_or_cleared_not_restored",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_requires_trust_dialog",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_disabled_by_disableallhooks",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_disabled_by_allowmanagedhooksonly",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_unavailability_is_explained",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_does_not_change_permissions",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_pair_with_auto_mode",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_auto_mode_complementary",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_fresh_model_decides_completion",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_comparison_pick_by_trigger",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_row_goal",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_row_loop",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_row_stop_hook",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_vs_stop_hook_scope",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_scheduling_is_a_different_axis",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_surfaces_headless_desktop_remote",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_p_flag_runs_to_completion",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_headless_silent_until_done",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_ctrl_c_stops_headless",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_slash_stacking_expansion_rules",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_forked_skill_terminates_expansion",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_best_practices_stop_hook_rung",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_verification_loop_prerequisite",
+   "target": "ccgoal_doc",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "claude-code-goal-docs.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "ccgoal_no_blocked_exit_primitive",
+   "target": "ccgoal_doc",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "claude-code-goal-docs.md",
