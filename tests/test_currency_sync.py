@@ -732,3 +732,134 @@ def test_restamp_is_a_noop_when_no_build_stamp_exists(tmp_path, monkeypatch) -> 
     root = _repo_with_generated(tmp_path)
     assert sync.restamp_artifacts(root, config.load(root)[0]) is None
     assert not (root / "graphify-out" / ".currency-stamp.json").exists()
+
+
+# ------------------------------------------------- self-managed (mise) ----
+#
+# A tool that bootstraps the toolchain cannot honestly be pinned in `[tools]`:
+# measured 2026-07-27, adding `ubi:jdx/mise` moved `which(mise)` from the ambient
+# `~/.local/bin/mise` to the install dir, so the check would have compared the
+# pinned copy against the pin and reported in sync forever while the binary that
+# actually runs every task drifted. Hence `expected` + a version read from the
+# binary, and hence these arms.
+
+
+def _self_managed(tmp_path, **overrides: str) -> config.ToolSpec:
+    (tmp_path / "currency.toml").write_text(
+        "[tool.mise]\n"
+        'binary = "mise"\n'
+        f'expected = "{overrides.get("expected", "2026.7.15")}"\n'
+        'version_pattern = "^v?(\\\\d+\\\\.\\\\d+\\\\.\\\\d+)"\n',
+        encoding="utf-8",
+    )
+    return config.load(tmp_path)[0]
+
+
+def test_a_tool_with_expected_is_self_managed(tmp_path) -> None:
+    assert _self_managed(tmp_path).self_managed is True
+    assert config.load(_repo(tmp_path))[0].self_managed is False
+
+
+def test_a_self_managed_tool_needs_no_mise_key(tmp_path) -> None:
+    """Requiring one would force a fake pin at a `[tools]` entry that must not exist."""
+    assert _self_managed(tmp_path).mise_key == ""
+
+
+def test_a_tool_declaring_neither_mise_key_nor_expected_is_rejected(tmp_path) -> None:
+    """CONTROL ARM: the relaxation must not accept a spec that declares nothing."""
+    (tmp_path / "currency.toml").write_text('[tool.x]\nbinary = "x"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match=r"mise_key.*or.*expected"):
+        config.load(tmp_path)
+
+
+def test_the_running_version_matching_the_reviewed_one_is_ok(tmp_path, monkeypatch) -> None:
+    spec = _self_managed(tmp_path)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "2026.7.15")
+    status = sync.check_sync(tmp_path, spec)
+    assert status.ok
+    assert status.verified
+    assert _finding(status, "version").status == sync.OK
+
+
+def test_a_self_updated_binary_is_drift(tmp_path, monkeypatch) -> None:
+    """THE point of the entry: the host moved under us and nothing else would say so."""
+    spec = _self_managed(tmp_path, expected="2026.7.0")
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "2026.7.15")
+    status = sync.check_sync(tmp_path, spec)
+    assert not status.ok
+    detail = _finding(status, "version").detail
+    assert "2026.7.15" in detail
+    assert "2026.7.0" in detail
+    # It must say what to DO — the config is not wrong, the host moved.
+    assert "bump `expected`" in detail
+
+
+def test_resolving_outside_mise_is_normal_for_a_self_managed_tool(tmp_path, monkeypatch) -> None:
+    """CONTROL ARM against the mise-managed path, which calls this exact state DRIFT.
+
+    `~/.local/bin/mise` is where mise correctly lives; reporting it as drift
+    would make the entry permanently red and therefore ignored.
+    """
+    spec = _self_managed(tmp_path)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/Users/x/.local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "2026.7.15")
+    assert sync.check_sync(tmp_path, spec).ok
+
+
+def test_an_unreadable_version_is_blind_not_drift(tmp_path, monkeypatch) -> None:
+    """A broken `version_pattern` must not masquerade as a tool upgrade.
+
+    Rendering it as DRIFT would send the reader to review release notes for a
+    bump that never happened; BLIND says the probe failed, which is the truth.
+    """
+    spec = _self_managed(tmp_path)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "")
+    status = sync.check_sync(tmp_path, spec)
+    assert status.ok  # BLIND is not red...
+    assert not status.verified  # ...but it is emphatically not a pass either
+    assert _finding(status, "version").status == sync.BLIND
+
+
+def test_an_absent_self_managed_binary_is_drift(tmp_path, monkeypatch) -> None:
+    spec = _self_managed(tmp_path)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: None)
+    assert not sync.check_sync(tmp_path, spec).ok
+
+
+# ------------------------------------------------------ version parsing ----
+
+
+def test_a_pattern_extracts_the_version_from_richer_output(monkeypatch) -> None:
+    """`mise --version` prints `<version> <arch> (<date>)`, so last-field is the DATE.
+
+    This silently produced `observed_version("mise") == "(2026-07-27)"` — a
+    string no comparison could ever match.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(
+        sync.subprocess,
+        "run",
+        lambda *_a, **_k: type(
+            "R", (), {"returncode": 0, "stdout": "2026.7.15 macos-arm64 (2026-07-27)", "stderr": ""}
+        )(),
+    )
+    assert sync.observed_version("mise", r"^v?(\d+\.\d+\.\d+)") == "2026.7.15"
+    # CONTROL ARM: the heuristic this replaces, on the same input.
+    assert sync.observed_version("mise") == "(2026-07-27)"
+
+
+def test_a_non_matching_pattern_returns_empty_rather_than_falling_back(monkeypatch) -> None:
+    """CONTROL ARM: silent fallback would hide a stale pattern behind a plausible value."""
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(
+        sync.subprocess,
+        "run",
+        lambda *_a, **_k: type(
+            "R", (), {"returncode": 0, "stdout": "graphify 0.9.26", "stderr": ""}
+        )(),
+    )
+    assert sync.observed_version("mise", r"^NOPE(\d+)") == ""
+    assert sync.observed_version("mise") == "0.9.26"

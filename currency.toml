@@ -107,3 +107,57 @@ binary = "ffmpeg"
 # Host-only, like graphify: on a Linux CI runner this reports not-applicable
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]
+
+# ---- mise itself: the one dependency that gates every other one --------------
+#
+# Every workflow here is a `mise run` task, and mise is installed standalone at
+# ~/.local/bin/mise and SELF-UPDATES out-of-band from any terminal on the host.
+# Until this entry existed nothing noticed. The cost of that blind spot, from a
+# review of all 13 published v2026.7.x releases (25 days): one silent breaking
+# change needing no opt-in (Tera v1 -> v2, #10756) and a 12-release window where
+# structured env files were shell-expanded, corrupting literals and pulling in
+# ambient process values (#11269, fixed in 7.14). This repo escaped the second
+# only by not using `env._.file` — luck, not design.
+#
+# SELF-MANAGED, so there is no `mise_key`. A `[tools] "ubi:jdx/mise"` pin was
+# tried and reverted: it installs fine, but the pinned copy then SHADOWS the
+# ambient binary that actually runs every task, so this check would compare
+# pinned-against-pinned and report in sync forever (measured — `which(mise)`
+# moved to the install dir the moment the pin was added). A pin that blinds the
+# check it was meant to feed is worse than no pin.
+#
+# `expected` is therefore the version whose release notes we have READ. Drift
+# means the host moved under us; the fix is to review the gap and then bump this
+# line, which is what records that the review happened. `mise.toml`'s
+# `min_version` is the other half and cannot do this job: both its keys compare
+# "lower than", so a floor never fires on a self-update, which always moves up.
+[tool.mise]
+binary = "mise"
+expected = "2026.7.15"
+# `mise --version` prints `2026.7.15 macos-arm64 (2026-07-27)`, so the engine's
+# default last-whitespace-field heuristic returns the build DATE. Anchored at the
+# start so it reads the version and not some later digit run.
+# TOML literal string: a basic "..." would need doubled backslashes
+version_pattern = '^v?(\d+\.\d+\.\d+)'
+# Releases only — mise is not on PyPI, and GitHub is where the notes live.
+github = "jdx/mise"
+# No `os` restriction: unlike graphify and ffmpeg, mise is required everywhere
+# this repo is checked out, so "absent" is a real failure on any platform.
+
+[[tool.mise.watch]]
+kind = "local"
+ref = "min-version-floor-vs-reviewed-version"
+note = """Two versions are declared and they mean different things. Keep them
+straight on every bump: `currency.toml` `expected` = the version whose notes we
+have read (moves every time we review); `mise.toml` `min_version.soft` = the
+version we are verified against; `min_version.hard` = the oldest we will run at
+all (2026.7.14, where #11269/#11288/#11296 landed). soft must stay ABOVE hard or
+it is inert — hard errors across exactly the range soft would warn in."""
+
+[[tool.mise.watch]]
+kind = "local"
+ref = "tera-v1-escape-hatch-removal"
+note = """mise moved templates from Tera v1 to v2 in v2026.7.1 (#10756) with a
+`tera_v1` / `MISE_TERA_V1` escape hatch scheduled for REMOVAL in 2027.4.0
+(#10817). This repo sets neither, so it is already on v2 — the item is here so
+the 2027.4.0 release is not read as routine."""

@@ -207,17 +207,24 @@ def _is_mise_shim(resolved: Path) -> bool:
     return any(resolved.is_relative_to(root) for root in _mise_shim_dirs())
 
 
-def observed_version(binary: str) -> str:
+def observed_version(binary: str, pattern: str = "") -> str:
     """Execute `binary --version` and return the bare version, or "" on failure.
 
-    This is the authoritative-but-slow reading (~0.4s of interpreter startup),
-    used when STAMPING a build — where the honest answer is "whatever actually
-    ran", not "whatever the pin says". A build that silently ran a stale binary
-    must stamp the stale version, or the stamp launders the very drift it exists
-    to expose.
+    This is the authoritative reading, used when STAMPING a build — where the
+    honest answer is "whatever actually ran", not "whatever the pin says". A
+    build that silently ran a stale binary must stamp the stale version, or the
+    stamp launders the very drift it exists to expose.
 
-    `check_sync` deliberately does not call this: it must stay cheap enough for a
-    per-session hook.
+    `pattern` is a regex whose first group is the version. Without it the
+    fallback is the last whitespace field, which is right for the conventional
+    `<name> <version>` output and WRONG for anything richer: `mise --version`
+    prints ``2026.7.15 macos-arm64 (2026-07-27)``, so the heuristic returned the
+    build date. A tool whose output is not two fields must declare a pattern.
+
+    Cost, measured 2026-07-27: ``mise --version`` 11.4 ms, ``graphify --version``
+    50.6 ms — the latter is Python interpreter startup, which is why `check_sync`
+    stays away from this for mise-managed tools. 11 ms is affordable in a
+    per-session hook, which is what lets a self-managed tool be checked there.
     """
     found = shutil.which(binary)
     if not found:
@@ -230,8 +237,15 @@ def observed_version(binary: str) -> str:
         return ""
     if res.returncode != 0:
         return ""
-    # Output is conventionally "<name> <version>"; take the last whitespace field.
-    parts = (res.stdout or res.stderr).strip().split()
+    text = (res.stdout or res.stderr).strip()
+    if pattern:
+        match = re.search(pattern, text)
+        # A pattern that does not match returns "" — the caller renders that as
+        # "could not read", never as agreement. Silently falling back to the
+        # last-field heuristic here would hide a stale pattern behind a
+        # plausible-looking version.
+        return match.group(1).lstrip("v") if match else ""
+    parts = text.split()
     return parts[-1].lstrip("v") if parts else ""
 
 
@@ -452,6 +466,79 @@ def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
     return Finding("resolution", OK, f"PATH reaches the pinned {resolved}"), resolved
 
 
+def _check_self_managed(spec: ToolSpec) -> SyncStatus:
+    """Step 1 for a tool that bootstraps the toolchain and pins nothing.
+
+    Every mise-pin check is inapplicable here by construction, so none of them
+    run: there is no `[tools]` entry to read, resolving OUTSIDE mise is the
+    correct permanent state rather than drift, and there is no install-dir path
+    segment to read a version from. What remains is the one question that
+    matters — is the binary a shell actually reaches the version we reviewed?
+
+    This costs one subprocess (~11 ms for mise), which the mise-managed path
+    deliberately avoids. The trade is worth it only because the alternative is
+    no check at all: a self-updating tool's version is not written down anywhere
+    on disk that we could read for free.
+
+    Drift here is a statement about the HOST, not the repo — the tool moved
+    under us — so the detail says what to do about it rather than implying the
+    config is wrong.
+    """
+    found = shutil.which(spec.binary)
+    if not found:
+        return SyncStatus(
+            tool=spec.name,
+            pinned=spec.expected,
+            resolved="",
+            findings=(
+                Finding("resolution", DRIFT, f"{spec.binary} is not installed on this host"),
+            ),
+        )
+    running = observed_version(spec.binary, spec.version_pattern)
+    if not running:
+        # BLIND, not DRIFT: an unreadable version is "could not ask". Rendering
+        # it as disagreement would make a broken `version_pattern` look like a
+        # tool upgrade, and send the reader to review release notes for a bump
+        # that never happened.
+        return SyncStatus(
+            tool=spec.name,
+            pinned=spec.expected,
+            resolved="",
+            findings=(
+                Finding(
+                    "version",
+                    BLIND,
+                    f"could not read a version from {found}"
+                    + (f" using pattern {spec.version_pattern!r}" if spec.version_pattern else ""),
+                ),
+            ),
+        )
+    if running != spec.expected:
+        return SyncStatus(
+            tool=spec.name,
+            pinned=spec.expected,
+            resolved=running,
+            findings=(
+                Finding(
+                    "version",
+                    DRIFT,
+                    f"{spec.binary} on PATH is {running} but the reviewed version is "
+                    f"{spec.expected} — it self-updated. Review the releases between "
+                    f"them, then bump `expected` in currency.toml to record that you "
+                    f"have",
+                ),
+            ),
+        )
+    return SyncStatus(
+        tool=spec.name,
+        pinned=spec.expected,
+        resolved=running,
+        findings=(
+            Finding("version", OK, f"{spec.binary} on PATH is the reviewed {running} ({found})"),
+        ),
+    )
+
+
 def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
     if not spec.extras:
         if declared:
@@ -658,6 +745,9 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
                 ),
             ),
         )
+
+    if spec.self_managed:
+        return _check_self_managed(spec)
 
     pinned, declared_extras = pinned_version(repo_root, spec)
     if not pinned:

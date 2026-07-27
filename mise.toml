@@ -9,6 +9,22 @@
 # graphify-out/, and the MCP server is pinned to THIS graph.json — so multiple
 # graphify projects on the same host never collide.
 
+# mise's own floor. `hard` ERRORS and refuses to run (measured: rc=1, the task
+# never starts); `soft` only WARNs and continues (rc=0). Both compare "lower
+# than", so they are FLOORS — there is no ceiling key anywhere in mise's schema
+# (control-armed: `min_version` and `tools` present, any key containing "max" →
+# none). A self-update moves UP, so this can never fire on one; catching that
+# direction is `currency.toml`'s `[tool.mise]`, not this.
+#
+# hard=2026.7.14 is where the env-file secret-expansion fix (#11269) and both
+# task-freshness correctness fixes (#11288, #11296) landed — below that there are
+# known-bad behaviours, even though this repo is not currently exposed to either
+# (no `env._.file`, no task `sources`/`outputs`). soft=2026.7.15 is the version
+# this repo has actually been verified against, so 7.14 runs with a nudge.
+# Keep soft > hard or soft is inert: hard errors across exactly the range soft
+# would warn in, so an equal pair makes the warning unobservable.
+min_version = { hard = "2026.7.14", soft = "2026.7.15" }
+
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.6"
@@ -354,6 +370,28 @@ description = "Verify the CURRENT session's environment (graphify resolution, si
 # cleaned one — cleaning first would launder the very drift it looks for, which is
 # how #40 stayed invisible to `preflight` (that one cleans first, correctly, because
 # it is about to hand a cleaned PATH to a child; this one reports reality).
+#
+# Raw, but of the SESSION's PATH — never this task's. `mise run` injects every tool
+# install dir into a task's environment and `uv` then resolves to a mise shim, which
+# re-prepends them; judging our own PATH made the graphify check unable to report
+# green here, ever. The session is found via `CLAUDE_PID` and its environment read
+# from the OS (`kb_setup.launch.session_path`); when that cannot be read the check
+# is UNKNOWN, not a guess. `--path "$PATH"` from a shell overrides it explicitly.
+#
+# DO NOT "simplify" this to mise's own `{{ get_env(name='PATH') }}` in a task `env`
+# block. It is documented as returning "the original process environment" and it
+# does — but it is bound to PRISTINE_ENV, which reverses __MISE_DIFF and REMOVES
+# every path mise added. Under an activated shell that is precisely the install
+# dirs this check hunts, so it launders the drift away. Measured 2026-07-27 with a
+# caller PATH carrying both a sentinel and a stale install dir:
+#
+#   activated shell : entries 5, installs 0, sentinel present   <- laundered
+#   env -i          : entries 5, installs 1, sentinel present   <- intact
+#
+# The published proof of `get_env` used `env -i`, where there is no __MISE_DIFF to
+# reverse and nothing is stripped. The CONDITION was the whole finding: correct
+# where it was measured, wrong here. Same defect class as `clean_path` in this
+# position — a check that cannot fail.
 #
 # Two of the five checks print `?`, not `✔`: which skills a session can see and
 # which permission mode it is in are facts only the session holds, and asserting

@@ -125,6 +125,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -134,7 +135,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
 #: The mise layout whose per-version `bin` directories shadow the shims. A path
 #: entry containing this segment is a pinned-version escape hatch, not something
@@ -144,6 +145,13 @@ _INSTALLS_SEGMENT = "/mise/installs/"
 #: The mise shim directory segment. An entry here is version-resolving (mise
 #: picks the version from the config for the cwd), which is what we want.
 _SHIMS_SEGMENT = "/mise/shims"
+
+#: `ps -Eww` prints a process's environment space-separated after its command,
+#: so a value must be ended by the NEXT `NAME=`, never by the next space: this
+#: machine's PATH contains `…/Application Support/JetBrains/Toolbox/scripts`,
+#: which a whitespace split truncates. Only needed on macOS — Linux reads
+#: `/proc/<pid>/environ`, which is NUL-separated and needs no parsing at all.
+_PS_PATH_RE = re.compile(r"(?:^| )PATH=(.*?)(?= [A-Za-z_][A-Za-z0-9_]*=|$)", re.DOTALL)
 
 
 def clean_path(path: str) -> str:
@@ -160,6 +168,120 @@ def clean_path(path: str) -> str:
     """
     kept = [p for p in path.split(os.pathsep) if p and _INSTALLS_SEGMENT not in p]
     return os.pathsep.join(kept)
+
+
+def _env_path_of(pid: str) -> str | None:
+    """The ``PATH`` of an arbitrary process, read from the OS, or None.
+
+    Linux exposes ``/proc/<pid>/environ`` NUL-separated, so the read is exact.
+    macOS has no ``/proc``; ``ps -Eww`` prints the environment space-separated
+    after the command, which cannot be split on whitespace — this machine's
+    ``PATH`` contains ``…/Library/Application Support/JetBrains/Toolbox/scripts``
+    and a naive split truncates it there. Hence the lookahead for the next
+    ``NAME=``: it ends the value at the following variable, not at a space.
+
+    Control arm for that parser (2026-07-27): run against a process whose PATH is
+    already known — our own — it reproduces ``os.environ["PATH"]`` byte for byte,
+    space-bearing entry included. See `tests/test_launch.py`.
+
+    Returns None rather than guessing when the environment cannot be read, which
+    genuinely happens: in the same measurement an intermediate ``/bin/zsh``
+    yielded 1,289 bytes with no ``PATH=`` in them while its ``claude`` parent
+    yielded 26,863 with one. `session_path` turns that None into UNKNOWN.
+    """
+    procfs = Path("/proc") / pid / "environ"
+    if procfs.is_file():
+        try:
+            entries = procfs.read_bytes().split(b"\0")
+        except OSError:
+            return None
+        for entry in entries:
+            if entry.startswith(b"PATH="):
+                return entry[len(b"PATH=") :].decode("utf-8", "replace")
+        return None
+    try:
+        out = subprocess.run(
+            ["ps", "-Eww", "-o", "command=", "-p", pid],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    if out.returncode != 0:
+        return None
+    match = _PS_PATH_RE.search(out.stdout)
+    return match.group(1) if match else None
+
+
+def session_path(
+    env: Mapping[str, str],
+    *,
+    read_env_path: Callable[[str], str | None] | None = None,
+) -> str | None:
+    """The ``PATH`` of the Claude Code SESSION, or None if it cannot be read.
+
+    `doctor` asks what the *session* has. ``os.environ["PATH"]`` does not answer
+    that whenever mise sat between the two, and under the task that invokes the
+    doctor it always does — twice over: ``mise run`` injects every install dir
+    into a task's environment, and ``uv`` then resolves to ``…/mise/shims/uv``,
+    a shim that re-enters mise and prepends them again (mechanism 3 in the module
+    docstring). Judging our own PATH made the graphify check unable to report
+    green under `mise run cc-doctor` — a probe with one face, in the module that
+    argues hardest against them.
+
+    From inside that task the session's PATH is NOT recoverable from the
+    environment. Measured 2026-07-27, and each dead end is recorded because each
+    looks plausible until probed:
+
+    * ``__MISE_ORIG_PATH`` is frozen at ``mise activate``, not re-stamped per
+      invocation. A sentinel directory and a fake install dir placed on the
+      inbound PATH both failed to appear in it. Judging it would have hidden
+      exactly the post-activation drift (#40, ``MISE_ENV_CACHE`` freezing a
+      stale entry) that this check exists to find — a check that cannot fail,
+      which is strictly worse than the one that could not pass.
+    * ``__MISE_SHIM`` is unset under ``mise run``/``mise exec``, so it does not
+      even mark the case the task hits.
+    * ``__MISE_DIFF`` does change per invocation, but it carries the user's
+      resolved secrets in cleartext (gzip+base64+msgpack, and mise's redaction
+      is a stdout filter that never touches it). Not something to parse, and
+      not something to log.
+    * ``{{ get_env(name='PATH') }}`` in a task ``env`` block is mise's own
+      documented recovery of "the original process environment", and it is the
+      obvious thing to reach for — but it is bound to ``PRISTINE_ENV``, which
+      reverses ``__MISE_DIFF`` and REMOVES every path mise added. Under an
+      activated shell those are exactly the install dirs this check hunts, so it
+      launders the drift. Measured from one caller PATH carrying a sentinel and
+      a stale install dir: activated shell → 5 entries / **0** installs /
+      sentinel; ``env -i`` → 5 entries / **1** install / sentinel. Its published
+      proof used ``env -i``, where there is no diff to reverse. The condition was
+      the whole finding — correct where measured, wrong here.
+
+    So the session is identified rather than reconstructed. Claude Code exports
+    **``CLAUDE_PID``**, its own process id, and being an ordinary variable it
+    survives both mise layers untouched (verified: ``mise exec`` and the ``uv``
+    shim both pass it through). Reading that process's environment gave 29
+    entries with 0 install dirs and ``graphify`` on the shims, against the 192
+    and 154 this process holds.
+
+    Note what is NOT happening here: no cleaning. `clean_path` strips install
+    dirs from whatever it is handed and would launder real drift, which is why
+    `doctor` must never use it. This selects *which* PATH to judge and then
+    judges it raw — a session that genuinely has a shadowing install dir still
+    fails.
+
+    None means "could not ask", never "asked and fine": outside a Claude Code
+    session there is no ``CLAUDE_PID``, and even with one the environment is not
+    always readable. `doctor` reports that as UNKNOWN.
+    """
+    # Resolved at call time, not bound as a default, so a test can substitute the
+    # OS read without the module-level name being frozen into the signature.
+    reader = _env_path_of if read_env_path is None else read_env_path
+    pid = env.get("CLAUDE_PID")
+    if not pid or not pid.isdigit():
+        return None
+    return reader(pid)
 
 
 def pinned_version(repo_root: Path, tool: str = "pipx:graphifyy") -> str | None:
@@ -485,7 +607,7 @@ class Check:
     detail: str
 
 
-def doctor(repo_root: Path, sibling: Path, *, path: str, probes: Probes) -> list[Check]:
+def doctor(repo_root: Path, sibling: Path, *, path: str | None, probes: Probes) -> list[Check]:
     """Verify a LIVE session's environment. Reports; never repairs.
 
     Deliberately different from :func:`preflight` in one way that is the whole
@@ -495,16 +617,37 @@ def doctor(repo_root: Path, sibling: Path, *, path: str, probes: Probes) -> list
     here would make it a check that cannot fail — it would launder exactly the
     drift it exists to find (#40 was found by hand for want of this).
 
-    The two checks a python process genuinely cannot make are reported UNKNOWN
-    with the reason, rather than asserted: which skills a Claude Code session can
-    see, and which permission mode it is in, are facts only the session holds.
-    Claiming them from out here would be a probe with one face.
+    Raw, but of the right PATH: ``path`` must be the SESSION's, which is not
+    this process's whenever mise sat in the launch chain — and under the task
+    that invokes the doctor it always does. Callers get it from
+    :func:`session_path`; passing ``os.environ["PATH"]`` straight in made this
+    check unable to report green under its own mise task.
+
+    ``path`` of None means the session's PATH could not be READ, which is not
+    the same as a session with no PATH and must never be rendered as either a
+    pass or a failure. It joins the two checks a python process genuinely cannot
+    make — which skills a Claude Code session can see, and which permission mode
+    it is in — as UNKNOWN with the reason. Claiming any of the three from out
+    here would be a probe with one face.
     """
     checks: list[Check] = []
 
     pin = pinned_version(repo_root)
-    resolved = probes.which("graphify", path)
-    if resolved is None:
+    resolved = None if path is None else probes.which("graphify", path)
+    if path is None:
+        checks.append(
+            Check(
+                "graphify",
+                UNKNOWN,
+                "the session's PATH could not be read, so this was NOT checked — "
+                "not that it is fine. `CLAUDE_PID` names the session process and "
+                "its environment is the only honest source: this process's own "
+                "PATH is mise's, carrying every install dir mise injects for a "
+                'task and a shim re-prepends. Pass `--path "$PATH"` from the '
+                "session's shell to check it explicitly.",
+            )
+        )
+    elif resolved is None:
         checks.append(Check("graphify", FAIL, "`graphify` does not resolve on PATH"))
     elif _SHIMS_SEGMENT not in resolved:
         found = probes.version_of(resolved)
@@ -587,14 +730,26 @@ def doctor(repo_root: Path, sibling: Path, *, path: str, probes: Probes) -> list
 
 
 def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
-    """`kb-setup cc-doctor --sibling <path> [--root <path>]`. Non-zero on any FAIL."""
+    """`kb-setup cc-doctor --sibling <path> [--root <path>] [--path <PATH>]`.
+
+    ``--path`` exists because the caller's shell can answer this for free: it
+    expands ``$PATH`` before mise or a shim touches anything, so
+    ``--path "$PATH"`` from the session's own shell is exact and needs no
+    process introspection. Without it the session is found via ``CLAUDE_PID``
+    (see :func:`session_path`), and if that cannot be read the graphify check
+    reports UNKNOWN rather than judging this process's PATH. Non-zero on any
+    FAIL; UNKNOWN never fails the run.
+    """
     sibling: Path | None = None
+    explicit_path: str | None = None
     args = list(argv)
     i = 0
     while i < len(args):
-        if args[i] in {"--sibling", "--root"} and i + 1 < len(args):
+        if args[i] in {"--sibling", "--root", "--path"} and i + 1 < len(args):
             if args[i] == "--sibling":
                 sibling = Path(args[i + 1])
+            elif args[i] == "--path":
+                explicit_path = args[i + 1]
             else:
                 repo_root = Path(args[i + 1])
             i += 2
@@ -608,7 +763,11 @@ def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
     results = doctor(
         repo_root.resolve(),
         sibling,
-        path=os.environ.get("PATH", ""),
+        # NOT os.environ["PATH"] — see `session_path`. Under `mise run` this
+        # process holds mise's PATH (install dirs injected for the task, then
+        # re-prepended by the `uv` shim), which describes our launcher and not
+        # the session. None here means "could not read it", reported UNKNOWN.
+        path=explicit_path if explicit_path is not None else session_path(os.environ),
         probes=Probes(which=_which, version_of=_version_of),
     )
     mark = {OK: "✔", FAIL: "✗", UNKNOWN: "?"}

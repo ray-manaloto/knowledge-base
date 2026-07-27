@@ -16,6 +16,14 @@ exclude = List(
   "graphify-out/**",
   "sources/**",
   "raw/**",
+  // Promoted agent reports, kept VERBATIM (`agent-report-persistence.md`).
+  // rumdl and the whitespace builtins want to rewrite them — trailing `.` off a
+  // heading, an EOF newline — and every such edit alters the record the rule
+  // exists to preserve. They are archived research, not authored docs, which is
+  // the same category `sources/**` above is excluded for and the same carve-out
+  // `.agnix.toml` already makes. Not a suppressed finding: nothing here is a
+  // defect in this repo's own source.
+  "docs/research/**",
   "**/.venv/**",
   "**/__pycache__/**",
   "**/*.lock",

@@ -128,3 +128,68 @@ def test_daily_does_not_flag_an_applicable_tool_as_not_checked(
     assert rc == 0
     assert "graphify 0.9.25 → 0.9.26" in out
     assert "not checked on this host" not in out
+
+
+# ------------------------------------------- check: "not checked" is not a pass ----
+#
+# `check` is the SessionStart hook's mode, and its contract is "silent when
+# clean". That makes silence load-bearing: a tool that APPLIES here but had no
+# check succeed must speak, or a broken probe disables it permanently while every
+# session looks green. Same reasoning as the missing-config branch, one level down.
+
+
+def _self_managed_repo(tmp_path: Path, *, pattern: str = r"^v?(\d+\.\d+\.\d+)") -> Path:
+    (tmp_path / "mise.toml").write_text("[tools]\n", encoding="utf-8")
+    (tmp_path / "currency.toml").write_text(
+        "[tool.mise]\n"
+        'binary = "mise"\n'
+        'expected = "2026.7.15"\n'
+        # TOML *literal* string: a basic "..." string would reject `\d` as an
+        # unescaped backslash, which is a trap for every regex written in TOML.
+        f"version_pattern = '{pattern}'\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_check_is_silent_when_the_self_managed_tool_agrees(tmp_path, monkeypatch, capsys) -> None:
+    """CONTROL ARM for the two tests below: the clean path must stay quiet."""
+    root = _self_managed_repo(tmp_path)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "2026.7.15")
+    assert run.check(root) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_check_announces_a_tool_it_could_not_read(tmp_path, monkeypatch, capsys) -> None:
+    """THE regression: before this, an all-BLIND tool printed nothing at all.
+
+    A stale `version_pattern` would have silently retired the mise check while
+    the hook kept reporting clean every session.
+    """
+    root = _self_managed_repo(tmp_path)
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "")
+    assert run.check(root) == 0  # a signal, never a gate
+    out = capsys.readouterr().out
+    assert "NOT CHECKED" in out
+    assert "not a pass" in out
+    assert "mise" in out
+
+
+def test_check_stays_quiet_about_a_tool_declared_for_another_platform(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """CONTROL ARM: not-applicable is not the same as not-checked.
+
+    A host-only tool on a foreign platform is also all-BLIND, but nagging about
+    it every session is exactly the noise the quiet mode exists to avoid — so the
+    announcement is gated on `applies_here()`, not on `verified` alone.
+    """
+    (tmp_path / "mise.toml").write_text("[tools]\n", encoding="utf-8")
+    (tmp_path / "currency.toml").write_text(
+        '[tool.mise]\nbinary = "mise"\nexpected = "2026.7.15"\nos = ["nosuchos"]\n',
+        encoding="utf-8",
+    )
+    assert run.check(tmp_path) == 0
+    assert capsys.readouterr().out == ""
