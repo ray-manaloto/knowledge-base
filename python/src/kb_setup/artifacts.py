@@ -12,7 +12,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from kb_setup.graphify_env import clean_env, ensure_runtime_deps
+from kb_setup.graphify_env import clean_env, ensure_runtime_deps, graphify_exe
 
 # svg does a full matplotlib spring_layout: O(n^2)-ish (useless hairball at scale)
 # AND it feeds node labels through matplotlib mathtext, so any label containing a
@@ -22,18 +22,20 @@ from kb_setup.graphify_env import clean_env, ensure_runtime_deps
 # with a `$`-bearing label crashed `graphify export svg` (rc=1).
 _SVG_NODE_LIMIT = 5000
 
-# name -> graphify command. All read graph.json; each writes its own file(s).
+# name -> graphify SUBCOMMAND argv (the binary is prepended at run time by
+# `graphify_exe`, so no entry can hard-code a PATH-resolved `graphify` — see #40).
+# All read graph.json; each writes its own file(s).
 # neo4j/falkordb both emit cypher.txt (OpenCypher, usable by either) — one entry.
 # svg needs scipy (ensured below) and is slow at scale (full spring_layout).
 _ARTIFACTS: list[tuple[str, list[str], str]] = [
-    ("report", ["graphify", "cluster-only", ".", "--no-label"], "GRAPH_REPORT.md + graph.html"),
-    ("tree", ["graphify", "tree"], "GRAPH_TREE.html"),
-    ("callflow", ["graphify", "export", "callflow-html"], "*-callflow.html"),
-    ("graphml", ["graphify", "export", "graphml"], "graph.graphml (Gephi/yEd)"),
-    ("cypher", ["graphify", "export", "neo4j"], "cypher.txt (Neo4j/FalkorDB)"),
-    ("wiki", ["graphify", "export", "wiki"], "wiki/ (agent-crawlable)"),
-    ("obsidian", ["graphify", "export", "obsidian"], "obsidian/ (one note per node)"),
-    ("svg", ["graphify", "export", "svg"], "graph.svg (slow at scale; needs scipy)"),
+    ("report", ["cluster-only", ".", "--no-label"], "GRAPH_REPORT.md + graph.html"),
+    ("tree", ["tree"], "GRAPH_TREE.html"),
+    ("callflow", ["export", "callflow-html"], "*-callflow.html"),
+    ("graphml", ["export", "graphml"], "graph.graphml (Gephi/yEd)"),
+    ("cypher", ["export", "neo4j"], "cypher.txt (Neo4j/FalkorDB)"),
+    ("wiki", ["export", "wiki"], "wiki/ (agent-crawlable)"),
+    ("obsidian", ["export", "obsidian"], "obsidian/ (one note per node)"),
+    ("svg", ["export", "svg"], "graph.svg (slow at scale; needs scipy)"),
 ]
 
 
@@ -69,11 +71,12 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
             )
 
     print(f"[kb-artifacts] generating {len(selected)} artifact(s)")
+    exe = graphify_exe(repo_root)
     failures: list[str] = []
-    for name, cmd, desc in selected:
+    for name, args, desc in selected:
         print(f"  → {name}: {desc}")
         # clean_env: no non-Claude backend key reaches graphify (Gemini-free).
-        rc = subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+        rc = subprocess.run([exe, *args], cwd=repo_root, env=clean_env(), check=False).returncode
         if rc != 0:
             print(f"    FAILED ({name}, rc={rc})")
             failures.append(name)

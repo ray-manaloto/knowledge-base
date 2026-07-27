@@ -94,7 +94,12 @@ def test_other_arguments_pass_through_untouched(
     """The wrapper adds a corpus; it is not a re-implementation of the CLI."""
     _, argv = _run(monkeypatch, _repo(tmp_path), ["q", "--budget", "8000", "--dfs"])
     assert argv is not None
-    assert argv[:2] == ["graphify", "query"]
+    # argv[0] is a RESOLVED path, not the bare name: `graphify_exe` asks mise
+    # rather than trusting PATH order (#40), so asserting the literal "graphify"
+    # here would pin the very behaviour that was removed. The binary's identity
+    # is still checked — by name, not by how it was found.
+    assert Path(argv[0]).name == "graphify"
+    assert argv[1] == "query"
     assert argv[2:6] == ["q", "--budget", "8000", "--dfs"]
 
 

@@ -18,13 +18,59 @@ THE TWO WAYS THE ENVIRONMENT LIES, both measured 2026-07-27:
    fix cannot be "strip the previous version"; it has to be "strip every
    install-dir entry that a shim already covers".
 
-2. **tmux hands a NEW session the SERVER's environment, not the caller's.**
-   ``update-environment`` does not include ``PATH``, so a session created
-   through a server started hours ago inherits that server's ``PATH`` — even
-   when launched from a pristine shell. Measured: a fresh login shell resolved
-   ``graphify`` to 0.9.27 via the shims while a new session on the running
-   server got 0.9.25. This is why the session is created with an explicit
-   ``tmux new-session -e PATH=…`` rather than trusting inheritance.
+2. **tmux hands a new pane the CLIENT's ``PATH``** — which is why this module
+   cleans its own environment before spawning tmux, and why it does NOT try to
+   inject ``PATH`` through tmux.
+
+   The earlier version of this note claimed tmux hands a new session the
+   *server's* environment, and that ``tmux new-session -e PATH=…`` was the fix
+   for it. Both halves were wrong, and the ``-e`` was doing nothing at all
+   (#40). Three-way sentinel probe, 2026-07-27::
+
+       env PATH=/SENTINEL_CLIENT/bin:/usr/bin:/bin \
+         tmux new-session -d -s p -e "PATH=/SENTINEL_INJECTED/bin:/usr/bin:/bin" \
+         /bin/sh -c 'printf "%s" "$PATH" > arm3.txt'
+       # arm3.txt -> /SENTINEL_CLIENT/bin:/usr/bin:/bin
+
+   The pane got the CLIENT's ``PATH``: not the injected one, and not the
+   server's. Two control arms pin the mechanism down:
+
+   * ``-e FOOBAR=hello_from_e`` arrived intact in the same pane, so ``-e`` is
+     not broken in general — ``PATH`` specifically is overridden. It *is*
+     stored in the session environment (``tmux show-environment`` shows the
+     clean value while the pane process holds a dirty one), it is simply not
+     what the pane's process gets.
+   * the probe ran ``/bin/sh -c``, which sources no profile, so the login
+     shell's ``mise activate`` is not the re-adder either. Running the same
+     probe through ``zsh -lic`` produced an identical result.
+
+   So the load-bearing step is :func:`cc_main` spawning tmux with
+   ``env={**os.environ, "PATH": cleaned}``. That is inherited by the pane and
+   is the only lever that works from here. Nothing on the tmux side —
+   ``-e``, ``set-environment -g``, ``default-command`` — can beat the client's
+   ``PATH``, so none of them is worth adding.
+
+   **The CONDITION this holds under**, established by adversarial verification
+   and worth carrying so the fact stays falsifiable: tmux overrides ``PATH``
+   only when the creating client *has* one. Given a client started with
+   ``env -i`` (no ``PATH`` at all), ``-e PATH=`` does reach the pane. The
+   override is therefore not "``-e PATH=`` is broken" — it is *outranked*. It
+   is unconditional **here** precisely because :func:`cc_main` always spawns
+   tmux with a ``PATH`` in its environment. Note also that ``PATH`` is special:
+   an arbitrary variable from the client (``FOO=bar``) does NOT leak into the
+   pane, so this is not "tmux passes the client's whole environment".
+
+   **What neither version of this module fixes:** ``new-session -A`` on an
+   ALREADY-EXISTING session attaches instead of spawning, and
+   ``update-environment`` does not list ``PATH`` — so an old session keeps the
+   ``PATH`` it was born with, whatever this function does. That is the most
+   likely reason a long-lived server drifts, and it is what ``cc-fresh``
+   (kill the server first) exists to resolve.
+
+   The durable protection is NOT this PATH hygiene at all: it is
+   :func:`kb_setup.graphify_env.graphify_exe`, which resolves the binary
+   through ``mise which`` at every call site that matters, so corpus
+   correctness no longer depends on ``PATH`` order in the first place.
 
 WHY IT VALIDATES INSTEAD OF JUST FIXING. Repairing ``PATH`` silently would make
 this module the next thing nobody checks. It refuses to launch when the
@@ -246,16 +292,21 @@ def _version_of(binary: str) -> str | None:
     return parts[-1] if parts else None
 
 
-def launch_argv(
-    repo_root: Path, sibling: Path, *, path: str, session: str, in_tmux: bool
-) -> list[str]:
+def launch_argv(repo_root: Path, sibling: Path, *, session: str, in_tmux: bool) -> list[str]:
     """The exact command to exec: claude directly, or a tmux session wrapping it.
 
-    ``-e PATH=…`` is the load-bearing part. tmux gives a new session the SERVER's
-    environment rather than the caller's, so a verified PATH would be discarded
-    on the way in — the session would launch with whatever the server was started
-    with hours ago. Passing it explicitly is what makes the preflight mean
-    something inside the session, not just outside it.
+    There is deliberately no ``PATH`` parameter here, and no ``tmux new-session
+    -e PATH=…``. That injection was measured to do nothing — tmux gives the pane
+    the CLIENT's ``PATH`` and ignores the session-environment value for it (#40;
+    the sentinel probe and its two control arms are in the module docstring).
+    Delivering a clean ``PATH`` is therefore entirely the caller's job, done by
+    :func:`cc_main` spawning this argv with ``env={**os.environ, "PATH":
+    cleaned}``. Taking a ``path`` argument we could not honour would be a
+    parameter that reads as a guarantee and is not one.
+
+    Removing the ``-e`` rather than replacing it with another tmux-side trick is
+    deliberate: every alternative loses to the client's ``PATH`` the same way,
+    so the honest change subtracts a mechanism instead of adding one.
 
     Already inside tmux, we exec claude directly: nesting a server inside a pane
     gives split-pane teammates nowhere useful to go.
@@ -268,18 +319,151 @@ def launch_argv(
     claude = ["claude", "--permission-mode", "auto", "--add-dir", str(sibling)]
     if in_tmux:
         return claude
-    return [
-        "tmux",
-        "new-session",
-        "-A",
-        "-s",
-        session,
-        "-c",
-        str(repo_root),
-        "-e",
-        f"PATH={path}",
-        *claude,
-    ]
+    return ["tmux", "new-session", "-A", "-s", session, "-c", str(repo_root), *claude]
+
+
+#: A doctor verdict. Three states, kept distinct for the reason the currency
+#: engine keeps them distinct: collapsing "could not check" into "fine" is how a
+#: broken environment reports green. UNKNOWN never passes as OK and never fails
+#: the run — it says the question was not asked here.
+OK, FAIL, UNKNOWN = "OK", "FAIL", "UNKNOWN"
+
+
+@dataclass(frozen=True)
+class Check:
+    """One doctor result: what was asked, what came back, and why it matters."""
+
+    name: str
+    status: str
+    detail: str
+
+
+def doctor(repo_root: Path, sibling: Path, *, path: str, probes: Probes) -> list[Check]:
+    """Verify a LIVE session's environment. Reports; never repairs.
+
+    Deliberately different from :func:`preflight` in one way that is the whole
+    point: preflight cleans ``path`` before judging it, because it is about to
+    hand a cleaned PATH to a child. The doctor judges the **raw** PATH, because
+    it is asking what the session it runs inside actually has. Cleaning first
+    here would make it a check that cannot fail — it would launder exactly the
+    drift it exists to find (#40 was found by hand for want of this).
+
+    The two checks a python process genuinely cannot make are reported UNKNOWN
+    with the reason, rather than asserted: which skills a Claude Code session can
+    see, and which permission mode it is in, are facts only the session holds.
+    Claiming them from out here would be a probe with one face.
+    """
+    checks: list[Check] = []
+
+    pin = pinned_version(repo_root)
+    resolved = probes.which("graphify", path)
+    if resolved is None:
+        checks.append(Check("graphify", FAIL, "`graphify` does not resolve on PATH"))
+    elif _SHIMS_SEGMENT not in resolved:
+        found = probes.version_of(resolved)
+        matches = "matches" if found == pin else f"is {found}, pin is {pin}"
+        checks.append(
+            Check(
+                "graphify",
+                FAIL,
+                f"resolves to {resolved} — an install dir shadowing the shims. Its "
+                f"version {matches}, but the entry is frozen and will not follow the "
+                f"next bump.",
+            )
+        )
+    else:
+        found = probes.version_of(resolved)
+        if pin is None:
+            checks.append(Check("graphify", UNKNOWN, f"{repo_root.name} pins no graphify version"))
+        elif found != pin:
+            checks.append(Check("graphify", FAIL, f"reports {found} but the pin is {pin}"))
+        else:
+            checks.append(Check("graphify", OK, f"{found} via the shims ({resolved})"))
+
+    checks.append(
+        Check("sibling", OK, f"{sibling} exists")
+        if sibling.is_dir()
+        else Check("sibling", FAIL, f"sibling repo not found at {sibling} — --add-dir would fail")
+    )
+
+    settings = repo_root / ".claude" / "settings.json"
+    if not settings.is_file():
+        checks.append(Check("hook-paths", UNKNOWN, f"no {settings}"))
+    else:
+        # An absolute home path in a hook is an outage on any other machine, and
+        # one already happened. Substring, not a parse: it must catch the path
+        # wherever it appears, including inside a command string.
+        bad = [
+            n
+            for n, line in enumerate(settings.read_text(encoding="utf-8").splitlines(), 1)
+            if "/Users/" in line
+        ]
+        checks.append(
+            Check("hook-paths", OK, "no absolute /Users/ path in .claude/settings.json")
+            if not bad
+            else Check("hook-paths", FAIL, f"absolute /Users/ path on line(s) {bad}")
+        )
+
+    checks.append(
+        Check(
+            "skills",
+            UNKNOWN,
+            "not answerable from here — in-session, confirm BOTH a knowledge-base-only "
+            "skill (kb-curator) and a dotfiles-only one (pr-workflow) are listed. One "
+            "side alone passes while --add-dir is silently broken.",
+        )
+    )
+    checks.append(
+        Check(
+            "permission-mode",
+            UNKNOWN,
+            "not answerable from here — in-session, confirm auto mode came from the "
+            "--permission-mode flag. A projectSettings defaultMode is ignored as "
+            "repo-controllable, so settings.json cannot grant it.",
+        )
+    )
+    return checks
+
+
+def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
+    """`kb-setup cc-doctor --sibling <path> [--root <path>]`. Non-zero on any FAIL."""
+    sibling: Path | None = None
+    args = list(argv)
+    i = 0
+    while i < len(args):
+        if args[i] in {"--sibling", "--root"} and i + 1 < len(args):
+            if args[i] == "--sibling":
+                sibling = Path(args[i + 1])
+            else:
+                repo_root = Path(args[i + 1])
+            i += 2
+            continue
+        print(f"[cc-doctor] unknown argument {args[i]!r}", file=sys.stderr)
+        return 2
+    if sibling is None:
+        print("[cc-doctor] --sibling <path> is required", file=sys.stderr)
+        return 2
+
+    results = doctor(
+        repo_root.resolve(),
+        sibling,
+        path=os.environ.get("PATH", ""),
+        probes=Probes(which=_which, version_of=_version_of),
+    )
+    mark = {OK: "✔", FAIL: "✗", UNKNOWN: "?"}
+    for c in results:
+        print(f"  {mark[c.status]} {c.name}: {c.detail}")
+    failed = [c for c in results if c.status == FAIL]
+    if failed:
+        print(
+            f"\n[cc-doctor] {len(failed)} FAILED. `mise run cc-fresh` relaunches on a "
+            f"clean tmux server; that is the usual fix for a PATH problem.",
+            file=sys.stderr,
+        )
+        return 1
+    unknown = sum(c.status == UNKNOWN for c in results)
+    print(f"\n[cc-doctor] no failures ({unknown} not verifiable from here — check them in-session)")
+    return 0
 
 
 def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
@@ -287,6 +471,8 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
     args = list(argv)
     sibling: Path | None = None
     session: str | None = None
+    fresh = "--fresh" in args
+    args = [a for a in args if a != "--fresh"]
     i = 0
     while i < len(args):
         if args[i] in {"--sibling", "--session", "--root"} and i + 1 < len(args):
@@ -309,6 +495,24 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
     session = session or repo_root.name
 
     in_tmux = bool(os.environ.get("TMUX"))
+    if fresh:
+        # A server outlives the pin that was current when it started, and a pane
+        # inherits the PATH of whatever client created it — so a long-lived server
+        # is the usual reason a session's environment disagrees with the repo.
+        # Killing it is the remedy the preflight's own failure message names.
+        if in_tmux:
+            print(
+                "[cc] --fresh kills the tmux server, and you are inside it — that "
+                "would kill this process before it could relaunch. Run it from a "
+                "plain terminal instead.",
+                file=sys.stderr,
+            )
+            return 2
+        # No server running is the desired state, not an error, so the status is
+        # ignored rather than checked.
+        subprocess.run(["tmux", "kill-server"], check=False, capture_output=True, timeout=60)
+        print("[cc] --fresh: tmux server killed; the new session starts from this shell's env")
+
     checked = preflight(
         repo_root,
         sibling,
@@ -327,9 +531,7 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         )
         return 1
 
-    argv_out = launch_argv(
-        repo_root, sibling.resolve(), path=checked.path, session=session, in_tmux=in_tmux
-    )
+    argv_out = launch_argv(repo_root, sibling.resolve(), session=session, in_tmux=in_tmux)
     print(f"[cc] preflight OK — rooted in {repo_root.name}, --add-dir {sibling.name}")
     print(f"[cc] {teammate_note(repo_root, in_tmux=in_tmux)}")
     # A CHILD, not `os.execvp`. Two reasons, and the second is the one that bit:

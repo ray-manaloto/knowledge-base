@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
+import time
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from kb_setup import launch
 
 _SHIM = "/home/u/.local/share/mise/shims/graphify"
@@ -189,27 +193,83 @@ def test_an_unpinned_repo_skips_the_version_check(tmp_path: Path) -> None:
 # --- launch_argv --------------------------------------------------------------
 
 
-def test_the_tmux_form_injects_the_verified_path(tmp_path: Path) -> None:
-    """Load-bearing: tmux hands a new session the SERVER's env, not the caller's.
+def test_the_tmux_form_does_not_try_to_inject_path(tmp_path: Path) -> None:
+    """The `-e PATH=` injection is GONE, because it never did anything (#40).
 
-    Without `-e PATH=...` the verified PATH is discarded on the way in and the
-    session inherits whatever the server started with — which is the exact
-    failure the preflight exists to catch, reintroduced one layer down.
+    This is the unit half of that fix. It is an absence assertion on purpose: the
+    behaviour it guards (`test_a_spawned_pane_inherits_the_callers_path` below)
+    passes whether or not `-e` is present — the client's PATH wins either way —
+    so only a structural check can stop the dead mechanism being re-added and
+    re-believed.
     """
-    argv = launch.launch_argv(
-        tmp_path, tmp_path / "sib", path="/clean/bin", session="kb", in_tmux=False
-    )
+    argv = launch.launch_argv(tmp_path, tmp_path / "sib", session="kb", in_tmux=False)
     assert argv[0] == "tmux"
-    assert "-e" in argv
-    assert "PATH=/clean/bin" in argv
+    assert "-e" not in argv
+    assert not any(a.startswith("PATH=") for a in argv)
     assert argv[-5:] == ["claude", "--permission-mode", "auto", "--add-dir", str(tmp_path / "sib")]
 
 
-def test_inside_tmux_it_execs_claude_directly(tmp_path: Path) -> None:
-    """CONTROL ARM: no nested server, and therefore no -e to inject."""
-    argv = launch.launch_argv(
-        tmp_path, tmp_path / "sib", path="/clean/bin", session="kb", in_tmux=True
+@pytest.mark.skipif(shutil.which("tmux") is None, reason="needs a real tmux to observe a pane")
+def test_a_spawned_pane_inherits_the_callers_path(tmp_path: Path) -> None:
+    """The EFFECT, observed inside a real spawned session — not in the argv.
+
+    The test this replaces asserted `-e` and `PATH=/clean/bin` appeared in the
+    argv. They did, and the feature still did nothing: tmux discards the
+    session-environment PATH and gives the pane the CLIENT's. That is a
+    right-answer-wrong-reason test, and it shipped inside the module written to
+    prevent exactly this class, so its replacement must observe the environment
+    the pane actually runs with.
+
+    Both arms run here:
+
+    * the caller's PATH REACHES the pane — which is what makes `cc_main`'s
+      `env={**os.environ, "PATH": cleaned}` the real mechanism;
+    * an injected `-e PATH=` LOSES to it — which is why the launcher no longer
+      pretends otherwise.
+
+    Two deliberate deviations from the production argv, both required to observe
+    anything: `-d` (an attaching session needs a tty pytest does not have) and a
+    probe command in place of `claude`. The tmux flags under test are taken from
+    `launch_argv` itself rather than restated, so a change there is not silently
+    unobserved.
+    """
+    prefix = launch.launch_argv(tmp_path, tmp_path / "sib", session="unused", in_tmux=False)
+    prefix = prefix[: prefix.index("claude")]
+
+    def spawn(name: str, extra: list[str]) -> str:
+        out = tmp_path / f"{name}.txt"
+        argv = list(prefix)
+        argv[argv.index("-s") + 1] = name
+        argv[argv.index("-c") + 1] = str(tmp_path)
+        argv.insert(argv.index("new-session") + 1, "-d")
+        argv += [*extra, "/bin/sh", "-c", f'printf "%s" "$PATH" > {out}']
+        subprocess.run(
+            argv,
+            check=True,
+            timeout=60,
+            env={**os.environ, "PATH": f"/SENTINEL_CLIENT/bin{os.pathsep}{os.environ['PATH']}"},
+        )
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline and not out.is_file():
+            time.sleep(0.1)
+        subprocess.run(["tmux", "kill-session", "-t", name], check=False, timeout=30)
+        assert out.is_file(), f"pane never wrote {out}"
+        return out.read_text(encoding="utf-8")
+
+    plain = spawn("kbprobe-plain", [])
+    assert "/SENTINEL_CLIENT/bin" in plain, "the caller's PATH must reach the pane"
+
+    injected = spawn("kbprobe-injected", ["-e", "PATH=/SENTINEL_INJECTED/bin"])
+    assert "/SENTINEL_CLIENT/bin" in injected, "the client's PATH still wins"
+    assert "/SENTINEL_INJECTED/bin" not in injected, (
+        "if this ever fails, tmux changed and `-e PATH=` became viable — "
+        "revisit the launcher docstring before celebrating"
     )
+
+
+def test_inside_tmux_it_execs_claude_directly(tmp_path: Path) -> None:
+    """CONTROL ARM: no nested server, and therefore no tmux flags at all."""
+    argv = launch.launch_argv(tmp_path, tmp_path / "sib", session="kb", in_tmux=True)
     assert argv[0] == "claude"
     assert "tmux" not in argv
     # The flag rides on BOTH paths: Claude Code ignores a project-settings
@@ -238,6 +298,112 @@ def test_a_root_without_mise_toml_refuses(tmp_path: Path) -> None:
     )
     assert not result.ok
     assert any("not a repo root" in p for p in result.problems)
+
+
+# --- doctor: the live-session sweep -------------------------------------------
+
+
+def _doctor(
+    tmp_path: Path,
+    *,
+    probes: launch.Probes | None = None,
+    settings: str | None = None,
+    sibling_exists: bool = True,
+) -> dict[str, launch.Check]:
+    repo = _pinned_repo(tmp_path)
+    sibling = tmp_path / "sibling"
+    if sibling_exists:
+        sibling.mkdir(exist_ok=True)
+    if settings is not None:
+        (repo / ".claude").mkdir(exist_ok=True)
+        (repo / ".claude" / "settings.json").write_text(settings, encoding="utf-8")
+    results = launch.doctor(
+        repo,
+        sibling,
+        path=_DIRTY_PATH,
+        probes=probes if probes is not None else _probes({"graphify": _SHIM}),
+    )
+    return {c.name: c for c in results}
+
+
+def test_the_doctor_judges_the_raw_path_not_a_cleaned_one(tmp_path: Path) -> None:
+    """THE difference from `preflight`, and the reason the doctor exists.
+
+    `preflight` cleans before judging — correctly, because it is about to hand a
+    cleaned PATH to a child. If the doctor did the same it would be a check that
+    cannot fail: it would strip the shadowing install dir and then report that no
+    install dir is shadowing. #40 went unseen for exactly this shape of reason.
+
+    Same `_DIRTY_PATH` as the preflight tests, so the two are directly
+    comparable: preflight passes it, the doctor must not.
+    """
+    passing = _check(tmp_path, probes=_probes({"graphify": _INSTALL}))
+    assert "installs" not in passing.path  # preflight cleaned it away
+
+    got = _doctor(tmp_path, probes=_probes({"graphify": _INSTALL}))
+    assert got["graphify"].status == launch.FAIL
+    assert "shadowing the shims" in got["graphify"].detail
+
+
+def test_a_sound_session_reports_ok(tmp_path: Path) -> None:
+    """CONTROL ARM: the direction that must pass, or every FAIL above is noise."""
+    got = _doctor(tmp_path, settings='{"hooks": {}}')
+    assert got["graphify"].status == launch.OK
+    assert got["sibling"].status == launch.OK
+    assert got["hook-paths"].status == launch.OK
+
+
+def test_a_version_mismatch_on_the_shims_still_fails(tmp_path: Path) -> None:
+    """Resolving correctly is not enough — the version must match the pin."""
+    got = _doctor(tmp_path, probes=_probes({"graphify": _SHIM}, "0.9.25"))
+    assert got["graphify"].status == launch.FAIL
+    assert "0.9.25" in got["graphify"].detail
+
+
+def test_a_missing_sibling_is_reported(tmp_path: Path) -> None:
+    assert _doctor(tmp_path, sibling_exists=False)["sibling"].status == launch.FAIL
+
+
+def test_an_absolute_home_path_in_a_hook_fails_with_its_line(tmp_path: Path) -> None:
+    """The outage this check exists for: a hook nobody else's machine can run."""
+    got = _doctor(tmp_path, settings='{\n  "hooks": "/Users/someone/bin/thing"\n}')
+    assert got["hook-paths"].status == launch.FAIL
+    assert "2" in got["hook-paths"].detail
+
+
+def test_a_missing_settings_file_is_unknown_not_ok(tmp_path: Path) -> None:
+    """CONTROL ARM: absence is "not asked", never "asked and fine"."""
+    assert _doctor(tmp_path)["hook-paths"].status == launch.UNKNOWN
+
+
+def test_the_two_session_only_facts_are_never_claimed(tmp_path: Path) -> None:
+    """A subprocess cannot see a session's skills or permission mode.
+
+    They are reported UNKNOWN with the reason rather than asserted. Claiming
+    either would be the one-faced probe this repo keeps banning — and check 2 in
+    particular passes one-sided while `--add-dir` is silently broken, which is
+    why the detail text names both a KB-only and a dotfiles-only skill.
+    """
+    got = _doctor(tmp_path, settings="{}")
+    assert got["skills"].status == launch.UNKNOWN
+    assert got["permission-mode"].status == launch.UNKNOWN
+    assert "kb-curator" in got["skills"].detail
+    assert "pr-workflow" in got["skills"].detail
+
+
+def test_fresh_refuses_inside_tmux(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`--fresh` kills the server it would be running inside — refuse, don't try.
+
+    Armed the other way by every other cc test: without `--fresh` the TMUX
+    variable is simply the in-tmux launch path, not a refusal.
+    """
+    # Shaped like a real TMUX value (socket,pid,session) but rooted in tmp_path:
+    # only its truthiness is read, and a literal /tmp path trips the temp-file rule.
+    monkeypatch.setenv("TMUX", f"{tmp_path / 'tmux-sock'},1,0")
+    sibling = tmp_path / "sibling"
+    sibling.mkdir()
+    rc = launch.cc_main(_pinned_repo(tmp_path), ["--fresh", "--sibling", str(sibling)])
+    assert rc == 2
 
 
 # --- teammate transport, reported not enforced --------------------------------

@@ -347,3 +347,26 @@ raw = true
 # from, not the repo (measured). Session name: CC_TMUX_SESSION, default the repo.
 # Single-quoted TOML so the inner double quotes need no escaping.
 run = 'uv run kb-setup cc --root "$MISE_PROJECT_ROOT" --sibling "$MISE_PROJECT_ROOT/../dotfiles"'
+
+[tasks.cc-doctor]
+description = "Verify the CURRENT session's environment (graphify resolution, sibling, hook paths)"
+# The standing version of the by-hand Phase A sweep. It judges the RAW PATH, not a
+# cleaned one — cleaning first would launder the very drift it looks for, which is
+# how #40 stayed invisible to `preflight` (that one cleans first, correctly, because
+# it is about to hand a cleaned PATH to a child; this one reports reality).
+#
+# Two of the five checks print `?`, not `✔`: which skills a session can see and
+# which permission mode it is in are facts only the session holds, and asserting
+# them from a subprocess would be a probe with one face. Non-zero on any FAIL;
+# UNKNOWN never fails the run and is never rendered green.
+run = 'uv run kb-setup cc-doctor --root "$MISE_PROJECT_ROOT" --sibling "$MISE_PROJECT_ROOT/../dotfiles"'
+
+[tasks.cc-fresh]
+description = "Kill the stale tmux server, then launch a session whose env is built from scratch"
+# The remedy `cc-doctor` and `preflight` both name. A tmux server outlives the pin
+# that was current when it started, and a pane inherits the PATH of the client that
+# created it — so a long-lived server is the usual reason a session's environment
+# disagrees with this repo. RUN IT FROM A PLAIN TERMINAL: it refuses inside tmux,
+# where killing the server would kill the process before it could relaunch.
+raw = true
+run = 'uv run kb-setup cc --fresh --root "$MISE_PROJECT_ROOT" --sibling "$MISE_PROJECT_ROOT/../dotfiles"'

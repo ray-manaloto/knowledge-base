@@ -299,6 +299,10 @@ def graphify_canary(
     graph_path = graph if graph is not None else repo_root / "graphify-out" / "graph.json"
     if not graph_path.is_file():
         return skip(f"no graph at {graph_path} — run the build task first")
+    # Bare "graphify" on purpose — a canary must probe the binary this session
+    # actually resolves, not the one the pin names. See `_retrieval` in
+    # eval_cases.py for the full reasoning, and #40 for why every OPERATIONAL
+    # call site went the other way.
     rc, out = run_command(["graphify", "query", question], cwd=repo_root, timeout=timeout)
     if rc != 0:
         return fail(f"graphify query rc={rc}: {out.strip()[:200]}")

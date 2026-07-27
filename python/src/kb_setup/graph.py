@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from kb_setup import manifest as mf
 from kb_setup import prose
-from kb_setup.graphify_env import clean_env, graphify_python
+from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
     from kb_setup.currency.config import ToolSpec
@@ -83,7 +83,7 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     """
     print(f"  $ graphify extract sources/{name} --code-only --force")
     subprocess.run(
-        ["graphify", "extract", f"sources/{name}", "--code-only", "--force"],
+        [graphify_exe(repo_root), "extract", f"sources/{name}", "--code-only", "--force"],
         cwd=repo_root,
         check=False,
         env=clean_env(),
@@ -134,7 +134,10 @@ def build(repo_root: Path) -> None:
     print(f"[kb-build] seeded graph.json from {seed}")
     for name in rest:
         sub = sources / name / "graphify-out" / "graph.json"
-        _run(["graphify", "merge-graphs", str(out), str(sub), "--out", str(out)], repo_root)
+        _run(
+            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
+            repo_root,
+        )
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)
@@ -193,9 +196,13 @@ def _stamp_build(repo_root: Path) -> None:
     indistinguishable from a current one.
 
     The version recorded is the one that ACTUALLY RAN (`graphify --version` on
-    the resolved binary), never the pin: `_run` invokes bare `graphify` through
-    PATH, and a stale install dir ahead of the mise shims is exactly the drift
-    this is meant to expose. Best-effort — a build must not fail over its stamp.
+    the resolved binary), never the pin. Since #40 that means resolving it the
+    SAME way the build did — through `graphify_exe` — because `observed_version`
+    resolves a bare name through PATH, and the build no longer does. Reading the
+    two differently would stamp one binary's version onto another binary's graph:
+    the precise unfalsifiable state this stamp exists to prevent, and one that
+    did not exist while both sides happened to read PATH.
+    Best-effort — a build must not fail over its stamp.
     """
     try:
         from kb_setup.currency import sync
@@ -207,7 +214,15 @@ def _stamp_build(repo_root: Path) -> None:
         # ran, turning an unreadable binary into a false "in sync" — the exact
         # laundering this stamp exists to prevent. An empty version is written
         # as empty, and `check_sync` then reports "built by an unknown version".
-        version = sync.observed_version(spec.binary)
+        # Resolved exactly as the build resolved it (see the docstring).
+        # Unconditional, not guarded on `spec.binary`: `_currency_spec` selects
+        # by `name == _STAMPED_TOOL`, so the spec reaching here is always
+        # graphify's, and the build always ran `graphify_exe`. An earlier draft
+        # guarded on `spec.binary == _STAMPED_TOOL`, which compared a BINARY name
+        # to a TOOL name — unreachable in the normal case and, for a config
+        # setting `binary` to anything else, a silent fall back to the
+        # PATH-resolved reading this exists to eliminate.
+        version = sync.observed_version(graphify_exe(repo_root))
         source_ref = sync.manifest_ref(repo_root, spec)
         path = sync.write_stamp(repo_root, spec, version=version, source_ref=source_ref)
         if version:
@@ -248,7 +263,7 @@ def update(repo_root: Path, name: str) -> None:
     _ensure_clone(m)
 
     # Incremental CODE re-extract (AST — free; MD5-diffs graphify-out/manifest.json).
-    _run(["graphify", "update", f"sources/{name}"], repo_root)
+    _run([graphify_exe(repo_root), "update", f"sources/{name}"], repo_root)
     print(
         f"[kb-update] {name} code updated. NOTE: changed DOCS are not re-extracted "
         f"here — host-agent extraction (a Claude Code session) must re-run on changed "

@@ -377,6 +377,18 @@ def _retrieval(repo_root: Path, graph: Path) -> evals.Retrieve:
     than reimplementing traversal: what is being measured is the retrieval a
     session actually gets, and anything else would measure a different program.
 
+    DELIBERATELY a bare ``"graphify"``, NOT
+    :func:`kb_setup.graphify_env.graphify_exe`. Every operational call site moved
+    to that resolver (#40) so corpus correctness stops depending on PATH order —
+    this one must not follow, and the difference is the point. `graphify_exe`
+    answers "the binary the pin names"; this case asks "the binary a session
+    actually runs". Pinning here would quietly convert an ecological measurement
+    into a hypothetical one, and would mask exactly the drift the eval exists to
+    expose. Falsifiability is preserved instead by :func:`_corpus_stamp`, which
+    records the version that ACTUALLY RAN alongside every number. When the
+    environment is honest the two coincide — and `mise run cc-doctor` is what
+    says whether it is.
+
     PINNED with an explicit ``--graph``, not left to resolve against the process
     cwd (caught in review of PR #30). That was already load-bearing with one
     corpus; with two it is the entire experiment — an unpinned query would

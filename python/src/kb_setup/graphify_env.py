@@ -10,7 +10,11 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+#: One-shot latches for warnings that would otherwise repeat per call.
+_WARNED: set[str] = set()
 
 # Env vars graphify's `detect_backend()` keys off, in its priority order:
 #   gemini -> kimi -> claude -> openai -> deepseek -> azure -> bedrock -> ollama.
@@ -68,6 +72,71 @@ def clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     return env
 
 
+def graphify_exe(repo_root: Path | None = None) -> str:
+    """The graphify binary to invoke — resolved through mise, never by PATH order.
+
+    WHY NOT A BARE ``"graphify"``. PATH ordering inside a live session is not ours
+    to control, and the launcher's cleaning does not necessarily reach it.
+    Measured 2026-07-27 with a three-way sentinel probe (#40): tmux hands a new
+    pane the **client's** PATH and discards ``new-session -e PATH=…`` — the
+    injected value is stored in the session environment (``show-environment``
+    confirms it) but is not what the pane's process gets. Control arms: ``-e
+    FOOBAR=…`` in the same pane arrived intact, so ``-e`` is not broken in
+    general, only overridden for PATH; and the probe's command was ``/bin/sh -c``,
+    which sources no profile, so the login shell is not the re-adder either.
+
+    The consequence is concrete: a frozen ``mise/installs/<tool>/<ver>/bin`` entry
+    can sit ahead of the shims *inside* a session that passed preflight, and
+    :func:`kb_setup.graph.build` stamps the corpus with the **pinned** version
+    regardless of which binary actually ran. A graph built by one version and
+    stamped another is unfalsifiable afterwards — the one failure this repo
+    cannot absorb.
+
+    ``mise which`` answers from mise's config for ``repo_root``, so it follows the
+    pin by construction and is indifferent to where an entry sits on PATH. The
+    ``shutil.which`` fallback keeps a mise-less machine working; it restores the
+    old PATH-ordered behaviour, which is worse but never worse than failing.
+    """
+    root = repo_root or Path.cwd()
+    try:
+        out = subprocess.run(
+            ["mise", "which", "graphify"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+            cwd=root,
+        )
+    except OSError, subprocess.SubprocessError:
+        pass
+    else:
+        # `or ""`: a CompletedProcess carries stdout=None whenever the call was not
+        # capturing, so this must not assume a string. Reached in practice by any
+        # caller that patches subprocess.run for its own reasons.
+        resolved = (out.stdout or "").strip()
+        if resolved and Path(resolved).is_file():
+            return resolved
+    # Not an error — a machine without mise still has a working graphify on PATH
+    # — but it IS a downgrade to the behaviour this function exists to replace,
+    # so it says so. Silence here would make the degradation invisible in a build
+    # log, which is the same "could not check, rendered as fine" collapse the
+    # currency engine refuses to make. Warned once per process: the artifact path
+    # resolves per output and would otherwise print eight times.
+    # A set that is MUTATED rather than a flag that is rebound: rebinding a
+    # module global would need a `global` statement, and silencing the resulting
+    # lint would need an inline suppression, which this repo rejects outright.
+    fallback = shutil.which("graphify")
+    if "fallback" not in _WARNED:
+        _WARNED.add("fallback")
+        print(
+            f"[graphify] WARNING: `mise which graphify` gave no answer; falling back to "
+            f"{fallback or 'the bare name `graphify`'} resolved through PATH. That does "
+            f"NOT follow this repo's pin — run `mise run cc-doctor`.",
+            file=sys.stderr,
+        )
+    return fallback or "graphify"
+
+
 def _imports_graphify(py: Path) -> bool:
     try:
         return (
@@ -102,6 +171,14 @@ def graphify_python(repo_root: Path | None = None) -> str:
             text=True,
             check=True,
             timeout=30,
+            # cwd=root, not the process cwd: `mise where` answers for the config
+            # it finds from the CWD, so without this the function silently
+            # ignored the repo_root it was handed and could return a DIFFERENT
+            # version's interpreter than the caller asked about. Measured: from
+            # the repo it answers 0.9.26, from /tmp it answers 0.9.28. That lands
+            # on corpus-WRITING paths (kb-merge's build_merge, kb-build's doc
+            # replay), so it is not cosmetic.
+            cwd=root,
         )
         base = Path(out.stdout.strip())
         for cand in sorted(base.glob("**/bin/python")):
