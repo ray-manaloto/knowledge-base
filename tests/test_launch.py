@@ -8,6 +8,7 @@ because the previous shell version could not refuse: it launched sessions whose
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -233,3 +234,42 @@ def test_a_root_without_mise_toml_refuses(tmp_path: Path) -> None:
     )
     assert not result.ok
     assert any("not a repo root" in p for p in result.problems)
+
+
+# --- teammate transport, reported not enforced --------------------------------
+
+
+def _settings(tmp_path: Path, teams: str | None) -> Path:
+    d = tmp_path / ".claude"
+    d.mkdir(exist_ok=True)
+    env = {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": teams} if teams is not None else {}
+    (d / "settings.json").write_text(json.dumps({"env": env}), encoding="utf-8")
+    return tmp_path
+
+
+def test_teams_enabled_reports_split_pane(tmp_path: Path) -> None:
+    """The direction the queue design assumes."""
+    note = launch.teammate_note(_settings(tmp_path, "1"), in_tmux=False)
+    assert "enabled" in note
+    assert "split-pane" in note
+
+
+def test_teams_not_declared_says_so(tmp_path: Path) -> None:
+    """CONTROL ARM, and the whole point: it must not look identical to enabled.
+
+    A repo that does not enable agent teams gets NO team at all — the teammates
+    the runbook assumes simply never exist. Silent before; stated now.
+    """
+    assert "DISABLED" in launch.teammate_note(_settings(tmp_path, None), in_tmux=False)
+    assert "DISABLED" in launch.teammate_note(_settings(tmp_path, "0"), in_tmux=True)
+    assert "DISABLED" in launch.teammate_note(tmp_path / "absent", in_tmux=False)
+
+
+def test_a_corrupt_settings_file_reports_disabled_rather_than_raising(
+    tmp_path: Path,
+) -> None:
+    """It is advisory — it must never take the launch down."""
+    d = tmp_path / ".claude"
+    d.mkdir()
+    (d / "settings.json").write_text("{not json", encoding="utf-8")
+    assert "DISABLED" in launch.teammate_note(tmp_path, in_tmux=False)

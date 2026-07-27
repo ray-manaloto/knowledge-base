@@ -40,6 +40,7 @@ its hk config), so there is no new dependency.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -96,6 +97,37 @@ def pinned_version(repo_root: Path, tool: str = "pipx:graphifyy") -> str | None:
         version = spec.get("version")
         return version if isinstance(version, str) else None
     return None
+
+
+def teammate_note(repo_root: Path, *, in_tmux: bool) -> str:
+    """One line describing what teammates will actually be. Never blocks.
+
+    REPORTED rather than enforced, because neither state is wrong — but they are
+    very different, and today they are indistinguishable at a glance. In-process
+    teammates cannot be resumed and cannot spawn background subagents; split-pane
+    ones can. A session that quietly landed in-process looks identical to one
+    that did not, which is how a design assumption becomes an unobserved
+    declaration.
+
+    Reads THIS repo's `.claude/settings.json` rather than the ambient
+    environment: Claude Code applies that env from settings *after* this runs, so
+    `os.environ` would report "off" even where the repo enables it.
+    """
+    settings = repo_root / ".claude" / "settings.json"
+    enabled = False
+    if settings.is_file():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8"))
+        except ValueError:
+            data = {}
+        enabled = str(data.get("env", {}).get("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "")) == "1"
+    if not enabled:
+        return (
+            "teammates: DISABLED — this repo does not set "
+            "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS, so no team is created"
+        )
+    where = "this tmux session" if in_tmux else "a tmux session it creates"
+    return f"teammates: enabled, split-pane via {where}"
 
 
 @dataclass(frozen=True)
@@ -294,6 +326,7 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         repo_root, sibling.resolve(), path=checked.path, session=session, in_tmux=in_tmux
     )
     print(f"[cc] preflight OK — rooted in {repo_root.name}, --add-dir {sibling.name}")
+    print(f"[cc] {teammate_note(repo_root, in_tmux=in_tmux)}")
     # A CHILD, not `os.execvp`. Two reasons, and the second is the one that bit:
     #   * exec replaces the process image, so anything still buffered in stdout is
     #     LOST — observed on the first live run, where the OK line vanished and
