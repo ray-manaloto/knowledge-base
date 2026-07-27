@@ -3,9 +3,6 @@
     "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "permissions": {
-    "defaultMode": "auto"
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -13,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard search",
+            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard search",
             "timeout": 15
           }
         ]
@@ -23,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base/python kb-setup hookguard",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR:-.}/python\" kb-setup hookguard",
             "timeout": 20
           }
         ]
@@ -33,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C /Users/rmanaloto/dev/github/ray-manaloto/knowledge-base -- graphify hook-guard read",
+            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard read",
             "timeout": 15
           }
         ]
@@ -87,6 +84,12 @@
       "source": {
         "source": "github",
         "repo": "mattpocock/skills"
+      }
+    },
+    "astral-sh": {
+      "source": {
+        "source": "github",
+        "repo": "astral-sh/claude-code-plugins"
       }
     }
   },
