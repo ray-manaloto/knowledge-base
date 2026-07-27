@@ -24,6 +24,18 @@ exclude = List(
   // `.agnix.toml` already makes. Not a suppressed finding: nothing here is a
   // defect in this repo's own source.
   "docs/research/**",
+  // The `/goal` PAYLOAD — the exact text pasted after `/goal `, so its bytes ARE
+  // the artifact (`docs/goals/README.md`). Same category as the line above, one
+  // step further: a formatter edit here does not just alter a record, it alters a
+  // live instruction to an agent. Measured: rumdl wants an H1 on line 1 (MD041),
+  // then objects that the heading ends in `.` (MD026), and `rumdl fmt` would strip
+  // that period off `Headline word: Legible.` — silently rewriting the condition.
+  // Adding an H1 to satisfy it also prepends `# ` to whatever gets pasted.
+  // Approved by Ray, 2026-07-27, over the two alternatives (fence the condition in
+  // a code block, which breaks `wc -c` against the 4,000-char cap; or accept the
+  // formatter shaping the payload). Scoped to `*-goal.md` ONLY — the `-rider.md`
+  // half and `README.md` are ordinary authored docs and stay fully linted.
+  "docs/goals/*-goal.md",
   "**/.venv/**",
   "**/__pycache__/**",
   "**/*.lock",
