@@ -9,6 +9,22 @@
 # graphify-out/, and the MCP server is pinned to THIS graph.json — so multiple
 # graphify projects on the same host never collide.
 
+# mise's own floor. `hard` ERRORS and refuses to run (measured: rc=1, the task
+# never starts); `soft` only WARNs and continues (rc=0). Both compare "lower
+# than", so they are FLOORS — there is no ceiling key anywhere in mise's schema
+# (control-armed: `min_version` and `tools` present, any key containing "max" →
+# none). A self-update moves UP, so this can never fire on one; catching that
+# direction is `currency.toml`'s `[tool.mise]`, not this.
+#
+# hard=2026.7.14 is where the env-file secret-expansion fix (#11269) and both
+# task-freshness correctness fixes (#11288, #11296) landed — below that there are
+# known-bad behaviours, even though this repo is not currently exposed to either
+# (no `env._.file`, no task `sources`/`outputs`). soft=2026.7.15 is the version
+# this repo has actually been verified against, so 7.14 runs with a nudge.
+# Keep soft > hard or soft is inert: hard errors across exactly the range soft
+# would warn in, so an equal pair makes the warning unobservable.
+min_version = { hard = "2026.7.14", soft = "2026.7.15" }
+
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.6"
