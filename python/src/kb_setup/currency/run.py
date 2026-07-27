@@ -57,21 +57,47 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
         return 2
 
     drifted: list[sync.SyncStatus] = []
+    unverifiable: list[sync.SyncStatus] = []
     for spec in _specs(repo_root, only):
         status = sync.check_sync(repo_root, spec)
         if status.drifted:
             drifted.append(status)
+            continue
+        # A tool that APPLIES here but had no check succeed is not clean — it is
+        # unchecked, and silence is this design's word for clean. The same
+        # reasoning as the missing-config branch above, one level down: a broken
+        # `version_pattern` or an unreadable binary would otherwise disable a
+        # tool's check permanently while every session looked green.
+        #
+        # Gated on applies_here() so a tool declared for another platform stays
+        # quiet: that one is genuinely not-applicable rather than not-checked,
+        # and nagging about it every session is the noise this mode avoids.
+        if spec.applies_here() and not status.verified:
+            unverifiable.append(status)
         elif not quiet:
             print(f"[currency] {status.summary()}")
 
-    if not drifted:
-        return 0
-
-    print("[currency] tool drift detected — run the tool-currency skill:")
-    for status in drifted:
-        for finding in status.drifted:
-            print(f"[currency]   {status.tool}: {finding.check} — {finding.detail}")
+    _report_check(drifted, unverifiable)
     return 0
+
+
+def _report_check(drifted: list[sync.SyncStatus], unverifiable: list[sync.SyncStatus]) -> None:
+    """Print the two non-clean outcomes, kept apart because they mean different things.
+
+    DRIFT is "checked, and it disagrees"; NOT CHECKED is "could not ask". Merging
+    them would let an unreadable probe borrow the credibility of a real finding —
+    and, worse, let a real finding be dismissed as a flaky probe.
+    """
+    if drifted:
+        print("[currency] tool drift detected — run the tool-currency skill:")
+        for status in drifted:
+            for finding in status.drifted:
+                print(f"[currency]   {status.tool}: {finding.check} — {finding.detail}")
+    if unverifiable:
+        print("[currency] NOT CHECKED (this is not a pass) — step 1 could not read:")
+        for status in unverifiable:
+            for finding in status.findings:
+                print(f"[currency]   {status.tool}: {finding.check} — {finding.detail}")
 
 
 def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:

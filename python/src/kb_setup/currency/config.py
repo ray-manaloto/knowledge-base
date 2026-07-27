@@ -81,8 +81,37 @@ class ToolSpec:
     artifact: str = ""
     artifacts: tuple[str, ...] = ()
     stamp: str = ""
+    # The reviewed version of a SELF-MANAGED tool — one that bootstraps the
+    # toolchain and therefore cannot honestly be pinned in `[tools]`. mise is the
+    # case: `ubi:jdx/mise` installs fine, but the pinned copy then SHADOWS the
+    # ambient binary that actually runs every task, so the check would compare
+    # pinned-against-pinned and report in sync forever (measured 2026-07-27 —
+    # `which(mise)` moved from `~/.local/bin/mise` to the install dir the moment
+    # the pin was added). Setting `expected` switches the tool onto a path that
+    # reads the version from the binary and compares it against THIS value.
+    #
+    # Bump it deliberately, after reviewing the release notes — that act is the
+    # gap analysis. Drift here means "the tool changed underfoot", which for a
+    # self-updating tool is a statement about the host, not about the config.
+    expected: str = ""
+    # Regex with ONE capture group pulling the version out of `--version` output.
+    # Needed because the default heuristic (last whitespace field) is wrong for
+    # any tool that prints more than "<name> <version>": mise prints
+    # `2026.7.15 macos-arm64 (2026-07-27)`, whose last field is the build DATE.
+    # That silently produced `observed_version("mise") == "(2026-07-27)"`.
+    version_pattern: str = ""
     os: tuple[str, ...] = ()
     watch: tuple[WatchItem, ...] = ()
+
+    @property
+    def self_managed(self) -> bool:
+        """Whether this tool is checked against `expected` rather than a mise pin.
+
+        Driven off `expected` rather than a separate flag: the two would only
+        ever be set together, and a flag that can disagree with the field it
+        guards is one more thing to keep consistent.
+        """
+        return bool(self.expected)
 
     @property
     def all_artifacts(self) -> tuple[str, ...]:
@@ -131,8 +160,16 @@ def _watch_items(raw: object) -> tuple[WatchItem, ...]:
 
 
 def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
-    if "mise_key" not in table:
-        raise ValueError(f"{CONFIG_NAME}: [tool.{name}] is missing required key 'mise_key'")
+    # One of the two must be present, and they are alternatives: `mise_key` says
+    # "mise installs this, read the pin from mise.toml"; `expected` says "this
+    # tool manages itself, compare the binary against the reviewed version".
+    # Demanding `mise_key` from a self-managed tool would force a fake pin
+    # pointing at a `[tools]` entry that must not exist.
+    if "mise_key" not in table and not table.get("expected"):
+        raise ValueError(
+            f"{CONFIG_NAME}: [tool.{name}] needs either 'mise_key' (mise-managed) "
+            f"or 'expected' (self-managed)"
+        )
 
     def _str(key: str) -> str:
         value = table.get(key, "")
@@ -144,7 +181,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
 
     return ToolSpec(
         name=name,
-        mise_key=str(table["mise_key"]),
+        mise_key=_str("mise_key"),
         binary=_str("binary") or name,
         pypi=_str("pypi"),
         github=_str("github"),
@@ -154,6 +191,8 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         artifact=_str("artifact"),
         artifacts=_tuple("artifacts"),
         stamp=_str("stamp"),
+        expected=_str("expected"),
+        version_pattern=_str("version_pattern"),
         os=_tuple("os"),
         watch=_watch_items(table.get("watch")),
     )
