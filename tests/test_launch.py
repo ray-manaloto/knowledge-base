@@ -256,10 +256,14 @@ def test_a_spawned_pane_inherits_the_callers_path(tmp_path: Path) -> None:
         assert out.is_file(), f"pane never wrote {out}"
         return out.read_text(encoding="utf-8")
 
-    plain = spawn("kbprobe-plain", [])
+    # PID-scoped: `launch_argv` emits `-A`, which ATTACHES to a same-named
+    # session instead of spawning one — so two concurrent runs would silently
+    # share a session and the probe would read the wrong pane.
+    tag = os.getpid()
+    plain = spawn(f"kbprobe-plain-{tag}", [])
     assert "/SENTINEL_CLIENT/bin" in plain, "the caller's PATH must reach the pane"
 
-    injected = spawn("kbprobe-injected", ["-e", "PATH=/SENTINEL_INJECTED/bin"])
+    injected = spawn(f"kbprobe-injected-{tag}", ["-e", "PATH=/SENTINEL_INJECTED/bin"])
     assert "/SENTINEL_CLIENT/bin" in injected, "the client's PATH still wins"
     assert "/SENTINEL_INJECTED/bin" not in injected, (
         "if this ever fails, tmux changed and `-e PATH=` became viable — "
@@ -342,7 +346,25 @@ def test_the_doctor_judges_the_raw_path_not_a_cleaned_one(tmp_path: Path) -> Non
 
     got = _doctor(tmp_path, probes=_probes({"graphify": _INSTALL}))
     assert got["graphify"].status == launch.FAIL
-    assert "shadowing the shims" in got["graphify"].detail
+    assert "an install dir ahead of the shims" in got["graphify"].detail
+    # And it must say what this does and does not mean. A reader who takes it as
+    # corpus drift will reach for a rebuild, which fixes nothing: every kb-* task
+    # resolves through `mise which` and is unaffected.
+    assert "NOT corpus correctness" in got["graphify"].detail
+
+
+def test_an_unreadable_version_is_not_reported_as_a_mismatch(tmp_path: Path) -> None:
+    """An unreadable version must not be printed as a mismatch against None.
+
+    The two collapsed into one branch, so a binary that answered nothing was
+    reported as having *reported* the string None against the pin — a version it
+    never gave. Fabricating a reading is worse than admitting the probe failed,
+    and `preflight` has always kept these separate.
+    """
+    got = _doctor(tmp_path, probes=_probes({"graphify": _SHIM}, None))
+    assert got["graphify"].status == launch.FAIL
+    assert "could not read a version" in got["graphify"].detail
+    assert "None" not in got["graphify"].detail
 
 
 def test_a_sound_session_reports_ok(tmp_path: Path) -> None:
@@ -389,6 +411,63 @@ def test_the_two_session_only_facts_are_never_claimed(tmp_path: Path) -> None:
     assert got["permission-mode"].status == launch.UNKNOWN
     assert "kb-curator" in got["skills"].detail
     assert "pr-workflow" in got["skills"].detail
+
+
+def _fresh_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, preflight_ok: bool
+) -> tuple[int, list[list[str]]]:
+    """Drive `cc_main --fresh` with a stubbed preflight; return rc + commands run."""
+    ran: list[list[str]] = []
+    monkeypatch.delenv("TMUX", raising=False)
+    monkeypatch.setattr(
+        launch,
+        "preflight",
+        lambda *_a, **_k: launch.Preflight(
+            path="/clean/bin", problems=() if preflight_ok else ("sibling repo not found",)
+        ),
+    )
+    monkeypatch.setattr(
+        launch.subprocess,
+        "run",
+        lambda cmd, **_k: (
+            ran.append(list(cmd)) or subprocess.CompletedProcess(args=cmd, returncode=0)
+        ),
+    )
+    sibling = tmp_path / "sibling"
+    sibling.mkdir(exist_ok=True)
+    rc = launch.cc_main(_pinned_repo(tmp_path), ["--fresh", "--sibling", str(sibling)])
+    return rc, ran
+
+
+def test_fresh_does_not_kill_the_server_when_preflight_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """THE ordering bug: it killed every session BEFORE validating anything.
+
+    A missing sibling, an unresolvable `claude`, a wrong `--root` or a version
+    mismatch would each destroy every tmux session on the host — including
+    unrelated projects — and then launch nothing. A repair step that runs before
+    its own validation is not a repair; it is an outage with no rollback.
+    """
+    rc, ran = _fresh_run(tmp_path, monkeypatch, preflight_ok=False)
+
+    assert rc == 1
+    assert ran == [], f"it ran {ran} despite refusing to launch"
+
+
+def test_fresh_does_kill_the_server_once_preflight_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: the kill must still happen, and BEFORE the launch.
+
+    Without this, the test above is satisfied by deleting the feature. The order
+    matters as much as the fact: killing after launching would take down the
+    session that was just created.
+    """
+    rc, ran = _fresh_run(tmp_path, monkeypatch, preflight_ok=True)
+
+    assert rc == 0
+    assert [c[:2] for c in ran] == [["tmux", "kill-server"], ["tmux", "new-session"]]
 
 
 def test_fresh_refuses_inside_tmux(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

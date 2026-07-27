@@ -361,20 +361,34 @@ def doctor(repo_root: Path, sibling: Path, *, path: str, probes: Probes) -> list
         checks.append(Check("graphify", FAIL, "`graphify` does not resolve on PATH"))
     elif _SHIMS_SEGMENT not in resolved:
         found = probes.version_of(resolved)
-        matches = "matches" if found == pin else f"is {found}, pin is {pin}"
+        version_note = (
+            "its version matches the pin"
+            if found == pin
+            else f"and it reports {found} against a pin of {pin}"
+        )
         checks.append(
             Check(
                 "graphify",
                 FAIL,
-                f"resolves to {resolved} — an install dir shadowing the shims. Its "
-                f"version {matches}, but the entry is frozen and will not follow the "
-                f"next bump.",
+                f"a bare `graphify` on this session's PATH resolves to {resolved} — "
+                f"an install dir ahead of the shims — {version_note}. This is PATH "
+                f"hygiene, NOT corpus correctness: every kb-* task resolves through "
+                f"`mise which` and is unaffected. What is affected is anything that "
+                f"still runs a bare `graphify` (the retrieval evals, the tier-1 "
+                f"canary, you at a prompt), because a frozen install dir does not "
+                f"follow the next bump.",
             )
         )
     else:
         found = probes.version_of(resolved)
         if pin is None:
             checks.append(Check("graphify", UNKNOWN, f"{repo_root.name} pins no graphify version"))
+        elif found is None:
+            # Distinct from a mismatch. Collapsing them printed "reports None but
+            # the pin is X" — a version the binary never reported, which is the
+            # state-fabrication this design exists to refuse. `preflight` has
+            # always separated these two; the doctor did not.
+            checks.append(Check("graphify", FAIL, f"could not read a version from {resolved}"))
         elif found != pin:
             checks.append(Check("graphify", FAIL, f"reports {found} but the pin is {pin}"))
         else:
@@ -495,23 +509,14 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
     session = session or repo_root.name
 
     in_tmux = bool(os.environ.get("TMUX"))
-    if fresh:
-        # A server outlives the pin that was current when it started, and a pane
-        # inherits the PATH of whatever client created it — so a long-lived server
-        # is the usual reason a session's environment disagrees with the repo.
-        # Killing it is the remedy the preflight's own failure message names.
-        if in_tmux:
-            print(
-                "[cc] --fresh kills the tmux server, and you are inside it — that "
-                "would kill this process before it could relaunch. Run it from a "
-                "plain terminal instead.",
-                file=sys.stderr,
-            )
-            return 2
-        # No server running is the desired state, not an error, so the status is
-        # ignored rather than checked.
-        subprocess.run(["tmux", "kill-server"], check=False, capture_output=True, timeout=60)
-        print("[cc] --fresh: tmux server killed; the new session starts from this shell's env")
+    if fresh and in_tmux:
+        print(
+            "[cc] --fresh kills the tmux server, and you are inside it — that "
+            "would kill this process before it could relaunch. Run it from a "
+            "plain terminal instead.",
+            file=sys.stderr,
+        )
+        return 2
 
     checked = preflight(
         repo_root,
@@ -530,6 +535,24 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
             file=sys.stderr,
         )
         return 1
+
+    if fresh:
+        # AFTER preflight, never before. Killing first meant any preflight
+        # problem — a missing sibling, no `claude`, a wrong --root, a version
+        # mismatch — destroyed every tmux session on the host (including
+        # unrelated projects) and then launched nothing. A repair step that runs
+        # before its own validation is not a repair, it is an outage with a
+        # rollback nobody wrote.
+        #
+        # A missing tmux cannot reach here either: preflight runs with
+        # need_tmux=True whenever we are not already inside tmux, so it refuses
+        # above rather than raising FileNotFoundError out of this call —
+        # `check=False` suppresses a non-zero exit, NOT a missing binary.
+        #
+        # No server running is the desired state, not an error, so a non-zero
+        # exit from kill-server is ignored.
+        subprocess.run(["tmux", "kill-server"], check=False, capture_output=True, timeout=60)
+        print("[cc] --fresh: tmux server killed; the new session starts from this shell's env")
 
     argv_out = launch_argv(repo_root, sibling.resolve(), session=session, in_tmux=in_tmux)
     print(f"[cc] preflight OK — rooted in {repo_root.name}, --add-dir {sibling.name}")
