@@ -1,21 +1,10 @@
 {
-  "extraKnownMarketplaces": {
-    "fable-orchestrator": {
-      "source": {
-        "source": "github",
-        "repo": "mar3co/fable-orchestrator"
-      }
-    },
-    "antigravity-for-claude-code": {
-      "source": {
-        "source": "github",
-        "repo": "yuting0624/antigravity-for-claude-code"
-      }
-    }
+  "env": {
+    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "enabledPlugins": {
-    "fable-orchestrator@fable-orchestrator": true,
-    "antigravity@antigravity-for-claude-code": true
+  "permissions": {
+    "defaultMode": "auto"
   },
   "hooks": {
     "PreToolUse": [
@@ -74,12 +63,32 @@
       }
     ]
   },
-  "permissions": {
-    "defaultMode": "auto"
+  "enabledPlugins": {
+    "fable-orchestrator@fable-orchestrator": true,
+    "antigravity@antigravity-for-claude-code": true,
+    "astral@astral-sh": true,
+    "mattpocock-skills@mattpocock": true,
+    "pr-review-toolkit@claude-plugins-official": true
   },
-  "env": {
-    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  "extraKnownMarketplaces": {
+    "fable-orchestrator": {
+      "source": {
+        "source": "github",
+        "repo": "mar3co/fable-orchestrator"
+      }
+    },
+    "antigravity-for-claude-code": {
+      "source": {
+        "source": "github",
+        "repo": "yuting0624/antigravity-for-claude-code"
+      }
+    },
+    "mattpocock": {
+      "source": {
+        "source": "github",
+        "repo": "mattpocock/skills"
+      }
+    }
   },
   "teammateMode": "auto"
 }
