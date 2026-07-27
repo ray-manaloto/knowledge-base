@@ -31,6 +31,14 @@ it twice.
    `.agent/kb/reports/agents/<agent-name>.md` in the SAME turn — before acting on
    its content. Sources the agent fetched go to `.agent/kb/raw/<slug>.md`.
 
+1b. **PROMOTE it to `docs/research/reports/` once it is load-bearing.** `.agent/`
+   is gitignored: it dies with a fresh clone or any `git clean -xdf`. That is
+   right for scratch and wrong for a report something tracked now cites —
+   `currency.toml`'s `[tool.mise]` block rests on the v2026.7.x review, and a
+   citation to a file only one machine can open is not a citation. Promotion is
+   a COPY (the `.agent/` original stays disposable) and it is still verbatim.
+   `docs/research/README.md` indexes them and states the no-normalising rule.
+
    **Extraction chunks are the exception, and go somewhere better:** a
    `{nodes,edges}` chunk is corpus input, not a report. Assemble it with
    `mise run kb-assemble -- <name> <chunk...>` and commit it under
