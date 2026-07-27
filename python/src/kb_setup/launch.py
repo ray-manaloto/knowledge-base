@@ -8,7 +8,7 @@ and stamps the corpus with the *pinned* version regardless of which binary
 actually ran. A rebuild done by 0.9.25 and stamped 0.9.27 is unfalsifiable
 afterwards.
 
-THE TWO WAYS THE ENVIRONMENT LIES, both measured 2026-07-27:
+THE THREE WAYS THE ENVIRONMENT LIES, all measured 2026-07-27:
 
 1. **A stale mise install directory sits ahead of the shims on ``PATH``.**
    ``…/mise/installs/pipx-graphifyy/0.9.25/bin`` was at position 32 while
@@ -71,6 +71,43 @@ THE TWO WAYS THE ENVIRONMENT LIES, both measured 2026-07-27:
    :func:`kb_setup.graphify_env.graphify_exe`, which resolves the binary
    through ``mise which`` at every call site that matters, so corpus
    correctness no longer depends on ``PATH`` order in the first place.
+
+3. **A mise SHIM re-injects every install dir it was just cleaned of** — which
+   made mechanisms 1 and 2 above correct and the launcher still ineffective.
+   `clean_path` strips the install dirs, so ``tmux`` no longer resolves to a
+   real binary and resolves to ``…/mise/shims/tmux`` instead. A shim does not
+   exec the tool: it re-enters mise, which applies mise's full environment and
+   PREPENDS every install dir back. The cleaning is therefore self-defeating by
+   construction — it is the very act of cleaning that routes the launch through
+   the thing that undoes it.
+
+   Measured, with the control arm that names which side is broken::
+
+       CLEAN=$(clean_path "$PATH")                     # installs=0, shims=2
+       env PATH=$CLEAN .../installs/node/.../node -e … # installs=0   <- direct
+       env PATH=$CLEAN .../shims/node            -e … # installs=154 <- shim
+
+   End to end, the same contrast through tmux (server pid taken from
+   ``tmux display-message -p '#{pid}'``, not a ``pgrep | head -1`` that could
+   name the wrong process):
+
+   * bare ``tmux`` (→ shim): server installs=154, pane installs=154;
+   * absolute ``$(mise which tmux)``: server installs=**0**, pane installs=0,
+     shims=2 — a session in which a bare ``graphify`` resolves through the
+     shims, which is exactly what `doctor` demands.
+
+   Hence :func:`shim_free`, and hence :func:`launch_argv` taking the resolved
+   binaries rather than bare names. Note what does NOT fix it: unsetting mise's
+   activate state (``__MISE_DIFF``, ``__MISE_ORIG_PATH``, ``__MISE_SESSION``,
+   ``__MISE_ENV_CACHE_KEY``, ``MISE_ENV_CACHE``) leaves the shim at installs=154
+   in every combination — the re-injection is what a shim IS, not a cache
+   artifact, so there is no env var to switch it off.
+
+   Why this hid for so long: the pane-inheritance test asserted that a sentinel
+   *reached* the pane, and it does — a shim PREPENDS, it does not discard, so
+   every original entry survives underneath the 154 new ones. A test that asks
+   "did my value arrive?" cannot see "and 154 others arrived in front of it".
+   The assertion that catches it is an ABSENCE one, on install dirs.
 
 WHY IT VALIDATES INSTEAD OF JUST FIXING. Repairing ``PATH`` silently would make
 this module the next thing nobody checks. It refuses to launch when the
@@ -278,6 +315,75 @@ def _which(tool: str, path: str) -> str | None:
     return shutil.which(tool, path=path)
 
 
+def _mise_which(tool: str, repo_root: Path) -> str | None:
+    """`mise which <tool>` resolved for ``repo_root``, or None if mise cannot.
+
+    Run with ``cwd=repo_root`` deliberately: mise resolves per-config, and the
+    answer we want is the one THIS repo's `mise.toml` pins, not the one for
+    whatever directory the task happened to be invoked from.
+
+    A non-mise-managed tool (``claude`` here) exits non-zero, which is not an
+    error — it is the signal to fall through to the PATH lookup.
+    """
+    try:
+        out = subprocess.run(
+            ["mise", "which", tool],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+            cwd=repo_root,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    if out.returncode != 0:
+        return None
+    resolved = out.stdout.strip()
+    return resolved or None
+
+
+def shim_free(
+    tool: str,
+    *,
+    repo_root: Path,
+    path: str,
+    lookup: Callable[[str, Path], str | None] = _mise_which,
+) -> str:
+    """Resolve ``tool`` to a binary that is NOT a mise shim.
+
+    This is the fix for mechanism 3 in the module docstring, and it is the whole
+    reason the cleaning now survives: a shim re-enters mise and prepends every
+    install dir back onto ``PATH``, so launching tmux through one hands the pane
+    — and therefore ``claude``, and therefore every bare ``graphify`` inside the
+    session — exactly the environment `clean_path` had just removed.
+
+    ``path`` must be the RAW ``PATH``, not the cleaned one. That is not an
+    oversight: the cleaned path is precisely the one on which a mise-managed
+    tool can only resolve to a shim, so looking there would return the thing
+    this function exists to avoid.
+
+    Order, and why:
+
+    1. ``mise which`` — authoritative for a mise-managed tool, and it names the
+       version this repo pins rather than whichever install dir happens to sit
+       first on an activated ``PATH`` (which may itself be the stale entry
+       mechanism 1 is about).
+    2. the raw ``PATH`` — covers a tool mise does not manage (a system or
+       homebrew ``tmux``, and ``claude``, which lives in ``~/.local/bin``).
+    3. whatever we found, or the bare name. Falling back to a shim is worse than
+       ideal but strictly better than refusing to launch: a shim still runs the
+       right tool, it just re-pollutes ``PATH``. That degradation is reported by
+       `doctor` in the resulting session rather than guessed at here.
+    """
+    resolved = lookup(tool, repo_root)
+    if resolved and _SHIMS_SEGMENT not in resolved:
+        return resolved
+    direct = shutil.which(tool, path=path)
+    if direct and _SHIMS_SEGMENT not in direct:
+        return direct
+    return direct or resolved or tool
+
+
 def _version_of(binary: str) -> str | None:
     """`graphify --version` -> the bare version, or None if it cannot be read."""
     try:
@@ -292,8 +398,48 @@ def _version_of(binary: str) -> str | None:
     return parts[-1] if parts else None
 
 
-def launch_argv(repo_root: Path, sibling: Path, *, session: str, in_tmux: bool) -> list[str]:
+@dataclass(frozen=True)
+class Binaries:
+    """The two executables to launch, each resolved SHIM-FREE.
+
+    Bundled rather than passed as two keyword arguments for the same reason
+    :class:`Probes` is: they are one concern (which binary actually runs), and
+    separating them pushed :func:`launch_argv` past the argument-count limit for
+    no gain in clarity.
+
+    The defaults are the bare names — the pre-fix behaviour, and wrong on any
+    machine with mise activated. They exist so a test asserting argv SHAPE need
+    not resolve anything; :func:`cc_main` always builds this with
+    :meth:`resolve`.
+    """
+
+    tmux: str = "tmux"
+    claude: str = "claude"
+
+    @classmethod
+    def resolve(cls, repo_root: Path, *, path: str) -> Binaries:
+        """Resolve both through :func:`shim_free`. ``path`` is the RAW ``PATH``."""
+        return cls(
+            tmux=shim_free("tmux", repo_root=repo_root, path=path),
+            claude=shim_free("claude", repo_root=repo_root, path=path),
+        )
+
+
+def launch_argv(
+    repo_root: Path,
+    sibling: Path,
+    *,
+    session: str,
+    in_tmux: bool,
+    binaries: Binaries | None = None,
+) -> list[str]:
     """The exact command to exec: claude directly, or a tmux session wrapping it.
+
+    ``binaries`` carries the SHIM-FREE executables (see :class:`Binaries`,
+    :func:`shim_free`, and mechanism 3 in the module docstring). Launching
+    through a mise shim would re-prepend every install dir onto the ``PATH``
+    :func:`clean_path` had just stripped, which is the defect this module exists
+    to prevent — so the binary that runs is part of the contract, not detail.
 
     There is deliberately no ``PATH`` parameter here, and no ``tmux new-session
     -e PATH=…``. That injection was measured to do nothing — tmux gives the pane
@@ -316,10 +462,11 @@ def launch_argv(repo_root: Path, sibling: Path, *, session: str, in_tmux: bool) 
     # settings — "only policy, user, and CLI-flag sources may grant auto mode
     # (projectSettings and localSettings are repo-controllable)". So the project
     # file cannot grant it and the flag can. Unattended goal turns need it.
-    claude = ["claude", "--permission-mode", "auto", "--add-dir", str(sibling)]
+    bins = binaries or Binaries()
+    claude = [bins.claude, "--permission-mode", "auto", "--add-dir", str(sibling)]
     if in_tmux:
         return claude
-    return ["tmux", "new-session", "-A", "-s", session, "-c", str(repo_root), *claude]
+    return [bins.tmux, "new-session", "-A", "-s", session, "-c", str(repo_root), *claude]
 
 
 #: A doctor verdict. Three states, kept distinct for the reason the currency
@@ -536,6 +683,14 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         )
         return 1
 
+    # Resolved AFTER preflight (so a refusing run does no extra work) and BEFORE
+    # the kill, so `--fresh` tears the server down with the same binary it will
+    # rebuild it with. Both are shim-free: launching through a mise shim would
+    # re-prepend every install dir onto the PATH we just cleaned, which is the
+    # defect this whole module exists to prevent (mechanism 3, module docstring).
+    # The RAW PATH is passed on purpose — see :func:`shim_free`.
+    binaries = Binaries.resolve(repo_root, path=os.environ.get("PATH", ""))
+
     if fresh:
         # AFTER preflight, never before. Killing first meant any preflight
         # problem — a missing sibling, no `claude`, a wrong --root, a version
@@ -551,10 +706,16 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         #
         # No server running is the desired state, not an error, so a non-zero
         # exit from kill-server is ignored.
-        subprocess.run(["tmux", "kill-server"], check=False, capture_output=True, timeout=60)
+        subprocess.run([binaries.tmux, "kill-server"], check=False, capture_output=True, timeout=60)
         print("[cc] --fresh: tmux server killed; the new session starts from this shell's env")
 
-    argv_out = launch_argv(repo_root, sibling.resolve(), session=session, in_tmux=in_tmux)
+    argv_out = launch_argv(
+        repo_root,
+        sibling.resolve(),
+        session=session,
+        in_tmux=in_tmux,
+        binaries=binaries,
+    )
     print(f"[cc] preflight OK — rooted in {repo_root.name}, --add-dir {sibling.name}")
     print(f"[cc] {teammate_note(repo_root, in_tmux=in_tmux)}")
     # A CHILD, not `os.execvp`. Two reasons, and the second is the one that bit:
