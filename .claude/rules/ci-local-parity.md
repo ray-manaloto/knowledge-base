@@ -10,7 +10,8 @@ paths:
 
 **This repo has no `.github/` today.** The gates are entirely local:
 `mise run lint` (hk), `mise run test` (pytest), `mise run lint-docs` (agnix),
-plus `brain-audit` — all three run by `mise run kb-ship` before a PR is opened.
+plus `brain-audit` and `eval` — all run by `mise run kb-ship` before a PR is
+opened, behind a `kb-review` receipt check that runs first.
 That makes the rule below *cheaper*, not optional: with no CI to catch drift,
 a check that exists in one place and not the other is simply not run.
 
@@ -25,8 +26,10 @@ mise task — never a command that lives only in someone's shell history. If you
 add a workflow step later, add its hk equivalent in the same change.
 
 `kb_setup.pr.run_gates` is the list `mise run kb-ship` actually enforces
-(`lint`, `test`, `brain-audit`). A gate that is not in that list, and not an hk
-step reached by `lint`, does not gate anything.
+(`lint`, `test`, `brain-audit`, `eval` — the `GATES` tuple in `pr.py`). The
+review receipt is checked BEFORE that list and again before the push. A gate
+that is not in that list, and not an hk step reached by `lint`, does not gate
+anything.
 
 ## Rule 2: Every tool an hk step invokes must be pinned in `mise.toml`
 

@@ -320,7 +320,7 @@ description = 'Review receipt + gates (lint/test/brain-audit/eval) → push → 
 run = "uv run kb-setup ship"
 
 [tasks.kb-land]
-description = 'Verify checks → SHA-pinned squash-merge → sync main: mise run kb-land -- <PR#>'
+description = 'Await terminal checks + review receipt → SHA-pinned squash-merge → sync main: mise run kb-land -- <PR#>'
 # Pins the merge to the head SHA it just verified (`gh pr merge --match-head-commit`),
 # so a commit pushed between check and merge cannot ride in unverified. No main-CI
 # watch and no container re-validation — this repo has neither. Logic in kb_setup.pr.

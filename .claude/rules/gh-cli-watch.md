@@ -31,10 +31,15 @@ Hand-rolled poll loops:
 required checks are whatever branch protection adds. That makes the
 canonical path shorter, not different:
 
-- `mise run kb-ship` runs the local gates (`lint`, `test`, `brain-audit`)
-  BEFORE pushing and opening the PR — the gates CI would have run.
-- `mise run kb-land -- <PR#>` reads the PR's check state, squash-merges
-  pinned to that SHA, and syncs main.
+- `mise run kb-ship` checks the `kb-review` receipt, then runs the local gates
+  (`lint`, `test`, `brain-audit`, `eval`) BEFORE pushing and opening the PR — the
+  gates CI would have run, plus the review CI never did.
+- `mise run kb-land -- <PR#>` gives the checks a BOUNDED chance to reach a
+  terminal state (it wraps `gh pr checks --watch`, since that flag has no timeout
+  of its own), then reads their state, refuses a PR head with no review receipt,
+  squash-merges pinned to that SHA, and syncs main. **CodeRabbit is advisory** —
+  reported in every bucket, blocking in none, because waiting on its quota is
+  waiting on a rate limit rather than on a review.
 
 Both already do the waiting. Reach for a raw `gh` watch only when you are
 inspecting a PR neither task owns.

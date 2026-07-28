@@ -41,8 +41,8 @@ It is the operational teeth behind `zero-skip-policy.md`.
 Scale the matrix to the blast radius — a one-line doc typo needs the docs
 row, not a full `kb-build`.
 
-**`mise run kb-ship` runs `lint` + `test` + `brain-audit` and refuses to push
-if any fails.** That is the floor, not the ceiling: it does not know whether
+**`mise run kb-ship` checks the `kb-review` receipt, then runs `lint` + `test` +
+`brain-audit` + `eval`, and refuses to push if any fails.** That is the floor, not the ceiling: it does not know whether
 your change needed a `kb-build` or a chunk validation.
 
 ## A green gate is not a green artifact

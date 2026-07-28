@@ -47,9 +47,9 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
 2. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.
-3. **`mise run kb-ship` gates.** `lint`, `test`, and `brain-audit` all run
-   before a PR is pushed, so a workflow that bypasses a task and breaks
-   something fails at ship time rather than in review.
+3. **`mise run kb-ship` gates.** The `kb-review` receipt, then `lint`, `test`,
+   `brain-audit`, and `eval` all run before a PR is pushed, so a workflow that
+   bypasses a task and breaks something fails at ship time rather than in review.
 
 The hook **fails OPEN on its own errors** — a crashed guard must not brick
 every Bash call. It is a *redirect* guard, not a sandbox: `$(…)` substitution,
