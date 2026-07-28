@@ -525,7 +525,99 @@ out of scope does not mean being lost.
 
 ---
 
-## 12. GitHub repos touched
+## 12. AMENDMENT, 2026-07-28 — the round landed a THIRD arm, and the goal has no room to say so
+
+Written during the round, by the rule in this file's own header: *"When the plan
+and this rider disagree, the plan wins; fix the rider in the same commit."* Here
+it is reality and the **goal** that disagree, and the goal cannot be edited —
+see the cap note below. Every item was raised by a review lane, named per item.
+
+### 12.1 Neither §9 arm fits what actually happened (spec lane)
+
+The goal offers two landings: **A** = cause established *and the smallest change
+restoring legible output is shipped*; **B** = cause not established, negative
+recorded. The round established the cause, so B is out — and shipped nothing that
+restores legibility, so A is not met either. The reason is not a shortfall:
+
+**Legibility was already restored, outside this repo, before the round began.**
+Ray set fnox `env = "exec"` in `~/.config/fnox/config.toml` on 2026-07-27,
+cutting mise's redaction set from 49 values to three 36–40 char ones. The
+remaining remedy is user-level config, which `do-not.md` #11 forbids this repo
+from touching, and dotfiles, which Posture 1 forbids this round from touching.
+
+So the honest landing is a third one, and it is what shipped:
+
+> **Arm C — cause established, remediation OUT OF THIS REPO'S REACH, detector
+> shipped instead.** Record the cause and its control arms where a future session
+> will read them (`mise.toml` `[tasks.eval]`), and ship a machine check that fails
+> if the condition recurs (`tier1.mise-redaction-legible`). Hand the remediation
+> back. Arm C requires everything Arm A requires *except* that the shipped change
+> restore legibility — because it already is legible — and it additionally
+> requires the detector's control arm to fail on demand.
+
+A future pair should offer Arm C from the start. The shape is general: *the cause
+is in a layer the round may not edit.* Neither Ceccarelli nor Sabrina covers it,
+and a pair with only A and B pushes the agent toward claiming A.
+
+### 12.2 §9 clause 7's literal string, vs. the fix that made it honest
+
+Clause 7 requires `OK eval: N passed, N skipped, 0 failed, 0 unarmed`. Those two
+zeroes were **hardcoded** in `evals.render`, which was true only while every case
+was gated. This round added the repo's first advisory case; an advisory FAIL does
+not redden the run, so the first one would have printed `0 failed` over a real
+failure. Fixed to read the true counts.
+
+**Clause 7 is amended to:** the `OK eval:` line must be present and must report
+the counts the run actually produced. On an all-green run that is byte-identical
+to the old string (pinned by `test_the_green_summary_line_is_unchanged_when_nothing_failed`),
+which is why the goal text still matches today. Raised by the spec lane, which
+noted the collision would only appear once the new case fails — i.e. the clause
+and the fix were on course to contradict each other silently.
+
+### 12.3 The goal file was NOT edited, deliberately
+
+`…-goal.md` is 3,941 of its 4,000-char cap, so an amendment does not fit without
+cutting something. **Cutting it was refused**: editing a round's own completion
+condition mid-round, to make the round satisfiable, is the Goodhart move this
+pair exists to model — the preserve list already names the cheapest instance of
+it (delete the receipt gate → `ship: OK` appears). The discrepancy is recorded
+here instead, and `kb-goal-outcome` records the round's real result.
+
+Consequence to state plainly: **an evaluator reading only the goal would see two
+arms and neither satisfied.** A human reading both sees Arm C. That asymmetry is
+the cost of the cap, and it is the strongest argument yet that the char cap is
+too tight for a pair that has to survive contact with the work.
+
+### 12.4 Two smaller corrections
+
+- **`2908be9` is labelled `(rider P1)` and P1 says "No code."** It commits two
+  work-memory files, not code — but it is out-of-phase housekeeping either way.
+  It is there because `.agent/plans/session-2026-07-28-b.md` explicitly directed
+  folding those files into the first branch this round creates, and by the header
+  rule the plan wins. Recorded rather than re-labelled. (spec lane)
+- **A SECOND hand-back exists, and §11 listed only rotation.** The user-level
+  mise/fnox configuration is Ray's alone, exactly like rotation. It is carried in
+  the P7 handoff. §11 is not rewritten because its numbered items are cited
+  elsewhere; read this bullet as its third entry. (spec lane)
+
+### 12.5 What the review lanes cost and returned
+
+Round 1 over `ba9909ae657112a471a1fba59012c5f9c39b02df...fdd73c4`
+(spelled with the FULL base SHA on purpose: abbreviated to seven characters it
+begins with a two-letter run that `typos` reads as a misspelling of "by", and
+this repo takes no inline suppressions — so the workaround is the literal):
+**18 findings, 2 blocking**, four lanes. The two
+blocking ones came from the two lanes that are not the Standards/Spec spine — a
+secret-leaking SKIP path (cold, the only non-Claude lane) and a dead advisory
+control arm that no renderer surfaced (silent-failure). Both were in code whose
+unit tests were green, which is the same result the previous round recorded.
+
+The stop rule was agreed with Ray **before** round 2, per the work-memory entry
+that five rounds did not converge: one more full four-lane round; if it finds new
+blocking findings, fix only those and re-review with the cold lane alone; hard
+stop, remaining findings become GitHub issues.
+
+## 13. GitHub repos touched
 
 - [jdx/mise](https://github.com/jdx/mise) — the redaction engine under investigation;
   `src/redactions.rs` / `src/cli/run.rs` / `src/logger.rs` are P4's read targets, and

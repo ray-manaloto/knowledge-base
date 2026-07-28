@@ -646,36 +646,54 @@ def _broken_doctor() -> evals.Outcome:
         return evals.doctor_health(script, timeout=30)
 
 
+#: Name of the short redacted value :func:`_redaction_collision_control` plants.
+#: The control's FAIL detail must NAME it, which is what proves the canary loaded
+#: rather than the arm having tripped over some short host secret.
+REDACTION_CANARY = "_EVAL_REDACTION_CANARY"
+
+
 def _redaction_collision_control() -> evals.Outcome:
     """The real reader, pointed at a config that DOES collide.
 
     Not a stubbed value list: this writes a throwaway ``mise.toml`` declaring a
     one-character redacted value and runs the same ``mise env --redacted`` the
-    probe runs, so the parse and the judgement are both exercised. It is the
-    hand-probe that established this round's cause, promoted into the harness.
+    probe runs, so the read, the parse and the judgement are all exercised. It is
+    the hand-probe that established this round's cause, promoted into the harness.
 
-    The user-level config is still in scope inside the temp directory, so its
-    real secrets are read too — the canary is simply the shortest value present,
-    and the case fails on it. That means the control arms correctly both here
-    and on a host with no redacted values at all.
+    The user-level config is still in scope inside the temp directory, so its real
+    secrets are read too, and the canary is simply the shortest value present.
+    That means the arm works both here and on a host holding no redacted values —
+    but it also means a FAIL alone does not prove the canary LOADED, since a short
+    host secret would produce one too. The probe therefore names the offending
+    variables, and :data:`REDACTION_CANARY` is asserted in the test. Raised by the
+    silent-failure lane: without it, a canary that quietly stopped loading on an
+    all-long host set returns PASS, and PASS from a control means NOT ARMED.
     """
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "mise.toml").write_text(
-            '[env]\n_EVAL_REDACTION_CANARY = { value = "1", redact = true }\n'
+            f'[env]\n{REDACTION_CANARY} = {{ value = "1", redact = true }}\n'
         )
         return evals.mise_redaction_legible(cwd=Path(tmp))
 
 
-def _mise_installed() -> evals.Outcome | None:
-    """Environment gate: nothing to say about mise's redaction set without mise.
+def _binary_gate(name: str, detail: str) -> evals.Outcome | None:
+    """SKIP when ``name`` does not resolve on PATH; otherwise run normally.
 
-    A precondition rather than a SKIP inside the probe, for the reason
-    :func:`_graphify_installed` records: the control arm drives the same reader,
-    so an in-probe skip would skip the control too.
+    Environment gates belong here rather than inside a probe: the control arm
+    drives the same code path, so an in-probe skip would skip the control too and
+    leave the case UNARMED — a case reported as decoration for a question that
+    was never asked. ``detail`` is per-tool because the REASON differs, and
+    collapsing two different "does not apply here" reasons into one message is
+    the same mistake one level down.
     """
-    if shutil.which("mise") is None:
-        return evals.skip("mise does not resolve on PATH — its redaction set cannot be read")
+    if shutil.which(name) is None:
+        return evals.skip(detail)
     return None
+
+
+def _mise_installed() -> evals.Outcome | None:
+    """Environment gate: nothing to say about mise's redaction set without mise."""
+    return _binary_gate("mise", "mise does not resolve on PATH — its redaction set cannot be read")
 
 
 def _graphify_installed() -> evals.Outcome | None:
@@ -683,17 +701,14 @@ def _graphify_installed() -> evals.Outcome | None:
 
     graphify is host-only in the sibling dotfiles repo, so inside its
     devcontainer this case asserts something that cannot be true. That is "does
-    not apply here", not "the graph is broken" — and it must be a precondition
-    rather than a SKIP inside the probe, because the control arm drives the same
-    code path and would skip too, leaving the case UNARMED.
+    not apply here", not "the graph is broken".
     """
-    if shutil.which("graphify") is None:
-        return evals.skip(
-            "graphify is not installed in this environment (it is host-only in "
-            "the consuming repo) — the canary cannot look, which is not the same "
-            "as the graph having nothing to say"
-        )
-    return None
+    return _binary_gate(
+        "graphify",
+        "graphify is not installed in this environment (it is host-only in "
+        "the consuming repo) — the canary cannot look, which is not the same "
+        "as the graph having nothing to say",
+    )
 
 
 def _retrieval_precondition(repo_root: Path) -> evals.Outcome | None:
@@ -774,15 +789,15 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             probe=lambda: evals.mise_redaction_legible(cwd=repo_root),
             control=_redaction_collision_control,
             precondition=_mise_installed,
-            # ADVISORY, and this is the one judgement call in the case. The
-            # remedy is never in this repo: the set is populated by
-            # `_.fnox-env` in the USER-level mise config, which `do-not.md` #11
-            # forbids this repo from touching. A gated case would therefore be a
-            # ship blocker only Ray can clear, wedging any round that met it.
-            # Advisory keeps the signal — a FAIL here says every number the run
-            # printed is untrustworthy — without handing a user-config setting a
-            # veto over the PR. `render` reports advisory failures explicitly
-            # rather than folding them into the green summary line.
+            # ADVISORY, and this is the one judgement call in the case: the remedy
+            # is never in this repo (the set is populated by `_.fnox-env` in the
+            # USER-level mise config, which `do-not.md` #11 forbids touching), so
+            # gating it would be a ship blocker no agent could clear. `render`
+            # surfaces an advisory FAIL, and a dead advisory control arm,
+            # explicitly rather than folding either into the green summary line.
+            # THE FULL REASONING LIVES IN ONE PLACE — `mise.toml` `[tasks.eval]`.
+            # It was restated in four (here, that comment, the probe docstring,
+            # and a test name) until the standards lane counted them.
             gated=False,
         ),
         evals.Case(

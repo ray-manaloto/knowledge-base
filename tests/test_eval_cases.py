@@ -90,12 +90,22 @@ def test_the_redaction_control_arm_really_fails() -> None:
     `test_every_control_arm_actually_fails` above skips advisory cases, so
     without this the one advisory case in the repo would be the only one whose
     control is never checked to fail.
+
+    It asserts the CANARY IS NAMED, not merely that something failed. A FAIL alone
+    would also be produced by any short secret already on the host, so the arm
+    could look healthy while its canary had quietly stopped loading — and on the
+    now-steady all-long host set that regression returns PASS, which means NOT
+    ARMED. Raised by the silent-failure review lane (F2).
     """
     control = _redaction_case().control
     assert control is not None
     outcome = control()
     assert outcome.verdict is evals.Verdict.FAIL
     assert "shorter than" in outcome.detail
+    assert eval_cases.REDACTION_CANARY in outcome.detail, (
+        "the arm failed, but not demonstrably on its own canary — a short host "
+        "secret would produce the same FAIL"
+    )
 
 
 def test_the_redaction_case_skips_without_mise() -> None:

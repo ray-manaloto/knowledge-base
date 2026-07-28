@@ -104,6 +104,14 @@ def working_tree_clean(repo_root: Path) -> bool:
 #: costs nothing here. Its two opt-in halves run on demand: `-- --live` for the
 #: lane doctor (one API call per installed lane) and `-- --slow` for the golden
 #: retrieval set (~3 min, advisory — it reports recall@k, it does not gate).
+#:
+#: NOT EVERY OFFLINE CASE IS BINDING, and this comment used to imply otherwise by
+#: scoping "advisory" to the `--slow` half alone. `tier1.mise-redaction-legible`
+#: is offline, runs on every ship, and is `gated=False`: it reports and never
+#: reddens, because its only remedy is a user-level mise config `do-not.md` #11
+#: forbids editing. So a green `eval` gate here means "nothing GATED failed", not
+#: "every case passed" — read the case table, not the rc. `evals.render` prints
+#: the true failed/unarmed counts precisely so that distinction survives.
 GATES = ("lint", "test", "brain-audit", "eval")
 
 
