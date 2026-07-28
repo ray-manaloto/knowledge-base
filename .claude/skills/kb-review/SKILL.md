@@ -124,14 +124,23 @@ lens*. No single winner across lenses.
 citation is labelled `unverified` and reported as such rather than dropped —
 dropping it hides a lead, promoting it launders a guess.
 
-### 6. Write the receipt
+### 6. Persist each lane's report, THEN write the receipt
+
+Write every lane's report verbatim to
+`.agent/kb/review/reports/review-<sha>-<lane>.md` **as it arrives** —
+`agent-report-persistence.md` requires it, and the receipt now checks for it.
+A lane that left no report is a claim, not a review. `NO FINDINGS` is a
+perfectly good report; an empty file is not.
 
 ```bash
-mise run kb-review-receipt -- --sha "$(git rev-parse HEAD)" \
+mise run kb-review-receipt -- \
   --lanes standards,spec,cold:codex,silent-failure \
   --skipped "cold:not-applicable-docs-only" \
   --findings <n> --blocking <n>
 ```
+
+`--blocking` is required — state it even when it is `0`. There is no `--sha`:
+the receipt is always for HEAD.
 
 It writes `.agent/kb/review/receipt-<sha>.json`. Gitignored on purpose: a
 receipt is machine-local proof that *this* machine reviewed *this* commit before

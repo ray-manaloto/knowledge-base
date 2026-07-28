@@ -178,7 +178,12 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     """Write the `kb-review` skill's receipt for HEAD; `ship` refuses to push without it."""
     from kb_setup import review
 
-    sha = _opt(rest, "--sha") or review.head_sha(repo_root)
+    # No `--sha` override. A receipt is ALWAYS for HEAD: letting the caller name
+    # a commit lets them file one for something that was never reviewed, and a
+    # value containing a path separator would write outside the receipt dir.
+    # (Spec lane.) An amend moves HEAD and invalidates the receipt — that is the
+    # intended behaviour, not something to work around with a flag.
+    sha = review.head_sha(repo_root)
     if not sha:
         print("review-receipt: could not read HEAD", file=sys.stderr)
         return 2
@@ -218,9 +223,11 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
             return 2
         counts[flag] = int(raw)
 
+    fixed_point = _opt(rest, "--fixed-point") or "main"
     receipt = review.Receipt(
         sha=sha,
-        fixed_point=_opt(rest, "--fixed-point") or "main",
+        fixed_point=fixed_point,
+        fixed_point_sha=review.base_sha(repo_root, fixed_point),
         lanes_ran=tuple(lanes),
         lanes_skipped=tuple(skipped),
         findings=counts["--findings"],
@@ -231,7 +238,7 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     # would leave an invalid receipt on disk for this SHA — harmless to the gate,
     # which re-reads and re-rejects it, but it turns "no review yet" into "a
     # review that failed", and those should not look the same on disk.
-    reason = review.rejection(receipt)
+    reason = review.rejection(repo_root, receipt)
     if reason is not None:
         print(f"review-receipt: REFUSED — {reason}", file=sys.stderr)
         return 2

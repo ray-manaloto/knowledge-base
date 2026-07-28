@@ -22,6 +22,7 @@ def _write(tmp_path: Path, **overrides: object) -> Path:
         "sha": _SHA,
         "written_at": "2026-07-28T02:14:09+00:00",
         "fixed_point": "main",
+        "fixed_point_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "lanes_ran": ["standards", "spec", "cold:codex", "silent-failure"],
         "lanes_skipped": [],
         "findings": 3,
@@ -31,7 +32,20 @@ def _write(tmp_path: Path, **overrides: object) -> Path:
     path = review.receipt_path(tmp_path, _SHA)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+    # Every lane claimed as RUN needs its report on disk, so the default fixture
+    # is a receipt whose evidence actually exists.
+    ran = payload.get("lanes_ran")
+    for entry in ran if isinstance(ran, list) else []:
+        _write_report(tmp_path, str(entry).partition(":")[0])
     return tmp_path
+
+
+def _write_report(tmp_path: Path, lane: str, body: str = "NO FINDINGS") -> Path:
+    """Write ``lane``'s report for the fixture SHA."""
+    rp = review.report_path(tmp_path, _SHA, lane)
+    rp.parent.mkdir(parents=True, exist_ok=True)
+    rp.write_text(body, encoding="utf-8")
+    return rp
 
 
 def test_valid_receipt_passes(tmp_path: Path) -> None:
@@ -43,11 +57,14 @@ def test_valid_receipt_passes(tmp_path: Path) -> None:
 
 def test_write_receipt_roundtrips(tmp_path: Path) -> None:
     """`write_receipt` produces something `receipt_state` accepts."""
+    for lane in ("standards", "spec"):
+        _write_report(tmp_path, lane)
     review.write_receipt(
         tmp_path,
         review.Receipt(
             sha=_SHA,
             fixed_point="main",
+            fixed_point_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             lanes_ran=("standards", "spec"),
             lanes_skipped=(
                 "cold:not-applicable-docs-only",
@@ -128,7 +145,7 @@ def test_no_lane_ran_fails(tmp_path: Path) -> None:
         _write(
             tmp_path,
             lanes_ran=[],
-            lanes_skipped=[f"{lane}:not-yet-run" for lane in review.LANES],
+            lanes_skipped=[f"{lane}:not-applicable-docs-only" for lane in review.LANES],
         ),
         _SHA,
     )
@@ -145,7 +162,7 @@ def test_unexplained_skip_fails(tmp_path: Path, skipped: list[object]) -> None:
     """
     ok, summary = review.receipt_state(_write(tmp_path, lanes_skipped=skipped), _SHA)
     assert not ok
-    assert "no reason" in summary
+    assert "not excused" in summary
 
 
 def test_explained_skip_passes(tmp_path: Path) -> None:
@@ -195,6 +212,61 @@ def test_lane_variant_suffix_is_accepted(tmp_path: Path) -> None:
         ),
         _SHA,
     )
+    assert ok
+
+
+def test_not_yet_run_is_not_a_valid_skip(tmp_path: Path) -> None:
+    """`cold:not-yet-run` is a GAP wearing a reason's clothes.
+
+    The reference docs already said a lane that could not be spawned is
+    `not-yet-run` and never `not-applicable` — and the first version of the gate
+    then accepted any non-empty reason, so the doc and the code disagreed with
+    the code being the permissive one.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "silent-failure"],
+            lanes_skipped=["cold:not-yet-run"],
+        ),
+        _SHA,
+    )
+    assert not ok
+    assert "not excused" in summary
+
+
+def test_lane_claimed_without_a_report_is_rejected(tmp_path: Path) -> None:
+    """The widest hole: a full-coverage receipt minted with no evidence at all.
+
+    `--lanes standards,spec,cold:codex,silent-failure --blocking 0` used to pass
+    in one command without any lane having run.
+    """
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "cold").unlink()
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "no non-empty report" in summary
+    assert "cold" in summary
+
+
+def test_empty_report_does_not_count_as_evidence(tmp_path: Path) -> None:
+    """A whitespace-only report file is a placeholder, not a review."""
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "spec").write_text("   \n", encoding="utf-8")
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "spec" in summary
+
+
+def test_no_findings_report_is_valid_evidence(tmp_path: Path) -> None:
+    """CONTROL ARM: a lane that ran and found nothing must still pass.
+
+    Without this arm the evidence check would quietly require every lane to
+    produce findings, which would reward inventing them.
+    """
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "standards").write_text("NO FINDINGS", encoding="utf-8")
+    ok, _ = review.receipt_state(root, _SHA)
     assert ok
 
 

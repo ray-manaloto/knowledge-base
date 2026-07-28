@@ -28,10 +28,39 @@ from typing import Any
 #: receipt is machine-local by design (`agent-artifact-conventions.md`).
 RECEIPT_DIR = Path(".agent/kb/review")
 
+#: Where each lane's report must be written, as `review-<sha>-<lane>.md`.
+#:
+#: This is what stops the receipt being pure honor-system. Without it,
+#: `--lanes standards,spec,cold:codex,silent-failure --blocking 0` minted a
+#: full-coverage receipt in one command with **zero evidence any lane ran** —
+#: the widest version of a hole whose narrower forms this module had already
+#: closed twice. Found by the spec lane, and `agent-report-persistence.md`
+#: independently requires these reports on disk anyway.
+#:
+#: It raises the bar; it is not proof. A determined caller can write a stub
+#: file. What it buys is that the honest path is the easy one and faking
+#: coverage takes deliberate work — the same "strictly less than a signed
+#: receipt" honesty the skill states about the whole mechanism.
+REPORT_DIR = RECEIPT_DIR / "reports"
+
 #: A skipped lane must say WHY, as `lane:reason`. A bare lane name is rejected:
 #: "did not run" and "does not apply here" are different states, and collapsing
 #: them is how a gap gets reported as coverage.
 _SKIP_SEPARATOR = ":"
+
+#: The ONLY reasons that excuse a lane. A skip must be a JUSTIFICATION — the
+#: lane had nothing to say about this diff — not a report that it never ran.
+#:
+#: Accepting any non-empty reason was the second version of the same defect: the
+#: reference docs already said "a lane that could not be spawned is
+#: `not-yet-run`, never `not-applicable`", and then `cold:not-yet-run` sailed
+#: through the gate. A doc and the code disagreeing is worse than either alone,
+#: and here the code was the permissive one. Found by the cold lane on its
+#: SECOND pass, over the commit that fixed its first finding.
+_SKIP_JUSTIFICATIONS = (
+    "not-applicable-",  # the lane cannot say anything about this diff
+    "no-spec-available",  # spec lane, and only when there genuinely is no spec
+)
 
 #: The four lenses. Every one must be ACCOUNTED FOR in a receipt — either it ran
 #: or it was skipped with a reason. Without this list the gate accepted any
@@ -61,6 +90,12 @@ class Receipt:
 
     sha: str
     fixed_point: str
+    #: The base RESOLVED to a commit. `fixed_point` alone is a movable name —
+    #: `main` today is not `main` tomorrow — so it cannot say which base was
+    #: actually reviewed. Recorded, not gated: the gate's question is "was THIS
+    #: commit reviewed", and over-gating on a base that legitimately moves would
+    #: invalidate honest receipts. (Cold lane, second pass.)
+    fixed_point_sha: str
     lanes_ran: tuple[str, ...]
     lanes_skipped: tuple[str, ...]
     findings: int
@@ -72,6 +107,7 @@ class Receipt:
             "sha": self.sha,
             "written_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
             "fixed_point": self.fixed_point,
+            "fixed_point_sha": self.fixed_point_sha,
             "lanes_ran": list(self.lanes_ran),
             "lanes_skipped": list(self.lanes_skipped),
             "findings": self.findings,
@@ -79,26 +115,48 @@ class Receipt:
         }
 
 
-def rejection(receipt: Receipt) -> str | None:
+def rejection(repo_root: Path, receipt: Receipt) -> str | None:
     """Return why ``receipt`` would be rejected, or None if it would pass.
 
     The same checks :func:`receipt_state` applies, reachable BEFORE the write so
     a bad receipt is refused rather than written and then reported as failing.
     One implementation, so the writer and the reader cannot drift apart.
     """
-    return _reject_reason(receipt.as_payload(), receipt.sha)
+    payload = receipt.as_payload()
+    return _reject_reason(payload, receipt.sha) or _evidence_gap(repo_root, payload, receipt.sha)
+
+
+def _evidence_gap(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
+    """Return why the claimed lanes lack reports on disk, or None if they don't."""
+    missing = _missing_reports(repo_root, data, sha)
+    if missing:
+        return (
+            f"claims lane(s) {', '.join(missing)} ran, but no non-empty report is at "
+            f"{REPORT_DIR}/review-{sha[:12]}…-<lane>.md — a lane that left no report "
+            f"is a claim, not a review"
+        )
+    return None
+
+
+def _safe(sha: str) -> str:
+    """Return ``sha`` with anything that is not a commit character stripped.
+
+    Defence in depth behind the CLI's refusal to take a `--sha`: a value with a
+    path separator in it would otherwise steer a write out of the receipt dir.
+    """
+    return "".join(c for c in sha if c.isalnum())
 
 
 def receipt_path(repo_root: Path, sha: str) -> Path:
     """Return the receipt path for ``sha`` (not necessarily existing)."""
-    return repo_root / RECEIPT_DIR / f"receipt-{sha}.json"
+    return repo_root / RECEIPT_DIR / f"receipt-{_safe(sha)}.json"
 
 
-def head_sha(repo_root: Path) -> str:
-    """Return the full SHA at HEAD, or "" if git cannot be read."""
+def _git(repo_root: Path, *args: str) -> str:
+    """Return stripped stdout of `git *args`, or "" if it cannot be read."""
     try:
         proc = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", *args],
             cwd=repo_root,
             capture_output=True,
             text=True,
@@ -110,6 +168,20 @@ def head_sha(repo_root: Path) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
+def head_sha(repo_root: Path) -> str:
+    """Return the full SHA at HEAD, or "" if git cannot be read."""
+    return _git(repo_root, "rev-parse", "HEAD")
+
+
+def base_sha(repo_root: Path, fixed_point: str) -> str:
+    """Resolve ``fixed_point`` to the merge-base commit, or "" if unresolvable.
+
+    Three-dot semantics, matching the `git diff <base>...HEAD` the review runs
+    against: the question is what the branch added, not how the base has moved.
+    """
+    return _git(repo_root, "merge-base", fixed_point, "HEAD")
+
+
 def write_receipt(repo_root: Path, receipt: Receipt) -> Path:
     """Write ``receipt`` under :data:`RECEIPT_DIR` and return its path."""
     path = receipt_path(repo_root, receipt.sha)
@@ -119,12 +191,37 @@ def write_receipt(repo_root: Path, receipt: Receipt) -> Path:
 
 
 def _unexplained_skips(data: dict[str, Any]) -> list[str]:
-    """Return skipped-lane entries that carry no reason."""
-    return [
-        str(s)
-        for s in data.get("lanes_skipped", [])
-        if not isinstance(s, str) or not s.partition(_SKIP_SEPARATOR)[2]
-    ]
+    """Return skipped-lane entries whose reason does not excuse the lane.
+
+    Two ways to fail: no reason at all, or a reason that merely REPORTS the lane
+    did not run. Only a justification — the lane had nothing to say about this
+    diff — excuses it. `cold:not-yet-run` is a gap wearing a reason's clothes.
+    """
+    bad: list[str] = []
+    for s in data.get("lanes_skipped", []):
+        if not isinstance(s, str):
+            bad.append(str(s))
+            continue
+        reason = s.partition(_SKIP_SEPARATOR)[2]
+        if not reason or not reason.startswith(_SKIP_JUSTIFICATIONS):
+            bad.append(s)
+    return bad
+
+
+def report_path(repo_root: Path, sha: str, lane: str) -> Path:
+    """Return where ``lane``'s report for ``sha`` must be written."""
+    return repo_root / REPORT_DIR / f"review-{_safe(sha)}-{_safe(lane)}.md"
+
+
+def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
+    """Return lanes claimed as RUN that have no non-empty report on disk."""
+    missing = []
+    for entry in data.get("lanes_ran") or []:
+        lane = _lane_prefix(str(entry))
+        path = report_path(repo_root, sha, lane)
+        if not path.is_file() or not path.read_text(encoding="utf-8", errors="replace").strip():
+            missing.append(lane)
+    return missing
 
 
 def _check_identity(data: dict[str, Any], sha: str) -> str | None:
@@ -146,7 +243,11 @@ def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
     """
     unexplained = _unexplained_skips(data)
     if unexplained:
-        return f"skipped lane(s) with no reason: {', '.join(unexplained)}"
+        return (
+            f"skipped lane(s) not excused: {', '.join(unexplained)} — a skip must "
+            f"justify itself with one of {', '.join(_SKIP_JUSTIFICATIONS)}; a lane "
+            f"that merely did not run is a gap, not a skip"
+        )
 
     ran = [str(s) for s in data.get("lanes_ran") or []]
     named = ran + [str(s) for s in data.get("lanes_skipped") or []]
@@ -216,7 +317,7 @@ def receipt_state(repo_root: Path, sha: str) -> tuple[bool, str]:
     if not isinstance(data, dict):
         return False, f"receipt for {sha[:12]} is not an object"
 
-    reason = _reject_reason(data, sha)
+    reason = _reject_reason(data, sha) or _evidence_gap(repo_root, data, sha)
     if reason is not None:
         return False, f"receipt for {sha[:12]} {reason}"
 

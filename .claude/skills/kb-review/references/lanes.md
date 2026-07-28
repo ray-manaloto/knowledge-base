@@ -122,6 +122,18 @@ found the shape and missed the reasoning; a lens that finds one of them
 `cold:claude-fallback-SAME-FAMILY`. **A skip with no reason is not a skip, it is
 a gap**, and `kb-ship` rejects a receipt containing one.
 
+**A lane claimed as RUN must have left a report** at
+`.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty. Without that the
+whole receipt was honor-system: one command with four lane names minted full
+coverage having run nothing, which is the widest form of a hole whose narrower
+forms had already been closed twice. It raises the bar rather than proving
+anything — a stub file still passes — but the honest path is now the easy one.
+
+**Only two skip reasons excuse a lane**: `not-applicable-<why>` and
+`no-spec-available`. `not-yet-run` is a **gap** and is rejected, which is what
+the paragraph above already said and the first version of the gate did not
+enforce.
+
 **The lane set is CLOSED** (`kb_setup.review.LANES`), and all four must be
 accounted for — each either ran or was skipped with a reason. Both halves of
 that matter, and the first draft had neither: the gate only checked that

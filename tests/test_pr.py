@@ -235,11 +235,16 @@ def test_ship_accepts_clean_feature_branch(monkeypatch, tmp_path):
     """
     from kb_setup import review
 
+    for lane in ("standards", "spec"):
+        rp = review.report_path(tmp_path, "feat/x", lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("NO FINDINGS", encoding="utf-8")
     review.write_receipt(
         tmp_path,
         review.Receipt(
             sha="feat/x",  # what the stubbed `git rev-parse HEAD` returns
             fixed_point="main",
+            fixed_point_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             lanes_ran=("standards", "spec"),
             lanes_skipped=(
                 "cold:not-applicable-docs-only",
@@ -263,6 +268,7 @@ def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
         review.Receipt(
             sha="feat/x",
             fixed_point="main",
+            fixed_point_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             lanes_ran=("standards", "spec", "cold:codex", "silent-failure"),
             lanes_skipped=(),
             findings=4,
