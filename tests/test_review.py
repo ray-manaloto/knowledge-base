@@ -589,66 +589,20 @@ def test_empty_sha_fails(tmp_path: Path) -> None:
 # JSON; these are about git, so they use git.
 
 
-def _git(root: Path, *args: str) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(root), *args], capture_output=True, text=True, check=True, timeout=30
-    )
-    return proc.stdout.strip()
-
-
-def _init_repo(tmp_path: Path) -> Path:
-    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True, timeout=30)
-    _git(tmp_path, "config", "user.email", "t@example.com")
-    _git(tmp_path, "config", "user.name", "T")
-    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "base")
-    _git(tmp_path, "checkout", "-q", "-b", "work")
-    return tmp_path
-
-
-def _commit_file(root: Path, rel: str, body: str = "x\n") -> str:
-    path = root / rel
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(body, encoding="utf-8")
-    _git(root, "add", "--", rel)
-    _git(root, "commit", "-q", "-m", f"add {rel}")
-    return _git(root, "rev-parse", "HEAD")
-
-
-def _receipt_for(root: Path, sha: str) -> None:
-    """Write a valid receipt (and its lane reports) for a real commit."""
-    for lane in LANES_RAN:
-        rp = review.report_path(root, sha, lane)
-        rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("NO FINDINGS", encoding="utf-8")
-    review.write_receipt(
-        root,
-        review.Receipt(
-            sha=sha,
-            fixed_point="main",
-            fixed_point_sha=review.base_sha(root, "main", head=sha),
-            lanes_ran=LANES_RAN,
-            lanes_skipped=(),
-            findings=0,
-            blocking=0,
-        ),
-    )
-
-
-LANES_RAN = ("standards", "spec", "cold:codex", "silent-failure")
-
-
-def test_exempt_delta_lets_an_ancestor_receipt_cover_head(tmp_path: Path) -> None:
+def test_exempt_delta_lets_an_ancestor_receipt_cover_head(
+    tmp_path: Path, commit_file, receipt_for
+) -> None:
     """#66's PASS arm: P7's own output committed after the review still ships.
 
     The realistic sequence — review, then `kb-remember` and `kb-goal-outcome`,
     then commit what they wrote. Before this, that commit was unshippable and
     three rounds running left the files uncommitted instead.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
-    _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
-    head = _commit_file(root, "docs/goals/README.md", "| pair | achieved |\n")
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+    head = commit_file("docs/goals/README.md", "| pair | achieved |\n")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert ok, summary
@@ -658,13 +612,13 @@ def test_exempt_delta_lets_an_ancestor_receipt_cover_head(tmp_path: Path) -> Non
     assert "graphify-out/memory/query_1.md" in summary
 
 
-def test_one_reviewed_path_in_the_delta_refuses(tmp_path: Path) -> None:
+def test_one_reviewed_path_in_the_delta_refuses(tmp_path: Path, commit_file, receipt_for) -> None:
     """FAIL arm: exempt files alongside code do not launder the code."""
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
-    _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
-    head = _commit_file(root, "python/src/kb_setup/other.py", "def g(): ...\n")
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+    head = commit_file("python/src/kb_setup/other.py", "def g(): ...\n")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert not ok
@@ -674,82 +628,90 @@ def test_one_reviewed_path_in_the_delta_refuses(tmp_path: Path) -> None:
     assert reviewed[:12] in summary
 
 
-def test_a_rename_out_of_a_reviewed_path_refuses(tmp_path: Path) -> None:
+def test_a_rename_out_of_a_reviewed_path_refuses(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
     """`--no-renames` earns its place: moving code INTO an exempt dir is a delete.
 
     With rename detection on, `git diff --name-only` reports only the exempt
     destination, so the delta reads as exempt while a reviewed file left the
     tree. Off, the source path shows as a delete and fails the check.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
     (root / "graphify-out" / "memory").mkdir(parents=True, exist_ok=True)
-    _git(root, "mv", "python/src/kb_setup/thing.py", "graphify-out/memory/thing.py")
-    _git(root, "commit", "-q", "-m", "move")
-    head = _git(root, "rev-parse", "HEAD")
+    git("mv", "python/src/kb_setup/thing.py", "graphify-out/memory/thing.py")
+    git("commit", "-q", "-m", "move")
+    head = git("rev-parse", "HEAD")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert not ok
     assert "python/src/kb_setup/thing.py" in summary
 
 
-def test_the_walk_does_not_reach_a_receipt_on_main(tmp_path: Path) -> None:
+def test_the_walk_does_not_reach_a_receipt_on_main(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
     """A receipt for a commit already on `main` reviewed a DIFFERENT branch.
 
     Bounding the ancestry walk to `main..sha` is what stops an old merged
     review vouching for new work whose delta happens to be exempt.
     """
-    root = _init_repo(tmp_path)
-    _git(root, "checkout", "-q", "main")
-    on_main = _commit_file(root, "docs/notes.md", "# notes\n")
-    _receipt_for(root, on_main)
-    _git(root, "checkout", "-q", "work")
-    _git(root, "merge", "-q", "main")
-    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    root = tmp_path
+    git("checkout", "-q", "main")
+    on_main = commit_file("docs/notes.md", "# notes\n")
+    receipt_for(on_main)
+    git("checkout", "-q", "work")
+    git("merge", "-q", "main")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert not ok
     assert "no commit below it on this branch has one either" in summary
 
 
-def test_the_fallback_is_opt_in_with_require_base(tmp_path: Path) -> None:
+def test_the_fallback_is_opt_in_with_require_base(tmp_path: Path, commit_file, receipt_for) -> None:
     """CONTROL ARM: without `require_base` the strict SHA identity still holds.
 
     The receipt writer's own read-back passes no base and must keep getting the
     unrelaxed answer, or this change would have quietly widened every caller.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
-    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
 
     ok, summary = review.receipt_state(root, head)
     assert not ok
     assert "no review receipt" in summary
 
 
-def test_the_ancestors_own_receipt_still_has_to_pass(tmp_path: Path) -> None:
+def test_the_ancestors_own_receipt_still_has_to_pass(
+    tmp_path: Path, commit_file, receipt_for
+) -> None:
     """The fallback picks WHICH receipt is read; it does not soften the reading.
 
     A blocking finding on the ancestor must still refuse, or an exempt commit
     on top would be a way to launder an unresolved blocker.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
     path = review.receipt_path(root, reviewed)
     data = json.loads(path.read_text(encoding="utf-8"))
     data["blocking"] = 1
     path.write_text(json.dumps(data), encoding="utf-8")
-    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert not ok
     assert "blocking review finding" in summary
 
 
-def test_an_unreadable_delta_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_unreadable_delta_fails_closed(
+    tmp_path: Path, commit_file, receipt_for, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A git failure must not read as "the delta is empty, so it is exempt".
 
     This is why `_git_result` exists at all: `_git` collapses a failure into
@@ -757,10 +719,10 @@ def test_an_unreadable_delta_fails_closed(tmp_path: Path, monkeypatch: pytest.Mo
     one return for both would make a broken `git diff` the most permissive
     input the gate has.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
-    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
     # CONTROL ARM: with git working, this exact call passes.
     assert review.receipt_state(root, head, require_base="main")[0]
 
@@ -787,18 +749,20 @@ def test_exempt_paths_match_prefixes_and_exact_files() -> None:
     assert not review._is_exempt("docs/goals/2026-07-27-x-goal.md")
 
 
-def test_many_reviewed_paths_are_summarised_not_dumped(tmp_path: Path) -> None:
+def test_many_reviewed_paths_are_summarised_not_dumped(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
     """The `(+N more)` branch of `_MAX_NAMED_PATHS`, which nothing reached before.
 
     Delete the bound and every test still passed — a limit verified only on
     inputs below it (`repo-smells.md`, "verified only in the PASS direction").
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
     for i in range(9):
-        _commit_file(root, f"python/src/kb_setup/mod_{i}.py", f"X = {i}\n")
-    head = _git(root, "rev-parse", "HEAD")
+        commit_file(f"python/src/kb_setup/mod_{i}.py", f"X = {i}\n")
+    head = git("rev-parse", "HEAD")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert not ok
@@ -807,25 +771,29 @@ def test_many_reviewed_paths_are_summarised_not_dumped(tmp_path: Path) -> None:
     assert summary.count("python/src/kb_setup/mod_") == review._MAX_NAMED_PATHS
 
 
-def test_an_accepted_fallback_is_summarised_too(tmp_path: Path) -> None:
+def test_an_accepted_fallback_is_summarised_too(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
     """CONTROL ARM on the permissive branch — it must bound its list as well.
 
     Only the refusal branch was bounded, leaving the branch that lets a commit
     SHIP able to print an unbounded wall of paths.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
     for i in range(9):
-        _commit_file(root, f"graphify-out/memory/query_{i}.md", f"# lesson {i}\n")
-    head = _git(root, "rev-parse", "HEAD")
+        commit_file(f"graphify-out/memory/query_{i}.md", f"# lesson {i}\n")
+    head = git("rev-parse", "HEAD")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert ok, summary
     assert "(+4 more)" in summary, summary
 
 
-def test_a_later_ancestor_can_cover_where_the_first_does_not(tmp_path: Path) -> None:
+def test_a_later_ancestor_can_cover_where_the_first_does_not(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
     """Trying EVERY reviewed ancestor, not just the first rev-list yields.
 
     The first draft took one candidate and justified it with "a farther ancestor
@@ -834,15 +802,15 @@ def test_a_later_ancestor_can_cover_where_the_first_does_not(tmp_path: Path) -> 
     cost an unwarranted refusal rather than a bad acceptance — which is why it
     survived a green suite. Two lanes found it independently.
     """
-    root = _init_repo(tmp_path)
-    older = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, older)
-    _commit_file(root, "scratch.py", "TEMP = 1\n")
-    newer = _git(root, "rev-parse", "HEAD")
-    _receipt_for(root, newer)
-    _git(root, "rm", "-q", "--", "scratch.py")
-    _git(root, "commit", "-q", "-m", "drop scratch")
-    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    root = tmp_path
+    older = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(older)
+    commit_file("scratch.py", "TEMP = 1\n")
+    newer = git("rev-parse", "HEAD")
+    receipt_for(newer)
+    git("rm", "-q", "--", "scratch.py")
+    git("commit", "-q", "-m", "drop scratch")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
 
     # The NEARER receipt (`newer`) cannot cover HEAD: scratch.py was deleted
     # since, and a delete is a reviewed-path change. The OLDER one can — that
@@ -855,23 +823,233 @@ def test_a_later_ancestor_can_cover_where_the_first_does_not(tmp_path: Path) -> 
     assert older[:12] in summary
 
 
-def test_a_refused_fallback_still_explains_itself_on_a_later_failure(tmp_path: Path) -> None:
+def test_a_refused_fallback_still_explains_itself_on_a_later_failure(
+    tmp_path: Path, commit_file, receipt_for
+) -> None:
     """The note must reach the FAILURE returns, not only the success one.
 
     An accepted fallback whose ancestor receipt then fails printed
     `receipt for <ancestor-sha> …` with nothing saying why a non-HEAD SHA was
     being judged — a refusal the reader cannot act on.
     """
-    root = _init_repo(tmp_path)
-    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
-    _receipt_for(root, reviewed)
+    root = tmp_path
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
     path = review.receipt_path(root, reviewed)
     data = json.loads(path.read_text(encoding="utf-8"))
     data["blocking"] = 1
     path.write_text(json.dumps(data), encoding="utf-8")
-    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
 
     ok, summary = review.receipt_state(root, head, require_base="main")
     assert not ok
     assert "blocking review finding" in summary
     assert "covered by the receipt for" in summary, summary
+
+
+def test_a_later_ancestor_is_tried_when_the_nearer_receipt_is_invalid(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
+    """A qualifying DELTA is not a valid RECEIPT — both candidates get judged.
+
+    The first draft committed to the first ancestor whose delta was exempt-only
+    and never looked further, so one ancestor with a blocking finding consumed
+    the branch's only chance even though an older receipt covered the same tree.
+    Fail-closed, and untested, which is why it survived a green suite — the same
+    single-candidate bug this feature had already fixed one dimension over.
+    """
+    older = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(older)
+    newer = commit_file("graphify-out/memory/query_0.md", "# earlier lesson\n")
+    receipt_for(newer)
+    blocked = review.receipt_path(tmp_path, newer)
+    data = json.loads(blocked.read_text(encoding="utf-8"))
+    data["blocking"] = 1
+    blocked.write_text(json.dumps(data), encoding="utf-8")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+
+    # Both ancestors have exempt-only deltas to HEAD; only the older validates.
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert ok, summary
+    assert older[:12] in summary
+
+
+def test_all_candidates_invalid_still_reports_the_receipt_failure(
+    tmp_path: Path, commit_file, receipt_for
+) -> None:
+    """CONTROL ARM — when NO candidate validates, the refusal must still be specific.
+
+    Without this the fix above could have been "skip invalid candidates
+    silently", which turns a blocking finding into a bare "no receipt".
+    """
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    path = review.receipt_path(tmp_path, reviewed)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["blocking"] = 2
+    path.write_text(json.dumps(data), encoding="utf-8")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert not ok
+    assert "2 blocking review finding" in summary
+
+
+def test_the_most_informative_refusal_is_the_one_reported(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
+    """Of several refusing ancestors, report the one naming the FEWEST files.
+
+    Candidates arrive in `git rev-list` order — reverse chronological, so the
+    NEWEST reviewed ancestor comes first. Newest is usually also fewest-offending,
+    which is why the first version of this test passed with the sort deleted: it
+    could only ever have agreed with it. A revert separates the two orders, and it
+    is the same non-monotonicity that forced trying every candidate at all — the
+    two scratch files are added after the older receipt and deleted again before
+    HEAD, so they are absent from the OLDER ancestor's delta and present as
+    deletions in the newer one's.
+    """
+    older = commit_file("python/src/kb_setup/a.py", "A = 1\n")
+    receipt_for(older)
+    commit_file("python/src/kb_setup/scratch_one.py", "S = 1\n")
+    newer = commit_file("python/src/kb_setup/scratch_two.py", "S = 2\n")
+    receipt_for(newer)
+    git(
+        "rm", "-q", "--", "python/src/kb_setup/scratch_one.py", "python/src/kb_setup/scratch_two.py"
+    )
+    git("commit", "-q", "-m", "drop the scratch files")
+    commit_file("python/src/kb_setup/last.py", "L = 1\n")
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+
+    # The measurement the assertion rests on, stated rather than assumed: the
+    # NEWER ancestor is blocked by three paths, the OLDER by one.
+    assert (
+        len(
+            [
+                p
+                for p in review._delta_paths(tmp_path, newer, head) or []
+                if not review._is_exempt(p)
+            ]
+        )
+        == 3
+    )
+    assert [
+        p for p in review._delta_paths(tmp_path, older, head) or [] if not review._is_exempt(p)
+    ] == ["python/src/kb_setup/last.py"]
+
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert not ok
+    # `rev-list` offers `newer` first. Reporting it would name three files
+    # including two irrelevant deletions; the one that actually blocks the ship
+    # is `last.py`, and it is the older ancestor's refusal that says so.
+    assert older[:12] in summary
+    assert "last.py" in summary
+    assert "scratch_one.py" not in summary
+
+
+def test_a_control_character_in_a_path_is_escaped(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
+    """Every character in a refusal comes from a filename in someone's commit.
+
+    A newline splits one line of tool output into what looks like two; an ANSI
+    escape can repaint the lines around it. `ship`/`land` print these strings, so
+    the gate's own diagnosis is the one part of its output an attacker can shape.
+    """
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    nasty = "python/src/kb_setup/we\x1b[2Kird\nname.py"
+    (tmp_path / nasty).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / nasty).write_text("X = 1\n", encoding="utf-8")
+    git("add", "--", nasty)
+    git("commit", "-q", "-m", "odd name")
+    head = git("rev-parse", "HEAD")
+
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert not ok
+    # The path is still identifiable...
+    assert "ird" in summary
+    # ...but neither control character survives into the terminal.
+    assert "\x1b" not in summary
+    assert "\n" not in summary
+    assert "\\x1b" in summary
+
+
+def test_an_ordinary_non_ascii_path_is_left_alone(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
+    r"""CONTROL ARM — escaping must not mangle a legitimate filename.
+
+    A `unicode_escape` round-trip would turn every accented or CJK path into
+    `\\xNN` noise, costing legibility for every honest filename to defend against
+    a rare one.
+    """
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    head = commit_file("python/src/kb_setup/café_日本.py", "X = 1\n")
+
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert not ok
+    assert "café_日本.py" in summary
+    assert "\\x" not in summary
+
+
+def test_a_non_utf8_pathname_refuses_instead_of_crashing(
+    tmp_path: Path, commit_file, receipt_for, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`text=True` decodes, and `UnicodeDecodeError` is not an `OSError`.
+
+    So a pathname git holds as non-UTF-8 bytes escaped as a TRACEBACK out of the
+    middle of `ship`/`land` — a crash where this module's whole contract is a
+    worded refusal. Raised through the real call site rather than by planting an
+    undecodable filename, because whether a given filesystem will accept one is
+    itself platform-dependent, and a test that silently does not run on macOS is
+    the kind of probe this repo keeps catching.
+    """
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+    # CONTROL ARM: it passes with git answering normally.
+    assert review.receipt_state(tmp_path, head, require_base="main")[0]
+
+    real = review.subprocess.run
+
+    # The kwargs are restated rather than forwarded: `**kwargs: object` fails ty
+    # against `subprocess.run`'s overloads and `**kwargs: Any` fails ruff ANN401,
+    # and there is no inline suppression in this repo. They are the exact set
+    # `_git_result` passes, so the stub stays honest about what it stands in for.
+    def decode_error_on_diff(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        if cmd[:2] == ["git", "diff"]:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        return real(cmd, cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30)
+
+    monkeypatch.setattr(review.subprocess, "run", decode_error_on_diff)
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert not ok
+    assert "could not be read" in summary
+
+
+def test_a_leading_space_in_a_pathname_survives_the_delta(
+    tmp_path: Path, git, commit_file, receipt_for
+) -> None:
+    r"""`_git_result` must not strip the NUL-joined `-z` blob.
+
+    `.strip()` ate a leading space from the FIRST path in the stream, so
+    `" graphify-out/memory/x.md"` and `"graphify-out/memory/x.md"` became the
+    same string — and in the shape that matters, an indented reviewed path could
+    read as an exempt one. The file here is named with a leading space on
+    purpose; `-z` exists so git hands over the bytes it has.
+    """
+    reviewed = commit_file("python/src/kb_setup/thing.py", "def f(): ...\n")
+    receipt_for(reviewed)
+    odd = " graphify-out/memory/leading-space.md"
+    (tmp_path / odd).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / odd).write_text("# not exempt\n", encoding="utf-8")
+    git("add", "--", odd)
+    git("commit", "-q", "-m", "leading space")
+    head = git("rev-parse", "HEAD")
+
+    assert review._delta_paths(tmp_path, reviewed, head) == [odd]
+    # And it must NOT be treated as exempt: the exempt entry has no leading space.
+    ok, summary = review.receipt_state(tmp_path, head, require_base="main")
+    assert not ok, summary

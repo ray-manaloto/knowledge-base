@@ -704,80 +704,25 @@ def test_land_refuses_an_unreviewed_pr_head(monkeypatch, tmp_path):
 # --------------------------------------------------------------------------
 # #66 — ship/land accept an ancestor receipt whose delta is exempt
 #
-# A REAL git repo, not the subprocess stub used above. The property under test
-# IS git behaviour (ancestry, `git diff`), and the round-1 spec lane's finding
-# was precisely that the only evidence `ship_main`/`land_main` honour the
-# fallback was inference from an unchanged file. Inference is what a stub would
-# repeat.
+# A REAL git repo (the `git`/`commit_file`/`receipt_for` fixtures in
+# `conftest.py`), not the subprocess stub used above. The property under test IS
+# git behaviour (ancestry, `git diff`), and the round-1 spec lane's finding was
+# precisely that the only evidence `ship_main`/`land_main` honour the fallback
+# was inference from an unchanged file. Inference is what a stub would repeat.
 # --------------------------------------------------------------------------
 
 
-def _real_repo(tmp_path) -> tuple[Callable[..., str], str]:
-    from kb_setup import review
-
-    def git(*args: str) -> str:
-        proc = subprocess.run(
-            ["git", "-C", str(tmp_path), *args],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30,
-        )
-        return proc.stdout.strip()
-
-    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True, timeout=30)
-    git("config", "user.email", "t@example.com")
-    git("config", "user.name", "T")
-    git("commit", "-q", "--allow-empty", "-m", "base")
-    git("checkout", "-q", "-b", "work")
-
-    # Receipts live under `.agent/`, which the real repo gitignores. Without
-    # that here, `_ship_preflight` refuses for a dirty tree before the receipt
-    # gate is ever reached — and the test would then pass for the wrong reason.
-    (tmp_path / ".gitignore").write_text(".agent/\n", encoding="utf-8")
-    (tmp_path / "code.py").write_text("X = 1\n", encoding="utf-8")
-    git("add", "--", ".gitignore", "code.py")
-    git("commit", "-q", "-m", "code")
-    reviewed = git("rev-parse", "HEAD")
-
-    for lane in ("standards", "spec", "cold", "silent-failure"):
-        rp = review.report_path(tmp_path, reviewed, lane)
-        rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("NO FINDINGS", encoding="utf-8")
-    review.write_receipt(
-        tmp_path,
-        review.Receipt(
-            sha=reviewed,
-            fixed_point="main",
-            fixed_point_sha=review.base_sha(tmp_path, "main", head=reviewed),
-            lanes_ran=("standards", "spec", "cold:codex", "silent-failure"),
-            lanes_skipped=(),
-            findings=0,
-            blocking=0,
-        ),
-    )
-    return git, reviewed
-
-
-def _commit_closing_artifact(git, tmp_path) -> str:
-    """Commit exactly what P7 writes — the case #66 exists for."""
-    mem = tmp_path / "graphify-out" / "memory"
-    mem.mkdir(parents=True, exist_ok=True)
-    (mem / "query_1.md").write_text("# a lesson\n", encoding="utf-8")
-    git("add", "--", "graphify-out/memory/query_1.md")
-    git("commit", "-q", "-m", "close the loop")
-    return git("rev-parse", "HEAD")
-
-
-def test_ship_accepts_an_ancestor_receipt_for_a_closing_commit(monkeypatch, tmp_path, capsys):
+def test_ship_accepts_an_ancestor_receipt_for_a_closing_commit(
+    monkeypatch, tmp_path, capsys, commit_file, receipt_for
+):
     """`ship` must get PAST the receipt gate when the delta is P7's own output.
 
     Stopped at the gates deliberately: running `lint`/`test`/`brain-audit`/`eval`
     inside a unit test is minutes of the wrong thing. What matters is WHICH
     refusal comes back — the gates', not the review's.
     """
-    git, _ = _real_repo(tmp_path)
-    _commit_closing_artifact(git, tmp_path)
+    receipt_for(commit_file("code.py", "X = 1\n"))
+    commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
     monkeypatch.setattr(pr, "run_gates", lambda _root: False)
 
     assert pr.ship_main(tmp_path) == 1
@@ -787,19 +732,18 @@ def test_ship_accepts_an_ancestor_receipt_for_a_closing_commit(monkeypatch, tmp_
     assert "covered by the receipt for" in out
 
 
-def test_ship_still_refuses_a_closing_commit_that_also_touches_code(monkeypatch, tmp_path, capsys):
+def test_ship_still_refuses_a_closing_commit_that_also_touches_code(
+    monkeypatch, tmp_path, capsys, commit_files, receipt_for
+):
     """CONTROL ARM — the same shape with one reviewed path added must refuse.
 
     Without this the test above would pass just as well against a gate that
     accepted any ancestor receipt at all.
     """
-    git, _ = _real_repo(tmp_path)
-    mem = tmp_path / "graphify-out" / "memory"
-    mem.mkdir(parents=True, exist_ok=True)
-    (mem / "query_1.md").write_text("# a lesson\n", encoding="utf-8")
-    (tmp_path / "code.py").write_text("X = 2\n", encoding="utf-8")
-    git("add", "-A")
-    git("commit", "-q", "-m", "close the loop, and edit code")
+    receipt_for(commit_files({"code.py": "X = 1\n"}))
+    # ONE commit carrying both an exempt artifact and a reviewed path — the shape
+    # the fallback must refuse.
+    commit_files({"graphify-out/memory/query_1.md": "# a lesson\n", "code.py": "X = 2\n"})
     monkeypatch.setattr(pr, "run_gates", lambda _root: False)
 
     assert pr.ship_main(tmp_path) == 1
@@ -808,10 +752,12 @@ def test_ship_still_refuses_a_closing_commit_that_also_touches_code(monkeypatch,
     assert "code.py" in out
 
 
-def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(monkeypatch, tmp_path, capsys):
+def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(
+    monkeypatch, tmp_path, capsys, commit_file, receipt_for
+):
     """`land` gates on the PR head, so it needs the same fallback as `ship`."""
-    git, _ = _real_repo(tmp_path)
-    head = _commit_closing_artifact(git, tmp_path)
+    receipt_for(commit_file("code.py", "X = 1\n"))
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
 
     # `_stub_run` patches the subprocess MODULE attribute, which `kb_setup.review`
     # shares — so a blanket stub silently answers review's git calls too, and the

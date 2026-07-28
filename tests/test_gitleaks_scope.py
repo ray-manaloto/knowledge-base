@@ -91,6 +91,44 @@ def test_the_memory_directory_itself_is_not_allowlisted() -> None:
     assert not _allowlisted("brain/graphify-out/memory")
 
 
+#: Constructs Python's `re` accepts and Go's RE2 — which gitleaks uses — does not.
+#: Lookaround and backreferences are the whole list; RE2 rejects them by design
+#: because they are what makes backtracking possible.
+_NOT_IN_RE2 = ("(?=", "(?!", "(?<=", "(?<!", "\\1", "\\2", "\\3")
+
+
+@pytest.mark.parametrize("pattern", _allowlist_paths())
+def test_patterns_are_re2_safe(pattern: str) -> None:
+    """The config is read by Go RE2; this file checks it with Python `re`.
+
+    That mismatch is a probe defect, not a nitpick: Python compiles `(?!` fine,
+    so the exact repair this file exists to prevent — "simplify the enumeration
+    back to one negated pattern" — would pass the whole suite and break gitleaks
+    at runtime. Measured on gitleaks 8.30.1: `^graphify-out/(?!memory/)` aborts
+    with `invalid perl operator: (?!`, and an unparsable pattern is an allowlist
+    entry that does not apply, i.e. noise rather than blindness — but a config
+    that crashes the scanner is not a working gate either.
+
+    A denylist of the constructs RE2 lacks, not a reimplementation of RE2: the
+    engines agree on everything this config actually uses. (Standards lane,
+    round 2.)
+    """
+    assert re.compile(pattern)
+    for construct in _NOT_IN_RE2:
+        assert construct not in pattern, f"{construct} does not compile in Go RE2"
+
+
+def test_the_re2_check_rejects_a_lookahead() -> None:
+    """CONTROL ARM — the probe above must be able to fail.
+
+    Without this, `_NOT_IN_RE2` could be an empty tuple and every pattern would
+    still "pass".
+    """
+    bad = "^graphify-out/(?!memory/)"
+    assert re.compile(bad), "Python accepts it, which is exactly the problem"
+    assert any(construct in bad for construct in _NOT_IN_RE2)
+
+
 def test_every_exempt_review_path_is_scanned() -> None:
     """Derived from `EXEMPT_PATHS`, so adding one there cannot silently skip this.
 
