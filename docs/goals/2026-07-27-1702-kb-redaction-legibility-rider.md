@@ -20,7 +20,7 @@ The plan (`session-2026-07-27-d.md:16-54`) lists three open items:
 |---|---|---|
 | (a) `[redacted]` over-redaction, cause unestablished | **IN this round** | The only code-shaped work. It has a question, a forbidden answer, and a testable end state. |
 | (b) Secret rotation | **OUT — Ray's, hand-back** | `session-2026-07-27-d.md:42-46`: "Nothing in the repo can do this and no code change substitutes for it." An agent cannot do it and must never report it done. |
-| (c) CodeRabbit "Review rate limited" | **OUT — a decision, not a task** | `session-2026-07-27-d.md:49-54` states it as a disjunction Ray picks between: "Either wait out the rate limit and request a re-review, or stop treating that check as evidence." Policy, not implementation. |
+| (c) CodeRabbit "Review rate limited" | **OUT — and now SETTLED (2026-07-27), so not even a hand-back** | `session-2026-07-27-d.md:49-54` states it as a disjunction Ray picks between: "Either wait out the rate limit and request a re-review, or stop treating that check as evidence." Policy, not implementation. |
 
 ### Why (a) and (c) are NOT one round, even though they rhyme
 
@@ -146,6 +146,7 @@ things this repo exists to protect. So:
 | The retracted-probe record | `mise.toml:114-121` (`[tasks.eval]` comment) | It is the artifact that stops a **third** retraction of the `[env]` theory. Deleting it as "stale comment" destroys the round's own guardrail. |
 | `version_pattern` in `[tool.mise]` | `currency.toml` | `session-2026-07-27-d.md:118-121`: `mise --version` prints a trailing date; the default heuristic returns the DATE. Removing the pattern silently reports the wrong version. |
 | `PASS  gate <name> rc=<rc>` and the ship/land strings | `python/src/kb_setup/pr.py:82,156,166,226` | These are this round's evidence channel. Changing their text invalidates every verification clause in the goal. |
+| The `kb-review` receipt gate | `python/src/kb_setup/review.py`; the receipt checks in `pr.ship_main` / `pr.land_main` | `ship` refuses without a receipt, so DELETING this is the cheapest route to `ship: OK`. It must not be the route. |
 
 ---
 
@@ -308,11 +309,21 @@ Exactly one of:
 
 Evidence: the `REDACT-FINDING:` block (§8).
 
-### P6 — Gates and ship
+### P6 — Review, gates, ship
 
-`mise run kb-ship`. It runs `lint`, `test`, `brain-audit`, `eval` in that order
+**Run the `kb-review` skill FIRST, then `mise run kb-review-receipt`.** Quote its
+`review-receipt: OK …` line. This step did not exist when the round was scoped and
+is not optional: since 2026-07-27 `kb-ship` REFUSES before it runs a single gate
+unless a review receipt exists for the current HEAD, so without it none of the
+`PASS  gate …` strings below can ever appear and the round cannot terminate.
+
+Then `mise run kb-ship`. It runs `lint`, `test`, `brain-audit`, `eval` in that order
 (`python/src/kb_setup/pr.py:74`) and refuses to push if any fails. Quote all four
 `PASS  gate …` lines and the `ship: OK …` line verbatim.
+
+**Do not "fix" a refusal by removing the receipt check.** That is the cheapest way
+to make `ship: OK` appear and it is forbidden by the preserve list — deleting the
+gate to satisfy the metric is the Goodhart move this round is supposed to model.
 If anything is red, that *is* the current task — `zero-skip-policy.md`; do not defer
 past it, do not suppress it.
 **Stop at `ship:`. Do NOT run `mise run kb-land`.** Merging is Ray's call, not
@@ -327,8 +338,10 @@ that disagrees with its own goal is worse than either alone.
   (`notepad-enforcement.md`).
 - `mise run kb-reflect`.
 - Write the next session handoff at `.agent/plans/session-<date>-<letter>.md`, and
-  carry forward the two items this round did **not** touch (secret rotation;
-  CodeRabbit) so they are not lost by being out of scope.
+  carry forward the one item this round did **not** touch — secret rotation — so it
+  is not lost by being out of scope. (The CodeRabbit policy call was Ray's and he
+  made it on 2026-07-27: advisory, never blocking, implemented in
+  `pr.py._ADVISORY_CHECKS`. Do not hand it back; it is done.)
 - If Ray adopted this goal+rider pair, promote both files to a tracked path (§2,
   third conflict).
 
@@ -349,7 +362,6 @@ REDACT-PROBE: <what was probed> -> <literal result> (<file:line or command>) @ <
 REDACT-FINDING: cause=<one sentence> | cause=NOT-ESTABLISHED @ <sha>
 REDACT-FINDING-ARM: <the control arm that discriminated it> @ <sha>
 HANDBACK: rotation — Ray @ <sha>
-HANDBACK: coderabbit — Ray @ <sha>
 GOAL-BLOCKED: <blocker> — tried: <probe1>; <probe2> @ <sha>
 ```
 
@@ -390,12 +402,16 @@ evaluator to run, read, or infer.
 
 1. A `REDACT-ARM+` line and a `REDACT-ARM-` line from P2.
 2. A `REDACT-FINDING:` line, and immediately after it a `REDACT-FINDING-ARM:` line.
-3. Both `HANDBACK:` lines, verbatim.
+3. The `HANDBACK: rotation — Ray` line, verbatim. (There is no longer a
+   coderabbit handback — Ray settled that policy on 2026-07-27.)
 4. The transcript contains **no** claim that a secret was rotated.
 
 **Required on Arm A or Arm B (a shipped change or a recorded negative):**
 
-5. These four lines, verbatim, two spaces after `PASS` (`pr.py:82`):
+5. A `review-receipt: OK …` line from `mise run kb-review-receipt`, after the
+   `kb-review` skill has run. Without it `kb-ship` refuses BEFORE any gate, so the
+   four lines below can never appear — this clause is what makes 6 reachable.
+6. These four lines, verbatim, two spaces after `PASS` (`pr.py:82`):
 
    ```
    PASS  gate lint rc=0
@@ -404,20 +420,21 @@ evaluator to run, read, or infer.
    PASS  gate eval rc=0
    ```
 
-6. An `OK eval: N passed, N skipped, 0 failed, 0 unarmed` line (`evals.py:1163`).
-7. `ship: OK — PR open, gates green` (`pr.py:166`) **or**
+7. An `OK eval: N passed, N skipped, 0 failed, 0 unarmed` line (`evals.py:1163`).
+8. `ship: OK — PR open, gates green` (`pr.py:166`) **or**
    `ship: OK — PR #N updated, gates green` (`pr.py:156`).
-8. **The round stops at `ship:`. Merging is Ray's call, not this round's.** The
+9. **The round stops at `ship:`. Merging is Ray's call, not this round's.** The
    drafted version required `land: OK — PR #N merged, main synced` (`pr.py:226`);
    that was removed deliberately. A goal loop that satisfies itself by merging is
-   autonomously landing code on `main` — and right now CodeRabbit returns
-   `pass  "Review rate limited"` on every PR, so nothing external is actually
-   reviewing the diff. Requiring a merge would make "no review happened" a
-   precondition of "done". The agent opens the PR and stops.
-9. `Saved to graphify-out/memory/<file>.md` from `kb-remember`.
-10. `Reflected N memories (N useful, N dead ends, N corrected) -> graphify-out/reflections/LESSONS.md`
+   autonomously landing code on `main`. CodeRabbit returns
+   `pass  "Review rate limited"` on most PRs, so it is not reviewing the diff
+   either — which is why the local `kb-review` lanes in clause 5 now are. Even so,
+   requiring a merge would make the round's completion depend on an action that is
+   Ray's. The agent opens the PR and stops.
+10. `Saved to graphify-out/memory/<file>.md` from `kb-remember`.
+11. `Reflected N memories (N useful, N dead ends, N corrected) -> graphify-out/reflections/LESSONS.md`
     from `kb-reflect`.
-11. A currency line naming an explicit STATUS — `OK`, `DRIFT`, or `NOT CHECKED` —
+12. A currency line naming an explicit STATUS — `OK`, `DRIFT`, or `NOT CHECKED` —
     not a bare `rc=0`. **`rc=0` is not evidence here:** `mise run kb-currency-check`
     always exits 0 by design and prints nothing when clean, so rc=0 is returned
     identically whether it verified everything or verified nothing. That is the exact
@@ -484,13 +501,17 @@ Neither of these may ever be reported as done by the agent.
    tokens) into a transcript. PR #49 stops the blob propagating *from now on*; "it
    cannot un-disclose what already leaked." If any are still live, only Ray can
    rotate them.
-2. **CodeRabbit.** PRs #48/#49/#50 all returned `CodeRabbit  pass  "Review rate
-   limited"` (`session-2026-07-27-d.md:49-54`). #49 was a security fix and got no
-   external review. The choice between waiting out the limit and de-counting the check
-   as evidence is a policy call.
+2. ~~**CodeRabbit.**~~ **SETTLED 2026-07-27 — no longer a hand-back.** PRs
+   #48/#49/#50 all returned `CodeRabbit  pass  "Review rate limited"`, and #49 was a
+   security fix that got no external review. Ray made the call: CodeRabbit is
+   advisory and never blocking (`pr.py._ADVISORY_CHECKS`), and the review it was not
+   doing moved on-machine as the `kb-review` skill, whose receipt `kb-ship` now
+   requires. Do NOT hand this back and do NOT emit a `HANDBACK: coderabbit` line —
+   the decision exists and is implemented.
 
-The agent's obligation is to *surface* both, verbatim, as the `HANDBACK:` lines in §8
-— and to keep them in the P7 handoff so being out of scope does not mean being lost.
+The agent's obligation is to *surface* the remaining one — rotation — verbatim, as
+the `HANDBACK: rotation — Ray` line in §8, and to keep it in the P7 handoff so being
+out of scope does not mean being lost.
 
 ---
 
