@@ -21,6 +21,8 @@ repo proper — never in `.agent/`. Do not create ad-hoc directories in either.
 | `.agent/plans/` | Plans and session handoffs (`session-{date}[-letter].md`) |
 | `.agent/logs/` | Execution logs, pipeline traces |
 | `.agent/brain-audit.md` | The advisory SessionEnd transcript audit |
+| `.agent/kb/review/receipt-<sha>.json` | One `kb-review` receipt, keyed to the exact commit — what `kb-ship` gates on |
+| `.agent/kb/review/reports/review-<sha>-<lane>.md` | That review's per-lane reports; the receipt refuses to name a lane that left none |
 
 `.agent/` is in the real **`.gitignore`**, not a per-clone
 `.git/info/exclude`. That distinction is the reason this rule exists in its

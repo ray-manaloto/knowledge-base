@@ -110,6 +110,7 @@ found the shape and missed the reasoning; a lens that finds one of them
   "sha": "9521853...",
   "written_at": "2026-07-28T02:14:09Z",
   "fixed_point": "main",
+  "fixed_point_sha": "9698879...",
   "lanes_ran": ["standards", "spec", "cold:codex", "silent-failure"],
   "lanes_skipped": [],
   "findings": 3,

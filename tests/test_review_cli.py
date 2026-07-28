@@ -147,3 +147,38 @@ def test_unreadable_head_refuses(repo: Path, monkeypatch: pytest.MonkeyPatch) ->
     """No HEAD, no receipt — `head_sha` returns "" when git cannot be read."""
     monkeypatch.setattr(review, "head_sha", lambda _root: "")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 2
+
+
+def test_documented_report_filename_is_the_one_the_gate_reads(repo: Path) -> None:
+    """The filename in SKILL.md must be the filename `_missing_reports` looks for.
+
+    Spelled out LITERALLY rather than built with `report_path`, because every
+    other test here builds its fixtures through that function and so inherits
+    whatever normalisation it applies. That is a tautological probe: it cannot
+    detect a doc-vs-code divergence in the very function it calls.
+
+    It was not hypothetical. `_safe()` stripped non-alphanumerics, so the gate
+    hunted for `review-<sha>-silentfailure.md` while every doc said
+    `review-<sha>-silent-failure.md` — a reviewer following the skill verbatim
+    left a real report the gate called missing. Two independent lanes found it;
+    this suite could not.
+    """
+    sha = "a" * 40
+    reports = repo / ".agent/kb/review/reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    for lane in ("standards", "spec", "cold", "silent-failure"):
+        (reports / f"review-{sha}-{lane}.md").write_text("NO FINDINGS", encoding="utf-8")
+
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+
+
+def test_unresolvable_fixed_point_is_refused(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A base that never resolved is "could not check", not "clean".
+
+    `base_sha` returns "" when `git merge-base` fails, so `--fixed-point no-such-ref`
+    (a typo or a deleted branch) recorded an empty base and passed — a green receipt for a range the
+    lanes could not have diffed.
+    """
+    monkeypatch.setattr(review, "base_sha", lambda _root, _fp: "")
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point", "no-such-ref") == 2

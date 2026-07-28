@@ -100,9 +100,10 @@ def run_gates(repo_root: Path) -> bool:
 def checks_state(pr_number: int) -> tuple[bool, str]:
     """Return ``(green, summary)`` for a PR's checks.
 
-    Green means every check reached a terminal, non-failing bucket. A PR with no
-    checks at all is green — this repo has no CI, so "no checks" is normal here
-    and must not deadlock the merge.
+    Green means every BINDING check reached a terminal, non-failing bucket.
+    Checks in :data:`_ADVISORY_CHECKS` are reported and never counted, in any
+    bucket including "pending". A PR with no checks at all is green — this repo
+    has no CI, so "no checks" is normal here and must not deadlock the merge.
     """
     rc, out = _run(
         ["gh", "pr", "checks", str(pr_number), "--json", "name,bucket"], timeout=_GH_TIMEOUT
@@ -175,12 +176,20 @@ def _ship_preflight(repo_root: Path) -> str | None:
 def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     """Open a PR for ``branch`` (or report the existing one); return an exit code."""
     rc, out = _run(
-        ["gh", "pr", "view", branch, "--json", "number", "--jq", ".number"], timeout=_GH_TIMEOUT
+        ["gh", "pr", "view", branch, "--json", "number", "--jq", ".number"],
+        cwd=repo_root,
+        timeout=_GH_TIMEOUT,
     )
     existing = out.strip()
     if rc == 0 and existing.isdigit():
         print(f"ship: OK — PR #{existing} updated, gates green")
         return 0
+    if rc != 0 and "no pull requests found" not in out.lower():
+        # Any other failure — auth expiry, network, rate limit — is "could not
+        # ask", not "there is no PR". Falling through to `gh pr create` would
+        # turn an unanswered question into a second PR. Say so and stop.
+        print(f"ship: could not read the branch's PR state (rc={rc})\n{out.strip()[:300]}")
+        return 1
 
     create = ["gh", "pr", "create", "--base", "main", "--head", branch]
     create += ["--title", title, "--body", ""] if title else ["--fill"]

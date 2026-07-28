@@ -122,8 +122,17 @@ def rejection(repo_root: Path, receipt: Receipt) -> str | None:
     a bad receipt is refused rather than written and then reported as failing.
     One implementation, so the writer and the reader cannot drift apart.
     """
-    payload = receipt.as_payload()
-    return _reject_reason(payload, receipt.sha) or _evidence_gap(repo_root, payload, receipt.sha)
+    return _all_reasons(repo_root, receipt.as_payload(), receipt.sha)
+
+
+def _all_reasons(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
+    """The complete verdict. ONE composition, called by both writer and reader.
+
+    Composing `_reject_reason or _evidence_gap` independently in two places is
+    how the writer and the reader drift back apart, which is the gap this
+    module exists to close.
+    """
+    return _reject_reason(data, sha) or _evidence_gap(repo_root, data, sha)
 
 
 def _evidence_gap(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
@@ -132,14 +141,14 @@ def _evidence_gap(repo_root: Path, data: dict[str, Any], sha: str) -> str | None
     if missing:
         return (
             f"claims lane(s) {', '.join(missing)} ran, but no non-empty report is at "
-            f"{REPORT_DIR}/review-{sha[:12]}…-<lane>.md — a lane that left no report "
-            f"is a claim, not a review"
+            f"{REPORT_DIR}/review-{_safe_sha(sha)}-<lane>.md — a lane that left no "
+            f"report is a claim, not a review"
         )
     return None
 
 
-def _safe(sha: str) -> str:
-    """Return ``sha`` with anything that is not a commit character stripped.
+def _safe_sha(sha: str) -> str:
+    """Return ``sha`` reduced to commit characters.
 
     Defence in depth behind the CLI's refusal to take a `--sha`: a value with a
     path separator in it would otherwise steer a write out of the receipt dir.
@@ -147,9 +156,24 @@ def _safe(sha: str) -> str:
     return "".join(c for c in sha if c.isalnum())
 
 
+def _safe_lane(lane: str) -> str:
+    """Return ``lane`` reduced to filename-safe characters, KEEPING hyphens.
+
+    Hyphens are load-bearing: the lane is `silent-failure`, and stripping the
+    hyphen made the gate hunt for `…-silentfailure.md` while every doc said
+    `…-silent-failure.md`. Following the skill verbatim then failed the gate.
+
+    The tests did not catch it because they built their fixture paths with
+    :func:`report_path` and so inherited the same normalisation — a tautological
+    probe (`probes-need-a-control-arm.md`). The test that guards this now spells
+    the documented filename out literally.
+    """
+    return "".join(c for c in lane if c.isalnum() or c in "-_")
+
+
 def receipt_path(repo_root: Path, sha: str) -> Path:
     """Return the receipt path for ``sha`` (not necessarily existing)."""
-    return repo_root / RECEIPT_DIR / f"receipt-{_safe(sha)}.json"
+    return repo_root / RECEIPT_DIR / f"receipt-{_safe_sha(sha)}.json"
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -163,7 +187,13 @@ def _git(repo_root: Path, *args: str) -> str:
             check=False,
             timeout=_GIT_TIMEOUT,
         )
-    except OSError, subprocess.SubprocessError:
+    except subprocess.TimeoutExpired:
+        # Distinguished from a clean miss on purpose: a timeout means the
+        # question was never answered, and a silent "" would read as an answer.
+        print(f"  git {' '.join(args)}: timed out after {_GIT_TIMEOUT}s")
+        return ""
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"  git {' '.join(args)}: {exc}")
         return ""
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
@@ -210,16 +240,22 @@ def _unexplained_skips(data: dict[str, Any]) -> list[str]:
 
 def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     """Return where ``lane``'s report for ``sha`` must be written."""
-    return repo_root / REPORT_DIR / f"review-{_safe(sha)}-{_safe(lane)}.md"
+    return repo_root / REPORT_DIR / f"review-{_safe_sha(sha)}-{_safe_lane(lane)}.md"
 
 
 def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
     """Return lanes claimed as RUN that have no non-empty report on disk."""
     missing = []
-    for entry in data.get("lanes_ran") or []:
+    for entry in _as_entries(data.get("lanes_ran") or []) or []:
         lane = _lane_prefix(str(entry))
         path = report_path(repo_root, sha, lane)
-        if not path.is_file() or not path.read_text(encoding="utf-8", errors="replace").strip():
+        try:
+            body = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+        except OSError:
+            # Unreadable is "could not check", which must refuse rather than
+            # traceback out of the middle of `ship`.
+            body = ""
+        if not body.strip():
             missing.append(lane)
     return missing
 
@@ -232,7 +268,24 @@ def _check_identity(data: dict[str, Any], sha: str) -> str | None:
     if not str(data.get("fixed_point") or "").strip():
         # Without a base, the receipt says a review happened but not of WHAT.
         return "names no fixed point, so it does not say what was reviewed"
+    if not str(data.get("fixed_point_sha") or "").strip():
+        # An unresolvable fixed point (a typo, a deleted branch) recorded an
+        # empty sha and sailed through, so the receipt claimed a base it never
+        # resolved. Unresolvable is "could not check", never "clean".
+        return "has an unresolved fixed point, so its comparison base is unknown"
     return None
+
+
+def _as_entries(value: object) -> list[str] | None:
+    """Return ``value`` as a list of strings, or None if it is not a list.
+
+    A numeric `lanes_ran` is valid JSON and used to raise TypeError out of the
+    validator, crashing `kb-ship` instead of refusing it. A crash is not a
+    verdict — malformed input has to fail CLOSED with a reason.
+    """
+    if not isinstance(value, list):
+        return None
+    return [str(v) for v in value]
 
 
 def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
@@ -241,6 +294,11 @@ def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
     All three are one defect wearing three hats: a receipt that claims more
     coverage than the review actually had.
     """
+    ran_raw = _as_entries(data.get("lanes_ran") or [])
+    skipped_raw = _as_entries(data.get("lanes_skipped") or [])
+    if ran_raw is None or skipped_raw is None:
+        return "has a malformed lane list (lanes_ran/lanes_skipped must be arrays)"
+
     unexplained = _unexplained_skips(data)
     if unexplained:
         return (
@@ -249,8 +307,8 @@ def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
             f"that merely did not run is a gap, not a skip"
         )
 
-    ran = [str(s) for s in data.get("lanes_ran") or []]
-    named = ran + [str(s) for s in data.get("lanes_skipped") or []]
+    ran = ran_raw
+    named = ran + skipped_raw
     accounted = {_lane_prefix(e) for e in named}
 
     unknown = sorted(accounted - set(LANES))
@@ -317,7 +375,7 @@ def receipt_state(repo_root: Path, sha: str) -> tuple[bool, str]:
     if not isinstance(data, dict):
         return False, f"receipt for {sha[:12]} is not an object"
 
-    reason = _reject_reason(data, sha) or _evidence_gap(repo_root, data, sha)
+    reason = _all_reasons(repo_root, data, sha)
     if reason is not None:
         return False, f"receipt for {sha[:12]} {reason}"
 

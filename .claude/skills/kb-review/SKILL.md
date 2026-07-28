@@ -136,11 +136,15 @@ perfectly good report; an empty file is not.
 mise run kb-review-receipt -- \
   --lanes standards,spec,cold:codex,silent-failure \
   --skipped "cold:not-applicable-docs-only" \
+  --fixed-point <the same fixed point you reviewed against> \
   --findings <n> --blocking <n>
 ```
 
-`--blocking` is required — state it even when it is `0`. There is no `--sha`:
-the receipt is always for HEAD.
+`--blocking` is required — state it even when it is `0`. `--fixed-point`
+defaults to `main`; **pass it whenever you reviewed against anything else**, or
+the receipt records a base you did not use. It is resolved to a commit and
+stored as `fixed_point_sha`; an unresolvable one is refused rather than stored
+empty. There is no `--sha` — the receipt is always for HEAD.
 
 It writes `.agent/kb/review/receipt-<sha>.json`. Gitignored on purpose: a
 receipt is machine-local proof that *this* machine reviewed *this* commit before

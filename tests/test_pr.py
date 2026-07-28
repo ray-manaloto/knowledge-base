@@ -294,3 +294,50 @@ def test_ship_does_not_push_when_gates_fail(monkeypatch, tmp_path):
     monkeypatch.setattr(pr, "run_gates", lambda _root: False)
     assert pr.ship_main(tmp_path) == 1
     assert not any(c[:2] == ["git", "push"] for c in seen)
+
+
+def test_ship_refuses_when_head_moves_during_the_gates(monkeypatch, tmp_path):
+    """The pre-push re-check must actually guard the push.
+
+    REALISTIC MUTATION, per `probes-need-a-control-arm.md`: the gates take
+    minutes and HEAD can move under them (an amend to fix a gate is the normal
+    way it happens). Without this test the second check is decoration — deleting
+    it kept the whole suite green, which is how the standards lane found it.
+    """
+    from kb_setup import review
+
+    for lane in ("standards", "spec"):
+        rp = review.report_path(tmp_path, "feat/x", lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("NO FINDINGS", encoding="utf-8")
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha="feat/x",
+            fixed_point="main",
+            fixed_point_sha="a" * 40,
+            lanes_ran=("standards", "spec"),
+            lanes_skipped=(
+                "cold:not-applicable-docs-only",
+                "silent-failure:not-applicable-docs-only",
+            ),
+            findings=0,
+            blocking=0,
+        ),
+    )
+
+    seen: list[list[str]] = []
+    heads = iter(["feat/x", "moved-after-the-gates"])
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    # HEAD reads `feat/x` for the pre-gate check, then a different commit for
+    # the pre-push one — exactly the window an amend opens.
+    monkeypatch.setattr(review, "head_sha", lambda _root: next(heads))
+
+    assert pr.ship_main(tmp_path) == 1
+    assert not any(c[:2] == ["git", "push"] for c in seen), "must not push"
