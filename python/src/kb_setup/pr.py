@@ -117,15 +117,38 @@ def working_tree_clean(repo_root: Path) -> bool:
 #:
 #: `kb-scan-range` is FIRST, and that ordering is load-bearing rather than
 #: tidiness. `run_gates` returns on the first failure, so putting the cheapest
-#: gate (~0.36s for a one-commit range) and the one with the worst failure mode
-#: (a credential reaching a public remote) ahead of the minutes-long ones means a
-#: branch carrying a secret is refused before anything else is spent on it.
+#: gate and the one with the worst failure mode (a credential reaching a public
+#: remote) ahead of the minutes-long ones means a branch carrying a secret is
+#: refused before anything else is spent on it.
+#:
+#: "Cheapest" is measured at **0.36s for a ONE-COMMIT range** — state the
+#: condition, because the ordering claim is being made about branches of tens of
+#: commits and that figure was not measured there. It scales with the bytes in
+#: the range's diffs, and `scan._SCAN_TIMEOUT` is 600s precisely because the
+#: upper bound is not known. What holds unconditionally is the ordering by
+#: CONSEQUENCE, which is the actual argument. (Spec lane, round 1.)
 #:
 #: It is also the only gate here that asks about a COMMIT RANGE rather than the
 #: working tree. hk's `gitleaks` step is handed `{{ files }}`, so a blob that
 #: exists only in an intermediate commit is never opened — and `ship` pushes
 #: every commit on the branch to a public remote. See `kb_setup.scan` and #67.
 GATES = ("kb-scan-range", "lint", "test", "brain-audit", "eval")
+
+
+def prepush_scan(repo_root: Path) -> tuple[bool, str]:
+    """Re-scan the commit range immediately before the push; ``(ok, summary)``.
+
+    A module-level seam, deliberately, and public for the same reason
+    :func:`run_gates` is: the ship tests that exercise CONTROL FLOW stub it, the
+    way they already stub the gates. A local import inside
+    `_validated_sha_for_push` could not be stubbed at all, so every such test
+    would shell out to a real gitleaks against a fixture with no repository —
+    fail closed, correctly, for a reason that has nothing to do with what the
+    test asks.
+    """
+    from kb_setup import scan
+
+    return scan.scan_range(repo_root)
 
 
 def run_gates(repo_root: Path) -> bool:
@@ -356,6 +379,26 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
     ok, summary = review.receipt_state(repo_root, sha, require_base="main")
     if not ok:
         print(f"ship: refusing — HEAD moved since the review ({summary})")
+        return None
+
+    # The secret scan is re-run HERE, on the commit about to be pushed, and not
+    # only as the first gate. Same reasoning as the receipt check directly
+    # above, applied to the other thing that must be true of the pushed bytes:
+    # `run_gates` scanned whatever HEAD was minutes ago, and nothing stops HEAD
+    # moving underneath the gates.
+    #
+    # A moved HEAD does not always invalidate the receipt — `review.EXEMPT_PATHS`
+    # lets an ancestor's receipt cover a delta of `graphify-out/memory/**`, which
+    # is precisely the directory that carried three live credentials on
+    # 2026-07-28. So the receipt check alone cannot stand in for this one.
+    # (Cold lane and silent-failure lane, round 1, independently.)
+    #
+    # Cheap enough to repeat. The first run is what fails fast; THIS one is
+    # what guarantees.
+    scanned, scan_summary = prepush_scan(repo_root)
+    print(f"==> scan-range (pre-push): {scan_summary}")
+    if not scanned:
+        print("ship: refusing — the commit range did not pass the secret scan")
         return None
     return sha
 

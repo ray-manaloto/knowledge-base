@@ -281,6 +281,24 @@ def test_ship_refuses_dirty_tree(monkeypatch, tmp_path):
     assert pr.ship_main(tmp_path) == 1
 
 
+@pytest.fixture(autouse=True)
+def _stub_prepush_scan(monkeypatch) -> None:
+    """Neutralise the pre-push secret scan for the CONTROL-FLOW tests.
+
+    `_validated_sha_for_push` re-scans the commit range before pushing, and the
+    tests in this module drive `ship_main` against a stubbed `subprocess` with no
+    real repository — so the scan refuses (correctly: no `.gitleaks.toml`, no
+    resolvable base) and every one of them fails for a reason unrelated to what
+    it asks.
+
+    Autouse and PASSING by default, with the failing direction covered
+    explicitly by `test_ship_refuses_when_the_prepush_scan_fails`, which
+    re-patches over this. A stub with no matching failure test would be exactly
+    the pass-only gate `probes-need-a-control-arm.md` rule 2 forbids.
+    """
+    monkeypatch.setattr(pr, "prepush_scan", lambda _root: (True, "stubbed: no secrets"))
+
+
 def _clean_branch_handler(cmd: list[str]) -> _Proc:
     """A clean feature branch with an existing PR — the happy path for ship."""
     if cmd[:2] == ["git", "rev-parse"]:
@@ -809,3 +827,38 @@ def test_every_gate_names_a_real_mise_task() -> None:
     # `defined` map this parsed wrongly.
     assert pr.GATES
     assert "no-such-task" not in defined
+
+
+def test_ship_refuses_when_the_prepush_scan_fails(monkeypatch, tmp_path):
+    """THE FAILING DIRECTION of the autouse stub above, and of the gate itself.
+
+    The scan runs a second time here — not only as the first gate — because the
+    gates take minutes and nothing stops HEAD moving underneath them. The receipt
+    check alone cannot stand in for it: `review.EXEMPT_PATHS` lets an ancestor's
+    receipt cover a delta of `graphify-out/memory/**`, which is precisely the
+    directory that carried three live credentials on 2026-07-28.
+    (Cold lane and silent-failure lane, round 1, independently.)
+    """
+    _write_valid_receipt(tmp_path)
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    monkeypatch.setattr(pr, "prepush_scan", lambda _root: (False, "SECRETS FOUND in x..HEAD"))
+
+    assert pr.ship_main(tmp_path) == 1
+
+
+def test_the_prepush_scan_really_calls_the_scanner(monkeypatch, tmp_path):
+    """The seam must not be a hole: `prepush_scan` has to reach `scan.scan_range`.
+
+    Without this, the autouse stub plus a `prepush_scan` that returned
+    `(True, "")` unconditionally would keep the whole suite green while the
+    pre-push scan did nothing at all.
+    """
+    from kb_setup import scan
+
+    # Undo the autouse stub — this is the one test that must see the real thing.
+    monkeypatch.undo()
+
+    ok, summary = pr.prepush_scan(tmp_path)
+    expected_ok, expected_summary = scan.scan_range(tmp_path)
+    assert (ok, summary) == (expected_ok, expected_summary)

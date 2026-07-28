@@ -30,9 +30,10 @@ from pathlib import Path
 
 _GIT_TIMEOUT = 30
 
-#: gitleaks reads the whole range's diffs. Generous, because the failure this
-#: bounds is a wedge, not slowness: measured at ~0.36s for a one-commit range,
-#: and a branch is tens of commits.
+#: gitleaks reads the whole range's diffs, so the cost scales with the bytes in
+#: them, not the commit count. Generous because the failure this bounds is a
+#: wedge rather than slowness, and because the upper bound is genuinely unknown:
+#: the only measurement taken is **0.36s for a one-commit range**.
 _SCAN_TIMEOUT = 600
 
 #: gitleaks exits 0 when clean and `--exit-code` when it finds something. That
@@ -49,10 +50,38 @@ _SCAN_TIMEOUT = 600
 _CLEAN = 0
 _LEAKS = 2
 
+#: gitleaks' log levels for "something went wrong". Their presence means the
+#: scan did not complete, REGARDLESS of the exit code.
+#:
+#: This is the blocking defect round 1 found, and it is the failure mode this
+#: whole module claims to be immune to. `gitleaks git` shells out to `git log
+#: -p`; when that fails it logs the error, reports **"0 commits scanned … no
+#: leaks found"**, and exits **0**. Mapping rc=0 to "no secrets" therefore
+#: turned any machine-local git misconfiguration into a permanently green,
+#: permanently blind gate.
+#:
+#: Reproduced here, three arms, gitleaks 8.30.1, with a `.gitattributes`
+#: `diff=` driver whose `textconv` command does not exist (the attribute must
+#: be live across the WHOLE range — a first attempt that added it in a later
+#: commit did not fire, and read as a refutation):
+#:   * control, no driver         → rc=2, `1 commits scanned`, leak found
+#:   * broken driver              → rc=0, `ERR [git] fatal: …`, `0 commits scanned`
+#:   * deletion-only range, clean → rc=0, `0 commits scanned`, and NO `ERR`
+#:
+#: That third arm is why this matches the ERROR LINES and not the commit count.
+#: The reviewer's proposed fix was to compare gitleaks' scanned count against
+#: the range size — but a legitimate branch that only deletes files also scans
+#: zero commits, so that check would refuse honest work. Right diagnosis, wrong
+#: remedy; only the third arm separated them.
+_SCAN_ERROR_MARKERS = (" ERR ", " FTL ")
+
 #: The fixed point the receipt uses, so the range scanned and the range reviewed
 #: are the same range. `ship` passes `require_base="main"` to
 #: `review.receipt_state` for the same reason.
 DEFAULT_BASE = "main"
+
+#: The only accepted argv shape: exactly ``--base <ref>``.
+_BASE_ARGV_LEN = 2
 
 
 def config_path(repo_root: Path) -> Path:
@@ -61,6 +90,19 @@ def config_path(repo_root: Path) -> Path:
 
 
 def _git(repo_root: Path, *args: str) -> tuple[int, str]:
+    """Run a git command; return ``(rc, stdout)`` with stderr kept SEPARATE.
+
+    Separate on purpose, unlike `pr._run` and `review._git` which merge the two.
+    Every caller here consumes the output as DATA — a SHA, a count — and git
+    writes advisories to stderr on commands that succeed (a detached-HEAD notice,
+    a hint, a `core.hooksPath` warning). Merged, one of those is concatenated
+    onto the SHA `range_base` returns; `commits_in_range` then fails to parse the
+    result, returns -1, and the ship aborts on a false alarm. (Cold lane, round 1.)
+
+    stderr is dropped rather than returned: no caller has anything to say about
+    it, and the two failure paths that matter — a non-zero rc and an unparsable
+    value — are both already handled as "could not ask".
+    """
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo_root), *args],
@@ -71,26 +113,45 @@ def _git(repo_root: Path, *args: str) -> tuple[int, str]:
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return 1, f"git: {exc}"
-    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+    return proc.returncode, proc.stdout or ""
 
 
 def range_base(repo_root: Path, base: str = DEFAULT_BASE) -> str:
-    """Return the merge-base of ``base`` and HEAD, or "" if it cannot be resolved.
+    """Return the cutoff commit for the scan, or "" if it cannot be resolved.
 
-    Merge-base, not ``base`` itself, so the range is what the branch ADDED —
-    matching `review.base_sha` and the ``<base>...HEAD`` the lanes read.
+    The merge-base against ``base``, but resolved against ``origin/<base>``
+    FIRST when that ref exists. The question this gate asks is "what will the
+    push publish", and `ship` pushes `<sha>:refs/heads/<branch>` — a raw SHA,
+    which carries its **entire ancestry**.
 
-    A STALE local ``main`` widens the range rather than narrowing it (the
-    merge-base moves backwards), so the failure direction here is scanning
-    commits that are already on the remote. That is noise, not blindness, and it
-    is the direction to prefer.
+    So a commit sitting on local ``main`` that has not reached the remote is
+    published by that push while sitting BELOW a merge-base taken against local
+    ``main`` — never scanned, and now public. Resolving against the
+    remote-tracking ref moves the cutoff back past it.
+
+    This docstring previously claimed the failure direction was safe, on the
+    grounds that "a stale local main WIDENS the range". That is true only when
+    local ``main`` is BEHIND the remote. The dangerous case is the opposite one
+    — local ``main`` AHEAD, with unpushed commits — and the sentence was written
+    as if only one direction existed. (Cold lane, round 1.)
+
+    A stale remote-tracking ref (no recent `git fetch`) still errs wide: it can
+    only be older than the real remote head, so the range grows. Scanning
+    commits that are already public is noise; missing one that is not is the
+    defect.
 
     ``--`` terminates option parsing: a base spelled like a flag is otherwise
     read by git as an option, and the command silently answers a different
     question. Same guard, same reason, as `review.base_sha`.
     """
-    rc, out = _git(repo_root, "merge-base", "--", base, "HEAD")
-    return out.strip() if rc == 0 else ""
+    for ref in (f"origin/{base}", base):
+        rc, _ = _git(repo_root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+        if rc != 0:
+            continue
+        rc, out = _git(repo_root, "merge-base", "--", ref, "HEAD")
+        if rc == 0 and out.strip():
+            return out.strip()
+    return ""
 
 
 def commits_in_range(repo_root: Path, base_sha: str) -> int:
@@ -152,6 +213,12 @@ def _gitleaks_cmd(repo_root: Path, base_sha: str) -> list[str]:
         "--redact",
         "--verbose",
         "--no-banner",
+        # REQUIRED for `_SCAN_ERROR_MARKERS` to work, not cosmetic. gitleaks
+        # colours its log level even when stdout is a pipe (it does not
+        # auto-detect), so the raw bytes are `\x1b[31mERR\x1b[0m` and a plain
+        # `" ERR "` match finds nothing — a detector that could only ever say
+        # "no error". Its own flag, rather than an ANSI-stripping regex here.
+        "--no-color",
     ]
 
 
@@ -183,6 +250,23 @@ def _run_gitleaks(repo_root: Path, base_sha: str, span: str) -> tuple[bool, str]
         return False, f"gitleaks could not run ({exc}) — refusing to claim clean"
 
     detail = ((proc.stdout or "") + (proc.stderr or "")).strip()
+
+    # BEFORE the exit code, because rc=0 is exactly what this case returns. See
+    # `_SCAN_ERROR_MARKERS`: gitleaks logs the failure of its own `git log -p`
+    # and then exits clean, so trusting rc alone is what made the gate blind.
+    #
+    # Deliberately checked on the CLEAN path too rather than only when something
+    # looks wrong — a scan that did not run cannot report a leak either, so an
+    # error alongside rc=2 is still worth saying out loud.
+    failed = [line for line in detail.splitlines() if any(m in line for m in _SCAN_ERROR_MARKERS)]
+    if failed:
+        reported = "\n".join(failed[:10])
+        return False, (
+            f"gitleaks reported an error while scanning {span} — refusing to claim clean "
+            f"(it exits 0 after a failed `git log`, so rc={proc.returncode} means nothing here)"
+            f"\n{reported}"
+        )
+
     if proc.returncode == _CLEAN:
         return True, f"no secrets in {span}"
     if proc.returncode == _LEAKS:
@@ -233,12 +317,16 @@ def main(repo_root: Path, argv: list[str] | None = None) -> int:
     """`kb-scan-range` entry point: scan the range and return an exit code."""
     args = list(argv or [])
     base = DEFAULT_BASE
-    if "--base" in args:
-        index = args.index("--base")
-        if index + 1 >= len(args):
-            print("kb-setup scan-range [--base REF]")
+    if args:
+        # REJECT anything not understood, rather than ignoring it. The first
+        # version scanned for `--base` and silently dropped everything else, so
+        # `-- --bas main` printed a green line having quietly scanned the
+        # default — a fail-OPEN in the one module whose whole contract is
+        # failing closed. (Spec lane, round 1.)
+        if args[0] != "--base" or len(args) != _BASE_ARGV_LEN:
+            print(f"kb-setup scan-range [--base REF] — unrecognised: {' '.join(args)}")
             return 2
-        base = args[index + 1]
+        base = args[1]
 
     ok, summary = scan_range(repo_root, base)
     print(f"scan-range: {summary}")

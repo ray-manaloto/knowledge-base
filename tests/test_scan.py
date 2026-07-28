@@ -32,20 +32,6 @@ _GITLEAKS_TIMEOUT = 120
 _REPO = Path(__file__).parent.parent.absolute()
 
 
-@pytest.fixture(autouse=True)
-def gitleaks_config(tmp_path: Path) -> Path:
-    """Give the fixture repo THIS repo's real `.gitleaks.toml`.
-
-    A copy, not a minimal stand-in: the allowlist is the part most likely to
-    silently widen, and a test against a config nobody ships would pass while
-    the shipped one looked away. `test_gitleaks_scope.py` asserts the config's
-    contents; this exercises it.
-    """
-    target = tmp_path / ".gitleaks.toml"
-    target.write_text((_REPO / ".gitleaks.toml").read_text(encoding="utf-8"), encoding="utf-8")
-    return target
-
-
 def _synthetic_token() -> str:
     """Return a fresh, high-entropy string shaped like a GitHub PAT.
 
@@ -251,3 +237,119 @@ def test_the_gate_is_wired_into_ship() -> None:
 
     assert "kb-scan-range" in pr.GATES
     assert pr.GATES[0] == "kb-scan-range", "the cheapest, most consequential gate runs first"
+
+
+def test_a_failed_git_log_is_not_reported_as_clean(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """THE ROUND-1 BLOCKER. gitleaks exits 0 after its own `git log -p` fails.
+
+    It logs the error, reports "0 commits scanned … no leaks found", and returns
+    0 — so mapping rc=0 to "no secrets" turned any machine-local git
+    misconfiguration into a permanently green, permanently blind gate. That is
+    the "could not ask is not nothing is wrong" collapse this module's docstring
+    claims immunity to, and it had exactly one arm where it was false.
+
+    The break is realistic and NOT contrived: a `.gitattributes` `diff=` driver
+    whose `textconv` command is missing. The attribute must be live across the
+    WHOLE range — a first attempt that added it in a later commit did not fire
+    and read as a refutation of the finding.
+    """
+    (tmp_path / ".gitattributes").write_text("*.md diff=broken\n", encoding="utf-8")
+    git("add", "--", ".gitattributes")
+    git("commit", "-q", "-m", "attrs")
+    git("checkout", "-q", "main")
+    git("merge", "-q", "--ff-only", "work")
+    git("checkout", "-q", "work")
+    commit_file("notes/leak.md", f'token = "{_synthetic_token()}"\n')
+    git("config", "diff.broken.textconv", "/nonexistent/command")
+
+    ok, summary = scan.scan_range(tmp_path)
+    assert not ok, summary
+    assert "reported an error" in summary
+    assert "no secrets" not in summary
+
+
+def test_a_deletion_only_range_still_passes(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """CONTROL ARM for the blocker fix, and the reason it matches ERRORS not COUNTS.
+
+    The reviewer who found the blocker proposed comparing gitleaks' own
+    "N commits scanned" against the range size. Measured: a legitimate branch
+    that ONLY DELETES files also reports `0 commits scanned` and rc=0, with no
+    error line — so that fix would have refused honest work forever. Right
+    diagnosis, wrong remedy, and only this third arm separates them.
+    """
+    commit_file("docs/doomed.md", "x\n")
+    git("checkout", "-q", "main")
+    git("merge", "-q", "--ff-only", "work")
+    git("checkout", "-q", "work")
+    git("rm", "-q", "--", "docs/doomed.md")
+    git("commit", "-q", "-m", "delete it")
+
+    assert scan.commits_in_range(tmp_path, scan.range_base(tmp_path)) == 1
+    ok, summary = scan.scan_range(tmp_path)
+    assert ok, summary
+    assert "no secrets" in summary
+
+
+def test_no_color_is_passed_or_the_error_markers_cannot_match() -> None:
+    r"""The marker check is useless without it, and would look fine.
+
+    gitleaks colours its log level even when stdout is a pipe, so the raw bytes
+    are `\\x1b[31mERR\\x1b[0m` and a plain `" ERR "` match finds nothing — a
+    detector that can only ever report "no error", which is the same shape as
+    the bug it exists to catch.
+    """
+    assert "--no-color" in scan._gitleaks_cmd(Path("/x"), "deadbeef")
+    assert scan._SCAN_ERROR_MARKERS
+
+
+def test_the_cutoff_prefers_the_remote_tracking_ref(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """A commit on local `main` that has not reached the remote must be SCANNED.
+
+    `ship` pushes `<sha>:refs/heads/<branch>` — a raw SHA, which carries its
+    entire ancestry. So an unpushed commit on local `main` is published by that
+    push while sitting BELOW a merge-base taken against local `main`: never
+    scanned, and now public. Resolving against `origin/main` moves the cutoff
+    back past it. (Cold lane, round 1.)
+
+    The old docstring called the failure direction safe because "a stale local
+    main widens the range" — true only when local main is BEHIND. This is the
+    other direction, which it did not consider.
+    """
+    remote = tmp_path.parent / f"{tmp_path.name}-remote.git"
+    subprocess.run(
+        ["git", "init", "-q", "--bare", str(remote)], check=True, timeout=_GITLEAKS_TIMEOUT
+    )
+    git("remote", "add", "origin", str(remote))
+    git("push", "-q", "origin", "main")
+
+    # A commit that exists on LOCAL main only, then a branch forked past it.
+    git("checkout", "-q", "main")
+    unpushed = commit_file("docs/unpushed.md", "x\n")
+    git("checkout", "-q", "-b", "later")
+    commit_file("docs/branch.md", "x\n")
+
+    base = scan.range_base(tmp_path)
+    assert base != unpushed, "the unpushed commit must be INSIDE the range, not the cutoff"
+    reachable = git("rev-list", f"{base}..HEAD").splitlines()
+    assert unpushed in reachable, "the unpushed commit would be published unscanned"
+
+
+def test_unknown_argv_is_rejected(tmp_path: Path, commit_file: Callable[..., str]) -> None:
+    """A typo must not silently scan the default and print green.
+
+    `-- --bas main` used to do exactly that — a fail-OPEN in the one module
+    whose entire contract is failing closed. (Spec lane, round 1.)
+    """
+    commit_file("docs/ordinary.md", "x\n")
+    assert scan.main(tmp_path, ["--bas", "main"]) == 2
+    assert scan.main(tmp_path, ["--base"]) == 2
+    assert scan.main(tmp_path, ["--base", "main", "extra"]) == 2
+    # CONTROL ARM — the accepted shape still works, or this only proves it rejects.
+    assert scan.main(tmp_path, ["--base", "main"]) == 0
+    assert scan.main(tmp_path, []) == 0

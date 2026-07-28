@@ -28,9 +28,12 @@ add a workflow step later, add its hk equivalent in the same change.
 `kb_setup.pr.run_gates` is the list `mise run kb-ship` actually enforces
 (`kb-scan-range`, `lint`, `test`, `brain-audit`, `eval` — the `GATES` tuple in
 `pr.py`). `kb-scan-range` is the only one that asks about a COMMIT RANGE rather
-than the working tree, which is why it cannot be an hk step: hk is
-file-list-driven, so it never opens a blob that exists only in an intermediate
-commit — and `ship` pushes every commit on the branch (#67). The
+than the working tree: hk's `gitleaks` step is handed `{{ files }}`, so it never
+opens a blob that exists only in an intermediate commit — and `ship` pushes
+every commit on the branch (#67). It is a ship gate rather than an hk step
+because of **timing**, not capability — `no_lint_skip` and `md_size_budget`
+prove hk can host a whole-repo step — and the range question is only meaningful
+against what a push would publish. The
 review receipt is checked BEFORE that list and again before the push. A gate
 that is not in that list, and not an hk step reached by `lint`, does not gate
 anything.
