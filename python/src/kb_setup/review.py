@@ -659,6 +659,20 @@ def _delta_paths(repo_root: Path, older: str, newer: str) -> list[str] | None:
     check. ``-z`` sidesteps `core.quotePath` escaping entirely, so a path with a
     quote or a non-ASCII byte in it is compared as the bytes git actually has
     rather than as a re-encoded display form.
+
+    **This is an ENDPOINT diff, and that bound is worth stating.** A file added
+    in one intervening commit and deleted in a later one appears in neither tree,
+    so it is invisible here. What that does NOT mean is that unreviewed content
+    can reach `main`: `land` merges with ``--squash``, so what lands is this
+    endpoint tree, and the guarantee — the shipped tree equals a reviewed tree
+    outside :data:`EXEMPT_PATHS` — holds exactly.
+
+    Where it is real is the PUSHED BRANCH: `ship` pushes every commit, so an
+    intermediate blob reaches the remote even though the squash discards it.
+    That is not a property of this fallback — the lanes themselves review
+    ``<base>...HEAD``, an endpoint diff, so the same blob is invisible to an
+    ordinary review — which is why it is recorded here and filed rather than
+    patched under a fallback that did not cause it. (Cold lane, round 3.)
     """
     ok, out = _git_result(
         repo_root, "diff", "--name-only", "--no-renames", "-z", older, newer, "--"

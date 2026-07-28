@@ -94,7 +94,14 @@ def test_the_memory_directory_itself_is_not_allowlisted() -> None:
 #: Constructs Python's `re` accepts and Go's RE2 — which gitleaks uses — does not.
 #: Lookaround and backreferences are the whole list; RE2 rejects them by design
 #: because they are what makes backtracking possible.
-_NOT_IN_RE2 = ("(?=", "(?!", "(?<=", "(?<!", "\\1", "\\2", "\\3")
+#:
+#: The backreference entry is a PATTERN, not `\1`-`\3` spelled out. The literal
+#: list was itself a bound that hid its own existence: `\4` and up passed a test
+#: whose name promises RE2-safety. An enumeration of "the first few" is the same
+#: defect class as a `-maxdepth` (`probes-need-a-control-arm.md` rule 3).
+#: (Cold lane, round 3.)
+_NOT_IN_RE2 = ("(?=", "(?!", "(?<=", "(?<!")
+_BACKREFERENCE = re.compile(r"\\[1-9]")
 
 
 @pytest.mark.parametrize("pattern", _allowlist_paths())
@@ -116,6 +123,7 @@ def test_patterns_are_re2_safe(pattern: str) -> None:
     assert re.compile(pattern)
     for construct in _NOT_IN_RE2:
         assert construct not in pattern, f"{construct} does not compile in Go RE2"
+    assert not _BACKREFERENCE.search(pattern), "Go RE2 rejects every numbered backreference"
 
 
 def test_the_re2_check_rejects_a_lookahead() -> None:
@@ -127,6 +135,8 @@ def test_the_re2_check_rejects_a_lookahead() -> None:
     bad = "^graphify-out/(?!memory/)"
     assert re.compile(bad), "Python accepts it, which is exactly the problem"
     assert any(construct in bad for construct in _NOT_IN_RE2)
+    # And the backreference arm, past where a hand-listed `\\1`-`\\3` stopped.
+    assert _BACKREFERENCE.search(r"^(a)graphify-out/\4")
 
 
 def test_every_exempt_review_path_is_scanned() -> None:

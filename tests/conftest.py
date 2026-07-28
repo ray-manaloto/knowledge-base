@@ -55,6 +55,13 @@ def git(tmp_path: Path) -> Callable[..., str]:
     )
     run("config", "user.email", "t@example.com")
     run("config", "user.name", "T")
+    # A machine with `commit.gpgsign = true` globally would make every commit
+    # below block on a pinentry prompt or fail for want of a key — a fixture that
+    # passes here and hangs on someone else's laptop. Unset on this machine, so
+    # this is the arm that could not have been discovered by running the suite.
+    # (Cold lane, round 3.)
+    run("config", "commit.gpgsign", "false")
+    run("config", "tag.gpgsign", "false")
     (tmp_path / ".gitignore").write_text(".agent/\n", encoding="utf-8")
     run("add", "--", ".gitignore")
     run("commit", "-q", "-m", "base")
