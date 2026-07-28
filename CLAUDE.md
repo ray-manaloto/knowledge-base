@@ -105,8 +105,6 @@ mise run lint && mise run test                # gates
 so the corpus gets smarter every ingestion. `sources/REGISTRY.md` is the durable
 source backlog. See `docs/graphify-reference.md` for the graphify mental model.
 
-Deep graphify operational reference: `docs/graphify-reference.md`.
-
 ## Tool currency
 
 `currency.toml` declares what to keep current; `kb_setup.currency` is the shared
@@ -171,13 +169,14 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
 | `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
 | `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |
+| `docs/goals/` | Committed goal+rider PAIRS — one round of agent work each. `*-goal.md` is the ≤4,000-char `/goal` payload (its bytes ARE the artifact, so it is excluded from hk's md builtins); `*-rider.md` is the unbounded detail. Audit with `kb-goal-check`; record how a round went with `kb-goal-outcome`. |
 | `.claude/workflows/` | Saved Claude workflows the skills compose — `kb-extract.js` (host-agent extraction fan-out). |
 | `tests/` | Pytest (`uv run pytest tests/`); config in the root `pyproject.toml`. |
-| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-prose`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`. |
+| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-prose`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`/`kb-goal-check`/`kb-goal-outcome`. |
 | `pyproject.toml` | The ONE python config (repo root): `[project]` + ruff (`select=ALL`) + ty + pytest. `uv run` uses it for `python/src` AND `tests/`. |
 | `hk.pkl` | Git-hook lint: ruff/ty (python), taplo (toml), rumdl (md), gitleaks (secrets), typos, pkl, hygiene + `no-lint-skip`. All logic in `kb_setup` (zero-bash). |
 | `docs/graphify-reference.md` | Expert operational reference for graphify itself. |
-| `.claude/` | graphify skill + project-scoped settings/hooks. |
+| `.claude/` | Skills (graphify, kb-curator, goal-engineering, tool-currency, orchestrator-routing) + project-scoped settings/hooks/rules. |
 
 ## Stack conventions
 
