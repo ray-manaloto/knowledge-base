@@ -282,6 +282,13 @@ Target `src/redactions.rs` first, then `src/cli/run.rs` and `src/logger.rs`
 set when no `[env]` directive asks for it?** Verify against the installed/pinned
 source, not the issue tracker (`use-tool-builtins.md`; graphify's stale-open #959 is
 this repo's worked example of that trap).
+**Query the graph before reading anything** (`research-doc-sources.md` step 0):
+mise is registry source #61 and `docs/research/reports/mise-path-research.md` already
+holds a control-armed sweep of its redaction internals, so the answer may be ingested
+already. Reading the installed source directly is a *diagnostic probe*, not a corpus
+ingestion, so the `sources/` contract does not gate it — but if the probe yields
+durable knowledge, route it into the graph rather than leaving it in a transcript.
+
 Evidence: `REDACT-PROBE:` line citing `file:line` from mise's source.
 
 ### P5 — Land a cause, or land a negative
@@ -308,7 +315,10 @@ Evidence: the `REDACT-FINDING:` block (§8).
 `PASS  gate …` lines and the `ship: OK …` line verbatim.
 If anything is red, that *is* the current task — `zero-skip-policy.md`; do not defer
 past it, do not suppress it.
-Then `mise run kb-land -- <PR#>` and quote the `land: OK …` line.
+**Stop at `ship:`. Do NOT run `mise run kb-land`.** Merging is Ray's call, not
+this round's — the goal says so and §9 explains why. An earlier draft of this line
+told the agent to land and quote `land: OK …`; that contradicted both, and a rider
+that disagrees with its own goal is worse than either alone.
 
 ### P7 — Close the loop, and the doc closure
 
@@ -407,11 +417,26 @@ evaluator to run, read, or infer.
 9. `Saved to graphify-out/memory/<file>.md` from `kb-remember`.
 10. `Reflected N memories (N useful, N dead ends, N corrected) -> graphify-out/reflections/LESSONS.md`
     from `kb-reflect`.
-11. A `kb-currency-check rc=0` line. **This one needs care:** the task prints nothing
-    and exits 0 when there is no drift, so silence is indistinguishable from "never
-    ran". The agent must echo the real exit status — redirect to a file and read the
-    recorded `rc`, never a piped `| tail`, which returns tail's 0
-    (`long-running-command-hangs.md` rule 3).
+11. A currency line naming an explicit STATUS — `OK`, `DRIFT`, or `NOT CHECKED` —
+    not a bare `rc=0`. **`rc=0` is not evidence here:** `mise run kb-currency-check`
+    always exits 0 by design and prints nothing when clean, so rc=0 is returned
+    identically whether it verified everything or verified nothing. That is the exact
+    collapse the currency engine refuses everywhere else (DRIFT / SKIP / OK kept
+    distinct so "could not check" is never rendered green), and requiring rc=0 as
+    proof would reintroduce it in the one place it is being used as proof. Read the
+    recorded rc from a file, never a piped `| tail` (returns tail's 0), AND state
+    which of the three statuses the run reported.
+
+    **ADVISORY, not evaluator-enforced** — see the note below.
+
+**Which of these the EVALUATOR can enforce.** Only what appears in the GOAL is
+enforceable — the evaluator never reads this rider. The goal carries items 1–4 (the
+ARM/FINDING/HANDBACK sentinels), the four `PASS  gate …` lines, `ship: OK`, and the
+memory/reflect lines. Items 6 and 11 (the `OK eval:` summary and the currency status)
+live here only, so they bind the AGENT by instruction, not the round by condition.
+That asymmetry is deliberate — the goal has a 4,000-character cap and spending it on
+evidence the gates already imply would crowd out the Preserve list — but it must be
+stated, or a reader assumes everything in this section is a completion requirement.
 
 **Instead of 5–11, the round may satisfy:**
 

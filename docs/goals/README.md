@@ -2,7 +2,8 @@
 
 One **pair** of markdown files per round of agent work:
 
-- a **goal** — the ≤4,000-character text pasted after `/goal `, and nothing else;
+- a **goal** — the ≤4,000-character text pasted after `/goal` (with a space before
+  the condition), and nothing else;
 - a **rider** — unbounded prescriptive detail the goal points at.
 
 The convention is Greg Ceccarelli's
@@ -86,8 +87,11 @@ Two of those carry most of the weight:
 **Pick one headline word.** If you cannot, the scope is too wide — split the round in
 two.
 
-Audit the result against the twelve ambiguity tests in
-`.agent/kb/reports/agents/syn-rubric.md` (T1 transcript-visibility · T2 literal-token ·
+Audit the result with `mise run kb-goal-check` (the mechanical half) and then against
+the twelve ambiguity tests in
+`.claude/skills/goal-engineering/references/rubric.md` — tracked, unlike the
+`.agent/kb/reports/**` research it was distilled from, which is gitignored and would
+be a citation only this machine could open (T1 transcript-visibility · T2 literal-token ·
 T3 stated-check · T4 Goodhart · T5 partial-completion · T6 floor-and-ceiling ·
 T7 one-interpretation · T8 scope-fence · T9 one-round · T10 proxy-signal ·
 T11 off-transcript · T12 stale-evidence).
