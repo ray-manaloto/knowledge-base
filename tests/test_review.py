@@ -322,20 +322,68 @@ def test_report_path_strips_the_lane_variant(tmp_path: Path) -> None:
     assert review.report_path(tmp_path, _SHA, "cold").name == f"review-{_SHA}-cold.md"
 
 
-def test_require_base_rejects_a_partial_range(tmp_path: Path) -> None:
+def test_require_base_rejects_a_partial_range(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A receipt against a narrower base must not gate the whole branch.
 
     The LIKELY mistake, not an adversarial one: on a second review round the
     instinct is "review what changed since last time", which produces a truthful
-    receipt covering one commit of twelve. `ship` passes `require_base="main"`.
+    receipt covering one commit of twelve.
+
+    `base_sha` is STUBBED, and that is the whole point of this version. Left to a
+    bare `tmp_path` — which is not a git repo — it returned "", so
+    `_base_coverage_gap` short-circuited on "could not resolve" and the assertion
+    survived on an `or` disjunct: the test exercised the identical path as its
+    sibling below and **could not fail**. Mutation-proven by the silent-failure
+    lane: deleting `if got != want:` left it green at 102 passed, rc=0, while
+    deleting the empty-range check on the same harness went red — so the harness
+    discriminates and only this test did not. The `3c38ceb` commit message's
+    "8/8 proved in the FAIL direction" was false for exactly this gate.
     """
+    monkeypatch.setattr(review, "base_sha", lambda *_a, **_kw: "c" * 40)
     ok, summary = review.receipt_state(
         _write(tmp_path, fixed_point_sha="b" * 40),
         _SHA,
         require_base="main",
     )
     assert not ok
-    assert "partial range" in summary or "could not resolve" in summary
+    assert "partial range" in summary
+    assert "could not resolve" not in summary, "must reach the comparison, not short-circuit"
+
+
+def test_require_base_accepts_a_matching_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM — the same path with a base that DOES match must pass."""
+    monkeypatch.setattr(review, "base_sha", lambda *_a, **_kw: "b" * 40)
+    ok, _ = review.receipt_state(
+        _write(tmp_path, fixed_point_sha="b" * 40), _SHA, require_base="main"
+    )
+    assert ok
+
+
+def test_require_base_resolves_against_the_validated_sha_not_live_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The merge-base must be taken from the commit being validated.
+
+    This is what lets `land` use the check at all: it validates the PR head oid,
+    which is usually not local HEAD, so a HEAD-relative merge-base would refuse
+    every merge. Adding `require_base` to `land` WITHOUT this would have shipped
+    a gate that always fires — the naive one-line version of the fix.
+    """
+    seen: dict[str, object] = {}
+
+    def fake_base_sha(_root: Path, fixed_point: str, *, head: str = "HEAD") -> str:
+        seen["fixed_point"] = fixed_point
+        seen["head"] = head
+        return "b" * 40
+
+    monkeypatch.setattr(review, "base_sha", fake_base_sha)
+    review.receipt_state(_write(tmp_path, fixed_point_sha="b" * 40), _SHA, require_base="main")
+    assert seen["head"] == _SHA, "resolved against live HEAD instead of the validated commit"
+    assert seen["fixed_point"] == "main"
 
 
 def test_require_base_fails_closed_when_the_base_cannot_resolve(tmp_path: Path) -> None:

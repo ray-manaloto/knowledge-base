@@ -159,6 +159,12 @@ def _land_handler(seen: list[list[str]]) -> Callable[[list[str]], _Proc]:
             return _Proc(0, json.dumps([{"name": "CodeRabbit", "bucket": "pass"}]))
         if cmd[:3] == ["gh", "pr", "view"]:
             return _Proc(0, "deadbeefcafe1234\n")
+        # Matches `_reviewed`'s `fixed_point_sha`, so the branch-coverage check
+        # `land` now applies sees a receipt that covers the whole branch. Without
+        # it `base_sha` returns "" and every land test refuses on "could not
+        # resolve" — fail-closed working, but testing the wrong thing.
+        if cmd[:2] == ["git", "merge-base"]:
+            return _Proc(0, "a" * 40)
         return _Proc(0, "")
 
     return handler
@@ -174,6 +180,43 @@ def test_land_pins_merge_to_verified_head_sha(monkeypatch, tmp_path):
     assert "--match-head-commit" in merge
     assert merge[merge.index("--match-head-commit") + 1] == "deadbeefcafe1234"
     assert "--squash" in merge
+
+
+def test_land_refuses_a_suffix_only_receipt(monkeypatch, tmp_path):
+    """`land` must demand the whole branch was reviewed, not just its tip.
+
+    `ship` refuses a `--fixed-point HEAD^` receipt; `land` did not, and `land` is
+    what puts commits on `main`. Reaching it does not require defeating `ship` —
+    `gh pr create` is not guard-denied here, and this gate is documented as the
+    backstop for exactly that bypass, so the backstop did not cover its own
+    stated case. Found by the cold lane and rated blocking; two other lanes found
+    the same asymmetry and rated it lower.
+    """
+    from kb_setup import review
+
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")  # written with fixed_point_sha "a"*40
+    # The branch's real base is a DIFFERENT commit, so the receipt covers only a
+    # suffix. Stubbed rather than left to a non-git tmp_path, or this would
+    # short-circuit on "could not resolve" and pass without comparing anything.
+    monkeypatch.setattr(review, "base_sha", lambda *_a, **_kw: "f" * 40)
+    _stub_run(monkeypatch, _land_handler(seen))
+
+    assert pr.land_main(tmp_path, 42) == 1
+    assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "must not merge"
+
+
+def test_land_accepts_a_full_branch_receipt(monkeypatch, tmp_path):
+    """CONTROL ARM — the same path with a matching base must still merge."""
+    from kb_setup import review
+
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    monkeypatch.setattr(review, "base_sha", lambda *_a, **_kw: "a" * 40)
+    _stub_run(monkeypatch, _land_handler(seen))
+
+    assert pr.land_main(tmp_path, 42) == 0
+    assert any(c[:3] == ["gh", "pr", "merge"] for c in seen)
 
 
 def test_land_refuses_when_checks_red(monkeypatch, tmp_path):

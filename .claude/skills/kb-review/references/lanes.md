@@ -112,16 +112,23 @@ against. Two rules now bind it:
   resolves through `git merge-base HEAD HEAD` to HEAD itself, and the field was
   checked only for non-blankness — so one flag minted a full-coverage receipt
   for a zero-line diff.
-- **`kb-ship` additionally requires it to equal this branch's merge-base with
+- **`kb-ship` AND `kb-land` both require it to equal the branch's merge-base with
   `main`.** A receipt against a narrower base is still a *truthful* record of
   what it reviewed; it just does not gate the whole branch. The dangerous case is
   not adversarial but ordinary: on a second review round the instinct is "review
   what changed since last time" (`--fixed-point HEAD^`), which produces an honest
-  receipt covering one commit of twelve, and `kb-ship` used to accept it for all
-  twelve.
+  receipt covering one commit of twelve.
+
+  `land` was the half that mattered and the half that was missing. `ship` guards
+  what IT pushes, but `gh pr create` is not guard-denied here, so a PR can reach
+  the remote another way — and `land`'s receipt check is documented as the
+  backstop for exactly that. A backstop that accepted a suffix-only receipt did
+  not cover its own stated case. The base is resolved against the commit being
+  validated (the PR head oid for `land`), not live `HEAD`, or `land` would refuse
+  every merge.
 
 So pass `--fixed-point` only when you genuinely reviewed against something other
-than `main`, and expect `kb-ship` to refuse it.
+than `main`, and expect both tasks to refuse it.
 
 **A lane claimed as RUN must have left a report** at
 `.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty — where `<lane>` is

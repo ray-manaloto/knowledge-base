@@ -508,7 +508,9 @@ def _reject_reason(data: dict[str, Any], sha: str) -> str | None:
     return None
 
 
-def _base_coverage_gap(repo_root: Path, data: dict[str, Any], require_base: str) -> str | None:
+def _base_coverage_gap(
+    repo_root: Path, data: dict[str, Any], require_base: str, sha: str
+) -> str | None:
     """Return why the receipt's base does not cover the whole branch, or None.
 
     A receipt is honest about the range it reviewed, and the gate never checked
@@ -517,10 +519,17 @@ def _base_coverage_gap(repo_root: Path, data: dict[str, Any], require_base: str)
     `kb-ship` accepted it for all twelve. This is the check that makes "reviewed"
     mean "reviewed the thing you are pushing".
 
+    The base is resolved against ``sha`` — the commit being validated — and NOT
+    against live `HEAD`. That distinction is what lets `land` use this at all:
+    `land` validates the PR head oid, which is usually not the local HEAD, so a
+    HEAD-relative merge-base would refuse every merge. `base_sha` grew its
+    ``head`` parameter for exactly this and only the receipt WRITER used it;
+    reading it here is the other half.
+
     Fails CLOSED on an unresolvable base: if the comparison cannot be made, the
     question was never asked.
     """
-    want = base_sha(repo_root, require_base)
+    want = base_sha(repo_root, require_base, head=sha)
     if not want:
         return f"could not resolve '{require_base}' to compare the review's base against"
     got = str(data.get("fixed_point_sha") or "").strip()
@@ -578,7 +587,7 @@ def receipt_state(
         return False, unreadable
 
     if require_base is not None:
-        gap = _base_coverage_gap(repo_root, data, require_base)
+        gap = _base_coverage_gap(repo_root, data, require_base, sha)
         if gap is not None:
             return False, f"receipt for {sha[:12]} {gap}"
 

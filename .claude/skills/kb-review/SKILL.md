@@ -211,9 +211,14 @@ pushing. Committing it would make it stale the moment anyone rebased, and a
 stale receipt is worse than none — it is a green light nobody earned.
 
 **`kb-land` gates on it too**, not just `kb-ship` — it refuses to merge a PR head
-with no receipt. That accepts a machine-local coupling (the landing machine must
-be the reviewing one) in exchange for closing the gap where a PR is pushed by one
-path and merged by another.
+with no receipt, **and one that covers only part of the branch**. That accepts a
+machine-local coupling (the landing machine must be the reviewing one) in
+exchange for closing the gap where a PR is pushed by one path and merged by
+another.
+
+The base-coverage half was missing until round 7 caught it, and the gap was
+precisely the case this paragraph advertises: `gh pr create` is not guard-denied
+here, so a hand-opened PR plus a `--fixed-point HEAD^` receipt was merged whole.
 
 **A `--blocking` greater than 0 is refused before anything is written**, so the
 command exits 2 and `kb-ship` then refuses for *no receipt*. The lane reports are

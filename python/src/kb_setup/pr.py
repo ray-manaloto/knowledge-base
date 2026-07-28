@@ -420,7 +420,18 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     # otherwise the refusal looks like a bug rather than the design.
     from kb_setup import review
 
-    reviewed, detail = review.receipt_state(repo_root, oid)
+    # `require_base="main"` here as well as in `ship`. Without it `land` accepted a
+    # receipt covering only a SUFFIX of the branch: `--fixed-point HEAD^` produces
+    # a perfectly truthful receipt for one commit, and land merged all twelve.
+    #
+    # That is not reachable through `ship`, which refuses the same receipt — but
+    # `gh pr create` is NOT guard-denied here (`mise.toml`, `mise-tasks-only.md`),
+    # and this gate is documented as the backstop for exactly that bypass
+    # (`kb-review/SKILL.md`, "closing the gap where a PR is pushed by one path and
+    # merged by another"). A backstop that does not cover its own stated case is
+    # the kind of untrue claim this module exists to refuse. Found by the cold
+    # lane; the standards and spec lanes found the asymmetry and rated it lower.
+    reviewed, detail = review.receipt_state(repo_root, oid, require_base="main")
     print(f"==> review: {detail}")
     if not reviewed:
         print(
