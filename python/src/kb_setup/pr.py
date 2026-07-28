@@ -141,6 +141,12 @@ def checks_state(pr_number: int) -> tuple[bool, str]:
     if bad:
         detail = ", ".join(f"{r.get('name')}={r.get('bucket')}" for r in bad)
         return False, f"{len(bad)} check(s) not green: {detail}{note}"
+    if not binding:
+        # Every row was advisory. That is the NORMAL path here (no CI, CodeRabbit
+        # on every PR), and it must not read as "0 checks green" — nothing was
+        # verified remotely, which is a different sentence from "verified clean".
+        # The local `kb-review` receipt is what actually gates; see ship_main.
+        return True, f"no binding checks — nothing verified remotely{note}"
     return True, f"{len(binding)} binding check(s) green{note}"
 
 
@@ -206,6 +212,14 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
 
     if not run_gates(repo_root):
         print("ship: gates failed — not pushing")
+        return 1
+
+    # Re-checked immediately before the push, not only before the gates: the
+    # gates take minutes, and nothing stops HEAD moving underneath them. The
+    # first check fails fast; THIS one is the one that actually guards the push.
+    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root))
+    if not ok:
+        print(f"ship: refusing — HEAD moved since the review ({summary})")
         return 1
 
     rc, out = _run(["git", "push", "-u", "origin", branch], cwd=repo_root)

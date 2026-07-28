@@ -33,7 +33,22 @@ RECEIPT_DIR = Path(".agent/kb/review")
 #: them is how a gap gets reported as coverage.
 _SKIP_SEPARATOR = ":"
 
+#: The four lenses. Every one must be ACCOUNTED FOR in a receipt — either it ran
+#: or it was skipped with a reason. Without this list the gate accepted any
+#: non-empty string, so `--lanes placeholder` satisfied it: a gate the model
+#: could talk itself past, which is the exact thing this module exists to stop.
+#: Found by the cold cross-family lane reviewing this module's own first draft.
+#:
+#: A lane entry may name a variant after a colon (`cold:codex`,
+#: `cold:claude-fallback-SAME-FAMILY`) — the prefix is what must be known.
+LANES = ("standards", "spec", "cold", "silent-failure")
+
 _GIT_TIMEOUT = 30
+
+
+def _lane_prefix(entry: str) -> str:
+    """Return the lane an entry names, ignoring any `:variant` suffix."""
+    return entry.partition(_SKIP_SEPARATOR)[0]
 
 
 @dataclass(frozen=True)
@@ -62,6 +77,16 @@ class Receipt:
             "findings": self.findings,
             "blocking": self.blocking,
         }
+
+
+def rejection(receipt: Receipt) -> str | None:
+    """Return why ``receipt`` would be rejected, or None if it would pass.
+
+    The same checks :func:`receipt_state` applies, reachable BEFORE the write so
+    a bad receipt is refused rather than written and then reported as failing.
+    One implementation, so the writer and the reader cannot drift apart.
+    """
+    return _reject_reason(receipt.as_payload(), receipt.sha)
 
 
 def receipt_path(repo_root: Path, sha: str) -> Path:
@@ -102,30 +127,73 @@ def _unexplained_skips(data: dict[str, Any]) -> list[str]:
     ]
 
 
-def _reject_reason(data: dict[str, Any], sha: str) -> str | None:
-    """Return why ``data`` fails as a receipt for ``sha``, or None if it passes.
-
-    One function so the checks read as a list. Every branch here fails CLOSED:
-    anything unreadable means the question was never answered, which is not the
-    same as "nothing is wrong" (`probes-need-a-control-arm.md`).
-    """
+def _check_identity(data: dict[str, Any], sha: str) -> str | None:
+    """Reject a receipt that is not about this commit, or not about any range."""
     if data.get("sha") != sha:
         # A receipt filed under this SHA that records another is a copied file.
         return f"records a different SHA ({data.get('sha')})"
+    if not str(data.get("fixed_point") or "").strip():
+        # Without a base, the receipt says a review happened but not of WHAT.
+        return "names no fixed point, so it does not say what was reviewed"
+    return None
 
+
+def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
+    """Reject a receipt whose lanes are unexplained, invented, or missing.
+
+    All three are one defect wearing three hats: a receipt that claims more
+    coverage than the review actually had.
+    """
     unexplained = _unexplained_skips(data)
     if unexplained:
         return f"skipped lane(s) with no reason: {', '.join(unexplained)}"
 
-    if not data.get("lanes_ran"):
-        return "records no lane that actually ran"
+    ran = [str(s) for s in data.get("lanes_ran") or []]
+    named = ran + [str(s) for s in data.get("lanes_skipped") or []]
+    accounted = {_lane_prefix(e) for e in named}
 
+    unknown = sorted(accounted - set(LANES))
+    if unknown:
+        return f"names unknown lane(s): {', '.join(unknown)} (known: {', '.join(LANES)})"
+
+    missing = [lane for lane in LANES if lane not in accounted]
+    if missing:
+        return (
+            f"lane(s) unaccounted for: {', '.join(missing)} — each must either run "
+            f"or be skipped with a reason"
+        )
+
+    if not ran:
+        return "records no lane that actually ran"
+    return None
+
+
+def _check_blocking(data: dict[str, Any], _sha: str) -> str | None:
+    """Reject a receipt with unresolved blocking findings, or an unreadable count."""
     blocking = data.get("blocking")
     if not isinstance(blocking, int) or isinstance(blocking, bool):
         return "has no readable blocking count"
     if blocking > 0:
         return f"{blocking} blocking review finding(s) — resolve them or re-review"
+    return None
 
+
+#: Run in order; the first reason wins. Split into named checks rather than one
+#: long branch so each is separately testable and the list reads as the contract.
+_CHECKS = (_check_identity, _check_lanes, _check_blocking)
+
+
+def _reject_reason(data: dict[str, Any], sha: str) -> str | None:
+    """Return why ``data`` fails as a receipt for ``sha``, or None if it passes.
+
+    Every check fails CLOSED: anything unreadable means the question was never
+    answered, which is not the same as "nothing is wrong"
+    (`probes-need-a-control-arm.md`).
+    """
+    for check in _CHECKS:
+        reason = check(data, sha)
+        if reason is not None:
+            return reason
     return None
 
 

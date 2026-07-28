@@ -122,6 +122,40 @@ found the shape and missed the reasoning; a lens that finds one of them
 `cold:claude-fallback-SAME-FAMILY`. **A skip with no reason is not a skip, it is
 a gap**, and `kb-ship` rejects a receipt containing one.
 
+**The lane set is CLOSED** (`kb_setup.review.LANES`), and all four must be
+accounted for — each either ran or was skipped with a reason. Both halves of
+that matter, and the first draft had neither: the gate only checked that
+`lanes_ran` was non-empty, so `--lanes placeholder --blocking 0` satisfied it,
+and `--lanes standards` quietly bought a pass for three lanes that never ran.
+
+That hole was found by the **cold lane, reviewing this feature's own first
+commit** — after the module's unit tests were green over it. It is the argument
+for the lane, arrived at by accident rather than by construction, so it is
+recorded here rather than smoothed away.
+
+## Spawning: prefer an UNNAMED subagent
+
+A *named* teammate needs a tmux pane, and panes run out — measured at 18 open,
+most of them finished agents whose panes persist. Two lanes failed to spawn that
+way on the first real run, and `tmux kill-pane` is not always permitted.
+
+An **unnamed** `Agent` call runs in the background without a pane and is the
+default here. For the cold lane there is a second route that needs no agent at
+all: drive the CLI directly, per `ai-cli-invocation.md` —
+
+```bash
+cat prompt.txt | codex exec --ephemeral --sandbox read-only -
+```
+
+Record that variant honestly as `cold:codex-cli-direct`: same model and the same
+coldness, but not the plugin agent, so it lacks the plugin's structured-error
+fallback and a hang shows up as a hang.
+
+**A lane that could not be spawned is `not-yet-run`, never `not-applicable`.**
+The first is a gap; the second is a judgement that the lane had nothing to say.
+Writing the second when you mean the first is how a receipt reports coverage it
+does not have.
+
 `blocking > 0` fails the ship gate. Everything else is reported and does not
 block — the review's job is to put findings in front of a human, not to
 adjudicate taste.

@@ -49,7 +49,10 @@ def test_write_receipt_roundtrips(tmp_path: Path) -> None:
             sha=_SHA,
             fixed_point="main",
             lanes_ran=("standards", "spec"),
-            lanes_skipped=("cold:not-applicable-docs-only",),
+            lanes_skipped=(
+                "cold:not-applicable-docs-only",
+                "silent-failure:not-applicable-docs-only",
+            ),
             findings=0,
             blocking=0,
         ),
@@ -116,8 +119,19 @@ def test_missing_blocking_count_fails_closed(tmp_path: Path) -> None:
 
 
 def test_no_lane_ran_fails(tmp_path: Path) -> None:
-    """A receipt recording that nothing ran is not evidence that anything did."""
-    ok, summary = review.receipt_state(_write(tmp_path, lanes_ran=[]), _SHA)
+    """Every lane skipped, each with a reason, is still not a review.
+
+    Each skip is individually well-formed, so this is the case that would slip
+    through a per-entry check: the defect is only visible across the whole set.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=[],
+            lanes_skipped=[f"{lane}:not-yet-run" for lane in review.LANES],
+        ),
+        _SHA,
+    )
     assert not ok
     assert "no lane" in summary
 
@@ -137,9 +151,58 @@ def test_unexplained_skip_fails(tmp_path: Path, skipped: list[object]) -> None:
 def test_explained_skip_passes(tmp_path: Path) -> None:
     """The control arm for the test above: a reasoned skip is accepted."""
     ok, _ = review.receipt_state(
-        _write(tmp_path, lanes_skipped=["cold:not-applicable-docs-only"]), _SHA
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "silent-failure"],
+            lanes_skipped=["cold:not-applicable-docs-only"],
+        ),
+        _SHA,
     )
     assert ok
+
+
+def test_invented_lane_name_is_rejected(tmp_path: Path) -> None:
+    """`--lanes placeholder` must not satisfy the gate.
+
+    Found by the cold cross-family lane reviewing this module's own first
+    draft: the check was `lanes_ran` non-empty, so any string passed. A gate
+    the caller can talk past by naming a lane that does not exist is not a
+    gate — which is the one thing this module claims to be.
+    """
+    ok, summary = review.receipt_state(_write(tmp_path, lanes_ran=["placeholder"]), _SHA)
+    assert not ok
+    assert "unknown lane" in summary
+
+
+def test_lane_left_unaccounted_for_is_rejected(tmp_path: Path) -> None:
+    """Naming only SOME lanes is the subtler half of the same bypass."""
+    ok, summary = review.receipt_state(_write(tmp_path, lanes_ran=["standards"]), _SHA)
+    assert not ok
+    assert "unaccounted for" in summary
+    assert "silent-failure" in summary
+
+
+def test_lane_variant_suffix_is_accepted(tmp_path: Path) -> None:
+    """CONTROL ARM: `cold:codex` names a known lane and must still pass.
+
+    Without this, the fix above would reject every real receipt — the cold
+    lane always records which family actually ran.
+    """
+    ok, _ = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "cold:claude-fallback-SAME-FAMILY", "silent-failure"],
+        ),
+        _SHA,
+    )
+    assert ok
+
+
+def test_missing_fixed_point_is_rejected(tmp_path: Path) -> None:
+    """A receipt with no base says a review happened, but not of what."""
+    ok, summary = review.receipt_state(_write(tmp_path, fixed_point="  "), _SHA)
+    assert not ok
+    assert "fixed point" in summary
 
 
 def test_empty_sha_fails(tmp_path: Path) -> None:

@@ -97,7 +97,10 @@ def test_checks_state_advisory_only_still_reports_binding_zero(monkeypatch):
     _stub_run(monkeypatch, lambda _cmd: _Proc(0, json.dumps(rows)))
     green, summary = pr.checks_state(7)
     assert green is True
-    assert "0 binding check(s) green" in summary
+    # NOT "0 binding check(s) green" — nothing was verified remotely, and that
+    # is a different sentence from "verified clean".
+    assert "no binding checks" in summary
+    assert "green" not in summary.split("|")[0]
 
 
 def test_checks_state_no_checks_is_green(monkeypatch):
@@ -238,7 +241,10 @@ def test_ship_accepts_clean_feature_branch(monkeypatch, tmp_path):
             sha="feat/x",  # what the stubbed `git rev-parse HEAD` returns
             fixed_point="main",
             lanes_ran=("standards", "spec"),
-            lanes_skipped=("cold:not-applicable-docs-only",),
+            lanes_skipped=(
+                "cold:not-applicable-docs-only",
+                "silent-failure:not-applicable-docs-only",
+            ),
             findings=0,
             blocking=0,
         ),

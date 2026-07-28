@@ -193,30 +193,56 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
         return 2
     skipped = [s.strip() for s in (_opt(rest, "--skipped") or "").split(",") if s.strip()]
 
+    # `--blocking` is REQUIRED and has no default. `review.receipt_state` rejects
+    # a missing blocking count as ambiguity rather than consent — defaulting it to
+    # "0" here would hand that fail-closed reader a fail-open writer, so the one
+    # field that actually gates would be the one nobody had to state. (Found by
+    # the silent-failure lane reviewing this command's own first draft.)
+    #
+    # `--findings` does default: it is reported, not gated, so an omission is
+    # imprecision rather than an unearned pass.
     counts: dict[str, int] = {}
-    for flag in ("--findings", "--blocking"):
-        raw = _opt(rest, flag) or "0"
-        if not raw.lstrip("-").isdigit() or int(raw) < 0:
+    for flag, default in (("--findings", "0"), ("--blocking", None)):
+        raw = _opt(rest, flag)
+        if raw is None and default is None:
+            print(
+                f"review-receipt: {flag} is required — state it explicitly, including {flag} 0",
+                file=sys.stderr,
+            )
+            return 2
+        raw = raw if raw is not None else default
+        # `.isdigit()` and not `.lstrip("-").isdigit()`: the latter accepts "--5",
+        # which then raises ValueError out of int().
+        if raw is None or not raw.isdigit():
             print(f"review-receipt: {flag} must be a non-negative integer", file=sys.stderr)
             return 2
         counts[flag] = int(raw)
 
-    path = review.write_receipt(
-        repo_root,
-        review.Receipt(
-            sha=sha,
-            fixed_point=_opt(rest, "--fixed-point") or "main",
-            lanes_ran=tuple(lanes),
-            lanes_skipped=tuple(skipped),
-            findings=counts["--findings"],
-            blocking=counts["--blocking"],
-        ),
+    receipt = review.Receipt(
+        sha=sha,
+        fixed_point=_opt(rest, "--fixed-point") or "main",
+        lanes_ran=tuple(lanes),
+        lanes_skipped=tuple(skipped),
+        findings=counts["--findings"],
+        blocking=counts["--blocking"],
     )
-    ok, summary = review.receipt_state(repo_root, sha)
+
+    # Validated BEFORE the write. Writing first and reporting REJECTED after
+    # would leave an invalid receipt on disk for this SHA — harmless to the gate,
+    # which re-reads and re-rejects it, but it turns "no review yet" into "a
+    # review that failed", and those should not look the same on disk.
+    reason = review.rejection(receipt)
+    if reason is not None:
+        print(f"review-receipt: REFUSED — {reason}", file=sys.stderr)
+        return 2
+
+    path = review.write_receipt(repo_root, receipt)
     print(f"review-receipt: wrote {path.relative_to(repo_root)}")
+    ok, summary = review.receipt_state(repo_root, sha)
     print(f"review-receipt: {'OK' if ok else 'REJECTED'} — {summary}")
-    # A receipt this module just wrote and its own gate rejects is a defect in
-    # one of the two; surface it now rather than at ship time.
+    # A receipt this module just wrote and its own gate rejects means the writer
+    # and the reader disagree — a defect in one of them, surfaced now rather
+    # than at ship time.
     return 0 if ok else 1
 
 
