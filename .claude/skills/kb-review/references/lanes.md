@@ -10,7 +10,19 @@ This skill supplies only the two sources the spine cannot find in this repo
 (SKILL.md step 3) and `references/repo-smells.md` as additions to its baseline.
 Everything below is the part the spine does not have.
 
-## Cold — `fable-orchestrator:codex-reviewer`
+## Cold — a lane from a DIFFERENT family than the implementer
+
+Which lane that is depends on who wrote the diff; **SKILL.md step 5 owns the
+routing table and this file defers to it.** Claude-authored (the usual case) →
+`fable-orchestrator:codex-reviewer`; codex-authored — which this project's
+Claude config makes the default for orchestrator-driven work — →
+`antigravity:review`.
+
+This section used to name `codex-reviewer` unconditionally, in its heading and
+in step 1 of the chain below, which meant following this file literally on a
+codex-authored branch recorded a **same-family** read as `cold:codex`. Three
+separate lanes flagged it in one round: SKILL.md had been corrected and its own
+reference file had not.
 
 **By ref, and cold.** Hand it the range and nothing else:
 
@@ -29,8 +41,8 @@ blind spots are different ones.
 
 | Step | Lane | Family |
 |---|---|---|
-| 1 | `fable-orchestrator:codex-reviewer` | OpenAI (GPT-5.6 Sol) — cross-family |
-| 2 | `antigravity:review` / `antigravity-delegate` | Google (Gemini 3.x) — cross-family |
+| 1 | whichever cross-family lane SKILL.md's table selects for THIS diff | OpenAI or Google — cross-family |
+| 2 | the other cross-family lane | still cross-family |
 | 3 | a Claude Opus subagent | **same family as the author** |
 
 Step 3 is a real fallback and never a silent one. Record it as
@@ -72,7 +84,7 @@ found the shape and missed the reasoning; a lens that finds one of them
 ```json
 {
   "sha": "9521853...",
-  "written_at": "2026-07-28T02:14:09Z",
+  "written_at": "2026-07-28T02:14:09+00:00",
   "fixed_point": "main",
   "fixed_point_sha": "9698879...",
   "lanes_ran": ["standards", "spec", "cold:codex", "silent-failure"],
@@ -94,10 +106,22 @@ was written for: both cross-family CLIs down. Found by two lanes independently.
 
 `fixed_point_sha` is the **merge-base**, not the fixed point resolved as a ref —
 three-dot semantics, matching the `git diff <base>...HEAD` the review runs
-against. It is recorded, never gated: the gate's question is "was THIS commit
-reviewed", and a receipt does not prove the fixed point covered the whole branch
-(review against `HEAD^` and the receipt is still honest about the SHA). Read the
-`fixed_point_sha` when that matters to you.
+against. Two rules now bind it:
+
+- **An EMPTY range is refused for every consumer.** `--fixed-point HEAD`
+  resolves through `git merge-base HEAD HEAD` to HEAD itself, and the field was
+  checked only for non-blankness — so one flag minted a full-coverage receipt
+  for a zero-line diff.
+- **`kb-ship` additionally requires it to equal this branch's merge-base with
+  `main`.** A receipt against a narrower base is still a *truthful* record of
+  what it reviewed; it just does not gate the whole branch. The dangerous case is
+  not adversarial but ordinary: on a second review round the instinct is "review
+  what changed since last time" (`--fixed-point HEAD^`), which produces an honest
+  receipt covering one commit of twelve, and `kb-ship` used to accept it for all
+  twelve.
+
+So pass `--fixed-point` only when you genuinely reviewed against something other
+than `main`, and expect `kb-ship` to refuse it.
 
 **A lane claimed as RUN must have left a report** at
 `.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty — where `<lane>` is
@@ -164,7 +188,8 @@ gate") described a path that does not exist and hid a real consequence: a review
 that FOUND blockers leaves the same empty disk as one that never ran. If you need
 those distinguishable, the lane reports are what distinguishes them — they are
 written before the receipt and survive its refusal. `review.py`'s own
-`_check_blocking` is defence-in-depth for a hand-edited receipt, not this path.
+`_check_blocking` is what performs that refusal — `cli.py` calls `rejection()`,
+which runs the same `_CHECKS` the reader runs, so writer and reader cannot drift.
 
 Everything below blocking is reported and does not block — the review's job is to
 put findings in front of a human, not to adjudicate taste.

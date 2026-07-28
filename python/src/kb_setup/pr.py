@@ -7,11 +7,23 @@ nothing to watch.
 
 What it does keep is the part that carries the safety:
 
-* ``ship`` runs the same local gates CI would have run (``lint`` + ``test``)
-  BEFORE the branch is pushed, so a red branch never becomes a PR;
+* ``ship`` refuses a commit with no `kb-review` receipt — checked before the
+  gates and again immediately before the push. **That is this module's strongest
+  behaviour**, because CodeRabbit is advisory here, so the local review is the
+  only review;
+* ``ship`` then runs every gate in :data:`GATES` (``lint``, ``test``,
+  ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red branch never
+  becomes a PR;
+* the push is pinned to the SHA the receipt was validated against
+  (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
+  unreviewed commit onto the remote;
 * ``land`` re-reads the checks and pins the merge to the head SHA it verified
   (``gh pr merge --match-head-commit``), so a commit pushed between the check
   and the merge cannot ride in unverified.
+
+This docstring said "``lint`` + ``test``" and never mentioned the receipt until
+the standards lane pointed out that `mise.toml` and `CLAUDE.md` had both been
+synced while the doc closest to the code had not.
 
 Invoked via the ``kb-ship`` / ``kb-land`` mise tasks — never by hand.
 """
@@ -242,28 +254,52 @@ def _ship_preflight(repo_root: Path) -> str | None:
     return branch
 
 
+def _pr_number_and_state(out: str) -> tuple[int | None, str]:
+    """Parse `gh pr view --json number,state` output; ``(None, "")`` if unreadable.
+
+    Strict, and fails closed: `_run` merges stdout and stderr, so anything gh
+    prints alongside the JSON lands here. An unreadable answer is not "no PR".
+    """
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        return None, ""
+    if not isinstance(data, dict) or not isinstance(data.get("number"), int):
+        return None, ""
+    return data["number"], str(data.get("state") or "")
+
+
 def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     """Open a PR for ``branch`` (or report the existing one); return an exit code."""
+    # `--json number,state`, not `--jq .number`: `gh pr view <branch>` resolves a
+    # branch to its PR REGARDLESS OF STATE. Measured — `gh pr view
+    # docs/clear-prep-sync --json number,state` → `{"number":52,"state":"MERGED"}`,
+    # rc=0 — so asking only for the number made `ship` print
+    # `OK — PR #52 updated, gates green` and exit 0 having opened nothing. That is
+    # reachable today: `land` deletes the remote branch and leaves the local one,
+    # and every PR in this repo is MERGED. A ship that reports success while doing
+    # nothing is the failure this whole branch exists to remove.
     rc, out = _run(
-        ["gh", "pr", "view", branch, "--json", "number", "--jq", ".number"],
+        ["gh", "pr", "view", branch, "--json", "number,state"],
         cwd=repo_root,
         timeout=_GH_TIMEOUT,
     )
-    existing = out.strip()
-    if rc == 0 and existing.isdigit():
-        print(f"ship: OK — PR #{existing} updated, gates green")
-        return 0
-    # Anything that is not a parsed number is either "no PR yet" (create one) or
-    # "could not ask" (stop). The rc was part of this condition — `rc != 0 and …`
-    # — which left the other axis open: `_run` merges stdout and stderr, so rc=0
-    # with any warning chatter beside the number defeats `.isdigit()` above and
-    # used to fall straight through to `gh pr create`, turning an answer we failed
-    # to READ into a second PR. Dropping rc from the condition closes that without
-    # a second branch to keep in sync.
-    if "no pull requests found" not in out.lower():
-        # Any other failure — auth expiry, network, rate limit — is "could not
-        # ask", not "there is no PR". Falling through to `gh pr create` would
-        # turn an unanswered question into a second PR. Say so and stop.
+    if rc == 0:
+        number, state = _pr_number_and_state(out)
+        if number is None:
+            print(f"ship: could not read the branch's PR state (rc=0)\n{out.strip()[:300]}")
+            return 1
+        if state == "OPEN":
+            print(f"ship: OK — PR #{number} updated, gates green")
+            return 0
+        # MERGED or CLOSED is not something to "update" — the commits just pushed
+        # need a new PR. Say which, so this does not look like a lost PR.
+        print(f"ship: branch's PR #{number} is {state}; opening a new one")
+    # rc != 0 is either "no PR yet" (create one) or "could not ask" (stop). Only
+    # the literal gh phrase means the former; any other failure — auth expiry,
+    # network, rate limit — is an unanswered question, and falling through to
+    # `gh pr create` would turn it into a second PR.
+    elif "no pull requests found" not in out.lower():
         print(f"ship: could not read the branch's PR state (rc={rc})\n{out.strip()[:300]}")
         return 1
 
@@ -278,6 +314,31 @@ def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     return 0
 
 
+def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
+    """Return the SHA to push, or None (having said why) if the push must not happen.
+
+    Re-checked immediately before the push, not only before the gates: the gates
+    take minutes and nothing stops HEAD moving underneath them. The first check
+    fails fast; THIS one guards the push.
+
+    BOTH halves of the refspec are re-read here. Pinning the push to a post-gate
+    `sha` while still using the pre-gate `branch` closed one half of the window
+    and left the other open: a checkout during the gates would push the new
+    branch's (separately reviewed, so passing) SHA onto the OLD branch's ref.
+    """
+    from kb_setup import review
+
+    sha = review.head_sha(repo_root)
+    if current_branch(repo_root) != branch:
+        print(f"ship: refusing — branch changed during the gates (was '{branch}')")
+        return None
+    ok, summary = review.receipt_state(repo_root, sha, require_base="main")
+    if not ok:
+        print(f"ship: refusing — HEAD moved since the review ({summary})")
+        return None
+    return sha
+
+
 def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     """Gate, push, and open a PR for the current branch; return an exit code."""
     branch = _ship_preflight(repo_root)
@@ -289,7 +350,7 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     # the cheap question first rather than after four gate runs.
     from kb_setup import review
 
-    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root))
+    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root), require_base="main")
     print(f"==> review: {summary}")
     if not ok:
         print("ship: refusing — not pushing an unreviewed commit")
@@ -299,13 +360,8 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
         print("ship: gates failed — not pushing")
         return 1
 
-    # Re-checked immediately before the push, not only before the gates: the
-    # gates take minutes, and nothing stops HEAD moving underneath them. The
-    # first check fails fast; THIS one is the one that actually guards the push.
-    sha = review.head_sha(repo_root)
-    ok, summary = review.receipt_state(repo_root, sha)
-    if not ok:
-        print(f"ship: refusing — HEAD moved since the review ({summary})")
+    sha = _validated_sha_for_push(repo_root, branch)
+    if sha is None:
         return 1
 
     # Push the SHA that was just VALIDATED, not the branch name. Re-reading HEAD

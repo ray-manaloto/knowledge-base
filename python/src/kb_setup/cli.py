@@ -178,6 +178,11 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
 #: rather than silently resolved to whichever `_opt` happens to find first.
 _RECEIPT_FLAGS = ("--lanes", "--skipped", "--findings", "--blocking", "--fixed-point")
 
+#: Digit bound on `--findings` / `--blocking`. Well under CPython's
+#: `sys.int_info.str_digits_check_threshold` (4300), past which `int()` itself
+#: raises ValueError — and far past any real finding count.
+_MAX_COUNT_DIGITS = 18
+
 
 def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     """Write the `kb-review` skill's receipt for HEAD; `ship` refuses to push without it."""
@@ -239,16 +244,29 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
         # `.isdigit()` alone is True for Unicode digits like "²" that `int()` then
         # REJECTS — so the guard whose comment claims it prevents a ValueError
         # raised one. (Cold lane, twice.)
-        if raw is None or not raw.isascii() or not raw.isdigit():
+        # The length bound is not cosmetic: CPython refuses `int()` on a
+        # digit-string longer than `sys.int_info.str_digits_check_threshold`
+        # (4300 by default) and raises ValueError — so an all-digit value could
+        # still crash the parse this guard exists to protect. (Cold lane.)
+        if raw is None or not raw.isascii() or not raw.isdigit() or len(raw) > _MAX_COUNT_DIGITS:
             print(f"review-receipt: {flag} must be a non-negative integer", file=sys.stderr)
             return 2
         counts[flag] = int(raw)
 
+    # `_opt` returns its default when a flag is LAST with no value, so a dangling
+    # `--fixed-point` silently reviewed against `main` while the command line said
+    # otherwise. A stated flag with no value is a typo, not a default.
+    if "--fixed-point" in rest and _opt(rest, "--fixed-point") is None:
+        print("review-receipt: --fixed-point needs a value", file=sys.stderr)
+        return 2
     fixed_point = _opt(rest, "--fixed-point") or "main"
     receipt = review.Receipt(
         sha=sha,
         fixed_point=fixed_point,
-        fixed_point_sha=review.base_sha(repo_root, fixed_point),
+        # Pinned to the SHA captured above, not to live HEAD: reading them a
+        # moment apart let a checkout in between label this receipt with a base
+        # from a different branch.
+        fixed_point_sha=review.base_sha(repo_root, fixed_point, head=sha),
         lanes_ran=tuple(lanes),
         lanes_skipped=tuple(skipped),
         findings=counts["--findings"],

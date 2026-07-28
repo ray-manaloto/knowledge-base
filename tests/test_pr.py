@@ -245,7 +245,9 @@ def _clean_branch_handler(cmd: list[str]) -> _Proc:
     if cmd[:2] == ["git", "status"]:
         return _Proc(0, "")
     if cmd[:3] == ["gh", "pr", "view"]:
-        return _Proc(0, "99")
+        return _Proc(0, json.dumps({"number": 99, "state": "OPEN"}))
+    if cmd[:2] == ["git", "merge-base"]:
+        return _Proc(0, "a" * 40)
     return _Proc(0, "")
 
 
@@ -411,13 +413,18 @@ def test_ship_refuses_on_detached_head(monkeypatch, tmp_path):
     _write_valid_receipt(tmp_path, sha="HEAD")
     seen: list[list[str]] = []
 
+    # Everything OTHER than the branch name must be a working happy path, or
+    # `ship_main` returns 1 for an unrelated reason and this test passes without
+    # exercising the guard. It did exactly that twice: first the receipt check
+    # refused before the guard was reached, then a bare `_Proc(0, "99")` for
+    # `gh pr view` failed the JSON parse and a `git merge-base` of "" failed the
+    # base-coverage check. Delegating to `_clean_branch_handler` keeps every
+    # other arm honest; only `rev-parse` is overridden.
     def handler(cmd: list[str]) -> _Proc:
         seen.append(cmd)
         if cmd[:2] == ["git", "rev-parse"]:
             return _Proc(0, "HEAD")
-        if cmd[:3] == ["gh", "pr", "view"]:
-            return _Proc(0, "99")
-        return _Proc(0, "")
+        return _clean_branch_handler(cmd)
 
     _stub_run(monkeypatch, handler)
     monkeypatch.setattr(pr, "run_gates", lambda _root: True)
@@ -487,6 +494,70 @@ def test_open_or_update_pr_refuses_an_unparsable_success(monkeypatch, tmp_path):
     monkeypatch.setattr(pr, "run_gates", lambda _root: True)
     assert pr.ship_main(tmp_path) == 1
     assert not any(c[:3] == ["gh", "pr", "create"] for c in seen)
+
+
+def test_ship_does_not_report_success_on_a_merged_pr(monkeypatch, tmp_path):
+    """`gh pr view <branch>` resolves a branch to its PR regardless of STATE.
+
+    Measured live: `gh pr view docs/clear-prep-sync --json number,state` →
+    `{"number":52,"state":"MERGED"}`, rc=0. Asking only for `.number` made ship
+    print `OK — PR #52 updated, gates green` and exit 0 having opened nothing.
+    Reachable today — `land` deletes the remote branch and leaves the local one,
+    and every PR in this repo is MERGED.
+    """
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(0, json.dumps({"number": 52, "state": "MERGED"}))
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+    assert any(c[:3] == ["gh", "pr", "create"] for c in seen), "a merged PR needs a NEW one"
+
+
+def test_ship_reports_update_only_for_an_open_pr(monkeypatch, tmp_path):
+    """CONTROL ARM for the test above — an OPEN PR must still short-circuit."""
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+    assert not any(c[:3] == ["gh", "pr", "create"] for c in seen)
+
+
+def test_ship_refuses_when_the_branch_changes_during_the_gates(monkeypatch, tmp_path):
+    """Both halves of the push refspec must come from the same instant.
+
+    Pinning `sha` post-gate while reusing the pre-gate `branch` closed one half
+    of the window and left the other: a checkout during the gates would push the
+    NEW branch's (separately reviewed, so passing) SHA to the OLD branch's ref.
+    """
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+    # Exactly two `current_branch` reads: the preflight, then the pre-push
+    # re-check. The second is the one that must see the checkout.
+    branches = iter(["feat/x", "feat/other"])
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        if cmd[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+            return _Proc(0, next(branches, "feat/other"))
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
+    assert not any(c[:2] == ["git", "push"] for c in seen), "must not push to a stale branch ref"
 
 
 def test_await_terminal_does_not_claim_terminal_on_a_failed_watch(monkeypatch):

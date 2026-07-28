@@ -434,7 +434,7 @@ evaluator to run, read, or infer.
 8. `ship: OK — PR open, gates green` (`pr.py` `_open_or_update_pr`) **or**
    `ship: OK — PR #N updated, gates green` (same function).
 9. **The round stops at `ship:`. Merging is Ray's call, not this round's.** The
-   drafted version required `land: OK — PR #N merged, main synced` (`pr.py:226`);
+   drafted version required `land: OK — PR #N merged, main synced` (`pr.py` `land_main`);
    that was removed deliberately. A goal loop that satisfies itself by merging is
    autonomously landing code on `main`. CodeRabbit returns
    `pass  "Review rate limited"` on most PRs, so it is not reviewing the diff

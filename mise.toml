@@ -314,7 +314,11 @@ run = "uv run kb-setup review-receipt"
 
 [tasks.kb-ship]
 description = 'Review receipt + gates (lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
-# The ONLY sanctioned way to open a PR here — `gh pr create` is guard-denied.
+# The sanctioned way to open a PR here. `gh pr create` is NOT guard-denied in
+# this repo — `hook_guard._REDIRECT` covers graphify subcommands only — so this
+# is convention, not enforcement, and a raw `gh pr create` would bypass the
+# review receipt entirely. Said plainly because the comment used to claim the
+# guard stopped it, while `mise-tasks-only.md` correctly said it does not.
 # Gates run BEFORE the push, so a red branch never becomes a PR. This repo has no
 # CI, so the local gates are the only gates. Logic in kb_setup.pr.
 run = "uv run kb-setup ship"

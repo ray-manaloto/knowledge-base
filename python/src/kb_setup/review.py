@@ -239,7 +239,17 @@ def _git(repo_root: Path, *args: str) -> str:
     except (OSError, subprocess.SubprocessError) as exc:
         print(f"  git {' '.join(args)}: {exc}")
         return ""
-    return proc.stdout.strip() if proc.returncode == 0 else ""
+    if proc.returncode != 0:
+        # The rc path is the one that ACTUALLY fires — a bad ref exits 128 rather
+        # than raising — and it was the one branch here that returned a silent ""
+        # while both exception paths above printed why. Two lines under a comment
+        # saying a silent "" would read as an answer. Callers fail closed on "",
+        # so this costs diagnosis rather than safety, which is exactly why it was
+        # invisible. (Silent-failure lane, third pass.)
+        detail = (proc.stderr or proc.stdout or "").strip()
+        print(f"  git {' '.join(args)}: rc={proc.returncode} {detail[:160]}")
+        return ""
+    return proc.stdout.strip()
 
 
 def head_sha(repo_root: Path) -> str:
@@ -247,13 +257,23 @@ def head_sha(repo_root: Path) -> str:
     return _git(repo_root, "rev-parse", "HEAD")
 
 
-def base_sha(repo_root: Path, fixed_point: str) -> str:
+def base_sha(repo_root: Path, fixed_point: str, *, head: str = "HEAD") -> str:
     """Resolve ``fixed_point`` to the merge-base commit, or "" if unresolvable.
 
     Three-dot semantics, matching the `git diff <base>...HEAD` the review runs
     against: the question is what the branch added, not how the base has moved.
+
+    ``head`` lets a caller that has already captured a SHA pin the comparison to
+    THAT commit. The receipt writer reads HEAD once for `sha` and then resolved
+    the base against live `HEAD` a moment later, so a checkout in between labelled
+    the receipt with a base from a different branch. (Cold lane.)
     """
-    return _git(repo_root, "merge-base", fixed_point, "HEAD")
+    # `--` terminates option parsing: without it a fixed point spelled like a flag
+    # (`--fork-point`) is read by git as an OPTION rather than a ref, so the
+    # command silently answers a different question. Probed both arms: with `--`,
+    # `--fork-point` → "Not a valid object name"; without it → a wrong answer,
+    # silently. (Cold lane.)
+    return _git(repo_root, "merge-base", "--", fixed_point, head)
 
 
 def write_receipt(repo_root: Path, receipt: Receipt) -> Path:
@@ -287,8 +307,17 @@ def _unexplained_skips(skipped: list[str]) -> list[str]:
 
 
 def report_path(repo_root: Path, sha: str, lane: str) -> Path:
-    """Return where ``lane``'s report for ``sha`` must be written."""
-    return repo_root / REPORT_DIR / f"review-{_safe_sha(sha)}-{_safe_lane(lane)}.md"
+    """Return where ``lane``'s report for ``sha`` must be written.
+
+    The `:variant` is STRIPPED: a lane recorded as `cold:codex` leaves
+    `…-cold.md`. `_missing_reports` already read it that way (via
+    `_lane_prefix`), so a caller passing the variant to this helper got
+    `…-coldcodex.md` while the gate hunted `…-cold.md` — the same
+    writer/reader divergence as the `_safe_lane` hyphen bug, one layer up, and
+    latent for the same reason: nothing passed a variant here.
+    """
+    lane_file = _safe_lane(_lane_prefix(lane))
+    return repo_root / REPORT_DIR / f"review-{_safe_sha(sha)}-{lane_file}.md"
 
 
 def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
@@ -318,10 +347,16 @@ def _check_identity(data: dict[str, Any], sha: str) -> str | None:
     if data.get("sha") != sha:
         # A receipt filed under this SHA that records another is a copied file.
         return f"records a different SHA ({data.get('sha')})"
-    if not str(data.get("fixed_point") or "").strip():
+    # `isinstance(..., str)` as well as non-blank: these were coerced with `str()`
+    # before the check, so a JSON `true` became the string "True" and passed as a
+    # perfectly good fixed point. Stringifying before validating turns "the wrong
+    # type" into "some text", which is never what a type check wants. (Cold lane.)
+    fixed_point = data.get("fixed_point")
+    if not isinstance(fixed_point, str) or not fixed_point.strip():
         # Without a base, the receipt says a review happened but not of WHAT.
         return "names no fixed point, so it does not say what was reviewed"
-    if not str(data.get("fixed_point_sha") or "").strip():
+    fixed_point_sha = data.get("fixed_point_sha")
+    if not isinstance(fixed_point_sha, str) or not fixed_point_sha.strip():
         # An unresolvable fixed point (a typo, a deleted branch) recorded an
         # empty sha and sailed through, so the receipt claimed a base it never
         # resolved. Unresolvable is "could not check", never "clean".
@@ -341,7 +376,7 @@ def _as_entries(value: object) -> list[str] | None:
     return [str(v) for v in value]
 
 
-def _accounting_reason(ran: list[str], skipped: list[str], accounted: set[str]) -> str | None:
+def _accounting_reason(ran: list[str], skipped: list[str]) -> str | None:
     """Return why the lane set is not fully and consistently accounted for.
 
     The three ways one receipt can misdescribe its own coverage: a lane claimed
@@ -349,7 +384,13 @@ def _accounting_reason(ran: list[str], skipped: list[str], accounted: set[str]) 
     out of :func:`_check_lanes` so each stays a named guard clause rather than
     being merged to satisfy a return-count limit — the limit is a signal to
     decompose, not to compress.
+
+    ``accounted`` is DERIVED here rather than passed in. It took it as a third
+    parameter that was exactly `{prefix(e) for e in ran + skipped}`, so a caller
+    could hand over a set inconsistent with the other two arguments — an instance
+    of the very defect this function exists to detect. (Standards lane.)
     """
+    accounted = {_lane_prefix(e) for e in (*ran, *skipped)}
     # A lane did one or the other. Listing it in both collapsed to a single set
     # entry, so `--lanes cold:codex --skipped cold:not-applicable-x` satisfied
     # "accounted for" twice over while saying two contradictory things about one
@@ -399,15 +440,11 @@ def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
             f"did not run is a gap, not a skip"
         )
 
-    ran = ran_raw
-    named = ran + skipped_raw
-    accounted = {_lane_prefix(e) for e in named}
-
-    accounting = _accounting_reason(ran, skipped_raw, accounted)
+    accounting = _accounting_reason(ran_raw, skipped_raw)
     if accounting is not None:
         return accounting
 
-    if not ran:
+    if not ran_raw:
         return "records no lane that actually ran"
     return None
 
@@ -429,9 +466,32 @@ def _check_blocking(data: dict[str, Any], _sha: str) -> str | None:
     return None
 
 
+def _check_range(data: dict[str, Any], sha: str) -> str | None:
+    """Reject a receipt whose comparison range is EMPTY.
+
+    `--fixed-point HEAD` resolves through `git merge-base HEAD HEAD` to HEAD
+    itself, and `fixed_point_sha` was only ever checked for non-blankness — so a
+    receipt recording a zero-line diff satisfied the entire gate in one flag.
+
+    The adversarial reading is not the dangerous one. The LIKELY one is: on a
+    second or third review round the natural instinct is "review what changed
+    since last time" (`--fixed-point HEAD^`), which mints an honest-looking
+    receipt covering one commit of twelve. `ship` additionally requires the base
+    to be the branch's own merge-base — see :func:`receipt_state`'s
+    ``require_base`` — but an empty range is malformed for any consumer, so it is
+    refused here for all of them. (Cold lane, third pass.)
+    """
+    if str(data.get("fixed_point_sha") or "").strip() == sha:
+        return (
+            "records an EMPTY comparison range (fixed_point_sha == sha) — nothing "
+            "was reviewed; `--fixed-point HEAD` resolves to HEAD itself"
+        )
+    return None
+
+
 #: Run in order; the first reason wins. Split into named checks rather than one
 #: long branch so each is separately testable and the list reads as the contract.
-_CHECKS = (_check_identity, _check_lanes, _check_blocking)
+_CHECKS = (_check_identity, _check_range, _check_lanes, _check_blocking)
 
 
 def _reject_reason(data: dict[str, Any], sha: str) -> str | None:
@@ -448,24 +508,79 @@ def _reject_reason(data: dict[str, Any], sha: str) -> str | None:
     return None
 
 
-def receipt_state(repo_root: Path, sha: str) -> tuple[bool, str]:
-    """Return ``(ok, summary)`` for ``sha``'s review receipt."""
-    if not sha:
-        return False, "could not read HEAD"
+def _base_coverage_gap(repo_root: Path, data: dict[str, Any], require_base: str) -> str | None:
+    """Return why the receipt's base does not cover the whole branch, or None.
 
-    path = receipt_path(repo_root, sha)
+    A receipt is honest about the range it reviewed, and the gate never checked
+    that the range was the range being SHIPPED. `--fixed-point HEAD^` on a
+    twelve-commit branch produces a truthful receipt covering one commit, and
+    `kb-ship` accepted it for all twelve. This is the check that makes "reviewed"
+    mean "reviewed the thing you are pushing".
+
+    Fails CLOSED on an unresolvable base: if the comparison cannot be made, the
+    question was never asked.
+    """
+    want = base_sha(repo_root, require_base)
+    if not want:
+        return f"could not resolve '{require_base}' to compare the review's base against"
+    got = str(data.get("fixed_point_sha") or "").strip()
+    if got != want:
+        return (
+            f"was reviewed against {got[:12] or '(nothing)'}, but this branch's base is "
+            f"{want[:12]} — a partial range does not gate the whole branch; re-review "
+            f"against {require_base}"
+        )
+    return None
+
+
+def _load_receipt(path: Path, sha: str) -> tuple[dict[str, Any] | None, str]:
+    """Return ``(data, "")``, or ``(None, reason)`` if it cannot be read as one.
+
+    Every arm fails CLOSED with a worded reason rather than raising: this is the
+    boundary where a receipt stops being bytes and starts being a verdict, and a
+    traceback out of here would be a crash where a refusal belongs.
+    """
     if not path.is_file():
-        return False, (
+        return None, (
             f"no review receipt for {sha[:12]} — run the `kb-review` skill "
             f"(an amend or rebase moves the SHA and invalidates the old one)"
         )
-
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return False, f"receipt for {sha[:12]} is unreadable: {exc}"
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        # `UnicodeDecodeError` is raised by `read_text` BEFORE json ever sees the
+        # bytes, and it is NOT an `OSError` — so a truncated or partly-binary
+        # receipt escaped as a traceback. `write_receipt` is a non-atomic
+        # `write_text`, so partial files are realistic, not theoretical.
+        return None, f"receipt for {sha[:12]} is unreadable: {exc}"
     if not isinstance(data, dict):
-        return False, f"receipt for {sha[:12]} is not an object"
+        return None, f"receipt for {sha[:12]} is not an object"
+    return data, ""
+
+
+def receipt_state(
+    repo_root: Path, sha: str, *, require_base: str | None = None
+) -> tuple[bool, str]:
+    """Return ``(ok, summary)`` for ``sha``'s review receipt.
+
+    ``require_base`` additionally demands that the receipt was written against
+    this branch's merge-base with that ref — i.e. that the review covered the
+    WHOLE branch, not a suffix of it. `ship` passes ``"main"``; nothing else
+    does, because a receipt reviewed against a narrower base is still a truthful
+    record of what it reviewed. It is the act of shipping the whole branch that
+    needs the whole branch reviewed.
+    """
+    if not sha:
+        return False, "could not read HEAD"
+
+    data, unreadable = _load_receipt(receipt_path(repo_root, sha), sha)
+    if data is None:
+        return False, unreadable
+
+    if require_base is not None:
+        gap = _base_coverage_gap(repo_root, data, require_base)
+        if gap is not None:
+            return False, f"receipt for {sha[:12]} {gap}"
 
     reason = _all_reasons(repo_root, data, sha)
     if reason is not None:

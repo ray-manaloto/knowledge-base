@@ -73,9 +73,10 @@ from a lane that failed to run. Collapsing those two is how every defect in the
 currency engine's review happened.
 
 The goal row keeps **Standards** as well, because `kb-goal-check` is mechanical —
-it counts sections, sentinels, and negations. The five judgement tests that
+it counts sections, sentinels, and negations. The judgement tests that
 actually catch a bad condition (Goodhart shortcuts, stale evidence, the
-stated-connective trap) live in `goal-engineering`'s rubric and no gate runs them.
+stated-connective trap) live in `goal-engineering`'s rubric — thirteen of them,
+and no gate runs any.
 Dropping Standards left a goal pair reviewed only by the tool that cannot read it,
 and a goal pair is its own Spec source, so Spec alone is close to self-review.
 

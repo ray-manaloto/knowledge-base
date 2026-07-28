@@ -286,6 +286,90 @@ def test_a_lane_cannot_be_both_run_and_skipped(tmp_path: Path) -> None:
     assert "cold" in summary
 
 
+def test_empty_comparison_range_is_rejected(tmp_path: Path) -> None:
+    """A receipt whose base IS its own SHA reviewed nothing.
+
+    `--fixed-point HEAD` resolves through `git merge-base HEAD HEAD` to HEAD
+    itself (verified against real git), and `fixed_point_sha` was checked only
+    for non-blankness — so one flag minted a full-coverage receipt for a
+    zero-line diff.
+    """
+    ok, summary = review.receipt_state(_write(tmp_path, fixed_point_sha=_SHA), _SHA)
+    assert not ok
+    assert "EMPTY comparison range" in summary
+
+
+@pytest.mark.parametrize("bad", [True, 42, None, ""])
+def test_non_string_fixed_point_is_rejected(tmp_path: Path, bad: object) -> None:
+    """A JSON `true` must not become the string "True" and pass as a base.
+
+    The value was coerced with `str()` BEFORE the non-blank check, so every
+    non-string except None/"" sailed through. Stringifying before validating
+    turns "wrong type" into "some text".
+    """
+    ok, _ = review.receipt_state(_write(tmp_path, fixed_point=bad), _SHA)
+    assert not ok
+
+
+def test_report_path_strips_the_lane_variant(tmp_path: Path) -> None:
+    """`cold:codex` must resolve to `…-cold.md`, matching what the gate reads.
+
+    Spelled out literally rather than compared against `_lane_prefix`, so this
+    cannot inherit the bug it is checking — the tautological-probe lesson from
+    the `_safe_lane` hyphen defect, which is the same divergence one layer down.
+    """
+    assert review.report_path(tmp_path, _SHA, "cold:codex").name == f"review-{_SHA}-cold.md"
+    assert review.report_path(tmp_path, _SHA, "cold").name == f"review-{_SHA}-cold.md"
+
+
+def test_require_base_rejects_a_partial_range(tmp_path: Path) -> None:
+    """A receipt against a narrower base must not gate the whole branch.
+
+    The LIKELY mistake, not an adversarial one: on a second review round the
+    instinct is "review what changed since last time", which produces a truthful
+    receipt covering one commit of twelve. `ship` passes `require_base="main"`.
+    """
+    ok, summary = review.receipt_state(
+        _write(tmp_path, fixed_point_sha="b" * 40),
+        _SHA,
+        require_base="main",
+    )
+    assert not ok
+    assert "partial range" in summary or "could not resolve" in summary
+
+
+def test_require_base_fails_closed_when_the_base_cannot_resolve(tmp_path: Path) -> None:
+    """An unresolvable base is "could not check", never "clean"."""
+    ok, summary = review.receipt_state(_write(tmp_path), _SHA, require_base="no-such-ref-anywhere")
+    assert not ok
+    assert "could not resolve" in summary
+
+
+def test_require_base_is_opt_in(tmp_path: Path) -> None:
+    """CONTROL ARM — without `require_base` the same receipt must still pass.
+
+    Otherwise the two tests above would also pass if the receipt were rejected
+    for some unrelated reason.
+    """
+    ok, _ = review.receipt_state(_write(tmp_path, fixed_point_sha="b" * 40), _SHA)
+    assert ok
+
+
+def test_unreadable_bytes_in_a_receipt_are_refused_not_crashed(tmp_path: Path) -> None:
+    """`UnicodeDecodeError` is raised by `read_text` and is NOT an `OSError`.
+
+    `write_receipt` is a non-atomic `write_text`, so a truncated or partly-binary
+    receipt is realistic — and it escaped as a traceback out of the one function
+    whose contract is to return a worded refusal.
+    """
+    path = review.receipt_path(tmp_path, _SHA)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b'{"sha": "\xff\xfe not utf-8"}')
+    ok, summary = review.receipt_state(tmp_path, _SHA)
+    assert not ok
+    assert "unreadable" in summary
+
+
 def test_negative_blocking_count_is_rejected(tmp_path: Path) -> None:
     """`-1` is malformed, not "fewer than zero blockers".
 

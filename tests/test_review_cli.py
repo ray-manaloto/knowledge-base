@@ -25,7 +25,7 @@ _ALL_LANES = "standards,spec,cold:codex,silent-failure"
 def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A repo root whose HEAD and merge-base are stubbed to fixed values."""
     monkeypatch.setattr(review, "head_sha", lambda _root: "a" * 40)
-    monkeypatch.setattr(review, "base_sha", lambda _root, _fp: "b" * 40)
+    monkeypatch.setattr(review, "base_sha", lambda _root, _fp, **_kw: "b" * 40)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -102,6 +102,24 @@ def test_a_repeated_flag_is_refused_rather_than_resolved(repo: Path, args: tuple
     _reports(repo, "standards", "spec", "cold", "silent-failure")
     assert _run(repo, "--lanes", _ALL_LANES, *args) == 2
     assert not review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_dangling_fixed_point_flag_is_refused(repo: Path) -> None:
+    """`--fixed-point` with no value must refuse, not silently mean `main`.
+
+    `_opt` returns its default when a flag is LAST, so the command line said one
+    thing and the receipt recorded another — the same class as the repeated-flag
+    hole, on the field that says WHAT was reviewed.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point") == 2
+    assert not review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_a_stated_fixed_point_is_still_accepted(repo: Path) -> None:
+    """CONTROL ARM — the refusal above is about the missing value, not the flag."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point", "main") == 0
 
 
 def test_lanes_is_required(repo: Path) -> None:
@@ -204,6 +222,6 @@ def test_unresolvable_fixed_point_is_refused(repo: Path, monkeypatch: pytest.Mon
     (a typo or a deleted branch) recorded an empty base and passed — a green receipt for a range the
     lanes could not have diffed.
     """
-    monkeypatch.setattr(review, "base_sha", lambda _root, _fp: "")
+    monkeypatch.setattr(review, "base_sha", lambda _root, _fp, **_kw: "")
     _reports(repo, "standards", "spec", "cold", "silent-failure")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point", "no-such-ref") == 2
