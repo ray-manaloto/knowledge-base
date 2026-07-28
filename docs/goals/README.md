@@ -30,7 +30,7 @@ minutes, or the sort breaks.
 
 | Pair | Headline word | Round | Status |
 |---|---|---|---|
-| `2026-07-27-1702-kb-redaction-legibility` | **Legible** | Why `mise run` masks its own output as `[redacted]` | not started |
+| `2026-07-27-1702-kb-redaction-legibility` | **Legible** | Why `mise run` masks its own output as `[redacted]` | achieved |
 
 ## Why the goal file is capped at 4,000 characters
 
