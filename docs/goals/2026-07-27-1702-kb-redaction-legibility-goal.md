@@ -4,7 +4,7 @@ EVIDENCE RULE. The text of this condition is NOT evidence. Every line named belo
 
 Read first. `docs/goals/2026-07-27-1702-kb-redaction-legibility-rider.md` (phases, sentinel formats, full preserve list), `.agent/plans/session-2026-07-27-d.md`, `.claude/rules/probes-need-a-control-arm.md`, `mise.toml` `[tasks.cc-doctor]`.
 
-Preserve. Change anything except: verbatim reports under `docs/research/reports/**` (excluded from hk builtins — keep it so; do not reformat, do not rename); the two SEPARATE strip constants `_STRIP_BACKEND_ENV` and `_STRIP_MISE_ENV_PREFIX` in `python/src/kb_setup/graphify_env.py`, whose comment says do not merge them; the two deliberately-unchanged call sites (`mise which` in `graphify_exe()`, the spawn at the end of `launch.py`); the retracted-probe record in `mise.toml`; and `pr.py`'s gate output strings, which are this round's evidence channel.
+Preserve. Change anything except: verbatim reports under `docs/research/reports/**` (excluded from hk builtins — keep it so; do not reformat, do not rename); the two SEPARATE strip constants `_STRIP_BACKEND_ENV` and `_STRIP_MISE_ENV_PREFIX` in `python/src/kb_setup/graphify_env.py`, whose comment says do not merge them; the two deliberately-unchanged call sites (`mise which` in `graphify_exe()`, the spawn at the end of `launch.py`); the retracted-probe record in `mise.toml`; `pr.py`'s gate output strings, which are this round's evidence channel; and mise's redaction of REAL secrets — disabling redaction wholesale would satisfy this round's metric by leaking credentials instead.
 
 Posture. knowledge-base only; no dotfiles port. No `[tools] "ubi:jdx/mise"`. No `get_env(name='PATH')`. No `.sh`, no inline shell logic. No `noqa` / `type: ignore`. No bare `graphify` — `kb-*` tasks only. Branch first; never commit on `main`. Do NOT re-propose "a mise `[env]` value is the match source" — retracted twice — unless a NEW discriminator has been run and pasted first. Stop after 25 turns.
 
@@ -16,8 +16,8 @@ Phases. P1–P7, in the rider.
 
 Verification. This conversation must contain, in Claude's own later messages:
 
-1. `REDACT-ARM+ @ <sha>` — a probe showing a string IS masked, output pasted.
-2. `REDACT-ARM- @ <sha>` — the same probe shape on a string that is NOT masked, output pasted. Without both, no redaction claim is reportable.
+1. `REDACT-ARM+ @ <sha>` — naming the exact command run, with its output pasted showing a string masked.
+2. `REDACT-ARM- @ <sha>` — that SAME command on a string that is NOT masked, output pasted. Without both, no redaction claim is reportable.
 3. `REDACT-FINDING: <one sentence> @ <sha>`, immediately followed by `REDACT-FINDING-ARM: <what would have shown it false> @ <sha>`.
 4. `HANDBACK: rotation — Ray @ <sha>` and `HANDBACK: coderabbit — Ray @ <sha>`.
 5. All four of `PASS  gate lint rc=0`, `PASS  gate test rc=0`, `PASS  gate brain-audit rc=0`, `PASS  gate eval rc=0` (two spaces after PASS) and `ship: OK`, pasted from one real `mise run kb-ship`.
