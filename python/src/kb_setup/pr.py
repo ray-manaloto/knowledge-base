@@ -31,6 +31,17 @@ _GATE_TIMEOUT = 1800
 # is deliberately absent — it means the answer is not in yet.
 _OK_BUCKETS = frozenset({"pass", "skipping", "neutral"})
 
+#: Checks that are ADVISORY here: reported, never blocking, in any bucket —
+#: including "pending". CodeRabbit returned `pass — Review rate limited` on 4 of
+#: 5 PRs, and a doc-only commit once sat blocked on its quota queue with nothing
+#: wrong. A reviewer that is usually rate-limited is a delay, not a gate.
+#:
+#: This does NOT mean the review went away. It moved on-machine: `kb-review`
+#: runs four local lenses and `ship_main` refuses to push without its receipt.
+#: Relaxing the remote gate and adding the local one are one change, not two —
+#: dropping only the first would leave the repo with no review at all.
+_ADVISORY_CHECKS = frozenset({"CodeRabbit"})
+
 
 def _run(
     cmd: list[str], *, cwd: Path | None = None, timeout: int = _GIT_TIMEOUT
@@ -117,11 +128,20 @@ def checks_state(pr_number: int) -> tuple[bool, str]:
     if not rows:
         return True, "no checks configured"
 
-    bad = [r for r in rows if r.get("bucket") not in _OK_BUCKETS]
+    advisory = [r for r in rows if r.get("name") in _ADVISORY_CHECKS]
+    binding = [r for r in rows if r.get("name") not in _ADVISORY_CHECKS]
+
+    note = ""
+    if advisory:
+        note = " | advisory (not blocking): " + ", ".join(
+            f"{r.get('name')}={r.get('bucket')}" for r in advisory
+        )
+
+    bad = [r for r in binding if r.get("bucket") not in _OK_BUCKETS]
     if bad:
         detail = ", ".join(f"{r.get('name')}={r.get('bucket')}" for r in bad)
-        return False, f"{len(bad)} check(s) not green: {detail}"
-    return True, f"{len(rows)} check(s) green"
+        return False, f"{len(bad)} check(s) not green: {detail}{note}"
+    return True, f"{len(binding)} binding check(s) green{note}"
 
 
 def pr_head_oid(pr_number: int) -> str | None:
@@ -171,6 +191,17 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     """Gate, push, and open a PR for the current branch; return an exit code."""
     branch = _ship_preflight(repo_root)
     if branch is None:
+        return 1
+
+    # Checked BEFORE the gates, deliberately: a failing gate is fixed by an
+    # amend, which moves the SHA and invalidates whatever receipt existed. Ask
+    # the cheap question first rather than after four gate runs.
+    from kb_setup import review
+
+    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root))
+    print(f"==> review: {summary}")
+    if not ok:
+        print("ship: refusing — not pushing an unreviewed commit")
         return 1
 
     if not run_gates(repo_root):

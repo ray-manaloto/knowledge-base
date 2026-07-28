@@ -303,8 +303,17 @@ description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency
 run = "uv run kb-setup currency run"
 
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
+[tasks.kb-review-receipt]
+description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review-receipt -- --lanes L[,L...] [--skipped lane:reason,...] [--findings N] [--blocking N]'
+# The LAST step of the `kb-review` skill, and the only part of that review a task
+# can own: the review spawns Claude agents, and only the model can do that, so the
+# skill runs the lenses and this records that it did. `kb-ship` then refuses to
+# push a HEAD with no receipt. Amending or rebasing moves the SHA and invalidates
+# the receipt — correctly, the reviewed bytes are gone. Logic in kb_setup.review.
+run = "uv run kb-setup review-receipt"
+
 [tasks.kb-ship]
-description = 'Gate (lint+test) → push → open PR for the current branch: mise run kb-ship [-- --title T]'
+description = 'Review receipt + gates (lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
 # The ONLY sanctioned way to open a PR here — `gh pr create` is guard-denied.
 # Gates run BEFORE the push, so a red branch never becomes a PR. This repo has no
 # CI, so the local gates are the only gates. Logic in kb_setup.pr.

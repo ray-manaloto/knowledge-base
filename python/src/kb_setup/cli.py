@@ -146,6 +146,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
             print("kb-setup land <PR#>", file=sys.stderr)
             return 2
         return pr.land_main(repo_root, int(positional[0]))
+    if cmd == "review-receipt":
+        return _review_receipt(repo_root, rest)
     if cmd == "currency":
         return _currency(repo_root, rest)
     if cmd == "manifest-add":
@@ -170,6 +172,52 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         file=sys.stderr,
     )
     return 2
+
+
+def _review_receipt(repo_root: Path, rest: list[str]) -> int:
+    """Write the `kb-review` skill's receipt for HEAD; `ship` refuses to push without it."""
+    from kb_setup import review
+
+    sha = _opt(rest, "--sha") or review.head_sha(repo_root)
+    if not sha:
+        print("review-receipt: could not read HEAD", file=sys.stderr)
+        return 2
+
+    lanes = [s.strip() for s in (_opt(rest, "--lanes") or "").split(",") if s.strip()]
+    if not lanes:
+        print(
+            "review-receipt: --lanes is required, comma-separated "
+            "(e.g. standards,spec,cold:codex,silent-failure)",
+            file=sys.stderr,
+        )
+        return 2
+    skipped = [s.strip() for s in (_opt(rest, "--skipped") or "").split(",") if s.strip()]
+
+    counts: dict[str, int] = {}
+    for flag in ("--findings", "--blocking"):
+        raw = _opt(rest, flag) or "0"
+        if not raw.lstrip("-").isdigit() or int(raw) < 0:
+            print(f"review-receipt: {flag} must be a non-negative integer", file=sys.stderr)
+            return 2
+        counts[flag] = int(raw)
+
+    path = review.write_receipt(
+        repo_root,
+        review.Receipt(
+            sha=sha,
+            fixed_point=_opt(rest, "--fixed-point") or "main",
+            lanes_ran=tuple(lanes),
+            lanes_skipped=tuple(skipped),
+            findings=counts["--findings"],
+            blocking=counts["--blocking"],
+        ),
+    )
+    ok, summary = review.receipt_state(repo_root, sha)
+    print(f"review-receipt: wrote {path.relative_to(repo_root)}")
+    print(f"review-receipt: {'OK' if ok else 'REJECTED'} — {summary}")
+    # A receipt this module just wrote and its own gate rejects is a defect in
+    # one of the two; surface it now rather than at ship time.
+    return 0 if ok else 1
 
 
 def _fetch(repo_root: Path, rest: list[str]) -> int:

@@ -1,0 +1,131 @@
+# The lanes: prompts, fallback, receipt
+
+## Standards — `general-purpose`
+
+```text
+Review the diff `git diff <FIXED>...HEAD` in this repository.
+Commits: <git log --oneline output>
+
+Standards sources, read them all: <the rule-file paths gathered in step 3> and CLAUDE.md.
+Smell baseline (you have no other access to it): <paste references/smell-baseline.md in full>
+
+Report, per file/hunk:
+(a) every place the diff violates a DOCUMENTED standard — cite the rule file and
+    the specific rule;
+(b) any baseline smell — name it and quote the hunk.
+
+Distinguish hard violations (a documented standard breached) from judgement
+calls (every baseline smell is one). A documented repo standard overrides the
+baseline. Skip anything `mise run lint` already enforces.
+
+Cite file:line for every finding. A finding you cannot cite, label `unverified`
+and keep — do not drop it and do not promote it.
+
+Under 400 words. Do not edit any file.
+```
+
+## Spec — `general-purpose`
+
+```text
+Review the diff `git diff <FIXED>...HEAD` in this repository.
+Commits: <git log --oneline output>
+
+The spec this change is meant to implement: <path(s), or the fetched issue body>
+
+Report:
+(a) requirements the spec asked for that are missing or only partial;
+(b) behaviour in the diff nobody asked for (scope creep);
+(c) requirements that look implemented but where the implementation looks wrong.
+
+Quote the spec line for each finding, and cite file:line in the diff.
+
+Under 400 words. Do not edit any file.
+```
+
+If no spec was found, skip this lane and record `spec:no-spec-available` in the
+receipt's skipped list. Reviewing against an invented spec is worse than not
+reviewing: it produces findings that look grounded and are not.
+
+## Cold — `fable-orchestrator:codex-reviewer`
+
+**By ref, and cold.** Hand it the range and nothing else:
+
+```text
+Review <FIXED>...HEAD in this repository. Read the diff yourself.
+Return a findings list: severity, a one-line claim, and file:line for each.
+Cite every claim or label it unverified.
+```
+
+Do **not** tell it what the change was for. That is the point of the lane — a
+reviewer given the design intent confirms the happy path, which is the failure
+mode a second lens exists to break. It shares no weights with Claude, so its
+blind spots are different ones.
+
+### The fallback chain — loud at every step
+
+| Step | Lane | Family |
+|---|---|---|
+| 1 | `fable-orchestrator:codex-reviewer` | OpenAI (GPT-5.6 Sol) — cross-family |
+| 2 | `antigravity:review` / `antigravity-delegate` | Google (Gemini 3.x) — cross-family |
+| 3 | a Claude Opus subagent | **same family as the author** |
+
+Step 3 is a real fallback and never a silent one. Record it as
+`cold:claude-fallback-SAME-FAMILY` in the receipt. A same-family cold read still
+catches things — a fresh context with no design intent is worth something — but
+it is not the cross-family check the lane is named for, and a receipt that
+implies otherwise is a lie told to a future reader.
+
+Both CLIs are pinned in `mise.toml` (`codex`, `antigravity-cli`) and auth is
+per-user, so "installed" is not "authenticated". The plugin agents return a
+structured error rather than substituting themselves; treat that error as
+"advance the chain", not as "no findings".
+
+## Silent failures — `pr-review-toolkit:silent-failure-hunter`
+
+Give it the same range. It looks for swallowed exceptions, bare `except`,
+fallbacks that mask a real error, and error paths that log-and-continue where
+they should fail.
+
+Two things in this repo are **deliberate** and must not be reported as findings
+— check the reasoning is intact rather than flagging the shape:
+
+- `kb_setup.hook_guard` **fails open on its own errors.** A crashed PreToolUse
+  guard must not brick every Bash call. That is a documented trade, not a
+  swallowed error.
+- `kb_setup.pr.checks_state` **fails closed on an unparsable payload.** Output
+  it cannot parse means the question was never asked, which must never authorise
+  a merge.
+
+They point opposite directions on purpose. A lens that flags either one has
+found the shape and missed the reasoning; a lens that finds one of them
+*inverted* has found a real defect.
+
+## The receipt
+
+`.agent/kb/review/receipt-<sha>.json`, written by
+`mise run kb-review-receipt`:
+
+```json
+{
+  "sha": "9521853...",
+  "written_at": "2026-07-28T02:14:09Z",
+  "fixed_point": "main",
+  "lanes_ran": ["standards", "spec", "cold:codex", "silent-failure"],
+  "lanes_skipped": [],
+  "findings": 3,
+  "blocking": 0
+}
+```
+
+`lanes_skipped` entries carry their reason —
+`cold:not-applicable-docs-only`, `spec:no-spec-available`,
+`cold:claude-fallback-SAME-FAMILY`. **A skip with no reason is not a skip, it is
+a gap**, and `kb-ship` rejects a receipt containing one.
+
+`blocking > 0` fails the ship gate. Everything else is reported and does not
+block — the review's job is to put findings in front of a human, not to
+adjudicate taste.
+
+The receipt is gitignored. It proves *this machine* reviewed *this commit*, and
+an amend or rebase moves the SHA and invalidates it — correctly, because the
+reviewed bytes are gone.

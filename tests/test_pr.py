@@ -36,7 +36,10 @@ def test_checks_state_green_when_all_pass(monkeypatch):
     _stub_run(monkeypatch, lambda _cmd: _Proc(0, json.dumps(rows)))
     green, summary = pr.checks_state(7)
     assert green is True
-    assert "2 check(s) green" in summary
+    # CodeRabbit is advisory, so only `lint` is counted as binding — but the
+    # advisory result is still REPORTED, never silently dropped.
+    assert "1 binding check(s) green" in summary
+    assert "CodeRabbit=pass" in summary
 
 
 def test_checks_state_red_when_any_fails(monkeypatch):
@@ -48,12 +51,53 @@ def test_checks_state_red_when_any_fails(monkeypatch):
     assert "lint=fail" in summary
 
 
-def test_checks_state_pending_is_not_green(monkeypatch):
-    """`pending` means the answer is not in yet — it must never read as green."""
-    rows = [{"name": "CodeRabbit", "bucket": "pending"}]
+def test_checks_state_binding_pending_is_not_green(monkeypatch):
+    """`pending` on a BINDING check means the answer is not in yet.
+
+    Unchanged property, narrowed subject: this used to be asserted with
+    CodeRabbit, which is now advisory (see the two tests below). The property
+    itself never moved — only which checks it governs.
+    """
+    rows = [{"name": "lint", "bucket": "pending"}]
     _stub_run(monkeypatch, lambda _cmd: _Proc(0, json.dumps(rows)))
     green, _ = pr.checks_state(7)
     assert green is False
+
+
+def test_checks_state_advisory_pending_does_not_block(monkeypatch):
+    """CodeRabbit sitting in a quota queue must not block a merge.
+
+    The motivating incident: a doc-only PR blocked on `pending` with nothing
+    wrong. CodeRabbit returned `pass — Review rate limited` on 4 of 5 PRs here,
+    so waiting on it is waiting on someone else's quota, not on a review.
+    """
+    rows = [{"name": "CodeRabbit", "bucket": "pending"}, {"name": "lint", "bucket": "pass"}]
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, json.dumps(rows)))
+    green, summary = pr.checks_state(7)
+    assert green is True
+    assert "advisory (not blocking): CodeRabbit=pending" in summary
+
+
+def test_checks_state_advisory_failure_does_not_block(monkeypatch):
+    """An advisory check is advisory in EVERY bucket, including `fail`.
+
+    Control arm for the pair above: if only `pending` were tolerated, a
+    rate-limit that surfaced as `fail` would still deadlock the merge.
+    """
+    rows = [{"name": "CodeRabbit", "bucket": "fail"}, {"name": "lint", "bucket": "pass"}]
+    _stub_run(monkeypatch, lambda _cmd: _Proc(1, json.dumps(rows)))
+    green, summary = pr.checks_state(7)
+    assert green is True
+    assert "CodeRabbit=fail" in summary
+
+
+def test_checks_state_advisory_only_still_reports_binding_zero(monkeypatch):
+    """A PR whose ONLY check is advisory is green, and says so honestly."""
+    rows = [{"name": "CodeRabbit", "bucket": "pending"}]
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, json.dumps(rows)))
+    green, summary = pr.checks_state(7)
+    assert green is True
+    assert "0 binding check(s) green" in summary
 
 
 def test_checks_state_no_checks_is_green(monkeypatch):
@@ -158,21 +202,70 @@ def test_ship_refuses_dirty_tree(monkeypatch, tmp_path):
     assert pr.ship_main(tmp_path) == 1
 
 
-def test_ship_accepts_clean_feature_branch(monkeypatch, tmp_path):
-    """CONTROL ARM for the two refusals above — the same path must succeed."""
-
-    def handler(cmd: list[str]) -> _Proc:
-        if cmd[:2] == ["git", "rev-parse"]:
-            return _Proc(0, "feat/x")
-        if cmd[:2] == ["git", "status"]:
-            return _Proc(0, "")
-        if cmd[:3] == ["gh", "pr", "view"]:
-            return _Proc(0, "99")
+def _clean_branch_handler(cmd: list[str]) -> _Proc:
+    """A clean feature branch with an existing PR — the happy path for ship."""
+    if cmd[:2] == ["git", "rev-parse"]:
+        return _Proc(0, "feat/x")
+    if cmd[:2] == ["git", "status"]:
         return _Proc(0, "")
+    if cmd[:3] == ["gh", "pr", "view"]:
+        return _Proc(0, "99")
+    return _Proc(0, "")
 
-    _stub_run(monkeypatch, handler)
+
+def test_ship_refuses_without_a_review_receipt(monkeypatch, tmp_path):
+    """An unreviewed commit must not leave the machine.
+
+    CodeRabbit is advisory here, so the local `kb-review` receipt IS the review
+    gate. Nothing else would stop an unreviewed push.
+    """
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
+
+
+def test_ship_accepts_clean_feature_branch(monkeypatch, tmp_path):
+    """CONTROL ARM for the refusals above — the same path must succeed.
+
+    The only difference from `test_ship_refuses_without_a_review_receipt` is
+    the receipt, which is what makes that test a check rather than decoration.
+    """
+    from kb_setup import review
+
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha="feat/x",  # what the stubbed `git rev-parse HEAD` returns
+            fixed_point="main",
+            lanes_ran=("standards", "spec"),
+            lanes_skipped=("cold:not-applicable-docs-only",),
+            findings=0,
+            blocking=0,
+        ),
+    )
+    _stub_run(monkeypatch, _clean_branch_handler)
     monkeypatch.setattr(pr, "run_gates", lambda _root: True)
     assert pr.ship_main(tmp_path) == 0
+
+
+def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
+    """A receipt that EXISTS but records blocking findings must still refuse."""
+    from kb_setup import review
+
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha="feat/x",
+            fixed_point="main",
+            lanes_ran=("standards", "spec", "cold:codex", "silent-failure"),
+            lanes_skipped=(),
+            findings=4,
+            blocking=1,
+        ),
+    )
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
 
 
 def test_ship_does_not_push_when_gates_fail(monkeypatch, tmp_path):
