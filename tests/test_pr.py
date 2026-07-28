@@ -699,3 +699,86 @@ def test_land_refuses_an_unreviewed_pr_head(monkeypatch, tmp_path):
     _stub_run(monkeypatch, _land_handler(seen))
     assert pr.land_main(tmp_path, 42) == 1
     assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "merge must not be attempted"
+
+
+# --------------------------------------------------------------------------
+# #66 — ship/land accept an ancestor receipt whose delta is exempt
+#
+# A REAL git repo (the `git`/`commit_file`/`receipt_for` fixtures in
+# `conftest.py`), not the subprocess stub used above. The property under test IS
+# git behaviour (ancestry, `git diff`), and the round-1 spec lane's finding was
+# precisely that the only evidence `ship_main`/`land_main` honour the fallback
+# was inference from an unchanged file. Inference is what a stub would repeat.
+# --------------------------------------------------------------------------
+
+
+def test_ship_accepts_an_ancestor_receipt_for_a_closing_commit(
+    monkeypatch, tmp_path, capsys, commit_file, receipt_for
+):
+    """`ship` must get PAST the receipt gate when the delta is P7's own output.
+
+    Stopped at the gates deliberately: running `lint`/`test`/`brain-audit`/`eval`
+    inside a unit test is minutes of the wrong thing. What matters is WHICH
+    refusal comes back — the gates', not the review's.
+    """
+    receipt_for(commit_file("code.py", "X = 1\n"))
+    commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+    monkeypatch.setattr(pr, "run_gates", lambda _root: False)
+
+    assert pr.ship_main(tmp_path) == 1
+    out = capsys.readouterr().out
+    assert "ship: gates failed" in out
+    assert "not pushing an unreviewed commit" not in out
+    assert "covered by the receipt for" in out
+
+
+def test_ship_still_refuses_a_closing_commit_that_also_touches_code(
+    monkeypatch, tmp_path, capsys, commit_files, receipt_for
+):
+    """CONTROL ARM — the same shape with one reviewed path added must refuse.
+
+    Without this the test above would pass just as well against a gate that
+    accepted any ancestor receipt at all.
+    """
+    receipt_for(commit_files({"code.py": "X = 1\n"}))
+    # ONE commit carrying both an exempt artifact and a reviewed path — the shape
+    # the fallback must refuse.
+    commit_files({"graphify-out/memory/query_1.md": "# a lesson\n", "code.py": "X = 2\n"})
+    monkeypatch.setattr(pr, "run_gates", lambda _root: False)
+
+    assert pr.ship_main(tmp_path) == 1
+    out = capsys.readouterr().out
+    assert "not pushing an unreviewed commit" in out
+    assert "code.py" in out
+
+
+def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(
+    monkeypatch, tmp_path, capsys, commit_file, receipt_for
+):
+    """`land` gates on the PR head, so it needs the same fallback as `ship`."""
+    receipt_for(commit_file("code.py", "X = 1\n"))
+    head = commit_file("graphify-out/memory/query_1.md", "# a lesson\n")
+
+    # `_stub_run` patches the subprocess MODULE attribute, which `kb_setup.review`
+    # shares — so a blanket stub silently answers review's git calls too, and the
+    # ancestry lookup this test exists for never runs. `git` is delegated to the
+    # real binary; only `gh` is stubbed.
+    real_run = subprocess.run
+
+    def handler(cmd: list[str]) -> object:
+        if cmd[:3] == ["gh", "pr", "checks"]:
+            return _Proc(0, json.dumps([{"name": "lint", "bucket": "pass"}]))
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(0, f"{head}\n")
+        if cmd[:2] in (["git", "pull"], ["git", "fetch"], ["git", "checkout"]):
+            # The post-merge sync needs a remote and is not what this test is about.
+            return _Proc(0, "")
+        if cmd and cmd[0] == "git":
+            return real_run(cmd, cwd=tmp_path, capture_output=True, text=True, check=False)
+        return _Proc(0, "")
+
+    _stub_run(monkeypatch, handler)
+    assert pr.land_main(tmp_path, 42) == 0
+    out = capsys.readouterr().out
+    assert "covered by the receipt for" in out
+    assert "land: refusing" not in out
