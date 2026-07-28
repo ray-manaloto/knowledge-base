@@ -911,13 +911,26 @@ def test_ship_scans_the_sha_it_pushes_not_a_freshly_resolved_head(
     is the property that makes the pre-push scan mean anything: scanning one
     commit and pushing another is indistinguishable from not scanning at all.
     """
-    _write_valid_receipt(tmp_path)
+    # THE SHA AND THE BRANCH NAME MUST DIFFER, and the shared
+    # `_clean_branch_handler` answers "feat/x" to BOTH `rev-parse HEAD` and
+    # `rev-parse --abbrev-ref HEAD`. The first version of this test used it, so
+    # `sha == branch` and "the same value reaches both" was vacuous against a
+    # sha→branch substitution — confirmed by mutation: passing `branch` to the
+    # scan, or pushing `branch:refs/heads/branch`, both left it green. It caught
+    # only the one literal regression it was named for. (Cold lane, verify pass.)
+    sha = "9f8e7d6c5b4a3210"
+    branch = "feat/x"
+    _write_valid_receipt(tmp_path, sha)
     pushed: list[str] = []
 
     def handler(cmd: list[str]) -> _Proc:
         if cmd[:2] == ["git", "push"]:
             pushed.append(cmd[-1])
             return _Proc(0, "")
+        if cmd[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+            return _Proc(0, branch)
+        if cmd[:2] == ["git", "rev-parse"]:
+            return _Proc(0, sha)
         return _clean_branch_handler(cmd)
 
     _stub_run(monkeypatch, handler)
@@ -925,10 +938,9 @@ def test_ship_scans_the_sha_it_pushes_not_a_freshly_resolved_head(
 
     assert pr.ship_main(tmp_path) == 0
 
-    # `_clean_branch_handler` makes `git rev-parse` answer "feat/x", so that is
-    # what `review.head_sha` returns and what the refspec must carry.
-    assert pushed == ["feat/x:refs/heads/feat/x"]
-    assert prepush_calls == ["feat/x"], (
-        "the scan must be pinned to the captured sha; 'HEAD' here means the gate "
-        "can scan a different commit than the one published"
+    assert pushed == [f"{sha}:refs/heads/{branch}"], "the refspec must carry the SHA"
+    assert prepush_calls == [sha], (
+        "the scan must be pinned to the captured sha; anything else — 'HEAD', or "
+        "the branch name — means the gate can scan a different commit than the "
+        "one published"
     )
