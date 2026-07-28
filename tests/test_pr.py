@@ -288,7 +288,7 @@ def test_ship_refuses_dirty_tree(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def _stub_prepush_scan(monkeypatch) -> None:
+def prepush_calls(monkeypatch) -> list[str]:
     """Neutralise the pre-push secret scan for the CONTROL-FLOW tests.
 
     `_validated_sha_for_push` re-scans the commit range before pushing, and the
@@ -301,8 +301,23 @@ def _stub_prepush_scan(monkeypatch) -> None:
     explicitly by `test_ship_refuses_when_the_prepush_scan_fails`, which
     re-patches over this. A stub with no matching failure test would be exactly
     the pass-only gate `probes-need-a-control-arm.md` rule 2 forbids.
+
+    IT RECORDS THE `sha` IT WAS GIVEN, and that is the whole point of returning
+    a list. The first version discarded both arguments (`lambda _root, _sha:`),
+    so reverting the call site to `prepush_scan(repo_root, "HEAD")` — literally
+    the pre-fix code for round 2's headline P1 — left the entire suite green.
+    The seam was armed and the refusal was armed; the JOIN between them, which
+    is the property round 2 actually fixed, was not. Found independently by the
+    standards and silent-failure lanes in round 3, both by mutation.
     """
-    monkeypatch.setattr(pr, "prepush_scan", lambda _root, _sha: (True, "stubbed: no secrets"))
+    calls: list[str] = []
+
+    def record(_root, sha) -> tuple[bool, str]:
+        calls.append(sha)
+        return True, "stubbed: no secrets"
+
+    monkeypatch.setattr(pr, "prepush_scan", record)
+    return calls
 
 
 def _clean_branch_handler(cmd: list[str]) -> _Proc:
@@ -880,3 +895,40 @@ def test_the_prepush_scan_scans_the_pushed_sha_over_a_real_range(tmp_path, git, 
     ok, summary = _REAL_PREPUSH_SCAN(tmp_path, "HEAD")
     assert ok, summary
     assert "a range of 2 commits" in summary, summary
+
+
+def test_ship_scans_the_sha_it_pushes_not_a_freshly_resolved_head(
+    monkeypatch, tmp_path, prepush_calls
+):
+    """THE JOIN: `_validated_sha_for_push` must hand its captured `sha` to the scan.
+
+    Round 2 fixed this and round 3 proved nothing guarded it — reverting the call
+    site to the literal string "HEAD" kept every test passing. The seam's own test
+    passes a sha explicitly, so it can only ever show that the seam honours its
+    argument, never that the caller supplies one.
+
+    This asserts the SAME value reaches both the scan and the push refspec, which
+    is the property that makes the pre-push scan mean anything: scanning one
+    commit and pushing another is indistinguishable from not scanning at all.
+    """
+    _write_valid_receipt(tmp_path)
+    pushed: list[str] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        if cmd[:2] == ["git", "push"]:
+            pushed.append(cmd[-1])
+            return _Proc(0, "")
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+
+    assert pr.ship_main(tmp_path) == 0
+
+    # `_clean_branch_handler` makes `git rev-parse` answer "feat/x", so that is
+    # what `review.head_sha` returns and what the refspec must carry.
+    assert pushed == ["feat/x:refs/heads/feat/x"]
+    assert prepush_calls == ["feat/x"], (
+        "the scan must be pinned to the captured sha; 'HEAD' here means the gate "
+        "can scan a different commit than the one published"
+    )

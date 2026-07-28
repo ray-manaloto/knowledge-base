@@ -485,3 +485,75 @@ def test_the_cutoff_is_the_oldest_candidate_not_the_first_to_resolve(
         "the OLDER candidate must win; preferring origin/ blindly would cut at "
         f"{remote_tip[:12]} and skip two commits"
     )
+
+
+def test_a_pinned_sha_ahead_of_head_is_still_scanned(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """`head` must reach the GITLEAKS COMMAND, not just the summary.
+
+    Round 3 mutation-proved that dropping `head` where `_run_gitleaks` builds the
+    command left the whole suite green — and the failure is worse than a miss:
+    `span` is composed separately in `scan_range`, so the report keeps saying
+    `<base>..<pinned sha>` while gitleaks actually scans `<base>..HEAD`. A gate
+    lying in its own summary is harder to catch than one that simply refuses.
+
+    The fixture is the real pre-push race rather than a convenient one: the
+    pinned SHA is AHEAD of HEAD (captured, then `git reset --hard HEAD~1`), so a
+    scan that resolves `HEAD` for itself cannot see the secret at all.
+    (Standards lane, round 3.)
+    """
+    commit_file("docs/clean.md", "ok\n")
+    pushed = commit_file("notes/leak.md", f'token = "{_synthetic_token()}"\n')
+    git("reset", "-q", "--hard", "HEAD~1")
+
+    assert git("rev-parse", "HEAD") != pushed, "the fixture must put the sha AHEAD of HEAD"
+    ok, summary = scan.scan_range(tmp_path, head=pushed)
+    assert not ok, summary
+    assert "SECRETS FOUND" in summary
+
+    # CONTROL ARM — the same repo scanned at HEAD is genuinely clean, so the
+    # assertion above is about the pinned sha and not about the repo.
+    ok, summary = scan.scan_range(tmp_path)
+    assert ok, summary
+
+
+def test_a_dead_git_subprocess_is_not_read_as_a_missing_ref(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str], monkeypatch
+) -> None:
+    """A dead probe must not become "the ref is absent", which NARROWS the cutoff.
+
+    `_git` used to map its own exceptions onto rc=1 — which is also git's "no
+    such ref" and git's "not an ancestor". Injecting an OSError on the existence
+    probe therefore moved the cutoff forward and dropped an unpushed commit
+    below it, while `ship` still publishes the whole ancestry.
+    (Silent-failure lane, round 3.)
+    """
+    git("checkout", "-q", "main")
+    remote_tip = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/main", remote_tip)
+    commit_file("docs/unpushed.md", "x\n")
+    git("checkout", "-q", "-b", "ahead")
+    commit_file("docs/branch.md", "y\n")
+
+    real_run = subprocess.run
+
+    # The kwargs are RESTATED rather than `**kwargs`: ruff rejects `Any` there
+    # (ANN401) and `ty` rejects `object` against `subprocess.run`'s overloads, and
+    # this repo has no inline suppressions. These four are exactly what
+    # `scan._git` passes.
+    def explode(
+        cmd: list[str],
+        *,
+        capture_output: bool = False,
+        text: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if "rev-parse" in cmd and any("refs/remotes/origin/" in str(a) for a in cmd):
+            msg = "injected"
+            raise OSError(msg)
+        return real_run(cmd, capture_output=capture_output, text=text, check=check, timeout=timeout)
+
+    monkeypatch.setattr(scan.subprocess, "run", explode)
+    assert scan.range_base(tmp_path) == "", "a dead probe must refuse, not fall back"

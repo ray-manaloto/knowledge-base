@@ -92,10 +92,10 @@ _LEAKS = 2
 _SCAN_ERROR_MARKERS = (" ERR ", " FTL ")
 
 #: The same fixed point the receipt uses. The two ranges are RELATED, not
-#: identical, and the difference is deliberate: `range_base` prefers
-#: ``origin/<base>`` while `review.base_sha` resolves the literal ref, so
-#: whenever local ``main`` is ahead of the remote the scan's range is strictly
-#: WIDER than the lanes'.
+#: identical, and the difference is deliberate: `range_base` reduces the
+#: ``origin/<base>`` and ``<base>`` merge-bases to their common ancestor while
+#: `review.base_sha` resolves the literal ref, so whenever local ``main`` is
+#: ahead of the remote the scan's range is strictly WIDER than the lanes'.
 #:
 #: That asymmetry is correct — the lanes review what the branch added, the
 #: scanner must cover what the push publishes — but this comment used to claim
@@ -106,6 +106,16 @@ DEFAULT_BASE = "main"
 
 #: The only accepted argv shape: exactly ``--base <ref>``.
 _BASE_ARGV_LEN = 2
+
+#: `_git`'s rc when the SUBPROCESS ITSELF failed — outside git's exit-code space
+#: on purpose, so "could not ask" can never be mistaken for one of git's
+#: answers. See `_git`.
+_GIT_EXEC_FAILED = -1
+
+#: `git rev-parse --verify --quiet <ref>` exits 1, and ONLY 1, for "no such
+#: ref". 128 is a real error and `_GIT_EXEC_FAILED` is a dead subprocess;
+#: neither is an answer, and neither may be read as absence.
+_GIT_REF_ABSENT = 1
 
 
 def config_path(repo_root: Path) -> Path:
@@ -124,8 +134,17 @@ def _git(repo_root: Path, *args: str) -> tuple[int, str]:
     result, returns -1, and the ship aborts on a false alarm. (Cold lane, round 1.)
 
     stderr is dropped rather than returned: no caller has anything to say about
-    it, and the two failure paths that matter — a non-zero rc and an unparsable
-    value — are both already handled as "could not ask".
+    it, and the failure paths that matter are handled as "could not ask".
+
+    A FAILED SUBPROCESS RETURNS :data:`_GIT_EXEC_FAILED`, not 1. It used to
+    return 1 — which is also git's "the ref does not exist" *and* git's
+    "not an ancestor", both of which are ANSWERS. So every caller that branched
+    on rc==1 read a crashed subprocess as a definite reply, and the docstring
+    here claimed those paths were "handled as could not ask" while they were
+    handled as answers. Measured by the silent-failure lane in round 3: an
+    injected `OSError` on the existence probe moved the cutoff forward and
+    dropped an unpushed commit below it. A sentinel outside git's exit-code
+    space makes the two distinguishable at every call site at once.
     """
     try:
         proc = subprocess.run(
@@ -136,17 +155,21 @@ def _git(repo_root: Path, *args: str) -> tuple[int, str]:
             timeout=_GIT_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return 1, f"git: {exc}"
+        return _GIT_EXEC_FAILED, f"git: {exc}"
     return proc.returncode, proc.stdout or ""
 
 
 def range_base(repo_root: Path, base: str = DEFAULT_BASE, head: str = "HEAD") -> str:
     """Return the cutoff commit for the scan, or "" if it cannot be resolved.
 
-    The merge-base against ``base``, but resolved against ``origin/<base>``
-    FIRST when that ref exists. The question this gate asks is "what will the
-    push publish", and `ship` pushes `<sha>:refs/heads/<branch>` — a raw SHA,
-    which carries its **entire ancestry**.
+    The merge-base against ``base`` AND against ``origin/<base>``, reduced to
+    the single commit that is an ancestor of both. The question this gate asks
+    is "what will the push publish", and `ship` pushes `<sha>:refs/heads/
+    <branch>` — a raw SHA, which carries its **entire ancestry**.
+
+    This paragraph used to say the cutoff was "resolved against ``origin/<base>``
+    FIRST", which described neither the code that followed it nor the behaviour
+    anyone wants. (Standards lane, round 3.)
 
     So a commit sitting on local ``main`` that has not reached the remote is
     published by that push while sitting BELOW a merge-base taken against local
@@ -169,35 +192,48 @@ def range_base(repo_root: Path, base: str = DEFAULT_BASE, head: str = "HEAD") ->
     question. Same guard, same reason, as `review.base_sha`.
     """
     bases: list[str] = []
-    for ref in (f"origin/{base}", base):
+    for ref in (f"refs/remotes/origin/{base}", base):
         rc, _ = _git(repo_root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+        if rc == _GIT_REF_ABSENT:
+            continue  # genuinely no such ref here; the other one may exist.
         if rc != 0:
-            continue  # the ref does not exist here; the other one may.
+            # 128, or a dead subprocess. NOT an answer, and reading it as
+            # "absent" silently narrows the cutoff — measured by injecting an
+            # `OSError` on this call with local `main` one unpushed commit
+            # ahead: the cutoff moved forward and dropped that commit below it,
+            # while `ship` still publishes its whole ancestry. (Silent-failure
+            # lane, round 3.)
+            return ""
         rc, out = _git(repo_root, "merge-base", "--", ref, head)
         if rc != 0 or not out.strip():
             # The ref EXISTS and merge-base still failed — unrelated histories,
-            # a corrupt object, a shallow clone. Refuse outright rather than
-            # falling through to the local ref: falling through NARROWS the
-            # range, and this function's whole job is to err wide. Measured by
-            # the silent-failure lane with an unrelated `origin/main`: the old
-            # loop returned local `main` and reported "no secrets", leaving all
-            # of local `main` unscanned and still published by the SHA push.
+            # a corrupt object, a shallow clone. Refuse rather than falling
+            # through to the local ref, which would NARROW the range.
             return ""
         bases.append(out.strip())
 
     if not bases:
         return ""
-    # The OLDEST of the candidates, not the first that resolves. "Errs wide by
-    # construction" was asserted in this docstring while the code returned
-    # whichever ref happened to resolve first — true in the common case and not
-    # guaranteed. `merge-base --is-ancestor` makes it structural. (Spec lane,
-    # round 2.)
-    oldest = bases[0]
-    for candidate in bases[1:]:
-        rc, _ = _git(repo_root, "merge-base", "--is-ancestor", candidate, oldest)
-        if rc == 0:
-            oldest = candidate
-    return oldest
+    if len(bases) == 1:
+        return bases[0]
+
+    # The merge-base OF THE CANDIDATES — an ancestor of both by construction,
+    # hence the widest of the available cutoffs.
+    #
+    # This replaces a `--is-ancestor` loop that kept whichever candidate the
+    # comparison endorsed. Two defects, both found in round 3 and one of them
+    # OBSERVED LIVE: `--is-ancestor` exits 0/1/**128**, and `_git` used to map
+    # its own exceptions onto 1, so "could not ask" was acted on as "no" and the
+    # NEWER base survived. A test flaked exactly once at `d3e054b` on that path
+    # and passed on three re-runs, which is the shape of defect that gets
+    # re-run rather than read. The loop also assumed the two candidates were
+    # comparable at all; nothing guaranteed it.
+    #
+    # One call, and its failure is a refusal rather than a silent preference.
+    rc, out = _git(repo_root, "merge-base", "--", *bases)
+    if rc != 0 or not out.strip():
+        return ""
+    return out.strip()
 
 
 def commits_in_range(repo_root: Path, base_sha: str, head: str = "HEAD") -> int:
@@ -255,6 +291,17 @@ def _gitleaks_cmd(repo_root: Path, base_sha: str, head: str = "HEAD") -> list[st
         #   without the flag → rc=0, "3 commits scanned", NO LEAKS   ← the hole
         #   with the flag    → rc=2, "4 commits scanned", leak found
         # (Silent-failure lane, round 2.)
+        #
+        # KNOWN COST, recorded rather than left to be hit: when a branch merges
+        # `origin/<base>` IN, that merge's first-parent diff is everything the
+        # base brought — commits OUTSIDE the rev-list range, scanned anyway. So
+        # a pre-existing secret on `main` blocks the ship with a message that
+        # accuses the branch, and there is no branch-side remedy. Measured: a
+        # secret present only in main's history goes rc=0/"no leaks" → rc=2.
+        # Fail-closed, which is the direction to prefer, and `--diff-merges`
+        # changes only whether merges emit a patch — never which commits are in
+        # the range (that would be `--first-parent`, which this is not).
+        # (Spec lane, round 3.)
         f"{base_sha}..{head} --diff-merges=first-parent",
         "--config",
         str(config_path(repo_root)),
@@ -343,7 +390,7 @@ def _run_gitleaks(
 
 
 def scan_range(repo_root: Path, base: str = DEFAULT_BASE, head: str = "HEAD") -> tuple[bool, str]:
-    """Scan every commit in ``base..HEAD`` for secrets; return ``(ok, summary)``.
+    """Scan every commit in ``base..head`` for secrets; return ``(ok, summary)``.
 
     Fails CLOSED. An unresolvable base, an unreadable commit count, and a
     gitleaks exit code that is neither "clean" nor "leaks" all return False:

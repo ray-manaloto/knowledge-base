@@ -70,9 +70,12 @@ def git(tmp_path: Path) -> Callable[..., str]:
     #   * `pr._ship_preflight` refuses a dirty tree, so an untracked file makes
     #     every ship test fail for the wrong reason — the same trap the
     #     `.gitignore` above exists for;
-    #   * `pr._validated_sha_for_push` re-runs the secret scan before pushing,
-    #     and that scan refuses when the config is missing (correctly). Without
-    #     this the ship tests fail closed on a fixture defect;
+    #   * the scan `pr._validated_sha_for_push` runs refuses when the config is
+    #     missing (correctly), so any test reaching it fails closed on a fixture
+    #     defect. `test_pr.py`'s autouse stub means its own tests no longer
+    #     reach that call — this reason now covers `test_scan.py` and any future
+    #     test that drives the real path, and it is stated that way because the
+    #     old wording named a caller none of this module's tests still make;
     #   * a copy of the REAL config, not a minimal stand-in: the allowlist is
     #     the part most likely to silently widen, and a test against a config
     #     nobody ships would pass while the shipped one looked away.
