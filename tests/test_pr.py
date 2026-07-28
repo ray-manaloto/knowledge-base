@@ -249,6 +249,39 @@ def _clean_branch_handler(cmd: list[str]) -> _Proc:
     return _Proc(0, "")
 
 
+def _write_valid_receipt(tmp_path, sha: str = "feat/x") -> None:
+    """Write a PASSING receipt, plus the reports it must be backed by.
+
+    ``sha`` defaults to what the stubbed `git rev-parse HEAD` returns.
+
+    Extracted because several tests need a receipt that is *not* the thing under
+    test. A test aimed at a LATER gate has to get past this one, or it silently
+    becomes a second test of this one — which is exactly what happened to
+    `test_ship_does_not_push_when_gates_fail`.
+    """
+    from kb_setup import review
+
+    for lane in ("standards", "spec"):
+        rp = review.report_path(tmp_path, sha, lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("NO FINDINGS", encoding="utf-8")
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha=sha,
+            fixed_point="main",
+            fixed_point_sha="a" * 40,
+            lanes_ran=("standards", "spec"),
+            lanes_skipped=(
+                "cold:not-applicable-docs-only",
+                "silent-failure:not-applicable-docs-only",
+            ),
+            findings=0,
+            blocking=0,
+        ),
+    )
+
+
 def test_ship_refuses_without_a_review_receipt(monkeypatch, tmp_path):
     """An unreviewed commit must not leave the machine.
 
@@ -266,27 +299,7 @@ def test_ship_accepts_clean_feature_branch(monkeypatch, tmp_path):
     The only difference from `test_ship_refuses_without_a_review_receipt` is
     the receipt, which is what makes that test a check rather than decoration.
     """
-    from kb_setup import review
-
-    for lane in ("standards", "spec"):
-        rp = review.report_path(tmp_path, "feat/x", lane)
-        rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("NO FINDINGS", encoding="utf-8")
-    review.write_receipt(
-        tmp_path,
-        review.Receipt(
-            sha="feat/x",  # what the stubbed `git rev-parse HEAD` returns
-            fixed_point="main",
-            fixed_point_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            lanes_ran=("standards", "spec"),
-            lanes_skipped=(
-                "cold:not-applicable-docs-only",
-                "silent-failure:not-applicable-docs-only",
-            ),
-            findings=0,
-            blocking=0,
-        ),
-    )
+    _write_valid_receipt(tmp_path)
     _stub_run(monkeypatch, _clean_branch_handler)
     monkeypatch.setattr(pr, "run_gates", lambda _root: True)
     assert pr.ship_main(tmp_path) == 0
@@ -314,19 +327,68 @@ def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
 
 
 def test_ship_does_not_push_when_gates_fail(monkeypatch, tmp_path):
-    """A red gate must stop the push — that is the whole point of gating first."""
+    """A red gate must stop the push — that is the whole point of gating first.
+
+    The receipt is written FIRST so this test actually reaches `run_gates`.
+    Without it `ship_main` returned at the receipt check and never evaluated the
+    gates at all: both assertions passed for the wrong reason, and deleting the
+    gate check entirely left the test green. That is the repo's own "a gate
+    verified only in the PASS direction" smell, sitting in the test that guards
+    a gate. Found by the cold lane.
+
+    `reached` is the control arm — without it this test cannot tell "refused
+    because the gates were red" from "refused before the gates ran".
+    """
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+    reached: list[str] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        return _clean_branch_handler(cmd)
+
+    def red_gates(_root) -> bool:
+        reached.append("run_gates")
+        return False
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", red_gates)
+    assert pr.ship_main(tmp_path) == 1
+    assert reached == ["run_gates"], "never reached the gates — the receipt refused first"
+    assert not any(c[:2] == ["git", "push"] for c in seen)
+
+
+def test_ship_pushes_the_validated_sha_not_the_branch_name(monkeypatch, tmp_path):
+    """The push must be pinned to the commit the receipt was just checked against.
+
+    REALISTIC MUTATION, per `probes-need-a-control-arm.md`: `git push origin
+    <branch>` resolves the branch at push time, so HEAD moving between the
+    pre-push receipt read and the push itself sends a commit no lane ever read.
+    The pre-push re-check cannot close that window — only the refspec can, by
+    making the validated object and the pushed object the same one.
+
+    Probed against real git before writing this: pushing `<sha>:refs/heads/<b>`
+    after a further commit lands the SHA, while `push <b>` lands the newer HEAD.
+    """
+    _write_valid_receipt(tmp_path)
     seen: list[list[str]] = []
 
     def handler(cmd: list[str]) -> _Proc:
         seen.append(cmd)
-        if cmd[:2] == ["git", "rev-parse"]:
-            return _Proc(0, "feat/x")
-        return _Proc(0, "")
+        return _clean_branch_handler(cmd)
 
     _stub_run(monkeypatch, handler)
-    monkeypatch.setattr(pr, "run_gates", lambda _root: False)
-    assert pr.ship_main(tmp_path) == 1
-    assert not any(c[:2] == ["git", "push"] for c in seen)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+
+    pushes = [c for c in seen if c[:2] == ["git", "push"]]
+    assert len(pushes) == 1
+    # Spelled out literally rather than rebuilt from the code under test: a
+    # fixture built by the function it checks inherits that function's bugs.
+    assert pushes[0] == ["git", "push", "origin", "feat/x:refs/heads/feat/x"]
+    assert "feat/x" in pushes[0][3], "the branch name alone would re-resolve at push time"
+    # `-u` cannot set tracking from a raw-SHA refspec, so it is set separately.
+    assert ["git", "branch", "--set-upstream-to", "origin/feat/x", "feat/x"] in seen
 
 
 def test_ship_refuses_when_head_moves_during_the_gates(monkeypatch, tmp_path):
@@ -339,25 +401,7 @@ def test_ship_refuses_when_head_moves_during_the_gates(monkeypatch, tmp_path):
     """
     from kb_setup import review
 
-    for lane in ("standards", "spec"):
-        rp = review.report_path(tmp_path, "feat/x", lane)
-        rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("NO FINDINGS", encoding="utf-8")
-    review.write_receipt(
-        tmp_path,
-        review.Receipt(
-            sha="feat/x",
-            fixed_point="main",
-            fixed_point_sha="a" * 40,
-            lanes_ran=("standards", "spec"),
-            lanes_skipped=(
-                "cold:not-applicable-docs-only",
-                "silent-failure:not-applicable-docs-only",
-            ),
-            findings=0,
-            blocking=0,
-        ),
-    )
+    _write_valid_receipt(tmp_path)
 
     seen: list[list[str]] = []
     heads = iter(["feat/x", "moved-after-the-gates"])

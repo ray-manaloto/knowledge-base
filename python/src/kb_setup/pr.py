@@ -264,15 +264,39 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     # Re-checked immediately before the push, not only before the gates: the
     # gates take minutes, and nothing stops HEAD moving underneath them. The
     # first check fails fast; THIS one is the one that actually guards the push.
-    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root))
+    sha = review.head_sha(repo_root)
+    ok, summary = review.receipt_state(repo_root, sha)
     if not ok:
         print(f"ship: refusing — HEAD moved since the review ({summary})")
         return 1
 
-    rc, out = _run(["git", "push", "-u", "origin", branch], cwd=repo_root)
+    # Push the SHA that was just VALIDATED, not the branch name. Re-reading HEAD
+    # and then pushing `branch` left the window open that the check above exists
+    # to close: HEAD could move between the two calls and the push would send a
+    # commit no lane ever read — the receipt would be honest and the pushed bytes
+    # would not be the ones it is for. The refspec makes the validated commit and
+    # the pushed commit the same object by construction.
+    rc, out = _run(["git", "push", "origin", f"{sha}:refs/heads/{branch}"], cwd=repo_root)
     if rc != 0:
         print(f"ship: push failed\n{out}")
         return 1
+
+    # `-u` cannot set tracking from a raw-SHA refspec — probed both arms: the
+    # push succeeds and silently leaves no upstream — so set it explicitly.
+    # Non-fatal on purpose, and NOT a swallowed error: the validated commit is
+    # already on the remote and the PR path uses `--head <branch>` rather than
+    # local tracking, so only a later bare `git push` would notice. Reported
+    # rather than ignored, with the command that fixes it.
+    rc_upstream, out_upstream = _run(
+        ["git", "branch", "--set-upstream-to", f"origin/{branch}", branch],
+        cwd=repo_root,
+    )
+    if rc_upstream != 0:
+        print(
+            f"ship: pushed {sha[:12]}, but could not set upstream tracking "
+            f"(non-fatal; run `git branch -u origin/{branch}`): "
+            f"{out_upstream.strip()[:200]}"
+        )
 
     return _open_or_update_pr(repo_root, branch, title)
 

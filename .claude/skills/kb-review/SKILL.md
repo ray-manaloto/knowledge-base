@@ -152,12 +152,23 @@ A lane that left no report is a claim, not a review. `NO FINDINGS` is a
 perfectly good report; an empty file is not.
 
 ```bash
+# All four ran — the usual case for a diff touching .py / mise.toml / hk.pkl.
 mise run kb-review-receipt -- \
   --lanes standards,spec,cold:codex,silent-failure \
-  --skipped "cold:not-applicable-docs-only" \
   --fixed-point <the same fixed point you reviewed against> \
   --findings <n> --blocking <n>
+
+# Docs-only — two ran, two do not apply. Every lane is still accounted for.
+mise run kb-review-receipt -- \
+  --lanes standards,spec \
+  --skipped cold:not-applicable-docs-only,silent-failure:not-applicable-docs-only \
+  --fixed-point <…> --findings <n> --blocking <n>
 ```
+
+Two examples because the single one that used to sit here named `cold` in **both**
+`--lanes` and `--skipped` — a lane cannot have run and been skipped, and copying it
+verbatim produced a receipt claiming coverage it did not have. `no-spec-available`
+excuses the **spec lane only**; `not-applicable-<why>` excuses any lane.
 
 `--blocking` is required — state it even when it is `0`. `--fixed-point`
 defaults to `main`; **pass it whenever you reviewed against anything else**, or

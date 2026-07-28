@@ -2,10 +2,18 @@
 
 This rider holds the prescriptive constraints for the goal at
 `docs/goals/2026-07-27-1702-kb-redaction-legibility-goal.md`. It supersedes nothing; it composes
-forward from `.agent/plans/session-2026-07-27-d.md`, which is the ground truth for
+forward from `.agent/plans/session-2026-07-27-g.md`, which is the ground truth for
 what is left. **When the plan and this rider disagree, the plan wins; fix the rider
 in the same commit.** (Pattern lifted from Ceccarelli's audit-anchor rule —
 `res-ceccarelli.md:370-379`, "the matrix wins. Update the rider in the same commit.")
+
+**Which plan is ground truth changed, and the rider did not follow.** This
+pointed at `-d.md` while the goal's own `Read first` named `-g.md` as current
+state — so the two halves of one pair disagreed about which plan wins, and P1
+below sent the round to read a plan that `-f` and `-g` had each superseded. Found
+by the cold lane. `-e.md` remains the **gotchas** source (the goal points there
+deliberately; do not repoint it), and `-d.md` survives below only as the
+historical record of where the scope decision came from.
 
 ---
 
@@ -14,7 +22,9 @@ in the same commit.** (Pattern lifted from Ceccarelli's audit-anchor rule —
 The brief asked me to judge whether the open work is one round or two. **It is one
 round, headline word `Legible`, and it covers item (a) only.**
 
-The plan (`session-2026-07-27-d.md:16-54`) lists three open items:
+The plan that framed this scope decision (`session-2026-07-27-d.md:16-54`, kept
+here as the historical record — `-g.md` is now ground truth) lists three open
+items:
 
 | Item | Verdict | Why |
 |---|---|---|
@@ -145,7 +155,7 @@ things this repo exists to protect. So:
 | The two deliberately-unchanged call sites | `mise which` in `graphify_exe()` (`graphify_env.py:112`) and the Claude Code spawn in `python/src/kb_setup/launch.py` | `session-2026-07-27-d.md:86-88`: "with reasons in the code so they do not read as oversights." An agent tidying for consistency will "fix" them. |
 | The retracted-probe record | `mise.toml:114-121` (`[tasks.eval]` comment) | It is the artifact that stops a **third** retraction of the `[env]` theory. Deleting it as "stale comment" destroys the round's own guardrail. |
 | `version_pattern` in `[tool.mise]` | `currency.toml` | `session-2026-07-27-d.md:118-121`: `mise --version` prints a trailing date; the default heuristic returns the DATE. Removing the pattern silently reports the wrong version. |
-| `PASS  gate <name> rc=<rc>` and the ship/land strings | `python/src/kb_setup/pr.py:82,156,166,226` | These are this round's evidence channel. Changing their text invalidates every verification clause in the goal. |
+| `PASS  gate <name> rc=<rc>` and the ship/land strings | `python/src/kb_setup/pr.py` — `run_gates`, `_open_or_update_pr`, `land_main` | These are this round's evidence channel. Changing their text invalidates every verification clause in the goal. |
 | The `kb-review` receipt gate | `python/src/kb_setup/review.py`; the receipt checks in `pr.ship_main` / `pr.land_main` | `ship` refuses without a receipt, so DELETING this is the cheapest route to `ship: OK`. It must not be the route. |
 
 ---
@@ -253,7 +263,7 @@ commit whose subject ends `(rider P<N>)`. Green gates on every commit that chang
 
 ### P1 — Ground in HEAD, restate the round
 
-Read, in order: this rider, `.agent/plans/session-2026-07-27-d.md`,
+Read, in order: this rider, `.agent/plans/session-2026-07-27-g.md`,
 `.claude/rules/probes-need-a-control-arm.md`, `.claude/rules/verify-before-advancing.md`,
 `mise.toml:110-125`, `docs/research/reports/mise-path-research.md` § Q4.
 Create the branch. **No code.**
@@ -318,7 +328,7 @@ unless a review receipt exists for the current HEAD, so without it none of the
 `PASS  gate …` strings below can ever appear and the round cannot terminate.
 
 Then `mise run kb-ship`. It runs `lint`, `test`, `brain-audit`, `eval` in that order
-(`python/src/kb_setup/pr.py:74`) and refuses to push if any fails. Quote all four
+(`python/src/kb_setup/pr.py`, `GATES`) and refuses to push if any fails. Quote all four
 `PASS  gate …` lines and the `ship: OK …` line verbatim.
 
 **Do not "fix" a refusal by removing the receipt check.** That is the cheapest way
@@ -411,7 +421,7 @@ evaluator to run, read, or infer.
 5. A `review-receipt: OK …` line from `mise run kb-review-receipt`, after the
    `kb-review` skill has run. Without it `kb-ship` refuses BEFORE any gate, so the
    four lines below can never appear — this clause is what makes 6 reachable.
-6. These four lines, verbatim, two spaces after `PASS` (`pr.py:82`):
+6. These four lines, verbatim, two spaces after `PASS` (`pr.py` `run_gates`):
 
    ```
    PASS  gate lint rc=0
@@ -420,9 +430,9 @@ evaluator to run, read, or infer.
    PASS  gate eval rc=0
    ```
 
-7. An `OK eval: N passed, N skipped, 0 failed, 0 unarmed` line (`evals.py:1163`).
-8. `ship: OK — PR open, gates green` (`pr.py:166`) **or**
-   `ship: OK — PR #N updated, gates green` (`pr.py:156`).
+7. An `OK eval: N passed, N skipped, 0 failed, 0 unarmed` line (`evals.py` `render`).
+8. `ship: OK — PR open, gates green` (`pr.py` `_open_or_update_pr`) **or**
+   `ship: OK — PR #N updated, gates green` (same function).
 9. **The round stops at `ship:`. Merging is Ray's call, not this round's.** The
    drafted version required `land: OK — PR #N merged, main synced` (`pr.py:226`);
    that was removed deliberately. A goal loop that satisfies itself by merging is

@@ -304,7 +304,7 @@ run = "uv run kb-setup currency run"
 
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
 [tasks.kb-review-receipt]
-description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review-receipt -- --lanes L[,L...] [--skipped lane:reason,...] [--findings N] [--blocking N]'
+description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review-receipt -- --lanes L[,L...] --blocking N [--skipped lane:reason,...] [--findings N]'
 # The LAST step of the `kb-review` skill, and the only part of that review a task
 # can own: the review spawns Claude agents, and only the model can do that, so the
 # skill runs the lenses and this records that it did. `kb-ship` then refuses to

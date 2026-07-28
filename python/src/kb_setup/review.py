@@ -57,10 +57,21 @@ _SKIP_SEPARATOR = ":"
 #: through the gate. A doc and the code disagreeing is worse than either alone,
 #: and here the code was the permissive one. Found by the cold lane on its
 #: SECOND pass, over the commit that fixed its first finding.
-_SKIP_JUSTIFICATIONS = (
-    "not-applicable-",  # the lane cannot say anything about this diff
-    "no-spec-available",  # spec lane, and only when there genuinely is no spec
-)
+#:
+#: Reasons that excuse ANY lane: the lane genuinely had nothing to say here.
+_SKIP_ANY_LANE = ("not-applicable-",)
+
+#: Reasons that excuse ONE named lane, and no other. `no-spec-available` is the
+#: spec lane's alone — a cold or silent-failure lane does not review against a
+#: spec, so "there is no spec" cannot explain why it did not run.
+#:
+#: The THIRD instance of one hole. The reason was matched without ever looking
+#: at the lane it was attached to, so `cold:no-spec-available` bought a pass for
+#: a lane that never ran — after `--lanes placeholder` and `cold:not-yet-run`
+#: had already been closed. The comment on the line right above it said "spec
+#: lane, and only when there genuinely is no spec"; nothing enforced it. Found
+#: by the cold lane, again, which is now three for three on this gate.
+_SKIP_BY_LANE = {"spec": ("no-spec-available",)}
 
 #: The four lenses. Every one must be ACCOUNTED FOR in a receipt — either it ran
 #: or it was skipped with a reason. Without this list the gate accepted any
@@ -78,6 +89,21 @@ _GIT_TIMEOUT = 30
 def _lane_prefix(entry: str) -> str:
     """Return the lane an entry names, ignoring any `:variant` suffix."""
     return entry.partition(_SKIP_SEPARATOR)[0]
+
+
+def _skip_reasons_for(lane: str) -> tuple[str, ...]:
+    """Return the skip reasons that excuse ``lane`` — no others do."""
+    return _SKIP_ANY_LANE + _SKIP_BY_LANE.get(lane, ())
+
+
+def _skip_reason_help() -> str:
+    """Return a human summary of every accepted skip reason, with its scope."""
+    scoped = ", ".join(
+        f"{reason} ({lane} lane only)"
+        for lane, reasons in _SKIP_BY_LANE.items()
+        for reason in reasons
+    )
+    return ", ".join((*_SKIP_ANY_LANE, scoped))
 
 
 @dataclass(frozen=True)
@@ -220,21 +246,25 @@ def write_receipt(repo_root: Path, receipt: Receipt) -> Path:
     return path
 
 
-def _unexplained_skips(data: dict[str, Any]) -> list[str]:
-    """Return skipped-lane entries whose reason does not excuse the lane.
+def _unexplained_skips(skipped: list[str]) -> list[str]:
+    """Return skipped-lane entries whose reason does not excuse THAT lane.
 
-    Two ways to fail: no reason at all, or a reason that merely REPORTS the lane
-    did not run. Only a justification — the lane had nothing to say about this
-    diff — excuses it. `cold:not-yet-run` is a gap wearing a reason's clothes.
+    Three ways to fail: no reason at all, a reason that merely REPORTS the lane
+    did not run, or a reason that is only valid for a DIFFERENT lane.
+    `cold:not-yet-run` is a gap wearing a reason's clothes; `cold:no-spec-available`
+    is a gap wearing the spec lane's clothes.
+
+    Takes the already-normalised list rather than re-reading ``data``. Reading
+    one key through two idioms — `data.get(k, [])` here, `data.get(k) or []` in
+    the caller — meant `"lanes_skipped": null` raised TypeError out of this
+    function while the caller treated the same value as empty. A crash is not a
+    verdict, and one key deserves one read.
     """
     bad: list[str] = []
-    for s in data.get("lanes_skipped", []):
-        if not isinstance(s, str):
-            bad.append(str(s))
-            continue
-        reason = s.partition(_SKIP_SEPARATOR)[2]
-        if not reason or not reason.startswith(_SKIP_JUSTIFICATIONS):
-            bad.append(s)
+    for entry in skipped:
+        lane, _, reason = entry.partition(_SKIP_SEPARATOR)
+        if not reason or not reason.startswith(_skip_reasons_for(lane)):
+            bad.append(entry)
     return bad
 
 
@@ -294,17 +324,23 @@ def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
     All three are one defect wearing three hats: a receipt that claims more
     coverage than the review actually had.
     """
-    ran_raw = _as_entries(data.get("lanes_ran") or [])
-    skipped_raw = _as_entries(data.get("lanes_skipped") or [])
+    # `data.get(k, [])`, NOT `data.get(k) or []`: absent and present-but-null are
+    # different states. Absent defaults to empty (a receipt with all four lanes
+    # run legitimately has no skips); an explicit `null`, `0`, or `""` is a
+    # MALFORMED array and must be refused, not quietly read as empty. `or []`
+    # collapsed the two, which is the same "could not check rendered as clean"
+    # this module refuses everywhere else.
+    ran_raw = _as_entries(data.get("lanes_ran", []))
+    skipped_raw = _as_entries(data.get("lanes_skipped", []))
     if ran_raw is None or skipped_raw is None:
         return "has a malformed lane list (lanes_ran/lanes_skipped must be arrays)"
 
-    unexplained = _unexplained_skips(data)
+    unexplained = _unexplained_skips(skipped_raw)
     if unexplained:
         return (
             f"skipped lane(s) not excused: {', '.join(unexplained)} — a skip must "
-            f"justify itself with one of {', '.join(_SKIP_JUSTIFICATIONS)}; a lane "
-            f"that merely did not run is a gap, not a skip"
+            f"justify itself with one of {_skip_reason_help()}; a lane that merely "
+            f"did not run is a gap, not a skip"
         )
 
     ran = ran_raw
@@ -380,7 +416,7 @@ def receipt_state(repo_root: Path, sha: str) -> tuple[bool, str]:
         return False, f"receipt for {sha[:12]} {reason}"
 
     ran = data["lanes_ran"]
-    skipped = data.get("lanes_skipped") or []
+    skipped = data.get("lanes_skipped", [])
     detail = f"{len(ran)} lane(s): {', '.join(map(str, ran))}"
     if skipped:
         detail += f" | skipped: {', '.join(map(str, skipped))}"

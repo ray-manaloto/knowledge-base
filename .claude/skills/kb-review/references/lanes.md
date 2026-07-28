@@ -82,10 +82,15 @@ found the shape and missed the reasoning; a lens that finds one of them
 }
 ```
 
-`lanes_skipped` entries carry their reason —
-`cold:not-applicable-docs-only`, `spec:no-spec-available`,
-`cold:claude-fallback-SAME-FAMILY`. **A skip with no reason is not a skip, it is
-a gap**, and `kb-ship` rejects a receipt containing one.
+`lanes_skipped` entries carry their reason — `cold:not-applicable-docs-only`,
+`spec:no-spec-available`. **A skip with no reason is not a skip, it is a gap**,
+and `kb-ship` rejects a receipt containing one.
+
+`cold:claude-fallback-SAME-FAMILY` was listed here as a third example and is
+**not a skip at all** — it belongs in `lanes_ran`, because that lane *ran*, just
+same-family (`_lane_prefix` already reads the `cold:` prefix). The gate rejected
+it, so this doc told you to do something the code refuses, on exactly the path it
+was written for: both cross-family CLIs down. Found by two lanes independently.
 
 **A lane claimed as RUN must have left a report** at
 `.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty. Without that the
@@ -94,10 +99,18 @@ coverage having run nothing, which is the widest form of a hole whose narrower
 forms had already been closed twice. It raises the bar rather than proving
 anything — a stub file still passes — but the honest path is now the easy one.
 
-**Only two skip reasons excuse a lane**: `not-applicable-<why>` and
-`no-spec-available`. `not-yet-run` is a **gap** and is rejected, which is what
-the paragraph above already said and the first version of the gate did not
-enforce.
+**Only two skip reasons excuse a lane, and one of them is lane-scoped**:
+`not-applicable-<why>` excuses any lane; `no-spec-available` excuses **the spec
+lane only**. `not-yet-run` is a **gap** and is rejected, which is what the
+paragraph above already said and the first version of the gate did not enforce.
+
+The scoping is the THIRD instance of one hole. The reason was matched without
+ever checking which lane it was attached to, so `cold:no-spec-available` bought a
+pass for a lane that never ran — a cold lane does not review against a spec, so
+"there is no spec" cannot explain its absence. `--lanes placeholder` and
+`cold:not-yet-run` were the first two. Found by the cold lane each time, which is
+now three for three on this gate — a reviewer that keeps finding the same *shape*
+is telling you the shape is the defect, not the instances.
 
 **The lane set is CLOSED** (`kb_setup.review.LANES`), and all four must be
 accounted for — each either ran or was skipped with a reason. Both halves of

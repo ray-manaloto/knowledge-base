@@ -165,6 +165,68 @@ def test_unexplained_skip_fails(tmp_path: Path, skipped: list[object]) -> None:
     assert "not excused" in summary
 
 
+def test_no_spec_available_does_not_excuse_a_non_spec_lane(tmp_path: Path) -> None:
+    """A skip reason must excuse THAT lane, not merely be a known string.
+
+    `no-spec-available` belongs to the spec lane alone — a cold or
+    silent-failure lane does not review against a spec, so "there is no spec"
+    cannot explain why it did not run. Matching the reason without looking at
+    the lane let `cold:no-spec-available` buy a pass for a lane that never ran:
+    the third instance of one hole, after `--lanes placeholder` and
+    `cold:not-yet-run`. The comment beside the constant already said "spec lane,
+    and only when there genuinely is no spec"; nothing enforced it.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "silent-failure"],
+            lanes_skipped=["cold:no-spec-available"],
+        ),
+        _SHA,
+    )
+    assert not ok
+    assert "not excused" in summary
+    assert "cold:no-spec-available" in summary
+
+
+def test_no_spec_available_still_excuses_the_spec_lane(tmp_path: Path) -> None:
+    """CONTROL ARM — the same reason on its OWN lane must still be accepted.
+
+    Without this arm the test above would also pass if the reason had simply
+    been deleted from the accepted set, which would be a different (and wrong)
+    fix.
+    """
+    ok, _ = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "cold:codex", "silent-failure"],
+            lanes_skipped=["spec:no-spec-available"],
+        ),
+        _SHA,
+    )
+    assert ok
+
+
+@pytest.mark.parametrize("container", [None, 0, "", "cold:not-applicable-x"])
+def test_malformed_lanes_skipped_container_is_refused_not_crashed(
+    tmp_path: Path, container: object
+) -> None:
+    """A bad CONTAINER must produce a verdict, exactly as a bad ELEMENT does.
+
+    `"lanes_skipped": null` crashed with `TypeError: 'NoneType' object is not
+    iterable` — `_check_lanes` normalised the key with `or []` while
+    `_unexplained_skips` re-read it raw, so one key was read through two idioms
+    and only one of them was safe. `land_main` died *after* printing
+    `==> checks: ok`, which is a crash wearing a green light's clothes.
+
+    The existing parametrize covers bad elements (`["cold"]`, `[123]`) and could
+    not see this: the container was never the variable.
+    """
+    ok, summary = review.receipt_state(_write(tmp_path, lanes_skipped=container), _SHA)
+    assert not ok
+    assert "malformed lane list" in summary
+
+
 def test_explained_skip_passes(tmp_path: Path) -> None:
     """The control arm for the test above: a reasoned skip is accepted."""
     ok, _ = review.receipt_state(
