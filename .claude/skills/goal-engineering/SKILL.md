@@ -144,6 +144,13 @@ That writes through `kb-remember` + `kb-reflect` and flips the Status cell in
 `docs/goals/README.md` — one command, so the step that is easiest to skip is
 also the cheapest to do.
 
+**Run it BEFORE `kb-ship`, then commit what it wrote.** Its output used to be
+unshippable — the review receipt is keyed to a commit, so committing these files
+moved HEAD past it and `ship` refused (#66). Since the receipt accepts an
+ancestor whose delta is entirely `graphify-out/memory/**` +
+`docs/goals/README.md`, closing the loop no longer costs a re-review, and the
+round's own record lands on the round's own branch.
+
 **`cleared` and `stalled` are not failures to hide.** They teach more than
 `achieved`, because they say the *condition* was wrong rather than the work —
 which is why the recorder tags them `corrected` rather than `useful`. A skill

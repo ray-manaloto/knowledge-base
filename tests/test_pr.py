@@ -699,3 +699,140 @@ def test_land_refuses_an_unreviewed_pr_head(monkeypatch, tmp_path):
     _stub_run(monkeypatch, _land_handler(seen))
     assert pr.land_main(tmp_path, 42) == 1
     assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "merge must not be attempted"
+
+
+# --------------------------------------------------------------------------
+# #66 — ship/land accept an ancestor receipt whose delta is exempt
+#
+# A REAL git repo, not the subprocess stub used above. The property under test
+# IS git behaviour (ancestry, `git diff`), and the round-1 spec lane's finding
+# was precisely that the only evidence `ship_main`/`land_main` honour the
+# fallback was inference from an unchanged file. Inference is what a stub would
+# repeat.
+# --------------------------------------------------------------------------
+
+
+def _real_repo(tmp_path) -> tuple[Callable[..., str], str]:
+    from kb_setup import review
+
+    def git(*args: str) -> str:
+        proc = subprocess.run(
+            ["git", "-C", str(tmp_path), *args],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+        return proc.stdout.strip()
+
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True, timeout=30)
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "T")
+    git("commit", "-q", "--allow-empty", "-m", "base")
+    git("checkout", "-q", "-b", "work")
+
+    # Receipts live under `.agent/`, which the real repo gitignores. Without
+    # that here, `_ship_preflight` refuses for a dirty tree before the receipt
+    # gate is ever reached — and the test would then pass for the wrong reason.
+    (tmp_path / ".gitignore").write_text(".agent/\n", encoding="utf-8")
+    (tmp_path / "code.py").write_text("X = 1\n", encoding="utf-8")
+    git("add", "--", ".gitignore", "code.py")
+    git("commit", "-q", "-m", "code")
+    reviewed = git("rev-parse", "HEAD")
+
+    for lane in ("standards", "spec", "cold", "silent-failure"):
+        rp = review.report_path(tmp_path, reviewed, lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("NO FINDINGS", encoding="utf-8")
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha=reviewed,
+            fixed_point="main",
+            fixed_point_sha=review.base_sha(tmp_path, "main", head=reviewed),
+            lanes_ran=("standards", "spec", "cold:codex", "silent-failure"),
+            lanes_skipped=(),
+            findings=0,
+            blocking=0,
+        ),
+    )
+    return git, reviewed
+
+
+def _commit_closing_artifact(git, tmp_path) -> str:
+    """Commit exactly what P7 writes — the case #66 exists for."""
+    mem = tmp_path / "graphify-out" / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "query_1.md").write_text("# a lesson\n", encoding="utf-8")
+    git("add", "--", "graphify-out/memory/query_1.md")
+    git("commit", "-q", "-m", "close the loop")
+    return git("rev-parse", "HEAD")
+
+
+def test_ship_accepts_an_ancestor_receipt_for_a_closing_commit(monkeypatch, tmp_path, capsys):
+    """`ship` must get PAST the receipt gate when the delta is P7's own output.
+
+    Stopped at the gates deliberately: running `lint`/`test`/`brain-audit`/`eval`
+    inside a unit test is minutes of the wrong thing. What matters is WHICH
+    refusal comes back — the gates', not the review's.
+    """
+    git, _ = _real_repo(tmp_path)
+    _commit_closing_artifact(git, tmp_path)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: False)
+
+    assert pr.ship_main(tmp_path) == 1
+    out = capsys.readouterr().out
+    assert "ship: gates failed" in out
+    assert "not pushing an unreviewed commit" not in out
+    assert "covered by the receipt for" in out
+
+
+def test_ship_still_refuses_a_closing_commit_that_also_touches_code(monkeypatch, tmp_path, capsys):
+    """CONTROL ARM — the same shape with one reviewed path added must refuse.
+
+    Without this the test above would pass just as well against a gate that
+    accepted any ancestor receipt at all.
+    """
+    git, _ = _real_repo(tmp_path)
+    mem = tmp_path / "graphify-out" / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "query_1.md").write_text("# a lesson\n", encoding="utf-8")
+    (tmp_path / "code.py").write_text("X = 2\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "close the loop, and edit code")
+    monkeypatch.setattr(pr, "run_gates", lambda _root: False)
+
+    assert pr.ship_main(tmp_path) == 1
+    out = capsys.readouterr().out
+    assert "not pushing an unreviewed commit" in out
+    assert "code.py" in out
+
+
+def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(monkeypatch, tmp_path, capsys):
+    """`land` gates on the PR head, so it needs the same fallback as `ship`."""
+    git, _ = _real_repo(tmp_path)
+    head = _commit_closing_artifact(git, tmp_path)
+
+    # `_stub_run` patches the subprocess MODULE attribute, which `kb_setup.review`
+    # shares — so a blanket stub silently answers review's git calls too, and the
+    # ancestry lookup this test exists for never runs. `git` is delegated to the
+    # real binary; only `gh` is stubbed.
+    real_run = subprocess.run
+
+    def handler(cmd: list[str]) -> object:
+        if cmd[:3] == ["gh", "pr", "checks"]:
+            return _Proc(0, json.dumps([{"name": "lint", "bucket": "pass"}]))
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(0, f"{head}\n")
+        if cmd[:2] in (["git", "pull"], ["git", "fetch"], ["git", "checkout"]):
+            # The post-merge sync needs a remote and is not what this test is about.
+            return _Proc(0, "")
+        if cmd and cmd[0] == "git":
+            return real_run(cmd, cwd=tmp_path, capture_output=True, text=True, check=False)
+        return _Proc(0, "")
+
+    _stub_run(monkeypatch, handler)
+    assert pr.land_main(tmp_path, 42) == 0
+    out = capsys.readouterr().out
+    assert "covered by the receipt for" in out
+    assert "land: refusing" not in out

@@ -13,6 +13,12 @@ one either. The receipt is what makes the local review the real gate.
 Receipts are gitignored: one proves that *this machine* reviewed *this commit*.
 Committing them would make them stale on the first rebase, and a stale receipt
 is worse than none — a green light nobody earned.
+
+The one place that strict commit-keying bends is :data:`EXEMPT_PATHS`: the
+round's own closing tasks write files that cannot exist until after the review,
+so an ancestor's receipt covers HEAD when everything committed since is inside
+that set. See :func:`_covering_receipt` — it changes which receipt is asked, not
+what is asked of it.
 """
 
 from __future__ import annotations
@@ -82,6 +88,47 @@ _SKIP_BY_LANE = {"spec": ("no-spec-available",)}
 #: A lane entry may name a variant after a colon (`cold:codex`,
 #: `cold:claude-fallback-SAME-FAMILY`) — the prefix is what must be known.
 LANES = ("standards", "spec", "cold", "silent-failure")
+
+#: Paths whose content cannot exist until AFTER the review has happened, because
+#: the round's own closing tasks write them (#66).
+#:
+#: `kb-remember` writes `graphify-out/memory/*.md` and `kb-goal-outcome` edits
+#: `docs/goals/README.md` — both mandated by every rider's P7 ("close the
+#: loop"). Because the receipt is keyed to a commit, their output could never be
+#: committed to the branch it belongs to: before the receipt it is unreviewed,
+#: after it HEAD has moved past the receipt and `ship`/`land` refuse. Three
+#: rounds running left them uncommitted, one `git clean -xdf` from gone.
+#:
+#: **That timing is the whole justification, and it is the only one.** The first
+#: draft of this comment also claimed these were "paths a review lane cannot
+#: meaningfully review" — which the review of this very commit falsified: three
+#: lanes found three live credentials pasted into one of these files by
+#: `kb-remember`. A lane reads them fine. What it cannot do is read them before
+#: they exist.
+#:
+#: So exempting them removes the only lane read they would ever get, which makes
+#: **scanner** coverage of these paths load-bearing rather than incidental.
+#: `.gitleaks.toml` used to allowlist all of `graphify-out/`; it no longer does,
+#: and `tests/test_gitleaks_scope.py` pins that. Do not add a path here that the
+#: scanner cannot see.
+#:
+#: An entry ending in `/` is a directory prefix; anything else is one exact
+#: path. Deliberately NOT a glob: a pattern language here would be a second
+#: thing to get wrong on the gate's permissive side.
+#:
+#: `graphify-out/reflections/` is the third P7 writer and is **absent on
+#: purpose** — it is gitignored (`.gitignore`, "reflect derived doc"), so it can
+#: never appear in a `git diff` and an entry for it could never fire. #66
+#: suggested including it; a rule that can only be dead is not a rule
+#: (`probes-need-a-control-arm.md`). `kb-reflect`'s other output is the
+#: `.graphify_*` learning overlay, gitignored for the same reason.
+EXEMPT_PATHS = ("graphify-out/memory/", "docs/goals/README.md")
+
+#: How many disqualifying paths the refusal message names before summarising.
+#: A DISPLAY bound, so it states the remainder ("+3 more") rather than truncating
+#: silently — a bound that hides its own existence is how "absent" and
+#: "unreachable" get confused (`probes-need-a-control-arm.md` rule 3).
+_MAX_NAMED_PATHS = 5
 
 _GIT_TIMEOUT = 30
 
@@ -221,7 +268,33 @@ def receipt_path(repo_root: Path, sha: str) -> Path:
 
 
 def _git(repo_root: Path, *args: str) -> str:
-    """Return stripped stdout of `git *args`, or "" if it cannot be read."""
+    """Return stripped stdout of `git *args`, or "" if it cannot be read.
+
+    Callers of this form fail closed on "" because every answer they ask for is
+    non-empty when it succeeds. :func:`_git_result` is for the questions where
+    an empty answer is a legitimate result — see its docstring.
+    """
+    return _git_result(repo_root, *args)[1].strip()
+
+
+def _git_result(repo_root: Path, *args: str) -> tuple[bool, str]:
+    """Return ``(ran_ok, RAW stdout)`` for `git *args`.
+
+    :func:`_git` collapses failure into ``""``, which is right for `rev-parse`
+    and `merge-base` — they never legitimately answer nothing. It is WRONG for
+    `git diff`, where "" is the perfectly ordinary answer "these two trees are
+    identical". Collapsing the two there would let a git failure read as "the
+    delta is empty, so nothing unreviewed was added" — a could-not-check
+    rendered as green, which is the one thing this module refuses everywhere
+    else. So the ok flag is carried separately rather than inferred.
+
+    Raw, and NOT stripped: :func:`_git` strips for its own callers. Stripping
+    here ate a leading space from the first path of a `-z` NUL stream, which
+    could turn `" python/x.py"` into `"python/x.py"` — and, in the shape that
+    matters, an indented path into an exempt-looking one. Stripping the
+    delimiter-joined blob contradicted `_delta_paths`' own claim to compare the
+    bytes git has. (Cold and silent-failure lanes, independently.)
+    """
     try:
         proc = subprocess.run(
             ["git", *args],
@@ -235,10 +308,16 @@ def _git(repo_root: Path, *args: str) -> str:
         # Distinguished from a clean miss on purpose: a timeout means the
         # question was never answered, and a silent "" would read as an answer.
         print(f"  git {' '.join(args)}: timed out after {_GIT_TIMEOUT}s")
-        return ""
-    except (OSError, subprocess.SubprocessError) as exc:
+        return False, ""
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:
+        # `UnicodeDecodeError` is raised by `text=True`'s decode and is NOT an
+        # `OSError` or a `SubprocessError`, so a pathname git holds as non-UTF-8
+        # bytes escaped as a TRACEBACK out of the middle of `ship`/`land` —
+        # a crash where this module's entire contract is a worded refusal. It is
+        # reachable: `git diff -z` emits raw pathname bytes precisely so they are
+        # not re-encoded. (Cold lane.)
         print(f"  git {' '.join(args)}: {exc}")
-        return ""
+        return False, ""
     if proc.returncode != 0:
         # The rc path is the one that ACTUALLY fires — a bad ref exits 128 rather
         # than raising — and it was the one branch here that returned a silent ""
@@ -248,8 +327,8 @@ def _git(repo_root: Path, *args: str) -> str:
         # invisible. (Silent-failure lane, third pass.)
         detail = (proc.stderr or proc.stdout or "").strip()
         print(f"  git {' '.join(args)}: rc={proc.returncode} {detail[:160]}")
-        return ""
-    return proc.stdout.strip()
+        return False, ""
+    return True, proc.stdout
 
 
 def head_sha(repo_root: Path) -> str:
@@ -542,17 +621,161 @@ def _base_coverage_gap(
     return None
 
 
-def _load_receipt(path: Path, sha: str) -> tuple[dict[str, Any] | None, str]:
+def _is_exempt(path: str) -> bool:
+    """Return whether ``path`` is one a review lane cannot cover (:data:`EXEMPT_PATHS`)."""
+    return any(
+        path.startswith(entry) if entry.endswith("/") else path == entry for entry in EXEMPT_PATHS
+    )
+
+
+def _delta_paths(repo_root: Path, older: str, newer: str) -> list[str] | None:
+    """Return every path differing between two commits, or None if unreadable.
+
+    ``--no-renames`` on purpose: with rename detection on, moving a reviewed
+    source file INTO an exempt directory shows only the exempt destination, so
+    the delta would read as exempt while a reviewed file was silently deleted.
+    Off, the same move is a delete plus an add and the deleted path fails the
+    check. ``-z`` sidesteps `core.quotePath` escaping entirely, so a path with a
+    quote or a non-ASCII byte in it is compared as the bytes git actually has
+    rather than as a re-encoded display form.
+    """
+    ok, out = _git_result(
+        repo_root, "diff", "--name-only", "--no-renames", "-z", older, newer, "--"
+    )
+    if not ok:
+        return None
+    return [p for p in out.split("\0") if p]
+
+
+def _reviewed_ancestors(repo_root: Path, sha: str, base_ref: str) -> tuple[list[str], str]:
+    """Return EVERY commit on this branch below ``sha`` that has a receipt.
+
+    All of them, not one. The first draft took only the first and justified it
+    with "a farther ancestor is strictly harder to accept, because every path in
+    the nearer delta is also in the farther one". That is **false**, and two
+    lanes said so independently: add `foo.py` in one commit and delete it in the
+    next, and the farther delta does not contain `foo.py` while the nearer one
+    does. It also claimed `git rev-list` yields the NEAREST first, which it does
+    not — rev-list orders by commit date, so a merge can put a farther commit
+    ahead of a nearer one.
+
+    Neither error was unsafe, and that is exactly why they survived: the check is
+    TREE-based, so any ancestor whose delta to ``sha`` is exempt-only proves the
+    same thing — the shipped tree equals a reviewed tree except in exempt paths.
+    The cost of trying one candidate was a refusal where an acceptance was
+    warranted. Trying all of them removes the ordering claim entirely rather than
+    asserting a property the code does not enforce.
+
+    The walk is bounded to ``base_ref..sha`` — this branch's own commits. That
+    is not a convenience: a receipt for some commit already on `main` is a
+    receipt for a review of a DIFFERENT branch, and letting the search reach one
+    would let ancient reviews vouch for new work.
+    """
+    base = base_sha(repo_root, base_ref, head=sha)
+    if not base:
+        return [], f"could not resolve '{base_ref}' to look for a reviewed ancestor"
+    ok, out = _git_result(repo_root, "rev-list", f"{base}..{sha}", "--")
+    if not ok:
+        return [], "could not list this branch's commits to look for a reviewed ancestor"
+    found = [
+        commit
+        for commit in out.split()
+        if commit != sha and receipt_path(repo_root, commit).is_file()
+    ]
+    if not found:
+        return [], "and no commit below it on this branch has one either"
+    return found, ""
+
+
+def _covering_receipt(repo_root: Path, sha: str, require_base: str | None) -> tuple[str, str]:
+    """Return ``(sha whose receipt to validate, note)`` for ``sha``.
+
+    Normally the receipt for a commit is the receipt FOR that commit, and this
+    returns ``sha`` unchanged. The exception is #66: every rider's P7 mandates
+    `kb-remember` and `kb-goal-outcome`, both of which write files
+    (:data:`EXEMPT_PATHS`) that can only exist once the review has already
+    happened. Committing them moved HEAD past the receipt and `ship` refused, so
+    three rounds running left them uncommitted instead.
+
+    So a receipt at an ancestor covers ``sha`` when the ENTIRE delta between
+    them is inside the exempt set. Nothing about the reviewed bytes is relaxed:
+    one reviewed path in that delta and the fallback is refused. That is the
+    narrower of the two options on #66 — the alternative, exempting those paths
+    from coverage outright, would also excuse them in a delta full of code.
+
+    Only offered when ``require_base`` is given, which is what bounds the
+    ancestry walk to this branch. Both callers that gate (`ship`, `land`) pass
+    it; the receipt writer's own read-back does not, and wants the strict
+    identity check.
+
+    The note is returned in BOTH directions — it explains an accepted fallback,
+    and equally explains a refused one. A refusal that fell back to the bare "no
+    receipt" message would hide that a candidate existed and say nothing about
+    which reviewed path disqualified it. When several ancestors are tried and all
+    are refused, the FIRST one's reason is reported: naming every candidate turns
+    a diagnosis into a wall, and they are usually refused for the same file.
+    """
+    if require_base is None or receipt_path(repo_root, sha).is_file():
+        return sha, ""
+
+    candidates, why = _reviewed_ancestors(repo_root, sha, require_base)
+    if not candidates:
+        return sha, why
+
+    first_refusal = ""
+    for candidate in candidates:
+        accepted, note = _exempt_delta_note(repo_root, candidate, sha)
+        if accepted:
+            return candidate, note
+        first_refusal = first_refusal or note
+    return sha, first_refusal
+
+
+def _exempt_delta_note(repo_root: Path, candidate: str, sha: str) -> tuple[bool, str]:
+    """Return ``(candidate covers sha, why)`` for one ancestor's delta."""
+    paths = _delta_paths(repo_root, candidate, sha)
+    if paths is None:
+        return False, f"and the delta from reviewed ancestor {candidate[:12]} could not be read"
+
+    reviewed = sorted(p for p in paths if not _is_exempt(p))
+    if reviewed:
+        return False, (
+            f"and reviewed ancestor {candidate[:12]} does not cover it: "
+            f"{_summarise(reviewed)} changed since, which no lane has read"
+        )
+
+    covered = _summarise(sorted(paths)) if paths else "an identical tree"
+    return True, f"covered by the receipt for {candidate[:12]}; since then only {covered}"
+
+
+def _summarise(paths: list[str]) -> str:
+    """Return ``paths`` joined, bounded by :data:`_MAX_NAMED_PATHS`, stating any remainder.
+
+    Applied to BOTH the refusal list and the accepted list. Bounding only the
+    refusal left the permissive branch — the one that lets a commit ship — able
+    to print an unbounded path list, which is the branch where a wall of text is
+    most likely to go unread. (Standards and spec lanes, independently.)
+    """
+    shown = ", ".join(paths[:_MAX_NAMED_PATHS])
+    extra = len(paths) - _MAX_NAMED_PATHS
+    return f"{shown} (+{extra} more)" if extra > 0 else shown
+
+
+def _load_receipt(path: Path, sha: str, *, note: str = "") -> tuple[dict[str, Any] | None, str]:
     """Return ``(data, "")``, or ``(None, reason)`` if it cannot be read as one.
 
     Every arm fails CLOSED with a worded reason rather than raising: this is the
     boundary where a receipt stops being bytes and starts being a verdict, and a
     traceback out of here would be a crash where a refusal belongs.
+
+    ``note`` is :func:`_covering_receipt`'s account of why the exempt-delta
+    fallback did not rescue this SHA, folded into the message ahead of the
+    advice so the reason precedes the remedy.
     """
     if not path.is_file():
         return None, (
-            f"no review receipt for {sha[:12]} — run the `kb-review` skill "
-            f"(an amend or rebase moves the SHA and invalidates the old one)"
+            f"no review receipt for {sha[:12]}{f', {note}' if note else ''} — run the "
+            f"`kb-review` skill (an amend or rebase moves the SHA and invalidates the old one)"
         )
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -578,26 +801,50 @@ def receipt_state(
     does, because a receipt reviewed against a narrower base is still a truthful
     record of what it reviewed. It is the act of shipping the whole branch that
     needs the whole branch reviewed.
+
+    It also enables the :func:`_covering_receipt` fallback, under which an
+    ancestor's receipt covers ``sha`` when everything committed since is inside
+    :data:`EXEMPT_PATHS`. Every other check below then runs against that
+    ancestor unchanged — the fallback decides WHICH receipt is asked, never how
+    hard it is asked.
     """
     if not sha:
         return False, "could not read HEAD"
 
-    data, unreadable = _load_receipt(receipt_path(repo_root, sha), sha)
+    # The note explains a fallback that was ACCEPTED (``covering`` moved to an
+    # ancestor) or one that was REFUSED (it stayed put). Both are worth saying,
+    # but the refused one belongs INSIDE the "no receipt" message rather than
+    # trailing it: "no receipt — run the review skill" reads as "you never
+    # reviewed", when the real story is "you reviewed, then committed something
+    # no lane has read", and only the second tells you which file to look at.
+    covering, note = _covering_receipt(repo_root, sha, require_base)
+    refused = bool(note) and covering == sha
+
+    data, unreadable = _load_receipt(
+        receipt_path(repo_root, covering), covering, note=note if refused else ""
+    )
     if data is None:
         return False, unreadable
 
-    if require_base is not None:
-        gap = _base_coverage_gap(repo_root, data, require_base, sha)
-        if gap is not None:
-            return False, f"receipt for {sha[:12]} {gap}"
+    # Carried onto the FAILURE returns too, not only the success one. Without it
+    # an accepted-then-rejected fallback printed `receipt for <ancestor-sha> …`
+    # with nothing to say why a SHA that is not HEAD was being judged — a
+    # refusal the reader cannot act on, and the exact gap `_covering_receipt`'s
+    # docstring claims to close. (Standards and silent-failure lanes.)
+    suffix = f" — {note}" if note and not refused else ""
 
-    reason = _all_reasons(repo_root, data, sha)
+    if require_base is not None:
+        gap = _base_coverage_gap(repo_root, data, require_base, covering)
+        if gap is not None:
+            return False, f"receipt for {covering[:12]} {gap}{suffix}"
+
+    reason = _all_reasons(repo_root, data, covering)
     if reason is not None:
-        return False, f"receipt for {sha[:12]} {reason}"
+        return False, f"receipt for {covering[:12]} {reason}{suffix}"
 
     ran = data["lanes_ran"]
     skipped = data.get("lanes_skipped", [])
     detail = f"{len(ran)} lane(s): {', '.join(map(str, ran))}"
     if skipped:
         detail += f" | skipped: {', '.join(map(str, skipped))}"
-    return True, detail
+    return True, f"{detail}{suffix}"

@@ -228,6 +228,23 @@ reviewed" — they are written first and survive the refusal.
 **Amending or rebasing invalidates the receipt**, because the SHA moves. That is
 correct, not friction: the reviewed bytes are gone.
 
+**One exception, and only one: the round's own closing artifacts.**
+`kb-remember` and `kb-goal-outcome` are mandated by every rider's "close the
+loop" phase, and they write `graphify-out/memory/*.md` and `docs/goals/README.md`
+— files that cannot exist until after the review has happened. Committing them
+moved HEAD past the receipt and `ship` refused, so three rounds running left
+them uncommitted instead, one `git clean -xdf` from gone (#66).
+
+So `ship` and `land` accept an ANCESTOR's receipt when the entire delta since it
+is inside `review.EXEMPT_PATHS`. One reviewed path in that delta and the
+fallback is refused, naming the file. It changes which receipt is read, never
+what is asked of it — a blocking finding on that ancestor still refuses.
+
+The workflow this buys: review → receipt → run the closing tasks → commit what
+they wrote → `kb-ship`. The summary line says which receipt covered HEAD and
+what changed since, because a gate that relaxes silently is worse than one that
+refuses.
+
 ## What this does not claim
 
 The cold lane is a second opinion, not a proof. It shares no weights with the

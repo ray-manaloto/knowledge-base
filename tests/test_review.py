@@ -7,6 +7,7 @@ check that has only ever been run against a good receipt is decoration.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -577,3 +578,300 @@ def test_empty_sha_fails(tmp_path: Path) -> None:
     ok, summary = review.receipt_state(tmp_path, "")
     assert not ok
     assert "HEAD" in summary
+
+
+# --- #66: the exempt-delta fallback -----------------------------------------
+#
+# A REAL git repo, not a monkeypatched `base_sha`. The whole mechanism is
+# `git rev-list` and `git diff` behaviour — rename detection, the ancestry
+# bound, an identical tree — and a stubbed git could only ever confirm the
+# stub. The other tests in this file stub because they are about the receipt's
+# JSON; these are about git, so they use git.
+
+
+def _git(root: Path, *args: str) -> str:
+    proc = subprocess.run(
+        ["git", "-C", str(root), *args], capture_output=True, text=True, check=True, timeout=30
+    )
+    return proc.stdout.strip()
+
+
+def _init_repo(tmp_path: Path) -> Path:
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True, timeout=30)
+    _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "user.name", "T")
+    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "base")
+    _git(tmp_path, "checkout", "-q", "-b", "work")
+    return tmp_path
+
+
+def _commit_file(root: Path, rel: str, body: str = "x\n") -> str:
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+    _git(root, "add", "--", rel)
+    _git(root, "commit", "-q", "-m", f"add {rel}")
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _receipt_for(root: Path, sha: str) -> None:
+    """Write a valid receipt (and its lane reports) for a real commit."""
+    for lane in LANES_RAN:
+        rp = review.report_path(root, sha, lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("NO FINDINGS", encoding="utf-8")
+    review.write_receipt(
+        root,
+        review.Receipt(
+            sha=sha,
+            fixed_point="main",
+            fixed_point_sha=review.base_sha(root, "main", head=sha),
+            lanes_ran=LANES_RAN,
+            lanes_skipped=(),
+            findings=0,
+            blocking=0,
+        ),
+    )
+
+
+LANES_RAN = ("standards", "spec", "cold:codex", "silent-failure")
+
+
+def test_exempt_delta_lets_an_ancestor_receipt_cover_head(tmp_path: Path) -> None:
+    """#66's PASS arm: P7's own output committed after the review still ships.
+
+    The realistic sequence — review, then `kb-remember` and `kb-goal-outcome`,
+    then commit what they wrote. Before this, that commit was unshippable and
+    three rounds running left the files uncommitted instead.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    head = _commit_file(root, "docs/goals/README.md", "| pair | achieved |\n")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert ok, summary
+    # The fallback must ANNOUNCE itself — a gate that silently relaxes is worse
+    # than one that refuses, because nobody can tell it happened.
+    assert reviewed[:12] in summary
+    assert "graphify-out/memory/query_1.md" in summary
+
+
+def test_one_reviewed_path_in_the_delta_refuses(tmp_path: Path) -> None:
+    """FAIL arm: exempt files alongside code do not launder the code."""
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    head = _commit_file(root, "python/src/kb_setup/other.py", "def g(): ...\n")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "python/src/kb_setup/other.py" in summary
+    # And it must not be reported as "you never reviewed" — the diagnosis is
+    # which file moved, not the absence of a review.
+    assert reviewed[:12] in summary
+
+
+def test_a_rename_out_of_a_reviewed_path_refuses(tmp_path: Path) -> None:
+    """`--no-renames` earns its place: moving code INTO an exempt dir is a delete.
+
+    With rename detection on, `git diff --name-only` reports only the exempt
+    destination, so the delta reads as exempt while a reviewed file left the
+    tree. Off, the source path shows as a delete and fails the check.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    (root / "graphify-out" / "memory").mkdir(parents=True, exist_ok=True)
+    _git(root, "mv", "python/src/kb_setup/thing.py", "graphify-out/memory/thing.py")
+    _git(root, "commit", "-q", "-m", "move")
+    head = _git(root, "rev-parse", "HEAD")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "python/src/kb_setup/thing.py" in summary
+
+
+def test_the_walk_does_not_reach_a_receipt_on_main(tmp_path: Path) -> None:
+    """A receipt for a commit already on `main` reviewed a DIFFERENT branch.
+
+    Bounding the ancestry walk to `main..sha` is what stops an old merged
+    review vouching for new work whose delta happens to be exempt.
+    """
+    root = _init_repo(tmp_path)
+    _git(root, "checkout", "-q", "main")
+    on_main = _commit_file(root, "docs/notes.md", "# notes\n")
+    _receipt_for(root, on_main)
+    _git(root, "checkout", "-q", "work")
+    _git(root, "merge", "-q", "main")
+    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "no commit below it on this branch has one either" in summary
+
+
+def test_the_fallback_is_opt_in_with_require_base(tmp_path: Path) -> None:
+    """CONTROL ARM: without `require_base` the strict SHA identity still holds.
+
+    The receipt writer's own read-back passes no base and must keep getting the
+    unrelaxed answer, or this change would have quietly widened every caller.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+
+    ok, summary = review.receipt_state(root, head)
+    assert not ok
+    assert "no review receipt" in summary
+
+
+def test_the_ancestors_own_receipt_still_has_to_pass(tmp_path: Path) -> None:
+    """The fallback picks WHICH receipt is read; it does not soften the reading.
+
+    A blocking finding on the ancestor must still refuse, or an exempt commit
+    on top would be a way to launder an unresolved blocker.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    path = review.receipt_path(root, reviewed)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["blocking"] = 1
+    path.write_text(json.dumps(data), encoding="utf-8")
+    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "blocking review finding" in summary
+
+
+def test_an_unreadable_delta_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A git failure must not read as "the delta is empty, so it is exempt".
+
+    This is why `_git_result` exists at all: `_git` collapses a failure into
+    `""`, and `""` is also what an identical tree legitimately returns. Sharing
+    one return for both would make a broken `git diff` the most permissive
+    input the gate has.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+    # CONTROL ARM: with git working, this exact call passes.
+    assert review.receipt_state(root, head, require_base="main")[0]
+
+    real = review._git_result
+
+    def failing_diff(repo_root: Path, *args: str) -> tuple[bool, str]:
+        return (False, "") if args and args[0] == "diff" else real(repo_root, *args)
+
+    monkeypatch.setattr(review, "_git_result", failing_diff)
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "could not be read" in summary
+
+
+def test_exempt_paths_match_prefixes_and_exact_files() -> None:
+    """The matcher, both arms — a directory entry is a prefix, a file is exact."""
+    assert review._is_exempt("graphify-out/memory/query_1.md")
+    assert review._is_exempt("docs/goals/README.md")
+    # A file NAMED like the directory is not inside it.
+    assert not review._is_exempt("graphify-out/memory")
+    # A sibling that merely shares the prefix string is not exempt.
+    assert not review._is_exempt("graphify-out/memory-of-a-thing.md")
+    assert not review._is_exempt("docs/goals/README.md.bak")
+    assert not review._is_exempt("docs/goals/2026-07-27-x-goal.md")
+
+
+def test_many_reviewed_paths_are_summarised_not_dumped(tmp_path: Path) -> None:
+    """The `(+N more)` branch of `_MAX_NAMED_PATHS`, which nothing reached before.
+
+    Delete the bound and every test still passed — a limit verified only on
+    inputs below it (`repo-smells.md`, "verified only in the PASS direction").
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    for i in range(9):
+        _commit_file(root, f"python/src/kb_setup/mod_{i}.py", f"X = {i}\n")
+    head = _git(root, "rev-parse", "HEAD")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "(+4 more)" in summary, summary
+    # The bound must STATE its remainder, never truncate silently.
+    assert summary.count("python/src/kb_setup/mod_") == review._MAX_NAMED_PATHS
+
+
+def test_an_accepted_fallback_is_summarised_too(tmp_path: Path) -> None:
+    """CONTROL ARM on the permissive branch — it must bound its list as well.
+
+    Only the refusal branch was bounded, leaving the branch that lets a commit
+    SHIP able to print an unbounded wall of paths.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    for i in range(9):
+        _commit_file(root, f"graphify-out/memory/query_{i}.md", f"# lesson {i}\n")
+    head = _git(root, "rev-parse", "HEAD")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert ok, summary
+    assert "(+4 more)" in summary, summary
+
+
+def test_a_later_ancestor_can_cover_where_the_first_does_not(tmp_path: Path) -> None:
+    """Trying EVERY reviewed ancestor, not just the first rev-list yields.
+
+    The first draft took one candidate and justified it with "a farther ancestor
+    is strictly harder to accept". False: add a file and delete it again, and the
+    FARTHER delta is exempt-only while the nearer one is not. Fail-closed, so it
+    cost an unwarranted refusal rather than a bad acceptance — which is why it
+    survived a green suite. Two lanes found it independently.
+    """
+    root = _init_repo(tmp_path)
+    older = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, older)
+    _commit_file(root, "scratch.py", "TEMP = 1\n")
+    newer = _git(root, "rev-parse", "HEAD")
+    _receipt_for(root, newer)
+    _git(root, "rm", "-q", "--", "scratch.py")
+    _git(root, "commit", "-q", "-m", "drop scratch")
+    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+
+    # The NEARER receipt (`newer`) cannot cover HEAD: scratch.py was deleted
+    # since, and a delete is a reviewed-path change. The OLDER one can — that
+    # file never existed in its tree.
+    assert "scratch.py" in (review._delta_paths(root, newer, head) or [])
+    assert review._delta_paths(root, older, head) == ["graphify-out/memory/query_1.md"]
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert ok, summary
+    assert older[:12] in summary
+
+
+def test_a_refused_fallback_still_explains_itself_on_a_later_failure(tmp_path: Path) -> None:
+    """The note must reach the FAILURE returns, not only the success one.
+
+    An accepted fallback whose ancestor receipt then fails printed
+    `receipt for <ancestor-sha> …` with nothing saying why a non-HEAD SHA was
+    being judged — a refusal the reader cannot act on.
+    """
+    root = _init_repo(tmp_path)
+    reviewed = _commit_file(root, "python/src/kb_setup/thing.py", "def f(): ...\n")
+    _receipt_for(root, reviewed)
+    path = review.receipt_path(root, reviewed)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["blocking"] = 1
+    path.write_text(json.dumps(data), encoding="utf-8")
+    head = _commit_file(root, "graphify-out/memory/query_1.md", "# a lesson\n")
+
+    ok, summary = review.receipt_state(root, head, require_base="main")
+    assert not ok
+    assert "blocking review finding" in summary
+    assert "covered by the receipt for" in summary, summary
