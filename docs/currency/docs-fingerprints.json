@@ -1,0 +1,14 @@
+{
+  "https://code.claude.com/docs/en/goal.md": {
+    "checked_at": "2026-07-27T23:27:25.556186+00:00",
+    "sha256": "56a76edc6bf3e8e52f184385c7223a075d520b0565ad8a3eb5b07d04b811e076"
+  },
+  "https://code.claude.com/docs/en/hooks.md": {
+    "checked_at": "2026-07-27T23:27:25.556186+00:00",
+    "sha256": "b65c99124dc5e4a1ad671d9fa2e906e9601706c0621e18718a122a29af7d33f7"
+  },
+  "https://code.claude.com/docs/en/skills.md": {
+    "checked_at": "2026-07-27T23:27:25.556186+00:00",
+    "sha256": "868916e08681720a85c5643f1444dbb85b987772854e17d094775767939a30ad"
+  }
+}

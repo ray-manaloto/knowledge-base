@@ -102,6 +102,13 @@ class ToolSpec:
     version_pattern: str = ""
     os: tuple[str, ...] = ()
     watch: tuple[WatchItem, ...] = ()
+    # Documentation pages whose CONTENT is the interface, fingerprinted so a
+    # revision is detectable without a version bump. Needed for anything whose
+    # semantics are documented rather than installed — `/goal` is the case: its
+    # behaviour lives at code.claude.com/docs/en/goal.md and Anthropic can revise
+    # that page any day without a release that looks relevant, silently staling
+    # every skill built on it. See `currency.docs` for the offline/network split.
+    docs_watch: tuple[str, ...] = ()
 
     @property
     def self_managed(self) -> bool:
@@ -195,6 +202,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         version_pattern=_str("version_pattern"),
         os=_tuple("os"),
         watch=_watch_items(table.get("watch")),
+        docs_watch=_tuple("docs_watch"),
     )
 
 
