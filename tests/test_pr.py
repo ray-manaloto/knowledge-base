@@ -391,6 +391,131 @@ def test_ship_pushes_the_validated_sha_not_the_branch_name(monkeypatch, tmp_path
     assert ["git", "branch", "--set-upstream-to", "origin/feat/x", "feat/x"] in seen
 
 
+def test_ship_refuses_on_detached_head(monkeypatch, tmp_path):
+    """A detached HEAD must not ship — and the old code got this for free.
+
+    `git rev-parse --abbrev-ref HEAD` returns the literal string "HEAD" when
+    detached (paused bisect, stopped rebase, `checkout <sha>`), which is neither
+    "" nor "main" and so passed the other two refusals. `git push -u origin HEAD`
+    then failed on its own — an ACCIDENTAL guard. Pinning the refspec removed the
+    accident: `git push origin <sha>:refs/heads/HEAD` succeeds and creates a
+    remote branch literally called `HEAD`. Probed against real git both ways.
+
+    REALISTIC MUTATION: delete the `branch == "HEAD"` arm and this fails.
+
+    The receipt is written for the literal SHA `"HEAD"` on purpose. Without it
+    this test passed for the wrong reason — the receipt check refused first, so
+    deleting the guard left it green. The mutation probe caught that, which is
+    the second time in this branch a detached-HEAD-shaped test was decoration.
+    """
+    _write_valid_receipt(tmp_path, sha="HEAD")
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        if cmd[:2] == ["git", "rev-parse"]:
+            return _Proc(0, "HEAD")
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(0, "99")
+        return _Proc(0, "")
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
+    assert not any(c[:2] == ["git", "push"] for c in seen), "must not push from a detached HEAD"
+
+
+def test_open_or_update_pr_refuses_when_the_pr_state_cannot_be_read(monkeypatch, tmp_path):
+    """`gh pr view` failing for any reason OTHER than "no PR" must not create one.
+
+    Flagged by the standards lane in two consecutive rounds as the one new gate
+    with no coverage in either direction. Its whole discriminator is gh's English
+    error text, so this test is also the tripwire for gh rewording it.
+    """
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(1, "error: could not authenticate to github.com")
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
+    assert not any(c[:3] == ["gh", "pr", "create"] for c in seen), "must not open a second PR"
+
+
+def test_open_or_update_pr_creates_when_there_is_genuinely_no_pr(monkeypatch, tmp_path):
+    """CONTROL ARM for the refusal above — the "no PR" wording must still create.
+
+    Without this arm, refusing unconditionally would also pass the test above.
+    """
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(1, "no pull requests found for branch feat/x")
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+    assert any(c[:3] == ["gh", "pr", "create"] for c in seen)
+
+
+def test_open_or_update_pr_refuses_an_unparsable_success(monkeypatch, tmp_path):
+    """rc=0 whose output is not a number is an UNREAD answer, not "no PR".
+
+    `_run` merges stdout and stderr, so a warning printed beside the number
+    defeats `.isdigit()`. This used to fall through to `gh pr create` and open a
+    second PR for a branch that already had one.
+    """
+    _write_valid_receipt(tmp_path)
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return _Proc(0, "warning: upgrade gh\n99")
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
+    assert not any(c[:3] == ["gh", "pr", "create"] for c in seen)
+
+
+def test_await_terminal_does_not_claim_terminal_on_a_failed_watch(monkeypatch):
+    """A non-zero `gh` exit must not be reported as "reached a terminal state".
+
+    rc cannot discriminate a FAILING check (terminal, expected) from "could not
+    ask" (auth expiry, no such PR), so the note declines to assert either — what
+    it must not do is assert the one it cannot know.
+    """
+    _stub_run(monkeypatch, lambda _cmd: _Proc(1, "", "could not resolve to a PullRequest"))
+    note = pr.await_terminal(7, timeout=1)
+    assert "reached a terminal state" not in note
+    assert "rc=1" in note
+
+
+def test_await_terminal_reports_terminal_on_a_clean_watch(monkeypatch):
+    """CONTROL ARM — rc=0 must still report the terminal state."""
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, ""))
+    assert pr.await_terminal(7, timeout=1) == "reached a terminal state"
+
+
+def test_checks_state_rejects_non_object_rows(monkeypatch):
+    """A scalar row must produce the module's worded refusal, not AttributeError."""
+    _stub_run(monkeypatch, lambda _cmd: _Proc(0, json.dumps(["lint", 3])))
+    green, summary = pr.checks_state(7)
+    assert green is False
+    assert "want a list of objects" in summary
+
+
 def test_ship_refuses_when_head_moves_during_the_gates(monkeypatch, tmp_path):
     """The pre-push re-check must actually guard the push.
 

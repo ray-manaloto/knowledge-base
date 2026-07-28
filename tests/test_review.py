@@ -227,6 +227,107 @@ def test_malformed_lanes_skipped_container_is_refused_not_crashed(
     assert "malformed lane list" in summary
 
 
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "not-applicable-",  # the prefix with no why after it — an empty claim
+        "no-spec-availablex",  # a typo that `startswith` accepted
+        "not-applicable",  # the prefix without its trailing hyphen
+    ],
+)
+def test_near_miss_skip_reasons_are_rejected(tmp_path: Path, reason: str) -> None:
+    """A justification must be the real one, not merely start like it.
+
+    `str.startswith` let a bare `not-applicable-` (no why) and a misspelled
+    `no-spec-availablex` through. `not-applicable-` stays a PREFIX because the
+    why is free text; everything else is matched exactly.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "silent-failure"],
+            lanes_skipped=[f"cold:{reason}"],
+        ),
+        _SHA,
+    )
+    assert not ok
+    assert "not excused" in summary
+
+
+def test_a_real_not_applicable_reason_still_passes(tmp_path: Path) -> None:
+    """CONTROL ARM for the near-misses — `not-applicable-<why>` must be accepted."""
+    ok, _ = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "silent-failure"],
+            lanes_skipped=["cold:not-applicable-docs-only"],
+        ),
+        _SHA,
+    )
+    assert ok
+
+
+def test_a_lane_cannot_be_both_run_and_skipped(tmp_path: Path) -> None:
+    """Claiming both is a contradiction, and it used to satisfy the gate twice.
+
+    `accounted` is a SET, so one lane in both lists collapsed to one entry and
+    read as covered while saying two opposite things about it.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "cold:codex", "silent-failure"],
+            lanes_skipped=["cold:not-applicable-docs-only"],
+        ),
+        _SHA,
+    )
+    assert not ok
+    assert "BOTH run and skipped" in summary
+    assert "cold" in summary
+
+
+def test_negative_blocking_count_is_rejected(tmp_path: Path) -> None:
+    """`-1` is malformed, not "fewer than zero blockers".
+
+    Only `> 0` was rejected, so a hand-edited receipt with a negative count read
+    as clean. The CLI cannot write one — a hand-edited receipt is exactly the
+    reader this check exists for, so the reader needs its own test.
+    """
+    ok, summary = review.receipt_state(_write(tmp_path, blocking=-1), _SHA)
+    assert not ok
+    assert "negative blocking count" in summary
+
+
+def test_payload_timestamp_is_stamped_once(tmp_path: Path) -> None:
+    """The bytes validated must be the bytes written.
+
+    `as_payload()` called `datetime.now()` on every invocation, so `rejection()`
+    checked a payload that differed from the one `write_receipt()` then wrote.
+    Nothing gates on the timestamp, so no verdict changed — but this module's
+    whole claim is that the writer and the reader see one artefact.
+
+    Asserted against an EXPLICIT stamp, not `as_payload() == as_payload()`: two
+    calls in the same second produce identical `timespec="seconds"` strings, so
+    the equality form stayed green under the mutation. The probe was the defect.
+    """
+    stamp = "2020-01-01T00:00:00+00:00"
+    receipt = review.Receipt(
+        sha=_SHA,
+        fixed_point="main",
+        fixed_point_sha="a" * 40,
+        lanes_ran=("standards", "spec"),
+        lanes_skipped=(
+            "cold:not-applicable-docs-only",
+            "silent-failure:not-applicable-docs-only",
+        ),
+        findings=0,
+        blocking=0,
+        written_at=stamp,
+    )
+    assert receipt.as_payload()["written_at"] == stamp
+    assert receipt.as_payload() == receipt.as_payload()
+
+
 def test_explained_skip_passes(tmp_path: Path) -> None:
     """The control arm for the test above: a reasoned skip is accepted."""
     ok, _ = review.receipt_state(

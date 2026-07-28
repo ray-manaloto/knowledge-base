@@ -133,8 +133,15 @@ def checks_state(pr_number: int) -> tuple[bool, str]:
         rows = json.loads(out)
     except json.JSONDecodeError:
         return False, f"could not read checks (rc={rc}): {out.strip()[:200]}"
-    if not isinstance(rows, list):
-        return False, f"unexpected checks payload (rc={rc}): {out.strip()[:200]}"
+    # The container AND its element types. Checking only `isinstance(rows, list)`
+    # left `r.get(...)` to raise AttributeError on a scalar row, out of a function
+    # whose entire contract is to return a worded refusal — a crash is not a
+    # verdict, and the comment above already promised strict parsing.
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return (
+            False,
+            f"unexpected checks payload — want a list of objects (rc={rc}): {out.strip()[:200]}",
+        )
 
     if not rows:
         return True, "no checks configured"
@@ -174,7 +181,7 @@ def await_terminal(pr_number: int, *, timeout: int = _TERMINAL_WAIT) -> str:
     Returns a note for the caller to print; never raises, never blocks a merge.
     """
     try:
-        subprocess.run(
+        proc = subprocess.run(
             ["gh", "pr", "checks", str(pr_number), "--watch", "--interval", "10"],
             capture_output=True,
             text=True,
@@ -186,6 +193,16 @@ def await_terminal(pr_number: int, *, timeout: int = _TERMINAL_WAIT) -> str:
     except (OSError, subprocess.SubprocessError) as exc:
         # Could not ask. Say so rather than implying the checks settled.
         return f"could not watch checks ({exc}); reading whatever state exists"
+    if proc.returncode != 0:
+        # `gh pr checks` exits non-zero for FAILING checks (terminal, expected)
+        # AND for "could not ask" (auth expiry, no such PR, a renamed flag), so
+        # rc cannot discriminate between them. The old code therefore ignored it
+        # and asserted "reached a terminal state" either way — a claim about a
+        # question that may never have been asked. It now declines to assert and
+        # reports what it saw; `checks_state` is the verdict regardless, so this
+        # costs nothing and stops the note from over-claiming.
+        detail = (proc.stderr or proc.stdout or "").strip()
+        return f"watch exited rc={proc.returncode}; reading whatever state exists: {detail[:160]}"
     return "reached a terminal state"
 
 
@@ -205,6 +222,20 @@ def _ship_preflight(repo_root: Path) -> str | None:
     if not branch or branch == "main":
         print(f"ship: refusing — on '{branch or 'unknown'}'; create a branch first")
         return None
+    # `git rev-parse --abbrev-ref HEAD` returns the literal string "HEAD" when
+    # detached, so a paused bisect, a stopped rebase, or a `git checkout <sha>`
+    # arrives here looking like a branch named HEAD.
+    #
+    # This guard USED to be free: `git push -u origin HEAD` failed on its own
+    # ("must fully qualify the ref"). Pinning the push to `<sha>:refs/heads/
+    # <branch>` — the fix for the TOCTOU window — SUCCEEDS on that input and
+    # creates a real remote branch literally called `HEAD`. The protection was
+    # an accident of the old form, and removing an accident is still removing a
+    # protection, so it is explicit now. Found by the cold and silent-failure
+    # lanes on the very commit that introduced the refspec.
+    if branch == "HEAD":
+        print("ship: refusing — detached HEAD; check out a branch first")
+        return None
     if not working_tree_clean(repo_root):
         print("ship: refusing — working tree is dirty; commit or stash first")
         return None
@@ -222,7 +253,14 @@ def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     if rc == 0 and existing.isdigit():
         print(f"ship: OK — PR #{existing} updated, gates green")
         return 0
-    if rc != 0 and "no pull requests found" not in out.lower():
+    # Anything that is not a parsed number is either "no PR yet" (create one) or
+    # "could not ask" (stop). The rc was part of this condition — `rc != 0 and …`
+    # — which left the other axis open: `_run` merges stdout and stderr, so rc=0
+    # with any warning chatter beside the number defeats `.isdigit()` above and
+    # used to fall straight through to `gh pr create`, turning an answer we failed
+    # to READ into a second PR. Dropping rc from the condition closes that without
+    # a second branch to keep in sync.
+    if "no pull requests found" not in out.lower():
         # Any other failure — auth expiry, network, rate limit — is "could not
         # ask", not "there is no PR". Falling through to `gh pr create` would
         # turn an unanswered question into a second PR. Say so and stop.

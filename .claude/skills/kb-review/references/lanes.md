@@ -92,8 +92,17 @@ same-family (`_lane_prefix` already reads the `cold:` prefix). The gate rejected
 it, so this doc told you to do something the code refuses, on exactly the path it
 was written for: both cross-family CLIs down. Found by two lanes independently.
 
+`fixed_point_sha` is the **merge-base**, not the fixed point resolved as a ref —
+three-dot semantics, matching the `git diff <base>...HEAD` the review runs
+against. It is recorded, never gated: the gate's question is "was THIS commit
+reviewed", and a receipt does not prove the fixed point covered the whole branch
+(review against `HEAD^` and the receipt is still honest about the SHA). Read the
+`fixed_point_sha` when that matters to you.
+
 **A lane claimed as RUN must have left a report** at
-`.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty. Without that the
+`.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty — where `<lane>` is
+the lane, with any `:variant` **stripped**. A lane recorded as `cold:codex` leaves
+`…-cold.md`, not `…-cold:codex.md`. Without that the
 whole receipt was honor-system: one command with four lane names minted full
 coverage having run nothing, which is the widest form of a hole whose narrower
 forms had already been closed twice. It raises the bar rather than proving
@@ -146,9 +155,19 @@ The first is a gap; the second is a judgement that the lane had nothing to say.
 Writing the second when you mean the first is how a receipt reports coverage it
 does not have.
 
-`blocking > 0` fails the ship gate. Everything else is reported and does not
-block — the review's job is to put findings in front of a human, not to
-adjudicate taste.
+**`--blocking N` where N > 0 is refused at RECEIPT-WRITE time** — `kb-review-receipt`
+validates before it writes, so it exits 2 having written nothing, and `kb-ship`
+then refuses for "no receipt". It never reaches a ship-time blocking check.
+
+Say that precisely, because the loose version ("`blocking > 0` fails the ship
+gate") described a path that does not exist and hid a real consequence: a review
+that FOUND blockers leaves the same empty disk as one that never ran. If you need
+those distinguishable, the lane reports are what distinguishes them — they are
+written before the receipt and survive its refusal. `review.py`'s own
+`_check_blocking` is defence-in-depth for a hand-edited receipt, not this path.
+
+Everything below blocking is reported and does not block — the review's job is to
+put findings in front of a human, not to adjudicate taste.
 
 The receipt is gitignored. It proves *this machine* reviewed *this commit*, and
 an amend or rebase moves the SHA and invalidates it — correctly, because the

@@ -56,14 +56,28 @@ the receipt records which lanes ran and why, and a skipped lane is visible.
 | The diff touches | Lanes |
 |---|---|
 | any `.py`, `hk.pkl`, `mise.toml`, `.claude/settings.json` | all four |
+| any other executable config — `currency.toml`, `pyproject.toml`, `.mcp.json` | all four |
 | only markdown, `docs/**`, `sources/**` | Standards + Spec |
-| only `docs/goals/*-goal.md` | Spec, plus `mise run kb-goal-check` |
+| only `docs/goals/*-goal.md` | Spec + Standards, plus `mise run kb-goal-check` |
+| anything not listed above | **all four** — the default is coverage, not a skip |
 
-The middle row is the case that motivated this skill. Docs cannot fail silently
+The last row is load-bearing. The table used to end at the goal row, so a real
+repo surface it did not name (`currency.toml`, `pyproject.toml`) had no verdict
+at all, and "not listed" reads as "docs-only" to a reader in a hurry. Absence of
+a row is not a judgement that a lane has nothing to say.
+
+The docs-only row is the case that motivated this skill. Docs cannot fail silently
 and have no Fowler smells, so a cold code reviewer over them returns nothing —
 that is a **SKIP because it does not apply**, which the receipt must distinguish
 from a lane that failed to run. Collapsing those two is how every defect in the
 currency engine's review happened.
+
+The goal row keeps **Standards** as well, because `kb-goal-check` is mechanical —
+it counts sections, sentinels, and negations. The five judgement tests that
+actually catch a bad condition (Goodhart shortcuts, stale evidence, the
+stated-connective trap) live in `goal-engineering`'s rubric and no gate runs them.
+Dropping Standards left a goal pair reviewed only by the tool that cannot read it,
+and a goal pair is its own Spec source, so Spec alone is close to self-review.
 
 ### 3. Resolve the two sources the spine cannot find here
 
@@ -107,17 +121,31 @@ are specific to this repo and are not in Fowler.
 ### 5. Run the two lanes the spine does not have
 
 **The cold lane must be a different model family than whoever wrote the code.**
-Claude wrote it, so the cold lane is `fable-orchestrator:codex-reviewer`
-(GPT-5.6 Sol, read-only sandbox). Review it **by ref and COLD** — hand it the
-SHA and nothing about what the change was *supposed* to do. Design context
-primes happy-path confirmation, which is the one thing a second lens exists not
-to do.
+That is a question about the diff, **not a constant** — ask it every time:
 
-If `codex` is missing or unauthenticated it returns a structured error rather
-than substituting itself. Fall back **loudly, never silently**:
-`codex` → `antigravity` (Gemini 3.x, still cross-family) → a Claude Opus
-subagent. Record which lane actually ran in the receipt; a Claude reviewer of
-Claude code is same-family and the receipt must not imply otherwise.
+| Implemented by | Cold lane | Family |
+|---|---|---|
+| Claude (the usual case) | `fable-orchestrator:codex-reviewer` | OpenAI |
+| `codex` (this repo's declared implementer lane) | `antigravity:review` | Google |
+| `antigravity` | `fable-orchestrator:codex-reviewer` | OpenAI |
+
+The middle row is not hypothetical: `.claude/CLAUDE.md` declares
+`fable-orchestrator: implementation lane = codex`, so a branch built through the
+orchestrator flow is **codex-authored**, and routing it to `codex-reviewer` buys
+a same-family read while the receipt says `cold:codex` — the exact
+false-cross-family claim the fallback chain is careful about. Hard-coding "Claude
+wrote it" made that the default. Check `git log --format='%an %s'` over the range
+and the session's declared lane before choosing.
+
+Review it **by ref and COLD** — hand it the SHA and nothing about what the change
+was *supposed* to do. Design context primes happy-path confirmation, which is the
+one thing a second lens exists not to do.
+
+If the chosen CLI is missing or unauthenticated it returns a structured error
+rather than substituting itself. Fall back **loudly, never silently**, to any
+remaining cross-family lane, and only then to a Claude Opus subagent. Record
+which lane actually ran in the receipt; a same-family reviewer still catches
+things, but the receipt must not imply it was cross-family.
 
 **Silent failures** is `pr-review-toolkit:silent-failure-hunter` — swallowed
 exceptions, bare excepts, fallbacks that mask a real error. `zero-skip-policy.md`
@@ -180,6 +208,16 @@ It writes `.agent/kb/review/receipt-<sha>.json`. Gitignored on purpose: a
 receipt is machine-local proof that *this* machine reviewed *this* commit before
 pushing. Committing it would make it stale the moment anyone rebased, and a
 stale receipt is worse than none — it is a green light nobody earned.
+
+**`kb-land` gates on it too**, not just `kb-ship` — it refuses to merge a PR head
+with no receipt. That accepts a machine-local coupling (the landing machine must
+be the reviewing one) in exchange for closing the gap where a PR is pushed by one
+path and merged by another.
+
+**A `--blocking` greater than 0 is refused before anything is written**, so the
+command exits 2 and `kb-ship` then refuses for *no receipt*. The lane reports are
+what preserve the distinction between "reviewed, found blockers" and "never
+reviewed" — they are written first and survive the refusal.
 
 **Amending or rebasing invalidates the receipt**, because the SHA moves. That is
 correct, not friction: the reviewed bytes are gone.

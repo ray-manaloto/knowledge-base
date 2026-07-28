@@ -72,11 +72,36 @@ def test_blocking_zero_stated_explicitly_passes(repo: Path) -> None:
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
 
 
-@pytest.mark.parametrize("bad", ["-5", "--5", "1.5", "one", ""])
+@pytest.mark.parametrize("bad", ["-5", "--5", "1.5", "one", "", "²"])
 def test_non_integer_blocking_is_refused(repo: Path, bad: str) -> None:
-    """`--5` is the interesting one: `.lstrip("-").isdigit()` accepted it."""
+    """`--5` is the interesting one: `.lstrip("-").isdigit()` accepted it.
+
+    `²` is the second: `"²".isdigit()` is True but `int("²")` raises, so the
+    guard whose comment says it prevents a ValueError used to raise one.
+    """
     _reports(repo, "standards", "spec", "cold", "silent-failure")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", bad) == 2
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--blocking", "2", "--blocking", "0"),
+        ("--blocking", "0", "--blocking", "2"),
+    ],
+)
+def test_a_repeated_flag_is_refused_rather_than_resolved(repo: Path, args: tuple[str, ...]) -> None:
+    """Stating one flag twice must refuse, not silently keep whichever came first.
+
+    `_opt` returns the FIRST occurrence, so both orderings below quietly recorded
+    a number other than what the command line reads as — a one-token way to
+    misstate the field that actually gates. Both orderings are parametrized
+    because keeping the LAST would be an equally wrong fix that only one of them
+    would catch.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert _run(repo, "--lanes", _ALL_LANES, *args) == 2
+    assert not review.receipt_path(repo, "a" * 40).exists()
 
 
 def test_lanes_is_required(repo: Path) -> None:

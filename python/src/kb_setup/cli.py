@@ -174,6 +174,11 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     return 2
 
 
+#: Every flag `kb-setup review-receipt` reads. Stating one twice is refused
+#: rather than silently resolved to whichever `_opt` happens to find first.
+_RECEIPT_FLAGS = ("--lanes", "--skipped", "--findings", "--blocking", "--fixed-point")
+
+
 def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     """Write the `kb-review` skill's receipt for HEAD; `ship` refuses to push without it."""
     from kb_setup import review
@@ -186,6 +191,19 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     sha = review.head_sha(repo_root)
     if not sha:
         print("review-receipt: could not read HEAD", file=sys.stderr)
+        return 2
+
+    # `_opt` returns the FIRST occurrence of a flag, so `--blocking 2 --blocking 0`
+    # silently kept the 2 and `--blocking 0 --blocking 2` silently kept the 0 —
+    # a one-token way to say something other than what the command line reads as,
+    # on the one field that gates. Ambiguity is refused rather than resolved.
+    # (Cold lane.)
+    repeated = sorted({f for f in _RECEIPT_FLAGS if rest.count(f) > 1})
+    if repeated:
+        print(
+            f"review-receipt: repeated flag(s) {', '.join(repeated)} — state each once",
+            file=sys.stderr,
+        )
         return 2
 
     lanes = [s.strip() for s in (_opt(rest, "--lanes") or "").split(",") if s.strip()]
@@ -217,8 +235,11 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
             return 2
         raw = raw if raw is not None else default
         # `.isdigit()` and not `.lstrip("-").isdigit()`: the latter accepts "--5",
-        # which then raises ValueError out of int().
-        if raw is None or not raw.isdigit():
+        # which then raises ValueError out of int(). `.isascii()` as well, because
+        # `.isdigit()` alone is True for Unicode digits like "²" that `int()` then
+        # REJECTS — so the guard whose comment claims it prevents a ValueError
+        # raised one. (Cold lane, twice.)
+        if raw is None or not raw.isascii() or not raw.isdigit():
             print(f"review-receipt: {flag} must be a non-negative integer", file=sys.stderr)
             return 2
         counts[flag] = int(raw)

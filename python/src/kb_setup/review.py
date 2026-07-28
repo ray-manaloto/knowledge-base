@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -91,9 +91,19 @@ def _lane_prefix(entry: str) -> str:
     return entry.partition(_SKIP_SEPARATOR)[0]
 
 
-def _skip_reasons_for(lane: str) -> tuple[str, ...]:
-    """Return the skip reasons that excuse ``lane`` — no others do."""
-    return _SKIP_ANY_LANE + _SKIP_BY_LANE.get(lane, ())
+def _justifies(lane: str, reason: str) -> bool:
+    """Return whether ``reason`` excuses ``lane`` — nothing else does.
+
+    `not-applicable-` is a PREFIX and requires a non-empty why after it: a bare
+    `not-applicable-` is the same empty claim as no reason at all, and
+    `str.startswith` accepted it. Every other justification is matched EXACTLY,
+    because `startswith` also accepted `no-spec-availablex` — a typo bought a
+    pass for a lane that never ran. Both found by the cold lane.
+    """
+    for prefix in _SKIP_ANY_LANE:
+        if reason.startswith(prefix) and len(reason) > len(prefix):
+            return True
+    return reason in _SKIP_BY_LANE.get(lane, ())
 
 
 def _skip_reason_help() -> str:
@@ -126,12 +136,20 @@ class Receipt:
     lanes_skipped: tuple[str, ...]
     findings: int
     blocking: int
+    #: Stamped ONCE, at construction. `as_payload()` used to call
+    #: `datetime.now()` on every invocation, so `rejection()` validated a payload
+    #: that differed from the one `write_receipt()` then wrote. Nothing gates on
+    #: the timestamp, so it changed no verdict — but "the bytes we checked are
+    #: the bytes we wrote" is the property this module sells, and it did not hold.
+    written_at: str = field(
+        default_factory=lambda: datetime.now(tz=UTC).isoformat(timespec="seconds")
+    )
 
     def as_payload(self) -> dict[str, Any]:
         """Return the JSON form written to disk."""
         return {
             "sha": self.sha,
-            "written_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
+            "written_at": self.written_at,
             "fixed_point": self.fixed_point,
             "fixed_point_sha": self.fixed_point_sha,
             "lanes_ran": list(self.lanes_ran),
@@ -263,7 +281,7 @@ def _unexplained_skips(skipped: list[str]) -> list[str]:
     bad: list[str] = []
     for entry in skipped:
         lane, _, reason = entry.partition(_SKIP_SEPARATOR)
-        if not reason or not reason.startswith(_skip_reasons_for(lane)):
+        if not reason or not _justifies(lane, reason):
             bad.append(entry)
     return bad
 
@@ -275,8 +293,13 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
 
 def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
     """Return lanes claimed as RUN that have no non-empty report on disk."""
+    # `data.get(k, [])`, matching `_check_lanes` — the THIRD idiom for one key
+    # was here (`or []`), contradicting the "one key deserves one read" rule two
+    # functions up. It is unreachable with a malformed value only because
+    # `_all_reasons` runs `_reject_reason` first; that ordering is now stated
+    # rather than relied on silently, and `or []` below is the belt to its braces.
     missing = []
-    for entry in _as_entries(data.get("lanes_ran") or []) or []:
+    for entry in _as_entries(data.get("lanes_ran", [])) or []:
         lane = _lane_prefix(str(entry))
         path = report_path(repo_root, sha, lane)
         try:
@@ -318,6 +341,39 @@ def _as_entries(value: object) -> list[str] | None:
     return [str(v) for v in value]
 
 
+def _accounting_reason(ran: list[str], skipped: list[str], accounted: set[str]) -> str | None:
+    """Return why the lane set is not fully and consistently accounted for.
+
+    The three ways one receipt can misdescribe its own coverage: a lane claimed
+    twice over, a lane that does not exist, and a lane nobody mentioned. Split
+    out of :func:`_check_lanes` so each stays a named guard clause rather than
+    being merged to satisfy a return-count limit — the limit is a signal to
+    decompose, not to compress.
+    """
+    # A lane did one or the other. Listing it in both collapsed to a single set
+    # entry, so `--lanes cold:codex --skipped cold:not-applicable-x` satisfied
+    # "accounted for" twice over while saying two contradictory things about one
+    # lane — and the skill's own worked example used to do exactly that.
+    contradictory = sorted({_lane_prefix(e) for e in ran} & {_lane_prefix(e) for e in skipped})
+    if contradictory:
+        return (
+            f"lists lane(s) as BOTH run and skipped: {', '.join(contradictory)} — a "
+            f"lane did one or the other, and claiming both is not coverage"
+        )
+
+    unknown = sorted(accounted - set(LANES))
+    if unknown:
+        return f"names unknown lane(s): {', '.join(unknown)} (known: {', '.join(LANES)})"
+
+    missing = [lane for lane in LANES if lane not in accounted]
+    if missing:
+        return (
+            f"lane(s) unaccounted for: {', '.join(missing)} — each must either run "
+            f"or be skipped with a reason"
+        )
+    return None
+
+
 def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
     """Reject a receipt whose lanes are unexplained, invented, or missing.
 
@@ -347,16 +403,9 @@ def _check_lanes(data: dict[str, Any], _sha: str) -> str | None:
     named = ran + skipped_raw
     accounted = {_lane_prefix(e) for e in named}
 
-    unknown = sorted(accounted - set(LANES))
-    if unknown:
-        return f"names unknown lane(s): {', '.join(unknown)} (known: {', '.join(LANES)})"
-
-    missing = [lane for lane in LANES if lane not in accounted]
-    if missing:
-        return (
-            f"lane(s) unaccounted for: {', '.join(missing)} — each must either run "
-            f"or be skipped with a reason"
-        )
+    accounting = _accounting_reason(ran, skipped_raw, accounted)
+    if accounting is not None:
+        return accounting
 
     if not ran:
         return "records no lane that actually ran"
@@ -368,6 +417,13 @@ def _check_blocking(data: dict[str, Any], _sha: str) -> str | None:
     blocking = data.get("blocking")
     if not isinstance(blocking, int) or isinstance(blocking, bool):
         return "has no readable blocking count"
+    # A negative count is malformed, not "fewer than zero blockers". Only
+    # `> 0` was rejected, so a hand-authored `"blocking": -1` read as clean —
+    # the same "unreadable rendered as green" this module refuses everywhere
+    # else. The CLI cannot produce one; a hand-edited receipt can, which is
+    # exactly the reader this check exists for.
+    if blocking < 0:
+        return f"has a negative blocking count ({blocking}) — that is malformed, not zero"
     if blocking > 0:
         return f"{blocking} blocking review finding(s) — resolve them or re-review"
     return None

@@ -26,7 +26,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `gh pr create` (+ push + gates by hand) | `mise run kb-ship` |
 | `gh pr merge` (+ watch + validate by hand) | `mise run kb-land -- <PR#>` |
 | a manual version-drift check | `mise run kb-currency-check` (offline) / `mise run kb-currency` |
-| a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — `kb-ship` refuses an unreviewed HEAD |
+| a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
 | `<gate> 2>&1 \| tail -40` | `<gate> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file — a pipe returns `tail`'s exit code, masking a failed gate |
 | `npx <tool>` | the mise-pinned binary directly |
