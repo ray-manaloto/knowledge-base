@@ -118,6 +118,44 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 # eval --slow` printed identical figures unmasked. Cause not established (a mise
 # `[env]` value was probed and is NOT what gets masked), so: when a digit comes
 # back masked, re-read the figures from `uv run`, never guess them.
+#
+# CAUSE ESTABLISHED 2026-07-28 — and the paragraph above is kept verbatim
+# because its retraction is still correct about what it tested. It probed THIS
+# FILE's `[env]`, found nothing, and concluded `[env]` was innocent. The
+# directive was one config level up.
+#
+# mise redaction is a display feature: it intercepts task output line by line
+# and replaces any literal occurrence of a redacted VALUE (docs/environments/
+# index.md:170). It has no idea whether the occurrence was the secret, so a
+# short value in the set rewrites unrelated text.
+#
+#   1. `~/.config/mise/config.toml:64` declares `_.fnox-env = { tools = true }`,
+#      which loads every fnox secret as a mise env directive and marks it
+#      redacted. Discriminator: with the user config ignored
+#      (`MISE_IGNORED_CONFIG_PATHS=~/.config/mise/config.toml mise env
+#      --redacted`) the set is EMPTY; honoured, it has entries — while the same
+#      secrets sit in the ambient shell in both arms. So the source is that
+#      directive, not the shell.
+#   2. Before 2026-07-27, fnox defaulted to `env = true` and exposed all 49
+#      declared secrets, several with short values (one-character telemetry
+#      flags). The literal string `1` was therefore IN the redaction set.
+#   3. Ray set `env = "exec"` in `~/.config/fnox/config.toml` on 2026-07-27,
+#      with three per-secret opt-backs. The set is now 3 values of 36/40/40
+#      chars and `mise run` output is legible again — verified: `mise run eval`
+#      prints `16 deny` and `6415 bytes` unmasked.
+#
+# Reproduction, three arms, in a throwaway dir outside this repo:
+#   redact=true  + value "1"   -> `count=[redacted]6 ... ruff=S[redacted]05`
+#   redact=false + value "1"   -> `count=16 ... ruff=S105`
+#   redact=true  + 36-char val -> `count=16 ... ruff=S105`
+#
+# THE REMEDY IS NOT IN THIS REPO. The directive is user-level config, which
+# `do-not.md` #11 forbids editing here. What IS here is the detector:
+# `tier1.mise-redaction-legible` (kb_setup.eval_cases) fails when any redacted
+# value is shorter than `evals.REDACTION_COLLISION_FLOOR`. It is ADVISORY — a
+# gated case would be a ship blocker no agent could clear — so read the eval
+# output, not the rc. While it is green, `mise run` figures are trustworthy;
+# when it is red, re-read every number from `uv run`.
 run = "uv run kb-setup eval"
 
 [tasks.lint-docs]

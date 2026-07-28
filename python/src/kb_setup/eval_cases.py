@@ -646,6 +646,38 @@ def _broken_doctor() -> evals.Outcome:
         return evals.doctor_health(script, timeout=30)
 
 
+def _redaction_collision_control() -> evals.Outcome:
+    """The real reader, pointed at a config that DOES collide.
+
+    Not a stubbed value list: this writes a throwaway ``mise.toml`` declaring a
+    one-character redacted value and runs the same ``mise env --redacted`` the
+    probe runs, so the parse and the judgement are both exercised. It is the
+    hand-probe that established this round's cause, promoted into the harness.
+
+    The user-level config is still in scope inside the temp directory, so its
+    real secrets are read too — the canary is simply the shortest value present,
+    and the case fails on it. That means the control arms correctly both here
+    and on a host with no redacted values at all.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "mise.toml").write_text(
+            '[env]\n_EVAL_REDACTION_CANARY = { value = "1", redact = true }\n'
+        )
+        return evals.mise_redaction_legible(cwd=Path(tmp))
+
+
+def _mise_installed() -> evals.Outcome | None:
+    """Environment gate: nothing to say about mise's redaction set without mise.
+
+    A precondition rather than a SKIP inside the probe, for the reason
+    :func:`_graphify_installed` records: the control arm drives the same reader,
+    so an in-probe skip would skip the control too.
+    """
+    if shutil.which("mise") is None:
+        return evals.skip("mise does not resolve on PATH — its redaction set cannot be read")
+    return None
+
+
 def _graphify_installed() -> evals.Outcome | None:
     """Environment gate: the canary cannot run where graphify is not installed.
 
@@ -731,6 +763,27 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             probe=lambda: evals.graphify_canary(repo_root, CANARY_QUESTION),
             control=_broken_graph_canary,
             precondition=_graphify_installed,
+        ),
+        evals.Case(
+            name="tier1.mise-redaction-legible",
+            description=(
+                "no value in mise's redaction set is short enough to collide "
+                "with ordinary output — a redacted `1` rewrites every digit a "
+                "task prints, which makes every gate figure unreadable evidence"
+            ),
+            probe=lambda: evals.mise_redaction_legible(cwd=repo_root),
+            control=_redaction_collision_control,
+            precondition=_mise_installed,
+            # ADVISORY, and this is the one judgement call in the case. The
+            # remedy is never in this repo: the set is populated by
+            # `_.fnox-env` in the USER-level mise config, which `do-not.md` #11
+            # forbids this repo from touching. A gated case would therefore be a
+            # ship blocker only Ray can clear, wedging any round that met it.
+            # Advisory keeps the signal — a FAIL here says every number the run
+            # printed is untrustworthy — without handing a user-config setting a
+            # veto over the PR. `render` reports advisory failures explicitly
+            # rather than folding them into the green summary line.
+            gated=False,
         ),
         evals.Case(
             name="tier1.lane-health",

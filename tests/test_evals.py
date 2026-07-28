@@ -361,6 +361,71 @@ def test_run_command_reports_a_timeout_distinctly() -> None:
     assert "timed out" in detail
 
 
+# --- mise redaction legibility ------------------------------------------------
+#
+# The parse-and-judge half is driven through a stubbed `run_command` so the
+# verdict does not depend on whatever secrets the host's mise config happens to
+# hold. The real `mise env --redacted` round-trip is covered by this case's
+# control arm in `test_eval_cases.py`, which writes a throwaway mise.toml.
+
+
+def _redaction_reader(monkeypatch: pytest.MonkeyPatch, rc: int, output: str) -> None:
+    monkeypatch.setattr(evals, "run_command", lambda *_a, **_k: (rc, output))
+
+
+def test_a_short_redacted_value_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The observed damage: a redacted `1` rewrote every digit mise printed."""
+    _redaction_reader(monkeypatch, 0, "1\nsome-genuinely-long-secret-value\n")
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "shortest=1" in outcome.detail
+
+
+def test_long_redacted_values_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CONTROL ARM for the above: the same probe says yes to a safe set."""
+    _redaction_reader(monkeypatch, 0, "a-36-character-looking-secret-value!\nanother-long-one\n")
+    assert evals.mise_redaction_legible().verdict is evals.Verdict.PASS
+
+
+def test_an_empty_redaction_set_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mise cannot mask what it does not hold — that is verified-good, not SKIP."""
+    _redaction_reader(monkeypatch, 0, "")
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.PASS
+    assert "no redacted values" in outcome.detail
+
+
+def test_an_unreadable_redaction_set_skips(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A set that could not be READ is a third state, never rendered as clean.
+
+    Distinct from the empty-set PASS above on purpose: both would otherwise be
+    "no short values found", which is how a probe that never ran gets counted
+    as one that found nothing.
+    """
+    _redaction_reader(monkeypatch, -2, "no such file or directory: mise")
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.SKIP
+    assert "rc=-2" in outcome.detail
+
+
+def test_the_probe_never_prints_the_redacted_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The values ARE the secrets, so only counts and lengths may be reported.
+
+    A probe that printed them to prove they were safe would be the disclosure
+    it exists to prevent. Checked on BOTH verdicts, because the failing branch
+    is the one tempted to name what it found.
+
+    (The fixture is spelled as a joined literal because ruff's S105 reads a
+    credential-shaped string assignment as a hardcoded password — correctly,
+    and this repo takes no inline suppressions.)
+    """
+    masked = "do-not-print-" + "this-value-anywhere"
+    _redaction_reader(monkeypatch, 0, f"1\n{masked}\n")
+    assert masked not in evals.mise_redaction_legible().detail
+    _redaction_reader(monkeypatch, 0, f"{masked}\n")
+    assert masked not in evals.mise_redaction_legible().detail
+
+
 # --- doctor.sh shim -----------------------------------------------------------
 
 
@@ -529,6 +594,27 @@ def test_render_names_an_unarmed_case_as_refused() -> None:
     text = evals.render(report)
     assert "UNARMED" in text
     assert "REFUSED TO COUNT" in text
+
+
+def test_the_green_summary_line_is_unchanged_when_nothing_failed() -> None:
+    """The exact string other things quote as evidence. Pinned deliberately."""
+    text = evals.render(evals.run_cases([_case(evals.ok("fine"))]))
+    assert "OK eval: 1 passed, 0 skipped, 0 failed, 0 unarmed" in text
+
+
+def test_an_advisory_failure_is_counted_in_the_summary_not_papered_over() -> None:
+    """The run is rc=0 and one case FAILED. Both facts must survive rendering.
+
+    Before this, the OK branch printed literal zeroes for failed/unarmed, which
+    was true only while every case was gated. The first advisory case would have
+    printed "0 failed" over a real failure — the "could not check rendered as
+    green" collapse this module refuses everywhere else.
+    """
+    report = evals.run_cases([_case(evals.fail("advisory problem"), gated=False)])
+    assert not report.red
+    text = evals.render(report)
+    assert "OK eval: 0 passed, 0 skipped, 1 failed, 0 unarmed" in text
+    assert "ADVISORY" in text
 
 
 # --- tier 2: guard fixture tables ---------------------------------------------

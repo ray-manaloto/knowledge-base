@@ -53,6 +53,15 @@ DEFAULT_TIMEOUT = 60
 #: the offline default must never wait on them.
 LIVE_TIMEOUT = 300
 
+#: Shortest redacted value that cannot plausibly collide with ordinary output.
+#: mise redacts by literal substring match over every line a task prints, so a
+#: short value in the redaction set corrupts unrelated text: a redacted ``1``
+#: renders ``16`` as ``[redacted]6`` and ruff's ``S105`` as ``S[redacted]05``.
+#: Twelve is chosen against the damage, not against secret strength — every real
+#: credential observed here is 36+ chars, while the values that actually caused
+#: corruption were 1 and 5 characters long.
+REDACTION_COLLISION_FLOOR = 12
+
 
 class Verdict(StrEnum):
     """The outcome of one case. ``UNARMED`` is a runner verdict, not a probe's.
@@ -234,6 +243,65 @@ def cli_present(name: str) -> Outcome:
     if path:
         return ok(f"{name} resolves at {path}")
     return fail(f"{name} does not resolve on PATH")
+
+
+def mise_redaction_legible(
+    *,
+    cwd: Path | None = None,
+    floor: int = REDACTION_COLLISION_FLOOR,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> Outcome:
+    """Is every value in mise's redaction set too long to corrupt task output?
+
+    mise redaction is a DISPLAY feature: it intercepts task output line by line
+    and replaces any literal occurrence of a redacted value with ``[redacted]``
+    (``docs/environments/index.md:170``). It does not know or care whether the
+    occurrence was the secret — so a short value in the set silently rewrites
+    unrelated text. Measured on this host: with a redacted ``1`` in scope,
+    ``mise run`` printed ``count=[redacted]6`` and ``ruff=S[redacted]05``, which
+    made every figure any gate reported through ``mise run`` unreadable.
+
+    The set is whatever ``mise env --redacted`` resolves at ``cwd``, so it is a
+    property of the CONFIG IN SCOPE THERE, not of the ambient shell — pointing
+    ``cwd`` at a directory whose ``mise.toml`` declares a short redacted value is
+    how the control arm makes this probe say no.
+
+    THE VALUES ARE NEVER REPORTED. They are exactly the secrets mise is trying
+    to hide, so a probe that printed them to prove they were safe would be the
+    disclosure it exists to prevent. Only counts and lengths are surfaced, which
+    is all the judgement needs.
+
+    Args:
+        cwd: Directory to resolve mise config from. ``None`` means the current
+            one.
+        floor: Shortest value considered safe. Defaults to
+            :data:`REDACTION_COLLISION_FLOOR`.
+        timeout: Seconds to allow the ``mise`` call.
+
+    Returns:
+        SKIP when the set could not be read at all — "we did not look" is not
+        "nothing is wrong". PASS when the set is empty (mise cannot mask what it
+        does not hold) or every value clears ``floor``. FAIL otherwise, naming
+        how many values are short and the shortest length.
+    """
+    rc, output = run_command(["mise", "env", "--redacted", "--values"], cwd=cwd, timeout=timeout)
+    if rc != 0:
+        return skip(f"could not read mise's redaction set (rc={rc}): {output.strip()[:200]}")
+    values = [line for line in output.splitlines() if line]
+    if not values:
+        return ok("mise reports no redacted values here — it cannot mask anything")
+    short = [len(v) for v in values if len(v) < floor]
+    if short:
+        return fail(
+            f"{len(short)} of {len(values)} redacted value(s) are shorter than "
+            f"{floor} chars (shortest={min(short)}) — mise masks by literal "
+            f"substring, so every figure `mise run` prints is untrustworthy "
+            f"while this holds; re-read numbers from `uv run`"
+        )
+    return ok(
+        f"{len(values)} redacted value(s), shortest {min(len(v) for v in values)} "
+        f"chars — none short enough to collide with ordinary output"
+    )
 
 
 def declared_lanes_reconcile(
@@ -1159,9 +1227,22 @@ def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
             f"{report.passed} passed, {report.skipped} skipped"
         )
     else:
+        # The counts are read off the report, NOT hardcoded. They used to be
+        # literal zeroes, which was true only for as long as every case was
+        # gated: an ADVISORY case that fails does not redden the run, so the
+        # first one added would have printed "0 failed" over a real failure —
+        # the same "could not check rendered as green" collapse this module
+        # refuses everywhere else. Both are zero on an all-green run, so the
+        # green line is byte-identical to what it always was.
         lines.append(
-            f"OK eval: {report.passed} passed, {report.skipped} skipped, 0 failed, 0 unarmed"
+            f"OK eval: {report.passed} passed, {report.skipped} skipped, "
+            f"{report.failed} failed, {report.unarmed} unarmed"
         )
+        if report.failed:
+            lines.append(
+                "  the failure(s) above are ADVISORY — reported, never gating. "
+                "rc=0 here does not mean nothing failed."
+            )
     return "\n".join(lines)
 
 
