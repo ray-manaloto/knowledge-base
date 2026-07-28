@@ -1,0 +1,35 @@
+CODEX REVIEW REPORT
+STATUS: complete
+DIFF: f3e233a92ef2b963f072c287e9be0dcc403fa203..9db94ea5477c7b5c460c1f3b93be97af964967fc (641 lines per `git diff <base>..HEAD | wc -l`; `git diff --stat` shows 8 files changed, 480 insertions(+), 15 deletions(-))
+
+FINDINGS:
+
+1. [P0/critical, spot-checked and CONFIRMED] Live-looking credentials are committed in the diff's new file: an EXA API key, a GitHub PAT, and the same PAT again under a second variable name.
+   - graphify-out/memory/query_20260728_072907_in_a_multi_round_kb_review_loop__which_lane_finds.md:14-16
+   - Verified directly by reading the file: line 14 holds an `EXA_API_KEY` value (UUID-shaped), lines 15-16 hold a `GITHUB_TOKEN` / `MISE_GITHUB_TOKEN` value (both `ghp_...`-shaped, identical value under two names). These are new lines added in this diff (the file itself is new, added between f3e233a9 and HEAD).
+   - ACTION: treat these as live until proven otherwise — rotate/revoke the EXA key and the GitHub PAT immediately; the values must not be repeated in any further report, log, or chat message (this report does not repeat them; the citation above avoids restating them). Removing the lines does not remove them from git history — the commit(s) that introduced them would need to be purged/rewritten if these are real, live secrets, in addition to rotation.
+
+2. [P1, confirmed] The new `EXEMPT_PATHS` review-fallback mechanism, combined with an existing gitleaks allowlist, together let secret-bearing content ship inside `graphify-out/memory/` with NEITHER lane review NOR secret scanning — and finding #1 is a live demonstration of the gap, not a hypothetical.
+   - `EXEMPT_PATHS = ("graphify-out/memory/", "docs/goals/README.md")` — python/src/kb_setup/review.py:112 (new in this diff).
+   - `_covering_receipt()` accepts an ancestor's receipt for `sha` once every changed path in the delta is exempt (`reviewed = sorted(p for p in paths if not _is_exempt(p))`, and if `reviewed` is empty it returns the ancestor's SHA as sufficient) — python/src/kb_setup/review.py:687-698 (new in this diff). No content or secret check runs over the exempt delta itself before the ancestor receipt is accepted.
+   - Separately, `.gitleaks.toml` allowlists all of `graphify-out/` from scanning (`paths = ['''^sources/''', '''^graphify-out/''', ...]`) — .gitleaks.toml:15-18 (pre-existing, not part of this diff, but directly relevant: it means gitleaks was never going to catch finding #1 either).
+   - Verified: `tests/test_review.py` has no test that exercises secret/content scanning of an exempt delta (checked all `test_*` functions in the file, lines 640-787 area covering the exempt-fallback behavior — `test_exempt_delta_lets_an_ancestor_receipt_cover_head`, `test_one_reviewed_path_in_the_delta_refuses`, etc. — none assert anything about content of the exempt files themselves).
+   - This is a genuine, currently-live gap: the mechanism is working exactly as designed (per its own docstring, review.py:41-45 / 671-698), but "as designed" here means committed content in `graphify-out/memory/` and `docs/goals/README.md` bypasses every review and scanning layer this repo has, and this very commit range shipped real-looking credentials through exactly that path.
+
+3. [P2, confirmed by reading code] `_delta_paths()` can raise instead of failing closed when a delta contains a non-UTF-8 git pathname, because the underlying `subprocess.run` call uses `text=True` and the exception handling does not catch `UnicodeDecodeError`.
+   - `_git_result()` runs `subprocess.run([...], text=True, ...)` — python/src/kb_setup/review.py:279-286 (283 sets `text=True`).
+   - Exception handling only catches `subprocess.TimeoutExpired` (287-291) and `(OSError, subprocess.SubprocessError)` (292-294) — `UnicodeDecodeError` is not a subclass of either, so it propagates uncaught.
+   - `_delta_paths()` calls `_git_result(..., "diff", "--name-only", "--no-renames", "-z", older, newer, "--")` — python/src/kb_setup/review.py:616-618 — and its own docstring explicitly claims `-z` is used so that "a path with a quote or a non-ASCII byte in it is compared as the bytes git actually has rather than as a re-encoded display form" (review.py:612-614). `text=True` contradicts that claim: a non-ASCII byte sequence that is not valid UTF-8 is decoded by Python's default codec inside `subprocess.run`, and an invalid sequence raises `UnicodeDecodeError` rather than being passed through as bytes.
+   - Blast radius: `receipt_state()` → `_covering_receipt()` → `_delta_paths()` is on the `ship`/`land` gating path — python/src/kb_setup/pr.py:343 (`ship`) and python/src/kb_setup/pr.py:442 (`land`) both call `review.receipt_state(...)` unguarded by any try/except at the call site. An uncaught `UnicodeDecodeError` here would crash `ship`/`land` with a traceback instead of the documented fail-closed refusal message.
+   - Severity note: this requires a non-UTF-8-decodable pathname to actually exist in the repo's history between the candidate ancestor and `sha`; no such pathname is known to exist today, so this is a latent defect, not a currently-triggered one. Not verified: whether any file in this repo's actual git history has such a pathname (no test in tests/test_review.py exercises this case, so it is unverified whether the crash path has ever fired).
+
+4. [P3, confirmed, narrow edge case] `_git_result()`'s `proc.stdout.strip()` (python/src/kb_setup/review.py:305) strips whitespace from the ENTIRE NUL-joined stdout string before `_delta_paths()` splits on `\0` (review.py:621). If the first NUL-delimited pathname in a `git diff -z` delta begins with a literal space (a pathname git permits), `.strip()` removes that leading space as part of stripping the whole blob, so the reconstructed first path differs from the actual git-recorded path by that leading whitespace. This could make a path that is NOT `graphify-out/memory/x` (real path: `" graphify-out/memory/x"`) compare as exempt via `_is_exempt()` (review.py:598-602), or conversely make a legitimately-exempt path fail to match. Unverified whether this repo's history contains any pathname starting with whitespace — this is a correctness concern about the general-purpose helper, not a demonstrated live bug.
+
+UNCITED: none — every codex claim above was independently spot-checked against file content and line numbers before being included.
+
+UNCOVERED: none. Full diff (641 lines) was reviewed in one pass; no size-guard batching was needed. `.claude/skills/goal-engineering/SKILL.md`, `.claude/skills/kb-review/SKILL.md`, and `docs/goals/README.md` changes were included in codex's review scope but produced no findings (doc-only prose changes); `graphify-out/memory/query_20260728_072853_*.md` and `graphify-out/memory/query_20260728_073149_*.md` were reviewed and produced no findings beyond the one file cited above.
+
+FAST MODE: not requested — standard tier used throughout.
+
+FULL REPORT: /var/folders/z4/0p475gq56vvczc3y4qlt60f80000gn/T/codex-review-final.XXXXXX.yPHov6nT9r (raw codex output, 11 lines)
+LOG: /var/folders/z4/0p475gq56vvczc3y4qlt60f80000gn/T/codex-review-log.XXXXXX.K6zHQhszC2

@@ -204,3 +204,16 @@ put findings in front of a human, not to adjudicate taste.
 The receipt is gitignored. It proves *this machine* reviewed *this commit*, and
 an amend or rebase moves the SHA and invalidates it — correctly, because the
 reviewed bytes are gone.
+
+**One exception, `review.EXEMPT_PATHS` (#66):** `ship`/`land` accept an
+ANCESTOR's receipt when the ENTIRE delta since it is `graphify-out/memory/**` or
+`docs/goals/README.md` — the files P7's `kb-remember` and `kb-goal-outcome`
+write, which cannot exist until after the review. One reviewed path in that
+delta and it refuses, naming the file. So close the loop BEFORE `kb-ship` and
+commit what it wrote; three rounds running had left those artifacts uncommitted.
+
+The exemption removes the only lane read those paths get, which is what makes
+**scanner** coverage of them load-bearing: `.gitleaks.toml` and `hk.pkl`'s
+`proseExclude` both deliberately keep them visible to gitleaks, and
+`tests/test_gitleaks_scope.py` pins that. Do not widen `EXEMPT_PATHS` to a path
+the scanner cannot see.
