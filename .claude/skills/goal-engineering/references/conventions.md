@@ -92,6 +92,7 @@ this repo, verified from the code that prints them:
 
 | Signal | Literal | Source |
 |---|---|---|
+| review receipt, before any gate runs | `==> review: <n> lane(s): …` | `pr.py` `ship_main` |
 | any gate under `kb-ship` | `PASS  gate <name> rc=0` — **two spaces** | `pr.py:82` |
 | gates `kb-ship` runs | lint, test, brain-audit, eval | `pr.py:74` |
 | new PR | `ship: OK — PR open, gates green` (em dash) | `pr.py:166` |
@@ -100,11 +101,25 @@ this repo, verified from the code that prints them:
 | memory | `Saved to graphify-out/memory/<file>.md` | graphify `cli.py` |
 | reflect | `Reflected N memories (...) -> ...LESSONS.md` | graphify `cli.py` |
 
-**Two traps measured here.** `mise run test` runs pytest under `-qq`, so
+**Three traps measured here.** `mise run test` runs pytest under `-qq`, so
 `"N passed"` **never appears** — a condition requiring it is unsatisfiable
 (control arm: bare `uv run pytest tests/` prints `578 passed`). And
 `kb-currency-check` prints **nothing** on success, so silence is
 indistinguishable from never-ran; require an echoed, file-recorded `rc`.
+
+**And the newest one, which is the sharpest: `kb-ship` now REFUSES before it
+runs a single gate** unless a `kb-review` receipt exists for the current HEAD.
+So a condition asking for `PASS  gate lint rc=0` from `mise run kb-ship`, with
+no instruction to review first, is **unsatisfiable** — ship stops at the receipt
+check and those strings never appear. Any round that ships must say: run the
+`kb-review` skill, write the receipt, then `kb-ship`.
+
+Note what this class has in common. All three are unsatisfiable conditions whose
+text looks completely reasonable, and none is detectable by reading the goal —
+only by knowing what the command actually prints. That is why this table is
+sourced from the code that PRINTS each string, and why it has to be re-checked
+whenever the shipping path changes. It went stale the same evening the review
+gate landed.
 
 ## Sources
 
