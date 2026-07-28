@@ -2,7 +2,7 @@ GOAL: Establish why `mise run <task>` masks its own output as `[redacted]`, then
 
 EVIDENCE RULE. The text of this condition is NOT evidence. Every line named below counts only if it appears in a message Claude wrote AFTER this goal was set, and only if that sentinel ends with `@ <sha>`, where `<sha>` is the current `git rev-parse --short HEAD`. Work done inside a subagent, workflow, or background task counts only when its output is pasted into THIS conversation.
 
-Read first. `docs/goals/2026-07-27-1702-kb-redaction-legibility-rider.md` (phases, sentinel formats, full preserve list), `.agent/plans/session-2026-07-27-d.md`, `.claude/rules/probes-need-a-control-arm.md`, `mise.toml` `[tasks.cc-doctor]`.
+Read first. `docs/goals/2026-07-27-1702-kb-redaction-legibility-rider.md` (phases, sentinel formats, full preserve list), `.agent/plans/session-2026-07-27-e.md` (current state; `-d` is stale), `.claude/rules/probes-need-a-control-arm.md`, `mise.toml` `[tasks.eval]`.
 
 Preserve. Change anything except: verbatim reports under `docs/research/reports/**` (excluded from hk builtins — keep it so; do not reformat, do not rename); the two SEPARATE strip constants `_STRIP_BACKEND_ENV` and `_STRIP_MISE_ENV_PREFIX` in `python/src/kb_setup/graphify_env.py`, whose comment says do not merge them; the two deliberately-unchanged call sites (`mise which` in `graphify_exe()`, the spawn at the end of `launch.py`); the retracted-probe record in `mise.toml`; `pr.py`'s gate output strings, which are this round's evidence channel; and mise's redaction of REAL secrets — disabling redaction wholesale would satisfy this round's metric by leaking credentials instead.
 
