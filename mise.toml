@@ -118,6 +118,73 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 # eval --slow` printed identical figures unmasked. Cause not established (a mise
 # `[env]` value was probed and is NOT what gets masked), so: when a digit comes
 # back masked, re-read the figures from `uv run`, never guess them.
+#
+# CAUSE ESTABLISHED 2026-07-28. READ THIS BEFORE ACTING ON THE PARAGRAPH ABOVE:
+# its parenthesis — "a mise `[env]` value was probed and is NOT what gets masked"
+# — is FALSE read unqualified. A mise `[env]` value with `redact = true` IS
+# masked; control arm, in a throwaway dir: `_C = { value = "1", redact = true }`
+# adds a 1-char entry to `mise env --redacted`, and removing the file removes it.
+# The old probe's SCOPE was wrong, not its subject: it probed THIS FILE's `[env]`,
+# correctly found nothing, and generalised to all of mise's. The directive that
+# does it is one config level up. The paragraph is kept verbatim because the
+# preserve list forbids rewriting it and because a retraction is a record of what
+# a session believed — but it must not be read as current fact, hence this.
+#
+# mise redaction is a display feature: it intercepts task output line by line
+# and replaces any literal occurrence of a redacted VALUE (docs/environments/
+# index.md:170). It has no idea whether the occurrence was the secret, so a
+# short value in the set rewrites unrelated text.
+#
+#   1. `~/.config/mise/config.toml:64` declares `_.fnox-env = { tools = true }`,
+#      which loads every fnox secret as a mise env directive and marks it
+#      redacted. Discriminator, with `MISE_IGNORED_CONFIG_PATHS` pointed at that
+#      file: ignored -> the three vars are absent from `mise env` (0) and the
+#      redacted set is EMPTY (0); honoured -> present (3) and redacted (3).
+#      Control arm: the same grep finds `HK_MISE` either way, so it discriminates.
+#      They do NOT reach mise from the ambient shell, and `:64` is the only
+#      redaction-capable directive in the file — which is what narrows this from
+#      "the user config" to that directive. (Attribution was flagged as unarmed by
+#      the spec review lane; this is the arm that closed it.) Nuance worth not
+#      rediscovering: `mise env --json-extended` reports `source=None` for all
+#      three while naming the file for ordinary `[env]` vars, so do not expect it
+#      to attribute a plugin-provided directive.
+#   2. Before 2026-07-27, fnox defaulted to `env = true` and exposed all 49
+#      declared secrets, several with short values (one-character telemetry
+#      flags). The literal string `1` was therefore IN the redaction set.
+#   3. Ray set `env = "exec"` in `~/.config/fnox/config.toml` on 2026-07-27,
+#      with three per-secret opt-backs. The set is now 3 values of 36/40/40
+#      chars and `mise run` output is legible again — verified: `mise run eval`
+#      prints `16 deny` and `6415 bytes` unmasked.
+#
+# CONFIRMED IN MISE'S OWN SOURCE, not only its docs (jdx/mise, tag v2026.7.15,
+# `src/redactions.rs` — fetched with a control arm: a bogus path in the same tree
+# returns 404, so the 200 is real):
+#   `:64-81`   `Redactor::redact` is an Aho-Corasick multi-pattern replace of
+#              every pattern with the literal "[redacted]" — no word boundaries,
+#              no length floor. Its own test at `:118-121` asserts
+#              "token1 and token2" -> "[redacted]1 and [redacted]2", which is the
+#              exact shape of `16` -> `[redacted]6`.
+#   `:31`      `Redactor::new` drops EMPTY patterns (`filter(|p| !p.is_empty())`),
+#              so an empty redacted value masks nothing. The detector excludes
+#              them; treating 0 as "shortest and worst" was a false positive one
+#              config change away, since this host's fnox set holds an empty
+#              LANGSMITH_WORKSPACE_ID. The docs do not say this — only the source.
+# mise is registry source #61 (T2, pending). Ingesting it for AST is a P7 handoff
+# item, not this round's: adding a `sources/**` input forces a full re-clone
+# rebuild, which the rider puts out of scope.
+#
+# Reproduction, three arms, in a throwaway dir outside this repo:
+#   redact=true  + value "1"   -> `count=[redacted]6 ... ruff=S[redacted]05`
+#   redact=false + value "1"   -> `count=16 ... ruff=S105`
+#   redact=true  + 36-char val -> `count=16 ... ruff=S105`
+#
+# THE REMEDY IS NOT IN THIS REPO. The directive is user-level config, which
+# `do-not.md` #11 forbids editing here. What IS here is the detector:
+# `tier1.mise-redaction-legible` (kb_setup.eval_cases) fails when any redacted
+# value is shorter than `evals.REDACTION_COLLISION_FLOOR`. It is ADVISORY — a
+# gated case would be a ship blocker no agent could clear — so read the eval
+# output, not the rc. While it is green, `mise run` figures are trustworthy;
+# when it is red, re-read every number from `uv run`.
 run = "uv run kb-setup eval"
 
 [tasks.lint-docs]

@@ -57,10 +57,71 @@ def test_the_expected_cases_are_declared() -> None:
         "tier1.lanes-declared-or-degraded",
         "tier1.graphify-resolves",
         "tier1.graph-answers",
+        "tier1.mise-redaction-legible",
         "tier1.lane-health",
         "tier2.guard-fixtures",
         "tier2.kb-retrieval",
     }
+
+
+# --- the mise redaction-legibility case ---------------------------------------
+
+
+def _redaction_case() -> evals.Case:
+    return next(c for c in _cases() if c.name == "tier1.mise-redaction-legible")
+
+
+def test_the_redaction_case_is_advisory_and_still_carries_a_control_arm() -> None:
+    """Advisory waives the REQUIREMENT for a control, not the discipline.
+
+    It is advisory because the only remedy lives in the USER-level mise config
+    (`_.fnox-env`), which `do-not.md` #11 forbids this repo from editing — a
+    gated case would be a ship blocker no agent could ever clear. That is a
+    reason to not gate it, never a reason to leave it unarmed.
+    """
+    case = _redaction_case()
+    assert not case.gated
+    assert case.control is not None
+
+
+def test_the_redaction_control_arm_really_fails() -> None:
+    """The FAIL direction, against real mise — not a stubbed value list.
+
+    `test_every_control_arm_actually_fails` above skips advisory cases, so
+    without this the one advisory case in the repo would be the only one whose
+    control is never checked to fail.
+
+    It asserts the CANARY IS NAMED, not merely that something failed. A FAIL alone
+    would also be produced by any short secret already on the host, so the arm
+    could look healthy while its canary had quietly stopped loading — and on the
+    now-steady all-long host set that regression returns PASS, which means NOT
+    ARMED. Raised by the silent-failure review lane (F2).
+    """
+    control = _redaction_case().control
+    assert control is not None
+    outcome = control()
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "shorter than" in outcome.detail
+    assert eval_cases.REDACTION_CANARY in outcome.detail, (
+        "the arm failed, but not demonstrably on its own canary — a short host "
+        "secret would produce the same FAIL"
+    )
+
+
+def test_the_redaction_case_skips_without_mise() -> None:
+    """CONTROL ARM: "mise is absent" must not read as "the set is clean".
+
+    An empty redaction set is a PASS (mise cannot mask what it does not hold),
+    so an unreadable one has to be a distinct verdict or the two collapse into
+    the false green this whole module exists to refuse.
+    """
+    case = _redaction_case()
+    assert case.precondition is not None
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(eval_cases.shutil, "which", lambda _name: None)
+        outcome = case.precondition()
+    assert outcome is not None
+    assert outcome.verdict is evals.Verdict.SKIP
 
 
 def test_only_the_doctor_case_is_live() -> None:

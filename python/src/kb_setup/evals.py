@@ -38,6 +38,7 @@ review happened.
 from __future__ import annotations
 
 import itertools
+import json
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -52,6 +53,15 @@ DEFAULT_TIMEOUT = 60
 #: The live lane checks each send one real API call, which is slow enough that
 #: the offline default must never wait on them.
 LIVE_TIMEOUT = 300
+
+#: Shortest redacted value that cannot plausibly collide with ordinary output.
+#: mise redacts by literal substring match over every line a task prints, so a
+#: short value in the redaction set corrupts unrelated text: a redacted ``1``
+#: renders ``16`` as ``[redacted]6`` and ruff's ``S105`` as ``S[redacted]05``.
+#: Twelve is chosen against the damage, not against secret strength — every real
+#: credential observed here is 36+ chars, while the values that actually caused
+#: corruption were 1 and 5 characters long.
+REDACTION_COLLISION_FLOOR = 12
 
 
 class Verdict(StrEnum):
@@ -192,18 +202,30 @@ class Report:
 # --- shelling out -------------------------------------------------------------
 
 
-def run_command(
+def run_command_split(
     argv: Sequence[str],
     *,
     cwd: Path | None = None,
     timeout: int = DEFAULT_TIMEOUT,
-) -> tuple[int, str]:
-    """Run ``argv``, returning ``(rc, combined output)``.
+) -> tuple[int, str, str]:
+    """Run ``argv``, returning ``(rc, stdout, stderr)`` with the streams SEPARATE.
+
+    The one subprocess call site in this module; :func:`run_command` is a thin
+    combining wrapper over it, so there is no second spawn path to drift.
+
+    Reach for this whenever stdout must PARSE. A tool that writes a benign
+    warning to stderr — an unknown config key, a deprecation, a version notice —
+    corrupts a combined payload, and the corruption arrives from a file nowhere
+    near the probe. That is not hypothetical here: ``mise_redaction_legible``'s
+    docstring claimed a JSON mapping "cannot be corrupted by an unrelated stderr
+    line" while reading combined output, so a single ``mise WARN`` turned the
+    detector into a permanent SKIP. Measured and armed by the silent-failure
+    review lane, with a real unknown-settings-key warning.
 
     Returns a synthetic negative rc rather than raising, so a probe always has
     a status to report (principle 8): ``-1`` timed out, ``-2`` the executable
-    was not found. Callers surface these verbatim rather than translating them
-    into prose.
+    was not found. The message lands in ``stderr``, leaving ``stdout`` empty —
+    a parser must never see a diagnostic where a payload should be.
     """
     try:
         proc = subprocess.run(
@@ -215,10 +237,26 @@ def run_command(
             check=False,
         )
     except subprocess.TimeoutExpired:
-        return -1, f"timed out after {timeout}s"
+        return -1, "", f"timed out after {timeout}s"
     except (FileNotFoundError, PermissionError) as exc:
-        return -2, str(exc)
-    return proc.returncode, (proc.stdout + proc.stderr)
+        return -2, "", str(exc)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def run_command(
+    argv: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> tuple[int, str]:
+    """Run ``argv``, returning ``(rc, combined output)``.
+
+    Correct for a probe that only ever *reports* what it saw. If the output has
+    to be PARSED, use :func:`run_command_split` — see its docstring for the
+    defect that distinction exists to prevent.
+    """
+    rc, out, err = run_command_split(argv, cwd=cwd, timeout=timeout)
+    return rc, (out + err)
 
 
 # --- probe primitives ---------------------------------------------------------
@@ -234,6 +272,142 @@ def cli_present(name: str) -> Outcome:
     if path:
         return ok(f"{name} resolves at {path}")
     return fail(f"{name} does not resolve on PATH")
+
+
+def _read_mise_redaction_set(*, cwd: Path | None, timeout: int) -> Mapping[str, object] | Outcome:
+    """Read ``mise env --redacted --json``, or a SKIP saying why it could not be.
+
+    Separated from the judgement so neither half needs seven exits, and so the
+    three distinct ways "we could not look" happens each keep their own message:
+    a non-zero ``rc``, output that is not JSON, and JSON of the wrong shape. None
+    of them may render as clean.
+
+    THE RAW OUTPUT NEVER REACHES A DETAIL. It can hold real secret values — a
+    ``mise`` that writes partial values and then exits non-zero is exactly the
+    case the cold review lane caught, where 200 chars of it were being echoed
+    into the report. That applies to stderr as much as stdout, so neither is
+    quoted, only classified.
+
+    Reads STDOUT ALONE (:func:`run_command_split`). Combined output meant a
+    benign ``mise WARN`` on stderr — an unknown config key is enough — broke the
+    JSON parse and turned this into a permanent SKIP, from a file nowhere near
+    the probe. Armed by the silent-failure review lane in both directions.
+    """
+    rc, output, _stderr = run_command_split(
+        ["mise", "env", "--redacted", "--json"], cwd=cwd, timeout=timeout
+    )
+    if rc != 0:
+        return skip(
+            f"could not read mise's redaction set: `mise env --redacted --json` "
+            f"exited {rc} (output withheld — it can contain redacted values)"
+        )
+    try:
+        entries = json.loads(output)
+    except ValueError as exc:
+        return skip(
+            f"mise's redaction set did not parse as JSON ({type(exc).__name__}) "
+            f"— output withheld; treat as unread, never as clean"
+        )
+    if not isinstance(entries, dict):
+        return skip(
+            f"mise's redaction set parsed as {type(entries).__name__}, not an object "
+            f"— treat as unread, never as clean"
+        )
+    return entries
+
+
+def mise_redaction_legible(
+    *,
+    cwd: Path | None = None,
+    floor: int = REDACTION_COLLISION_FLOOR,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> Outcome:
+    """Is every value in mise's redaction set too long to corrupt task output?
+
+    mise redaction is a DISPLAY feature: it intercepts task output line by line
+    and replaces any literal occurrence of a redacted value with ``[redacted]``
+    (``docs/environments/index.md:170``). It does not know or care whether the
+    occurrence was the secret — so a short value in the set silently rewrites
+    unrelated text. Measured on this host: with a redacted ``1`` in scope,
+    ``mise run`` printed ``count=[redacted]6`` and ``ruff=S[redacted]05``, which
+    made every figure any gate reported through ``mise run`` unreadable.
+
+    Confirmed against mise's own source, not just its docs: ``Redactor::redact``
+    is an Aho-Corasick multi-pattern replace of every pattern with the literal
+    ``"[redacted]"`` (jdx/mise ``src/redactions.rs:64-81``, tag v2026.7.15) — no
+    word boundaries and no length floor, and its own unit test at ``:118-121``
+    asserts ``"token1 and token2"`` becomes ``"[redacted]1 and [redacted]2"``,
+    which is precisely the shape of the damage observed here.
+
+    The set is whatever ``mise env --redacted`` resolves at ``cwd``, so it is a
+    property of the CONFIG IN SCOPE THERE, not of the ambient shell — pointing
+    ``cwd`` at a directory whose ``mise.toml`` declares a short redacted value is
+    how the control arm makes this probe say no.
+
+    NAMES MAY BE REPORTED; VALUES NEVER. The values are exactly the secrets mise
+    is trying to hide, so a probe that printed one to prove it was safe would be
+    the disclosure it exists to prevent. Variable names are not secrets and are
+    what makes a failure actionable, so a FAIL names the offending variables and
+    states lengths. **That invariant binds the ERROR path too** — an unreadable
+    set reports its ``rc`` and nothing else, because a ``mise`` that writes
+    partial values to stdout and *then* exits non-zero would otherwise have them
+    echoed into the report. Found by the cold review lane; the earlier version
+    embedded 200 chars of raw output here while the PASS/FAIL paths were clean.
+
+    Reads ``--json`` rather than ``--values``, which matters three ways and was
+    also review feedback: a multiline value (a PEM block) stays ONE value instead
+    of being measured line-by-line, an empty set is *observed* rather than
+    inferred from an absence of output, and a mapping cannot be corrupted by an
+    unrelated stderr line — that third one **only because the reader takes stdout
+    alone**. It was written here as a property of ``--json`` while the reader
+    still concatenated stderr, which made the sentence false and the detector one
+    stray ``mise WARN`` away from a permanent SKIP.
+
+    Args:
+        cwd: Directory to resolve mise config from. ``None`` means the current
+            one.
+        floor: Shortest value considered safe. Defaults to
+            :data:`REDACTION_COLLISION_FLOOR`.
+        timeout: Seconds to allow the ``mise`` call.
+
+    Returns:
+        SKIP when the set could not be read or did not parse — "we did not look"
+        is not "nothing is wrong". PASS when the set is empty (mise cannot mask
+        what it does not hold) or every value clears ``floor``. FAIL otherwise,
+        naming the offending variables and the shortest length.
+    """
+    entries = _read_mise_redaction_set(cwd=cwd, timeout=timeout)
+    if isinstance(entries, Outcome):
+        return entries
+    if not entries:
+        return ok("mise reports no redacted values here — it cannot mask anything")
+    # An EMPTY value is not a collision risk: mise filters empty patterns out of
+    # the automaton before building it — `Redactor::new` does
+    # `filter(|p| !p.is_empty())` (jdx/mise `src/redactions.rs:31`, read at tag
+    # v2026.7.15). So an empty redacted variable masks nothing, and both counting
+    # it as the shortest value and flagging it would report a defect that cannot
+    # happen. The first version did the former, which is a false positive one
+    # config change away on this very host (its fnox set holds an empty
+    # LANGSMITH_WORKSPACE_ID). Dropped here, once, so no branch below can see it.
+    lengths = {name: len(str(value)) for name, value in entries.items() if len(str(value)) > 0}
+    if not lengths:
+        return ok(
+            f"{len(entries)} redacted variable(s), every value empty — mise drops "
+            f"empty patterns, so nothing can be masked"
+        )
+    short = sorted(name for name, size in lengths.items() if size < floor)
+    if short:
+        return fail(
+            f"{len(short)} of {len(lengths)} non-empty redacted value(s) are shorter "
+            f"than {floor} chars (shortest={min(lengths[n] for n in short)}): "
+            f"{', '.join(short)} — mise masks by literal substring, so every figure "
+            f"`mise run` prints is untrustworthy while this holds; re-read numbers "
+            f"from `uv run`"
+        )
+    return ok(
+        f"{len(lengths)} redacted value(s), shortest {min(lengths.values())} "
+        f"chars — none short enough to collide with ordinary output"
+    )
 
 
 def declared_lanes_reconcile(
@@ -1057,6 +1231,12 @@ def _environment_skip(case: Case) -> Outcome | None:
         return fail(f"precondition raised {type(exc).__name__}: {exc}")
 
 
+#: Marker an advisory case's dead control arm carries, so the writer
+#: (:func:`_advisory_detail`) and the reader (:func:`render`) cannot drift —
+#: they drifted once, and the result was a silent false green.
+_NOT_ARMED = "NOT ARMED"
+
+
 def _advisory_detail(case: Case) -> str:
     """What to record about an advisory case's control arm.
 
@@ -1071,7 +1251,7 @@ def _advisory_detail(case: Case) -> str:
     if case.control is None:
         return "advisory — control arm not required"
     armed, detail = _control_verdict(case)
-    return f"advisory — {detail}" if armed else f"advisory — NOT ARMED: {detail}"
+    return f"advisory — {detail}" if armed else f"advisory — {_NOT_ARMED}: {detail}"
 
 
 def run_cases(cases: Sequence[Case], *, live: bool = False, slow: bool = False) -> Report:
@@ -1148,6 +1328,31 @@ def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
                 "           REFUSED TO COUNT: a gated case with no working control "
                 "arm cannot be distinguished from decoration"
             )
+        # An ADVISORY case's control-arm state is stated ALWAYS, in all three of
+        # its wordings — not only when it is broken. Rule 5 of
+        # `probes-need-a-control-arm.md` is "say which arm you ran": a result
+        # without its control is an opinion, so "never asked" and "asked, and it
+        # said no" have to be different sentences in the artifact a human reads.
+        #
+        # Two rounds of the same defect, narrowing each time. Round 1: the string
+        # went into `Result.control_detail` and NO renderer read it, so a dead
+        # control arm was invisible. Round 2 (this): the fix read only the
+        # NOT-ARMED marker, so `control arm not required` — no control arm exists
+        # at all — still rendered BYTE-IDENTICALLY to `control arm failed as
+        # required`. Measured both times by the silent-failure lane. Printing the
+        # whole detail is what makes the third state unable to hide, and it also
+        # re-exposes the canary name that `_redaction_collision_control` discloses
+        # as its own residual risk — previously checked only in a unit test on one
+        # machine, never in the report the gate emits on every ship.
+        #
+        # ADVISORY ONLY, and the scoping is the point rather than a shortcut. A
+        # GATED case cannot hide a dead control arm: the runner refuses to count
+        # it, the verdict becomes UNARMED and the run goes red, which the branch
+        # above shouts. Advisory is the only class where the state is invisible.
+        # Printing it for every case also buries the report — the guard-fixture
+        # control arm's detail is the whole inverted table, ~4 KB on one line.
+        if not r.case.gated and r.control_detail:
+            lines.append(f"           {r.control_detail}")
     lines.append("")
     if report.nothing_verifiable:
         lines.append(
@@ -1159,8 +1364,43 @@ def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
             f"{report.passed} passed, {report.skipped} skipped"
         )
     else:
+        # The counts are read off the report, NOT hardcoded. They used to be
+        # literal zeroes, which was true only for as long as every case was
+        # gated: an ADVISORY case that fails does not redden the run, so the
+        # first one added would have printed "0 failed" over a real failure —
+        # the same "could not check rendered as green" collapse this module
+        # refuses everywhere else. Both are zero on an all-green run, so the
+        # green line is byte-identical to what it always was.
         lines.append(
-            f"OK eval: {report.passed} passed, {report.skipped} skipped, 0 failed, 0 unarmed"
+            f"OK eval: {report.passed} passed, {report.skipped} skipped, "
+            f"{report.failed} failed, {report.unarmed} unarmed"
+        )
+    # The advisory caveat is emitted on EVERY branch, not just the green one. It
+    # used to sit inside the `else` above, so a red run attributed advisory
+    # failures to the gated count with no caveat at all — `report.failed` counts
+    # every FAIL while `report.red` counts only gated ones.
+    advisory_failed = [
+        r.case.name
+        for r in report.results
+        if r.outcome.verdict is Verdict.FAIL and not r.case.gated
+    ]
+    if advisory_failed:
+        lines.append(
+            f"  ADVISORY failure(s) included in the count above: "
+            f"{', '.join(advisory_failed)} — reported, never gating. On a green run "
+            f"rc=0 therefore does not mean nothing failed."
+        )
+    # Said again on the LAST line, because that is the line people read. An
+    # advisory case cannot redden the run (that contract is deliberate), so this
+    # note is the only thing standing between a dead control arm and a report
+    # that looks entirely healthy.
+    dead = [r.case.name for r in report.results if _NOT_ARMED in r.control_detail]
+    if dead:
+        lines.append(
+            f"  {_NOT_ARMED}: {', '.join(dead)} — an advisory case whose control arm "
+            f"stopped failing proves nothing; its VERDICT above is not evidence. "
+            f"(Verdict, not 'PASS': the case can equally be SKIP or FAIL, and naming "
+            f"the wrong one is how a reader learns to skim the line.)"
         )
     return "\n".join(lines)
 

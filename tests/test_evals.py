@@ -7,7 +7,9 @@ control-arm rule is itself control-armed here, in both directions.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+import shutil
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pytest
@@ -361,6 +363,253 @@ def test_run_command_reports_a_timeout_distinctly() -> None:
     assert "timed out" in detail
 
 
+# --- mise redaction legibility ------------------------------------------------
+#
+# The parse-and-judge half is driven through a stubbed `run_command` so the
+# verdict does not depend on whatever secrets the host's mise config happens to
+# hold. The real `mise env --redacted` round-trip is covered by this case's
+# control arm in `test_eval_cases.py`, which writes a throwaway mise.toml.
+
+#: A stand-in long enough to clear REDACTION_COLLISION_FLOOR by a wide margin.
+_LONG = "a-genuinely-long-credential-value-36ch"
+
+
+def _redaction_reader(
+    monkeypatch: pytest.MonkeyPatch, rc: int, output: str, stderr: str = ""
+) -> None:
+    """Stub the SPLIT reader — the probe deliberately never sees combined output.
+
+    ``stderr`` defaults to empty and is a real parameter, not decoration: the
+    defect this shape replaced was a benign warning on stderr being concatenated
+    into the JSON payload, so a test must be able to put something there and see
+    the verdict NOT change.
+    """
+    monkeypatch.setattr(evals, "run_command_split", lambda *_a, **_k: (rc, output, stderr))
+
+
+def _redaction_json(monkeypatch: pytest.MonkeyPatch, entries: dict[str, str]) -> None:
+    _redaction_reader(monkeypatch, 0, json.dumps(entries))
+
+
+def test_a_short_redacted_value_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The observed damage: a redacted `1` rewrote every digit mise printed."""
+    _redaction_json(monkeypatch, {"TELEMETRY_FLAG": "1", "REAL_TOKEN": _LONG})
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "shortest=1" in outcome.detail
+
+
+def test_a_failure_names_the_offending_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A length alone is not actionable; a NAME is, and a name is not a secret.
+
+    This is also what lets the control arm prove its canary loaded rather than
+    having tripped over some short host secret (silent-failure lane, F2).
+    """
+    _redaction_json(monkeypatch, {"TELEMETRY_FLAG": "1", "REAL_TOKEN": _LONG})
+    detail = evals.mise_redaction_legible().detail
+    assert "TELEMETRY_FLAG" in detail
+    assert "REAL_TOKEN" not in detail, "only the SHORT ones are named"
+
+
+def test_long_redacted_values_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CONTROL ARM for the above: the same probe says yes to a safe set."""
+    _redaction_json(monkeypatch, {"A": _LONG, "B": _LONG + "-more"})
+    assert evals.mise_redaction_legible().verdict is evals.Verdict.PASS
+
+
+def test_a_stderr_warning_does_not_change_the_verdict(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The unit-level arm for the stderr-corruption defect.
+
+    A benign warning alongside a perfectly good payload must be inert. The
+    end-to-end arm against real `mise` is below; this one pins the contract at the
+    layer where the bug lived, so it cannot come back via a different caller.
+    """
+    _redaction_reader(
+        monkeypatch, 0, json.dumps({"A": _LONG}), stderr="mise WARN unknown field: settings.x"
+    )
+    assert evals.mise_redaction_legible().verdict is evals.Verdict.PASS
+
+
+def test_an_empty_value_is_ignored_because_mise_filters_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A zero-length value masks NOTHING, so flagging it would be a false positive.
+
+    `Redactor::new` drops empty patterns before building the automaton —
+    `filter(|p| !p.is_empty())`, jdx/mise `src/redactions.rs:31` at tag
+    v2026.7.15. This test exists because the first version treated 0 as the
+    shortest-and-worst value, and this host's fnox set really does hold an empty
+    `LANGSMITH_WORKSPACE_ID`, so the false positive was one config change away.
+
+    Reading the source is what caught it; the docs do not say this.
+    """
+    _redaction_json(monkeypatch, {"EMPTY_ONE": "", "REAL_TOKEN": _LONG})
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.PASS
+    assert "EMPTY_ONE" not in outcome.detail
+
+
+def test_a_short_but_nonempty_value_beside_an_empty_one_still_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CONTROL ARM for the above: the empty exclusion must not swallow a real one.
+
+    Written the obvious wrong way — `if size and size < floor` over a `min()` of
+    all lengths — the reported `shortest` would be 0 and the name list empty.
+    """
+    _redaction_json(monkeypatch, {"EMPTY_ONE": "", "FLAG": "1", "REAL_TOKEN": _LONG})
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.FAIL
+    assert "FLAG" in outcome.detail
+    assert "EMPTY_ONE" not in outcome.detail
+    # The reported `shortest` must be the shortest OFFENDING value, not the
+    # shortest value overall. Reported `shortest=0` before this assertion existed
+    # — an excluded value still setting the headline number, which is how a
+    # correct exclusion produces an incorrect report.
+    assert "shortest=1" in outcome.detail
+
+
+def test_an_all_empty_redaction_set_passes_and_says_why(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Variables present, every value empty: nothing to mask, and it says so.
+
+    Distinct from the no-variables PASS, because the two have different causes and
+    a reader chasing a masked digit needs to know which one they are looking at.
+    """
+    _redaction_json(monkeypatch, {"EMPTY_ONE": "", "EMPTY_TWO": ""})
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.PASS
+    assert "every value empty" in outcome.detail
+
+
+def test_a_multiline_value_is_measured_whole(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A PEM block is ONE value, not one per line.
+
+    The first version read `--values` and split on newlines, so every line of a
+    multiline secret was measured independently and a short line produced a false
+    FAIL — while mise's own match is against the whole value. Found by the cold
+    review lane; reading `--json` makes it structurally impossible.
+    """
+    pem = "-----BEGIN KEY-----\nab\ncd\n-----END KEY-----"
+    _redaction_json(monkeypatch, {"PEM": pem})
+    assert evals.mise_redaction_legible().verdict is evals.Verdict.PASS
+
+
+def test_an_empty_redaction_set_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mise cannot mask what it does not hold — that is verified-good, not SKIP.
+
+    Observed, not inferred: `{}` is an empty MAPPING. The `--values` version
+    inferred it from an absence of output, which is also what an unrelated silent
+    failure looks like.
+    """
+    _redaction_json(monkeypatch, {})
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.PASS
+    assert "no redacted values" in outcome.detail
+
+
+def test_an_unreadable_redaction_set_skips(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A set that could not be READ is a third state, never rendered as clean.
+
+    Distinct from the empty-set PASS above on purpose: both would otherwise be
+    "no short values found", which is how a probe that never ran gets counted
+    as one that found nothing.
+    """
+    _redaction_reader(monkeypatch, -2, "no such file or directory: mise")
+    outcome = evals.mise_redaction_legible()
+    assert outcome.verdict is evals.Verdict.SKIP
+    assert "exited -2" in outcome.detail
+
+
+def test_unparsable_output_skips_rather_than_passing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """rc=0 with output that is not JSON is unread, not clean.
+
+    This is the shape an unrelated stderr line mixing into stdout produces, which
+    the `--values` reader silently counted as redacted values.
+    """
+    _redaction_reader(monkeypatch, 0, "warning: something\nnot json at all")
+    assert evals.mise_redaction_legible().verdict is evals.Verdict.SKIP
+
+
+def test_a_json_scalar_skips_rather_than_crashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valid JSON of the wrong SHAPE is still unread. `null` parses fine."""
+    _redaction_reader(monkeypatch, 0, "null")
+    assert evals.mise_redaction_legible().verdict is evals.Verdict.SKIP
+
+
+def test_run_command_split_keeps_a_diagnostic_out_of_the_payload() -> None:
+    """A parser must never receive a diagnostic where a payload should be.
+
+    The bug this pins: `mise_redaction_legible` claimed a JSON mapping "cannot be
+    corrupted by an unrelated stderr line" while reading COMBINED output, so one
+    benign `mise WARN` — an unknown config key is enough — broke the parse and
+    turned the detector into a permanent SKIP, triggered from a file nowhere near
+    the probe. Found and armed by the silent-failure review lane.
+
+    Driven through a real subprocess rather than a stub, because the stub is what
+    hid it: every parse test monkeypatches `run_command`, so the concatenation was
+    never exercised by any of them.
+    """
+    argv = [
+        "python3",
+        "-c",
+        'import sys; sys.stderr.write("WARN unrelated\\n"); print(\'{"A": "x"}\')',
+    ]
+    rc, out, err = evals.run_command_split(argv)
+    assert rc == 0
+    assert json.loads(out) == {"A": "x"}, "stdout alone must parse"
+    assert "WARN" in err, "the warning is still available, just not in the payload"
+    # CONTROL ARM: the combining wrapper is exactly what used to break it.
+    _, combined = evals.run_command(argv)
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(combined)
+
+
+def test_the_probe_survives_a_stderr_warning_from_the_real_command(
+    tmp_path: Path,
+) -> None:
+    """End to end, against real `mise`: a warning must not become "unreadable".
+
+    The tempdir config declares an unknown settings key, which mise reports on
+    stderr while still exiting 0 and still emitting valid JSON on stdout.
+    """
+    if shutil.which("mise") is None:
+        pytest.skip("mise does not resolve on PATH")
+    (tmp_path / "mise.toml").write_text(
+        "[settings]\nnot_a_real_setting = true\n\n"
+        '[env]\n_TEST_LONG = { value = "a-genuinely-long-credential-value", redact = true }\n'
+    )
+    outcome = evals.mise_redaction_legible(cwd=tmp_path)
+    assert outcome.verdict is not evals.Verdict.SKIP, (
+        f"a benign stderr warning degraded the probe to unreadable: {outcome.detail}"
+    )
+
+
+def test_the_probe_never_prints_the_redacted_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The values ARE the secrets, so only names, counts and lengths may appear.
+
+    Checked on ALL FOUR paths, and the two error paths are the point: the first
+    version embedded 200 chars of raw combined output in its SKIP detail while
+    PASS and FAIL were clean, so a `mise` that wrote partial values to stdout and
+    then exited non-zero would have leaked them into the eval report. Found by the
+    cold review lane, which is the only lane sharing no weights with the author.
+
+    (The fixture is spelled as a joined literal because ruff's S105 reads a
+    credential-shaped string assignment as a hardcoded password — correctly, and
+    this repo takes no inline suppressions.)
+    """
+    leaked = "do-not-print-" + "this-value-anywhere"
+    _redaction_json(monkeypatch, {"SHORT": "1", "LONG": leaked})
+    assert leaked not in evals.mise_redaction_legible().detail  # FAIL path
+    _redaction_json(monkeypatch, {"LONG": leaked})
+    assert leaked not in evals.mise_redaction_legible().detail  # PASS path
+    _redaction_reader(monkeypatch, 1, f'{{"LONG": "{leaked}"}}')
+    assert leaked not in evals.mise_redaction_legible().detail  # rc != 0 path
+    _redaction_reader(monkeypatch, 0, f"partial {leaked} then a parse error")
+    assert leaked not in evals.mise_redaction_legible().detail  # unparsable path
+
+
 # --- doctor.sh shim -----------------------------------------------------------
 
 
@@ -529,6 +778,173 @@ def test_render_names_an_unarmed_case_as_refused() -> None:
     text = evals.render(report)
     assert "UNARMED" in text
     assert "REFUSED TO COUNT" in text
+
+
+def test_the_green_summary_line_is_unchanged_when_nothing_failed() -> None:
+    """The exact string other things quote as evidence. Pinned deliberately."""
+    text = evals.render(evals.run_cases([_case(evals.ok("fine"))]))
+    assert "OK eval: 1 passed, 0 skipped, 0 failed, 0 unarmed" in text
+
+
+def test_an_advisory_failure_is_counted_in_the_summary_not_papered_over() -> None:
+    """The run is rc=0 and one case FAILED. Both facts must survive rendering.
+
+    Before this, the OK branch printed literal zeroes for failed/unarmed, which
+    was true only while every case was gated. The first advisory case would have
+    printed "0 failed" over a real failure — the "could not check rendered as
+    green" collapse this module refuses everywhere else.
+    """
+    report = evals.run_cases([_case(evals.fail("advisory problem"), gated=False)])
+    assert not report.red
+    text = evals.render(report)
+    assert "OK eval: 0 passed, 0 skipped, 1 failed, 0 unarmed" in text
+    assert "ADVISORY" in text
+
+
+def test_a_dead_advisory_control_arm_is_rendered_not_just_recorded() -> None:
+    """`_advisory_detail` promised this was "surfaced"; nothing rendered it.
+
+    The string went into `Result.control_detail`, whose only readers were two
+    unit tests — so an advisory case with a broken control arm printed
+    byte-comparably to a healthy pass, in the module whose own docstring forbids
+    exactly that collapse. Found by the silent-failure review lane on the commit
+    that added this repo's first advisory case and thereby made the path
+    reachable at all.
+    """
+    case = evals.Case(
+        name="tier1.demo-advisory",
+        description="d",
+        probe=lambda: evals.ok("looks fine"),
+        control=lambda: evals.ok("did not fail"),
+        gated=False,
+    )
+    text = evals.render(evals.run_cases([case]))
+    assert "NOT ARMED" in text, "a dead control arm must not be invisible"
+    assert "tier1.demo-advisory" in text.split("OK eval:")[1], "named in the summary too"
+
+
+def test_a_live_advisory_control_arm_does_not_trip_the_not_armed_warning() -> None:
+    """CONTROL ARM for the above: the loud line must not fire on a healthy case.
+
+    Without this, `render` could unconditionally print NOT ARMED and the test
+    above would still pass — a warning that is always on is not a warning.
+
+    This replaces `..._says_nothing_extra`, which asserted the healthy case
+    printed NOTHING and thereby PINNED the very collapse the next test measures.
+    A test can lock in a defect while looking like a control arm.
+    """
+    case = evals.Case(
+        name="tier1.demo-advisory",
+        description="d",
+        probe=lambda: evals.ok("looks fine"),
+        control=lambda: evals.fail("armed"),
+        gated=False,
+    )
+    text = evals.render(evals.run_cases([case]))
+    assert "NOT ARMED" not in text
+    assert "control arm failed as required" in text
+
+
+def test_all_three_advisory_control_arm_states_render_distinctly() -> None:
+    """A never-asked control arm must not read like one that was asked and said no.
+
+    Round 1 of review: the control-arm string was recorded and no renderer read
+    it, so a DEAD arm was invisible. Round 2: the fix read only the NOT-ARMED
+    marker, so `control arm not required` — meaning no control arm exists at all —
+    rendered BYTE-IDENTICALLY to `control arm failed as required`. The silent-
+    failure lane measured that identity both times.
+
+    So this asserts the three states are mutually distinct, which is stronger
+    than asserting any one of them appears: it is the property that actually
+    failed twice, and it cannot be satisfied by a renderer that prints a constant.
+    """
+
+    def case(control: Callable[[], evals.Outcome] | None) -> evals.Case:
+        return evals.Case(
+            name="tier1.demo-advisory",
+            description="d",
+            probe=lambda: evals.ok("looks fine"),
+            control=control,
+            gated=False,
+        )
+
+    absent = evals.render(evals.run_cases([case(None)]))
+    armed = evals.render(evals.run_cases([case(lambda: evals.fail("broke as required"))]))
+    dead = evals.render(evals.run_cases([case(lambda: evals.ok("did not fail"))]))
+
+    assert absent != armed, "no control arm at all must not read like a verified one"
+    assert armed != dead
+    assert absent != dead
+    assert "control arm not required" in absent
+    assert "control arm failed as required" in armed
+    assert "NOT ARMED" in dead
+
+
+def test_a_gated_cases_control_detail_is_not_dumped_into_the_report() -> None:
+    """The advisory scoping is deliberate, not an oversight — pinned so it stays.
+
+    A GATED case cannot hide a dead control arm: the runner refuses to count it,
+    the verdict becomes UNARMED and the run goes red. So there is nothing to
+    surface, and surfacing it anyway buries the report — the guard-fixture control
+    arm's detail is the whole inverted table, about 4 KB on a single line. That
+    is what the first version of this fix did.
+    """
+    report = evals.run_cases([_case(evals.ok("fine"), control=evals.fail("a" * 500))])
+    text = evals.render(report)
+    assert report.results[0].control_detail, "the runner still RECORDS it"
+    assert "a" * 500 not in text, "but a gated case's control detail is not printed"
+
+
+def test_the_not_armed_marker_is_not_printed_twice() -> None:
+    """The detail already carries the marker; prefixing it repeated the token.
+
+    Observed verbatim as `NOT ARMED: advisory — NOT ARMED: control arm returned
+    PASS…`. Loud-direction, so not a silent failure — but the line exists to be
+    read, and a stutter is how a reader learns to stop reading it.
+    """
+    case = evals.Case(
+        name="tier1.demo-advisory",
+        description="d",
+        probe=lambda: evals.ok("looks fine"),
+        control=lambda: evals.ok("did not fail"),
+        gated=False,
+    )
+    case_line = next(
+        line for line in evals.render(evals.run_cases([case])).splitlines() if "advisory — " in line
+    )
+    assert case_line.count("NOT ARMED") == 1, case_line
+
+
+def test_the_dead_arm_summary_does_not_claim_a_pass_that_may_not_exist() -> None:
+    """The case's verdict can be SKIP or FAIL; the summary said "its PASS above"."""
+    case = evals.Case(
+        name="tier1.demo-advisory",
+        description="d",
+        probe=lambda: evals.skip("could not look"),
+        control=lambda: evals.ok("did not fail"),
+        gated=False,
+    )
+    text = evals.render(evals.run_cases([case]))
+    assert "NOT ARMED" in text
+    assert "its PASS above" not in text
+
+
+def test_an_advisory_failure_is_caveated_even_on_a_red_run() -> None:
+    """`report.failed` counts every FAIL; `report.red` counts only gated ones.
+
+    So a red run's `FAIL eval: N failed` silently folds advisory failures into
+    the gated count. The caveat used to live inside the green branch only.
+    """
+    report = evals.run_cases(
+        [
+            _case(evals.fail("a gated problem"), gated=True),
+            _case(evals.fail("an advisory problem"), gated=False),
+        ]
+    )
+    assert report.red
+    text = evals.render(report)
+    assert "FAIL eval:" in text
+    assert "ADVISORY failure(s) included in the count above" in text
 
 
 # --- tier 2: guard fixture tables ---------------------------------------------
