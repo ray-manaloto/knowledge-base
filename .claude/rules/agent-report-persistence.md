@@ -31,6 +31,13 @@ it twice.
    `.agent/kb/reports/agents/<agent-name>.md` in the SAME turn — before acting on
    its content. Sources the agent fetched go to `.agent/kb/raw/<slug>.md`.
 
+   **One exception, and it is a stricter one: `kb-review` lane reports go to
+   `.agent/kb/review/reports/review-<sha>-<lane>.md`.** Keyed by commit rather
+   than by agent name, because `kb_setup.review` *reads* them — a receipt that
+   names a lane which left no report is refused, so the filename is a contract
+   and not a convention. An agent name is not unique across commits and could
+   not carry that. Everything else here still applies: verbatim, at receipt.
+
 1b. **PROMOTE it to `docs/research/reports/` once it is load-bearing.** `.agent/`
    is gitignored: it dies with a fresh clone or any `git clean -xdf`. That is
    right for scratch and wrong for a report something tracked now cites —

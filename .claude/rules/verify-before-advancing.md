@@ -36,13 +36,13 @@ It is the operational teeth behind `zero-skip-policy.md`.
 | `mise.toml` tool pins | `mise run kb-currency-check` (offline drift check) |
 | `hk.pkl` | `hk validate`, then the FAIL direction of the new step (below) |
 | anything the `brain` surface reads | `mise run brain-audit` — `kb-ship` runs it, so a failure blocks the PR anyway; find it locally first |
-| Opened a PR | `gh pr checks <n>` until terminal — every check `pass` or `skipping`, **0 fail** |
+| Opened a PR | `gh pr checks <n>` until terminal — every **binding** check `pass` or `skipping`, **0 fail**. CodeRabbit is *advisory here* and blocking in no bucket (`kb_setup.pr._ADVISORY_CHECKS`); it is still read and reported, never silently dropped |
 
 Scale the matrix to the blast radius — a one-line doc typo needs the docs
 row, not a full `kb-build`.
 
-**`mise run kb-ship` runs `lint` + `test` + `brain-audit` and refuses to push
-if any fails.** That is the floor, not the ceiling: it does not know whether
+**`mise run kb-ship` checks the `kb-review` receipt, then runs `lint` + `test` +
+`brain-audit` + `eval`, and refuses to push if any fails.** That is the floor, not the ceiling: it does not know whether
 your change needed a `kb-build` or a chunk validation.
 
 ## A green gate is not a green artifact

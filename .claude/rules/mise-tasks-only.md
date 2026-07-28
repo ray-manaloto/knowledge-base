@@ -26,6 +26,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `gh pr create` (+ push + gates by hand) | `mise run kb-ship` |
 | `gh pr merge` (+ watch + validate by hand) | `mise run kb-land -- <PR#>` |
 | a manual version-drift check | `mise run kb-currency-check` (offline) / `mise run kb-currency` |
+| a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
 | `<gate> 2>&1 \| tail -40` | `<gate> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file — a pipe returns `tail`'s exit code, masking a failed gate |
 | `npx <tool>` | the mise-pinned binary directly |
@@ -46,9 +47,9 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
 2. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.
-3. **`mise run kb-ship` gates.** `lint`, `test`, and `brain-audit` all run
-   before a PR is pushed, so a workflow that bypasses a task and breaks
-   something fails at ship time rather than in review.
+3. **`mise run kb-ship` gates.** The `kb-review` receipt, then `lint`, `test`,
+   `brain-audit`, and `eval` all run before a PR is pushed, so a workflow that
+   bypasses a task and breaks something fails at ship time rather than in review.
 
 The hook **fails OPEN on its own errors** — a crashed guard must not brick
 every Bash call. It is a *redirect* guard, not a sandbox: `$(…)` substitution,

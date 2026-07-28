@@ -92,19 +92,44 @@ this repo, verified from the code that prints them:
 
 | Signal | Literal | Source |
 |---|---|---|
-| any gate under `kb-ship` | `PASS  gate <name> rc=0` — **two spaces** | `pr.py:82` |
-| gates `kb-ship` runs | lint, test, brain-audit, eval | `pr.py:74` |
-| new PR | `ship: OK — PR open, gates green` (em dash) | `pr.py:166` |
-| merged | `land: OK — PR #N merged, main synced` | `pr.py:226` |
-| eval | `OK eval: N passed, N skipped, 0 failed, 0 unarmed` | `evals.py:1163` |
+| review receipt, before any gate runs | `==> review: <n> lane(s): …` | `pr.py` `ship_main` |
+| any gate under `kb-ship` | `PASS  gate <name> rc=0` — **two spaces** | `pr.py` `run_gates` |
+| gates `kb-ship` runs | lint, test, brain-audit, eval | `pr.py` `GATES` |
+| new PR | `ship: OK — PR open, gates green` (em dash) | `pr.py` `_open_or_update_pr` |
+| merged | `land: OK — PR #N merged, main synced` | `pr.py` `land_main` |
+| eval | `OK eval: N passed, N skipped, 0 failed, 0 unarmed` | `evals.py` `render` |
 | memory | `Saved to graphify-out/memory/<file>.md` | graphify `cli.py` |
 | reflect | `Reflected N memories (...) -> ...LESSONS.md` | graphify `cli.py` |
 
-**Two traps measured here.** `mise run test` runs pytest under `-qq`, so
+**Anchored to SYMBOLS, not line numbers, deliberately.** These were `pr.py:74`,
+`:82`, `:166`, `:226` until a change to `ship_main` pushed every one of them out
+by 8–114 lines — the second time they rotted, and found by the standards lane on
+a commit whose message was *"make the ship/land docs match the code they
+describe"*. The prose was fixed and the anchors were not, which is the failure
+mode this table exists to prevent: a line number is invalidated by any edit
+above it, including one that never touches the string being cited. A symbol name
+is invalidated only by a rename — which is exactly when the citation *should*
+break.
+
+**Three traps measured here.** `mise run test` runs pytest under `-qq`, so
 `"N passed"` **never appears** — a condition requiring it is unsatisfiable
 (control arm: bare `uv run pytest tests/` prints `578 passed`). And
 `kb-currency-check` prints **nothing** on success, so silence is
 indistinguishable from never-ran; require an echoed, file-recorded `rc`.
+
+**And the newest one, which is the sharpest: `kb-ship` now REFUSES before it
+runs a single gate** unless a `kb-review` receipt exists for the current HEAD.
+So a condition asking for `PASS  gate lint rc=0` from `mise run kb-ship`, with
+no instruction to review first, is **unsatisfiable** — ship stops at the receipt
+check and those strings never appear. Any round that ships must say: run the
+`kb-review` skill, write the receipt, then `kb-ship`.
+
+Note what this class has in common. All three are unsatisfiable conditions whose
+text looks completely reasonable, and none is detectable by reading the goal —
+only by knowing what the command actually prints. That is why this table is
+sourced from the code that PRINTS each string, and why it has to be re-checked
+whenever the shipping path changes. It went stale the same evening the review
+gate landed.
 
 ## Sources
 

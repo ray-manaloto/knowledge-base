@@ -88,7 +88,7 @@ Two of those carry most of the weight:
 two.
 
 Audit the result with `mise run kb-goal-check` (the mechanical half) and then against
-the twelve ambiguity tests in
+the thirteen ambiguity tests in
 `.claude/skills/goal-engineering/references/rubric.md` — tracked, unlike the
 `.agent/kb/reports/**` research it was distilled from, which is gitignored and would
 be a citation only this machine could open (T1 transcript-visibility · T2 literal-token ·

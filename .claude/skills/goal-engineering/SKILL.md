@@ -104,7 +104,7 @@ required sections, naming schema, headline-word count, sentinel format, turn
 bound, posture negations, preserve list, and the rider's structure.
 
 Then apply the judgement tests it cannot: **`references/rubric.md`** holds all
-twelve, each with a bad example and its rewrite. The four the checker cannot
+thirteen, each with a bad example and its rewrite. The five the checker cannot
 reach, and which catch the expensive defects:
 
 - **T4 Goodhart** — could a lazy agent satisfy this clause by *destroying*
@@ -117,6 +117,16 @@ reach, and which catch the expensive defects:
   conversation? Setting a goal *starts a turn with the condition as the
   directive*, so anything the condition spells out is in the transcript at turn
   0. This is the subtlest defect in the set and the easiest to reintroduce.
+- **T13 stated connective** — with more than one clause, does the condition say
+  how they combine? Bullets then a bare `or` has no defined meaning, and both
+  readings usually terminate on turn one. Added after the skill's own scoring
+  round, where the **no-skill baseline** caught it and the skilled arm did not.
+
+**Cite the clause in every verdict — the passes as well as the failures.** Quote
+the substring you judged, or give its line. An audit that says "T4: fine" is
+unreviewable: the reader cannot tell which clause you looked at, or whether you
+looked. This is the one thing the skill measurably does WORSE than an
+unaided reviewer, so it is worth the extra words.
 
 Report verdicts as a short list, then **rewrite the failing clauses** rather than
 only naming them. A verdict without a replacement puts the work back on the user.
@@ -161,7 +171,7 @@ live docs are; this file is the technique built on top of them.
 
 ## References
 
-- `references/rubric.md` — the twelve ambiguity tests, each with a bad example
+- `references/rubric.md` — the thirteen ambiguity tests, each with a bad example
   and its rewrite. Read this whenever auditing, and when a clause feels vague but
   you cannot say why.
 - `references/conventions.md` — the goal and rider recipes, the naming schema,

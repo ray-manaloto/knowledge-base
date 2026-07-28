@@ -303,15 +303,28 @@ description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency
 run = "uv run kb-setup currency run"
 
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
+[tasks.kb-review-receipt]
+description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review-receipt -- --lanes L[,L...] --blocking N [--skipped lane:reason,...] [--findings N] [--fixed-point REF]'
+# The LAST step of the `kb-review` skill, and the only part of that review a task
+# can own: the review spawns Claude agents, and only the model can do that, so the
+# skill runs the lenses and this records that it did. `kb-ship` then refuses to
+# push a HEAD with no receipt. Amending or rebasing moves the SHA and invalidates
+# the receipt — correctly, the reviewed bytes are gone. Logic in kb_setup.review.
+run = "uv run kb-setup review-receipt"
+
 [tasks.kb-ship]
-description = 'Gate (lint+test) → push → open PR for the current branch: mise run kb-ship [-- --title T]'
-# The ONLY sanctioned way to open a PR here — `gh pr create` is guard-denied.
+description = 'Review receipt + gates (lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
+# The sanctioned way to open a PR here. `gh pr create` is NOT guard-denied in
+# this repo — `hook_guard._REDIRECT` covers graphify subcommands only — so this
+# is convention, not enforcement, and a raw `gh pr create` would bypass the
+# review receipt entirely. Said plainly because the comment used to claim the
+# guard stopped it, while `mise-tasks-only.md` correctly said it does not.
 # Gates run BEFORE the push, so a red branch never becomes a PR. This repo has no
 # CI, so the local gates are the only gates. Logic in kb_setup.pr.
 run = "uv run kb-setup ship"
 
 [tasks.kb-land]
-description = 'Verify checks → SHA-pinned squash-merge → sync main: mise run kb-land -- <PR#>'
+description = 'Await terminal checks + review receipt → SHA-pinned squash-merge → sync main: mise run kb-land -- <PR#>'
 # Pins the merge to the head SHA it just verified (`gh pr merge --match-head-commit`),
 # so a commit pushed between check and merge cannot ride in unverified. No main-CI
 # watch and no container re-validation — this repo has neither. Logic in kb_setup.pr.

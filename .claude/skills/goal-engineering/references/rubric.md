@@ -1,11 +1,11 @@
-# The twelve ambiguity tests
+# The thirteen ambiguity tests
 
 Apply **per clause, not per document** — a goal is only as unambiguous as its
 weakest clause. Any FAIL is a defect. Each test below gives the question, a bad
 example, and its rewrite.
 
 `mise run kb-goal-check` decides T2, T5, T6, T8, T9 and the structural checks
-mechanically. **T1, T3, T4, T7, T10, T11, T12 need judgement** and are why this
+mechanically. **T1, T3, T4, T7, T10, T11, T12, T13 need judgement** and are why this
 file exists.
 
 The operating constraint every test serves:
@@ -39,7 +39,7 @@ Fails on: *good, clean, proper, reasonable, major, minor, adequate, complete,
 robust, comprehensive, well-formed, sensible, thorough.*
 
 - BAD: `the rubric is comprehensive and the scorecard is usable`
-- GOOD: `references/rubric.md contains a "## T12" heading and twelve "## T" sections`
+- GOOD: `references/rubric.md contains a "## T13" heading and thirteen "## T<n> —" sections`
 
 > "Make it good" isn't a finish line. "Scores over 8+ out of 10 using my custom
 > grading skill" is.
@@ -173,6 +173,43 @@ with that command's output immediately above it
 Pair it with an explicit line in the goal: *the text of this condition is not
 evidence.*
 
+## T13 — stated connective
+
+**When the condition has more than one clause, does it say how they combine?**
+
+A list of bullets followed by a bare `or` has no defined meaning, and the two
+readings usually differ by the entire round.
+
+- BAD:
+
+```text
+Done when:
+- graphify-out/ no longer contains any [redacted] artifacts
+- the test suite passes with no failures
+- a review subagent has confirmed the change is correct
+- the transcript contains "REDACTION-DONE"
+- or the cause is not established
+```
+
+  Read as `(1∧2∧3∧4) ∨ 5`, the whole round collapses into bullet 5. Read as
+  `1∧2∧3∧(4∨5)`, it collapses into bullet 4 plus three already-true conditions.
+  **Both parses terminate on turn one**, for different reasons.
+
+- GOOD: `Stop when ALL of 1–4 are present, OR Claude's most recent message is
+  GOAL-BLOCKED: …` — the skeleton's own wording, which states the quantifier
+  over the conjunction and marks the escape arm as the only disjunct.
+
+Never leave the operator implicit in something you will walk away from for
+eight hours. An evaluator asked to settle an ambiguous boolean will pick a
+reading, and it will not tell you which.
+
+**Provenance:** this test is not from the source essays. It was found by the
+**no-skill baseline** during the skill's own scoring round, on a condition
+carrying seven deliberately planted defects — it was the one defect nobody had
+planted, and the arm *with* the skill missed it. A rubric that only encodes
+what its author already knew cannot find this class; the honest response is to
+add the test, and to note where it came from.
+
 ## Scorecard
 
 Run down this list against a finished goal; each is answerable in under a minute.
@@ -189,6 +226,7 @@ Run down this list against a finished goal; each is answerable in under a minute
 - [ ] No narration accepted in place of pasted output (T10)
 - [ ] Subagent/background evidence must be restated in the main conversation (T11)
 - [ ] Every sentinel carries a run-specific value; condition-text disclaimed (T12)
+- [ ] A multi-clause condition states how its clauses combine (T13)
 
 ## The honest residual
 

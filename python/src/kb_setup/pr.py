@@ -7,11 +7,23 @@ nothing to watch.
 
 What it does keep is the part that carries the safety:
 
-* ``ship`` runs the same local gates CI would have run (``lint`` + ``test``)
-  BEFORE the branch is pushed, so a red branch never becomes a PR;
+* ``ship`` refuses a commit with no `kb-review` receipt — checked before the
+  gates and again immediately before the push. **That is this module's strongest
+  behaviour**, because CodeRabbit is advisory here, so the local review is the
+  only review;
+* ``ship`` then runs every gate in :data:`GATES` (``lint``, ``test``,
+  ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red branch never
+  becomes a PR;
+* the push is pinned to the SHA the receipt was validated against
+  (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
+  unreviewed commit onto the remote;
 * ``land`` re-reads the checks and pins the merge to the head SHA it verified
   (``gh pr merge --match-head-commit``), so a commit pushed between the check
   and the merge cannot ride in unverified.
+
+This docstring said "``lint`` + ``test``" and never mentioned the receipt until
+the standards lane pointed out that `mise.toml` and `CLAUDE.md` had both been
+synced while the doc closest to the code had not.
 
 Invoked via the ``kb-ship`` / ``kb-land`` mise tasks — never by hand.
 """
@@ -30,6 +42,27 @@ _GATE_TIMEOUT = 1800
 # valid terminal state (a conditional job that correctly did not run); "pending"
 # is deliberately absent — it means the answer is not in yet.
 _OK_BUCKETS = frozenset({"pass", "skipping", "neutral"})
+
+#: Checks that are ADVISORY here: reported, never blocking, in any bucket —
+#: including "pending". CodeRabbit returned `pass — Review rate limited` on 4 of
+#: 5 PRs, and a doc-only commit once sat blocked on its quota queue with nothing
+#: wrong. A reviewer that is usually rate-limited is a delay, not a gate.
+#:
+#: This does NOT mean the review went away. It moved on-machine: `kb-review`
+#: runs four local lenses and `ship_main` refuses to push without its receipt.
+#: Relaxing the remote gate and adding the local one are one change, not two —
+#: dropping only the first would leave the repo with no review at all.
+_ADVISORY_CHECKS = frozenset({"CodeRabbit"})
+
+#: How long `land` gives the checks to reach a terminal state before treating
+#: the delay as QUOTA rather than review.
+#:
+#: The distinction is the whole point. "Never blocking" is not "never looking":
+#: a CodeRabbit verdict that lands ten seconds after the merge was never read,
+#: and reading it costs nothing. What must never happen is waiting on someone
+#: else's rate limit — which is why this is bounded and why expiry proceeds
+#: rather than refuses.
+_TERMINAL_WAIT = 180
 
 
 def _run(
@@ -89,9 +122,10 @@ def run_gates(repo_root: Path) -> bool:
 def checks_state(pr_number: int) -> tuple[bool, str]:
     """Return ``(green, summary)`` for a PR's checks.
 
-    Green means every check reached a terminal, non-failing bucket. A PR with no
-    checks at all is green — this repo has no CI, so "no checks" is normal here
-    and must not deadlock the merge.
+    Green means every BINDING check reached a terminal, non-failing bucket.
+    Checks in :data:`_ADVISORY_CHECKS` are reported and never counted, in any
+    bucket including "pending". A PR with no checks at all is green — this repo
+    has no CI, so "no checks" is normal here and must not deadlock the merge.
     """
     rc, out = _run(
         ["gh", "pr", "checks", str(pr_number), "--json", "name,bucket"], timeout=_GH_TIMEOUT
@@ -111,17 +145,77 @@ def checks_state(pr_number: int) -> tuple[bool, str]:
         rows = json.loads(out)
     except json.JSONDecodeError:
         return False, f"could not read checks (rc={rc}): {out.strip()[:200]}"
-    if not isinstance(rows, list):
-        return False, f"unexpected checks payload (rc={rc}): {out.strip()[:200]}"
+    # The container AND its element types. Checking only `isinstance(rows, list)`
+    # left `r.get(...)` to raise AttributeError on a scalar row, out of a function
+    # whose entire contract is to return a worded refusal — a crash is not a
+    # verdict, and the comment above already promised strict parsing.
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return (
+            False,
+            f"unexpected checks payload — want a list of objects (rc={rc}): {out.strip()[:200]}",
+        )
 
     if not rows:
         return True, "no checks configured"
 
-    bad = [r for r in rows if r.get("bucket") not in _OK_BUCKETS]
+    advisory = [r for r in rows if r.get("name") in _ADVISORY_CHECKS]
+    binding = [r for r in rows if r.get("name") not in _ADVISORY_CHECKS]
+
+    note = ""
+    if advisory:
+        note = " | advisory (not blocking): " + ", ".join(
+            f"{r.get('name')}={r.get('bucket')}" for r in advisory
+        )
+
+    bad = [r for r in binding if r.get("bucket") not in _OK_BUCKETS]
     if bad:
         detail = ", ".join(f"{r.get('name')}={r.get('bucket')}" for r in bad)
-        return False, f"{len(bad)} check(s) not green: {detail}"
-    return True, f"{len(rows)} check(s) green"
+        return False, f"{len(bad)} check(s) not green: {detail}{note}"
+    if not binding:
+        # Every row was advisory. That is the NORMAL path here (no CI, CodeRabbit
+        # on every PR), and it must not read as "0 checks green" — nothing was
+        # verified remotely, which is a different sentence from "verified clean".
+        # The local `kb-review` receipt is what actually gates; see ship_main.
+        return True, f"no binding checks — nothing verified remotely{note}"
+    return True, f"{len(binding)} binding check(s) green{note}"
+
+
+def await_terminal(pr_number: int, *, timeout: int = _TERMINAL_WAIT) -> str:
+    """Give a PR's checks a BOUNDED chance to reach a terminal state.
+
+    Uses `gh pr checks --watch` rather than a hand-rolled poll loop, per
+    `gh-cli-watch.md`: the CLI already redraws, paces its own interval, and
+    knows what terminal means. What it has no flag for is a *bound*, so the
+    bound is applied from outside.
+
+    Expiry is not a failure. Past the bound the remaining delay is a rate limit,
+    not a review, and this repo's binding gates all ran locally before the push.
+    Returns a note for the caller to print; never raises, never blocks a merge.
+    """
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "checks", str(pr_number), "--watch", "--interval", "10"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return f"still pending after {timeout}s — treating as quota, not review; proceeding"
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Could not ask. Say so rather than implying the checks settled.
+        return f"could not watch checks ({exc}); reading whatever state exists"
+    if proc.returncode != 0:
+        # `gh pr checks` exits non-zero for FAILING checks (terminal, expected)
+        # AND for "could not ask" (auth expiry, no such PR, a renamed flag), so
+        # rc cannot discriminate between them. The old code therefore ignored it
+        # and asserted "reached a terminal state" either way — a claim about a
+        # question that may never have been asked. It now declines to assert and
+        # reports what it saw; `checks_state` is the verdict regardless, so this
+        # costs nothing and stops the note from over-claiming.
+        detail = (proc.stderr or proc.stdout or "").strip()
+        return f"watch exited rc={proc.returncode}; reading whatever state exists: {detail[:160]}"
+    return "reached a terminal state"
 
 
 def pr_head_oid(pr_number: int) -> str | None:
@@ -140,21 +234,74 @@ def _ship_preflight(repo_root: Path) -> str | None:
     if not branch or branch == "main":
         print(f"ship: refusing — on '{branch or 'unknown'}'; create a branch first")
         return None
+    # `git rev-parse --abbrev-ref HEAD` returns the literal string "HEAD" when
+    # detached, so a paused bisect, a stopped rebase, or a `git checkout <sha>`
+    # arrives here looking like a branch named HEAD.
+    #
+    # This guard USED to be free: `git push -u origin HEAD` failed on its own
+    # ("must fully qualify the ref"). Pinning the push to `<sha>:refs/heads/
+    # <branch>` — the fix for the TOCTOU window — SUCCEEDS on that input and
+    # creates a real remote branch literally called `HEAD`. The protection was
+    # an accident of the old form, and removing an accident is still removing a
+    # protection, so it is explicit now. Found by the cold and silent-failure
+    # lanes on the very commit that introduced the refspec.
+    if branch == "HEAD":
+        print("ship: refusing — detached HEAD; check out a branch first")
+        return None
     if not working_tree_clean(repo_root):
         print("ship: refusing — working tree is dirty; commit or stash first")
         return None
     return branch
 
 
+def _pr_number_and_state(out: str) -> tuple[int | None, str]:
+    """Parse `gh pr view --json number,state` output; ``(None, "")`` if unreadable.
+
+    Strict, and fails closed: `_run` merges stdout and stderr, so anything gh
+    prints alongside the JSON lands here. An unreadable answer is not "no PR".
+    """
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        return None, ""
+    if not isinstance(data, dict) or not isinstance(data.get("number"), int):
+        return None, ""
+    return data["number"], str(data.get("state") or "")
+
+
 def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     """Open a PR for ``branch`` (or report the existing one); return an exit code."""
+    # `--json number,state`, not `--jq .number`: `gh pr view <branch>` resolves a
+    # branch to its PR REGARDLESS OF STATE. Measured — `gh pr view
+    # docs/clear-prep-sync --json number,state` → `{"number":52,"state":"MERGED"}`,
+    # rc=0 — so asking only for the number made `ship` print
+    # `OK — PR #52 updated, gates green` and exit 0 having opened nothing. That is
+    # reachable today: `land` deletes the remote branch and leaves the local one,
+    # and every PR in this repo is MERGED. A ship that reports success while doing
+    # nothing is the failure this whole branch exists to remove.
     rc, out = _run(
-        ["gh", "pr", "view", branch, "--json", "number", "--jq", ".number"], timeout=_GH_TIMEOUT
+        ["gh", "pr", "view", branch, "--json", "number,state"],
+        cwd=repo_root,
+        timeout=_GH_TIMEOUT,
     )
-    existing = out.strip()
-    if rc == 0 and existing.isdigit():
-        print(f"ship: OK — PR #{existing} updated, gates green")
-        return 0
+    if rc == 0:
+        number, state = _pr_number_and_state(out)
+        if number is None:
+            print(f"ship: could not read the branch's PR state (rc=0)\n{out.strip()[:300]}")
+            return 1
+        if state == "OPEN":
+            print(f"ship: OK — PR #{number} updated, gates green")
+            return 0
+        # MERGED or CLOSED is not something to "update" — the commits just pushed
+        # need a new PR. Say which, so this does not look like a lost PR.
+        print(f"ship: branch's PR #{number} is {state}; opening a new one")
+    # rc != 0 is either "no PR yet" (create one) or "could not ask" (stop). Only
+    # the literal gh phrase means the former; any other failure — auth expiry,
+    # network, rate limit — is an unanswered question, and falling through to
+    # `gh pr create` would turn it into a second PR.
+    elif "no pull requests found" not in out.lower():
+        print(f"ship: could not read the branch's PR state (rc={rc})\n{out.strip()[:300]}")
+        return 1
 
     create = ["gh", "pr", "create", "--base", "main", "--head", branch]
     create += ["--title", title, "--body", ""] if title else ["--fill"]
@@ -167,26 +314,94 @@ def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     return 0
 
 
+def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
+    """Return the SHA to push, or None (having said why) if the push must not happen.
+
+    Re-checked immediately before the push, not only before the gates: the gates
+    take minutes and nothing stops HEAD moving underneath them. The first check
+    fails fast; THIS one guards the push.
+
+    BOTH halves of the refspec are re-read here. Pinning the push to a post-gate
+    `sha` while still using the pre-gate `branch` closed one half of the window
+    and left the other open: a checkout during the gates would push the new
+    branch's (separately reviewed, so passing) SHA onto the OLD branch's ref.
+    """
+    from kb_setup import review
+
+    sha = review.head_sha(repo_root)
+    if current_branch(repo_root) != branch:
+        print(f"ship: refusing — branch changed during the gates (was '{branch}')")
+        return None
+    ok, summary = review.receipt_state(repo_root, sha, require_base="main")
+    if not ok:
+        print(f"ship: refusing — HEAD moved since the review ({summary})")
+        return None
+    return sha
+
+
 def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     """Gate, push, and open a PR for the current branch; return an exit code."""
     branch = _ship_preflight(repo_root)
     if branch is None:
         return 1
 
+    # Checked BEFORE the gates, deliberately: a failing gate is fixed by an
+    # amend, which moves the SHA and invalidates whatever receipt existed. Ask
+    # the cheap question first rather than after four gate runs.
+    from kb_setup import review
+
+    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root), require_base="main")
+    print(f"==> review: {summary}")
+    if not ok:
+        print("ship: refusing — not pushing an unreviewed commit")
+        return 1
+
     if not run_gates(repo_root):
         print("ship: gates failed — not pushing")
         return 1
 
-    rc, out = _run(["git", "push", "-u", "origin", branch], cwd=repo_root)
+    sha = _validated_sha_for_push(repo_root, branch)
+    if sha is None:
+        return 1
+
+    # Push the SHA that was just VALIDATED, not the branch name. Re-reading HEAD
+    # and then pushing `branch` left the window open that the check above exists
+    # to close: HEAD could move between the two calls and the push would send a
+    # commit no lane ever read — the receipt would be honest and the pushed bytes
+    # would not be the ones it is for. The refspec makes the validated commit and
+    # the pushed commit the same object by construction.
+    rc, out = _run(["git", "push", "origin", f"{sha}:refs/heads/{branch}"], cwd=repo_root)
     if rc != 0:
         print(f"ship: push failed\n{out}")
         return 1
+
+    # `-u` cannot set tracking from a raw-SHA refspec — probed both arms: the
+    # push succeeds and silently leaves no upstream — so set it explicitly.
+    # Non-fatal on purpose, and NOT a swallowed error: the validated commit is
+    # already on the remote and the PR path uses `--head <branch>` rather than
+    # local tracking, so only a later bare `git push` would notice. Reported
+    # rather than ignored, with the command that fixes it.
+    rc_upstream, out_upstream = _run(
+        ["git", "branch", "--set-upstream-to", f"origin/{branch}", branch],
+        cwd=repo_root,
+    )
+    if rc_upstream != 0:
+        print(
+            f"ship: pushed {sha[:12]}, but could not set upstream tracking "
+            f"(non-fatal; run `git branch -u origin/{branch}`): "
+            f"{out_upstream.strip()[:200]}"
+        )
 
     return _open_or_update_pr(repo_root, branch, title)
 
 
 def land_main(repo_root: Path, pr_number: int) -> int:
     """Verify a PR's checks, squash-merge it pinned to that SHA, and sync main."""
+    # Wait for a TERMINAL state, never for quota. Advisory checks still cannot
+    # block the merge — but a verdict that arrives ten seconds later was never
+    # read, and reading it is free.
+    print(f"==> waiting for terminal check state: {await_terminal(pr_number)}")
+
     green, summary = checks_state(pr_number)
     print(f"==> checks: {summary}")
     if not green:
@@ -197,6 +412,34 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     if not oid:
         print(f"land: could not read head SHA for PR #{pr_number}")
         return 1
+
+    # The PR head — not local HEAD. `ship` guards what IT pushes; a commit
+    # pushed afterwards by any other route reaches the merge having been
+    # reviewed by nothing. Receipts are machine-local, so this also means you
+    # land from the machine you reviewed on; the message says so, because
+    # otherwise the refusal looks like a bug rather than the design.
+    from kb_setup import review
+
+    # `require_base="main"` here as well as in `ship`. Without it `land` accepted a
+    # receipt covering only a SUFFIX of the branch: `--fixed-point HEAD^` produces
+    # a perfectly truthful receipt for one commit, and land merged all twelve.
+    #
+    # That is not reachable through `ship`, which refuses the same receipt — but
+    # `gh pr create` is NOT guard-denied here (`mise.toml`, `mise-tasks-only.md`),
+    # and this gate is documented as the backstop for exactly that bypass
+    # (`kb-review/SKILL.md`, "closing the gap where a PR is pushed by one path and
+    # merged by another"). A backstop that does not cover its own stated case is
+    # the kind of untrue claim this module exists to refuse. Found by the cold
+    # lane; the standards and spec lanes found the asymmetry and rated it lower.
+    reviewed, detail = review.receipt_state(repo_root, oid, require_base="main")
+    print(f"==> review: {detail}")
+    if not reviewed:
+        print(
+            f"land: refusing — PR #{pr_number}'s head is unreviewed. Run the "
+            f"`kb-review` skill against it, or land from the machine that did."
+        )
+        return 1
+
     print(f"==> merging PR #{pr_number} pinned to {oid[:12]}")
 
     rc, out = _run(
