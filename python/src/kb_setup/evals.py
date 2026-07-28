@@ -202,18 +202,30 @@ class Report:
 # --- shelling out -------------------------------------------------------------
 
 
-def run_command(
+def run_command_split(
     argv: Sequence[str],
     *,
     cwd: Path | None = None,
     timeout: int = DEFAULT_TIMEOUT,
-) -> tuple[int, str]:
-    """Run ``argv``, returning ``(rc, combined output)``.
+) -> tuple[int, str, str]:
+    """Run ``argv``, returning ``(rc, stdout, stderr)`` with the streams SEPARATE.
+
+    The one subprocess call site in this module; :func:`run_command` is a thin
+    combining wrapper over it, so there is no second spawn path to drift.
+
+    Reach for this whenever stdout must PARSE. A tool that writes a benign
+    warning to stderr — an unknown config key, a deprecation, a version notice —
+    corrupts a combined payload, and the corruption arrives from a file nowhere
+    near the probe. That is not hypothetical here: ``mise_redaction_legible``'s
+    docstring claimed a JSON mapping "cannot be corrupted by an unrelated stderr
+    line" while reading combined output, so a single ``mise WARN`` turned the
+    detector into a permanent SKIP. Measured and armed by the silent-failure
+    review lane, with a real unknown-settings-key warning.
 
     Returns a synthetic negative rc rather than raising, so a probe always has
     a status to report (principle 8): ``-1`` timed out, ``-2`` the executable
-    was not found. Callers surface these verbatim rather than translating them
-    into prose.
+    was not found. The message lands in ``stderr``, leaving ``stdout`` empty —
+    a parser must never see a diagnostic where a payload should be.
     """
     try:
         proc = subprocess.run(
@@ -225,10 +237,26 @@ def run_command(
             check=False,
         )
     except subprocess.TimeoutExpired:
-        return -1, f"timed out after {timeout}s"
+        return -1, "", f"timed out after {timeout}s"
     except (FileNotFoundError, PermissionError) as exc:
-        return -2, str(exc)
-    return proc.returncode, (proc.stdout + proc.stderr)
+        return -2, "", str(exc)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def run_command(
+    argv: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> tuple[int, str]:
+    """Run ``argv``, returning ``(rc, combined output)``.
+
+    Correct for a probe that only ever *reports* what it saw. If the output has
+    to be PARSED, use :func:`run_command_split` — see its docstring for the
+    defect that distinction exists to prevent.
+    """
+    rc, out, err = run_command_split(argv, cwd=cwd, timeout=timeout)
+    return rc, (out + err)
 
 
 # --- probe primitives ---------------------------------------------------------
@@ -254,12 +282,20 @@ def _read_mise_redaction_set(*, cwd: Path | None, timeout: int) -> Mapping[str, 
     a non-zero ``rc``, output that is not JSON, and JSON of the wrong shape. None
     of them may render as clean.
 
-    THE RAW OUTPUT NEVER REACHES A DETAIL. It is stdout+stderr and can hold real
-    secret values — a ``mise`` that writes partial values and then exits non-zero
-    is exactly the case the cold review lane caught, where 200 chars of it were
-    being echoed into the report.
+    THE RAW OUTPUT NEVER REACHES A DETAIL. It can hold real secret values — a
+    ``mise`` that writes partial values and then exits non-zero is exactly the
+    case the cold review lane caught, where 200 chars of it were being echoed
+    into the report. That applies to stderr as much as stdout, so neither is
+    quoted, only classified.
+
+    Reads STDOUT ALONE (:func:`run_command_split`). Combined output meant a
+    benign ``mise WARN`` on stderr — an unknown config key is enough — broke the
+    JSON parse and turned this into a permanent SKIP, from a file nowhere near
+    the probe. Armed by the silent-failure review lane in both directions.
     """
-    rc, output = run_command(["mise", "env", "--redacted", "--json"], cwd=cwd, timeout=timeout)
+    rc, output, _stderr = run_command_split(
+        ["mise", "env", "--redacted", "--json"], cwd=cwd, timeout=timeout
+    )
     if rc != 0:
         return skip(
             f"could not read mise's redaction set: `mise env --redacted --json` "
@@ -319,10 +355,13 @@ def mise_redaction_legible(
     embedded 200 chars of raw output here while the PASS/FAIL paths were clean.
 
     Reads ``--json`` rather than ``--values``, which matters three ways and was
-    also review feedback: a mapping cannot be corrupted by an unrelated stderr
-    line, a multiline value (a PEM block) stays ONE value instead of being
-    measured line-by-line, and an empty set is *observed* rather than inferred
-    from an absence of output.
+    also review feedback: a multiline value (a PEM block) stays ONE value instead
+    of being measured line-by-line, an empty set is *observed* rather than
+    inferred from an absence of output, and a mapping cannot be corrupted by an
+    unrelated stderr line — that third one **only because the reader takes stdout
+    alone**. It was written here as a property of ``--json`` while the reader
+    still concatenated stderr, which made the sentence false and the detector one
+    stray ``mise WARN`` away from a permanent SKIP.
 
     Args:
         cwd: Directory to resolve mise config from. ``None`` means the current
@@ -1289,16 +1328,31 @@ def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
                 "           REFUSED TO COUNT: a gated case with no working control "
                 "arm cannot be distinguished from decoration"
             )
-        # An ADVISORY case's dead control arm was recorded and never rendered.
-        # `_advisory_detail` promises it "is surfaced here rather than reddening
-        # the run" — but the string went into `Result.control_detail`, which no
-        # renderer read, so the only readers were two unit tests. An advisory
-        # case whose control stopped failing printed byte-comparably to a healthy
-        # pass: this module's own named failure mode, inside the module that
-        # forbids it. Found by the silent-failure lane on the commit that added
-        # the repo's first advisory case, which is what made the path reachable.
-        if _NOT_ARMED in r.control_detail:
-            lines.append(f"           {_NOT_ARMED}: {r.control_detail}")
+        # An ADVISORY case's control-arm state is stated ALWAYS, in all three of
+        # its wordings — not only when it is broken. Rule 5 of
+        # `probes-need-a-control-arm.md` is "say which arm you ran": a result
+        # without its control is an opinion, so "never asked" and "asked, and it
+        # said no" have to be different sentences in the artifact a human reads.
+        #
+        # Two rounds of the same defect, narrowing each time. Round 1: the string
+        # went into `Result.control_detail` and NO renderer read it, so a dead
+        # control arm was invisible. Round 2 (this): the fix read only the
+        # NOT-ARMED marker, so `control arm not required` — no control arm exists
+        # at all — still rendered BYTE-IDENTICALLY to `control arm failed as
+        # required`. Measured both times by the silent-failure lane. Printing the
+        # whole detail is what makes the third state unable to hide, and it also
+        # re-exposes the canary name that `_redaction_collision_control` discloses
+        # as its own residual risk — previously checked only in a unit test on one
+        # machine, never in the report the gate emits on every ship.
+        #
+        # ADVISORY ONLY, and the scoping is the point rather than a shortcut. A
+        # GATED case cannot hide a dead control arm: the runner refuses to count
+        # it, the verdict becomes UNARMED and the run goes red, which the branch
+        # above shouts. Advisory is the only class where the state is invisible.
+        # Printing it for every case also buries the report — the guard-fixture
+        # control arm's detail is the whole inverted table, ~4 KB on one line.
+        if not r.case.gated and r.control_detail:
+            lines.append(f"           {r.control_detail}")
     lines.append("")
     if report.nothing_verifiable:
         lines.append(
@@ -1321,11 +1375,21 @@ def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
             f"OK eval: {report.passed} passed, {report.skipped} skipped, "
             f"{report.failed} failed, {report.unarmed} unarmed"
         )
-        if report.failed:
-            lines.append(
-                "  the failure(s) above are ADVISORY — reported, never gating. "
-                "rc=0 here does not mean nothing failed."
-            )
+    # The advisory caveat is emitted on EVERY branch, not just the green one. It
+    # used to sit inside the `else` above, so a red run attributed advisory
+    # failures to the gated count with no caveat at all — `report.failed` counts
+    # every FAIL while `report.red` counts only gated ones.
+    advisory_failed = [
+        r.case.name
+        for r in report.results
+        if r.outcome.verdict is Verdict.FAIL and not r.case.gated
+    ]
+    if advisory_failed:
+        lines.append(
+            f"  ADVISORY failure(s) included in the count above: "
+            f"{', '.join(advisory_failed)} — reported, never gating. On a green run "
+            f"rc=0 therefore does not mean nothing failed."
+        )
     # Said again on the LAST line, because that is the line people read. An
     # advisory case cannot redden the run (that contract is deliberate), so this
     # note is the only thing standing between a dead control arm and a report
@@ -1334,7 +1398,9 @@ def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
     if dead:
         lines.append(
             f"  {_NOT_ARMED}: {', '.join(dead)} — an advisory case whose control arm "
-            f"stopped failing proves nothing; its PASS above is not evidence."
+            f"stopped failing proves nothing; its VERDICT above is not evidence. "
+            f"(Verdict, not 'PASS': the case can equally be SKIP or FAIL, and naming "
+            f"the wrong one is how a reader learns to skim the line.)"
         )
     return "\n".join(lines)
 
