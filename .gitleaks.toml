@@ -1,20 +1,53 @@
 # gitleaks config for the KB. This repo INGESTS external content — the cloned
-# source repos under sources/ (e.g. system-prompts-leaks) and the derived
-# graphify-out/ cache are gitignored research data that inherently contain
-# secret-LIKE strings (leaked prompts, fixture keys). They are never committed, so
-# scanning them is pure noise. Scan only the real, tracked repo files.
+# source repos under sources/ and the derived graphify-out/ cache are research
+# data that inherently contain secret-LIKE strings (leaked prompts, fixture
+# keys), so scanning them is pure noise. Scan the real, tracked repo files.
 title = "kb-gitleaks"
 
 [extend]
 useDefault = true
 
 [allowlist]
-description = "gitignored research corpus + derived artifacts (never committed)"
-# brain/graphify-out/ is the second-brain vault's DERIVED graph (gitignored, same as
-# the root graphify-out/): its stat-index content-hashes read as generic-api-key noise.
+description = "ingested corpus + DERIVED graphify artifacts — noise by construction"
+# WAS `^graphify-out/`, on the stated premise that none of it "is ever
+# committed". That premise is FALSE and always was: `graphify-out/memory/` is
+# the ONE committed subdirectory of an otherwise derived tree (CLAUDE.md
+# invariant 5, .gitignore). So the scanner was configured to look away from the
+# one place in that tree where a secret of OURS could land — and on 2026-07-28
+# one did: `kb-remember` wrote a work-memory note ABOUT a credential leak with
+# the probe output pasted in verbatim, and hk's gitleaks step went green over
+# three live tokens. Caught pre-push by three review lanes and by no scanner.
+#
+# It matters more since `kb_setup.review.EXEMPT_PATHS` — a commit whose whole
+# delta is `graphify-out/memory/**` can ship on an ancestor's receipt, so no
+# review lane reads it either. Scanner coverage here is a PRECONDITION for that
+# exemption, not a follow-up to it.
+#
+# ENUMERATED rather than negated: gitleaks' regex engine is Go RE2, which has
+# no lookahead — `^graphify-out/(?!memory/)` does not compile, measured
+# (`invalid perl operator: (?!`). The first pattern requires a DOT so it matches
+# top-level derived FILES (graph.json, graph.svg, GRAPH_REPORT.md) and not the
+# extensionless `graphify-out/memory` directory, which gitleaks tests against
+# this list while walking. A new derived subdirectory that is not listed here
+# produces noise until it is added — the failure direction that reports too much
+# rather than the one that looks away.
+#
+# Control-armed both ways on gitleaks 8.30.1 with a random synthetic token:
+# baseline (no config) → 6 leaks, so the fixture is detectable; with this list →
+# `graphify-out/graph.json` and `graphify-out/wiki/x.md` skipped, and
+# `graphify-out/memory/note.md` → 2 leaks. `tests/test_gitleaks_scope.py` pins it.
+#
+# `^sources/` stays BROAD, and that is a deliberate residual: `extractions/`,
+# `media/` and `*.manifest` under it ARE committed, but every byte there is
+# ingested external content whose secret-like strings are the noise this
+# allowlist exists for. Nothing this repo authors writes there.
 paths = [
   '''^sources/''',
-  '''^graphify-out/''',
-  '''^brain/graphify-out/''',
   '''^raw/''',
+  '''^graphify-out/[^/]+\.[A-Za-z0-9_]+$''',
+  '''^graphify-out/(cache|converted|obsidian|reflections|transcripts|wiki)/''',
+  '''^graphify-out/[0-9]{4}-[0-9]{2}-[0-9]{2}/''',
+  '''^brain/graphify-out/[^/]+\.[A-Za-z0-9_]+$''',
+  '''^brain/graphify-out/(cache|converted|obsidian|reflections|transcripts|wiki)/''',
+  '''^brain/graphify-out/[0-9]{4}-[0-9]{2}-[0-9]{2}/''',
 ]
