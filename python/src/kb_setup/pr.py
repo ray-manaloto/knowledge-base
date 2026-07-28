@@ -11,9 +11,11 @@ What it does keep is the part that carries the safety:
   gates and again immediately before the push. **That is this module's strongest
   behaviour**, because CodeRabbit is advisory here, so the local review is the
   only review;
-* ``ship`` then runs every gate in :data:`GATES` (``lint``, ``test``,
-  ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red branch never
-  becomes a PR;
+* ``ship`` then runs every gate in :data:`GATES` (``kb-scan-range``, ``lint``,
+  ``test``, ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red
+  branch never becomes a PR. ``kb-scan-range`` is the only one that asks about
+  the COMMIT RANGE rather than the working tree — the push sends every commit on
+  the branch, and nothing else here reads the intermediate ones (#67);
 * the push is pinned to the SHA the receipt was validated against
   (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
   unreviewed commit onto the remote;
@@ -112,7 +114,18 @@ def working_tree_clean(repo_root: Path) -> bool:
 #: forbids editing. So a green `eval` gate here means "nothing GATED failed", not
 #: "every case passed" — read the case table, not the rc. `evals.render` prints
 #: the true failed/unarmed counts precisely so that distinction survives.
-GATES = ("lint", "test", "brain-audit", "eval")
+#:
+#: `kb-scan-range` is FIRST, and that ordering is load-bearing rather than
+#: tidiness. `run_gates` returns on the first failure, so putting the cheapest
+#: gate (~0.36s for a one-commit range) and the one with the worst failure mode
+#: (a credential reaching a public remote) ahead of the minutes-long ones means a
+#: branch carrying a secret is refused before anything else is spent on it.
+#:
+#: It is also the only gate here that asks about a COMMIT RANGE rather than the
+#: working tree. hk's `gitleaks` step is handed `{{ files }}`, so a blob that
+#: exists only in an intermediate commit is never opened — and `ship` pushes
+#: every commit on the branch to a public remote. See `kb_setup.scan` and #67.
+GATES = ("kb-scan-range", "lint", "test", "brain-audit", "eval")
 
 
 def run_gates(repo_root: Path) -> bool:
