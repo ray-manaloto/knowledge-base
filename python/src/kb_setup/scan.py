@@ -73,11 +73,35 @@ _LEAKS = 2
 #: the range size — but a legitimate branch that only deletes files also scans
 #: zero commits, so that check would refuse honest work. Right diagnosis, wrong
 #: remedy; only the third arm separated them.
+#:
+#: KNOWN FALSE-POSITIVE SURFACE, recorded rather than discovered later: gitleaks
+#: emits `ERR error="stderr is not empty"` for ANY output git writes to stderr,
+#: so a benign advisory refuses the ship. That is the direction to prefer — it
+#: reports too much rather than looking away — but it is a real cost, and the
+#: remedy is to fix the advisory, never to narrow this tuple. It is not
+#: env-defeatable in the other direction either: `GITLEAKS_LOG_LEVEL=fatal` and
+#: friends still emit the ERR lines; only an explicit `-l fatal` suppresses
+#: them, and `_gitleaks_cmd` never passes one. (Silent-failure lane, round 2.)
+#:
+#: What actually pins this tuple is the END-TO-END arm
+#: (`tests/test_scan.py::test_a_failed_git_log_is_not_reported_as_clean`), not
+#: the truthiness assertion beside it — narrowing it to `()` reddens that test.
+#: Blind spots it does NOT cover, none of which log an error: an archive past
+#: `--max-archive-depth`, a root `.gitleaksignore`, and honoured
+#: `gitleaks:allow` comments.
 _SCAN_ERROR_MARKERS = (" ERR ", " FTL ")
 
-#: The fixed point the receipt uses, so the range scanned and the range reviewed
-#: are the same range. `ship` passes `require_base="main"` to
-#: `review.receipt_state` for the same reason.
+#: The same fixed point the receipt uses. The two ranges are RELATED, not
+#: identical, and the difference is deliberate: `range_base` prefers
+#: ``origin/<base>`` while `review.base_sha` resolves the literal ref, so
+#: whenever local ``main`` is ahead of the remote the scan's range is strictly
+#: WIDER than the lanes'.
+#:
+#: That asymmetry is correct — the lanes review what the branch added, the
+#: scanner must cover what the push publishes — but this comment used to claim
+#: they were "the same range", which stopped being true the moment the remote
+#: preference landed. (Standards lane, round 2: a claim carried without its
+#: condition.)
 DEFAULT_BASE = "main"
 
 #: The only accepted argv shape: exactly ``--base <ref>``.
@@ -116,7 +140,7 @@ def _git(repo_root: Path, *args: str) -> tuple[int, str]:
     return proc.returncode, proc.stdout or ""
 
 
-def range_base(repo_root: Path, base: str = DEFAULT_BASE) -> str:
+def range_base(repo_root: Path, base: str = DEFAULT_BASE, head: str = "HEAD") -> str:
     """Return the cutoff commit for the scan, or "" if it cannot be resolved.
 
     The merge-base against ``base``, but resolved against ``origin/<base>``
@@ -144,19 +168,41 @@ def range_base(repo_root: Path, base: str = DEFAULT_BASE) -> str:
     read by git as an option, and the command silently answers a different
     question. Same guard, same reason, as `review.base_sha`.
     """
+    bases: list[str] = []
     for ref in (f"origin/{base}", base):
         rc, _ = _git(repo_root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
         if rc != 0:
-            continue
-        rc, out = _git(repo_root, "merge-base", "--", ref, "HEAD")
-        if rc == 0 and out.strip():
-            return out.strip()
-    return ""
+            continue  # the ref does not exist here; the other one may.
+        rc, out = _git(repo_root, "merge-base", "--", ref, head)
+        if rc != 0 or not out.strip():
+            # The ref EXISTS and merge-base still failed — unrelated histories,
+            # a corrupt object, a shallow clone. Refuse outright rather than
+            # falling through to the local ref: falling through NARROWS the
+            # range, and this function's whole job is to err wide. Measured by
+            # the silent-failure lane with an unrelated `origin/main`: the old
+            # loop returned local `main` and reported "no secrets", leaving all
+            # of local `main` unscanned and still published by the SHA push.
+            return ""
+        bases.append(out.strip())
+
+    if not bases:
+        return ""
+    # The OLDEST of the candidates, not the first that resolves. "Errs wide by
+    # construction" was asserted in this docstring while the code returned
+    # whichever ref happened to resolve first — true in the common case and not
+    # guaranteed. `merge-base --is-ancestor` makes it structural. (Spec lane,
+    # round 2.)
+    oldest = bases[0]
+    for candidate in bases[1:]:
+        rc, _ = _git(repo_root, "merge-base", "--is-ancestor", candidate, oldest)
+        if rc == 0:
+            oldest = candidate
+    return oldest
 
 
-def commits_in_range(repo_root: Path, base_sha: str) -> int:
-    """Return how many commits ``base_sha..HEAD`` holds, or -1 if unreadable."""
-    rc, out = _git(repo_root, "rev-list", "--count", f"{base_sha}..HEAD")
+def commits_in_range(repo_root: Path, base_sha: str, head: str = "HEAD") -> int:
+    """Return how many commits ``base_sha..head`` holds, or -1 if unreadable."""
+    rc, out = _git(repo_root, "rev-list", "--count", f"{base_sha}..{head}")
     if rc != 0:
         return -1
     try:
@@ -165,8 +211,8 @@ def commits_in_range(repo_root: Path, base_sha: str) -> int:
         return -1
 
 
-def _gitleaks_cmd(repo_root: Path, base_sha: str) -> list[str]:
-    """Build the gitleaks invocation for ``base_sha..HEAD``.
+def _gitleaks_cmd(repo_root: Path, base_sha: str, head: str = "HEAD") -> list[str]:
+    """Build the gitleaks invocation for ``base_sha..head``.
 
     ``--config`` is passed EXPLICITLY even though `mise.toml` exports
     ``GITLEAKS_CONFIG`` at the same path. Two reasons, both measured on
@@ -196,7 +242,20 @@ def _gitleaks_cmd(repo_root: Path, base_sha: str) -> list[str]:
         "git",
         str(repo_root),
         "--log-opts",
-        f"{base_sha}..HEAD",
+        # `--diff-merges=first-parent` closes an EVIL-MERGE hole, and it is #67's
+        # own scenario surviving #67's own gate. `git log -p` emits no patch for
+        # a merge commit, so content introduced by the merge RESOLUTION —
+        # present in neither parent — is scanned by nothing, and gitleaks logs
+        # no error, so the round-1 marker check does not fire either.
+        #
+        # Measured, and the first attempt at the repro did NOT fire: putting the
+        # token on a side branch leaves it in an ordinary commit that is itself
+        # in the range, which is caught. The real case needs a conflict resolved
+        # by writing the token. With that:
+        #   without the flag → rc=0, "3 commits scanned", NO LEAKS   ← the hole
+        #   with the flag    → rc=2, "4 commits scanned", leak found
+        # (Silent-failure lane, round 2.)
+        f"{base_sha}..{head} --diff-merges=first-parent",
         "--config",
         str(config_path(repo_root)),
         # See `_LEAKS`: this separates "found something" from "could not run",
@@ -214,16 +273,25 @@ def _gitleaks_cmd(repo_root: Path, base_sha: str) -> list[str]:
         "--verbose",
         "--no-banner",
         # REQUIRED for `_SCAN_ERROR_MARKERS` to work, not cosmetic. gitleaks
-        # colours its log level even when stdout is a pipe (it does not
-        # auto-detect), so the raw bytes are `\x1b[31mERR\x1b[0m` and a plain
+        # colours its log level even when the stream is a pipe rather than a
+        # terminal, so the raw bytes are `\x1b[31mERR\x1b[0m` and a plain
         # `" ERR "` match finds nothing — a detector that could only ever say
         # "no error". Its own flag, rather than an ANSI-stripping regex here.
+        #
+        # "the stream", not "stdout": gitleaks writes its whole log to STDERR
+        # (measured, piped: stdout 0 bytes, stderr 281). An earlier version of
+        # this comment said stdout, which would have made the marker check work
+        # only by the accident of `_run_gitleaks` merging both. It merges them
+        # deliberately; the comment was the part that was wrong. (Spec lane,
+        # round 2 — a stated condition that does not hold.)
         "--no-color",
     ]
 
 
-def _run_gitleaks(repo_root: Path, base_sha: str, span: str) -> tuple[bool, str]:
-    """Run the scan over ``base_sha..HEAD`` and translate its exit code.
+def _run_gitleaks(
+    repo_root: Path, base_sha: str, span: str, head: str = "HEAD"
+) -> tuple[bool, str]:
+    """Run the scan over ``base_sha..head`` and translate its exit code.
 
     The gitleaks binary is PINNED in `mise.toml`. It is therefore not allowed to
     be missing here, and a missing one is DRIFT rather than a skip — hence no
@@ -238,7 +306,7 @@ def _run_gitleaks(repo_root: Path, base_sha: str, span: str) -> tuple[bool, str]
     env = {k: v for k, v in os.environ.items() if k != "GITLEAKS_CONFIG"}
     try:
         proc = subprocess.run(
-            _gitleaks_cmd(repo_root, base_sha),
+            _gitleaks_cmd(repo_root, base_sha, head),
             cwd=repo_root,
             env=env,
             capture_output=True,
@@ -274,7 +342,7 @@ def _run_gitleaks(repo_root: Path, base_sha: str, span: str) -> tuple[bool, str]
     return False, f"gitleaks exited rc={proc.returncode} — could not scan {span}\n{detail[:800]}"
 
 
-def scan_range(repo_root: Path, base: str = DEFAULT_BASE) -> tuple[bool, str]:
+def scan_range(repo_root: Path, base: str = DEFAULT_BASE, head: str = "HEAD") -> tuple[bool, str]:
     """Scan every commit in ``base..HEAD`` for secrets; return ``(ok, summary)``.
 
     Fails CLOSED. An unresolvable base, an unreadable commit count, and a
@@ -294,23 +362,23 @@ def scan_range(repo_root: Path, base: str = DEFAULT_BASE) -> tuple[bool, str]:
         # instead of accusing the branch of carrying a secret.
         return False, f"no gitleaks config at {config} — refusing to claim clean"
 
-    base_sha = range_base(repo_root, base)
+    base_sha = range_base(repo_root, base, head)
     if not base_sha:
         return False, f"could not resolve a merge-base against '{base}' — refusing to claim clean"
 
-    count = commits_in_range(repo_root, base_sha)
+    count = commits_in_range(repo_root, base_sha, head)
     if count < 0:
-        return False, f"could not count commits in {base_sha[:12]}..HEAD"
+        return False, f"could not count commits in {base_sha[:12]}..{head[:12]}"
     if count == 0:
-        return True, f"no commits in {base_sha[:12]}..HEAD — nothing to scan"
+        return True, f"no commits in {base_sha[:12]}..{head[:12]} — nothing to scan"
 
     # "a range of N commits", not "N commits scanned": gitleaks prints its own,
     # SMALLER count (it skips commits whose diff adds nothing — a pure deletion,
     # for instance), and two different numbers in one report read as a bug.
     # This one is the range size, which is the number the reader is choosing to
     # push.
-    span = f"{base_sha[:12]}..HEAD (a range of {count} commit{'s' if count != 1 else ''})"
-    return _run_gitleaks(repo_root, base_sha, span)
+    span = f"{base_sha[:12]}..{head[:12]} (a range of {count} commit{'s' if count != 1 else ''})"
+    return _run_gitleaks(repo_root, base_sha, span, head)
 
 
 def main(repo_root: Path, argv: list[str] | None = None) -> int:

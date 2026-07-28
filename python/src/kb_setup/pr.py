@@ -135,20 +135,25 @@ def working_tree_clean(repo_root: Path) -> bool:
 GATES = ("kb-scan-range", "lint", "test", "brain-audit", "eval")
 
 
-def prepush_scan(repo_root: Path) -> tuple[bool, str]:
-    """Re-scan the commit range immediately before the push; ``(ok, summary)``.
+def prepush_scan(repo_root: Path, sha: str) -> tuple[bool, str]:
+    """Scan the range ending at ``sha`` — the commit about to be pushed.
 
-    A module-level seam, deliberately, and public for the same reason
-    :func:`run_gates` is: the ship tests that exercise CONTROL FLOW stub it, the
-    way they already stub the gates. A local import inside
+    ``sha``, not ``HEAD``. The first version took no ref and let `scan_range`
+    resolve `HEAD` itself, while the caller had captured a SHA specifically to
+    pin the push — so a HEAD move between the two validated a different commit
+    than the one published, reopening the very race the surrounding comments
+    said this scan closed. All three non-spine lanes found it independently in
+    round 2, and the commit message asserting otherwise was the worse half.
+
+    A module-level seam, and public for the same reason :func:`run_gates` is:
+    the ship tests that exercise CONTROL FLOW stub it. A local import inside
     `_validated_sha_for_push` could not be stubbed at all, so every such test
     would shell out to a real gitleaks against a fixture with no repository —
-    fail closed, correctly, for a reason that has nothing to do with what the
-    test asks.
+    failing closed, correctly, for a reason unrelated to what the test asks.
     """
     from kb_setup import scan
 
-    return scan.scan_range(repo_root)
+    return scan.scan_range(repo_root, head=sha)
 
 
 def run_gates(repo_root: Path) -> bool:
@@ -381,11 +386,11 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
         print(f"ship: refusing — HEAD moved since the review ({summary})")
         return None
 
-    # The secret scan is re-run HERE, on the commit about to be pushed, and not
-    # only as the first gate. Same reasoning as the receipt check directly
-    # above, applied to the other thing that must be true of the pushed bytes:
-    # `run_gates` scanned whatever HEAD was minutes ago, and nothing stops HEAD
-    # moving underneath the gates.
+    # The secret scan is re-run HERE, pinned to `sha` — the exact object the
+    # push will send — and not only as the first gate. Same reasoning as the
+    # receipt check directly above, applied to the other thing that must be true
+    # of the pushed bytes: `run_gates` scanned whatever HEAD was minutes ago,
+    # and nothing stops HEAD moving underneath the gates.
     #
     # A moved HEAD does not always invalidate the receipt — `review.EXEMPT_PATHS`
     # lets an ancestor's receipt cover a delta of `graphify-out/memory/**`, which
@@ -395,7 +400,7 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
     #
     # Cheap enough to repeat. The first run is what fails fast; THIS one is
     # what guarantees.
-    scanned, scan_summary = prepush_scan(repo_root)
+    scanned, scan_summary = prepush_scan(repo_root, sha)
     print(f"==> scan-range (pre-push): {scan_summary}")
     if not scanned:
         print("ship: refusing — the commit range did not pass the secret scan")

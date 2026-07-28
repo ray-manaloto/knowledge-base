@@ -29,7 +29,6 @@ import pytest
 from kb_setup import scan
 
 _GITLEAKS_TIMEOUT = 120
-_REPO = Path(__file__).parent.parent.absolute()
 
 
 def _synthetic_token() -> str:
@@ -71,14 +70,23 @@ def planted(
 
 
 def _gitleaks_dir(repo_root: Path) -> int:
-    """Scan the WORKING TREE, the way hk's file-list-driven step effectively does."""
+    """Scan the WORKING TREE — the question hk's `gitleaks` step asks, not its form.
+
+    NOT equivalent to that step, and the docstring used to imply it was: hk
+    passes N file arguments, and `gitleaks dir` IGNORES its path arguments once
+    there is more than one (measured last round: 1 arg → 5.01 KB, 2 args →
+    8.62 MB). What this shares with the hk step is the SUBJECT — the checked-out
+    tree — which is all this control arm needs. The genuine end-to-end arm
+    against the real hk step was run by hand and is recorded in `98899e4`.
+    (Standards lane, round 1.)
+    """
     proc = subprocess.run(
         [
             "gitleaks",
             "dir",
             str(repo_root),
             "--config",
-            str(Path(__file__).parent.parent / ".gitleaks.toml"),
+            str(scan.config_path(Path(__file__).parent.parent)),
             "--redact",
             "--no-banner",
         ],
@@ -222,7 +230,7 @@ def test_the_config_is_pinned_and_the_secret_is_redacted(tmp_path: Path) -> None
     cmd = scan._gitleaks_cmd(tmp_path, "deadbeef")
     assert "--redact" in cmd
     assert cmd[cmd.index("--config") + 1] == str(tmp_path / ".gitleaks.toml")
-    assert cmd[cmd.index("--log-opts") + 1] == "deadbeef..HEAD"
+    assert cmd[cmd.index("--log-opts") + 1].startswith("deadbeef..HEAD")
     assert cmd[cmd.index("--exit-code") + 1] == "2"
 
 
@@ -353,3 +361,127 @@ def test_unknown_argv_is_rejected(tmp_path: Path, commit_file: Callable[..., str
     # CONTROL ARM — the accepted shape still works, or this only proves it rejects.
     assert scan.main(tmp_path, ["--base", "main"]) == 0
     assert scan.main(tmp_path, []) == 0
+
+
+def test_a_secret_introduced_by_a_merge_commit_is_caught(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """An EVIL MERGE — #67's own scenario surviving #67's own gate.
+
+    `git log -p` emits no patch for a merge commit, so content introduced by the
+    merge RESOLUTION (present in neither parent) is scanned by nothing. gitleaks
+    logs no error for it either, so round 1's marker check does not fire.
+    `--diff-merges=first-parent` is the built-in that closes it.
+
+    The FIRST attempt at this probe did not fire, and that matters more than the
+    fix: putting the token on the side branch leaves it in an ordinary commit
+    that is itself inside the range, which was already caught. The hole needs a
+    conflict resolved by writing the token — content in neither parent.
+    Measured: without the flag rc=0 over 3 commits and "no leaks found"; with
+    it, rc=2. (Silent-failure lane, round 2.)
+    """
+    commit_file("conf.md", "shared = 1\n")
+    git("checkout", "-q", "main")
+    git("merge", "-q", "--ff-only", "work")
+    git("checkout", "-q", "-b", "side")
+    commit_file("conf.md", "shared = 2\n")
+    git("checkout", "-q", "work")
+    git("merge", "-q", "--ff-only", "main")
+    commit_file("conf.md", "shared = 3\n")
+
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "merge", "--no-commit", "side"],
+        capture_output=True,
+        check=False,
+        timeout=_GITLEAKS_TIMEOUT,
+    )
+    # The resolution introduces a token that exists in NEITHER parent.
+    (tmp_path / "conf.md").write_text(
+        f'shared = 4\ntoken = "{_synthetic_token()}"\n', encoding="utf-8"
+    )
+    git("add", "--", "conf.md")
+    git("commit", "-q", "-m", "merge side")
+    (tmp_path / "conf.md").write_text("shared = 4\n", encoding="utf-8")
+    git("commit", "-q", "-am", "remove the token")
+
+    ok, summary = scan.scan_range(tmp_path)
+    assert not ok, summary
+    assert "SECRETS FOUND" in summary
+
+
+def test_diff_merges_is_in_the_invocation() -> None:
+    """CONTROL ARM — the flag the test above depends on, asserted directly.
+
+    Without it that test could pass for an unrelated reason and the flag could
+    be dropped in a refactor with the suite staying green.
+    """
+    cmd = scan._gitleaks_cmd(Path("/x"), "deadbeef", "cafe")
+    assert "--diff-merges=first-parent" in cmd[cmd.index("--log-opts") + 1]
+    assert "deadbeef..cafe" in cmd[cmd.index("--log-opts") + 1]
+
+
+def test_a_broken_origin_ref_refuses_rather_than_narrowing(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """`origin/<base>` EXISTS but merge-base against it fails → refuse.
+
+    The first version's loop fell through to local `<base>`, which NARROWS the
+    range — the opposite of this function's whole job. Reproduced by the
+    silent-failure lane with an unrelated `origin/main`: it returned local
+    `main` and reported "no secrets", leaving all of local `main` unscanned and
+    still published by the SHA push. (Silent-failure lane and cold lane, round 2.)
+    """
+    commit_file("docs/work.md", "x\n")
+    # An `origin/main` with a completely unrelated history.
+    git("checkout", "-q", "--orphan", "unrelated")
+    git("rm", "-q", "-rf", ".")
+    (tmp_path / "other.md").write_text("y\n", encoding="utf-8")
+    git("add", "--", "other.md")
+    git("commit", "-q", "-m", "unrelated root")
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+    git("checkout", "-q", "work")
+
+    assert scan.range_base(tmp_path) == ""
+    ok, summary = scan.scan_range(tmp_path)
+    assert not ok
+    assert "could not resolve" in summary
+
+
+def test_the_cutoff_is_the_oldest_candidate_not_the_first_to_resolve(
+    tmp_path: Path, git: Callable[..., str], commit_file: Callable[..., str]
+) -> None:
+    """Erring wide has to be STRUCTURAL, not incidental.
+
+    The docstring asserted "errs wide by construction" while the code returned
+    whichever ref resolved FIRST — true in the common case, guaranteed in none.
+    (Spec lane, round 2.)
+
+    The discriminating fixture is the uncommon-but-real one: local `main`
+    BEHIND the remote, with the branch forked from the remote tip — what you get
+    from a `git fetch` followed by branching off `origin/main`. There
+    `merge-base(origin/main, HEAD)` is NEWER than `merge-base(main, HEAD)`, so
+    preferring the remote blindly NARROWS the range.
+
+    The first version of this test used a local-main-ahead fixture, where the
+    remote candidate is already the oldest — so `return bases[0]` passed it and
+    the test proved nothing. Caught by mutating the code it was written for.
+    """
+    git("checkout", "-q", "main")
+    behind = git("rev-parse", "HEAD")
+
+    # Stand in for a remote that has moved on.
+    git("checkout", "-q", "-b", "remote-sim")
+    commit_file("docs/remote-a.md", "a\n")
+    remote_tip = commit_file("docs/remote-b.md", "b\n")
+    git("update-ref", "refs/remotes/origin/main", remote_tip)
+
+    # Local `main` stays behind; the working branch forks from the REMOTE tip.
+    git("checkout", "-q", "-b", "forked-from-remote", remote_tip)
+    commit_file("docs/branch.md", "c\n")
+
+    assert git("rev-parse", "main") == behind, "local main must be BEHIND for this to discriminate"
+    base = scan.range_base(tmp_path)
+    assert base == behind, (
+        "the OLDER candidate must win; preferring origin/ blindly would cut at "
+        f"{remote_tip[:12]} and skip two commits"
+    )

@@ -13,6 +13,12 @@ from collections.abc import Callable
 import pytest
 from kb_setup import pr
 
+#: Captured at IMPORT, before the autouse stub below can replace it. The one
+#: test that must exercise the real seam uses this rather than
+#: `monkeypatch.undo()`, which undoes EVERY patch on the instance and would
+#: silently drop any autouse fixture added later. (Standards lane, round 2.)
+_REAL_PREPUSH_SCAN = pr.prepush_scan
+
 
 class _Proc:
     """Minimal stand-in for subprocess.CompletedProcess."""
@@ -296,7 +302,7 @@ def _stub_prepush_scan(monkeypatch) -> None:
     re-patches over this. A stub with no matching failure test would be exactly
     the pass-only gate `probes-need-a-control-arm.md` rule 2 forbids.
     """
-    monkeypatch.setattr(pr, "prepush_scan", lambda _root: (True, "stubbed: no secrets"))
+    monkeypatch.setattr(pr, "prepush_scan", lambda _root, _sha: (True, "stubbed: no secrets"))
 
 
 def _clean_branch_handler(cmd: list[str]) -> _Proc:
@@ -842,23 +848,35 @@ def test_ship_refuses_when_the_prepush_scan_fails(monkeypatch, tmp_path):
     _write_valid_receipt(tmp_path)
     _stub_run(monkeypatch, _clean_branch_handler)
     monkeypatch.setattr(pr, "run_gates", lambda _root: True)
-    monkeypatch.setattr(pr, "prepush_scan", lambda _root: (False, "SECRETS FOUND in x..HEAD"))
+    monkeypatch.setattr(pr, "prepush_scan", lambda _root, _sha: (False, "SECRETS FOUND in x..HEAD"))
 
     assert pr.ship_main(tmp_path) == 1
 
 
-def test_the_prepush_scan_really_calls_the_scanner(monkeypatch, tmp_path):
-    """The seam must not be a hole: `prepush_scan` has to reach `scan.scan_range`.
+def test_the_prepush_scan_scans_the_pushed_sha_over_a_real_range(tmp_path, git, commit_file):
+    """The seam must reach the scanner AND scan the range ending at `sha`.
 
-    Without this, the autouse stub plus a `prepush_scan` that returned
-    `(True, "")` unconditionally would keep the whole suite green while the
-    pre-push scan did nothing at all.
+    THE FIRST VERSION OF THIS TEST WAS DECORATION. It ran both sides against a
+    bare `tmp_path` with no git repo and no config, so each returned the same
+    trivial first-guard refusal and it could never observe *which* range the
+    seam scanned. The Standards lane mutation-proved it: pointing `prepush_scan`
+    at an always-empty range — a permanently green gate — left the module at
+    rc=0, 41 passed. `probes-need-a-control-arm.md` rule 2, in the very test
+    added to prevent that.
+
+    So: a real repository, a real range, and an assertion about the SHA.
     """
-    from kb_setup import scan
+    first = commit_file("docs/one.md", "x\n")
+    commit_file("docs/two.md", "y\n")
 
-    # Undo the autouse stub — this is the one test that must see the real thing.
-    monkeypatch.undo()
+    # Pinned to `first`, so the range is ONE commit even though HEAD holds two.
+    # This is the assertion the old version could not make, and it is the one
+    # that reddens if the seam ever resolves `HEAD` for itself again.
+    ok, summary = _REAL_PREPUSH_SCAN(tmp_path, first)
+    assert ok, summary
+    assert "a range of 1 commit" in summary, summary
+    assert "..HEAD" not in summary, "the scan must name the pinned SHA, not HEAD"
 
-    ok, summary = pr.prepush_scan(tmp_path)
-    expected_ok, expected_summary = scan.scan_range(tmp_path)
-    assert (ok, summary) == (expected_ok, expected_summary)
+    ok, summary = _REAL_PREPUSH_SCAN(tmp_path, "HEAD")
+    assert ok, summary
+    assert "a range of 2 commits" in summary, summary
