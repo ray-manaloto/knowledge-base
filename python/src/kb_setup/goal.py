@@ -24,7 +24,9 @@ lying. A file that cannot be read is NOT a pass.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -302,6 +304,42 @@ def _section(text: str, name: str) -> str | None:
     return "\n".join(body)
 
 
+#: A `1.` / `2.` list item at the start of a line.
+_NUMBERED_ITEM_RE = re.compile(r"^[ \t]*\d+\.\s")
+
+#: Where one goal section ends and the next begins. Built from the section names
+#: this convention uses, because a goal is prose with sentence-case headers
+#: rather than markdown headings — there is no `##` to split on.
+_SECTION_START_RE = re.compile(
+    r"^[ \t]*(?:#+[ \t]*)?\*{0,2}(?:GOAL:|EVIDENCE RULE|Read first|Preserve|Posture|Phases"
+    r"|Verification|Stop when|Hand back|Two landings)\b",
+    re.IGNORECASE,
+)
+
+
+def _section_block(text: str, name: str) -> str | None:
+    """A section's FULL body, blank lines included, up to the next section header.
+
+    Distinct from :func:`_section`, which stops at the first blank line. That is
+    right for a one-paragraph section like Posture and wrong for Verification,
+    whose numbered items sit *below* a blank line — using the paragraph version
+    there would silently see zero items and report a vacuous OK.
+    """
+    header = re.compile(
+        rf"^[ \t]*(?:#+[ \t]*)?\*{{0,2}}{re.escape(name)}\b[.:]?", re.IGNORECASE | re.MULTILINE
+    )
+    m = header.search(text)
+    if m is None:
+        return None
+    lines = text[m.start() :].splitlines()
+    body = [lines[0]]
+    for line in lines[1:]:
+        if _SECTION_START_RE.match(line):
+            break
+        body.append(line)
+    return "\n".join(body)
+
+
 def _check_name(path: Path | None, kind: str) -> Finding:
     """The `<date>-<HHMM>-<project>-<topic>-{goal,rider}.md` schema."""
     if path is None:
@@ -316,11 +354,50 @@ def _check_name(path: Path | None, kind: str) -> Finding:
     return Finding("naming-schema", Verdict.OK, path.name)
 
 
+def _check_verification_items(text: str) -> Finding:
+    """Every numbered Verification item names a command or a literal.
+
+    The mechanizable half of the stated-check test. A clause like "a probe
+    showing the string IS masked" reads as rigorous and leaves the METHOD to the
+    agent's discretion — which is how two control arms end up running different
+    commands and proving nothing about each other. Found by hand auditing this
+    repo's own first goal; a machine can decide it, so it should.
+
+    Deliberately shallow: it asks whether a backticked span EXISTS in the item,
+    not whether that span is the right command. Judging fitness is the model's
+    job (see the skill's rubric); judging presence is not, and conflating the two
+    would put a heuristic where judgement belongs.
+    """
+    section = _section_block(text, "Verification")
+    if section is None:
+        return Finding("verification-items", Verdict.WARN, "no Verification section to check")
+    items = [ln for ln in section.splitlines() if _NUMBERED_ITEM_RE.match(ln)]
+    if not items:
+        return Finding(
+            "verification-items",
+            Verdict.WARN,
+            "Verification is prose, not numbered items — the evaluator's `reason` names "
+            "which clause failed, so numbering it turns a rejection into useful steering.",
+        )
+    bare = [ln for ln in items if "`" not in ln]
+    if bare:
+        return Finding(
+            "verification-items",
+            Verdict.FAIL,
+            f"{len(bare)} of {len(items)} item(s) name no command or literal — the first is "
+            f"{bare[0].strip()[:60]!r}. Name the exact command, or two arms can diverge.",
+            _line_of(text, bare[0].strip()[:40]),
+        )
+    return Finding("verification-items", Verdict.OK, f"{len(items)} item(s), all name a literal")
+
+
 def check_goal(text: str, path: Path | None = None) -> list[Finding]:
     """Every mechanical test that applies to a goal document."""
     findings = [_check_char_cap(text), _check_name(path, "goal")]
     findings.extend(_check_sections(text))
-    findings.extend([_check_headline(text), _check_sentinels(text)])
+    findings.extend(
+        [_check_headline(text), _check_sentinels(text), _check_verification_items(text)]
+    )
     findings.extend(_check_adjectives(text))
     findings.extend(
         [_check_turn_bound(text), _check_posture_negations(text), _check_preserve(text)]
@@ -410,6 +487,118 @@ def _resolve(target: str, repo_root: Path) -> tuple[str, Path | None, bool]:
     return target, None, False
 
 
+#: What a round can end as. `cleared` and `stalled` are NOT failures to hide —
+#: they are the outcomes that teach the most, because they say the condition was
+#: wrong rather than the work. A skill that only ever records `achieved` learns
+#: nothing about its own conventions.
+_RESULTS = ("achieved", "cleared", "stalled", "blocked")
+
+#: Runs a mise task and returns its exit code. Named so tests can substitute one
+#: without shelling out — and typed concretely, because `object` is not safe to
+#: call and loosening it to keep a test simple pushes the looseness into the
+#: production path (the same defect `currency.docs` had with its fetcher).
+TaskRunner = Callable[[Path, list[str]], int]
+
+#: Cells in a `| a | b | Status |` row, minimum, for the index flip to be safe.
+_MIN_ROW_CELLS = 2
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """How a round actually ended.
+
+    Grouped so the recorder takes one argument for the finding rather than three
+    positional strings that are easy to swap.
+    """
+
+    result: str
+    turns: str = ""
+    note: str = ""
+
+
+def record_outcome(
+    repo_root: Path,
+    pair: str,
+    outcome: Outcome,
+    *,
+    runner: TaskRunner | None = None,
+) -> int:
+    """Record how a round actually went, and flip its row in the index.
+
+    THIS IS THE HALF THAT MAKES THE SKILL SELF-IMPROVING. Everything else in this
+    module encodes hypotheses about what makes a goal work; only an outcome tests
+    one. The worked example that justifies it: a condition requiring "N passed"
+    from `mise run test` would have looped forever, because that task runs pytest
+    under `-qq` and the string never appears — no amount of auditing the goal
+    text finds that, and one recorded outcome does.
+
+    Delegates to `graphify save-result` and `graphify reflect` through the same
+    seam every other memory write uses, rather than writing memory files
+    directly: one writer means one format.
+    """
+    result, turns, note = outcome.result, outcome.turns, outcome.note
+    if result not in _RESULTS:
+        print(f"kb-goal-outcome: --result must be one of {', '.join(_RESULTS)} (got {result!r})")
+        return 2
+    name = Path(pair).name.replace("-goal.md", "").replace("-rider.md", "")
+    question = f"How did the `{name}` goal round actually behave when run?"
+    answer = (
+        f"result={result} turns={turns or 'unrecorded'}. {note}"
+        if note
+        else f"result={result} turns={turns or 'unrecorded'}. (no detail recorded)"
+    )
+    run: TaskRunner = runner or _run_task
+    rc = run(
+        repo_root,
+        [
+            "kb-remember",
+            "--",
+            "--question",
+            question,
+            "--answer",
+            answer,
+            "--outcome",
+            "corrected" if result != "achieved" else "useful",
+        ],
+    )
+    if rc != 0:
+        print("kb-goal-outcome: kb-remember failed — outcome NOT recorded")
+        return rc
+    run(repo_root, ["kb-reflect"])
+    updated = _flip_index_row(repo_root, name, result)
+    print(
+        f"kb-goal-outcome: recorded {name} -> {result}"
+        + ("" if updated else " (no index row found)")
+    )
+    return 0
+
+
+def _run_task(repo_root: Path, argv: list[str]) -> int:
+    """Run a mise task. Separated so tests can substitute it without shelling out."""
+    return subprocess.run(
+        ["mise", "run", *argv], cwd=repo_root, check=False, timeout=900
+    ).returncode
+
+
+def _flip_index_row(repo_root: Path, name: str, result: str) -> bool:
+    """Set the Status cell for ``name`` in docs/goals/README.md. True if changed."""
+    index = repo_root / "docs" / "goals" / "README.md"
+    if not index.is_file():
+        return False
+    lines = index.read_text(encoding="utf-8").splitlines(keepends=True)
+    changed = False
+    for i, line in enumerate(lines):
+        if line.startswith("|") and name in line:
+            cells = line.rstrip("\n").split("|")
+            if len(cells) >= _MIN_ROW_CELLS:
+                cells[-2] = f" {result} "
+                lines[i] = "|".join(cells) + "\n"
+                changed = True
+    if changed:
+        index.write_text("".join(lines), encoding="utf-8")
+    return changed
+
+
 def main(args: list[str], repo_root: Path) -> int:
     """`kb-goal-check` — always returns 0; this is advisory, never a gate."""
     if args and args[0] == "--text":
@@ -434,3 +623,26 @@ def main(args: list[str], repo_root: Path) -> int:
 
     print(render(findings))
     return 0
+
+
+def outcome_main(args: list[str], repo_root: Path) -> int:
+    """`kb-goal-outcome` — parse the flags and record the round's real result."""
+    if not args:
+        print(f'kb-goal-outcome: <pair> --result {"|".join(_RESULTS)} [--turns N] [--note "..."]')
+        return 2
+    pair, rest = args[0], args[1:]
+    flags = {"--result": "", "--turns": "", "--note": ""}
+    key = ""
+    for token in rest:
+        if token in flags:
+            key = token
+        elif key:
+            flags[key] = f"{flags[key]} {token}".strip()
+    if not flags["--result"]:
+        print(f"kb-goal-outcome: --result is required ({'|'.join(_RESULTS)})")
+        return 2
+    return record_outcome(
+        repo_root,
+        pair,
+        Outcome(result=flags["--result"], turns=flags["--turns"], note=flags["--note"]),
+    )

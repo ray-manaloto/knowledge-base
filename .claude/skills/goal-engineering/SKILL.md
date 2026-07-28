@@ -126,13 +126,19 @@ only naming them. A verdict without a replacement puts the work back on the user
 When a round ends, come back and record what actually happened:
 
 ```bash
-mise run kb-remember -- --question "How did the <headline> goal behave?" \
-  --answer "result=<achieved|cleared|stalled> turns=<n>. <which clause kept failing and why>" \
-  --outcome useful
-mise run kb-reflect
+mise run kb-goal-outcome -- <pair> --result achieved|cleared|stalled|blocked \
+  --turns <n> --note "which clause kept failing, and why"
 ```
 
-Then flip the row in `docs/goals/README.md`.
+That writes through `kb-remember` + `kb-reflect` and flips the Status cell in
+`docs/goals/README.md` — one command, so the step that is easiest to skip is
+also the cheapest to do.
+
+**`cleared` and `stalled` are not failures to hide.** They teach more than
+`achieved`, because they say the *condition* was wrong rather than the work —
+which is why the recorder tags them `corrected` rather than `useful`. A skill
+whose memory contains only successes has learned nothing about its own
+conventions.
 
 This matters more than it looks. The conventions in this skill are hypotheses
 about what makes a goal work; only outcomes test them. The one worked example so

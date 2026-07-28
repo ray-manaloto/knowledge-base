@@ -232,3 +232,123 @@ def test_main_always_returns_zero_even_on_a_broken_goal(tmp_path: Path) -> None:
     must never be able to block a PR.
     """
     assert goal.main(["--text", "this is not a goal at all"], tmp_path) == 0
+
+
+# --- verification-items: the mechanizable half of the stated-check test --------
+
+
+def test_a_verification_item_with_no_command_fails() -> None:
+    """The defect this check exists for, found by hand on this repo's first goal.
+
+    "a probe showing a string IS masked" reads as rigorous and leaves the METHOD
+    to the agent — which is how two control arms end up running different
+    commands and proving nothing about each other.
+    """
+    bad = _GOOD.replace(
+        "The transcript must contain `REDACT-ARM+ @ <sha>` and",
+        "The transcript must contain:\n\n1. a probe showing a string IS masked,"
+        " pasted.\n2. `REDACT-ARM- @ <sha>` and",
+    )
+    assert _verdict(goal.check_goal(bad), "verification-items") is Verdict.FAIL
+
+
+def test_numbered_items_that_all_name_a_literal_pass() -> None:
+    """CONTROL ARM: the check must be able to return OK."""
+    good = _GOOD.replace(
+        "The transcript must contain `REDACT-ARM+ @ <sha>` and",
+        "The transcript must contain:\n\n1. `REDACT-ARM+ @ <sha>`, pasted.\n"
+        "2. `REDACT-ARM- @ <sha>` and",
+    )
+    assert _verdict(goal.check_goal(good), "verification-items") is Verdict.OK
+
+
+def test_the_section_block_survives_a_blank_line() -> None:
+    r"""REGRESSION ARM for the `^\s*` bug.
+
+    `\\s` matches newlines, so `^\\s*` under MULTILINE swallowed the blank line
+    BEFORE the header — making the header itself look like the *next* section and
+    returning an empty block. The check then reported a plausible "Verification is
+    prose, not numbered items" on a goal that had six numbered items. A quietly
+    wrong check is worse than a missing one, so this pins the anchor.
+    """
+    text = "Posture. No.\n\nVerification. Items:\n\n1. `a` here\n2. `b` here\n\nStop when done.\n"
+    block = goal._section_block(text, "Verification")
+    assert block is not None
+    assert sum(1 for line in block.splitlines() if goal._NUMBERED_ITEM_RE.match(line)) == 2
+
+
+# --- kb-goal-outcome ----------------------------------------------------------
+
+
+def test_an_unknown_result_is_refused() -> None:
+    """Fail closed on a typo rather than recording a result nothing can group by."""
+    assert (
+        goal.record_outcome(Path("nonexistent-root"), "x-goal.md", goal.Outcome("donezo", "", ""))
+        == 2
+    )
+
+
+def test_a_recorded_outcome_calls_remember_then_reflect(tmp_path: Path) -> None:
+    """Writes through the existing memory seam — one writer, one format."""
+    calls: list[list[str]] = []
+    rc = goal.record_outcome(
+        tmp_path,
+        "2026-07-27-1702-kb-x-goal.md",
+        goal.Outcome("achieved", "9", "clause 5 never matched"),
+        runner=lambda _r, argv: calls.append(argv) or 0,
+    )
+    assert rc == 0
+    assert calls[0][0] == "kb-remember"
+    assert calls[1] == ["kb-reflect"]
+    assert "clause 5 never matched" in " ".join(calls[0])
+
+
+def test_a_non_achieved_result_is_recorded_as_corrected(tmp_path: Path) -> None:
+    """Non-achieved results are tagged `corrected`, not `useful`.
+
+    `cleared`/`stalled` are the outcomes that teach most — they say the CONDITION
+    was wrong, not the work. Tagging them `useful` would bury them.
+    """
+    calls: list[list[str]] = []
+    goal.record_outcome(
+        tmp_path,
+        "x-goal.md",
+        goal.Outcome("stalled", "25", "looped"),
+        runner=lambda _r, argv: calls.append(argv) or 0,
+    )
+    assert "corrected" in calls[0]
+
+
+def test_a_failed_remember_aborts_before_reflect(tmp_path: Path) -> None:
+    """A failed remember aborts before reflect.
+
+    Reflecting over an outcome that was never recorded would aggregate nothing
+    while printing success.
+    """
+    calls: list[list[str]] = []
+    rc = goal.record_outcome(
+        tmp_path,
+        "x-goal.md",
+        goal.Outcome("achieved", "1", "n"),
+        runner=lambda _r, argv: (calls.append(argv), 1)[1],
+    )
+    assert rc == 1
+    assert len(calls) == 1
+
+
+def test_the_index_row_is_flipped(tmp_path: Path) -> None:
+    """The README row is the human-visible half of the outcome."""
+    index = tmp_path / "docs" / "goals" / "README.md"
+    index.parent.mkdir(parents=True)
+    index.write_text(
+        "| Pair | Word | Round | Status |\n|---|---|---|---|\n"
+        "| `2026-07-27-1702-kb-x` | **X** | why | not started |\n",
+        encoding="utf-8",
+    )
+    goal.record_outcome(
+        tmp_path,
+        "2026-07-27-1702-kb-x-goal.md",
+        goal.Outcome("achieved", "9", "n"),
+        runner=lambda _r, _a: 0,
+    )
+    assert "| achieved |" in index.read_text(encoding="utf-8")
