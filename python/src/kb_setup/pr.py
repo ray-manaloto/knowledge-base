@@ -42,6 +42,16 @@ _OK_BUCKETS = frozenset({"pass", "skipping", "neutral"})
 #: dropping only the first would leave the repo with no review at all.
 _ADVISORY_CHECKS = frozenset({"CodeRabbit"})
 
+#: How long `land` gives the checks to reach a terminal state before treating
+#: the delay as QUOTA rather than review.
+#:
+#: The distinction is the whole point. "Never blocking" is not "never looking":
+#: a CodeRabbit verdict that lands ten seconds after the merge was never read,
+#: and reading it costs nothing. What must never happen is waiting on someone
+#: else's rate limit — which is why this is bounded and why expiry proceeds
+#: rather than refuses.
+_TERMINAL_WAIT = 180
+
 
 def _run(
     cmd: list[str], *, cwd: Path | None = None, timeout: int = _GIT_TIMEOUT
@@ -151,6 +161,34 @@ def checks_state(pr_number: int) -> tuple[bool, str]:
     return True, f"{len(binding)} binding check(s) green{note}"
 
 
+def await_terminal(pr_number: int, *, timeout: int = _TERMINAL_WAIT) -> str:
+    """Give a PR's checks a BOUNDED chance to reach a terminal state.
+
+    Uses `gh pr checks --watch` rather than a hand-rolled poll loop, per
+    `gh-cli-watch.md`: the CLI already redraws, paces its own interval, and
+    knows what terminal means. What it has no flag for is a *bound*, so the
+    bound is applied from outside.
+
+    Expiry is not a failure. Past the bound the remaining delay is a rate limit,
+    not a review, and this repo's binding gates all ran locally before the push.
+    Returns a note for the caller to print; never raises, never blocks a merge.
+    """
+    try:
+        subprocess.run(
+            ["gh", "pr", "checks", str(pr_number), "--watch", "--interval", "10"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return f"still pending after {timeout}s — treating as quota, not review; proceeding"
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Could not ask. Say so rather than implying the checks settled.
+        return f"could not watch checks ({exc}); reading whatever state exists"
+    return "reached a terminal state"
+
+
 def pr_head_oid(pr_number: int) -> str | None:
     """Return the PR's current head commit SHA, or None if it cannot be read."""
     rc, out = _run(
@@ -241,6 +279,11 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
 
 def land_main(repo_root: Path, pr_number: int) -> int:
     """Verify a PR's checks, squash-merge it pinned to that SHA, and sync main."""
+    # Wait for a TERMINAL state, never for quota. Advisory checks still cannot
+    # block the merge — but a verdict that arrives ten seconds later was never
+    # read, and reading it is free.
+    print(f"==> waiting for terminal check state: {await_terminal(pr_number)}")
+
     green, summary = checks_state(pr_number)
     print(f"==> checks: {summary}")
     if not green:
@@ -251,6 +294,23 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     if not oid:
         print(f"land: could not read head SHA for PR #{pr_number}")
         return 1
+
+    # The PR head — not local HEAD. `ship` guards what IT pushes; a commit
+    # pushed afterwards by any other route reaches the merge having been
+    # reviewed by nothing. Receipts are machine-local, so this also means you
+    # land from the machine you reviewed on; the message says so, because
+    # otherwise the refusal looks like a bug rather than the design.
+    from kb_setup import review
+
+    reviewed, detail = review.receipt_state(repo_root, oid)
+    print(f"==> review: {detail}")
+    if not reviewed:
+        print(
+            f"land: refusing — PR #{pr_number}'s head is unreviewed. Run the "
+            f"`kb-review` skill against it, or land from the machine that did."
+        )
+        return 1
+
     print(f"==> merging PR #{pr_number} pinned to {oid[:12]}")
 
     rc, out = _run(

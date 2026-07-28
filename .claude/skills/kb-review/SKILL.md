@@ -65,28 +65,46 @@ that is a **SKIP because it does not apply**, which the receipt must distinguish
 from a lane that failed to run. Collapsing those two is how every defect in the
 currency engine's review happened.
 
-### 3. Gather the sources each lane needs
+### 3. Resolve the two sources the spine cannot find here
 
-**Standards** — `.claude/rules/*.md` (this repo's real standards; there is no
-`CODING_STANDARDS.md` or `CONTRIBUTING.md` here, which is what the upstream
-spine assumes) plus `CLAUDE.md`, plus the smell baseline in
-`references/smell-baseline.md`.
+The Standards and Spec axes are **not implemented here.** They come from
+`mattpocock-skills:code-review`, which already does exactly what this repo
+needs: two axes, parallel sub-agents, no cross-axis reranking, a Fowler smell
+baseline, and an explicit rule to skip whatever tooling already enforces.
+`use-tool-builtins.md` makes composing it the default and re-writing it the
+thing that needs justifying — and an earlier draft of this skill did re-write
+it, which the Spec lane caught.
 
-**Spec** — in this order:
+What it *cannot* do unaided is find this repo's two sources, because both of
+its defaults are absent here. Resolve them first and hand them over:
+
+**Standards sources** → `.claude/rules/*.md` plus `CLAUDE.md`. There is no
+`CODING_STANDARDS.md` and no `CONTRIBUTING.md` in this repo; those are the
+spine's defaults, and it will find nothing if left to look.
+
+**Spec source** → in this order:
 
 1. The `docs/goals/` pair for the round, if one is open.
 2. The newest `.agent/plans/session-*.md`.
 3. An issue referenced in a commit message (`#123`, `Closes #45`) — `gh issue view`.
-4. If none exists, say so and let the Spec lane report *no spec available*
-   rather than inventing one to review against. Do **not** reach for
-   `docs/agents/issue-tracker.md` — agnix rejects `**/agents/*.md` here, because
-   that glob reads as agent *definitions*, so the file the upstream spine wants
-   cannot exist in this repo.
+4. If none exists, say so and let the Spec axis report *no spec available*
+   rather than inventing one to review against.
 
-### 4. Spawn the lanes — one message, all of them
+Do **not** reach for `docs/agents/issue-tracker.md`, and do **not** run
+`/setup-matt-pocock-skills` when the spine asks you to: agnix rejects
+`**/agents/*.md` here because that glob reads as agent *definitions*, so the
+file the spine wants **cannot exist in this repo**.
 
-**Standards** and **Spec** are `general-purpose` subagents. Paste the smell
-baseline into the Standards prompt in full; it has no other access to it.
+### 4. Run the two axes through the spine
+
+Invoke `mattpocock-skills:code-review` with the fixed point from step 1, and
+give it the two sources from step 3 so it does not go looking for its defaults.
+
+**It carries the Fowler baseline itself — do not supply one.** Add only
+`references/repo-smells.md`, which holds the handful of recurring smells that
+are specific to this repo and are not in Fowler.
+
+### 5. Run the two lanes the spine does not have
 
 **The cold lane must be a different model family than whoever wrote the code.**
 Claude wrote it, so the cold lane is `fable-orchestrator:codex-reviewer`
@@ -107,10 +125,11 @@ is the reason this gets its own lens instead of a bullet in Standards: a
 suppressed error is the failure mode this repo cares most about, and a lens that
 shares context with three other concerns finds fewer of them.
 
-### 5. Aggregate — verbatim, unreranked
+### 6. Aggregate — verbatim, unreranked
 
 Present under `## Standards`, `## Spec`, `## Cold (<lane>)`, `## Silent failures`.
-Verbatim or lightly cleaned.
+Verbatim or lightly cleaned. The spine aggregates its own two axes — keep its
+wording and set the other two alongside rather than folding them in.
 
 **Do not merge or rerank findings across lenses.** A change can pass one axis and
 fail another — code that follows every rule and implements the wrong thing is
@@ -124,7 +143,7 @@ lens*. No single winner across lenses.
 citation is labelled `unverified` and reported as such rather than dropped —
 dropping it hides a lead, promoting it launders a guess.
 
-### 6. Persist each lane's report, THEN write the receipt
+### 7. Persist each lane's report, THEN write the receipt
 
 Write every lane's report verbatim to
 `.agent/kb/review/reports/review-<sha>-<lane>.md` **as it arrives** —
@@ -168,7 +187,7 @@ implying the loop is closed.
 
 ## References
 
-- `references/smell-baseline.md` — the Fowler smell baseline the Standards lane
-  carries, and the two rules that bind it.
+- `references/repo-smells.md` — the repo-specific smells that are NOT in the
+  spine's Fowler baseline. Additions only; the spine carries the rest.
 - `references/lanes.md` — the exact sub-agent prompts, the fallback chain, and
   the receipt schema.

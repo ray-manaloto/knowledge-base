@@ -7,6 +7,8 @@ assertion has a control arm: a check that can only pass is not a check.
 from __future__ import annotations
 
 import json
+import subprocess
+from collections.abc import Callable
 
 import pytest
 from kb_setup import pr
@@ -123,8 +125,33 @@ def test_checks_state_unparsable_is_not_green(monkeypatch):
 # --------------------------------------------------------------------------
 
 
-def test_land_pins_merge_to_verified_head_sha(monkeypatch, tmp_path):
-    seen: list[list[str]] = []
+def _reviewed(tmp_path, oid: str) -> None:
+    """Write a valid review receipt (and its lane reports) for ``oid``."""
+    from kb_setup import review
+
+    for lane in ("standards", "spec"):
+        rp = review.report_path(tmp_path, oid, lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("NO FINDINGS", encoding="utf-8")
+    review.write_receipt(
+        tmp_path,
+        review.Receipt(
+            sha=oid,
+            fixed_point="main",
+            fixed_point_sha="a" * 40,
+            lanes_ran=("standards", "spec"),
+            lanes_skipped=(
+                "cold:not-applicable-docs-only",
+                "silent-failure:not-applicable-docs-only",
+            ),
+            findings=0,
+            blocking=0,
+        ),
+    )
+
+
+def _land_handler(seen: list[list[str]]) -> Callable[[list[str]], _Proc]:
+    """A PR whose checks are green and whose head is a fixed SHA."""
 
     def handler(cmd: list[str]) -> _Proc:
         seen.append(cmd)
@@ -134,7 +161,13 @@ def test_land_pins_merge_to_verified_head_sha(monkeypatch, tmp_path):
             return _Proc(0, "deadbeefcafe1234\n")
         return _Proc(0, "")
 
-    _stub_run(monkeypatch, handler)
+    return handler
+
+
+def test_land_pins_merge_to_verified_head_sha(monkeypatch, tmp_path):
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    _stub_run(monkeypatch, _land_handler(seen))
     assert pr.land_main(tmp_path, 42) == 0
 
     merge = next(c for c in seen if c[:3] == ["gh", "pr", "merge"])
@@ -341,3 +374,45 @@ def test_ship_refuses_when_head_moves_during_the_gates(monkeypatch, tmp_path):
 
     assert pr.ship_main(tmp_path) == 1
     assert not any(c[:2] == ["git", "push"] for c in seen), "must not push"
+
+
+def test_land_waits_for_a_terminal_state_before_reading_checks(monkeypatch, tmp_path):
+    """`--watch` must actually be used, not a hand-rolled poll (`gh-cli-watch.md`).
+
+    "Never blocking" is not "never looking": a CodeRabbit verdict that lands
+    ten seconds after the merge was never read, and reading it is free.
+    """
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    _stub_run(monkeypatch, _land_handler(seen))
+    assert pr.land_main(tmp_path, 42) == 0
+    watched = [c for c in seen if c[:3] == ["gh", "pr", "checks"] and "--watch" in c]
+    assert watched, "land must give the checks a bounded chance to settle"
+
+
+def test_await_terminal_expiry_proceeds_rather_than_refusing(monkeypatch):
+    """Past the bound the remaining delay is a rate limit, not a review.
+
+    This is the half of the spec that matters: waiting on quota is the thing
+    that blocked a doc-only PR, so expiry must be a note and never a refusal.
+    """
+
+    def boom(*_a: object, **_kw: object) -> None:
+        raise subprocess.TimeoutExpired(cmd="gh", timeout=180)
+
+    monkeypatch.setattr(pr.subprocess, "run", boom)
+    note = pr.await_terminal(7, timeout=180)
+    assert "quota" in note
+    assert "proceeding" in note
+
+
+def test_land_refuses_an_unreviewed_pr_head(monkeypatch, tmp_path):
+    """CONTROL ARM: the same green PR, with no receipt for its head.
+
+    `ship` guards only what IT pushes; a commit pushed afterwards by any other
+    route reached the merge reviewed by nothing.
+    """
+    seen: list[list[str]] = []
+    _stub_run(monkeypatch, _land_handler(seen))
+    assert pr.land_main(tmp_path, 42) == 1
+    assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "merge must not be attempted"

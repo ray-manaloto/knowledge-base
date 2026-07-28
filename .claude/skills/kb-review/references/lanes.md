@@ -1,50 +1,14 @@
-# The lanes: prompts, fallback, receipt
+# The lanes: the two this skill owns, the fallback, and the receipt
 
-## Standards — `general-purpose`
+## Standards and Spec — NOT here
 
-```text
-Review the diff `git diff <FIXED>...HEAD` in this repository.
-Commits: <git log --oneline output>
+Both axes belong to `mattpocock-skills:code-review`. Its prompts, its Fowler
+baseline, and its no-reranking rule are the spine's, and duplicating them here
+is what `use-tool-builtins.md` forbids — an earlier draft did exactly that.
 
-Standards sources, read them all: <the rule-file paths gathered in step 3> and CLAUDE.md.
-Smell baseline (you have no other access to it): <paste references/smell-baseline.md in full>
-
-Report, per file/hunk:
-(a) every place the diff violates a DOCUMENTED standard — cite the rule file and
-    the specific rule;
-(b) any baseline smell — name it and quote the hunk.
-
-Distinguish hard violations (a documented standard breached) from judgement
-calls (every baseline smell is one). A documented repo standard overrides the
-baseline. Skip anything `mise run lint` already enforces.
-
-Cite file:line for every finding. A finding you cannot cite, label `unverified`
-and keep — do not drop it and do not promote it.
-
-Under 400 words. Do not edit any file.
-```
-
-## Spec — `general-purpose`
-
-```text
-Review the diff `git diff <FIXED>...HEAD` in this repository.
-Commits: <git log --oneline output>
-
-The spec this change is meant to implement: <path(s), or the fetched issue body>
-
-Report:
-(a) requirements the spec asked for that are missing or only partial;
-(b) behaviour in the diff nobody asked for (scope creep);
-(c) requirements that look implemented but where the implementation looks wrong.
-
-Quote the spec line for each finding, and cite file:line in the diff.
-
-Under 400 words. Do not edit any file.
-```
-
-If no spec was found, skip this lane and record `spec:no-spec-available` in the
-receipt's skipped list. Reviewing against an invented spec is worse than not
-reviewing: it produces findings that look grounded and are not.
+This skill supplies only the two sources the spine cannot find in this repo
+(SKILL.md step 3) and `references/repo-smells.md` as additions to its baseline.
+Everything below is the part the spine does not have.
 
 ## Cold — `fable-orchestrator:codex-reviewer`
 
