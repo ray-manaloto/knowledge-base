@@ -782,3 +782,30 @@ def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(
     out = capsys.readouterr().out
     assert "covered by the receipt for" in out
     assert "land: refusing" not in out
+
+
+def test_every_gate_names_a_real_mise_task() -> None:
+    """`GATES` holds mise task NAMES, and nothing checked they exist.
+
+    `run_gates` shells out to `mise run <gate>`, so a typo or a renamed task
+    fails closed — the gate returns non-zero and `ship` refuses. Safe, but late
+    and confusing: the branch looks red when the wiring is what broke. This is
+    the cheap offline arm, and the same shape as `ci-local-parity.md` rule 1,
+    which says a gate that is not reachable from `mise run` gates nothing.
+
+    Reads `mise.toml` directly rather than `mise tasks`: that command merges the
+    user's GLOBAL config, so it lists tasks defined in no file in this repo —
+    which would let a task that exists only on one machine pass here.
+    """
+    import tomllib
+    from pathlib import Path
+
+    repo = Path(__file__).parent.parent.absolute()
+    defined = tomllib.loads((repo / "mise.toml").read_text(encoding="utf-8"))["tasks"]
+
+    for gate in pr.GATES:
+        assert gate in defined, f"pr.GATES names `{gate}`, which mise.toml does not define"
+    # CONTROL ARM — without it an empty `GATES` would pass, and so would a
+    # `defined` map this parsed wrongly.
+    assert pr.GATES
+    assert "no-such-task" not in defined

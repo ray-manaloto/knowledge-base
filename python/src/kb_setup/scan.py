@@ -142,7 +142,15 @@ def _gitleaks_cmd(repo_root: Path, base_sha: str) -> list[str]:
         # which gitleaks' default of 1 for both does not.
         "--exit-code",
         str(_LEAKS),
+        # `--redact` WITH `--verbose`, which is the pairing that makes this
+        # usable. Verbose alone prints the secret; redact alone prints only
+        # "leaks found: 1" with no file, line, or rule, so the summary's "see
+        # the findings above" pointed at nothing — measured on the end-to-end
+        # arm. Together they print the finding's location and rule id with the
+        # value replaced by REDACTED. hk's own gitleaks builtin uses the same
+        # pair.
         "--redact",
+        "--verbose",
         "--no-banner",
     ]
 
@@ -212,7 +220,12 @@ def scan_range(repo_root: Path, base: str = DEFAULT_BASE) -> tuple[bool, str]:
     if count == 0:
         return True, f"no commits in {base_sha[:12]}..HEAD — nothing to scan"
 
-    span = f"{base_sha[:12]}..HEAD ({count} commit{'s' if count != 1 else ''})"
+    # "a range of N commits", not "N commits scanned": gitleaks prints its own,
+    # SMALLER count (it skips commits whose diff adds nothing — a pure deletion,
+    # for instance), and two different numbers in one report read as a bug.
+    # This one is the range size, which is the number the reader is choosing to
+    # push.
+    span = f"{base_sha[:12]}..HEAD (a range of {count} commit{'s' if count != 1 else ''})"
     return _run_gitleaks(repo_root, base_sha, span)
 
 
