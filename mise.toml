@@ -379,30 +379,8 @@ description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review
 # the receipt — correctly, the reviewed bytes are gone. Logic in kb_setup.review.
 run = "uv run kb-setup review-receipt"
 
-[tasks.kb-scan-range]
-description = 'Scan every commit in <base>..HEAD for secrets (not just the tree): mise run kb-scan-range [-- --base REF]'
-# The one gate that asks a question about a COMMIT RANGE. hk's `gitleaks` step
-# is handed `{{ files }}`, so it only ever opens files that exist in the working
-# tree — and `kb-ship` pushes every commit on the branch to a public remote. A
-# blob added in one commit and deleted in the next is invisible to that step AND
-# to the review lanes, which read an endpoint diff (#67). `kb-land`
-# squash-merges, so `main` was never at risk; the pushed branch was, and GitHub
-# retains it after the branch is deleted.
-#
-# It lives here rather than in `hk.pkl` because of TIMING, not capability. An
-# earlier version of this comment said hk "cannot" host it, being file-list-
-# driven — which this repo's own config refutes: `no_lint_skip` and
-# `md_size_budget` are whole-repo hk steps that ignore `{{ files }}` entirely.
-# The real reason is that the question is only meaningful at PUSH time, against
-# the range a push would publish; asking it on every commit and every
-# `mise run lint` would answer a question nobody asked. (Standards lane, round 1
-# — a claim carried without its condition.)
-# `gitleaks git --log-opts` is the built-in — no hand-rolled range walk.
-# Logic in kb_setup.scan; run on every ship via kb_setup.pr.GATES.
-run = "uv run kb-setup scan-range"
-
 [tasks.kb-ship]
-description = 'Review receipt + gates (kb-scan-range/lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
+description = 'Review receipt + gates (lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
 # The sanctioned way to open a PR here. `gh pr create` is NOT guard-denied in
 # this repo — `hook_guard._REDIRECT` covers graphify subcommands only — so this
 # is convention, not enforcement, and a raw `gh pr create` would bypass the

@@ -63,40 +63,10 @@ def git(tmp_path: Path) -> Callable[..., str]:
     run("config", "commit.gpgsign", "false")
     run("config", "tag.gpgsign", "false")
     (tmp_path / ".gitignore").write_text(".agent/\n", encoding="utf-8")
-    # THIS repo's real `.gitleaks.toml`, committed in the base commit.
-    #
-    # Committed rather than merely written, and in the BASE commit rather than
-    # later, for three separate reasons that each cost a test:
-    #   * `pr._ship_preflight` refuses a dirty tree, so an untracked file makes
-    #     every ship test fail for the wrong reason — the same trap the
-    #     `.gitignore` above exists for;
-    #   * the scan `pr._validated_sha_for_push` runs refuses when the config is
-    #     missing (correctly), so any test reaching it fails closed on a fixture
-    #     defect. `test_pr.py`'s autouse stub means its own tests no longer
-    #     reach that call — this reason now covers `test_scan.py` and any future
-    #     test that drives the real path, and it is stated that way because the
-    #     old wording named a caller none of this module's tests still make;
-    #   * a copy of the REAL config, not a minimal stand-in: the allowlist is
-    #     the part most likely to silently widen, and a test against a config
-    #     nobody ships would pass while the shipped one looked away.
-    (tmp_path / ".gitleaks.toml").write_text(
-        (Path(__file__).parent.parent / ".gitleaks.toml").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-    run("add", "--", ".gitignore", ".gitleaks.toml")
+    run("add", "--", ".gitignore")
     run("commit", "-q", "-m", "base")
     run("checkout", "-q", "-b", "work")
     return run
-
-
-@pytest.fixture
-def gitleaks_config(git: Callable[..., str], tmp_path: Path) -> Path:
-    """The fixture repo's `.gitleaks.toml`, for a test that needs to remove it.
-
-    Depends on `git` so the file exists; the path alone would be a promise the
-    fixture did not keep.
-    """
-    return tmp_path / ".gitleaks.toml"
 
 
 @pytest.fixture

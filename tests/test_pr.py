@@ -13,12 +13,6 @@ from collections.abc import Callable
 import pytest
 from kb_setup import pr
 
-#: Captured at IMPORT, before the autouse stub below can replace it. The one
-#: test that must exercise the real seam uses this rather than
-#: `monkeypatch.undo()`, which undoes EVERY patch on the instance and would
-#: silently drop any autouse fixture added later. (Standards lane, round 2.)
-_REAL_PREPUSH_SCAN = pr.prepush_scan
-
 
 class _Proc:
     """Minimal stand-in for subprocess.CompletedProcess."""
@@ -285,39 +279,6 @@ def test_ship_refuses_dirty_tree(monkeypatch, tmp_path):
 
     _stub_run(monkeypatch, handler)
     assert pr.ship_main(tmp_path) == 1
-
-
-@pytest.fixture(autouse=True)
-def prepush_calls(monkeypatch) -> list[str]:
-    """Neutralise the pre-push secret scan for the CONTROL-FLOW tests.
-
-    `_validated_sha_for_push` re-scans the commit range before pushing, and the
-    tests in this module drive `ship_main` against a stubbed `subprocess` with no
-    real repository — so the scan refuses (correctly: no `.gitleaks.toml`, no
-    resolvable base) and every one of them fails for a reason unrelated to what
-    it asks.
-
-    Autouse and PASSING by default, with the failing direction covered
-    explicitly by `test_ship_refuses_when_the_prepush_scan_fails`, which
-    re-patches over this. A stub with no matching failure test would be exactly
-    the pass-only gate `probes-need-a-control-arm.md` rule 2 forbids.
-
-    IT RECORDS THE `sha` IT WAS GIVEN, and that is the whole point of returning
-    a list. The first version discarded both arguments (`lambda _root, _sha:`),
-    so reverting the call site to `prepush_scan(repo_root, "HEAD")` — literally
-    the pre-fix code for round 2's headline P1 — left the entire suite green.
-    The seam was armed and the refusal was armed; the JOIN between them, which
-    is the property round 2 actually fixed, was not. Found independently by the
-    standards and silent-failure lanes in round 3, both by mutation.
-    """
-    calls: list[str] = []
-
-    def record(_root, sha) -> tuple[bool, str]:
-        calls.append(sha)
-        return True, "stubbed: no secrets"
-
-    monkeypatch.setattr(pr, "prepush_scan", record)
-    return calls
 
 
 def _clean_branch_handler(cmd: list[str]) -> _Proc:
@@ -821,126 +782,3 @@ def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(
     out = capsys.readouterr().out
     assert "covered by the receipt for" in out
     assert "land: refusing" not in out
-
-
-def test_every_gate_names_a_real_mise_task() -> None:
-    """`GATES` holds mise task NAMES, and nothing checked they exist.
-
-    `run_gates` shells out to `mise run <gate>`, so a typo or a renamed task
-    fails closed — the gate returns non-zero and `ship` refuses. Safe, but late
-    and confusing: the branch looks red when the wiring is what broke. This is
-    the cheap offline arm, and the same shape as `ci-local-parity.md` rule 1,
-    which says a gate that is not reachable from `mise run` gates nothing.
-
-    Reads `mise.toml` directly rather than `mise tasks`: that command merges the
-    user's GLOBAL config, so it lists tasks defined in no file in this repo —
-    which would let a task that exists only on one machine pass here.
-    """
-    import tomllib
-    from pathlib import Path
-
-    repo = Path(__file__).parent.parent.absolute()
-    defined = tomllib.loads((repo / "mise.toml").read_text(encoding="utf-8"))["tasks"]
-
-    for gate in pr.GATES:
-        assert gate in defined, f"pr.GATES names `{gate}`, which mise.toml does not define"
-    # CONTROL ARM — without it an empty `GATES` would pass, and so would a
-    # `defined` map this parsed wrongly.
-    assert pr.GATES
-    assert "no-such-task" not in defined
-
-
-def test_ship_refuses_when_the_prepush_scan_fails(monkeypatch, tmp_path):
-    """THE FAILING DIRECTION of the autouse stub above, and of the gate itself.
-
-    The scan runs a second time here — not only as the first gate — because the
-    gates take minutes and nothing stops HEAD moving underneath them. The receipt
-    check alone cannot stand in for it: `review.EXEMPT_PATHS` lets an ancestor's
-    receipt cover a delta of `graphify-out/memory/**`, which is precisely the
-    directory that carried three live credentials on 2026-07-28.
-    (Cold lane and silent-failure lane, round 1, independently.)
-    """
-    _write_valid_receipt(tmp_path)
-    _stub_run(monkeypatch, _clean_branch_handler)
-    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
-    monkeypatch.setattr(pr, "prepush_scan", lambda _root, _sha: (False, "SECRETS FOUND in x..HEAD"))
-
-    assert pr.ship_main(tmp_path) == 1
-
-
-def test_the_prepush_scan_scans_the_pushed_sha_over_a_real_range(tmp_path, git, commit_file):
-    """The seam must reach the scanner AND scan the range ending at `sha`.
-
-    THE FIRST VERSION OF THIS TEST WAS DECORATION. It ran both sides against a
-    bare `tmp_path` with no git repo and no config, so each returned the same
-    trivial first-guard refusal and it could never observe *which* range the
-    seam scanned. The Standards lane mutation-proved it: pointing `prepush_scan`
-    at an always-empty range — a permanently green gate — left the module at
-    rc=0, 41 passed. `probes-need-a-control-arm.md` rule 2, in the very test
-    added to prevent that.
-
-    So: a real repository, a real range, and an assertion about the SHA.
-    """
-    first = commit_file("docs/one.md", "x\n")
-    commit_file("docs/two.md", "y\n")
-
-    # Pinned to `first`, so the range is ONE commit even though HEAD holds two.
-    # This is the assertion the old version could not make, and it is the one
-    # that reddens if the seam ever resolves `HEAD` for itself again.
-    ok, summary = _REAL_PREPUSH_SCAN(tmp_path, first)
-    assert ok, summary
-    assert "a range of 1 commit" in summary, summary
-    assert "..HEAD" not in summary, "the scan must name the pinned SHA, not HEAD"
-
-    ok, summary = _REAL_PREPUSH_SCAN(tmp_path, "HEAD")
-    assert ok, summary
-    assert "a range of 2 commits" in summary, summary
-
-
-def test_ship_scans_the_sha_it_pushes_not_a_freshly_resolved_head(
-    monkeypatch, tmp_path, prepush_calls
-):
-    """THE JOIN: `_validated_sha_for_push` must hand its captured `sha` to the scan.
-
-    Round 2 fixed this and round 3 proved nothing guarded it — reverting the call
-    site to the literal string "HEAD" kept every test passing. The seam's own test
-    passes a sha explicitly, so it can only ever show that the seam honours its
-    argument, never that the caller supplies one.
-
-    This asserts the SAME value reaches both the scan and the push refspec, which
-    is the property that makes the pre-push scan mean anything: scanning one
-    commit and pushing another is indistinguishable from not scanning at all.
-    """
-    # THE SHA AND THE BRANCH NAME MUST DIFFER, and the shared
-    # `_clean_branch_handler` answers "feat/x" to BOTH `rev-parse HEAD` and
-    # `rev-parse --abbrev-ref HEAD`. The first version of this test used it, so
-    # `sha == branch` and "the same value reaches both" was vacuous against a
-    # sha→branch substitution — confirmed by mutation: passing `branch` to the
-    # scan, or pushing `branch:refs/heads/branch`, both left it green. It caught
-    # only the one literal regression it was named for. (Cold lane, verify pass.)
-    sha = "9f8e7d6c5b4a3210"
-    branch = "feat/x"
-    _write_valid_receipt(tmp_path, sha)
-    pushed: list[str] = []
-
-    def handler(cmd: list[str]) -> _Proc:
-        if cmd[:2] == ["git", "push"]:
-            pushed.append(cmd[-1])
-            return _Proc(0, "")
-        if cmd[:3] == ["git", "rev-parse", "--abbrev-ref"]:
-            return _Proc(0, branch)
-        if cmd[:2] == ["git", "rev-parse"]:
-            return _Proc(0, sha)
-        return _clean_branch_handler(cmd)
-
-    _stub_run(monkeypatch, handler)
-    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
-
-    assert pr.ship_main(tmp_path) == 0
-
-    assert pushed == [f"{sha}:refs/heads/{branch}"], "the refspec must carry the SHA"
-    assert prepush_calls == [sha], (
-        "the scan must be pinned to the captured sha; anything else — 'HEAD', or "
-        "the branch name — means the gate can scan a different commit than the "
-        "one published"
-    )

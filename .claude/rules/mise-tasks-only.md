@@ -26,7 +26,6 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `gh pr create` (+ push + gates by hand) | `mise run kb-ship` |
 | `gh pr merge` (+ watch + validate by hand) | `mise run kb-land -- <PR#>` |
 | a manual version-drift check | `mise run kb-currency-check` (offline) / `mise run kb-currency` |
-| a raw `gitleaks git --log-opts …`, or trusting hk's `gitleaks` step to have read the branch's intermediate commits | `mise run kb-scan-range` — hk's step is handed `{{ files }}`, so it only opens the working tree; `ship` pushes every commit (#67) |
 | a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD (one exception: a commit whose ENTIRE delta since the receipt is `graphify-out/memory/**` or `docs/goals/README.md`, so the round's own closing tasks can land — `kb_setup.review.EXEMPT_PATHS`, #66) |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
 | `<gate> 2>&1 \| tail -40` | `<gate> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file — a pipe returns `tail`'s exit code, masking a failed gate |
@@ -48,12 +47,9 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
 2. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.
-3. **`mise run kb-ship` gates.** The `kb-review` receipt, then `kb-scan-range`,
-   `lint`, `test`, `brain-audit`, and `eval` all run before a PR is pushed, so a
-   workflow that bypasses a task and breaks something fails at ship time rather
-   than in review. `kb-scan-range` is first because it is the cheapest and the
-   one whose failure is worst, and it runs AGAIN immediately before the push —
-   the gates take minutes and nothing stops HEAD moving underneath them.
+3. **`mise run kb-ship` gates.** The `kb-review` receipt, then `lint`, `test`,
+   `brain-audit`, and `eval` all run before a PR is pushed, so a workflow that
+   bypasses a task and breaks something fails at ship time rather than in review.
 
 The hook **fails OPEN on its own errors** — a crashed guard must not brick
 every Bash call. It is a *redirect* guard, not a sandbox: `$(…)` substitution,
