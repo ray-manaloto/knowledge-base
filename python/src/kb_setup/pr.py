@@ -11,9 +11,11 @@ What it does keep is the part that carries the safety:
   gates and again immediately before the push. **That is this module's strongest
   behaviour**, because CodeRabbit is advisory here, so the local review is the
   only review;
-* ``ship`` then runs every gate in :data:`GATES` (``lint``, ``test``,
-  ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red branch never
-  becomes a PR;
+* ``ship`` then runs every gate in :data:`GATES` (``kb-scan-range``, ``lint``,
+  ``test``, ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red
+  branch never becomes a PR. ``kb-scan-range`` is the only one that asks about
+  the COMMIT RANGE rather than the working tree — the push sends every commit on
+  the branch, and nothing else here reads the intermediate ones (#67);
 * the push is pinned to the SHA the receipt was validated against
   (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
   unreviewed commit onto the remote;
@@ -112,7 +114,46 @@ def working_tree_clean(repo_root: Path) -> bool:
 #: forbids editing. So a green `eval` gate here means "nothing GATED failed", not
 #: "every case passed" — read the case table, not the rc. `evals.render` prints
 #: the true failed/unarmed counts precisely so that distinction survives.
-GATES = ("lint", "test", "brain-audit", "eval")
+#:
+#: `kb-scan-range` is FIRST, and that ordering is load-bearing rather than
+#: tidiness. `run_gates` returns on the first failure, so putting the cheapest
+#: gate and the one with the worst failure mode (a credential reaching a public
+#: remote) ahead of the minutes-long ones means a branch carrying a secret is
+#: refused before anything else is spent on it.
+#:
+#: "Cheapest" is measured at **0.36s for a ONE-COMMIT range** — state the
+#: condition, because the ordering claim is being made about branches of tens of
+#: commits and that figure was not measured there. It scales with the bytes in
+#: the range's diffs, and `scan._SCAN_TIMEOUT` is 600s precisely because the
+#: upper bound is not known. What holds unconditionally is the ordering by
+#: CONSEQUENCE, which is the actual argument. (Spec lane, round 1.)
+#:
+#: It is also the only gate here that asks about a COMMIT RANGE rather than the
+#: working tree. hk's `gitleaks` step is handed `{{ files }}`, so a blob that
+#: exists only in an intermediate commit is never opened — and `ship` pushes
+#: every commit on the branch to a public remote. See `kb_setup.scan` and #67.
+GATES = ("kb-scan-range", "lint", "test", "brain-audit", "eval")
+
+
+def prepush_scan(repo_root: Path, sha: str) -> tuple[bool, str]:
+    """Scan the range ending at ``sha`` — the commit about to be pushed.
+
+    ``sha``, not ``HEAD``. The first version took no ref and let `scan_range`
+    resolve `HEAD` itself, while the caller had captured a SHA specifically to
+    pin the push — so a HEAD move between the two validated a different commit
+    than the one published, reopening the very race the surrounding comments
+    said this scan closed. All three non-spine lanes found it independently in
+    round 2, and the commit message asserting otherwise was the worse half.
+
+    A module-level seam, and public for the same reason :func:`run_gates` is:
+    the ship tests that exercise CONTROL FLOW stub it. A local import inside
+    `_validated_sha_for_push` could not be stubbed at all, so every such test
+    would shell out to a real gitleaks against a fixture with no repository —
+    failing closed, correctly, for a reason unrelated to what the test asks.
+    """
+    from kb_setup import scan
+
+    return scan.scan_range(repo_root, head=sha)
 
 
 def run_gates(repo_root: Path) -> bool:
@@ -343,6 +384,26 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
     ok, summary = review.receipt_state(repo_root, sha, require_base="main")
     if not ok:
         print(f"ship: refusing — HEAD moved since the review ({summary})")
+        return None
+
+    # The secret scan is re-run HERE, pinned to `sha` — the exact object the
+    # push will send — and not only as the first gate. Same reasoning as the
+    # receipt check directly above, applied to the other thing that must be true
+    # of the pushed bytes: `run_gates` scanned whatever HEAD was minutes ago,
+    # and nothing stops HEAD moving underneath the gates.
+    #
+    # A moved HEAD does not always invalidate the receipt — `review.EXEMPT_PATHS`
+    # lets an ancestor's receipt cover a delta of `graphify-out/memory/**`, which
+    # is precisely the directory that carried three live credentials on
+    # 2026-07-28. So the receipt check alone cannot stand in for this one.
+    # (Cold lane and silent-failure lane, round 1, independently.)
+    #
+    # Cheap enough to repeat. The first run is what fails fast; THIS one is
+    # what guarantees.
+    scanned, scan_summary = prepush_scan(repo_root, sha)
+    print(f"==> scan-range (pre-push): {scan_summary}")
+    if not scanned:
+        print("ship: refusing — the commit range did not pass the secret scan")
         return None
     return sha
 

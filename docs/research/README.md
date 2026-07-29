@@ -39,6 +39,7 @@ needs to see both the claim and its refutation to judge either.
 | [`reports/mise-path-research.md`](reports/mise-path-research.md) | 2026-07-27 | Whether mise exposes the caller's pre-mise `PATH`. **Read the annotation box first** — its headline `get_env(name='PATH')` recommendation is correct under `env -i` and wrong under an activated shell, where `PRISTINE_ENV` strips the very install dirs a drift check hunts. Also settles `__MISE_DIFF`'s secret exposure as expected upstream behaviour with no fix pending. |
 | [`reports/refuter-exe.md`](reports/refuter-exe.md) | 2026-07-27 | Adversarial verification of the `graphify_exe` / launcher work (earlier session, PRs #43/#45). |
 | [`reports/refuter-tmux.md`](reports/refuter-tmux.md) | 2026-07-27 | Adversarial verification of the tmux `PATH`-inheritance mechanism (earlier session, #40/#45). |
+| [`reports/2026-07-28-receipt-exempt-artifacts/`](reports/2026-07-28-receipt-exempt-artifacts/README.md) | 2026-07-28 | Ten lane reports across four review passes over #66 (PR #69). Underpins `.gitleaks.toml`'s allowlist scoping and `hk.pkl`'s `exclude`/`proseExclude` split — both rest on measurements taken here, including that **`gitleaks dir` ignores its path arguments once there is more than one**. Round 1 found three live credentials in a work-memory file that every gate was green over; its SHA is deliberately unreachable, the reports are not. |
 
 ## See also
 
