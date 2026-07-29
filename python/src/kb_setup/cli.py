@@ -27,7 +27,6 @@ def main(argv: list[str] | None = None) -> int:
             "brain [record|reflect|audit] | md-budget | goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
-            "scan-range [--base REF] | "
             "ensure-deps | version"
         )
         return 0
@@ -135,10 +134,6 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         got = ensure_runtime_deps(repo_root)
         print(f"[deps] {'installed ' + ', '.join(got) if got else 'all output deps present'}")
         return 0
-    if cmd == "scan-range":
-        from kb_setup import scan
-
-        return scan.main(repo_root, rest)
     if cmd == "ship":
         from kb_setup import pr
 

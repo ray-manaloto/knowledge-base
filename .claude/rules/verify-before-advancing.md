@@ -41,16 +41,9 @@ It is the operational teeth behind `zero-skip-policy.md`.
 Scale the matrix to the blast radius — a one-line doc typo needs the docs
 row, not a full `kb-build`.
 
-**`mise run kb-ship` checks the `kb-review` receipt, then runs `kb-scan-range` +
-`lint` + `test` + `brain-audit` + `eval`, and refuses to push if any fails.** That is the floor, not the ceiling: it does not know whether
+**`mise run kb-ship` checks the `kb-review` receipt, then runs `lint` + `test` +
+`brain-audit` + `eval`, and refuses to push if any fails.** That is the floor, not the ceiling: it does not know whether
 your change needed a `kb-build` or a chunk validation.
-
-**`kb-scan-range` is the one gate that reads a COMMIT RANGE.** Everything else
-here — hk's `gitleaks` step included — asks about the working tree, and the
-lanes read an endpoint diff, so a blob added in one commit and deleted in a
-later one was seen by nothing while `ship` pushed it to a public remote (#67).
-`land` squash-merges, so `main` never carried it; the pushed branch did, and
-GitHub keeps it after the branch is deleted.
 
 ## A green gate is not a green artifact
 
