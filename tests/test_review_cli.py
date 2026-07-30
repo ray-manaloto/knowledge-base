@@ -236,7 +236,7 @@ def test_unreadable_head_refuses(
 
 
 def test_documented_report_filename_is_the_one_the_gate_reads(repo: Path) -> None:
-    """The filename in SKILL.md must be the filename `_missing_reports` looks for.
+    """The filename in SKILL.md must be the filename `_report_gaps` looks for.
 
     Spelled out LITERALLY rather than built with `report_path`, because every
     other test here builds its fixtures through that function and so inherits

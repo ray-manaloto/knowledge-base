@@ -430,7 +430,8 @@ def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
 
     **Every other reason to refuse is removed first**, which is the whole
     difference between this and the version that shipped: it wrote a receipt
-    claiming four lanes and no report files at all, so `_missing_reports`
+    claiming four lanes and no report files at all, so `_report_gaps` (then
+    named `_missing_reports`)
     refused it before `_check_blocking` was ever consulted. Deleting the
     blocking check outright would have left the test green — a probe passing for
     a reason other than the one it names. (#59)

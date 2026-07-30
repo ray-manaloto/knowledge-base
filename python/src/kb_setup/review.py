@@ -497,7 +497,7 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     """Return where ``lane``'s report for ``sha`` must be written.
 
     The `:variant` is STRIPPED: a lane recorded as `cold:codex` leaves
-    `…-cold.md`. `_missing_reports` already read it that way (via
+    `…-cold.md`. `_report_gaps` already read it that way (via
     `_lane_prefix`), so a caller passing the variant to this helper got
     `…-coldcodex.md` while the gate hunted `…-cold.md` — the same
     writer/reader divergence as the `_safe_lane` hyphen bug, one layer up, and

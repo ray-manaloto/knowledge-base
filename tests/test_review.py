@@ -681,7 +681,8 @@ def test_an_honest_fix_round_report_still_passes(tmp_path: Path) -> None:
 def test_an_undecodable_report_does_not_count_as_evidence(tmp_path: Path) -> None:
     """Unreadable evidence is not evidence — the same answer `_load_receipt` gives.
 
-    `_missing_reports` read each report with `errors="replace"`, so a truncated
+    `_report_gaps` (then named `_missing_reports`) read each report with
+    `errors="replace"`, so a truncated
     or partly-binary file decoded into U+FFFD replacement characters, survived
     `.strip()`, and counted as proof that a lane ran. Three functions away,
     `_load_receipt` refuses undecodable receipt bytes outright — one module
