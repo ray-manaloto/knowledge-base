@@ -208,6 +208,23 @@ description = "Reproduce graph.json from committed inputs (manifests + doc extra
 # Clones each sources/*.manifest at its pinned SHA (gitignored), AST-extracts code
 # (free), then replays the committed sources/extractions/*.json doc chunks. No
 # host-agent needed — reproduction is free. Logic in kb_setup.graph.
+#
+# DECIDED 2026-07-29 (Ray): do NOT put mise's task output cache on this task, and
+# this comment exists so it is not re-proposed as an obvious win. mise 7.16 ships
+# `--task-cache` / `task.cache_dir` / `cache.command_inputs`, and this is the most
+# expensive task here, so it looks like the natural candidate. It is not:
+#   1. A cache HIT skips the re-clone. This task's whole job is proving the corpus
+#      reproduces from committed inputs, and a manifest whose pinned SHA was
+#      force-pushed away would go undetected — `persistence-gate-retry.md` lists
+#      `reference is not a tree` as a REAL DEFECT signature, not a transient.
+#   2. `.currency-stamp.json` would be restored from cache, asserting a build that
+#      never ran in this environment. `currency.toml` requires that stamp to record
+#      the version that ACTUALLY RAN, "never the pin, which would launder drift".
+#   3. Each entry stores a ~119MB graph.json.
+# It trades "reproducible, verified by doing it" for "we did it once and
+# remembered" — and two of the three task-freshness fixes in our own
+# `min_version.hard` floor were cache-correctness bugs. The objection is
+# correctness, so a speedup measurement cannot answer it.
 run = "uv run kb-setup build"
 
 [tasks.kb-update]

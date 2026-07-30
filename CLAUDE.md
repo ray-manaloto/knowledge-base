@@ -113,7 +113,7 @@ engine (dotfiles consumes the same package). Six steps: **1** in-sync check,
 AskUserQuestion interview, **6** a committed report under `docs/currency/`.
 
 ```bash
-mise run kb-currency-check    # step 1 only — offline, ~10ms, silent when clean
+mise run kb-currency-check    # step 1: offline ~10ms, silent when clean; + pin-vs-upstream
 mise run kb-currency          # the full loop; writes docs/currency/
 ```
 
@@ -176,7 +176,7 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `pyproject.toml` | The ONE python config (repo root): `[project]` + ruff (`select=ALL`) + ty + pytest. `uv run` uses it for `python/src` AND `tests/`. |
 | `hk.pkl` | Git-hook lint: ruff/ty (python), taplo (toml), rumdl (md), gitleaks (secrets), typos, pkl, hygiene + `no-lint-skip`. All logic in `kb_setup` (zero-bash). |
 | `docs/graphify-reference.md` | Expert operational reference for graphify itself. |
-| `.claude/` | Skills (graphify, kb-curator, goal-engineering, kb-review, tool-currency, orchestrator-routing) + project-scoped settings/hooks/rules. `kb-review` is the REAL review gate — four local lenses, then a receipt `kb-ship` refuses to push without; CodeRabbit is advisory and never blocks. |
+| `.claude/` | Skills (graphify, kb-curator, goal-engineering, kb-review, tool-currency, orchestrator-routing) + project-scoped settings/hooks/rules. `kb-review` is the REAL review gate — ONE cold cross-family lens, bounded at 2 rounds, then a receipt `kb-ship` refuses to push without; CodeRabbit is advisory and never blocks. |
 
 ## Stack conventions
 

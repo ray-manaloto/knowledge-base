@@ -110,6 +110,29 @@ Upstream tracks the port to the mcp 2.x API in #2308 (below). When that lands
 the `<2` ceiling lifts; until then, do not "helpfully" relax it."""
 
 [[tool.graphify.watch]]
+kind = "local"
+ref = "data-only-json-produces-zero-nodes"
+note = """`kb-build` emits 18 warnings covering ~330 files: "produced zero nodes
+and are absent from the graph". DISPOSITION (Ray, 2026-07-29): known upstream
+limitation, not a defect to fix here — but tracked so it is not rediscovered from
+build output every time.
+
+Every affected file is data-only `.json` inside a THIRD-PARTY cloned source
+(`sources/agents/`, `sources/ecc/`, `sources/fable-orchestrator/` —
+`marketplace.json`, `plugin.json`, settings schemas). None is ours, and a data
+file has no AST to extract, so zero nodes is arguably correct. The content we
+actually want IS in the graph by the other path: the committed prose extraction
+`sources/extractions/marketplace-inventory-docs.json`. graphify points at its own
+#1666 and asks for reports if it persists.
+
+UNKNOWN, and left explicitly unknown: whether 0.9.30 made this newly VISIBLE
+rather than newly happening. The message says "empties are no longer cached",
+which suggests they now retry and re-warn where they previously warned once and
+went quiet — but no committed prior build log exists to compare against, so do
+not repeat this as "new in 0.9.30". Re-probe by counting the warnings on the next
+bump."""
+
+[[tool.graphify.watch]]
 kind = "issue"
 ref = "2308"
 
