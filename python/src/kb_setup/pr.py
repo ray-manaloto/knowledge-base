@@ -17,13 +17,19 @@ What it does keep is the part that carries the safety:
 * the push is pinned to the SHA the receipt was validated against
   (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
   unreviewed commit onto the remote;
-* ``land`` re-reads the checks and pins the merge to the head SHA it verified
+* ``land`` gives the checks a BOUNDED chance to reach a terminal state before
+  reading them (:func:`await_terminal` — `gh pr checks --watch` has no timeout of
+  its own), then refuses a PR head with no `kb-review` receipt covering the WHOLE
+  branch, and pins the merge to the head SHA it verified
   (``gh pr merge --match-head-commit``), so a commit pushed between the check
   and the merge cannot ride in unverified.
 
 This docstring said "``lint`` + ``test``" and never mentioned the receipt until
 the standards lane pointed out that `mise.toml` and `CLAUDE.md` had both been
-synced while the doc closest to the code had not.
+synced while the doc closest to the code had not. The ``land`` bullet then
+repeated the shape one commit later — it described the check re-read and the
+merge pin while omitting both the terminal wait and the receipt refusal, in the
+very commit that congratulated itself for syncing the ``ship`` half. (#57)
 
 Invoked via the ``kb-ship`` / ``kb-land`` mise tasks — never by hand.
 """
@@ -404,7 +410,19 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
 
 
 def land_main(repo_root: Path, pr_number: int) -> int:
-    """Verify a PR's checks, squash-merge it pinned to that SHA, and sync main."""
+    """Await terminal checks, refuse an unreviewed head, squash-merge pinned, sync main.
+
+    Four steps, and the one-line version named only two. In order: give the
+    checks a BOUNDED chance to reach a terminal state (:func:`await_terminal`);
+    refuse unless every binding check is green; refuse a head with no
+    `kb-review` receipt covering the whole branch (``require_base="main"``);
+    then squash-merge pinned to the SHA that was verified.
+
+    The receipt refusal is the step worth naming here rather than leaving to the
+    body comment: it is what makes `land` a backstop for a PR that reached the
+    remote without going through `ship`, and a summary that omits a gate reads
+    as a gate that does not exist. (#57)
+    """
     # Wait for a TERMINAL state, never for quota. Advisory checks still cannot
     # block the merge — but a verdict that arrives ten seconds later was never
     # read, and reading it is free.

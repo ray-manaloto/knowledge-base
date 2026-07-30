@@ -94,7 +94,7 @@ the thirteen ambiguity tests in
 be a citation only this machine could open (T1 transcript-visibility · T2 literal-token ·
 T3 stated-check · T4 Goodhart · T5 partial-completion · T6 floor-and-ceiling ·
 T7 one-interpretation · T8 scope-fence · T9 one-round · T10 proxy-signal ·
-T11 off-transcript · T12 stale-evidence).
+T11 off-transcript · T12 stale-evidence · T13 stated-connective).
 
 ## See also
 

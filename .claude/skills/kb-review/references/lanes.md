@@ -59,9 +59,23 @@ blind spots are different ones.
 
 | Step | Lane | Family |
 |---|---|---|
-| 1 | whichever cross-family lane SKILL.md's table selects for THIS diff | OpenAI or Google — cross-family |
-| 2 | the other cross-family lane | still cross-family |
+| 1 | whichever cross-family lane SKILL.md's table selects for THIS diff | cross-family, by construction |
+| 2 | the other CLI lane | cross-family **only when Claude wrote the diff** — see below |
 | 3 | a Claude Opus subagent | **same family as the author** |
+
+**Step 2 is not unconditionally cross-family, and this table said it was.** There
+are two CLI lanes and three possible authors. When Claude wrote the diff, step 1
+is codex and step 2 is antigravity — both cross-family, and the old label held.
+But this project's Claude config declares `implementation lane = codex`, so an
+orchestrator-driven branch is **codex-authored**: step 1 is then antigravity and
+step 2 is codex, which is the author's own family. Falling through to it and
+recording `cold:codex` makes the same false cross-family claim that step 3's
+`cold:claude-fallback-SAME-FAMILY` naming exists to prevent.
+
+So check the author before falling through, exactly as step 1 does. If step 2
+would be the implementer's family, label it `cold:<lane>-SAME-FAMILY` and treat
+it as the step-3 class of evidence — a fresh cold context, but not the
+cross-family check the lane is named for. (#60)
 
 Step 3 is a real fallback and never a silent one. Record it as
 `cold:claude-fallback-SAME-FAMILY` in the receipt. A same-family cold read still

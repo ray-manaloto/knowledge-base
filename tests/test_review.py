@@ -554,14 +554,53 @@ def test_empty_report_does_not_count_as_evidence(tmp_path: Path) -> None:
     assert "spec" in summary
 
 
+def test_an_undecodable_report_does_not_count_as_evidence(tmp_path: Path) -> None:
+    """Unreadable evidence is not evidence — the same answer `_load_receipt` gives.
+
+    `_missing_reports` read each report with `errors="replace"`, so a truncated
+    or partly-binary file decoded into U+FFFD replacement characters, survived
+    `.strip()`, and counted as proof that a lane ran. Three functions away,
+    `_load_receipt` refuses undecodable receipt bytes outright — one module
+    holding two answers to "what is readable", with the permissive one guarding
+    the *evidence* and the strict one guarding the *claim*. (#58)
+
+    The bytes below are a lone UTF-8 continuation byte: valid on disk, and
+    `bytes.decode("utf-8")` raises on them. Written with `write_bytes` because
+    there is no way to produce this through `write_text`.
+    """
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "cold").write_bytes(b"\xff\xfe findings \x80\x81")
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "cold" in summary
+
+
 def test_no_findings_report_is_valid_evidence(tmp_path: Path) -> None:
     """CONTROL ARM: a lane that ran and found nothing must still pass.
 
     Without this arm the evidence check would quietly require every lane to
-    produce findings, which would reward inventing them.
+    produce findings, which would reward inventing them. It is also the arm that
+    proves the strict decoding above rejects UNDECODABLE bytes rather than
+    merely rejecting anything it was handed.
     """
     root = _write(tmp_path)
     review.report_path(root, _SHA, "standards").write_text("NO FINDINGS", encoding="utf-8")
+    ok, _ = review.receipt_state(root, _SHA)
+    assert ok
+
+
+def test_a_non_ascii_report_is_still_valid_evidence(tmp_path: Path) -> None:
+    """CONTROL ARM 2: strict decoding must not reject an ordinary UTF-8 report.
+
+    A lane quoting a filename with an accent, an em-dash, or a CJK identifier
+    writes perfectly valid UTF-8. Without this arm, "reject undecodable" and
+    "reject non-ASCII" would be indistinguishable, and the fix for #58 would
+    silently start refusing honest reports.
+    """
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "cold").write_text(
+        "NO FINDINGS — checked `café/日本語.py`", encoding="utf-8"
+    )
     ok, _ = review.receipt_state(root, _SHA)
     assert ok
 

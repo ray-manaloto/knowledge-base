@@ -116,8 +116,39 @@ def test_dangling_fixed_point_flag_is_refused(repo: Path) -> None:
     assert not review.receipt_path(repo, "a" * 40).exists()
 
 
+@pytest.mark.parametrize("empty", ["", "   ", "\t"])
+def test_an_explicitly_empty_fixed_point_is_refused(
+    repo: Path, capsys: pytest.CaptureFixture[str], empty: str
+) -> None:
+    """`--fixed-point ""` must refuse too — the guard tested the wrong thing.
+
+    The dangling case above and this one are one defect with two spellings, and
+    only the first was closed. `_opt` returns its DEFAULT (None) for a flag with
+    no following token, but returns the token itself — `""` — when the token is
+    present and empty. The guard asked `is None`, so the empty spelling sailed
+    through and `or "main"` substituted a base the command line never stated: a
+    one-token way to make the receipt say something other than what it reads as,
+    which is exactly the hole `114adce` closed for repeated flags. (#55)
+
+    **The message is asserted, not just the exit code, and that is the whole
+    point of this test.** Measured while writing it: with the guard reverted to
+    its pre-fix form, the two whitespace spellings still exited 2 — refused
+    downstream by `_check_identity`'s "names no fixed point" on a `.strip()`ed
+    field, several layers past the guard under test. An rc-only assertion would
+    have gone green on a mutation that restores the defect, which is a probe
+    passing for a reason other than the one it claims
+    (`probes-need-a-control-arm.md`). Pinning the CLI's own wording is what makes
+    all three spellings actually exercise the guard.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    rc = _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point", empty)
+    assert rc == 2
+    assert "--fixed-point needs a value" in capsys.readouterr().err
+    assert not review.receipt_path(repo, "a" * 40).exists()
+
+
 def test_a_stated_fixed_point_is_still_accepted(repo: Path) -> None:
-    """CONTROL ARM — the refusal above is about the missing value, not the flag."""
+    """CONTROL ARM — the refusals above are about the missing value, not the flag."""
     _reports(repo, "standards", "spec", "cold", "silent-failure")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point", "main") == 0
 

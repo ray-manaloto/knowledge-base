@@ -38,6 +38,12 @@ it twice.
    and not a convention. An agent name is not unique across commits and could
    not carry that. Everything else here still applies: verbatim, at receipt.
 
+   `<lane>` is the lane with any **`:variant` stripped** (`report_path` →
+   `_lane_prefix`): a lane recorded as `cold:codex` must leave `…-cold.md`, not
+   `…-cold:codex.md`. Following this rule literally without that caveat writes a
+   file the gate cannot see, and the refusal then reads as "the lane never ran".
+   (#60)
+
 1b. **PROMOTE it to `docs/research/reports/` once it is load-bearing.** `.agent/`
    is gitignored: it dies with a fresh clone or any `git clean -xdf`. That is
    right for scratch and wrong for a report something tracked now cites —
