@@ -227,17 +227,33 @@ def has_paths_frontmatter(raw: str) -> bool:
     return bool(m) and re.search(r"^paths:", m.group(1), re.MULTILINE) is not None
 
 
-def skill_description(raw: str) -> str:
-    """Extract a SKILL.md frontmatter description, or "" when absent."""
-    m = re.match(r"^---\n(.*?)\n---(\n|$)", raw, re.DOTALL)
-    if not m:
-        return ""
+def _frontmatter_field(front: str, field: str) -> str:
     d = re.search(
-        r"^description:\s*(.*?)(?=\n[A-Za-z_-]+:|\Z)",
-        m.group(1),
+        rf"^{field}:\s*(.*?)(?=\n[A-Za-z_-]+:|\Z)",
+        front,
         re.DOTALL | re.MULTILINE,
     )
     return d.group(1).strip() if d else ""
+
+
+def skill_description(raw: str) -> str:
+    """The text the 1,536-char cap actually applies to: description + `when_to_use`.
+
+    BOTH fields, because the cap is on their COMBINED length — *"Appended to
+    `description` in the skill listing and counts toward the 1,536-character
+    cap"* (`code.claude.com/docs/en/skills.md`, Frontmatter reference). This
+    measured `description` alone, so a skill splitting its text across the two
+    fields would pass a gate that the harness would then truncate. No SKILL.md
+    here uses `when_to_use` today, so the gate was not yet lying — it was simply
+    unable to notice. (Cold lane round 2, P2; the rule file was corrected to the
+    combined cap in the same branch, which is what made the gate disagree with
+    its own documentation.)
+    """
+    m = re.match(r"^---\n(.*?)\n---(\n|$)", raw, re.DOTALL)
+    if not m:
+        return ""
+    parts = [_frontmatter_field(m.group(1), f) for f in ("description", "when_to_use")]
+    return " ".join(p for p in parts if p)
 
 
 # --- Classification ----------------------------------------------------------
@@ -339,7 +355,7 @@ def _description_violation(rel: str, raw: str) -> Violation | None:
         return None
     return Violation(
         rel,
-        f"description is {len(desc)} chars (HARD cap {SKILL_DESCRIPTION_MAX}) "
+        f"description + when_to_use is {len(desc)} chars (HARD cap {SKILL_DESCRIPTION_MAX}) "
         f"— the tail is TRUNCATED SILENTLY, taking the keywords Claude matches "
         f"on with it, so the skill stops being discovered",
     )

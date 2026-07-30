@@ -251,7 +251,7 @@ def _stamp_build(repo_root: Path) -> None:
         print(f"[kb-build] WARNING: could not write the currency stamp: {e}")
 
 
-def update_all(repo_root: Path) -> None:
+def update_all(repo_root: Path) -> int:
     """Advance every tracked source to its latest upstream commit.
 
     `kind = docs` sources are INCLUDED, and the omission is worth recording: this
@@ -265,25 +265,32 @@ def update_all(repo_root: Path) -> None:
     repos = [m for m in manifests if m.kind in {"code", "docs"}]
     if not repos:
         print("[kb-update] no manifests to update")
-        return
+        return 0
     print(f"[kb-update] checking {len(repos)} source(s) for upstream updates")
-    for m in repos:
-        update(repo_root, m.name)
+    # WORST rc, not the last one: a bulk run must not report success because the
+    # source that failed happened not to sort last.
+    return max((update(repo_root, m.name) for m in repos), default=0)
 
 
-def update(repo_root: Path, name: str) -> None:
-    """Advance one source to its latest upstream commit and incrementally re-extract."""
+def update(repo_root: Path, name: str) -> int:
+    """Advance one source to its latest upstream commit and incrementally re-extract.
+
+    Returns a process exit code. A docs pin whose diff FAILED returns 1: the pin
+    is correctly left unmoved, but the CLI used to `return 0` regardless, so the
+    one failure path this module has was invisible to anything reading an rc.
+    (Cold lane round 2, P2 — the round-1 fix stopped the state corruption and
+    left the signal broken.)
+    """
     sources = repo_root / "sources"
     m = mf.load(sources / f"{name}.manifest")
     latest = mf.latest_commit(m)
     if latest == m.commit:
         print(f"[kb-update] {name} already at latest {latest[:10]} — nothing to do")
-        return
+        return 0
 
     print(f"[kb-update] {name}: {m.commit[:10]} -> {latest[:10]}")
     if m.kind == "docs":
-        _advance_docs_pin(m, latest)
-        return
+        return _advance_docs_pin(m, latest)
 
     m = mf.write_commit(m, latest)
     _ensure_clone(m)
@@ -296,6 +303,7 @@ def update(repo_root: Path, name: str) -> None:
         f"docs and refresh sources/extractions/{name}-docs.json (the semantic cache "
         f"skips unchanged docs)."
     )
+    return 0
 
 
 #: Extensions the host-agent extraction wave can actually read. A docs mirror is
@@ -326,11 +334,19 @@ def _classify_change(status: str, paths: list[str]) -> tuple[list[str], list[str
         return [], [p for p in paths if _is_doc(p)]
     if status.startswith(("R", "C")) and len(paths) == _RENAME_PATHS:
         old, new = paths
-        return ([new] if _is_doc(new) else []), ([old] if _is_doc(old) else [])
+        extract = [new] if _is_doc(new) else []
+        # A COPY leaves the original in place; only a RENAME makes it stale.
+        # Treating `C###` like `R###` queued a file that still exists for
+        # removal. Bounded — the worklist is advisory, read by a host agent
+        # rather than executed — but it would send that agent to delete a live
+        # page's extraction. (Cold lane round 2, P2.)
+        if status.startswith("C"):
+            return extract, []
+        return extract, ([old] if _is_doc(old) else [])
     return [p for p in paths if _is_doc(p)], []
 
 
-def _advance_docs_pin(m: mf.Manifest, latest: str) -> None:
+def _advance_docs_pin(m: mf.Manifest, latest: str) -> int:
     """Advance a `kind = docs` pin, but ONLY once its worklist has been reported.
 
     THE POINT OF A DOCS MIRROR, and the reason `kind` had to stop being inert
@@ -373,10 +389,11 @@ def _advance_docs_pin(m: mf.Manifest, latest: str) -> None:
             f"UNKNOWN, not empty, so the pin was NOT advanced (still "
             f"{m.commit[:10]}). Re-run to retry."
         )
-        return
+        return 1
 
     mf.write_commit(m, latest)
     _print_doc_worklist(m.name, diff.stdout)
+    return 0
 
 
 def _print_doc_worklist(name: str, name_status: str) -> None:

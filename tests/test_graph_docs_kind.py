@@ -198,6 +198,50 @@ def test_successful_diff_does_advance_the_pin(monkeypatch, tmp_path):
 # --------------------------------------------------------------------------
 
 
+def test_a_copy_does_not_make_the_original_stale(monkeypatch, tmp_path, capsys):
+    """`C###` is a COPY: the original still exists, so it is not stale.
+
+    Treating it like `R###` queued a live page's extraction for removal. The
+    worklist is advisory, so the blast radius is a host agent sent to delete
+    something real — bounded, but wrong. (Cold lane round 2, P2.)
+    """
+    _advance(monkeypatch, tmp_path, _Completed(0, out="C085\tdocs/a/src.md\tdocs/a/copy.md\n"))
+    printed = capsys.readouterr().out
+
+    assert "re-extract  docs/a/copy.md" in printed
+    assert "REMOVE" not in printed, "a copy leaves the original in place"
+
+
+def test_a_failed_docs_diff_returns_a_nonzero_rc(monkeypatch, tmp_path):
+    """The failure path must be visible to anything reading an exit code.
+
+    Round 1 stopped the pin from advancing past a lost worklist; the rc stayed 0,
+    so automation could not see it. Realistic break: return 0 from the failure
+    branch, or drop the `return` in the CLI dispatch. (Cold lane round 2, P2.)
+    """
+    m = _manifest(tmp_path, kind="docs")
+    monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
+    monkeypatch.setattr(graph.subprocess, "run", lambda *_a, **_k: _Completed(128, err="boom"))
+    assert graph._advance_docs_pin(m, _NEW) == 1
+
+
+def test_a_successful_docs_diff_returns_zero(monkeypatch, tmp_path):
+    """CONTROL ARM: without it, always-return-1 would satisfy the test above."""
+    m = _manifest(tmp_path, kind="docs")
+    monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
+    ok = _Completed(0, out="M\tdocs/a.md\n")
+    monkeypatch.setattr(graph.subprocess, "run", lambda *_a, **_k: ok)
+    assert graph._advance_docs_pin(m, _NEW) == 0
+
+
+def test_update_all_reports_the_worst_rc_not_the_last(monkeypatch, tmp_path):
+    """One failing source must not be masked by a later passing one."""
+    _manifest(tmp_path, kind="docs", name="aaa-fails")
+    _manifest(tmp_path, kind="code", name="zzz-passes")
+    monkeypatch.setattr(graph, "update", lambda _root, name: 1 if "fails" in name else 0)
+    assert graph.update_all(tmp_path) == 1
+
+
 def test_update_all_includes_docs_manifests(monkeypatch, tmp_path):
     """A bare `mise run kb-update` must not silently skip every docs mirror.
 
@@ -209,7 +253,7 @@ def test_update_all_includes_docs_manifests(monkeypatch, tmp_path):
     _manifest(tmp_path, kind="docs", name="mirror")
     _manifest(tmp_path, kind="code", name="repo")
     seen: list[str] = []
-    monkeypatch.setattr(graph, "update", lambda _root, name: seen.append(name))
+    monkeypatch.setattr(graph, "update", lambda _root, name: seen.append(name) or 0)
     graph.update_all(tmp_path)
 
     assert sorted(seen) == ["mirror", "repo"], f"docs manifest must be updated too, saw {seen}"
