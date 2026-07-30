@@ -173,8 +173,11 @@ def verify(
     nothing. Measured 2026-07-29 — all three watched Claude Code pages drifted,
     the committed row read ``claude-code 2.1.220, current: clean``, and a second
     run was silent. So a page stays flagged until a human has actually re-read it
-    and rolled the baseline forward (``kb-setup currency docs-reviewed``), which
-    is the same rule this engine applies to a moved tracked issue.
+    and rolled the baseline forward (``kb-setup currency docs-reviewed --tool
+    <name>``), which is the same rule this engine applies to a moved tracked
+    issue. The `--tool` is REQUIRED and is not decoration: rolling this baseline
+    asserts a human read those pages, and nobody reads every watched tool's docs
+    in one sitting.
 
     A page that could not be fetched also leaves its entry untouched, so an outage
     never overwrites a good baseline with nothing. A FIRST-RUN baseline is
@@ -202,7 +205,8 @@ def verify(
                     "docs-drift",
                     "page CHANGED since the last check — re-read it, re-ingest via the "
                     "kb-curator skill, update any skill built on it in the same change, "
-                    "then roll the baseline with `kb-setup currency docs-reviewed`",
+                    "then roll the baseline with "
+                    "`kb-setup currency docs-reviewed --tool <name>`",
                     drifted=True,
                     verified=True,
                 )
