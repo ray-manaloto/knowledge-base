@@ -10,6 +10,7 @@ one way the guard could not see.
 
 import json
 
+import pytest
 from kb_setup.currency import upstream
 
 
@@ -464,3 +465,90 @@ def test_prose_dates_and_counts_are_not_mistaken_for_version_headings() -> None:
     status = upstream.UpstreamStatus(notes=notes)
     assert any("a thing" in h for h in status.feature_highlights)
     assert not status.feature_scan_unrecognised
+
+
+def test_a_prose_heading_that_starts_with_a_version_is_not_a_release_boundary() -> None:
+    """`## 2.0 migration guide` split one release in two.
+
+    The predecessor regex was anchored only on the LEFT — it asked the heading to
+    START with a version and never asked what followed — so a prose section opened
+    a new span. The per-release `all(...)` then scored that span on its own, found
+    no recognised feature format in plain prose, and marked a fully-readable
+    release partially unrecognised. The sibling test above only covered
+    `## 2 breaking changes`, which fails on the two-numeric-components rule and so
+    never reached this gap.
+
+    THE PROSE MUST FOLLOW A RECOGNISED SECTION, and that is the whole test. A
+    first draft put the prose heading FIRST and was green under the bug: the
+    `## Added` simply landed in the second span and scored fine either way, so the
+    probe could not fail. Measured both ways on this shape: 2 spans / recognised
+    with the fix, 3 spans / UNRECOGNISED without it.
+    """
+    for prose in ("## 2.0 migration guide", "## 3.14 compatibility notes"):
+        notes = (
+            f"## v1.0.0\n\n## Added\n- a real feature\n\n"
+            f"{prose}\n\nPlain prose describing the upgrade path.\n"
+        )
+        status = upstream.UpstreamStatus(notes=notes)
+        assert any("a real feature" in h for h in status.feature_highlights), prose
+        assert not status.feature_scan_unrecognised, prose
+
+
+def test_real_release_headings_are_still_boundaries() -> None:
+    """CONTROL ARM for the tightening: the shapes this repo actually meets.
+
+    GitHub generates the tag alone; Keep-a-Changelog generates the dated form
+    (whose hyphens `_normalize` turns into spaces, hence the digit-led branch).
+    A rule that rejected these would silently restore the round-1 masking bug —
+    one release's `## Added` certifying the next.
+    """
+    for heading in ("## v1.0.2", "## 2026.7.16", "## v1.0.2 — a title", "## 1.0.2 - 2026-01-01"):
+        notes = f"## v1.0.1\n\n## Added\n- real feature\n\n{heading}\n\n- unsectioned bullet\n"
+        highlights = upstream.UpstreamStatus(notes=notes).feature_highlights
+        assert any("real feature" in h for h in highlights), heading
+        assert not any("unsectioned" in h for h in highlights), heading
+
+
+# ------------------------------------------- same_release (cold lane, round 2) ----
+
+
+def test_same_release_ignores_decoration_and_zero_padding() -> None:
+    """`v2.1.220` and `2.1.220` are ONE release; a raw `==` said otherwise.
+
+    Three call sites compared raw strings — `probe`'s early return, `decide`'s,
+    and `_has_upgrade` — so they were free to disagree about the same pair. They
+    now share this one function.
+    """
+    assert upstream.same_release("2.1.220", "v2.1.220")
+    assert upstream.same_release("v2.1.220", "2.1.220")
+    assert upstream.same_release("1.2", "1.2.0")
+
+
+def test_same_release_still_separates_genuinely_different_releases() -> None:
+    """CONTROL ARM: an always-True `same_release` must not pass.
+
+    It would satisfy the test above while disabling every upgrade this engine
+    exists to find.
+    """
+    assert not upstream.same_release("0.9.26", "0.9.30")
+    assert not upstream.same_release("v1.0.0", "v2.0.0")
+    # Unparsable on either side falls back to string equality, both ways.
+    assert not upstream.same_release("nightly", "0.9.30")
+    assert upstream.same_release("nightly", "nightly")
+
+
+def test_probe_does_not_fetch_notes_for_a_decoration_only_mismatch(monkeypatch) -> None:
+    """The behaviour the string `==` actually cost.
+
+    Notes were fetched for a release already installed, which `decide` then ran
+    its gates against.
+    """
+    monkeypatch.setattr(upstream, "github_versions", lambda _r: ("v2.1.220", ("v2.1.220",), ""))
+    monkeypatch.setattr(
+        upstream,
+        "release_for_tag",
+        lambda _r, _v: pytest.fail("fetched notes for a release already installed"),
+    )
+    status = upstream.probe(pypi="", github="anthropics/claude-code", current="2.1.220")
+    assert status.latest == "v2.1.220"
+    assert not status.notes

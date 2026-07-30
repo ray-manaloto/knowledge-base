@@ -118,6 +118,54 @@ def _stale(observed_at: str, now: datetime) -> bool:
     return now - seen > timedelta(days=STALE_AFTER_DAYS)
 
 
+def _recorded_latest(tool: str, entry: object) -> tuple[str, BaselineFinding | None]:
+    """Read one cache entry's `latest`: `(version, None)` or `("", why-not)`.
+
+    MALFORMED is its own answer, not folded into "never recorded". Both block the
+    comparison, but one says nobody has run the loop and the other says the cache
+    is corrupt — and a hand-edited or half-written file deserves to be named as
+    such rather than reported as a missing run.
+
+    ORDER IS THE WHOLE FIX. A single `not entry.get("latest")` test used to run
+    BEFORE the type narrowing, so every FALSY non-string — `0`, `false`, `[]` —
+    was reported as "nobody ran the loop", leaving the MALFORMED branch
+    unreachable for exactly the corrupt-cache class it was added to name. Type
+    first, emptiness second. (Cold lane, round 2 — the round-1 fix had this gap.)
+
+    Split out of `behind` so that reading the entry and judging the version it
+    holds are two jobs rather than one eight-branch function.
+    """
+
+    def _never_recorded() -> BaselineFinding:
+        return BaselineFinding(
+            tool,
+            "upstream-cache",
+            "no upstream version has ever been recorded — run `mise run kb-currency` "
+            "so the offline check can tell whether this pin is behind",
+        )
+
+    def _malformed(what: str) -> BaselineFinding:
+        return BaselineFinding(
+            tool,
+            "upstream-cache",
+            f"the recorded upstream entry is MALFORMED ({what}) — delete it and "
+            "re-run `mise run kb-currency`; until then whether this pin is behind "
+            "is UNKNOWN",
+        )
+
+    if entry is None:
+        return "", _never_recorded()
+    if not isinstance(entry, dict):
+        return "", _malformed(f"the entry is a {type(entry).__name__}, not an object")
+    latest = entry.get("latest")
+    if latest is None or latest == "":
+        # Absent, null, or empty: nothing was ever written. Not corruption.
+        return "", _never_recorded()
+    if not isinstance(latest, str):
+        return "", _malformed(f"'latest' is a {type(latest).__name__}, not a string")
+    return latest, None
+
+
 def behind(
     tool: str,
     pinned: str,
@@ -148,26 +196,9 @@ def behind(
     """
     moment = now or datetime.now(UTC)
     entry = store.get(tool)
-    if entry is None or (isinstance(entry, dict) and not entry.get("latest")):
-        return BaselineFinding(
-            tool,
-            "upstream-cache",
-            "no upstream version has ever been recorded — run `mise run kb-currency` "
-            "so the offline check can tell whether this pin is behind",
-        )
-    # MALFORMED is its own answer, not folded into "never recorded". Both block the
-    # comparison, but one says nobody has run the loop and the other says the cache
-    # is corrupt — and a hand-edited or half-written file deserves to be named as
-    # such rather than reported as a missing run.
-    latest = entry.get("latest") if isinstance(entry, dict) else None
-    if not isinstance(latest, str):
-        return BaselineFinding(
-            tool,
-            "upstream-cache",
-            f"the recorded upstream entry is MALFORMED ({type(entry).__name__}) — "
-            "delete it and re-run `mise run kb-currency`; until then whether this "
-            "pin is behind is UNKNOWN",
-        )
+    latest, unreadable = _recorded_latest(tool, entry)
+    if unreadable is not None:
+        return unreadable
     raw_observed = entry.get("observed_at") if isinstance(entry, dict) else None
     observed = raw_observed if isinstance(raw_observed, str) else ""
     stale = _stale(observed, moment)

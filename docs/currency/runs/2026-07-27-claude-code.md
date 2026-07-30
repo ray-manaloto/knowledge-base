@@ -34,7 +34,7 @@ _No watch items configured for this tool._
 
 Gates passed:
 
-- ✅ PyPI latest has a matching GitHub tag
+- ✅ latest version has a readable GitHub release
 - ✅ no breaking/removal/deprecation marker
 - ✅ extras unchanged
 - ✅ no tracked issue moved
@@ -47,6 +47,21 @@ Gates passed:
 - Detail: Only the patch component may move unattended. Pre-1.0 projects use the MINOR slot as their breaking channel, so 0.9.x → 0.10.0 stops here.
 - Recommended: Read the release notes, then decide.
 - **Answer:** _not yet answered_
+
+> **Two corrections, 2026-07-30 — neither changes an outcome.**
+>
+> 1. The first gate rendered as `PyPI latest has a matching GitHub tag`. Like
+>    mise, `[tool.claude-code]` has no `pypi` key (`currency.toml:248-261`), so
+>    that label named a lookup that never ran; `decide.GATES[1]` hardcoded the
+>    PyPI wording regardless of source. The gate that ran is the GitHub-release
+>    read, and it passed.
+> 2. **This question should never have been asked.** `2.1.220 → v2.1.220` is one
+>    release wearing two spellings. `decide()`'s early return compared raw
+>    strings, so a decoration-only mismatch fell through to the gates. It now
+>    compares parsed versions (`upstream.same_release`) and returns before any
+>    gate runs — an already-installed release raises nothing.
+>
+> Both found by the cold lane, round 2.
 
 ## Step 6 — process note
 

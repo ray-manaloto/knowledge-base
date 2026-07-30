@@ -523,6 +523,63 @@ def test_a_v_prefixed_tag_is_not_an_upgrade_over_the_bare_version() -> None:
     assert "current" in verdict.summary()
 
 
+def test_a_v_prefixed_tag_raises_no_question_at_all() -> None:
+    """`auto_apply` was already False here; the ROUND-2 finding is what came with it.
+
+    `_has_upgrade` had been moved onto parsed versions, but `decide`'s own early
+    return still read `latest == current` as raw strings — so a decoration-only
+    mismatch fell PAST it into `_gate_tag`/`_gate_markers`/`_gate_local`, none of
+    which check that a version delta exists before asking. A populated
+    `ambiguities` then drives `needs_interview`, i.e. a human is asked to adopt a
+    release they are already running. The `has_upgrade` assertion above cannot see
+    that, because the gates run either way.
+
+    The notes deliberately carry a breaking marker: under the old raw comparison
+    `_gate_markers` fired on them, which is what made the question appear.
+    """
+    verdict = decide(
+        sync=_sync(pinned="2.1.220"),
+        upstream=UpstreamStatus(
+            latest="v2.1.220", github_tag="v2.1.220", notes="- BREAKING: removed support for X"
+        ),
+        moved=(),
+    )
+    assert verdict.ambiguities == ()
+    assert not verdict.needs_interview
+
+
+def test_a_real_bump_with_a_breaking_marker_still_asks() -> None:
+    """CONTROL ARM for the early return: it must not swallow a GENUINE question.
+
+    Same notes, same gates — only the version delta is real. If the early return
+    were widened (or `same_release` always said True), the test above would still
+    pass while the marker gate stopped firing on anything at all.
+    """
+    verdict = decide(
+        sync=_sync(pinned="2.1.220"),
+        upstream=UpstreamStatus(
+            latest="2.1.221", github_tag="v2.1.221", notes="- BREAKING: removed support for X"
+        ),
+        moved=(),
+    )
+    assert verdict.needs_interview
+    assert any("breaking" in a.gate for a in verdict.ambiguities)
+
+
+def test_the_tag_gate_is_not_labelled_as_a_pypi_lookup() -> None:
+    """A GitHub-only tool's PASSING gate rendered as a check it never ran.
+
+    `_gate_tag` reads `upstream.github_tag` — the same question whichever source
+    supplied the version — but `GATES[1]` hardcoded the PyPI wording, so
+    `docs/currency/runs/2026-07-29-mise.md` committed
+    `✅ PyPI latest has a matching GitHub tag` for mise, whose `currency.toml`
+    block has no `pypi` key at all.
+    """
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(latest="0.9.26"), moved=())
+    assert "latest version has a readable GitHub release" in verdict.gates_passed
+    assert not any("PyPI" in g for g in verdict.gates_passed)
+
+
 def test_a_genuine_upgrade_still_auto_applies() -> None:
     """Control arm: requiring an upgrade must not disable auto-apply."""
     verdict = decide(sync=_sync(), upstream=_clean_upstream(latest="0.9.26"), moved=())

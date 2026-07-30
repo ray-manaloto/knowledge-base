@@ -119,8 +119,15 @@ over.
 ```
 
 `lanes_skipped` entries carry their reason — `standards:by-policy-one-lane`,
-`spec:no-spec-available`, `cold:not-applicable-docs-only`. **A skip with no reason is not a skip, it is a gap**,
+`spec:no-spec-available`. **A skip with no reason is not a skip, it is a gap**,
 and `kb-ship` rejects a receipt containing one.
+
+`cold:not-applicable-docs-only` was the third example here and **no longer names a
+reachable state.** Under one-lane-always (`SKILL.md`), a docs-only branch either has
+a non-empty scoped diff — in which case cold runs — or an empty one, in which case
+there is no receipt at all rather than a per-lane skip. It survived the very commit
+that made it unreachable, one line above a table stating `cold` can never be
+excused. (Cold lane, round 2.)
 
 `cold:claude-fallback-SAME-FAMILY` was listed here as a third example and is
 **not a skip at all** — it belongs in `lanes_ran`, because that lane *ran*, just

@@ -85,11 +85,13 @@ _MAX_FEATURE_LINES = 12
 # A markdown section heading, at any depth (`## Added`, `### New features`).
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*?)\s*#*\s*$")
 # A heading naming a RELEASE rather than a content section — `## v0.9.27`,
-# `## 2026.7.16`, `## v1.0.0 — title`. Matched against the NORMALISED heading, and
-# requiring two numeric components so prose like "2 breaking changes" cannot pass.
+# `## 2026.7.16`, `## v1.0.0 — title`, `## 1.2.3 (2026-01-01)`. Matched against the
+# NORMALISED heading, and requiring two numeric components so prose like
+# `## 2 breaking changes` cannot pass.
+#
 # This boundary is what makes the format check per-release: without it, one
 # release's recognised sections certified an entire multi-version jump.
-_VERSION_HEADING_RE = re.compile(r"^v?\d+\.\d+")
+_VERSION_TOKEN_RE = re.compile(r"^v?\d+\.\d+[\w.+]*")
 # Keep-a-Changelog / GitHub-generated-notes section names whose bullets ARE
 # features by construction. This is the detector's primary signal, and it exists
 # because the phrase/`feat:` heuristics alone matched NOTHING on any real corpus
@@ -177,6 +179,65 @@ class Version:
         return self.parts + (0,) * (width - len(self.parts))
 
 
+def same_release(left: str, right: str) -> bool:
+    """Do these two strings name the SAME release, decoration and padding aside?
+
+    `v2.1.220` and `2.1.220` are one release; so are `1.2` and `1.2.0`. Raw `==`
+    says otherwise on both, which is the bug: `probe()` fetched release notes for a
+    "new" release we were already running, and `decide()` then ran the tag/marker/
+    local gates against them and could surface a spurious "Adopt it?" about it.
+    `_gate_patch` and `_has_upgrade` had already been moved onto parsed `Version`
+    comparison for exactly this reason; these two call sites were left behind.
+    (Cold lane, round 2.)
+
+    NOT `Version.__eq__` — `Version` is a frozen dataclass carrying `raw`, so its
+    generated equality compares the decoration this function exists to ignore.
+    Unparsable on either side falls back to string equality: nothing better is
+    available, and every caller already treats an unparsable version as an
+    ambiguity a human must settle.
+    """
+    a, b = Version.parse(left), Version.parse(right)
+    if a is None or b is None:
+        return left == right
+    return not (a > b or b > a)
+
+
+def _is_version_heading(heading: str) -> bool:
+    r"""Is this NORMALISED heading naming a release, rather than prose about one?
+
+    `## v0.9.27`, `## 2026.7.16`, `## v1.0.0 — title`, `## 1.2.3 (2026-01-01)` and
+    the Keep-a-Changelog `## 1.0.0 - 2026-01-01` are releases. `## 2 breaking
+    changes` is not (the token needs two numeric components), and neither is
+    `## 2.0 migration guide`.
+
+    That last case is the round-2 fix. The predecessor was a lone
+    `re.match(r"^v?\d+\.\d+", …)` — anchored only on the LEFT, so it asked the
+    heading to *start* with a version and never asked what came after. A prose
+    section headed `## 2.0 migration guide` therefore opened a new release span,
+    splitting one release in two and letting the per-release `all(...)` mark a
+    fully-readable release partially unrecognised.
+
+    Deliberately a function rather than one cleverer regex: every right-anchored
+    pattern tried here matched `0.9.30 hotfix` through BACKTRACKING (`\d+\.\d+`
+    settling for `0.9`, leaving `.` to satisfy the punctuation branch), so the
+    regex answered a different question than the one it appeared to ask. Splitting
+    "read the version token" from "judge what follows it" removes the ambiguity.
+
+    The accepted cost: a real heading with a bare one-word title (`## 0.9.30
+    hotfix`, or `## v1.0.0-rc1` once `_normalize` has turned the hyphen into a
+    space) reads as prose and merges into the previous release. Both directions
+    are wrong somewhere; this one degrades to the coarser pre-round-1 grouping
+    rather than to a false "could not tell", and GitHub's tag-only headings plus
+    Keep-a-Changelog's dated form — the two shapes this repo actually meets — are
+    both still recognised. (Cold lane, round 2.)
+    """
+    token = _VERSION_TOKEN_RE.match(heading)
+    if token is None:
+        return False
+    rest = heading[token.end() :].strip()
+    return not rest or not rest[0].isalpha()
+
+
 def _release_spans(notes: str) -> list[list[str]]:
     """Split concatenated release notes into one line-list per release.
 
@@ -189,7 +250,7 @@ def _release_spans(notes: str) -> list[list[str]]:
     current: list[str] = []
     for raw in notes.splitlines():
         heading = _HEADING_RE.match(raw)
-        if heading and _VERSION_HEADING_RE.match(_normalize(heading.group(1)).rstrip(":.")):
+        if heading and _is_version_heading(_normalize(heading.group(1)).rstrip(":.")):
             spans.append(current)
             current = []
             continue
@@ -551,7 +612,10 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
         return UpstreamStatus(source="none")
     if err:
         return UpstreamStatus(source=source, reachable=False, error=err)
-    if latest == current or not github:
+    # `same_release`, not `==`: a decoration-only mismatch (`v2.1.220` vs `2.1.220`)
+    # is not a pending release, and reading notes for it is what produced an
+    # "Adopt it?" about a version already installed. (Cold lane, round 2.)
+    if same_release(latest, current) or not github:
         return UpstreamStatus(latest=latest, source=source)
 
     pending = versions_between(versions, current, latest) or (latest,)

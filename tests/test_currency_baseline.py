@@ -224,3 +224,33 @@ def test_a_comparable_pair_still_reports_a_real_direction() -> None:
     found = baseline.behind("graphify", "0.9.26", _cache("0.9.30"), now=_NOW)
     assert found is not None
     assert found.check == "upstream-version"
+
+
+def test_a_falsy_non_string_latest_is_malformed_not_never_recorded() -> None:
+    """The round-1 fix's own gap: a FALSY non-string was never reachable.
+
+    `0`, `false` and `[]` are falsy, and were caught by a truthiness test that ran
+    BEFORE the type narrowing — so the MALFORMED branch was unreachable for exactly
+    the corrupt-cache class it was added to name.
+    `test_malformed_and_never_recorded_are_different_messages` only ever exercised
+    a TRUTHY malformed value (a string), which is why it stayed green.
+    """
+    for junk in (0, False, [], {}):
+        found = baseline.behind("graphify", "0.9.26", {"graphify": {"latest": junk}}, now=_NOW)
+        assert found is not None, junk
+        assert "MALFORMED" in found.detail, junk
+        assert "has ever been recorded" not in found.detail, junk
+
+
+def test_an_absent_or_empty_latest_is_still_never_recorded() -> None:
+    """CONTROL ARM: the reorder must not invent corruption.
+
+    Putting the type check first must not turn "nobody ran the loop" into "the
+    cache is corrupt". An absent key, an explicit null, and an
+    empty string all mean nothing was ever written — not corruption.
+    """
+    for entry in ({}, {"latest": None}, {"latest": ""}):
+        found = baseline.behind("graphify", "0.9.26", {"graphify": entry}, now=_NOW)
+        assert found is not None, entry
+        assert "has ever been recorded" in found.detail, entry
+        assert "MALFORMED" not in found.detail, entry

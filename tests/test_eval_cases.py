@@ -200,11 +200,21 @@ def test_the_gated_retrieval_case_still_does_not_bite_on_ship() -> None:
     explicitly — and a stated property nothing checks is exactly the inert
     declaration dotfiles#354 exists to catch. So the claim is pinned here: gated
     AND slow, and a default run skips it.
+
+    ONE CASE, not the whole suite. This ran `run_cases(_cases())` and then asserted
+    `not report.failed` over EVERY case — so a unit test about one case's SKIP flag
+    could go red because a lane CLI was absent from PATH or the 130k-node graph
+    answered differently. It did: one full-suite run failed here and would not
+    reproduce across five more, and the assertion only reports a COUNT, so which
+    case failed was unrecoverable. `run_cases` treats cases independently (each
+    iteration appends its own `Result`), so passing the single case proves the same
+    property with none of the ambient dependency. What the other cases do is
+    `mise run kb-eval`'s business, not this test's. (Found at clear-prep, 2026-07-29.)
     """
     case = next(c for c in _cases() if c.name == "tier2.kb-retrieval")
     assert case.gated
     assert case.slow
-    report = evals.run_cases(_cases())
+    report = evals.run_cases([case])
     row = next(r for r in report.results if r.case.name == "tier2.kb-retrieval")
     assert row.outcome.verdict is evals.Verdict.SKIP
     assert not report.failed

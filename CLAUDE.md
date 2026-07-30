@@ -144,7 +144,7 @@ mise run kb-currency          # the full loop; writes docs/currency/
   missing `currency.toml` (silence is this design's "clean", so an absent config
   must announce that step 1 did not run) and an unknown `--tool` (exit 2).
 - **An unambiguous bump may apply itself**, where unambiguous means all six gates
-  pass: patch-level · PyPI latest has a matching GitHub tag · no breaking marker ·
+  pass: patch-level · latest has a readable GitHub release · no breaking marker ·
   extras unchanged · no tracked issue moved · step 1 green. It **fails closed** —
   anything unreadable is ambiguity, not consent. PyPI is the installable truth
   (mise installs from it); GitHub is only the narrative.

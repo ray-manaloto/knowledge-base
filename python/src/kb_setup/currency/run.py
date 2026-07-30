@@ -297,15 +297,39 @@ def docs_reviewed(repo_root: Path, *, only: str = "") -> int:
     this runs, a drifted page keeps being reported — which is the point: the
     signal used to be consumed by the same run that raised it, so the committed
     report said "clean" while three watched pages had changed.
+
+    Requires `--tool`, for the same reason `apply` does and one more. CONSUMING a
+    signal is never a fan-out: this asserts a human read those pages, and nobody
+    reads every watched tool's docs in one sitting. The extra reason is that
+    `_opt` treats a DANGLING `--tool` (the flag as the last token) as absent, so
+    a typo'd `kb-setup currency docs-reviewed --tool` arrived here as `only=""`
+    and silently rolled the fingerprint for every watched tool — swallowing
+    exactly the drift this whole surface exists to keep un-swallowed. (Cold lane.)
+
+    Returns 1 when any page could not be FETCHED. `mark_reviewed` leaves such a
+    page's baseline alone and reports `NOT CHECKED`, so a bare `return 0` told a
+    caller scripting the exit code that the roll had succeeded during a network
+    outage that left pages unrolled. (Cold lane.)
     """
+    if not only:
+        print("[currency] docs-reviewed requires --tool <name>", file=sys.stderr)
+        return 2
     specs = [s for s in _specs(repo_root, only) if s.docs_watch]
     if not specs:
-        scope = f" for {only!r}" if only else ""
-        print(f"[currency] no tool{scope} watches any docs page", file=sys.stderr)
+        print(f"[currency] no tool for {only!r} watches any docs page", file=sys.stderr)
         return 2
+    unfetched = 0
     for spec in specs:
         for finding in docs.mark_reviewed(repo_root, spec.docs_watch):
             print(f"[currency] {spec.name}: {finding.detail} — {finding.url}")
+            unfetched += not finding.verified
+    if unfetched:
+        print(
+            f"[currency] {unfetched} page(s) could not be fetched, so their baseline was "
+            "NOT rolled — re-run once they are reachable",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
