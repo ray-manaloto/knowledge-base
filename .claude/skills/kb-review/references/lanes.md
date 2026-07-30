@@ -158,7 +158,17 @@ against. Two rules now bind it:
   checked only for non-blankness — so one flag minted a full-coverage receipt
   for a zero-line diff.
 - **`kb-ship` AND `kb-land` both require it to equal the branch's merge-base with
-  `main`.** A receipt against a narrower base is still a *truthful* record of
+  `review.DEFAULT_BASE_REF` — `origin/main`, NOT local `main` (#54).** The PR is
+  opened against GitHub's branch, so resolving the local one asked a different
+  question: local `main` merely behind is harmless (the merge-base is older, so
+  the review covered more), but local `main` ahead **along this branch's own
+  ancestry** moves the merge-base forward and the receipt then claims a coverage
+  it does not have. `origin/main` is a local remote-tracking ref — measured at
+  0.64s against `git ls-remote`'s 2.5s — so this buys correctness for no network.
+  A clone with no `origin/main` REFUSES rather than falling back, because a
+  fallback would reinstate the defect exactly where nobody would see it.
+
+  A receipt against a narrower base is still a *truthful* record of
   what it reviewed; it just does not gate the whole branch. The dangerous case is
   not adversarial but ordinary: on a second review round the instinct is "review
   what changed since last time" (`--fixed-point HEAD^`), which produces an honest
@@ -173,7 +183,7 @@ against. Two rules now bind it:
   every merge.
 
 So pass `--fixed-point` only when you genuinely reviewed against something other
-than `main`, and expect both tasks to refuse it.
+than `origin/main`, and expect both tasks to refuse it.
 
 **A lane claimed as RUN must have left a report** at
 `.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty — where `<lane>` is

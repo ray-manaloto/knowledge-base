@@ -225,6 +225,54 @@ def test_land_accepts_a_full_branch_receipt(monkeypatch, tmp_path):
     assert any(c[:3] == ["gh", "pr", "merge"] for c in seen)
 
 
+def test_the_coverage_gate_resolves_origin_main_not_local_main(monkeypatch, tmp_path):
+    """The base must be resolved against the ref the PR is actually opened against.
+
+    `gh pr create --base main` targets GitHub's `main`; the gate resolved the
+    LOCAL one. Local `main` ahead along the branch's own ancestry moves the
+    merge-base forward, so the review covered LESS than the PR's real diff while
+    the receipt claimed the whole branch. (#54)
+
+    Asserted on the `git merge-base` ARGUMENT rather than on an outcome, because
+    both refs answer `"a" * 40` in these stubs — an outcome assertion could not
+    tell them apart, which is the #59 shape. Spelled literally rather than
+    interpolating `review.DEFAULT_BASE_REF`: a fixture built from the constant
+    under test passes whatever that constant becomes.
+    """
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    _stub_run(monkeypatch, _land_handler(seen))
+    assert pr.land_main(tmp_path, 42) == 0
+
+    bases = [c for c in seen if c[:2] == ["git", "merge-base"]]
+    assert bases, "the coverage gate must resolve a base at all"
+    assert all("origin/main" in c for c in bases), f"resolved something else: {bases}"
+    assert not any(c[3:4] == ["main"] for c in bases), "local `main` is the defect"
+
+
+def test_an_unresolvable_base_refuses_rather_than_falling_back(monkeypatch, tmp_path):
+    """CONTROL ARM for the choice above: no `origin/main` must REFUSE, not degrade.
+
+    Falling back to local `main` would silently reinstate #54 on exactly the
+    clones least able to notice. "Could not check" is never rendered as clean
+    anywhere else in `kb_setup.review`, and this is the path where that rule
+    costs something — so it is pinned. (Ray's explicit trade, 2026-07-30.)
+    """
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    inner = _land_handler(seen)
+
+    def handler(cmd: list[str]) -> _Proc:
+        if cmd[:2] == ["git", "merge-base"]:
+            seen.append(cmd)
+            return _Proc(128, "", "fatal: Not a valid object name origin/main")
+        return inner(cmd)
+
+    _stub_run(monkeypatch, handler)
+    assert pr.land_main(tmp_path, 42) == 1
+    assert not any(c[:3] == ["gh", "pr", "merge"] for c in seen), "must not merge"
+
+
 def test_land_refuses_when_checks_red(monkeypatch, tmp_path):
     """CONTROL ARM: red checks must stop the merge before it is attempted."""
     seen: list[list[str]] = []

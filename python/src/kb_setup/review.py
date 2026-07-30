@@ -142,6 +142,35 @@ LANES = ("standards", "spec", "cold", "silent-failure")
 #: `.graphify_*` learning overlay, gitignored for the same reason.
 EXEMPT_PATHS = ("graphify-out/memory/", "docs/goals/README.md")
 
+#: The ref the branch's base is resolved against — the REMOTE-TRACKING one.
+#:
+#: It was local `main`, while the PR is opened against GitHub's
+#: (`gh pr create --base main`). Those disagree in two directions and only one
+#: is safe: local `main` merely BEHIND makes the merge-base older, so the review
+#: covered MORE than the branch; local `main` AHEAD **along the branch's own
+#: ancestry** moves the merge-base forward, so the review covered LESS and the
+#: receipt claims a coverage it does not have. Using `origin/main` removes
+#: exactly the unsafe direction. (#54)
+#:
+#: **It costs no network, and the issue's own framing said otherwise.**
+#: `origin/main` is a local remote-tracking ref: `git merge-base -- origin/main
+#: HEAD` reads `.git/refs/remotes/origin/main` and never opens a socket.
+#: Measured both arms — that call 0.64s against `git ls-remote origin main`
+#: (a real network round-trip) at 2.5s. So this is not a correctness-for-network
+#: trade; the only thing given up is freshness, and a stale `origin/main` errs
+#: in the SAFE direction above.
+#:
+#: One new failure mode, accepted deliberately (Ray, 2026-07-30): a clone with
+#: no `origin/main` ref resolves to "" and `_base_coverage_gap` REFUSES rather
+#: than falling back to local `main`. Falling back would silently reinstate the
+#: defect on exactly the machines least likely to notice, and "could not check"
+#: is never rendered as clean anywhere else in this module.
+#:
+#: Shared by the gate (`ship`/`land` pass it as ``require_base``) and by the
+#: receipt writer's default `--fixed-point`, so the two cannot name different
+#: refs — the drift this module has now closed in four other places.
+DEFAULT_BASE_REF = "origin/main"
+
 #: How many disqualifying paths the refusal message names before summarising.
 #: A DISPLAY bound, so it states the remainder ("+3 more") rather than truncating
 #: silently — a bound that hides its own existence is how "absent" and
@@ -447,7 +476,28 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
 
 
 def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
-    """Return lanes claimed as RUN that have no non-empty report on disk."""
+    """Return lanes claimed as RUN that have no non-empty report on disk.
+
+    **This is also what pins the receipt to the SHA the lanes actually read**,
+    which is not obvious and was filed as a design gap (#56): the CLI reads HEAD
+    at mint time and there is deliberately no `--sha`, so nothing *appears* to
+    stop a commit landing between the last lane finishing and the receipt being
+    written.
+
+    Something does. Reports are resolved through :func:`report_path` against the
+    RECEIPT's sha — which is that fresh HEAD — so if HEAD moved after the lanes
+    ran, their reports are named for the old commit, are invisible here, and the
+    receipt is refused for missing evidence. The window closes itself.
+
+    What remains is authoring a report at the NEW sha, and that is not a hole to
+    plug: `kb-review/SKILL.md` step 4 PRESCRIBES exactly that for the fix-round
+    case (fix a round-2 finding, re-run the gates, write a short report at the
+    fixed sha stating plainly that no lane re-ran) and forbids copying the
+    round-2 report to the new name. #56's proposed fix — capture HEAD at lane
+    dispatch and refuse if it moved — would make that documented path
+    impossible, since committing the fix is what moves HEAD. Closed as
+    already-mitigated rather than implemented (Ray, 2026-07-30).
+    """
     # `data.get(k, [])`, matching `_check_lanes` — the THIRD idiom for one key
     # was here (`or []`), contradicting the "one key deserves one read" rule two
     # functions up. It is unreachable with a malformed value only because

@@ -268,7 +268,12 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     if "--fixed-point" in rest and not (_opt(rest, "--fixed-point") or "").strip():
         print("review-receipt: --fixed-point needs a value", file=sys.stderr)
         return 2
-    fixed_point = _opt(rest, "--fixed-point") or "main"
+    # Defaults to the SAME ref `ship`/`land` gate against (`review.DEFAULT_BASE_REF`
+    # — `origin/main`), not a second spelling of it. The default was the literal
+    # `"main"` while the gate resolved local `main` too, so they agreed by
+    # coincidence; pointing only the gate at `origin/main` would have made the
+    # writer record one base and the reader demand another. (#54)
+    fixed_point = _opt(rest, "--fixed-point") or review.DEFAULT_BASE_REF
     receipt = review.Receipt(
         sha=sha,
         fixed_point=fixed_point,

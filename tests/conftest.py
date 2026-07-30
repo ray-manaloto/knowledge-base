@@ -34,10 +34,20 @@ LANES_RAN = ("standards", "spec", "cold:codex", "silent-failure")
 def git(tmp_path: Path) -> Callable[..., str]:
     """Return a `git(*args) -> stdout` bound to a fresh repo on a `work` branch.
 
-    The repo has one empty commit on `main`, a `.gitignore` covering `.agent/`,
-    and `work` checked out. The `.gitignore` is not incidental: receipts live
-    under `.agent/`, and without it `pr._ship_preflight` refuses for a dirty tree
-    before any receipt check runs — so a test would pass for the wrong reason.
+    The repo has one empty commit on `main`, a `refs/remotes/origin/main`
+    pointing at it, a `.gitignore` covering `.agent/`, and `work` checked out.
+
+    The `.gitignore` is not incidental: receipts live under `.agent/`, and
+    without it `pr._ship_preflight` refuses for a dirty tree before any receipt
+    check runs — so a test would pass for the wrong reason.
+
+    Neither is `origin/main`. The coverage gate resolves the branch's base
+    against :data:`review.DEFAULT_BASE_REF` (#54), and a repo with no such ref
+    fails CLOSED — correctly, but it would make every test here refuse on
+    "could not resolve" instead of exercising the fallback it is aimed at. A
+    real clone has this ref; a `git init` does not, and that gap between the
+    fixture and the world is what the tests were quietly relying on. Created
+    with `update-ref`, so there is no remote and no network.
     """
 
     def run(*args: str) -> str:
@@ -65,6 +75,7 @@ def git(tmp_path: Path) -> Callable[..., str]:
     (tmp_path / ".gitignore").write_text(".agent/\n", encoding="utf-8")
     run("add", "--", ".gitignore")
     run("commit", "-q", "-m", "base")
+    run("update-ref", "refs/remotes/origin/main", run("rev-parse", "main"))
     run("checkout", "-q", "-b", "work")
     return run
 
@@ -114,6 +125,11 @@ def receipt_for(tmp_path: Path) -> Callable[[str], None]:
     The base is resolved against the commit itself, not live HEAD, so the receipt
     records the range that was actually reviewed — the same distinction
     `base_sha`'s ``head`` parameter exists for.
+
+    It names :data:`review.DEFAULT_BASE_REF` rather than the literal `"main"`,
+    because that is what `ship`/`land` gate against (#54); hardcoding `"main"`
+    here would make the fixture record one base while the code demanded another,
+    and every test would refuse for a reason none of them is about.
     """
 
     def write(sha: str) -> None:
@@ -125,8 +141,8 @@ def receipt_for(tmp_path: Path) -> Callable[[str], None]:
             tmp_path,
             review.Receipt(
                 sha=sha,
-                fixed_point="main",
-                fixed_point_sha=review.base_sha(tmp_path, "main", head=sha),
+                fixed_point=review.DEFAULT_BASE_REF,
+                fixed_point_sha=review.base_sha(tmp_path, review.DEFAULT_BASE_REF, head=sha),
                 lanes_ran=LANES_RAN,
                 lanes_skipped=(),
                 findings=0,

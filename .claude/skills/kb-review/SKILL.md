@@ -38,7 +38,12 @@ and a receipt whose SHA does not match is not a receipt.
 ### 1. Pin the fixed point
 
 `$ARGUMENTS` is the fixed point when the user gave one — a SHA, a branch, a tag.
-Empty means the merge-base with `main`. Confirm it before spawning anything:
+Empty means the merge-base with **`origin/main`**, not local `main` (#54): the PR
+is opened against GitHub's branch, and a local `main` that has moved ahead along
+this branch's ancestry shifts the merge-base forward, so the review covers less
+than the PR's real diff while the receipt claims the whole branch. `origin/main`
+is a local remote-tracking ref, so this costs no network. Confirm it before
+spawning anything:
 
 ```bash
 git rev-parse <fixed-point>
@@ -196,10 +201,23 @@ chose not to run it" would make every future receipt claim a judgement nobody
 made. `no-spec-available` remains the spec lane's alone.
 
 `--blocking` is required — state it even when it is `0`. `--fixed-point`
-defaults to `main`; **pass it whenever you reviewed against anything else**, or
+defaults to **`origin/main`** (`review.DEFAULT_BASE_REF`, the same ref
+`ship`/`land` gate against — one constant, so the writer and the reader cannot
+name different refs); **pass it whenever you reviewed against anything else**, or
 the receipt records a base you did not use. It is resolved to a commit and
 stored as `fixed_point_sha`; an unresolvable one is refused rather than stored
-empty. There is no `--sha` — the receipt is always for HEAD.
+empty — including a clone with no `origin/main`, which REFUSES rather than
+quietly falling back to local `main`.
+
+There is no `--sha` — the receipt is always for HEAD, and **that is not the gap
+it looks like** (#56). Nothing appears to stop a commit landing between the last
+lane finishing and the receipt being written, but the lane reports are named
+`review-<sha>-<lane>.md` against that same fresh HEAD, so if HEAD moved the
+reports are named for the old commit, are invisible to the gate, and the receipt
+is refused for missing evidence. The one remaining way through is authoring a
+report at the new SHA — which is precisely the fix-round path step 4 prescribes,
+honestly labelled. Closed as already-mitigated; do not add a HEAD-capture check,
+which would make that path impossible.
 
 It writes `.agent/kb/review/receipt-<sha>.json`. Gitignored on purpose: a
 receipt is machine-local proof that *this* machine reviewed *this* commit before
