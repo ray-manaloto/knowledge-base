@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from kb_setup.currency import docs
+from kb_setup.currency import docs, run
 from kb_setup.fetch import content_hash
 
 _URL = "https://code.claude.com/docs/en/goal.md"
@@ -128,6 +128,31 @@ def test_the_drift_finding_is_still_raised_while_the_baseline_holds() -> None:
     findings, _ = docs.verify((_URL,), _store(_NOW, "old"), fetcher=lambda _u: ("new", ""))
     assert findings[0].drifted
     assert "docs-reviewed" in findings[0].detail
+
+
+def test_the_drift_finding_names_a_command_that_actually_runs(tmp_path: Path) -> None:
+    """The remedy a message prescribes must be one the code accepts.
+
+    `docs-reviewed` grew a required `--tool` (a dangling flag used to roll EVERY
+    watched tool's baseline), and this message still read
+    `kb-setup currency docs-reviewed` — so following the instruction verbatim
+    exits 2. A self-contradiction introduced by the very fix that hardened the
+    command, in the same commit range, one file away.
+
+    Both halves are asserted rather than just grepping for `--tool`: the message
+    must name the flag, AND the guard must really refuse the flagless form. A
+    test on the string alone would stay green if the guard were later dropped,
+    leaving the message over-specified instead of the code under-specified.
+    """
+    findings, _ = docs.verify((_URL,), _store(_NOW, "old"), fetcher=lambda _u: ("new", ""))
+    assert "docs-reviewed --tool" in findings[0].detail
+
+    (tmp_path / "mise.toml").write_text("[tools]\n", encoding="utf-8")
+    (tmp_path / "currency.toml").write_text(
+        f'[tool.claude-code]\nbinary = "claude"\nexpected = "2.1.220"\ndocs_watch = ["{_URL}"]\n',
+        encoding="utf-8",
+    )
+    assert run.docs_reviewed(tmp_path, only="") == 2
 
 
 def test_drift_is_reported_on_every_run_until_reviewed() -> None:
