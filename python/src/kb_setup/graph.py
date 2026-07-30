@@ -120,8 +120,21 @@ def build(repo_root: Path) -> None:
     # Code graph (AST — free, deterministic). Each source extracts into its own
     # sub-graph; prose-only repos (no code) are skipped WITHOUT aborting the build —
     # their content is added later by the host-agent prose wave, not here.
-    with_code = [m.name for m in manifests if _extract_code(repo_root, m.name)]
-    skipped = [m.name for m in manifests if m.name not in with_code]
+    #
+    # A `kind = docs` manifest is NOT ASKED. `--code-only` is defined by graphify as
+    # "index code … and skip doc/paper/image files", so running it over a docs mirror
+    # is a guaranteed-empty full AST scan of every markdown file, on every build. The
+    # reason to skip it is not only the waste: a docs manifest that never ran and a
+    # code repo that ran and produced nothing are DIFFERENT ANSWERS, and until now
+    # both printed the same `[skip] … no code nodes` line. That is the
+    # not-applicable/could-not-check collapse this repo refuses everywhere else
+    # (`currency`'s DRIFT/SKIP/OK). Declaring the kind makes the build say which.
+    docs_only = [m.name for m in manifests if m.kind == "docs"]
+    askable = [m.name for m in manifests if m.name not in docs_only]
+    with_code = [name for name in askable if _extract_code(repo_root, name)]
+    for name in docs_only:
+        print(f"  [docs] {name}: kind=docs — no AST pass; prose comes from the extraction wave")
+    skipped = [name for name in askable if name not in with_code]
     for name in skipped:
         print(f"  [skip] {name}: no code nodes — prose-only, deferred to the extraction wave")
     if not with_code:
@@ -259,8 +272,13 @@ def update(repo_root: Path, name: str) -> None:
         return
 
     print(f"[kb-update] {name}: {m.commit[:10]} -> {latest[:10]}")
+    previous = m.commit
     m = mf.write_commit(m, latest)
     _ensure_clone(m)
+
+    if m.kind == "docs":
+        _report_doc_changes(m, previous, latest)
+        return
 
     # Incremental CODE re-extract (AST — free; MD5-diffs graphify-out/manifest.json).
     _run([graphify_exe(repo_root), "update", f"sources/{name}"], repo_root)
@@ -270,3 +288,48 @@ def update(repo_root: Path, name: str) -> None:
         f"docs and refresh sources/extractions/{name}-docs.json (the semantic cache "
         f"skips unchanged docs)."
     )
+
+
+def _report_doc_changes(m: mf.Manifest, previous: str, latest: str) -> None:
+    """Print the exact pages that changed across a docs pin advance.
+
+    THE POINT OF A DOCS MIRROR, and the reason `kind` had to stop being inert
+    metadata. Fingerprinting a page (`currency.toml` `docs_watch`) proves THAT it
+    changed and can never say WHAT — knowledge-base#76 was opened on three moved
+    sha256 values with no way to read the delta, and the only reason that session
+    recovered one was that a gitignored `.agent/kb/raw/` copy of the old text
+    happened to survive. A `git clean -xdf` erases that; a pinned clone does not.
+
+    So the mirror's own history IS the diff: two SHAs we committed, and every
+    changed page named. That list is the host-agent re-extraction worklist, which
+    is what keeps re-ingestion proportional to the change instead of re-reading a
+    whole corpus to find a nine-line edit.
+
+    Printed, never acted on. Re-extraction is a Claude Code session's job
+    (invariant: the host agent IS the extraction LLM), so this task's contract is
+    to hand over an accurate worklist and stop.
+    """
+    diff = subprocess.run(
+        ["git", "-C", str(m.clone_dir), "diff", "--name-only", previous, latest],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if diff.returncode != 0:
+        # Never rendered as "nothing changed": a failed diff did not ASK the
+        # question. Advancing the pin already succeeded, so this is a report gap,
+        # not a build failure.
+        print(
+            f"[kb-update] {m.name}: pin advanced, but the doc diff FAILED "
+            f"({diff.stderr.strip() or 'no stderr'}) — the changed-page list is "
+            f"UNKNOWN, not empty. Re-run, or diff {previous[:10]}..{latest[:10]} by hand."
+        )
+        return
+    changed = [ln for ln in diff.stdout.splitlines() if ln.strip()]
+    if not changed:
+        print(f"[kb-update] {m.name}: pin advanced, 0 files changed")
+        return
+    print(f"[kb-update] {m.name}: {len(changed)} file(s) changed — re-extraction worklist:")
+    for path in changed:
+        print(f"    {path}")

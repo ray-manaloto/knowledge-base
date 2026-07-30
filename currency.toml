@@ -272,3 +272,94 @@ docs_watch = [
   "https://code.claude.com/docs/en/hooks.md",
   "https://code.claude.com/docs/en/skills.md",
 ]
+
+[[tool.claude-code.watch]]
+kind = "local"
+ref = "sessionend-hooks-share-a-1.5s-budget"
+note = """hooks.md gained this on 2026-07-30 (#76): "`SessionEnd` hooks share a
+1.5-second budget; if your settings set a longer per-hook `timeout`, Claude Code
+raises the budget to match, up to 60 seconds."
+
+THE TIMEOUT IS LOAD-BEARING, and not for the reason it looks. Without any
+`timeout` our SessionEnd `brain-transcript-audit` would get **1.5s** — a
+transcript scan cannot finish in that, and a killed SessionEnd hook is silent, so
+the failure mode is an audit that simply stops existing. The declared number is
+what buys the budget.
+
+`.claude/settings.json` declared **120**, which the documented ceiling can never
+grant; lowered to **60** so the config states what it can actually get. Do not
+read the change as a reduction — the effective budget is identical, and 60 is the
+documented maximum. Do not delete the field to "use the default": that is the one
+edit that would silently cost the audit ~58 of its 60 seconds.
+
+Re-probe on each docs review: if the ceiling moves, this number moves with it."""
+
+[[tool.claude-code.watch]]
+kind = "local"
+ref = "goal-evaluator-model-is-not-always-haiku"
+note = """goal.md, same 2026-07-30 revision. Was "defaults to Haiku"; now
+"defaults to Haiku ON THE CLAUDE API; on a third-party provider, check your
+provider page", plus a new `ANTHROPIC_DEFAULT_HAIKU_MODEL` override whose scope is
+GLOBAL — it also rebinds the `haiku` alias and background functionality such as
+conversation summarization.
+
+Why it is tracked rather than absorbed: the goal-engineering skill's central rule
+is that a clause must be settleable by "a Haiku-class reader, given the transcript
+and nothing else". That phrasing survives — it is now a FLOOR rather than a
+description of the deployed model. The risk this guards against is the inverse of
+the obvious one: not that the evaluator is weaker than assumed, but that someone
+observes a smart evaluator judging a vague clause correctly and concludes the
+clause was fine.
+
+Consequence for recorded outcomes: `kb-goal-outcome` results are conditional on
+the evaluator that produced them. A `stalled` under one model is not evidence
+about another (`verify-before-advancing.md`, "carry a fact's CONDITION").
+
+UNCHANGED and re-verified the same day, which is the reason the skill needed no
+structural edit: the transcript-only/no-tools constraint (quoted verbatim in
+`references/rubric.md`), the **4,000-character** cap (`goal.py:GOAL_CHAR_CAP`),
+one goal per session, "setting a goal starts a turn with the condition as the
+directive" (T12's entire basis), the turn-clause bound, the `clear` aliases and
+the resume semantics."""
+
+[[tool.claude-code.watch]]
+kind = "local"
+ref = "nested-project-skills-are-not-loaded-at-startup"
+note = """skills.md, same 2026-07-30 revision, and it REVERSED a claim rather than
+refining one. Was: "Claude Code also discovers skills from nested `.claude/skills/`
+directories on demand." Now: they "aren't loaded at startup … Until then, those
+skills don't appear in autocomplete and can't be invoked by name" — they load only
+once Claude reads or edits a file inside that subdirectory.
+
+NO IMPACT HERE, stated so the next session does not re-derive it: every skill in
+this repo lives at the repo-root `.claude/skills/`, which loads at startup. Recorded
+because the failure it now describes is invisible — a nested skill is not missing,
+it is merely un-invocable until an unrelated file read happens to arm it, so
+"the skill did not fire" would read as a description problem.
+
+Same revision, no action: `/verify` records its own recipe to
+`.claude/skills/verify/SKILL.md` (v2.1.200+, edit behaviour narrowed in v2.1.205),
+and the cloud-session doc anchor moved from `claude-code-on-the-web` to
+`cloud-environments`."""
+
+[[tool.claude-code.watch]]
+kind = "local"
+ref = "permissionrequest-now-fires-where-nobody-can-be-asked"
+note = """hooks.md, same 2026-07-30 revision. Was: "Runs when the user is shown a
+permission dialog." Now it also runs in sessions that CANNOT show one — background
+subagents in non-interactive mode — and "if no hook returns a decision, it denies
+the tool call."
+
+Tracked because the old sentence made the event sound unreachable in headless
+work, so a `PermissionRequest` hook would look like the wrong tool for gating an
+unattended lane. It is now the opposite: in headless mode the DEFAULT is deny, and
+a hook is what can allow. This repo registers no `PermissionRequest` hook (its
+three PreToolUse guards are the enforcement layer, `mise-tasks-only.md`), so
+nothing changes today.
+
+NOT changed, control-armed the same day because the graph records a standing
+disagreement about it: the "Claude Code overrides the hook and ends the turn after
+8 consecutive blocks" Stop-hook cap is still present — 1 occurrence in both the
+2026-07-27 baseline and the current page, against a bogus term at 0. goal.md still
+never mentions a cap. The unreconciled-doc-disagreement node stays TRUE; do not
+re-derive it."""
