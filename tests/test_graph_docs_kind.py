@@ -37,7 +37,7 @@ def _manifest(tmp_path: Path, *, kind: str, name: str = "demo") -> mf.Manifest:
         path=src / f"{name}.manifest",
         url="https://example.invalid/o/demo",
         ref="main",
-        commit=_NEW,
+        commit=_OLD,
         kind=kind,
     )
     m.path.write_text(
@@ -116,43 +116,100 @@ def test_docs_skip_is_reported_distinctly_from_no_code_nodes(monkeypatch, tmp_pa
 # --------------------------------------------------------------------------
 
 
-def _report(monkeypatch, tmp_path: Path, completed: _Completed) -> str:
+def _advance(monkeypatch, tmp_path: Path, completed: _Completed) -> list[str]:
+    """Run `_advance_docs_pin`; return the manifest's `commit =` lines after it."""
     m = _manifest(tmp_path, kind="docs")
+    monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph.subprocess, "run", lambda *_a, **_k: completed)
-    graph._report_doc_changes(m, _OLD, _NEW)
-    return ""
+    graph._advance_docs_pin(m, _NEW)
+    return [ln for ln in m.path.read_text(encoding="utf-8").splitlines() if ln.startswith("commit")]
 
 
-def test_changed_pages_are_named_one_per_line(monkeypatch, tmp_path, capsys):
-    """The worklist is the deliverable: which pages to re-extract, by path."""
-    out = "docs/claude-code/goal.md\ndocs/codex/hooks.md\n"
-    _report(monkeypatch, tmp_path, _Completed(0, out=out))
+def test_changed_pages_are_named_with_their_action(monkeypatch, tmp_path, capsys):
+    """The worklist is the deliverable, and it must say what to DO with each path."""
+    out = "M\tdocs/claude-code/goal.md\nD\tdocs/codex/gone.md\nA\tdocs/codex/hooks.md\n"
+    _advance(monkeypatch, tmp_path, _Completed(0, out=out))
     printed = capsys.readouterr().out
 
-    assert "2 file(s) changed" in printed
-    assert "docs/claude-code/goal.md" in printed
-    assert "docs/codex/hooks.md" in printed
+    assert "re-extract  docs/claude-code/goal.md" in printed
+    assert "re-extract  docs/codex/hooks.md" in printed
+    assert "REMOVE stale extraction for  docs/codex/gone.md" in printed
+    assert "re-extract  docs/codex/gone.md" not in printed, "a deletion is not a page to read"
 
 
-def test_empty_diff_reports_zero_changed(monkeypatch, tmp_path, capsys):
-    """A real, successful 'nothing moved' — distinct from the failure below."""
-    _report(monkeypatch, tmp_path, _Completed(0, out=""))
+def test_a_rename_is_both_jobs(monkeypatch, tmp_path, capsys):
+    """A rename produces work at the new path AND a stale extraction at the old one."""
+    _advance(monkeypatch, tmp_path, _Completed(0, out="R096\tdocs/a/old.md\tdocs/a/new.md\n"))
     printed = capsys.readouterr().out
 
-    assert "0 files changed" in printed
-    assert "UNKNOWN" not in printed
+    assert "re-extract  docs/a/new.md" in printed
+    assert "REMOVE stale extraction for  docs/a/old.md" in printed
 
 
-def test_failed_diff_is_unknown_never_zero(monkeypatch, tmp_path, capsys):
-    """THE ONE THAT MATTERS. A diff that errored did not answer 'nothing changed'.
+def test_non_document_churn_is_not_extraction_work(monkeypatch, tmp_path, capsys):
+    """A mirror is a git repo: its own metadata moves on syncs that touched no docs.
 
-    Realistic break it guards: dropping the `returncode` check makes a failed
-    `git diff` fall through to an empty stdout and print '0 files changed' — a
-    green worklist for a corpus nobody looked at.
+    Reporting `docs_manifest.json` as a page to read spends host-agent tokens on a
+    build script — the realistic cost of the unfiltered first version.
     """
-    _report(monkeypatch, tmp_path, _Completed(128, err="fatal: bad object"))
+    out = "M\tdocs_manifest.json\nM\t.github/workflows/update-docs.yml\n"
+    _advance(monkeypatch, tmp_path, _Completed(0, out=out))
     printed = capsys.readouterr().out
 
+    assert "no document changes" in printed
+    assert "2 non-document file(s) changed" in printed
+    assert "re-extract" not in printed
+
+
+def test_failed_diff_leaves_the_pin_exactly_where_it_was(monkeypatch, tmp_path, capsys):
+    """THE ONE THAT MATTERS, and the defect a cold review caught.
+
+    The first version wrote the pin and THEN diffed, so a failed diff printed
+    "UNKNOWN — re-run" while the re-run hit `latest == m.commit` and reported
+    "already at latest — nothing to do". The worklist was not merely unreported,
+    it was unrecoverable, and the message pointed at a retry that could not work.
+
+    Realistic break: move `mf.write_commit` back above the diff. The pin then
+    reads `_NEW` here and the promised retry is dead.
+    """
+    commit_lines = _advance(monkeypatch, tmp_path, _Completed(128, err="fatal: bad object"))
+    printed = capsys.readouterr().out
+
+    assert commit_lines == [f"commit = {_OLD}"], (
+        f"a failed diff must leave the pin at {_OLD[:10]}, saw {commit_lines}"
+    )
     assert "UNKNOWN" in printed, "a failed diff must not be reported as an empty one"
-    assert "0 files changed" not in printed
+    assert "NOT advanced" in printed
     assert "fatal: bad object" in printed, "the operator needs the real git error"
+
+
+def test_successful_diff_does_advance_the_pin(monkeypatch, tmp_path):
+    """CONTROL ARM for the test above: the happy path must still write the pin.
+
+    Without it, code that never advanced the pin at all would satisfy the
+    failed-diff test and the mechanism would simply never move.
+    """
+    commit_lines = _advance(monkeypatch, tmp_path, _Completed(0, out="M\tdocs/a.md\n"))
+    assert commit_lines == [f"commit = {_NEW}"]
+
+
+# --------------------------------------------------------------------------
+# 3. update_all(): the bulk path must reach docs mirrors
+# --------------------------------------------------------------------------
+
+
+def test_update_all_includes_docs_manifests(monkeypatch, tmp_path):
+    """A bare `mise run kb-update` must not silently skip every docs mirror.
+
+    This filtered to `kind == "code"` back when `code` was the only kind, so
+    adding the docs kind excluded mirrors from the bulk path — the changed-page
+    worklist would then appear ONLY when a human named the source by hand, which
+    is a check that exists and never runs. (Cold lane, P2.)
+    """
+    _manifest(tmp_path, kind="docs", name="mirror")
+    _manifest(tmp_path, kind="code", name="repo")
+    seen: list[str] = []
+    monkeypatch.setattr(graph, "update", lambda _root, name: seen.append(name))
+    graph.update_all(tmp_path)
+
+    assert sorted(seen) == ["mirror", "repo"], f"docs manifest must be updated too, saw {seen}"
