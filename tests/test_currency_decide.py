@@ -7,7 +7,7 @@ tested explicitly — an engine that treats "I could not check" as "go ahead" is
 the failure mode that matters here.
 """
 
-from kb_setup.currency.decide import GATES, decide
+from kb_setup.currency.decide import GATES, _gate_patch, decide
 from kb_setup.currency.issues import Observation
 from kb_setup.currency.sync import BLIND, DRIFT, OK, SKIP, Finding, SyncStatus
 from kb_setup.currency.upstream import UpstreamStatus, Version
@@ -450,3 +450,110 @@ def test_a_routine_bump_carries_no_feature_review() -> None:
     verdict = decide(sync=_sync(), upstream=_clean_upstream(notes="- fix: a typo"), moved=())
     assert verdict.auto_apply
     assert verdict.feature_review == ()
+
+
+# ------------------------------------- the patch gate on a NON-bump --------
+
+
+def test_being_exactly_current_asks_nothing() -> None:
+    """A version equal to latest has nothing to adopt, so there is nothing to ask.
+
+    Measured 2026-07-29: claude-code sat on its own latest release and the gate
+    rendered `2.1.220 → v2.1.220 is not a patch bump. Adopt it?` on every run —
+    a question with no answer, on a bump that does not exist. Noise in the one
+    channel this engine exists to keep signal-bearing.
+    """
+    assert _gate_patch("2.1.220", "v2.1.220") is None
+
+
+def test_zero_padded_equality_is_also_a_non_bump() -> None:
+    """`1.2` and `1.2.0` are the same version written two ways."""
+    assert _gate_patch("1.2", "1.2.0") is None
+    assert _gate_patch("1.2.0", "1.2") is None
+
+
+def test_a_downgrade_still_stops() -> None:
+    """The equality short-circuit must not widen into 'any non-forward move is fine'.
+
+    A latest BELOW the pin means the upstream lookup disagrees with reality
+    (a yanked release, a misparsed tag). That is exactly a human's problem.
+    """
+    gate = _gate_patch("1.0.5", "1.0.2")
+    assert gate is not None
+    assert "not a patch bump" in gate.question
+
+
+def test_a_real_minor_bump_still_stops() -> None:
+    """Control arm: the short-circuit did not disable the gate."""
+    assert _gate_patch("0.9.26", "0.10.0") is not None
+
+
+def test_an_exactly_current_tool_asks_nothing_and_applies_nothing() -> None:
+    """End-to-end: no question about the non-bump, and no claim of work to do.
+
+    `auto_apply` must stay False here — `apply()` refuses a no-op, so a True
+    would put the verdict and the applier in disagreement, and it is the VERDICT
+    the landing page publishes.
+    """
+    verdict = decide(
+        sync=_sync(pinned="0.9.26"),
+        upstream=UpstreamStatus(latest="0.9.26", github_tag="v0.9.26", notes="- fix: a typo"),
+        moved=(),
+    )
+    assert verdict.ambiguities == ()
+    assert not verdict.has_upgrade
+    assert not verdict.auto_apply
+
+
+def test_a_v_prefixed_tag_is_not_an_upgrade_over_the_bare_version() -> None:
+    """The one character that caused the cluster: `2.1.220` vs the tag `v2.1.220`.
+
+    Measured on claude-code 2026-07-29. A string `!=` called this an upgrade, so
+    the landing page rendered an arrow between two identical versions and claimed
+    `auto-applying (6/6 gates)` for a release already installed.
+    """
+    verdict = decide(
+        sync=_sync(pinned="2.1.220"),
+        upstream=UpstreamStatus(latest="v2.1.220", github_tag="v2.1.220", notes="- fix: a typo"),
+        moved=(),
+    )
+    assert not verdict.has_upgrade
+    assert not verdict.auto_apply
+    assert "auto-applying" not in verdict.summary()
+    assert "current" in verdict.summary()
+
+
+def test_a_genuine_upgrade_still_auto_applies() -> None:
+    """Control arm: requiring an upgrade must not disable auto-apply."""
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(latest="0.9.26"), moved=())
+    assert verdict.has_upgrade
+    assert verdict.auto_apply
+    assert "auto-applying" in verdict.summary()
+
+
+# --------------------------- feature review: the two honesty signals ------
+
+
+def test_unparsable_notes_set_features_unreadable_not_a_silent_empty() -> None:
+    """An empty review must never be indistinguishable from 'nothing to adopt'."""
+    verdict = decide(
+        sync=_sync(),
+        upstream=_clean_upstream(notes="**A bold subhead**\n\n- something happened\n"),
+        moved=(),
+    )
+    assert verdict.feature_review == ()
+    assert verdict.features_unreadable
+
+
+def test_a_recognised_fixes_only_release_is_not_flagged_unreadable() -> None:
+    """Control arm: the flag means 'could not parse', not 'found nothing'."""
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(notes="## Fixed\n- a typo\n"), moved=())
+    assert verdict.feature_review == ()
+    assert not verdict.features_unreadable
+
+
+def test_the_dropped_count_reaches_the_verdict() -> None:
+    """The cap has to be visible where the report renders it."""
+    notes = "## Added\n" + "\n".join(f"- thing {i}" for i in range(20))
+    verdict = decide(sync=_sync(), upstream=_clean_upstream(notes=notes), moved=())
+    assert verdict.features_dropped == 8

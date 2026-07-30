@@ -299,3 +299,106 @@ def test_feature_highlights_are_capped() -> None:
     """A giant changelog must not flood the interview."""
     notes = "\n".join(f"- feat: feature number {i}" for i in range(50))
     assert len(upstream.UpstreamStatus(notes=notes).feature_highlights) <= 12
+
+
+# ------------------------------- section-based notes (the real corpora) ----
+#
+# Every test above this line writes its fixture in the ONE format the detector
+# already understood — conventional-commits `feat:` lines and adoption prose. All
+# three passed while the detector scored **zero** on every real release this repo
+# tracks (control-armed 2026-07-29: mise v2026.7.16 = 0 matches across 10.8KB
+# with nine `## Added` bullets, graphify 0.9.27-0.9.30 = 0 across 9.2KB,
+# claude-code 2.1.220 = 0). A fixture shaped like the code under test cannot fail,
+# so the arms below are written in the formats upstream actually publishes.
+
+
+def _github_generated_notes() -> str:
+    """The shape `gh api /releases` returns and mise publishes: named sections."""
+    return (
+        "## v2026.7.16\n\n"
+        "A release summary paragraph that announces nothing by itself.\n\n"
+        "## Highlights\n"
+        "- The task output cache gains per-run controls (`--task-cache`)\n\n"
+        "## Added\n"
+        "- **task:** experimental `task.cache_dir` setting and `MISE_TASK_CACHE_DIR`\n"
+        "- **mcp:** new `list_commands` tool exposing each command's effect\n\n"
+        "## Fixed\n"
+        "- **npm:** reproducing a lockfile no longer requires `allow_low_downloads`\n\n"
+        "## New Contributors\n"
+        "* @someone made their first contribution\n"
+    )
+
+
+def test_bullets_under_a_feature_section_are_features_without_any_phrase() -> None:
+    """The regression that mattered: `## Added` bullets carry no `feat:` and no phrase.
+
+    This is why the detector reported nothing for mise across a 10.8KB changelog.
+    """
+    status = upstream.UpstreamStatus(notes=_github_generated_notes())
+    highlights = status.feature_highlights
+    assert any("task.cache_dir" in h for h in highlights)
+    assert any("list_commands" in h for h in highlights)
+    assert any("per-run controls" in h for h in highlights)
+    assert not status.feature_scan_unrecognised
+
+
+def test_a_fix_is_not_promoted_even_when_it_matches_a_feature_phrase() -> None:
+    """`no longer requires` under `## Fixed` is a fix. Section beats phrase."""
+    highlights = upstream.UpstreamStatus(notes=_github_generated_notes()).feature_highlights
+    assert not any("allow_low_downloads" in h for h in highlights)
+
+
+def test_contributor_lines_are_not_features() -> None:
+    """`New Contributors` must not prefix-match the `new` feature section."""
+    highlights = upstream.UpstreamStatus(notes=_github_generated_notes()).feature_highlights
+    assert not any("first contribution" in h for h in highlights)
+
+
+# ------------------------------------- the third state: unparsable notes ----
+
+
+def test_prose_notes_with_no_recognisable_format_report_could_not_tell() -> None:
+    """Graphify's real shape: bold subheads, mixed bullets, no `## Added`.
+
+    The scan must NOT answer this with an empty tuple that reads as "no features".
+    """
+    notes = (
+        "## v0.9.27\n\n"
+        "A large maintenance release.\n\n"
+        "**Install and data safety**\n\n"
+        "- `claude install` no longer overwrites a settings file it cannot parse\n"
+    )
+    status = upstream.UpstreamStatus(notes=notes)
+    assert status.feature_highlights == ()
+    assert status.feature_scan_unrecognised
+
+
+def test_a_recognised_fixes_only_release_is_a_confident_zero() -> None:
+    """Control arm for the state above — the two must not collapse into one.
+
+    A named `## Fixed` section means the format WAS understood, so "no features"
+    is an answer rather than a shrug.
+    """
+    status = upstream.UpstreamStatus(notes="## v1.0.1\n\n## Fixed\n\n- a typo\n")
+    assert status.feature_highlights == ()
+    assert not status.feature_scan_unrecognised
+
+
+def test_empty_notes_are_not_reported_as_unreadable() -> None:
+    """No notes is not a parse failure — ffmpeg has no release channel at all."""
+    assert not upstream.UpstreamStatus(notes="").feature_scan_unrecognised
+    assert not upstream.UpstreamStatus(notes="   \n").feature_scan_unrecognised
+
+
+def test_the_display_cap_reports_what_it_dropped() -> None:
+    """A silent truncation reads as 'that was all of them'."""
+    notes = "## Added\n" + "\n".join(f"- feature number {i}" for i in range(20))
+    status = upstream.UpstreamStatus(notes=notes)
+    assert len(status.feature_highlights) == 12
+    assert status.features_dropped == 8
+
+
+def test_no_cap_no_dropped_count() -> None:
+    """Control arm: the counter must stay 0 when nothing was cut."""
+    status = upstream.UpstreamStatus(notes="## Added\n- one thing\n")
+    assert status.features_dropped == 0

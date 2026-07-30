@@ -67,6 +67,14 @@ _SKIP_SEPARATOR = ":"
 #: Reasons that excuse ANY lane: the lane genuinely had nothing to say here.
 _SKIP_ANY_LANE = ("not-applicable-",)
 
+#: The reason a lane did not run because the SKILL CHOSE not to run it. Distinct
+#: from `not-applicable-` on purpose: that one asserts a judgement — the lane read
+#: this diff and had nothing to say — whereas this asserts a policy, that the
+#: review deliberately runs one lane. Reusing `not-applicable-` for "we chose not
+#: to" would make every future receipt claim a judgement nobody made, which is the
+#: gap-wearing-a-reason's-clothes shape this file has now closed three times.
+_BY_POLICY = "by-policy-one-lane"
+
 #: Reasons that excuse ONE named lane, and no other. `no-spec-available` is the
 #: spec lane's alone — a cold or silent-failure lane does not review against a
 #: spec, so "there is no spec" cannot explain why it did not run.
@@ -77,7 +85,17 @@ _SKIP_ANY_LANE = ("not-applicable-",)
 #: had already been closed. The comment on the line right above it said "spec
 #: lane, and only when there genuinely is no spec"; nothing enforced it. Found
 #: by the cold lane, again, which is now three for three on this gate.
-_SKIP_BY_LANE = {"spec": ("no-spec-available",)}
+#:
+#: `_BY_POLICY` is scoped here rather than in `_SKIP_ANY_LANE` for exactly that
+#: lesson: **`cold` is deliberately absent.** The one-lane policy IS "run cold",
+#: so `cold:by-policy-one-lane` is self-contradictory and must never buy a pass.
+#: A lane-blind prefix would have accepted it, and the `not ran_raw` backstop
+#: only catches the case where ALL four are skipped.
+_SKIP_BY_LANE = {
+    "spec": ("no-spec-available", _BY_POLICY),
+    "standards": (_BY_POLICY,),
+    "silent-failure": (_BY_POLICY,),
+}
 
 #: The four lenses. Every one must be ACCOUNTED FOR in a receipt — either it ran
 #: or it was skipped with a reason. Without this list the gate accepted any

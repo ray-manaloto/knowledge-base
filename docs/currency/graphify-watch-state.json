@@ -26,7 +26,7 @@
   "local:label-communities-schema-gap": {
     "comments": 0,
     "state": "local",
-    "title": "`label_communities` (llm.py) has no JSON-schema constant, unlike\n`_EXTRACTION_JSON_SCHEMA`. Extraction is fixed; LABELLING is still broken \u2014\nprobed on 0.9.25, 42/42 batches failed. Community names come from the free\ndeterministic `label_communities_by_hub` instead. Re-probe on each bump.",
+    "title": "`label_communities` (llm.py) has no JSON-schema constant, unlike\n`_EXTRACTION_JSON_SCHEMA`. Extraction is fixed; LABELLING is still broken \u2014\nprobed on 0.9.25, 42/42 batches failed. Community names come from the free\ndeterministic `label_communities_by_hub` instead. Re-probe on each bump.\n\nSTILL PRESENT on 0.9.26 (re-probed 2026-07-26). The cheap re-probe is a file\ndiff, not a batch run: `llm.py` is BYTE-IDENTICAL across the two installs, so\nthe gap cannot have moved. Counts agree in both \u2014 `_EXTRACTION_JSON_SCHEMA` x2,\nlabel-side schema constant x0, `def label_communities` x1 \u2014 and a bogus symbol\ngreps to 0 in the same file, so the zero is an absence rather than a broken\nprobe. Do the diff first on the next bump; only run the 42-batch probe if the\nfile actually changed.",
     "updated_at": ""
   }
 }

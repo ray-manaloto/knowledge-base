@@ -164,11 +164,21 @@ def verify(
 ) -> tuple[list[DocsFinding], dict[str, dict[str, str]]]:
     """NETWORK: fetch each page, hash it, and compare against the baseline.
 
-    Returns ``(findings, updated_store)``. The store is updated for every page
-    that was successfully fetched — including a drifted one, because the point of
-    recording is that the NEXT run compares against what we have now seen. A page
-    that could not be fetched leaves its entry untouched, so an outage never
-    overwrites a good baseline with nothing.
+    Returns ``(findings, updated_store)``.
+
+    A DRIFTED page deliberately keeps its OLD baseline. Recording the new hash
+    here would consume the signal on the very run that raised it: drift is
+    reported to the console, the report's verdict never carries it (it is not a
+    sync finding), and the next run compares against the changed page and says
+    nothing. Measured 2026-07-29 — all three watched Claude Code pages drifted,
+    the committed row read ``claude-code 2.1.220, current: clean``, and a second
+    run was silent. So a page stays flagged until a human has actually re-read it
+    and rolled the baseline forward (``kb-setup currency docs-reviewed``), which
+    is the same rule this engine applies to a moved tracked issue.
+
+    A page that could not be fetched also leaves its entry untouched, so an outage
+    never overwrites a good baseline with nothing. A FIRST-RUN baseline is
+    recorded, because there is no prior signal to consume.
     """
     get: Fetcher = fetcher or _fetch
     moment = (now or datetime.now(UTC)).isoformat()
@@ -181,22 +191,62 @@ def verify(
             continue
         digest = content_hash(body)
         previous = store.get(url, {}).get("sha256", "")
-        updated[url] = {"sha256": digest, "checked_at": moment}
-        if not previous:
-            findings.append(
-                DocsFinding(url, "docs-baseline", "baseline recorded (first run)", verified=True)
-            )
-        elif previous != digest:
+        if previous and previous != digest:
+            # Leave the baseline alone — see the docstring. `checked_at` does not
+            # advance either: a drifted page has NOT been verified in the sense the
+            # offline staleness check means, and refreshing the date would make it
+            # look freshly reviewed on every run.
             findings.append(
                 DocsFinding(
                     url,
                     "docs-drift",
                     "page CHANGED since the last check — re-read it, re-ingest via the "
-                    "kb-curator skill, and update any skill built on it in the same change",
+                    "kb-curator skill, update any skill built on it in the same change, "
+                    "then roll the baseline with `kb-setup currency docs-reviewed`",
                     drifted=True,
                     verified=True,
                 )
             )
+            continue
+        updated[url] = {"sha256": digest, "checked_at": moment}
+        if not previous:
+            findings.append(
+                DocsFinding(url, "docs-baseline", "baseline recorded (first run)", verified=True)
+            )
         else:
             findings.append(DocsFinding(url, "docs-drift", "unchanged", verified=True))
     return findings, updated
+
+
+def mark_reviewed(
+    repo_root: Path,
+    urls: tuple[str, ...],
+    *,
+    now: datetime | None = None,
+    fetcher: Fetcher | None = None,
+) -> list[DocsFinding]:
+    """Roll a drifted page's baseline forward, AFTER a human has re-read it.
+
+    The deliberate manual step that `verify` no longer performs for a drifted
+    page. Re-fetches so the recorded hash is the content that was actually
+    reviewed rather than whatever the last run happened to see, and a page that
+    cannot be fetched is left alone — rolling a baseline to an unknown hash would
+    silence the finding without anyone having read anything.
+    """
+    get: Fetcher = fetcher or _fetch
+    moment = (now or datetime.now(UTC)).isoformat()
+    store = load(repo_root)
+    findings: list[DocsFinding] = []
+    for url in urls:
+        body, err = get(url)
+        if err:
+            findings.append(DocsFinding(url, "docs-fetch", f"NOT CHECKED — {err}"))
+            continue
+        store[url] = {"sha256": content_hash(body), "checked_at": moment}
+        findings.append(
+            DocsFinding(
+                url, "docs-baseline", "baseline rolled to the reviewed content", verified=True
+            )
+        )
+    save(repo_root, store)
+    return findings

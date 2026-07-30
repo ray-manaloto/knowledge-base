@@ -1,0 +1,14 @@
+{
+  "local:min-version-floor-vs-reviewed-version": {
+    "comments": 0,
+    "state": "local",
+    "title": "Two versions are declared and they mean different things. Keep them\nstraight on every bump: `currency.toml` `expected` = the version whose notes we\nhave read (moves every time we review); `mise.toml` `min_version.soft` = the\nversion we are verified against; `min_version.hard` = the oldest we will run at\nall (2026.7.14, where #11269/#11288/#11296 landed). soft must stay ABOVE hard or\nit is inert \u2014 hard errors across exactly the range soft would warn in.",
+    "updated_at": ""
+  },
+  "local:tera-v1-escape-hatch-removal": {
+    "comments": 0,
+    "state": "local",
+    "title": "mise moved templates from Tera v1 to v2 in v2026.7.1 (#10756) with a\n`tera_v1` / `MISE_TERA_V1` escape hatch scheduled for REMOVAL in 2027.4.0\n(#10817). This repo sets neither, so it is already on v2 \u2014 the item is here so\nthe 2027.4.0 release is not read as routine.",
+    "updated_at": ""
+  }
+}

@@ -47,6 +47,7 @@ Before triaging a failure as a real defect:
 | `getaddrinfo ENOTFOUND` / `Could not resolve host` | environmental | retry once per the heuristic above |
 | `dial tcp: lookup … no such host` | environmental | retry once |
 | HTTP 429 / 5xx from PyPI or GitHub | environmental (rate limit) | wait, then retry once |
+| mise: `no versions found matching date filter` | **environmental, DISGUISED** — on mise **below 2026.7.16** this is what a network failure listing remote versions looked like (#11391). Not a "no", but indistinguishable from one | check DNS per step 2, then retry once; on ≥7.16 the same failure now says *fetch failure* outright |
 | `fatal: reference is not a tree: <sha>` | **real defect** — the pinned SHA was force-pushed away or the manifest is wrong | fix the manifest; `mise run kb-update -- <name>` |
 | a chunk merges but adds ~0 nodes | **real defect** — extraction produced nothing | `kb-validate-chunks`; re-run extraction |
 | `kb-currency-check` reports *version unknown* | **real defect** — the graph was rebuilt outside `kb-build` | rebuild via `mise run kb-build` |
@@ -56,6 +57,17 @@ Before triaging a failure as a real defect:
 real defect as a transient wastes every retry after it, and misreading a
 transient as a defect wastes the expensive rebuild the heuristic exists to
 avoid.
+
+**And the `no versions found matching date filter` row is the nastiest class:
+a tool reporting an outage in the words of an authoritative answer.** Nothing in
+that string suggests the network; it reads as "we asked, and there is nothing" —
+so the natural response is to go and fix a filter that was never the problem.
+mise fixed it in v2026.7.16, which is exactly why the row records the VERSION
+CONDITION rather than the string alone: on any host below that floor the
+misleading form is still what you will see. When a tool's negative answer
+surprises you, check whether it could have been produced by a failure to ask —
+that is `probes-need-a-control-arm.md`'s whole subject, arriving here as a
+concrete signature.
 
 ## Applies to
 

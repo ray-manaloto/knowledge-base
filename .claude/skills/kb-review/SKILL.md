@@ -1,14 +1,20 @@
 ---
 name: kb-review
-description: "Run this repo's local cross-family review of a diff — Standards, Spec, a cold different-family reviewer, and a silent-failure lens — and write the receipt `mise run kb-ship` gates on. Use this before shipping ANY branch, when the user says review / ship / open a PR / is this ready, and whenever a change is about to leave this machine. CodeRabbit is advisory here and often rate-limited, so this review is the real gate; a branch with no receipt for its current HEAD does not ship."
+description: "Run this repo's local cross-family review of a diff — ONE cold reviewer from a different model family than whoever wrote the code, bounded at two rounds — and write the receipt `mise run kb-ship` gates on. Use this before shipping ANY branch, when the user says review / ship / open a PR / is this ready, and whenever a change is about to leave this machine. CodeRabbit is advisory here and often rate-limited, so this review is the real gate; a branch with no receipt for its current HEAD does not ship."
 argument-hint: "[fixed point — a SHA, branch, or tag; defaults to the merge-base with main]"
 ---
 
 # kb-review
 
-Four lenses over one diff, run in parallel, reported side by side and never
-reranked against each other. Then a receipt, keyed to the exact commit, that
-`mise run kb-ship` refuses to push without.
+**One** cold lens over one diff, from a different model family than whoever wrote
+the code, bounded at **two rounds**. Then a receipt, keyed to the exact commit,
+that `mise run kb-ship` refuses to push without.
+
+It ran four lenses with no round bound until 2026-07-29. That version cost
+**2.93M subagent tokens over 5 rounds / 17 lane-runs** on #67 and surfaced
+**one** real defect among three findings it rated blocking — on a change that was
+then reverted whole, and whose actual harm was already covered by ~3 lines of
+scanner config. The simplification is the finding.
 
 This exists because **CodeRabbit is not a gate here** — it returned
 `pass — Review rate limited` on 4 of 5 PRs, and a doc-only commit once sat
@@ -36,90 +42,45 @@ Empty means the merge-base with `main`. Confirm it before spawning anything:
 
 ```bash
 git rev-parse <fixed-point>
-git diff --stat <fixed-point>...HEAD
+git diff --stat <fixed-point>...HEAD -- . ':(exclude)docs/research/**'
 git log <fixed-point>..HEAD --oneline
 ```
 
 Three-dot, so the comparison is against the merge-base rather than against
 whatever `main` has drifted to since.
 
-A bad ref or an empty diff fails **here**, not inside four parallel sub-agents.
-Four agents reporting "nothing to review" costs four agents to learn one thing
+A bad ref or an empty diff fails **here**, not inside a spawned sub-agent. An
+agent reporting "nothing to review" costs an agent to learn one thing
 `git rev-parse` would have told you for free.
 
-### 2. Scale the lanes to the diff
+**`docs/research/**` is excluded from the reviewed diff, and that exclusion is
+the single biggest thing this skill got wrong.** On #67, **2,054 of 3,651
+reviewed lines — 56%** were prose under `docs/research/`: the persisted lane
+reports of *earlier rounds of the same review*. Every lane re-read the previous
+rounds' transcripts, 17 lane-runs deep, and paid for them in context that could
+have gone to the code. A review whose largest input is its own exhaust is not
+reviewing anything.
 
-Running four lenses over a typo is the same friction this skill exists to
-remove, so pick lanes by what actually changed. This is not an escape hatch —
-the receipt records which lanes ran and why, and a skipped lane is visible.
+Pass the exclusion to every lane, not just to your own `git diff`. Those files
+are still tracked, still promoted, still verbatim (`agent-report-persistence.md`
+is unchanged) — they are simply not code under review.
 
-| The diff touches | Lanes |
-|---|---|
-| any `.py`, `hk.pkl`, `mise.toml`, `.claude/settings.json` | all four |
-| any other executable config — `currency.toml`, `pyproject.toml`, `.mcp.json` | all four |
-| only markdown, `docs/**`, `sources/**` | Standards + Spec |
-| only `docs/goals/*-goal.md` | Spec + Standards, plus `mise run kb-goal-check` |
-| anything not listed above | **all four** — the default is coverage, not a skip |
+### 2. Run ONE lane: the cold cross-family reviewer
 
-The last row is load-bearing. The table used to end at the goal row, so a real
-repo surface it did not name (`currency.toml`, `pyproject.toml`) had no verdict
-at all, and "not listed" reads as "docs-only" to a reader in a hurry. Absence of
-a row is not a judgement that a lane has nothing to say.
+**One lane, always. There is no diff-type table and no multi-lane mode.**
 
-The docs-only row is the case that motivated this skill. Docs cannot fail silently
-and have no Fowler smells, so a cold code reviewer over them returns nothing —
-that is a **SKIP because it does not apply**, which the receipt must distinguish
-from a lane that failed to run. Collapsing those two is how every defect in the
-currency engine's review happened.
+This replaced a table that scaled four lenses to the diff, and the reason is
+measured rather than aesthetic. Over five rounds on #67 the four lanes cost
+**2.93M subagent tokens across 17 lane-runs**, and of three findings rated
+*blocking*, exactly **one** was a real defect — the other two were correct code
+whose tests would not have caught a hypothetical future revert. The whole change
+was then reverted. Four lenses did not buy four times the signal; they bought
+four times the transcript, and the volume is what made the disproportion hard to
+see from inside.
 
-The goal row keeps **Standards** as well, because `kb-goal-check` is mechanical —
-it counts sections, sentinels, and negations. The judgement tests that
-actually catch a bad condition (Goodhart shortcuts, stale evidence, the
-stated-connective trap) live in `goal-engineering`'s rubric — thirteen of them,
-and no gate runs any.
-Dropping Standards left a goal pair reviewed only by the tool that cannot read it,
-and a goal pair is its own Spec source, so Spec alone is close to self-review.
-
-### 3. Resolve the two sources the spine cannot find here
-
-The Standards and Spec axes are **not implemented here.** They come from
-`mattpocock-skills:code-review`, which already does exactly what this repo
-needs: two axes, parallel sub-agents, no cross-axis reranking, a Fowler smell
-baseline, and an explicit rule to skip whatever tooling already enforces.
-`use-tool-builtins.md` makes composing it the default and re-writing it the
-thing that needs justifying — and an earlier draft of this skill did re-write
-it, which the Spec lane caught.
-
-What it *cannot* do unaided is find this repo's two sources, because both of
-its defaults are absent here. Resolve them first and hand them over:
-
-**Standards sources** → `.claude/rules/*.md` plus `CLAUDE.md`. There is no
-`CODING_STANDARDS.md` and no `CONTRIBUTING.md` in this repo; those are the
-spine's defaults, and it will find nothing if left to look.
-
-**Spec source** → in this order:
-
-1. The `docs/goals/` pair for the round, if one is open.
-2. The newest `.agent/plans/session-*.md`.
-3. An issue referenced in a commit message (`#123`, `Closes #45`) — `gh issue view`.
-4. If none exists, say so and let the Spec axis report *no spec available*
-   rather than inventing one to review against.
-
-Do **not** reach for `docs/agents/issue-tracker.md`, and do **not** run
-`/setup-matt-pocock-skills` when the spine asks you to: agnix rejects
-`**/agents/*.md` here because that glob reads as agent *definitions*, so the
-file the spine wants **cannot exist in this repo**.
-
-### 4. Run the two axes through the spine
-
-Invoke `mattpocock-skills:code-review` with the fixed point from step 1, and
-give it the two sources from step 3 so it does not go looking for its defaults.
-
-**It carries the Fowler baseline itself — do not supply one.** Add only
-`references/repo-smells.md`, which holds the handful of recurring smells that
-are specific to this repo and are not in Fowler.
-
-### 5. Run the two lanes the spine does not have
+So the lane set is not a judgement call at the call site any more. If a diff
+needs more than this, that is a decision for the human reading the summary, not
+a table for the skill to consult.
 
 **The cold lane must be a different model family than whoever wrote the code.**
 That is a question about the diff, **not a constant** — ask it every time:
@@ -140,7 +101,8 @@ and the session's declared lane before choosing.
 
 Review it **by ref and COLD** — hand it the SHA and nothing about what the change
 was *supposed* to do. Design context primes happy-path confirmation, which is the
-one thing a second lens exists not to do.
+one thing a second lens exists not to do. Hand it the same
+`':(exclude)docs/research/**'` scope from step 1.
 
 If the chosen CLI is missing or unauthenticated it returns a structured error
 rather than substituting itself. Fall back **loudly, never silently**, to any
@@ -148,31 +110,33 @@ remaining cross-family lane, and only then to a Claude Opus subagent. Record
 which lane actually ran in the receipt; a same-family reviewer still catches
 things, but the receipt must not imply it was cross-family.
 
-**Silent failures** is `pr-review-toolkit:silent-failure-hunter` — swallowed
-exceptions, bare excepts, fallbacks that mask a real error. `zero-skip-policy.md`
-is the reason this gets its own lens instead of a bullet in Standards: a
-suppressed error is the failure mode this repo cares most about, and a lens that
-shares context with three other concerns finds fewer of them.
+### 3. Report the lane verbatim
 
-### 6. Aggregate — verbatim, unreranked
-
-Present under `## Standards`, `## Spec`, `## Cold (<lane>)`, `## Silent failures`.
-Verbatim or lightly cleaned. The spine aggregates its own two axes — keep its
-wording and set the other two alongside rather than folding them in.
-
-**Do not merge or rerank findings across lenses.** A change can pass one axis and
-fail another — code that follows every rule and implements the wrong thing is
-Standards-pass / Spec-fail — and cross-axis ranking is exactly how one lens masks
-another.
-
-End with one line per lens: finding count, and the worst finding *within that
-lens*. No single winner across lenses.
+Present under `## Cold (<lane>)`, verbatim or lightly cleaned. End with the
+finding count and the worst finding.
 
 **Every finding must cite `file:line` or quote the hunk.** A finding without a
 citation is labelled `unverified` and reported as such rather than dropped —
 dropping it hides a lead, promoting it launders a guess.
 
-### 7. Persist each lane's report, THEN write the receipt
+### 4. Bound the review at TWO rounds
+
+Round 1 reviews. You fix. Round 2 verifies, **and is the last round.**
+
+The bound exists because a stop rule did not work. One was agreed before round 1
+of #67 and the review still ran **five** rounds, for a structural reason worth
+stating: `kb-review-receipt` refuses `blocking > 0`, so any stop rule silently
+becomes *"rounds until zero blocking"* — the reviewer, not the rule, decides when
+to stop. A count is the only bound that cannot be argued with.
+
+**If round 2 reports something blocking:** fix it, re-run the local gates
+(`mise run lint`, `mise run test`, and whatever else the change touches), and
+write the receipt against the fixed SHA — **without a third lane round.** The
+gates are the verification at that point. Say so in the PR body; nothing in the
+receipt schema records it, and deliberately so — a `gate_verified_delta` field
+would be one more thing to maintain for a case the prose already covers.
+
+### 5. Persist the lane's report, THEN write the receipt
 
 Write every lane's report verbatim to
 `.agent/kb/review/reports/review-<sha>-<lane>.md` **as it arrives** —
@@ -181,23 +145,23 @@ A lane that left no report is a claim, not a review. `NO FINDINGS` is a
 perfectly good report; an empty file is not.
 
 ```bash
-# All four ran — the usual case for a diff touching .py / mise.toml / hk.pkl.
 mise run kb-review-receipt -- \
-  --lanes standards,spec,cold:codex,silent-failure \
+  --lanes cold:codex \
+  --skipped standards:by-policy-one-lane,spec:by-policy-one-lane,silent-failure:by-policy-one-lane \
   --fixed-point <the same fixed point you reviewed against> \
   --findings <n> --blocking <n>
-
-# Docs-only — two ran, two do not apply. Every lane is still accounted for.
-mise run kb-review-receipt -- \
-  --lanes standards,spec \
-  --skipped cold:not-applicable-docs-only,silent-failure:not-applicable-docs-only \
-  --fixed-point <…> --findings <n> --blocking <n>
 ```
 
-Two examples because the single one that used to sit here named `cold` in **both**
-`--lanes` and `--skipped` — a lane cannot have run and been skipped, and copying it
-verbatim produced a receipt claiming coverage it did not have. `no-spec-available`
-excuses the **spec lane only**; `not-applicable-<why>` excuses any lane.
+`LANES` is a closed set of four and every one must still be ACCOUNTED FOR, so the
+three that the one-lane policy stands down are skipped with
+**`by-policy-one-lane`** — a reason that exists for exactly this and is scoped to
+those three lanes. `cold:by-policy-one-lane` is refused: the policy *is* "run
+cold", so citing it to skip cold is self-contradictory.
+
+Do **not** reach for `not-applicable-<why>` here. That reason asserts a
+judgement — the lane read this diff and had nothing to say — and using it for "we
+chose not to run it" would make every future receipt claim a judgement nobody
+made. `no-spec-available` remains the spec lane's alone.
 
 `--blocking` is required — state it even when it is `0`. `--fixed-point`
 defaults to `main`; **pass it whenever you reviewed against anything else**, or
@@ -256,6 +220,15 @@ own reading of the diff.
 
 And it is strictly weaker than a signed external check. Say so rather than
 implying the loop is closed.
+
+**One lane costs coverage, and the measurement says so.** On #67 the *standards*
+lane found **2 of the 3** blocking findings while cold found **0 in five runs** and
+missed both on the SHA where they sat. So this is not "cold was the best lane" —
+it is a deliberate trade of coverage for proportion, made because the four-lane
+version's cost was not repayable at any observed yield. What actually predicted a
+blocker was **method** (a lane that mutated code to test its claim) rather than
+lane identity, which is the thread to pull if this bound ever needs revisiting:
+give the one lane a mutating instruction before adding a second lane back.
 
 ## References
 

@@ -78,9 +78,29 @@ def _cell(value: object) -> str:
     A single `|` anywhere in a cell silently splits it into two columns and
     corrupts the whole table — and these cells carry upstream-controlled text
     (issue titles, error strings, paths). Newlines do the same to the row.
+
+    Whitespace is COLLAPSED, not merely newline-substituted. Replacing each single
+    newline with a space turned a paragraph break in a multi-line watch note into two
+    consecutive spaces, which is rumdl MD064 — so a `currency.toml` note written
+    in ordinary paragraphs produced a report that failed `mise run lint`. Any run
+    of whitespace is meaningless inside a one-line cell anyway.
     """
-    text = str(value)
-    return text.replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+    return _oneline(str(value).replace("|", "\\|"))
+
+
+def _oneline(value: str | None) -> str:
+    """Collapse any whitespace run to one space — safe inside a cell or a list item.
+
+    Shared by `_cell` and `_ambiguity_section` because both embed multi-line
+    foreign text (watch notes, upstream marker text) into single-line markdown
+    constructs, and both produced rumdl MD064 on real content.
+
+    `None` maps to `""` rather than raising: an unanswered gate's answer is None,
+    which is the NORMAL state of a freshly written report, and no test covered
+    rendering one — so a partial version of this function crashed the whole run
+    on the commonest input it has.
+    """
+    return re.sub(r"\s+", " ", value).strip() if value else ""
 
 
 def _slug(when: datetime, tool: str) -> str:
@@ -133,9 +153,13 @@ def _ambiguity_section(verdict: Verdict, answers: tuple[tuple[str, str], ...]) -
         blocks.append(
             f"### Gate: {a.gate}\n\n"
             f"**{a.question}**\n\n"
-            f"- Detail: {a.detail}\n"
-            f"- Recommended: {a.recommendation or '—'}\n"
-            f"- **Answer:** {answer or '_not yet answered_'}\n"
+            # `_oneline`, for the same reason `_cell` collapses whitespace: these
+            # carry `currency.toml` watch notes and upstream marker text, and a
+            # paragraph break inside a LIST ITEM becomes two consecutive spaces —
+            # rumdl MD064, on content that is not ours to reformat.
+            f"- Detail: {_oneline(a.detail)}\n"
+            f"- Recommended: {_oneline(a.recommendation) or '—'}\n"
+            f"- **Answer:** {_oneline(answer) or '_not yet answered_'}\n"
         )
     # rstrip: the template already supplies the blank line before the next
     # heading. Without this the generator emits a double blank line and every
@@ -184,23 +208,64 @@ def _feature_section(verdict: Verdict) -> str:
     here for a human to skim and decide whether a new capability is worth a config
     change.
     """
+    if verdict.features_unreadable:
+        # NOT the same as "no features", and rendering nothing here is what let a
+        # whole release go unread. Say that the scan could not parse the body, so
+        # the reader knows the silence is ours and not upstream's.
+        return (
+            "### Features to consider adopting\n\n"
+            "_**Could not tell.** The release notes are non-empty but match no "
+            "changelog format this scan understands (no `Added`/`Highlights` "
+            "section, no `feat:` prefixes, no adoption phrases), so this is "
+            "**not** a report of zero features — read the notes by hand._"
+        )
     if not verdict.feature_review:
         return ""
     lines = "\n".join(f"- {item}" for item in verdict.feature_review)
+    dropped = (
+        f"\n\n_{verdict.features_dropped} further feature line(s) were cut by the "
+        "display cap — read the full notes if you are deciding on adoption._"
+        if verdict.features_dropped
+        else ""
+    )
     return (
         "### Features to consider adopting\n\n"
         "_Advisory — these did not block the bump. Skim for a new capability "
         "worth a config change._\n\n"
-        f"{lines}"
+        f"{lines}{dropped}"
     )
+
+
+def _notes_excerpt(raw: str) -> str:
+    """The release notes, FENCED so upstream's markdown cannot break our own gate.
+
+    These are foreign text quoted for the record, and embedding them raw made this
+    repo's markdown lint a hostage to upstream's formatting choices: mise
+    v2026.7.16 writes `## Highlights` immediately followed by a list item, which
+    is rumdl MD032, so `mise run lint` failed on a file the engine had just
+    generated — unfixable here, because the content is not ours to reformat.
+    Fencing also stops upstream's `##` headings from inverting this page's own
+    heading structure.
+
+    The fence is longer than the longest backtick run inside, because release notes
+    routinely contain fenced examples of their own (7.16 embeds a ```toml block); a
+    fixed three-backtick fence would be closed early by the first one and spill the
+    rest of the notes back into the document as live markdown.
+    """
+    notes = raw.strip()
+    if not notes:
+        return ""
+    truncated = len(notes) > _NOTES_EXCERPT_CHARS
+    body = notes[:_NOTES_EXCERPT_CHARS] + ("\n\n… (truncated)" if truncated else "")
+    longest = max((len(run) for run in re.findall(r"`+", body)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return f"{fence}text\n{body}\n{fence}"
 
 
 def render_detail(record: RunRecord, when: datetime) -> str:
     """The full per-run detail page."""
     v = record.verdict
-    notes = record.upstream.notes.strip()
-    truncated = len(notes) > _NOTES_EXCERPT_CHARS
-    excerpt = notes[:_NOTES_EXCERPT_CHARS] + ("\n\n… (truncated)" if truncated else "")
+    excerpt = _notes_excerpt(record.upstream.notes)
     gates = (
         "\n".join(f"- ✅ {g}" for g in v.gates_passed)
         if v.gates_passed

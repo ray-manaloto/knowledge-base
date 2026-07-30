@@ -20,7 +20,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from kb_setup.currency import config, docs, issues, report, sync, upstream
+from kb_setup.currency import baseline, config, docs, issues, report, sync, upstream
 from kb_setup.currency.decide import decide
 
 
@@ -68,10 +68,20 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
         for finding in docs.staleness(spec.docs_watch, docs_store)
     ]
 
+    # OFFLINE upstream check: is the pin behind the last version a full run saw?
+    # Step 1 otherwise compares install-against-pin only, which agreed with itself
+    # while graphify sat four releases behind (see `baseline`'s module docstring).
+    cache = baseline.load(repo_root)
+    behind: list[baseline.BaselineFinding] = []
+
     drifted: list[sync.SyncStatus] = []
     unverifiable: list[sync.SyncStatus] = []
     for spec in _specs(repo_root, only):
         status = sync.check_sync(repo_root, spec)
+        # Collected BEFORE the branches below, which `continue` past a drifted
+        # tool: being behind upstream is an independent fact from being out of sync
+        # locally, and a tool can easily be both.
+        behind.extend(_upstream_finding(spec, status, cache))
         if status.drifted:
             drifted.append(status)
             continue
@@ -90,11 +100,45 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
             print(f"[currency] {status.summary()}")
 
     _report_check(drifted, unverifiable)
+    _report_upstream(behind)
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
         for tool, finding in stale:
             print(f"[currency]   {tool}: {finding.detail} — {finding.url}")
     return 0
+
+
+def _upstream_finding(
+    spec: config.ToolSpec, status: sync.SyncStatus, cache: dict[str, dict[str, str]]
+) -> list[baseline.BaselineFinding]:
+    """The offline pin-vs-upstream verdict for one tool, as a 0-or-1 element list.
+
+    A list rather than an Optional so the caller stays a single `extend` — the
+    branch it replaces was what pushed `check` past its complexity budget.
+    """
+    if not (spec.applies_here() and spec.tracks_upstream):
+        return []
+    found = baseline.behind(spec.name, status.pinned, cache)
+    return [found] if found else []
+
+
+def _report_upstream(behind: list[baseline.BaselineFinding]) -> None:
+    """Print the pin-vs-upstream findings, splitting the two that mean different things.
+
+    Same principle as `_report_check`: "we know the pin is stale" and "we have no
+    observation to judge it against" are different answers, and one header over
+    both would let the weaker borrow the stronger's weight.
+    """
+    stale_pin = [f for f in behind if f.check == "upstream-version"]
+    no_record = [f for f in behind if f.check != "upstream-version"]
+    if stale_pin:
+        print("[currency] pin is behind the last upstream version seen:")
+        for finding in stale_pin:
+            print(f"[currency]   {finding.tool}: {finding.detail}")
+    if no_record:
+        print("[currency] NOT CHECKED against upstream (this is not a pass):")
+        for finding in no_record:
+            print(f"[currency]   {finding.tool}: {finding.detail}")
 
 
 def _report_check(drifted: list[sync.SyncStatus], unverifiable: list[sync.SyncStatus]) -> None:
@@ -159,6 +203,33 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     )
 
 
+def _where_written(repo_root: Path, detail: Path | None, *, write: bool) -> str:
+    """How to describe where this tool's output went, for the human-readable line.
+
+    Three distinct outcomes, and "landing row only" must not be confused with a
+    dry run: the first means the run had nothing worth a detail page, the second
+    means nothing was written at all.
+    """
+    if not write:
+        return "dry run — nothing written"
+    return str(detail.relative_to(repo_root)) if detail else "landing row only"
+
+
+def _payload(
+    repo_root: Path, tool: str, record: report.RunRecord, detail: Path | None
+) -> dict[str, object]:
+    """One tool's `--json` object — the shape the tool-currency skill reads."""
+    return {
+        "tool": tool,
+        "verdict": asdict(record.verdict),
+        "sync": asdict(record.sync),
+        "upstream": asdict(record.upstream),
+        "observations": [asdict(o) for o in record.observations],
+        "moved": [asdict(o) for o in record.moved],
+        "detail_page": str(detail.relative_to(repo_root)) if detail else None,
+    }
+
+
 def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool = True) -> int:
     """The full workflow. Returns 0 always — findings are output, not failure.
 
@@ -189,6 +260,7 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
 
     payloads: list[dict[str, object]] = []
     lines: list[str] = []
+    cache = baseline.load(repo_root)
     for spec in specs:
         record = _run_one(repo_root, spec)
         detail: Path | None = None
@@ -196,31 +268,43 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
             report_root = repo_root / report.REPORT_DIR
             _, detail = report.write_run(repo_root, record)
             issues.save_current(report_root, spec.name, record.observations)
+            # Hand the offline check the third version it cannot see for itself.
+            # Only from a REACHABLE probe: caching "" from a failed lookup would
+            # turn an outage into a recorded claim that upstream offers nothing.
+            if record.upstream.reachable:
+                cache = baseline.record(cache, spec.name, record.upstream.latest)
 
-        if not write:
-            where = "dry run — nothing written"
-        elif detail:
-            where = str(detail.relative_to(repo_root))
-        else:
-            where = "landing row only"
+        where = _where_written(repo_root, detail, write=write)
         lines.append(f"[currency] {record.verdict.summary()} — {where}")
-        payloads.append(
-            {
-                "tool": spec.name,
-                "verdict": asdict(record.verdict),
-                "sync": asdict(record.sync),
-                "upstream": asdict(record.upstream),
-                "observations": [asdict(o) for o in record.observations],
-                "moved": [asdict(o) for o in record.moved],
-                "detail_page": str(detail.relative_to(repo_root)) if detail else None,
-            }
-        )
+        payloads.append(_payload(repo_root, spec.name, record, detail))
+
+    if write:
+        baseline.save(repo_root, cache)
 
     if as_json:
         print(json.dumps(payloads, indent=2))
     else:
         for line in lines:
             print(line)
+    return 0
+
+
+def docs_reviewed(repo_root: Path, *, only: str = "") -> int:
+    """Roll the docs baseline forward after a human has re-read the drifted pages.
+
+    The deliberate second step that `docs.verify` no longer does for itself. Until
+    this runs, a drifted page keeps being reported — which is the point: the
+    signal used to be consumed by the same run that raised it, so the committed
+    report said "clean" while three watched pages had changed.
+    """
+    specs = [s for s in _specs(repo_root, only) if s.docs_watch]
+    if not specs:
+        scope = f" for {only!r}" if only else ""
+        print(f"[currency] no tool{scope} watches any docs page", file=sys.stderr)
+        return 2
+    for spec in specs:
+        for finding in docs.mark_reviewed(repo_root, spec.docs_watch):
+            print(f"[currency] {spec.name}: {finding.detail} — {finding.url}")
     return 0
 
 

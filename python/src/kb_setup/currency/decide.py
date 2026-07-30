@@ -46,6 +46,23 @@ class Ambiguity:
     recommendation: str = ""
 
 
+def _has_upgrade(current: str, latest: str) -> bool:
+    """Whether `latest` is a different RELEASE from `current`, not a different string.
+
+    Module-level so `decide` can consult it while building the verdict and
+    `Verdict.has_upgrade` can expose it afterwards — one implementation, because
+    two would be free to disagree about the case that caused the bug.
+    """
+    if not latest:
+        return False
+    cur, new = Version.parse(current), Version.parse(latest)
+    if cur is None or new is None:
+        # Nothing better is available; an unparsable side is already an ambiguity
+        # via `_gate_patch`, so this only decides how the row is worded.
+        return latest != current
+    return new > cur or cur > new
+
+
 @dataclass(frozen=True)
 class Verdict:
     """The outcome of a run: what happens next, and why."""
@@ -62,11 +79,26 @@ class Verdict:
     # breaking marker fired. Empty when there is no upgrade or the notes announce
     # nothing feature-shaped.
     feature_review: tuple[str, ...] = ()
+    # How many feature lines the cap discarded, and whether the notes' format was
+    # recognisable at all. Both exist so an empty `feature_review` is never read as
+    # "there was nothing to adopt" — see `UpstreamStatus.feature_scan_unrecognised`.
+    features_dropped: int = 0
+    features_unreadable: bool = False
 
     @property
     def has_upgrade(self) -> bool:
-        """True when upstream offers a version we are not on."""
-        return bool(self.latest) and self.latest != self.current
+        """True when upstream offers a version we are not on.
+
+        Compared as PARSED VERSIONS, not as strings. `latest` carries whatever
+        decoration upstream ships — GitHub hands back the tag, so claude-code's
+        `2.1.220` was measured against `v2.1.220` and a plain `!=` called the same
+        release an upgrade. That one character then propagated: the landing page
+        rendered an arrow between two identical versions, `has_content` earned a
+        detail page for a run with no content, and notes were fetched for a bump
+        that did not exist. Falls back to string inequality only when a side will
+        not parse, where nothing better is available.
+        """
+        return _has_upgrade(self.current, self.latest)
 
     @property
     def needs_interview(self) -> bool:
@@ -114,6 +146,16 @@ def _gate_patch(current: str, latest: str) -> Ambiguity | None:
             detail="A non-numeric version cannot be classified as patch/minor/major.",
             recommendation="Hold — read the release manually before adopting.",
         )
+    if not (cur > new) and not (new > cur):
+        # SAME version, differing only in decoration (`2.1.220` vs the `v2.1.220`
+        # tag). There is nothing to adopt, so there is nothing to ask about — and
+        # asking anyway is worse than noise: claude-code sat exactly on its latest
+        # release and this gate demanded a decision on the non-bump every single
+        # run, which trains the reader to skip the one output this engine exists to
+        # produce. `is_patch_bump_from` already refuses the no-op in the APPLY
+        # direction (its docstring names the `1.2` vs `1.2.0` case); this is the
+        # same equality seen from the interview side, where it has to be silence.
+        return None
     if not new.is_patch_bump_from(cur):
         return Ambiguity(
             gate=GATES[0],
@@ -374,9 +416,16 @@ def decide(
         tool=sync.tool,
         current=current,
         latest=latest,
-        auto_apply=not ambiguities,
+        # An upgrade must actually EXIST to be auto-applied. `apply()` already
+        # refuses a no-op ("no upgrade pending"), so without this the verdict and
+        # the applier disagreed, and the landing page published the verdict's
+        # version: `claude-code 2.1.220 → v2.1.220: auto-applying (6/6 gates)`,
+        # which announces work on a release we are already running.
+        auto_apply=not ambiguities and _has_upgrade(current, latest),
         gates_passed=passed,
         ambiguities=ambiguities,
         tracked=upstream.tracked,
         feature_review=upstream.feature_highlights,
+        features_dropped=upstream.features_dropped,
+        features_unreadable=upstream.feature_scan_unrecognised,
     )

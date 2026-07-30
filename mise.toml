@@ -23,7 +23,7 @@
 # this repo has actually been verified against, so 7.14 runs with a nudge.
 # Keep soft > hard or soft is inert: hard errors across exactly the range soft
 # would warn in, so an equal pair makes the warning unobservable.
-min_version = { hard = "2026.7.14", soft = "2026.7.15" }
+min_version = { hard = "2026.7.14", soft = "2026.7.16" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
@@ -36,7 +36,7 @@ typos = "1.48.0"
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.26", extras = ["all"] }
+"pipx:graphifyy" = { version = "0.9.30", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).

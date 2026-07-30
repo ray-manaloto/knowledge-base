@@ -64,6 +64,7 @@ _BANG_RE = re.compile(r"^\s*\w+(\([^)]*\))?!\s*:", re.MULTILINE)
 # and prose like "you can now" by substring.
 _FEATURE_PHRASES = (
     "you can now",
+    "can now",
     "now supports",
     "now support",
     "new option",
@@ -74,10 +75,49 @@ _FEATURE_PHRASES = (
     "added support",
     "introduces",
     "introduce ",
+    "graduates from experimental",
+    "no longer requires",
 )
 # Conventional-commits `feat:` / `feat(scope):` at the start of a line.
 _FEAT_RE = re.compile(r"^\s*[-*]?\s*feat(\([^)]*\))?\s*:", re.IGNORECASE | re.MULTILINE)
 _MAX_FEATURE_LINES = 12
+
+# A markdown section heading, at any depth (`## Added`, `### New features`).
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*?)\s*#*\s*$")
+# Keep-a-Changelog / GitHub-generated-notes section names whose bullets ARE
+# features by construction. This is the detector's primary signal, and it exists
+# because the phrase/`feat:` heuristics alone matched NOTHING on any real corpus
+# this repo tracks: mise v2026.7.16 ships nine `## Added` bullets and scored 0,
+# as did graphify 0.9.27-0.9.30 and claude-code 2.1.220 (control-armed
+# 2026-07-29 — the same patterns DO fire on a synthetic `feat:` fixture, so the
+# zero was the detector's shape, not an absence of features). The unit tests
+# passed throughout, because every fixture was written in the one format the
+# detector already understood.
+_FEATURE_SECTIONS = frozenset(
+    {"added", "features", "new features", "highlights", "new", "what's new"}
+)
+# Sections whose bullets are explicitly NOT new capabilities. Named rather than
+# inferred so that recognising a body's FORMAT is separable from finding features
+# in it — a fixes-only changelog is a confident zero, which is a different answer
+# from "this body has no structure I understand". `new contributors` is here
+# because it would otherwise prefix-match `new`.
+_NON_FEATURE_SECTIONS = frozenset(
+    {
+        "fixed",
+        "fixes",
+        "bug fixes",
+        "changed",
+        "removed",
+        "deprecated",
+        "security",
+        "documentation",
+        "docs",
+        "registry",
+        "new contributors",
+        "chore",
+        "internal",
+    }
+)
 
 # Markdown emphasis and the hyphen/underscore variants are decoration, not
 # meaning. Collapsing them lets ONE marker cover every spelling.
@@ -176,6 +216,49 @@ class UpstreamStatus:
             found.append("conventional-commits `!`")
         return tuple(found)
 
+    def _scan_features(self) -> tuple[tuple[str, ...], int, bool]:
+        """Walk the notes once: `(highlights, dropped, format_recognised)`.
+
+        Section state is what makes this reliable. A bullet under `## Added` is a
+        feature because of WHERE it sits, which needs no phrase to match — and
+        phrases are suppressed under a known non-feature section so a fix reading
+        "no longer requires X" does not arrive labelled as a capability.
+
+        `format_recognised` exists so an empty result stays TWO answers rather
+        than one: a fixes-only changelog is a confident "no features", while a
+        body whose structure we do not understand is "could not tell". Collapsing
+        those is the same absence-of-evidence trap `UpstreamStatus`'s three-state
+        docstring above already avoids for reachability.
+        """
+        highlights: list[str] = []
+        dropped = 0
+        section = ""
+        recognised = False
+        for raw in self.notes.splitlines():
+            heading = _HEADING_RE.match(raw)
+            if heading:
+                section = _normalize(heading.group(1)).rstrip(":.")
+                if section in _FEATURE_SECTIONS or section in _NON_FEATURE_SECTIONS:
+                    recognised = True
+                continue
+            line = raw.strip().lstrip("-*").strip()
+            if not line:
+                continue
+            low = line.lower()
+            is_bullet = raw.strip().startswith(("-", "*"))
+            in_feature_section = section in _FEATURE_SECTIONS
+            phrased = any(p in low for p in _FEATURE_PHRASES)
+            if _FEAT_RE.match(raw) or phrased:
+                recognised = True
+            if section in _NON_FEATURE_SECTIONS:
+                continue
+            if (is_bullet and in_feature_section) or _FEAT_RE.match(raw) or phrased:
+                if len(highlights) >= _MAX_FEATURE_LINES:
+                    dropped += 1
+                    continue
+                highlights.append(line)
+        return tuple(highlights), dropped, recognised
+
     @property
     def feature_highlights(self) -> tuple[str, ...]:
         """Note lines announcing a NEW capability worth a look — step 3's other half.
@@ -183,21 +266,31 @@ class UpstreamStatus:
         Purely advisory: these never gate a bump (that is `markers`' job). They
         exist so "should we adopt this?" reaches the human even on a clean bump
         that no breaking marker stopped — the release-note review Ray asked for.
-        A line qualifies via a `feat:` prefix or an adoption phrase; the raw line
-        is returned (trimmed of list bullets) so the reader sees the real wording,
-        capped so a huge changelog does not flood the interview.
+        A line qualifies by sitting under a feature section, by a `feat:` prefix,
+        or by an adoption phrase; the raw line is returned (trimmed of list
+        bullets) so the reader sees the real wording, capped so a huge changelog
+        does not flood the interview. When the cap bites, `features_dropped` says
+        by how much — a silent truncation would read as "that was all of them".
         """
-        highlights: list[str] = []
-        for raw in self.notes.splitlines():
-            line = raw.strip().lstrip("-*").strip()
-            if not line:
-                continue
-            low = line.lower()
-            if _FEAT_RE.match(raw) or any(p in low for p in _FEATURE_PHRASES):
-                highlights.append(line)
-            if len(highlights) >= _MAX_FEATURE_LINES:
-                break
-        return tuple(highlights)
+        return self._scan_features()[0]
+
+    @property
+    def features_dropped(self) -> int:
+        """How many feature lines the cap discarded. Never truncate silently."""
+        return self._scan_features()[1]
+
+    @property
+    def feature_scan_unrecognised(self) -> bool:
+        """True when there are notes, no features found, and no format we know.
+
+        The honest third state. `feature_highlights == ()` alone cannot tell
+        "this release adds nothing" from "these notes are prose we cannot parse",
+        and rendering the second as the first is how a whole release went unread:
+        graphify 0.9.27-0.9.30 groups its bullets under bold subheads rather than
+        `## Added`, so section detection finds no purchase there.
+        """
+        highlights, _, recognised = self._scan_features()
+        return bool(self.notes.strip()) and not highlights and not recognised
 
 
 def _pypi_json(package: str) -> tuple[dict[str, object], str]:

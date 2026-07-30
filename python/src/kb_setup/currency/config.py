@@ -133,6 +133,17 @@ class ToolSpec:
                 seen.setdefault(path, None)
         return tuple(seen)
 
+    @property
+    def tracks_upstream(self) -> bool:
+        """Whether this tool has a release channel to be behind at all.
+
+        ffmpeg declares neither `pypi` nor `github`: it is presence-tracked, so
+        "no upstream version recorded" is the correct and permanent state rather
+        than something to nag about. Mirrors `UpstreamStatus.tracked`, which draws
+        the same line one layer out.
+        """
+        return bool(self.pypi or self.github)
+
     def applies_here(self) -> bool:
         """Whether this tool is expected to exist on the current host.
 

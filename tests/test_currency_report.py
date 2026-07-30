@@ -445,3 +445,193 @@ def test_no_feature_section_and_no_blank_pileup_when_absent(tmp_path) -> None:
     body = detail.read_text(encoding="utf-8")
     assert "Features to consider adopting" not in body
     assert "\n\n\n" not in body
+
+
+def _feature_record(
+    *,
+    feature_review: tuple[str, ...] = (),
+    features_dropped: int = 0,
+    features_unreadable: bool = False,
+) -> report.RunRecord:
+    """A run record whose verdict carries the feature-review fields under test.
+
+    Deliberately carries a real PENDING UPGRADE, because that is the only state in
+    which release notes are fetched at all (`_notes_source` renders "not fetched —
+    already on the latest version" otherwise). A no-upgrade fixture earns no
+    detail page and would be testing a shape production never produces.
+    """
+    verdict = Verdict(
+        tool="graphify",
+        current="0.9.25",
+        latest="0.9.26",
+        auto_apply=True,
+        gates_passed=(),
+        ambiguities=(),
+        feature_review=feature_review,
+        features_dropped=features_dropped,
+        features_unreadable=features_unreadable,
+    )
+    return report.RunRecord(
+        tool="graphify",
+        sync=SyncStatus(
+            tool="graphify",
+            pinned="0.9.25",
+            resolved="0.9.25",
+            findings=(Finding("pin", OK, "pinned"),),
+        ),
+        upstream=UpstreamStatus(latest="0.9.26", notes="**bold subhead**\n\n- a change\n"),
+        observations=(),
+        moved=(),
+        verdict=verdict,
+    )
+
+
+def test_unreadable_notes_render_could_not_tell_not_silence(tmp_path) -> None:
+    """A could-not-check is never rendered as green — the same rule as reachability.
+
+    Without this the page omits the section entirely, which reads as "upstream
+    added nothing" for notes we simply could not parse.
+    """
+    _, detail = report.write_run(tmp_path, _feature_record(features_unreadable=True))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "Could not tell" in body
+    assert "read the notes by hand" in body
+    assert "\n\n\n" not in body
+
+
+def test_a_capped_feature_list_says_what_it_dropped(tmp_path) -> None:
+    """No silent caps: a truncated list must name the truncation."""
+    _, detail = report.write_run(
+        tmp_path,
+        _feature_record(feature_review=("one thing",), features_dropped=7),
+    )
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "7 further feature line(s) were cut" in body
+    assert "\n\n\n" not in body
+
+
+def test_an_uncapped_feature_list_makes_no_truncation_claim(tmp_path) -> None:
+    """Control arm: the drop notice must not appear when nothing was cut."""
+    _, detail = report.write_run(tmp_path, _feature_record(feature_review=("one thing",)))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "were cut by the display cap" not in body
+    assert "Features to consider adopting" in body
+
+
+# ------------------ upstream text must not be able to break OUR lint gate ----
+#
+# The reports embed two kinds of foreign text: release notes and watch-item
+# notes. Both broke `mise run lint` on real content (2026-07-29), and neither is
+# ours to reformat — so the generator has to neutralise them.
+
+
+def _notes_record(notes: str) -> report.RunRecord:
+    verdict = Verdict(
+        tool="graphify",
+        current="0.9.25",
+        latest="0.9.26",
+        auto_apply=True,
+        gates_passed=(),
+        ambiguities=(),
+    )
+    return report.RunRecord(
+        tool="graphify",
+        sync=SyncStatus(
+            tool="graphify",
+            pinned="0.9.25",
+            resolved="0.9.25",
+            findings=(Finding("pin", OK, "pinned"),),
+        ),
+        upstream=UpstreamStatus(latest="0.9.26", notes=notes),
+        observations=(),
+        moved=(),
+        verdict=verdict,
+    )
+
+
+def test_release_notes_are_fenced_so_upstream_markdown_is_inert(tmp_path) -> None:
+    """Mise v2026.7.16's real shape: a heading immediately followed by a list.
+
+    Unfenced, that is rumdl MD032 and `mise run lint` fails on a file the engine
+    just wrote — with no legitimate fix, since the content is upstream's.
+    """
+    _, detail = report.write_run(tmp_path, _notes_record("## Highlights\n- a thing\n"))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "```text" in body
+    # The upstream heading must not be a live heading in our document.
+    assert "\n## Highlights" not in body.split("```text")[0]
+
+
+def test_the_fence_outgrows_a_code_block_inside_the_notes(tmp_path) -> None:
+    """Release notes embed their own fenced examples — 7.16 ships a ```toml block.
+
+    A fixed three-backtick fence would be CLOSED by the first inner fence, and
+    everything after it would spill back into the page as live markdown.
+    """
+    notes = 'Intro.\n\n```toml\n[tasks.build]\nrun = "x"\n```\n\n## Added\n- a thing\n'
+    _, detail = report.write_run(tmp_path, _notes_record(notes))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "````text" in body
+    assert body.count("````") == 2
+
+
+def test_empty_notes_produce_no_fence_at_all(tmp_path) -> None:
+    """Control arm: an empty excerpt must not render an empty code block."""
+    _, detail = report.write_run(tmp_path, _notes_record(""))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "```" not in body
+    assert "_No release notes retrieved._" in body
+
+
+def test_a_table_cell_collapses_whitespace_runs() -> None:
+    """A paragraph break in a watch note became two spaces — rumdl MD064.
+
+    So a `currency.toml` note written as ordinary paragraphs made every report
+    containing it fail the markdown gate.
+    """
+    assert report._cell("first para\n\nsecond para") == "first para second para"
+    assert report._cell("a\t\tb") == "a b"
+    assert report._cell("  padded  ") == "padded"
+
+
+def test_a_table_cell_still_escapes_pipes() -> None:
+    """Control arm: the collapse must not have dropped the original job."""
+    assert report._cell("a | b") == "a \\| b"
+
+
+def test_an_unanswered_ambiguity_renders(tmp_path) -> None:
+    """The commonest state of a fresh report, and it was untested.
+
+    Every existing ambiguity test supplied an answer, so the `answer is None`
+    path had no coverage — and a partial `_oneline` crashed the entire
+    `mise run kb-currency` run on it.
+    """
+    ambiguity = Ambiguity(
+        gate="no tracked issue moved",
+        question="1 local watch item(s) must be re-probed. Done?",
+        # A real multi-paragraph watch note, which is what MD064 fired on.
+        detail="First paragraph.\n\nSecond paragraph.",
+        recommendation="Re-probe, then record the result.",
+    )
+    _, detail = report.write_run(tmp_path, _record(latest="0.9.26", ambiguities=(ambiguity,)))
+    assert detail is not None
+    body = detail.read_text(encoding="utf-8")
+    assert "_not yet answered_" in body
+    assert "First paragraph. Second paragraph." in body
+    # And the markdown gates the generator must satisfy.
+    assert "\n\n\n" not in body
+    assert "  " not in body
+
+
+def test_a_missing_recommendation_renders_a_dash(tmp_path) -> None:
+    """Control arm: the None-tolerant collapse must not eat the em-dash default."""
+    ambiguity = Ambiguity(gate="g", question="q?", detail="d", recommendation="")
+    _, detail = report.write_run(tmp_path, _record(latest="0.9.26", ambiguities=(ambiguity,)))
+    assert detail is not None
+    assert "- Recommended: —" in detail.read_text(encoding="utf-8")
