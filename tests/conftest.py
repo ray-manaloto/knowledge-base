@@ -136,7 +136,9 @@ def receipt_for(tmp_path: Path) -> Callable[[str], None]:
         for lane in LANES_RAN:
             report = review.report_path(tmp_path, sha, lane)
             report.parent.mkdir(parents=True, exist_ok=True)
-            report.write_text("NO FINDINGS", encoding="utf-8")
+            # Names the SHA: a report must DECLARE what it read, not merely sit
+            # under a filename someone else chose (#56).
+            report.write_text(f"NO FINDINGS — reviewed {sha}", encoding="utf-8")
         review.write_receipt(
             tmp_path,
             review.Receipt(

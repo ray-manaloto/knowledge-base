@@ -16,6 +16,11 @@ from kb_setup import review
 _SHA = "9521853abcdef0123456789abcdef0123456789a"
 _OTHER = "0000000abcdef0123456789abcdef0123456789b"
 
+#: A report body that DECLARES which commit it is about (#56). The default for
+#: every PASS-arm fixture here, because that is what a real lane report now has
+#: to carry — a fixture that omits it would be testing a shape the gate rejects.
+_BOUND_BODY = f"NO FINDINGS — reviewed {_SHA}"
+
 
 #: Sentinel meaning "DELETE this key", not "set it to something falsy".
 #:
@@ -58,7 +63,7 @@ def _write(tmp_path: Path, **overrides: object) -> Path:
     return tmp_path
 
 
-def _write_report(tmp_path: Path, lane: str, body: str = "NO FINDINGS") -> Path:
+def _write_report(tmp_path: Path, lane: str, body: str = _BOUND_BODY) -> Path:
     """Write ``lane``'s report for the fixture SHA."""
     rp = review.report_path(tmp_path, _SHA, lane)
     rp.parent.mkdir(parents=True, exist_ok=True)
@@ -591,6 +596,88 @@ def test_empty_report_does_not_count_as_evidence(tmp_path: Path) -> None:
     assert "spec" in summary
 
 
+def test_a_report_that_never_names_the_commit_is_refused(tmp_path: Path) -> None:
+    """A filename is not a binding: the report must say what it read (#56).
+
+    The receipt is minted against fresh HEAD and there is deliberately no
+    `--sha`, so the only thing tying "the commit the lanes reviewed" to "the
+    commit the receipt is for" was the report's FILENAME — which the
+    orchestrator chooses, not the lane. It records where a file was put, not
+    what was read.
+
+    Not hypothetical: of the two real lane reports on disk when this landed, one
+    named its SHA and one did not.
+    """
+    root = _write(tmp_path)
+    _write_report(tmp_path, "cold", "NO FINDINGS")  # plausible, and says nothing
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "cold" in summary
+    assert "never names" in summary
+
+
+def test_the_abbreviated_sha_binds_too(tmp_path: Path) -> None:
+    """CONTROL ARM: the 12-char form this module prints everywhere must count.
+
+    Every message here renders `sha[:12]`, so that is the form a lane naturally
+    quotes back. Accepting only the full 40 would refuse honest reports and push
+    authors toward pasting a SHA they never looked at.
+    """
+    root = _write(tmp_path)
+    _write_report(tmp_path, "cold", f"Reviewed {_SHA[:12]} — NO FINDINGS")
+    ok, _ = review.receipt_state(root, _SHA)
+    assert ok
+
+
+def test_a_seven_char_prefix_does_not_bind(tmp_path: Path) -> None:
+    """CONTROL ARM 2: git's short form is too short to be evidence.
+
+    A 7-hex run turns up in ordinary prose — and in other SHAs — often enough to
+    match by accident, so accepting it would let the check pass without having
+    verified anything. Refusing it is what makes the passing case mean something.
+    """
+    root = _write(tmp_path)
+    _write_report(tmp_path, "cold", f"Reviewed {_SHA[:7]} — NO FINDINGS")
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "never names" in summary
+
+
+def test_a_report_naming_another_commit_is_refused(tmp_path: Path) -> None:
+    """The case the whole check exists for: evidence about some other commit.
+
+    This is the shape a copied report has — `lanes.md` forbids copying the
+    round-2 report to a new name, and until now nothing enforced it.
+    """
+    root = _write(tmp_path)
+    _write_report(tmp_path, "cold", f"NO FINDINGS — reviewed {_OTHER}")
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "never names" in summary
+
+
+def test_an_honest_fix_round_report_still_passes(tmp_path: Path) -> None:
+    """The documented fix-round path must stay open (why #56 was not filed's fix).
+
+    `SKILL.md` step 4 prescribes writing a SHORT report at the fixed SHA that
+    states plainly that no lane re-ran and names the gates as the verification.
+    Capturing HEAD at lane dispatch (the issue's proposal) would have made that
+    impossible, since committing the fix is what moves HEAD. Asking the report to
+    name its commit closes the same gap and leaves this path open — and now makes
+    it VISIBLE rather than conventional.
+    """
+    root = _write(tmp_path)
+    _write_report(
+        tmp_path,
+        "cold",
+        f"Round 2 reviewed {_OTHER}; see review-{_OTHER}-cold.md for the findings.\n"
+        f"No lane re-ran against {_SHA}. Verification for the fix is the local gates: "
+        f"lint rc=0, pytest rc=0.\n",
+    )
+    ok, _ = review.receipt_state(root, _SHA)
+    assert ok
+
+
 def test_an_undecodable_report_does_not_count_as_evidence(tmp_path: Path) -> None:
     """Unreadable evidence is not evidence — the same answer `_load_receipt` gives.
 
@@ -621,7 +708,7 @@ def test_no_findings_report_is_valid_evidence(tmp_path: Path) -> None:
     merely rejecting anything it was handed.
     """
     root = _write(tmp_path)
-    review.report_path(root, _SHA, "standards").write_text("NO FINDINGS", encoding="utf-8")
+    review.report_path(root, _SHA, "standards").write_text(_BOUND_BODY, encoding="utf-8")
     ok, _ = review.receipt_state(root, _SHA)
     assert ok
 
@@ -636,7 +723,7 @@ def test_a_non_ascii_report_is_still_valid_evidence(tmp_path: Path) -> None:
     """
     root = _write(tmp_path)
     review.report_path(root, _SHA, "cold").write_text(
-        "NO FINDINGS — checked `café/日本語.py`", encoding="utf-8"
+        f"NO FINDINGS — reviewed {_SHA} — checked `café/日本語.py`", encoding="utf-8"
     )
     ok, _ = review.receipt_state(root, _SHA)
     assert ok

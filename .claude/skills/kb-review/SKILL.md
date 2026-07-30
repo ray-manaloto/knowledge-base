@@ -154,11 +154,13 @@ receipt schema records it, and deliberately so — a `gate_verified_delta` field
 would be one more thing to maintain for a case the prose already covers.
 
 **That path needs one more step than it looks, and without it the gate refuses.**
-A receipt is always keyed to `HEAD`, and `_missing_reports` looks for
+A receipt is always keyed to `HEAD`, and `_report_gaps` looks for
 `review-<that same sha>-<lane>.md` — so the moment you commit the fix, HEAD moves
 and the round-2 report, named for the pre-fix SHA, is invisible to it. The
 shortcut as first written was a dead end (found by the cold lane on this very
-change). So write a **short fix-round report at the new SHA**:
+change). So write a **short fix-round report at the new SHA**. Note that it names
+BOTH commits, which is what lets it satisfy the SHA-binding check honestly (#56)
+— it says what was reviewed, what was not, and why that is still enough:
 
 ```text
 .agent/kb/review/reports/review-<fixed-sha>-cold.md
@@ -180,6 +182,13 @@ Write every lane's report verbatim to
 `agent-report-persistence.md` requires it, and the receipt now checks for it.
 A lane that left no report is a claim, not a review. `NO FINDINGS` is a
 perfectly good report; an empty file is not.
+
+**The report must NAME the commit it reviewed** — the full SHA or its first 12
+characters, anywhere in the body. The filename is not enough: the orchestrator
+picks that, so it says where a file was put, not what was read (#56). So the
+lane prompt asks for it (`references/lanes.md`), and a bare `NO FINDINGS` with
+no SHA is now refused — write `NO FINDINGS — reviewed <sha>`. Seven characters
+is deliberately too few to count; a 7-hex run matches ordinary prose by accident.
 
 ```bash
 mise run kb-review-receipt -- \
@@ -209,15 +218,26 @@ stored as `fixed_point_sha`; an unresolvable one is refused rather than stored
 empty — including a clone with no `origin/main`, which REFUSES rather than
 quietly falling back to local `main`.
 
-There is no `--sha` — the receipt is always for HEAD, and **that is not the gap
-it looks like** (#56). Nothing appears to stop a commit landing between the last
-lane finishing and the receipt being written, but the lane reports are named
-`review-<sha>-<lane>.md` against that same fresh HEAD, so if HEAD moved the
-reports are named for the old commit, are invisible to the gate, and the receipt
-is refused for missing evidence. The one remaining way through is authoring a
-report at the new SHA — which is precisely the fix-round path step 4 prescribes,
-honestly labelled. Closed as already-mitigated; do not add a HEAD-capture check,
-which would make that path impossible.
+There is no `--sha` — the receipt is always for HEAD. **What binds that HEAD to
+what the lanes actually read is the report NAMING it** (#56): every report must
+contain the commit it is about, full or 12-char, or the receipt is refused.
+
+The filename alone was never that binding. It does close the accidental case —
+reports resolve as `review-<receipt sha>-<lane>.md`, so a moved HEAD leaves the
+old report invisible — but a filename is chosen by the orchestrator, not by the
+lane, so it records where a file was put rather than what was read. The cold
+lane rated that P1 on PR #79.
+
+**The issue's own proposal was not what got built.** Capturing HEAD at lane
+dispatch and refusing if it moved would make step 4's fix-round path impossible,
+because committing the fix is what moves HEAD. Requiring the report to name its
+commit closes the same gap and leaves that path open — the fix-round template
+below already states the fixed SHA, so an honest fix-round report passes, and now
+passes *visibly* rather than by convention.
+
+It is still not proof; a determined caller can paste a SHA into a stub, just as
+one could already write a stub. What it removes is a report standing as evidence
+for a commit nobody ever claimed it was about.
 
 It writes `.agent/kb/review/receipt-<sha>.json`. Gitignored on purpose: a
 receipt is machine-local proof that *this* machine reviewed *this* commit before

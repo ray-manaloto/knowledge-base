@@ -35,7 +35,7 @@ def _reports(repo_root: Path, *lanes: str) -> None:
     for lane in lanes:
         path = review.report_path(repo_root, "a" * 40, lane)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("NO FINDINGS", encoding="utf-8")
+        path.write_text(f"NO FINDINGS — reviewed {'a' * 40}", encoding="utf-8")
 
 
 def _run(repo_root: Path, *args: str) -> int:
@@ -253,7 +253,9 @@ def test_documented_report_filename_is_the_one_the_gate_reads(repo: Path) -> Non
     reports = repo / ".agent/kb/review/reports"
     reports.mkdir(parents=True, exist_ok=True)
     for lane in ("standards", "spec", "cold", "silent-failure"):
-        (reports / f"review-{sha}-{lane}.md").write_text("NO FINDINGS", encoding="utf-8")
+        (reports / f"review-{sha}-{lane}.md").write_text(
+            f"NO FINDINGS — reviewed {sha}", encoding="utf-8"
+        )
 
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
 

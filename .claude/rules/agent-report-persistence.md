@@ -44,6 +44,13 @@ it twice.
    file the gate cannot see, and the refusal then reads as "the lane never ran".
    (#60)
 
+   **The report must also NAME `<sha>`** — full, or its first 12 characters —
+   somewhere in its body, or the receipt is refused (#56). Verbatim persistence
+   is what makes that cheap: a lane asked to state the commit it reviewed says so
+   in its report, and copying it forward to a different SHA then fails visibly
+   rather than silently standing as evidence for a commit nobody claimed it was
+   about.
+
 1b. **PROMOTE it to `docs/research/reports/` once it is load-bearing.** `.agent/`
    is gitignored: it dies with a fresh clone or any `git clean -xdf`. That is
    right for scratch and wrong for a report something tracked now cites —
