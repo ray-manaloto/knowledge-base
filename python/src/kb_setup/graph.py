@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -120,8 +121,21 @@ def build(repo_root: Path) -> None:
     # Code graph (AST — free, deterministic). Each source extracts into its own
     # sub-graph; prose-only repos (no code) are skipped WITHOUT aborting the build —
     # their content is added later by the host-agent prose wave, not here.
-    with_code = [m.name for m in manifests if _extract_code(repo_root, m.name)]
-    skipped = [m.name for m in manifests if m.name not in with_code]
+    #
+    # A `kind = docs` manifest is NOT ASKED. `--code-only` is defined by graphify as
+    # "index code … and skip doc/paper/image files", so running it over a docs mirror
+    # is a guaranteed-empty full AST scan of every markdown file, on every build. The
+    # reason to skip it is not only the waste: a docs manifest that never ran and a
+    # code repo that ran and produced nothing are DIFFERENT ANSWERS, and until now
+    # both printed the same `[skip] … no code nodes` line. That is the
+    # not-applicable/could-not-check collapse this repo refuses everywhere else
+    # (`currency`'s DRIFT/SKIP/OK). Declaring the kind makes the build say which.
+    docs_only = [m.name for m in manifests if m.kind == "docs"]
+    askable = [m.name for m in manifests if m.name not in docs_only]
+    with_code = [name for name in askable if _extract_code(repo_root, name)]
+    for name in docs_only:
+        print(f"  [docs] {name}: kind=docs — no AST pass; prose comes from the extraction wave")
+    skipped = [name for name in askable if name not in with_code]
     for name in skipped:
         print(f"  [skip] {name}: no code nodes — prose-only, deferred to the extraction wave")
     if not with_code:
@@ -237,28 +251,47 @@ def _stamp_build(repo_root: Path) -> None:
         print(f"[kb-build] WARNING: could not write the currency stamp: {e}")
 
 
-def update_all(repo_root: Path) -> None:
-    """Advance every github-repo source to its latest upstream commit."""
+def update_all(repo_root: Path) -> int:
+    """Advance every tracked source to its latest upstream commit.
+
+    `kind = docs` sources are INCLUDED, and the omission is worth recording: this
+    filtered to `kind == "code"` when the only kind in use was `code`, so adding
+    the docs kind silently excluded every docs mirror from the bulk path. The
+    changed-page worklist — the entire reason a mirror is pinned — would then only
+    ever appear when someone named the source by hand, which is the failure mode
+    where a check exists and never runs. (Cold lane, P2.)
+    """
     manifests = mf.load_all(repo_root / "sources")
-    repos = [m for m in manifests if m.kind == "code"]
+    repos = [m for m in manifests if m.kind in {"code", "docs"}]
     if not repos:
-        print("[kb-update] no code-repo manifests to update")
-        return
+        print("[kb-update] no manifests to update")
+        return 0
     print(f"[kb-update] checking {len(repos)} source(s) for upstream updates")
-    for m in repos:
-        update(repo_root, m.name)
+    # WORST rc, not the last one: a bulk run must not report success because the
+    # source that failed happened not to sort last.
+    return max((update(repo_root, m.name) for m in repos), default=0)
 
 
-def update(repo_root: Path, name: str) -> None:
-    """Advance one source to its latest upstream commit and incrementally re-extract."""
+def update(repo_root: Path, name: str) -> int:
+    """Advance one source to its latest upstream commit and incrementally re-extract.
+
+    Returns a process exit code. A docs pin whose diff FAILED returns 1: the pin
+    is correctly left unmoved, but the CLI used to `return 0` regardless, so the
+    one failure path this module has was invisible to anything reading an rc.
+    (Cold lane round 2, P2 — the round-1 fix stopped the state corruption and
+    left the signal broken.)
+    """
     sources = repo_root / "sources"
     m = mf.load(sources / f"{name}.manifest")
     latest = mf.latest_commit(m)
     if latest == m.commit:
         print(f"[kb-update] {name} already at latest {latest[:10]} — nothing to do")
-        return
+        return 0
 
     print(f"[kb-update] {name}: {m.commit[:10]} -> {latest[:10]}")
+    if m.kind == "docs":
+        return _advance_docs_pin(m, latest)
+
     m = mf.write_commit(m, latest)
     _ensure_clone(m)
 
@@ -270,3 +303,136 @@ def update(repo_root: Path, name: str) -> None:
         f"docs and refresh sources/extractions/{name}-docs.json (the semantic cache "
         f"skips unchanged docs)."
     )
+    return 0
+
+
+#: Extensions the host-agent extraction wave can actually read. A docs mirror is
+#: still a git repo, so its own metadata (`docs_manifest.json`, workflows, README
+#: scaffolding) changes on syncs that touched no documentation at all. Listing
+#: those as "re-extraction work" would spend host-agent tokens on a build script.
+#: (Cold lane, P2.)
+_DOC_SUFFIXES = frozenset({".md", ".mdx", ".markdown", ".rst", ".txt"})
+
+#: `git diff --name-status` emits `R<score>\told\tnew` for a rename or copy — two
+#: paths where every other status has one.
+_RENAME_PATHS = 2
+
+
+def _is_doc(path: str) -> bool:
+    return Path(path).suffix.lower() in _DOC_SUFFIXES
+
+
+def _classify_change(status: str, paths: list[str]) -> tuple[list[str], list[str]]:
+    """One `--name-status` row -> (paths to re-extract, stale extractions to drop).
+
+    Both lists empty means the row touched no document — a mirror's own metadata,
+    which is real churn but not extraction work.
+    """
+    if not any(_is_doc(p) for p in paths):
+        return [], []
+    if status.startswith("D"):
+        return [], [p for p in paths if _is_doc(p)]
+    if status.startswith(("R", "C")) and len(paths) == _RENAME_PATHS:
+        old, new = paths
+        extract = [new] if _is_doc(new) else []
+        # A COPY leaves the original in place; only a RENAME makes it stale.
+        # Treating `C###` like `R###` queued a file that still exists for
+        # removal. Bounded — the worklist is advisory, read by a host agent
+        # rather than executed — but it would send that agent to delete a live
+        # page's extraction. (Cold lane round 2, P2.)
+        if status.startswith("C"):
+            return extract, []
+        return extract, ([old] if _is_doc(old) else [])
+    return [p for p in paths if _is_doc(p)], []
+
+
+def _advance_docs_pin(m: mf.Manifest, latest: str) -> int:
+    """Advance a `kind = docs` pin, but ONLY once its worklist has been reported.
+
+    THE POINT OF A DOCS MIRROR, and the reason `kind` had to stop being inert
+    metadata. Fingerprinting a page (`currency.toml` `docs_watch`) proves THAT it
+    changed and can never say WHAT — knowledge-base#76 was opened on three moved
+    sha256 values with no way to read the delta, and the only reason that session
+    recovered one was that a gitignored `.agent/kb/raw/` copy of the old text
+    happened to survive. A `git clean -xdf` erases that; a pinned clone does not.
+
+    ORDER IS THE WHOLE CORRECTNESS ARGUMENT, and the first version got it wrong.
+    It wrote the pin, then diffed, and on a diff failure printed "UNKNOWN, not
+    empty — re-run". But the pin had already moved, so the re-run hit
+    `latest == m.commit` and reported *"already at latest — nothing to do"*: the
+    worklist was not merely unreported, it was **unrecoverable**, and the careful
+    UNKNOWN message pointed at a retry that could no longer work. The comment
+    there read "a report gap, not a build failure", which is exactly the kind of
+    self-reassurance a cold reviewer is for — it was found by one (P2).
+
+    So the clone is brought to `latest` in memory, the diff runs, and the manifest
+    is written only if the diff SUCCEEDED. A failure now leaves the pin where it
+    was, which makes the retry the message promises actually work.
+
+    Printed, never acted on. Re-extraction is a Claude Code session's job
+    (invariant: the host agent IS the extraction LLM), so this task's contract is
+    to hand over an accurate worklist and stop.
+    """
+    advanced = replace(m, commit=latest)
+    _ensure_clone(advanced)
+    diff = subprocess.run(
+        ["git", "-C", str(advanced.clone_dir), "diff", "--name-status", m.commit, latest],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if diff.returncode != 0:
+        print(
+            f"[kb-update] {m.name}: doc diff FAILED "
+            f"({diff.stderr.strip() or 'no stderr'}) — the changed-page list is "
+            f"UNKNOWN, not empty, so the pin was NOT advanced (still "
+            f"{m.commit[:10]}). Re-run to retry."
+        )
+        return 1
+
+    mf.write_commit(m, latest)
+    _print_doc_worklist(m.name, diff.stdout)
+    return 0
+
+
+def _print_doc_worklist(name: str, name_status: str) -> None:
+    """Turn `git diff --name-status` into a worklist that says what to DO.
+
+    `--name-only` was the first version and it flattened three different jobs into
+    one list (cold lane, P2). A deletion upstream is not re-extraction work — it is
+    a *stale extraction to remove*, and reporting it as a page to read sends the
+    host agent after a file that no longer exists. A rename is the same, plus the
+    old path that has to be dropped. So the status column is kept and the output is
+    grouped by the action each change implies.
+    """
+    extract: list[str] = []
+    drop: list[str] = []
+    other = 0
+    for line in name_status.splitlines():
+        if not line.strip():
+            continue
+        status, *paths = line.split("\t")
+        if not paths:
+            continue
+        did_extract, did_drop = _classify_change(status, paths)
+        if not did_extract and not did_drop:
+            other += 1
+            continue
+        extract.extend(did_extract)
+        drop.extend(did_drop)
+
+    if not extract and not drop:
+        # Distinct from "0 files changed": non-document churn is a real answer —
+        # the mirror synced, and nothing the extraction wave reads was touched.
+        suffix = f" ({other} non-document file(s) changed)" if other else ""
+        print(f"[kb-update] {name}: pin advanced, no document changes{suffix}")
+        return
+
+    print(f"[kb-update] {name}: pin advanced — re-extraction worklist:")
+    for path in extract:
+        print(f"    re-extract  {path}")
+    for path in drop:
+        print(f"    REMOVE stale extraction for  {path}")
+    if other:
+        print(f"    ({other} non-document file(s) changed — not extraction work)")

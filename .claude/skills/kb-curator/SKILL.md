@@ -95,9 +95,26 @@ is not repo B's — so merges never dedup across repos (`merge-graphs` for code;
 | Source | Path | Cost |
 |---|---|---|
 | **GitHub repo** | add `sources/<name>.manifest` (url+ref+SHA); `mise run kb-build` clones + AST-extracts + merges | free (AST) |
-| **Docs page / sitemap.xml** | parse the sitemap (use `advertools`/`usp` — do NOT hand-roll), fetch on-topic pages, host-agent prose-extract → chunk | tokens |
+| **A whole docs SITE with an auto-synced mirror repo** | `mise run kb-manifest-add -- <mirror-url> --kind docs`, then host-agent extract from the pinned clone | tokens, but only for CHANGED pages |
+| **Docs page / sitemap.xml** (no mirror exists) | parse the sitemap (use `advertools`/`usp` — do NOT hand-roll), fetch on-topic pages, host-agent prose-extract → chunk | tokens |
 | **PDF / video / transcript / blog / forum** | vendor under `sources/media/`, host-agent prose-extract → `sources/extractions/<name>-docs.json` | tokens |
 | **Any URL (quick)** | `mise run kb-add -- <url>` (graphify fetches → `./raw` → updates graph) | varies |
+
+**Prefer a mirror over per-page fetching whenever one exists.** `kind = docs` is
+not a cosmetic label: it makes `kb-build` SKIP the AST pass (`--code-only` is
+defined as *"index code … and skip doc/paper/image files"*, so it is a
+guaranteed-empty scan over markdown), and it makes `mise run kb-update` print the
+**changed-page worklist** from `git diff <old-sha>..<new-sha>`. That worklist is
+the whole point — fingerprinting a page proves THAT it changed and never WHAT, so
+without it every revision costs a re-read of the corpus to find a nine-line edit
+(#76). Control-arm a candidate mirror before pinning it: hash its copy of a page
+against the live page. `mrkhachaturov/agent-harness-docs` and
+`ericbuess/claude-code-docs` were byte-identical on 2026-07-30 and sync every 3h.
+
+⚠️ **Never pin a tool's own repo `kind = code` to get its docs.** That extracts
+the SOURCE and skips every `.md` — the exact opposite — while adding the repo's
+whole AST to a graph already crowding prose out of the query budget (#12).
+See issue #81 for the full scan and the suggested order.
 
 **Tier by relevance** (host-agent prose is token-costly): T1 = full semantic + code
 for authoritative/on-topic sources; T2 = code-AST or README-only; T3 = register but

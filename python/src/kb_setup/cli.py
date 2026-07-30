@@ -43,11 +43,13 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "update":
         from kb_setup import graph
 
-        if not rest:  # update ALL github-repo sources
-            graph.update_all(repo_root)
-        else:
-            graph.update(repo_root, rest[0])
-        return 0
+        # The rc is RETURNED, not discarded. A docs pin whose diff failed leaves
+        # the pin correctly unmoved and prints "UNKNOWN — re-run", but this used
+        # to `return 0` regardless, so the one failure path the module has was
+        # invisible to anything reading an exit code. (Cold lane round 2, P2.)
+        if not rest:  # update ALL sources
+            return graph.update_all(repo_root)
+        return graph.update(repo_root, rest[0])
     if cmd == "prose":
         from kb_setup import prose
 

@@ -82,9 +82,33 @@ This repo is **Claude-only and ships no `AGENTS.md`**, so AGM-003's 12,000-char
 ceiling never binds here — but the shared engine still must not re-adopt the
 figure, and a test pins that.
 
-Plus one **hard** limit: a `SKILL.md` `description` **> 1,536 chars is
-truncated silently**, taking the keywords Claude matches on with it — the skill
-simply stops being discovered. It is the only real cliff a repo here can hit.
+Plus the skill-listing budget — **two** mechanisms, recorded here as one until
+2026-07-30 (#76 docs review; `skills.md` § *Skill descriptions are cut short*):
+
+1. **A per-entry cap.** The **combined** `description` **and** `when_to_use` text
+   is capped at **1,536 chars** — not `description` alone — "regardless of
+   budget", and is configurable via `skillListingMaxDescChars`. Put the key use
+   case first; it is the tail that is lost.
+2. **A whole-listing budget scaling at 1% of the model's context window.** On
+   overflow Claude Code "drops descriptions starting with the skills you invoke
+   least" — so **a short description can lose its keywords purely because OTHER
+   skills exist**, with nothing about that skill having changed. Raise it with
+   `skillListingBudgetFraction` / `SLASH_COMMAND_TOOL_CHAR_BUDGET`, or set
+   low-priority entries to `name-only` in `skillOverrides` to free room.
+
+The listing always keeps every skill **name**; what goes is the description,
+which is exactly what model-invocation matches on. So the failure is silent and
+presents as a badly-written description rather than a full budget.
+
+**Measure it rather than reasoning about it:** `/doctor` estimates the listing's
+context cost and names its biggest contributors, and the Skills row in
+`/context` reports the size **after** the budget is applied — what the model
+actually received. An overflow also writes a warning to the `--debug` log.
+
+Calling the per-entry cap "the only real cliff" was wrong in the direction that
+matters here: with seven project skills plus five enabled plugins' skills, the
+*listing* budget is the one this repo can plausibly hit — and no per-skill edit
+would ever explain the symptom.
 
 **The byte ceilings are ours**, not Anthropic's — anti-gaming backstops (a line
 cap alone admits 200 × 400-char lines), sized never to bind before the

@@ -2587,12 +2587,12 @@
   },
   {
    "id": "ccgoal_evaluator_is_small_fast_model",
-   "label": "Each time Claude finishes a turn, the condition AND the conversation so far are sent to the session's configured small fast model, which defaults to Haiku. The evaluator therefore reads the whole transcript, so evidence in a long run competes for attention with everything else in it.",
+   "label": "Each time Claude finishes a turn, the condition AND the conversation so far are sent to the session's configured small fast model. That model defaults to Haiku on the Claude API only — a third-party provider substitutes its own, and ANTHROPIC_DEFAULT_HAIKU_MODEL replaces it outright. The evaluator therefore reads the whole transcript, so evidence in a long run competes for attention with everything else in it. (Re-verified 2026-07-30; 'defaults to Haiku' was unqualified until then.)",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
    "source_location": "line 126",
    "source_url": "https://code.claude.com/docs/en/goal.md",
-   "captured_at": "2026-07-27",
+   "captured_at": "2026-07-30",
    "author": "Anthropic",
    "contributor": null
   },

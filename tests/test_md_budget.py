@@ -258,6 +258,40 @@ def test_skill_description_at_the_cap_passes(tmp_path: Path) -> None:
     assert not report.violations
 
 
+def test_the_cap_counts_when_to_use_too(tmp_path: Path) -> None:
+    """The 1,536 cap is on `description` + `when_to_use` COMBINED, not description alone.
+
+    *"Appended to `description` in the skill listing and counts toward the
+    1,536-character cap"* — `code.claude.com/docs/en/skills.md`. Measuring
+    `description` alone lets a skill split its text across the two fields and pass
+    a gate the harness would then truncate. Neither half here is over the cap; only
+    their sum is, so this fails for the right reason. (Cold lane round 2, P2.)
+    """
+    root = _git_repo(tmp_path)
+    half = "x" * (md_budget.SKILL_DESCRIPTION_MAX // 2 + 10)
+    _commit(
+        root,
+        ".claude/skills/s/SKILL.md",
+        f"---\nname: s\ndescription: {half}\nwhen_to_use: {half}\n---\n# S\n",
+    )
+    report = md_budget.check(root)
+    assert any("TRUNCATED SILENTLY" in v.message for v in report.violations), (
+        "combined description + when_to_use over the cap must be caught"
+    )
+
+
+def test_when_to_use_alone_under_the_cap_still_passes(tmp_path: Path) -> None:
+    """CONTROL ARM: reading both fields must not make an ordinary skill fail."""
+    root = _git_repo(tmp_path)
+    _commit(
+        root,
+        ".claude/skills/s/SKILL.md",
+        "---\nname: s\ndescription: a short one\nwhen_to_use: also short\n---\n# S\n",
+    )
+    report = md_budget.check(root)
+    assert not report.violations
+
+
 def test_gate_fails_when_an_import_target_blows_the_closure(tmp_path: Path) -> None:
     """CONTROL ARM: splitting into an @import must NOT evade the budget.
 

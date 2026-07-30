@@ -7,9 +7,8 @@ argument-hint: "[path to a goal/rider/pair, or nothing to author a new one]"
 # Goal engineering
 
 A `/goal` sets a completion condition. After every turn a small fast model
-(Haiku by default) decides whether it holds, and if not, Claude takes another
-turn. That evaluator is the whole ballgame, and it has one property that
-determines everything else:
+decides whether it holds, and if not, Claude takes another turn. That evaluator
+is the whole ballgame, and it has one property that determines everything else:
 
 > It does not call tools, so it can only judge what Claude has already surfaced
 > in the conversation.
@@ -20,6 +19,15 @@ Haiku-class reader, given the transcript and nothing else, can settle it by
 string match.** "The tests pass" is unjudgeable. "The transcript contains
 `PASS  gate test rc=0`" is judgeable. Almost every defect in a bad goal traces
 back to forgetting this.
+
+**Write for the weakest evaluator you could get, not the one you have.** Haiku
+is only the default *on the Claude API* — a third-party provider substitutes its
+own small fast model, and `ANTHROPIC_DEFAULT_HAIKU_MODEL` replaces it outright
+(that variable is global: it also rebinds the `haiku` alias and background work
+such as conversation summarization, so it is never a `/goal`-only knob). None of
+this loosens the rule above; it removes the excuse that a smarter evaluator will
+cover for a vague clause. Which model judged a round is worth recording in the
+outcome — a `stalled` under one evaluator is not evidence about another.
 
 ## Which mode
 
