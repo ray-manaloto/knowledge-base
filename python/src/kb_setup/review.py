@@ -142,6 +142,35 @@ LANES = ("standards", "spec", "cold", "silent-failure")
 #: `.graphify_*` learning overlay, gitignored for the same reason.
 EXEMPT_PATHS = ("graphify-out/memory/", "docs/goals/README.md")
 
+#: The ref the branch's base is resolved against — the REMOTE-TRACKING one.
+#:
+#: It was local `main`, while the PR is opened against GitHub's
+#: (`gh pr create --base main`). Those disagree in two directions and only one
+#: is safe: local `main` merely BEHIND makes the merge-base older, so the review
+#: covered MORE than the branch; local `main` AHEAD **along the branch's own
+#: ancestry** moves the merge-base forward, so the review covered LESS and the
+#: receipt claims a coverage it does not have. Using `origin/main` removes
+#: exactly the unsafe direction. (#54)
+#:
+#: **It costs no network, and the issue's own framing said otherwise.**
+#: `origin/main` is a local remote-tracking ref: `git merge-base -- origin/main
+#: HEAD` reads `.git/refs/remotes/origin/main` and never opens a socket.
+#: Measured both arms — that call 0.64s against `git ls-remote origin main`
+#: (a real network round-trip) at 2.5s. So this is not a correctness-for-network
+#: trade; the only thing given up is freshness, and a stale `origin/main` errs
+#: in the SAFE direction above.
+#:
+#: One new failure mode, accepted deliberately (Ray, 2026-07-30): a clone with
+#: no `origin/main` ref resolves to "" and `_base_coverage_gap` REFUSES rather
+#: than falling back to local `main`. Falling back would silently reinstate the
+#: defect on exactly the machines least likely to notice, and "could not check"
+#: is never rendered as clean anywhere else in this module.
+#:
+#: Shared by the gate (`ship`/`land` pass it as ``require_base``) and by the
+#: receipt writer's default `--fixed-point`, so the two cannot name different
+#: refs — the drift this module has now closed in four other places.
+DEFAULT_BASE_REF = "origin/main"
+
 #: How many disqualifying paths the refusal message names before summarising.
 #: A DISPLAY bound, so it states the remainder ("+3 more") rather than truncating
 #: silently — a bound that hides its own existence is how "absent" and
@@ -199,9 +228,22 @@ class Receipt:
     fixed_point: str
     #: The base RESOLVED to a commit. `fixed_point` alone is a movable name —
     #: `main` today is not `main` tomorrow — so it cannot say which base was
-    #: actually reviewed. Recorded, not gated: the gate's question is "was THIS
-    #: commit reviewed", and over-gating on a base that legitimately moves would
-    #: invalidate honest receipts. (Cold lane, second pass.)
+    #: actually reviewed.
+    #:
+    #: **GATED, twice** — this line read "Recorded, not gated" until #57, which
+    #: was true when written and was falsified by the two checks that landed
+    #: after it: :func:`_check_range` refuses an EMPTY range (`fixed_point_sha ==
+    #: sha`) for every consumer, and :func:`_base_coverage_gap` refuses a receipt
+    #: whose base is not the branch's merge-base whenever ``require_base`` is
+    #: given. The comment nearest the field was the one that rotted, which is the
+    #: whole of #57: a false comment costs the next reader more than a missing
+    #: one, and here it said the field was inert on the exact commit that made it
+    #: load-bearing.
+    #:
+    #: The original worry it recorded is still real and is what bounds the second
+    #: check rather than removing it: a base that legitimately moves must not
+    #: invalidate an honest receipt, so `_base_coverage_gap` runs only for the
+    #: callers that ship the WHOLE branch, never for the writer's own read-back.
     fixed_point_sha: str
     lanes_ran: tuple[str, ...]
     lanes_skipped: tuple[str, ...]
@@ -233,9 +275,19 @@ class Receipt:
 def rejection(repo_root: Path, receipt: Receipt) -> str | None:
     """Return why ``receipt`` would be rejected, or None if it would pass.
 
-    The same checks :func:`receipt_state` applies, reachable BEFORE the write so
-    a bad receipt is refused rather than written and then reported as failing.
-    One implementation, so the writer and the reader cannot drift apart.
+    The :func:`_all_reasons` checks :func:`receipt_state` applies, reachable
+    BEFORE the write so a bad receipt is refused rather than written and then
+    reported as failing. One implementation of THOSE, so the writer and the
+    reader cannot drift apart on them.
+
+    **It does not cover ``require_base``, and the claim here used to imply it
+    did.** `_base_coverage_gap` lives in :func:`receipt_state`, outside
+    `_all_reasons`, and the CLI calls neither with a base — so
+    `kb-review-receipt --fixed-point HEAD^` prints `OK` for a receipt that
+    `ship` and `land` both then refuse. That is fail-CLOSED, so the behaviour is
+    safe and only the wording was wrong; but "cannot drift apart" is exactly the
+    sentence a reader trusts instead of re-checking, and the one place it did not
+    hold is the field most likely to be wrong on a second review round. (#57)
     """
     return _all_reasons(repo_root, receipt.as_payload(), receipt.sha)
 
@@ -424,7 +476,28 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
 
 
 def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
-    """Return lanes claimed as RUN that have no non-empty report on disk."""
+    """Return lanes claimed as RUN that have no non-empty report on disk.
+
+    **This is also what pins the receipt to the SHA the lanes actually read**,
+    which is not obvious and was filed as a design gap (#56): the CLI reads HEAD
+    at mint time and there is deliberately no `--sha`, so nothing *appears* to
+    stop a commit landing between the last lane finishing and the receipt being
+    written.
+
+    Something does. Reports are resolved through :func:`report_path` against the
+    RECEIPT's sha — which is that fresh HEAD — so if HEAD moved after the lanes
+    ran, their reports are named for the old commit, are invisible here, and the
+    receipt is refused for missing evidence. The window closes itself.
+
+    What remains is authoring a report at the NEW sha, and that is not a hole to
+    plug: `kb-review/SKILL.md` step 4 PRESCRIBES exactly that for the fix-round
+    case (fix a round-2 finding, re-run the gates, write a short report at the
+    fixed sha stating plainly that no lane re-ran) and forbids copying the
+    round-2 report to the new name. #56's proposed fix — capture HEAD at lane
+    dispatch and refuse if it moved — would make that documented path
+    impossible, since committing the fix is what moves HEAD. Closed as
+    already-mitigated rather than implemented (Ray, 2026-07-30).
+    """
     # `data.get(k, [])`, matching `_check_lanes` — the THIRD idiom for one key
     # was here (`or []`), contradicting the "one key deserves one read" rule two
     # functions up. It is unreachable with a malformed value only because
@@ -435,10 +508,23 @@ def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[st
         lane = _lane_prefix(str(entry))
         path = report_path(repo_root, sha, lane)
         try:
-            body = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
-        except OSError:
+            # STRICT decoding, matching `_load_receipt`. This read with
+            # `errors="replace"`, so a corrupted or partly-binary file decoded
+            # into U+FFFD noise, survived `.strip()`, and counted as evidence
+            # that a lane ran — while `_load_receipt` three functions down
+            # refuses undecodable RECEIPT bytes outright. One module, two
+            # answers to "what is readable", and the permissive one was guarding
+            # the evidence while the strict one guarded the claim. The receipt
+            # side is the one that is right: unreadable evidence is not
+            # evidence. The bar stays soft either way — a stub file still passes,
+            # as `lanes.md` says — this only stops the two reads disagreeing. (#58)
+            body = path.read_text(encoding="utf-8") if path.is_file() else ""
+        except OSError, UnicodeDecodeError:
             # Unreadable is "could not check", which must refuse rather than
-            # traceback out of the middle of `ship`.
+            # traceback out of the middle of `ship`. `UnicodeDecodeError` needs
+            # naming explicitly — it is NOT an `OSError`, the same trap
+            # `_load_receipt` records — or strict decoding would convert this
+            # refusal into a crash.
             body = ""
         if not body.strip():
             missing.append(lane)
@@ -903,10 +989,15 @@ def receipt_state(
 
     ``require_base`` additionally demands that the receipt was written against
     this branch's merge-base with that ref — i.e. that the review covered the
-    WHOLE branch, not a suffix of it. `ship` passes ``"main"``; nothing else
-    does, because a receipt reviewed against a narrower base is still a truthful
-    record of what it reviewed. It is the act of shipping the whole branch that
-    needs the whole branch reviewed.
+    WHOLE branch, not a suffix of it. **`ship` AND `land` both pass ``"main"``**;
+    the receipt writer's own read-back does not, because a receipt reviewed
+    against a narrower base is still a truthful record of what it reviewed. It is
+    the act of shipping the whole branch that needs the whole branch reviewed.
+
+    `land` was added to that list in `b4d1063` and this sentence was not, so it
+    named one caller for four rounds while two were passing it — and the missing
+    one is the half that matters, since `gh pr create` is not guard-denied here
+    and `land` is documented as the backstop for exactly that bypass. (#57)
 
     It also enables the :func:`_covering_candidates` fallback, under which an
     ancestor's receipt covers ``sha`` when everything committed since is inside

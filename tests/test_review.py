@@ -17,8 +17,22 @@ _SHA = "9521853abcdef0123456789abcdef0123456789a"
 _OTHER = "0000000abcdef0123456789abcdef0123456789b"
 
 
+#: Sentinel meaning "DELETE this key", not "set it to something falsy".
+#:
+#: `_write` could only ever `update()`, so every test named "missing <field>"
+#: actually passed a REPLACEMENT — `blocking="none"`, `fixed_point="  "`. Those
+#: are worth testing and they are not the same state: a hand-edited or truncated
+#: receipt can simply lack the key, and `data.get(k)` then returns None down a
+#: path no test reached. Genuine absence was untested on a validator whose entire
+#: contract is failing closed on it. (#59)
+_ABSENT = object()
+
+
 def _write(tmp_path: Path, **overrides: object) -> Path:
-    """Write a valid receipt with ``overrides`` applied; return the repo root."""
+    """Write a valid receipt with ``overrides`` applied; return the repo root.
+
+    An override of :data:`_ABSENT` DELETES the key rather than setting it.
+    """
     payload: dict[str, object] = {
         "sha": _SHA,
         "written_at": "2026-07-28T02:14:09+00:00",
@@ -30,6 +44,9 @@ def _write(tmp_path: Path, **overrides: object) -> Path:
         "blocking": 0,
     }
     payload.update(overrides)
+    for key, value in overrides.items():
+        if value is _ABSENT:
+            del payload[key]
     path = review.receipt_path(tmp_path, _SHA)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -131,9 +148,29 @@ def test_blocking_findings_fail(tmp_path: Path) -> None:
 
 
 def test_missing_blocking_count_fails_closed(tmp_path: Path) -> None:
-    """An absent or non-integer blocking count is ambiguity, not consent."""
+    """A NON-INTEGER blocking count is ambiguity, not consent."""
     ok, _ = review.receipt_state(_write(tmp_path, blocking="none"), _SHA)
     assert not ok
+
+
+@pytest.mark.parametrize("field", ["blocking", "fixed_point", "fixed_point_sha", "sha"])
+def test_a_genuinely_absent_field_fails_closed(tmp_path: Path, field: str) -> None:
+    """A key that is DELETED, not merely falsy, must still refuse.
+
+    Every test named "missing <field>" replaced the value instead of removing
+    the key, so `data.get(k)` returning None was never exercised on a validator
+    whose whole contract is failing closed on unreadable input. The two states
+    are genuinely different and both reachable: `write_receipt` is a non-atomic
+    `write_text`, and a hand-edited receipt is exactly the reader
+    `_check_blocking`'s negative-count guard already exists for. (#59)
+
+    Parametrized across all four gating fields rather than the one that
+    prompted it — the defect is the fixture's inability to express absence, so
+    fixing it for one field and not the rest would leave the same gap.
+    """
+    ok, summary = review.receipt_state(_write(tmp_path, **{field: _ABSENT}), _SHA)
+    assert not ok
+    assert summary
 
 
 def test_no_lane_ran_fails(tmp_path: Path) -> None:
@@ -554,11 +591,34 @@ def test_empty_report_does_not_count_as_evidence(tmp_path: Path) -> None:
     assert "spec" in summary
 
 
+def test_an_undecodable_report_does_not_count_as_evidence(tmp_path: Path) -> None:
+    """Unreadable evidence is not evidence — the same answer `_load_receipt` gives.
+
+    `_missing_reports` read each report with `errors="replace"`, so a truncated
+    or partly-binary file decoded into U+FFFD replacement characters, survived
+    `.strip()`, and counted as proof that a lane ran. Three functions away,
+    `_load_receipt` refuses undecodable receipt bytes outright — one module
+    holding two answers to "what is readable", with the permissive one guarding
+    the *evidence* and the strict one guarding the *claim*. (#58)
+
+    The bytes below are a lone UTF-8 continuation byte: valid on disk, and
+    `bytes.decode("utf-8")` raises on them. Written with `write_bytes` because
+    there is no way to produce this through `write_text`.
+    """
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "cold").write_bytes(b"\xff\xfe findings \x80\x81")
+    ok, summary = review.receipt_state(root, _SHA)
+    assert not ok
+    assert "cold" in summary
+
+
 def test_no_findings_report_is_valid_evidence(tmp_path: Path) -> None:
     """CONTROL ARM: a lane that ran and found nothing must still pass.
 
     Without this arm the evidence check would quietly require every lane to
-    produce findings, which would reward inventing them.
+    produce findings, which would reward inventing them. It is also the arm that
+    proves the strict decoding above rejects UNDECODABLE bytes rather than
+    merely rejecting anything it was handed.
     """
     root = _write(tmp_path)
     review.report_path(root, _SHA, "standards").write_text("NO FINDINGS", encoding="utf-8")
@@ -566,8 +626,30 @@ def test_no_findings_report_is_valid_evidence(tmp_path: Path) -> None:
     assert ok
 
 
-def test_missing_fixed_point_is_rejected(tmp_path: Path) -> None:
-    """A receipt with no base says a review happened, but not of what."""
+def test_a_non_ascii_report_is_still_valid_evidence(tmp_path: Path) -> None:
+    """CONTROL ARM 2: strict decoding must not reject an ordinary UTF-8 report.
+
+    A lane quoting a filename with an accent, an em-dash, or a CJK identifier
+    writes perfectly valid UTF-8. Without this arm, "reject undecodable" and
+    "reject non-ASCII" would be indistinguishable, and the fix for #58 would
+    silently start refusing honest reports.
+    """
+    root = _write(tmp_path)
+    review.report_path(root, _SHA, "cold").write_text(
+        "NO FINDINGS — checked `café/日本語.py`", encoding="utf-8"
+    )
+    ok, _ = review.receipt_state(root, _SHA)
+    assert ok
+
+
+def test_blank_fixed_point_is_rejected(tmp_path: Path) -> None:
+    """A receipt with a BLANK base says a review happened, but not of what.
+
+    Renamed from `test_missing_fixed_point_is_rejected`: it passes `"  "`, which
+    is present-but-blank, not missing. Genuine absence is covered by
+    `test_a_genuinely_absent_field_fails_closed`, and naming this one "missing"
+    is what disguised the gap for four rounds. (#59)
+    """
     ok, summary = review.receipt_state(_write(tmp_path, fixed_point="  "), _SHA)
     assert not ok
     assert "fixed point" in summary

@@ -257,10 +257,23 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
     # `_opt` returns its default when a flag is LAST with no value, so a dangling
     # `--fixed-point` silently reviewed against `main` while the command line said
     # otherwise. A stated flag with no value is a typo, not a default.
-    if "--fixed-point" in rest and _opt(rest, "--fixed-point") is None:
+    #
+    # The test is on the VALUE, not on `is None`. `_opt` returns `""` — not None —
+    # for an explicitly empty `--fixed-point ""`, so the `is None` form let one
+    # token slip past the guard and `or "main"` then substituted silently: the
+    # receipt recorded a base the command line never stated. Same class as the
+    # repeated-flag hole, and the third time this field has been the one that
+    # drifts. `.strip()` closes the whitespace-only spelling in the same move,
+    # because `git merge-base -- " " HEAD` is a refusal, not a base. (#55)
+    if "--fixed-point" in rest and not (_opt(rest, "--fixed-point") or "").strip():
         print("review-receipt: --fixed-point needs a value", file=sys.stderr)
         return 2
-    fixed_point = _opt(rest, "--fixed-point") or "main"
+    # Defaults to the SAME ref `ship`/`land` gate against (`review.DEFAULT_BASE_REF`
+    # — `origin/main`), not a second spelling of it. The default was the literal
+    # `"main"` while the gate resolved local `main` too, so they agreed by
+    # coincidence; pointing only the gate at `origin/main` would have made the
+    # writer record one base and the reader demand another. (#54)
+    fixed_point = _opt(rest, "--fixed-point") or review.DEFAULT_BASE_REF
     receipt = review.Receipt(
         sha=sha,
         fixed_point=fixed_point,

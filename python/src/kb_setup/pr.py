@@ -17,13 +17,19 @@ What it does keep is the part that carries the safety:
 * the push is pinned to the SHA the receipt was validated against
   (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
   unreviewed commit onto the remote;
-* ``land`` re-reads the checks and pins the merge to the head SHA it verified
+* ``land`` gives the checks a BOUNDED chance to reach a terminal state before
+  reading them (:func:`await_terminal` — `gh pr checks --watch` has no timeout of
+  its own), then refuses a PR head with no `kb-review` receipt covering the WHOLE
+  branch, and pins the merge to the head SHA it verified
   (``gh pr merge --match-head-commit``), so a commit pushed between the check
   and the merge cannot ride in unverified.
 
 This docstring said "``lint`` + ``test``" and never mentioned the receipt until
 the standards lane pointed out that `mise.toml` and `CLAUDE.md` had both been
-synced while the doc closest to the code had not.
+synced while the doc closest to the code had not. The ``land`` bullet then
+repeated the shape one commit later — it described the check re-read and the
+merge pin while omitting both the terminal wait and the receipt refusal, in the
+very commit that congratulated itself for syncing the ``ship`` half. (#57)
 
 Invoked via the ``kb-ship`` / ``kb-land`` mise tasks — never by hand.
 """
@@ -340,7 +346,7 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
     if current_branch(repo_root) != branch:
         print(f"ship: refusing — branch changed during the gates (was '{branch}')")
         return None
-    ok, summary = review.receipt_state(repo_root, sha, require_base="main")
+    ok, summary = review.receipt_state(repo_root, sha, require_base=review.DEFAULT_BASE_REF)
     if not ok:
         print(f"ship: refusing — HEAD moved since the review ({summary})")
         return None
@@ -358,7 +364,9 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     # the cheap question first rather than after four gate runs.
     from kb_setup import review
 
-    ok, summary = review.receipt_state(repo_root, review.head_sha(repo_root), require_base="main")
+    ok, summary = review.receipt_state(
+        repo_root, review.head_sha(repo_root), require_base=review.DEFAULT_BASE_REF
+    )
     print(f"==> review: {summary}")
     if not ok:
         print("ship: refusing — not pushing an unreviewed commit")
@@ -404,7 +412,20 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
 
 
 def land_main(repo_root: Path, pr_number: int) -> int:
-    """Verify a PR's checks, squash-merge it pinned to that SHA, and sync main."""
+    """Await terminal checks, refuse an unreviewed head, squash-merge pinned, sync main.
+
+    Four steps, and the one-line version named only two. In order: give the
+    checks a BOUNDED chance to reach a terminal state (:func:`await_terminal`);
+    refuse unless every binding check is green; refuse a head with no
+    `kb-review` receipt covering the whole branch (``require_base`` —
+    `origin/main`, per :data:`review.DEFAULT_BASE_REF`); then squash-merge
+    pinned to the SHA that was verified.
+
+    The receipt refusal is the step worth naming here rather than leaving to the
+    body comment: it is what makes `land` a backstop for a PR that reached the
+    remote without going through `ship`, and a summary that omits a gate reads
+    as a gate that does not exist. (#57)
+    """
     # Wait for a TERMINAL state, never for quota. Advisory checks still cannot
     # block the merge — but a verdict that arrives ten seconds later was never
     # read, and reading it is free.
@@ -428,7 +449,7 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     # otherwise the refusal looks like a bug rather than the design.
     from kb_setup import review
 
-    # `require_base="main"` here as well as in `ship`. Without it `land` accepted a
+    # `require_base` here as well as in `ship`. Without it `land` accepted a
     # receipt covering only a SUFFIX of the branch: `--fixed-point HEAD^` produces
     # a perfectly truthful receipt for one commit, and land merged all twelve.
     #
@@ -439,7 +460,7 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     # merged by another"). A backstop that does not cover its own stated case is
     # the kind of untrue claim this module exists to refuse. Found by the cold
     # lane; the standards and spec lanes found the asymmetry and rated it lower.
-    reviewed, detail = review.receipt_state(repo_root, oid, require_base="main")
+    reviewed, detail = review.receipt_state(repo_root, oid, require_base=review.DEFAULT_BASE_REF)
     print(f"==> review: {detail}")
     if not reviewed:
         print(

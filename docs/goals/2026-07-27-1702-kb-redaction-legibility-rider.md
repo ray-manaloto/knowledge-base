@@ -459,15 +459,15 @@ evaluator to run, read, or infer.
 **Which of these the EVALUATOR can enforce.** Only what appears in the GOAL is
 enforceable — the evaluator never reads this rider. The goal carries items 1–4 (the
 ARM/FINDING/HANDBACK sentinels), the four `PASS  gate …` lines, `ship: OK`, and the
-memory/reflect lines. Items 6 and 11 (the `OK eval:` summary and the currency status)
+memory/reflect lines. Items 7 and 12 (the `OK eval:` summary and the currency status)
 live here only, so they bind the AGENT by instruction, not the round by condition.
 That asymmetry is deliberate — the goal has a 4,000-character cap and spending it on
 evidence the gates already imply would crowd out the Preserve list — but it must be
 stated, or a reader assumes everything in this section is a completion requirement.
 
-**Instead of 5–11, the round may satisfy:**
+**Instead of 5–12, the round may satisfy:**
 
-12. A `GOAL-BLOCKED:` line naming the blocker and at least two probes already tried.
+13. A `GOAL-BLOCKED:` line naming the blocker and at least two probes already tried.
 
 **The Arm B floor — two discriminators, not zero.** Arm B ("cause NOT established")
 is a legitimate landing, but without a floor it is satisfiable on turn 1 by simply

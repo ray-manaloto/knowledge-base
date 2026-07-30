@@ -21,8 +21,8 @@ repo proper — never in `.agent/`. Do not create ad-hoc directories in either.
 | `.agent/plans/` | Plans and session handoffs (`session-{date}[-letter].md`) |
 | `.agent/logs/` | Execution logs, pipeline traces |
 | `.agent/brain-audit.md` | The advisory SessionEnd transcript audit |
-| `.agent/kb/review/receipt-<sha>.json` | One `kb-review` receipt, keyed to the exact commit — what `kb-ship` gates on. An ancestor's receipt also covers HEAD when everything committed since is in `review.EXEMPT_PATHS` (`graphify-out/memory/**`, `docs/goals/README.md`), which is what lets a round commit its own `kb-remember`/`kb-goal-outcome` output (#66) |
-| `.agent/kb/review/reports/review-<sha>-<lane>.md` | That review's per-lane reports; the receipt refuses to name a lane that left none |
+| `.agent/kb/review/receipt-<sha>.json` | One `kb-review` receipt, keyed to the exact commit — what **both `kb-ship` and `kb-land`** gate on (`land` is the backstop for a PR that reached the remote without `ship`). An ancestor's receipt also covers HEAD when everything committed since is in `review.EXEMPT_PATHS` (`graphify-out/memory/**`, `docs/goals/README.md`), which is what lets a round commit its own `kb-remember`/`kb-goal-outcome` output (#66) |
+| `.agent/kb/review/reports/review-<sha>-<lane>.md` | That review's per-lane reports; the receipt refuses to name a lane that left none. `<lane>` is the lane with any `:variant` **stripped** — `cold:codex` leaves `…-cold.md` |
 
 `.agent/` is in the real **`.gitignore`**, not a per-clone
 `.git/info/exclude`. That distinction is the reason this rule exists in its
