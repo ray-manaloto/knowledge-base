@@ -207,13 +207,19 @@ def test_land_refuses_a_suffix_only_receipt(monkeypatch, tmp_path):
 
 
 def test_land_accepts_a_full_branch_receipt(monkeypatch, tmp_path):
-    """CONTROL ARM — the same path with a matching base must still merge."""
-    from kb_setup import review
+    """CONTROL ARM — the same path with a matching base must still merge.
 
+    The `monkeypatch.setattr(review, "base_sha", …)` this used to carry was a
+    NO-OP: `_land_handler` already answers `"a" * 40` to `git merge-base`, which
+    is what `_reviewed` records as `fixed_point_sha`. So the line that looked
+    like the arm's variable was setting it to the value it already had, and the
+    contrast with `test_land_refuses_a_suffix_only_receipt` — whose stub really
+    does change it, to `"f" * 40` — was invisible at the call site. Removed, and
+    the source of the matching base named instead. (#59)
+    """
     seen: list[list[str]] = []
-    _reviewed(tmp_path, "deadbeefcafe1234")
-    monkeypatch.setattr(review, "base_sha", lambda *_a, **_kw: "a" * 40)
-    _stub_run(monkeypatch, _land_handler(seen))
+    _reviewed(tmp_path, "deadbeefcafe1234")  # records fixed_point_sha "a" * 40
+    _stub_run(monkeypatch, _land_handler(seen))  # answers merge-base "a" * 40 — they MATCH
 
     assert pr.land_main(tmp_path, 42) == 0
     assert any(c[:3] == ["gh", "pr", "merge"] for c in seen)
@@ -281,10 +287,31 @@ def test_ship_refuses_dirty_tree(monkeypatch, tmp_path):
     assert pr.ship_main(tmp_path) == 1
 
 
+#: The branch name and the commit at its tip, kept DISTINCT on purpose.
+#:
+#: `_clean_branch_handler` used to answer `"feat/x"` to every `git rev-parse`,
+#: so `head_sha()` (`rev-parse HEAD`) and `current_branch()`
+#: (`rev-parse --abbrev-ref HEAD`) returned the same string. That made
+#: `test_ship_pushes_the_validated_sha_not_the_branch_name` unable to tell the
+#: two apart: the refspec it asserts, `feat/x:refs/heads/feat/x`, is what BOTH
+#: the correct code and the regression it names would produce. The test's own
+#: docstring says it guards against pushing the branch name, and it could not
+#: have noticed. (#59)
+_BRANCH = "feat/x"
+_HEAD = "c" * 40
+
+
 def _clean_branch_handler(cmd: list[str]) -> _Proc:
-    """A clean feature branch with an existing PR — the happy path for ship."""
+    """A clean feature branch with an existing PR — the happy path for ship.
+
+    The two `rev-parse` forms answer DIFFERENTLY — see :data:`_HEAD`. Order
+    matters: `--abbrev-ref` must be matched before the bare form, or the bare
+    prefix swallows it and both collapse back to one answer.
+    """
+    if cmd[:4] == ["git", "rev-parse", "--abbrev-ref", "HEAD"]:
+        return _Proc(0, _BRANCH)
     if cmd[:2] == ["git", "rev-parse"]:
-        return _Proc(0, "feat/x")
+        return _Proc(0, _HEAD)
     if cmd[:2] == ["git", "status"]:
         return _Proc(0, "")
     if cmd[:3] == ["gh", "pr", "view"]:
@@ -294,7 +321,7 @@ def _clean_branch_handler(cmd: list[str]) -> _Proc:
     return _Proc(0, "")
 
 
-def _write_valid_receipt(tmp_path, sha: str = "feat/x") -> None:
+def _write_valid_receipt(tmp_path, sha: str = _HEAD) -> None:
     """Write a PASSING receipt, plus the reports it must be backed by.
 
     ``sha`` defaults to what the stubbed `git rev-parse HEAD` returns.
@@ -351,15 +378,31 @@ def test_ship_accepts_clean_feature_branch(monkeypatch, tmp_path):
 
 
 def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
-    """A receipt that EXISTS but records blocking findings must still refuse."""
+    """A receipt that EXISTS but records blocking findings must still refuse.
+
+    **Every other reason to refuse is removed first**, which is the whole
+    difference between this and the version that shipped: it wrote a receipt
+    claiming four lanes and no report files at all, so `_missing_reports`
+    refused it before `_check_blocking` was ever consulted. Deleting the
+    blocking check outright would have left the test green — a probe passing for
+    a reason other than the one it names. (#59)
+
+    So the reports exist, the base matches, and `blocking=1` is the ONLY
+    remaining defect. `test_ship_accepts_clean_feature_branch` is the control
+    arm: identical path, `blocking=0`, must return 0.
+    """
     from kb_setup import review
 
+    for lane in ("standards", "spec", "cold", "silent-failure"):
+        rp = review.report_path(tmp_path, _HEAD, lane)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text("one blocking finding", encoding="utf-8")
     review.write_receipt(
         tmp_path,
         review.Receipt(
-            sha="feat/x",
+            sha=_HEAD,
             fixed_point="main",
-            fixed_point_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            fixed_point_sha="a" * 40,
             lanes_ran=("standards", "spec", "cold:codex", "silent-failure"),
             lanes_skipped=(),
             findings=4,
@@ -430,10 +473,15 @@ def test_ship_pushes_the_validated_sha_not_the_branch_name(monkeypatch, tmp_path
     assert len(pushes) == 1
     # Spelled out literally rather than rebuilt from the code under test: a
     # fixture built by the function it checks inherits that function's bugs.
-    assert pushes[0] == ["git", "push", "origin", "feat/x:refs/heads/feat/x"]
-    assert "feat/x" in pushes[0][3], "the branch name alone would re-resolve at push time"
+    assert pushes[0] == ["git", "push", "origin", f"{_HEAD}:refs/heads/{_BRANCH}"]
+    # The SOURCE half must be the commit, not the branch name. This is the
+    # assertion the test was missing: while the stub answered "feat/x" to every
+    # `rev-parse`, the expected refspec was `feat/x:refs/heads/feat/x` — which
+    # the named regression produces too, so the probe could only ever pass.
+    assert pushes[0][3].startswith(f"{_HEAD}:"), "must push the validated SHA, not the branch"
+    assert not pushes[0][3].startswith(f"{_BRANCH}:"), "a branch name re-resolves at push time"
     # `-u` cannot set tracking from a raw-SHA refspec, so it is set separately.
-    assert ["git", "branch", "--set-upstream-to", "origin/feat/x", "feat/x"] in seen
+    assert ["git", "branch", "--set-upstream-to", f"origin/{_BRANCH}", _BRANCH] in seen
 
 
 def test_ship_refuses_on_detached_head(monkeypatch, tmp_path):
@@ -669,15 +717,25 @@ def test_land_waits_for_a_terminal_state_before_reading_checks(monkeypatch, tmp_
     _reviewed(tmp_path, "deadbeefcafe1234")
     _stub_run(monkeypatch, _land_handler(seen))
     assert pr.land_main(tmp_path, 42) == 0
-    watched = [c for c in seen if c[:3] == ["gh", "pr", "checks"] and "--watch" in c]
-    assert watched, "land must give the checks a bounded chance to settle"
+
+    # ORDERING, not mere presence. The test asserted only that a `--watch` call
+    # existed somewhere in `seen`, so it would have stayed green with the wait
+    # moved AFTER the read — which is precisely the regression its name forbids
+    # and the only one that matters, since a verdict read before the checks
+    # settle is a verdict about nothing. (#59)
+    watch_at = [i for i, c in enumerate(seen) if c[:3] == ["gh", "pr", "checks"] and "--watch" in c]
+    read_at = [i for i, c in enumerate(seen) if c[:3] == ["gh", "pr", "checks"] and "--json" in c]
+    assert watch_at, "land must give the checks a bounded chance to settle"
+    assert read_at, "land must then read the settled state"
+    assert watch_at[0] < read_at[0], "the watch must precede the read, not follow it"
 
 
 def test_await_terminal_expiry_proceeds_rather_than_refusing(monkeypatch):
     """Past the bound the remaining delay is a rate limit, not a review.
 
-    This is the half of the spec that matters: waiting on quota is the thing
-    that blocked a doc-only PR, so expiry must be a note and never a refusal.
+    Unit-level: `await_terminal` itself must return a NOTE on timeout, never
+    raise. `test_land_still_merges_when_the_watch_times_out` is the half that
+    drives the same timeout through `land_main`.
     """
 
     def boom(*_a: object, **_kw: object) -> None:
@@ -687,6 +745,43 @@ def test_await_terminal_expiry_proceeds_rather_than_refusing(monkeypatch):
     note = pr.await_terminal(7, timeout=180)
     assert "quota" in note
     assert "proceeding" in note
+
+
+def test_land_still_merges_when_the_watch_times_out(monkeypatch, tmp_path):
+    """Expiry must not block the merge — asserted THROUGH `land_main`.
+
+    The test above proves `await_terminal` returns a note rather than raising,
+    which is a claim about one function. The claim that actually matters is
+    `land`'s: "expiry is a note and never a refusal". Nothing drove a timeout
+    through `land_main`, so a *caller* that treated the note as a failure would
+    have gone unnoticed by a suite green on both. (#59)
+
+    **What this is armed against, stated precisely.** It does NOT catch the
+    deletion of `await_terminal`'s `except subprocess.TimeoutExpired` arm —
+    measured, and the reason is worth keeping: `TimeoutExpired` subclasses
+    `SubprocessError`, so the generic arm below it catches the same exception and
+    also returns a note, and `land` proceeds either way. Two arms reaching one
+    outcome is not a gap here, it is the safety net working.
+
+    It IS armed against the regression it exists for: adding a refusal on a
+    non-terminal note. Probed — inserting `if "reached a terminal state" not in
+    note: return 1` into `land_main` turns this red and leaves the unit test
+    above green, which is exactly the split that made it worth writing. Waiting
+    on quota is what blocked a doc-only PR in the first place.
+    """
+    seen: list[list[str]] = []
+    _reviewed(tmp_path, "deadbeefcafe1234")
+    inner = _land_handler(seen)
+
+    def handler(cmd: list[str]) -> _Proc:
+        if cmd[:3] == ["gh", "pr", "checks"] and "--watch" in cmd:
+            seen.append(cmd)
+            raise subprocess.TimeoutExpired(cmd="gh", timeout=1)
+        return inner(cmd)
+
+    _stub_run(monkeypatch, handler)
+    assert pr.land_main(tmp_path, 42) == 0, "a timed-out watch must not refuse the merge"
+    assert any(c[:3] == ["gh", "pr", "merge"] for c in seen), "the merge must still happen"
 
 
 def test_land_refuses_an_unreviewed_pr_head(monkeypatch, tmp_path):

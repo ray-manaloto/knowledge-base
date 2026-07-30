@@ -217,10 +217,22 @@ def test_blocking_findings_refuse_the_receipt(repo: Path) -> None:
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "1") == 2
 
 
-def test_unreadable_head_refuses(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """No HEAD, no receipt — `head_sha` returns "" when git cannot be read."""
+def test_unreadable_head_refuses(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No HEAD, no receipt — `head_sha` returns "" when git cannot be read.
+
+    The reports are written and the MESSAGE is asserted, neither of which the
+    original did. Without the reports the command exits 2 from the
+    missing-evidence gate whether or not HEAD is readable, so deleting the
+    `if not sha` guard left this green; and with them, `report_path(root, "", …)`
+    would still miss, so the exit code alone cannot name the cause either way.
+    Pinning the wording is what makes this a test of the HEAD guard. (#59)
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
     monkeypatch.setattr(review, "head_sha", lambda _root: "")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 2
+    assert "could not read HEAD" in capsys.readouterr().err
 
 
 def test_documented_report_filename_is_the_one_the_gate_reads(repo: Path) -> None:
