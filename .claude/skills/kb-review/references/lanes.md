@@ -1,18 +1,24 @@
-# The lanes: the two this skill owns, the fallback, and the receipt
+# The lane: the one this skill runs, the fallback, and the receipt
 
-## Standards and Spec — NOT here
+## Standards, Spec and Silent-failures — NOT RUN (since 2026-07-29)
 
-Both axes belong to `mattpocock-skills:code-review`. Its prompts, its Fowler
-baseline, and its no-reranking rule are the spine's, and duplicating them here
-is what `use-tool-builtins.md` forbids — an earlier draft did exactly that.
+The review is **one lane**. These three are stood down by policy and recorded in
+the receipt as `by-policy-one-lane` (see below). They are described here only so a
+future reader knows what was given up and where to find it again:
 
-This skill supplies only the two sources the spine cannot find in this repo
-(SKILL.md step 3) and `references/repo-smells.md` as additions to its baseline.
-Everything below is the part the spine does not have.
+- **Standards** and **Spec** were two axes of `mattpocock-skills:code-review`,
+  handed this repo's two sources: the project rule files plus `CLAUDE.md` for
+  standards, and the `docs/goals/` pair or newest session plan for spec. The
+  spine still exists and can be invoked directly if a human wants those axes on
+  a given diff.
+- **Silent failures** was `pr-review-toolkit:silent-failure-hunter`.
+
+Reviving any of them is a human decision on a specific diff, not something this
+skill chooses per-diff any more — that table was the thing removed.
 
 ## Cold — a lane from a DIFFERENT family than the implementer
 
-Which lane that is depends on who wrote the diff; **SKILL.md step 5 owns the
+Which lane that is depends on who wrote the diff; **SKILL.md step 2 owns the
 routing table and this file defers to it.** Claude-authored (the usual case) →
 `fable-orchestrator:codex-reviewer`; codex-authored — which this project's
 Claude config makes the default for orchestrator-driven work — →
@@ -27,10 +33,22 @@ reference file had not.
 **By ref, and cold.** Hand it the range and nothing else:
 
 ```text
-Review <FIXED>...HEAD in this repository. Read the diff yourself.
+Review <FIXED>...HEAD in this repository. Read the diff yourself, using this
+exact scope — it excludes one tracked prose directory that is not code under
+review:
+
+    git diff <FIXED>...HEAD -- . ':(exclude)docs/research/**'
+
 Return a findings list: severity, a one-line claim, and file:line for each.
-Cite every claim or label it unverified.
+Cite every claim or label it unverified. Report NO FINDINGS explicitly if you
+find nothing, rather than inventing something.
 ```
+
+**The scope is IN the template, not just in SKILL.md.** It was described in the
+skill and missing from this prompt, so following this file verbatim reintroduced
+the 56%-prose context cost the exclusion exists to remove — the same
+skill-corrected/reference-not-corrected split as the `codex-reviewer` paragraph
+directly above. Found by the cold lane, on the change that added the exclusion.
 
 Do **not** tell it what the change was for. That is the point of the lane — a
 reviewer given the design intent confirms the happy path, which is the failure
@@ -56,14 +74,11 @@ per-user, so "installed" is not "authenticated". The plugin agents return a
 structured error rather than substituting themselves; treat that error as
 "advance the chain", not as "no findings".
 
-## Silent failures — `pr-review-toolkit:silent-failure-hunter`
+### Two shapes in this repo that are DELIBERATE
 
-Give it the same range. It looks for swallowed exceptions, bare `except`,
-fallbacks that mask a real error, and error paths that log-and-continue where
-they should fail.
-
-Two things in this repo are **deliberate** and must not be reported as findings
-— check the reasoning is intact rather than flagging the shape:
+Carried over from the retired silent-failure lane, because the cold lane reads the
+same code and will meet them. Check the reasoning is intact rather than flagging
+the shape:
 
 - `kb_setup.hook_guard` **fails open on its own errors.** A crashed PreToolUse
   guard must not brick every Bash call. That is a documented trade, not a
@@ -76,6 +91,11 @@ They point opposite directions on purpose. A lens that flags either one has
 found the shape and missed the reasoning; a lens that finds one of them
 *inverted* has found a real defect.
 
+`zero-skip-policy.md` is why a suppressed error used to get its own lens. With one
+lane, that concern rides along in the cold review instead — a real reduction in
+coverage, recorded in SKILL.md's "what this does not claim" rather than smoothed
+over.
+
 ## The receipt
 
 `.agent/kb/review/receipt-<sha>.json`, written by
@@ -87,16 +107,27 @@ found the shape and missed the reasoning; a lens that finds one of them
   "written_at": "2026-07-28T02:14:09+00:00",
   "fixed_point": "main",
   "fixed_point_sha": "9698879...",
-  "lanes_ran": ["standards", "spec", "cold:codex", "silent-failure"],
-  "lanes_skipped": [],
+  "lanes_ran": ["cold:codex"],
+  "lanes_skipped": [
+    "standards:by-policy-one-lane",
+    "spec:by-policy-one-lane",
+    "silent-failure:by-policy-one-lane"
+  ],
   "findings": 3,
   "blocking": 0
 }
 ```
 
-`lanes_skipped` entries carry their reason — `cold:not-applicable-docs-only`,
+`lanes_skipped` entries carry their reason — `standards:by-policy-one-lane`,
 `spec:no-spec-available`. **A skip with no reason is not a skip, it is a gap**,
 and `kb-ship` rejects a receipt containing one.
+
+`cold:not-applicable-docs-only` was the third example here and **no longer names a
+reachable state.** Under one-lane-always (`SKILL.md`), a docs-only branch either has
+a non-empty scoped diff — in which case cold runs — or an empty one, in which case
+there is no receipt at all rather than a per-lane skip. It survived the very commit
+that made it unreachable, one line above a table stating `cold` can never be
+excused. (Cold lane, round 2.)
 
 `cold:claude-fallback-SAME-FAMILY` was listed here as a third example and is
 **not a skip at all** — it belongs in `lanes_ran`, because that lane *ran*, just
@@ -139,10 +170,27 @@ coverage having run nothing, which is the widest form of a hole whose narrower
 forms had already been closed twice. It raises the bar rather than proving
 anything — a stub file still passes — but the honest path is now the easy one.
 
-**Only two skip reasons excuse a lane, and one of them is lane-scoped**:
-`not-applicable-<why>` excuses any lane; `no-spec-available` excuses **the spec
-lane only**. `not-yet-run` is a **gap** and is rejected, which is what the
-paragraph above already said and the first version of the gate did not enforce.
+**Three skip reasons excuse a lane, and two of them are lane-scoped**:
+
+| Reason | Excuses | Asserts |
+|---|---|---|
+| `not-applicable-<why>` | any lane | a JUDGEMENT — the lane read this diff and had nothing to say |
+| `no-spec-available` | the **spec** lane only | there is no spec to review against |
+| `by-policy-one-lane` | **standards**, **spec**, **silent-failure** — never `cold` | a POLICY — the skill deliberately runs one lane |
+
+`not-yet-run` is a **gap** and is rejected, which is what the paragraph above
+already said and the first version of the gate did not enforce.
+
+`by-policy-one-lane` exists because the review became single-lane (2026-07-29)
+and `LANES` is still closed, so the three stood-down lanes need a reason that is
+TRUE. Reusing `not-applicable-` would have been the easy move and the wrong one:
+it asserts a judgement nobody made, which is the gap-wearing-a-reason's-clothes
+shape this file records three times below. **`cold` is deliberately excluded** —
+the one-lane policy *is* "run cold", so `cold:by-policy-one-lane` cites the policy
+to skip the lane the policy exists to run. It is scoped in `_SKIP_BY_LANE` rather
+than added as a lane-blind prefix for exactly that reason; a prefix would have
+accepted it, and the `records no lane that actually ran` backstop only fires when
+ALL four lanes are skipped.
 
 The scoping is the THIRD instance of one hole. The reason was matched without
 ever checking which lane it was attached to, so `cold:no-spec-available` bought a
@@ -153,7 +201,10 @@ now three for three on this gate — a reviewer that keeps finding the same *sha
 is telling you the shape is the defect, not the instances.
 
 **The lane set is CLOSED** (`kb_setup.review.LANES`), and all four must be
-accounted for — each either ran or was skipped with a reason. Both halves of
+accounted for — each either ran or was skipped with a reason. It stays four
+entries even though the skill now runs one: changing `LANES` to `("cold",)` would
+touch 63 references across 11 files including the eval harness, so the
+"simplification" would be larger than the thing it simplifies. Both halves of
 that matter, and the first draft had neither: the gate only checked that
 `lanes_ran` was non-empty, so `--lanes placeholder --blocking 0` satisfied it,
 and `--lanes standards` quietly bought a pass for three lanes that never ran.
@@ -214,6 +265,9 @@ commit what it wrote; three rounds running had left those artifacts uncommitted.
 
 The exemption removes the only lane read those paths get, which is what makes
 **scanner** coverage of them load-bearing: `.gitleaks.toml` and `hk.pkl`'s
-`proseExclude` both deliberately keep them visible to gitleaks, and
-`tests/test_gitleaks_scope.py` pins that. Do not widen `EXEMPT_PATHS` to a path
-the scanner cannot see.
+`proseExclude` both deliberately keep them visible to gitleaks. **Two tests pin
+it, one per half** — `tests/test_gitleaks_scope.py` for the `.gitleaks.toml`
+allowlist, and `tests/test_hk_scanner_scope.py` (added with #73) for the hk half,
+asserted against the **evaluated** pkl config rather than the source text, so a
+`proseExclude` that stops applying cannot pass by still being written down. Do
+not widen `EXEMPT_PATHS` to a path the scanner cannot see.

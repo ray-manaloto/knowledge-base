@@ -64,6 +64,7 @@ _BANG_RE = re.compile(r"^\s*\w+(\([^)]*\))?!\s*:", re.MULTILINE)
 # and prose like "you can now" by substring.
 _FEATURE_PHRASES = (
     "you can now",
+    "can now",
     "now supports",
     "now support",
     "new option",
@@ -74,10 +75,57 @@ _FEATURE_PHRASES = (
     "added support",
     "introduces",
     "introduce ",
+    "graduates from experimental",
+    "no longer requires",
 )
 # Conventional-commits `feat:` / `feat(scope):` at the start of a line.
 _FEAT_RE = re.compile(r"^\s*[-*]?\s*feat(\([^)]*\))?\s*:", re.IGNORECASE | re.MULTILINE)
 _MAX_FEATURE_LINES = 12
+
+# A markdown section heading, at any depth (`## Added`, `### New features`).
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*?)\s*#*\s*$")
+# A heading naming a RELEASE rather than a content section — `## v0.9.27`,
+# `## 2026.7.16`, `## v1.0.0 — title`, `## 1.2.3 (2026-01-01)`. Matched against the
+# NORMALISED heading, and requiring two numeric components so prose like
+# `## 2 breaking changes` cannot pass.
+#
+# This boundary is what makes the format check per-release: without it, one
+# release's recognised sections certified an entire multi-version jump.
+_VERSION_TOKEN_RE = re.compile(r"^v?\d+\.\d+[\w.+]*")
+# Keep-a-Changelog / GitHub-generated-notes section names whose bullets ARE
+# features by construction. This is the detector's primary signal, and it exists
+# because the phrase/`feat:` heuristics alone matched NOTHING on any real corpus
+# this repo tracks: mise v2026.7.16 ships nine `## Added` bullets and scored 0,
+# as did graphify 0.9.27-0.9.30 and claude-code 2.1.220 (control-armed
+# 2026-07-29 — the same patterns DO fire on a synthetic `feat:` fixture, so the
+# zero was the detector's shape, not an absence of features). The unit tests
+# passed throughout, because every fixture was written in the one format the
+# detector already understood.
+_FEATURE_SECTIONS = frozenset(
+    {"added", "features", "new features", "highlights", "new", "what's new"}
+)
+# Sections whose bullets are explicitly NOT new capabilities. Named rather than
+# inferred so that recognising a body's FORMAT is separable from finding features
+# in it — a fixes-only changelog is a confident zero, which is a different answer
+# from "this body has no structure I understand". `new contributors` is here
+# because it would otherwise prefix-match `new`.
+_NON_FEATURE_SECTIONS = frozenset(
+    {
+        "fixed",
+        "fixes",
+        "bug fixes",
+        "changed",
+        "removed",
+        "deprecated",
+        "security",
+        "documentation",
+        "docs",
+        "registry",
+        "new contributors",
+        "chore",
+        "internal",
+    }
+)
 
 # Markdown emphasis and the hyphen/underscore variants are decoration, not
 # meaning. Collapsing them lets ONE marker cover every spelling.
@@ -131,6 +179,125 @@ class Version:
         return self.parts + (0,) * (width - len(self.parts))
 
 
+def same_release(left: str, right: str) -> bool:
+    """Do these two strings name the SAME release, decoration and padding aside?
+
+    `v2.1.220` and `2.1.220` are one release; so are `1.2` and `1.2.0`. Raw `==`
+    says otherwise on both, which is the bug: `probe()` fetched release notes for a
+    "new" release we were already running, and `decide()` then ran the tag/marker/
+    local gates against them and could surface a spurious "Adopt it?" about it.
+    `_gate_patch` and `_has_upgrade` had already been moved onto parsed `Version`
+    comparison for exactly this reason; these two call sites were left behind.
+    (Cold lane, round 2.)
+
+    NOT `Version.__eq__` — `Version` is a frozen dataclass carrying `raw`, so its
+    generated equality compares the decoration this function exists to ignore.
+    Unparsable on either side falls back to string equality: nothing better is
+    available, and every caller already treats an unparsable version as an
+    ambiguity a human must settle.
+    """
+    a, b = Version.parse(left), Version.parse(right)
+    if a is None or b is None:
+        return left == right
+    return not (a > b or b > a)
+
+
+def _is_version_heading(heading: str) -> bool:
+    r"""Is this NORMALISED heading naming a release, rather than prose about one?
+
+    `## v0.9.27`, `## 2026.7.16`, `## v1.0.0 — title`, `## 1.2.3 (2026-01-01)` and
+    the Keep-a-Changelog `## 1.0.0 - 2026-01-01` are releases. `## 2 breaking
+    changes` is not (the token needs two numeric components), and neither is
+    `## 2.0 migration guide`.
+
+    That last case is the round-2 fix. The predecessor was a lone
+    `re.match(r"^v?\d+\.\d+", …)` — anchored only on the LEFT, so it asked the
+    heading to *start* with a version and never asked what came after. A prose
+    section headed `## 2.0 migration guide` therefore opened a new release span,
+    splitting one release in two and letting the per-release `all(...)` mark a
+    fully-readable release partially unrecognised.
+
+    Deliberately a function rather than one cleverer regex: every right-anchored
+    pattern tried here matched `0.9.30 hotfix` through BACKTRACKING (`\d+\.\d+`
+    settling for `0.9`, leaving `.` to satisfy the punctuation branch), so the
+    regex answered a different question than the one it appeared to ask. Splitting
+    "read the version token" from "judge what follows it" removes the ambiguity.
+
+    The accepted cost: a real heading with a bare one-word title (`## 0.9.30
+    hotfix`, or `## v1.0.0-rc1` once `_normalize` has turned the hyphen into a
+    space) reads as prose and merges into the previous release. Both directions
+    are wrong somewhere; this one degrades to the coarser pre-round-1 grouping
+    rather than to a false "could not tell", and GitHub's tag-only headings plus
+    Keep-a-Changelog's dated form — the two shapes this repo actually meets — are
+    both still recognised. (Cold lane, round 2.)
+    """
+    token = _VERSION_TOKEN_RE.match(heading)
+    if token is None:
+        return False
+    rest = heading[token.end() :].strip()
+    return not rest or not rest[0].isalpha()
+
+
+def _release_spans(notes: str) -> list[list[str]]:
+    """Split concatenated release notes into one line-list per release.
+
+    A version heading is a RELEASE BOUNDARY rather than a content section, so it
+    also stops the previous release's `## Added` from leaking onto the next
+    release's bullets. The leading span (the preamble before the first version
+    heading) is returned too, and is usually empty.
+    """
+    spans: list[list[str]] = []
+    current: list[str] = []
+    for raw in notes.splitlines():
+        heading = _HEADING_RE.match(raw)
+        if heading and _is_version_heading(_normalize(heading.group(1)).rstrip(":.")):
+            spans.append(current)
+            current = []
+            continue
+        current.append(raw)
+    spans.append(current)
+    return spans
+
+
+def _scan_release(lines: list[str], already: int) -> tuple[list[str], int, bool, bool]:
+    """Scan ONE release: `(highlights, dropped, recognised, had_content)`.
+
+    `already` is how many highlights the caller has collected across earlier
+    releases, so the display cap applies to the whole span rather than resetting
+    per release — a four-release jump must not quietly return 4x the cap.
+    """
+    highlights: list[str] = []
+    dropped = 0
+    section = ""
+    recognised = False
+    had_content = False
+    for raw in lines:
+        heading = _HEADING_RE.match(raw)
+        if heading:
+            section = _normalize(heading.group(1)).rstrip(":.")
+            had_content = True
+            if section in _FEATURE_SECTIONS or section in _NON_FEATURE_SECTIONS:
+                recognised = True
+            continue
+        line = raw.strip().lstrip("-*").strip()
+        if not line:
+            continue
+        had_content = True
+        phrased = any(p in line.lower() for p in _FEATURE_PHRASES)
+        is_feat = bool(_FEAT_RE.match(raw))
+        if is_feat or phrased:
+            recognised = True
+        if section in _NON_FEATURE_SECTIONS:
+            continue
+        bulleted_feature = raw.strip().startswith(("-", "*")) and section in _FEATURE_SECTIONS
+        if bulleted_feature or is_feat or phrased:
+            if already + len(highlights) >= _MAX_FEATURE_LINES:
+                dropped += 1
+                continue
+            highlights.append(line)
+    return highlights, dropped, recognised, had_content
+
+
 @dataclass(frozen=True)
 class UpstreamStatus:
     """What upstream currently offers, and whether we could read it at all.
@@ -176,6 +343,42 @@ class UpstreamStatus:
             found.append("conventional-commits `!`")
         return tuple(found)
 
+    def _scan_features(self) -> tuple[tuple[str, ...], int, bool]:
+        """Walk the notes: `(highlights, dropped, format_recognised)`.
+
+        Section state is what makes this reliable. A bullet under `## Added` is a
+        feature because of WHERE it sits, which needs no phrase to match — and
+        phrases are suppressed under a known non-feature section so a fix reading
+        "no longer requires X" does not arrive labelled as a capability.
+
+        `format_recognised` exists so an empty result stays TWO answers rather
+        than one: a fixes-only changelog is a confident "no features", while a
+        body whose structure we do not understand is "could not tell". Collapsing
+        those is the same absence-of-evidence trap `UpstreamStatus`'s three-state
+        docstring above already avoids for reachability.
+
+        It is computed PER RELEASE. `probe()` concatenates the notes of every
+        release in a multi-patch jump (graphify 0.9.26 -> 0.9.30 arrives as four
+        bodies in one string), so one flag over the whole string let a single
+        `## Added` certify the entire span: a later release written in a style this
+        scan does not understand, with real features in it, was reported as a
+        confident zero. Recognised means EVERY release carrying content was
+        recognised. (Cold lane.)
+        """
+        highlights: list[str] = []
+        dropped = 0
+        per_release: list[bool] = []
+        for lines in _release_spans(self.notes):
+            found, cut, recognised, had_content = _scan_release(lines, len(highlights))
+            highlights.extend(found)
+            dropped += cut
+            # Spans with nothing in them are not evidence either way. The preamble
+            # before the first version heading is one, and counting it would make
+            # every sectioned changelog unrecognised.
+            if had_content:
+                per_release.append(recognised)
+        return tuple(highlights), dropped, bool(per_release) and all(per_release)
+
     @property
     def feature_highlights(self) -> tuple[str, ...]:
         """Note lines announcing a NEW capability worth a look — step 3's other half.
@@ -183,21 +386,36 @@ class UpstreamStatus:
         Purely advisory: these never gate a bump (that is `markers`' job). They
         exist so "should we adopt this?" reaches the human even on a clean bump
         that no breaking marker stopped — the release-note review Ray asked for.
-        A line qualifies via a `feat:` prefix or an adoption phrase; the raw line
-        is returned (trimmed of list bullets) so the reader sees the real wording,
-        capped so a huge changelog does not flood the interview.
+        A line qualifies by sitting under a feature section, by a `feat:` prefix,
+        or by an adoption phrase; the raw line is returned (trimmed of list
+        bullets) so the reader sees the real wording, capped so a huge changelog
+        does not flood the interview. When the cap bites, `features_dropped` says
+        by how much — a silent truncation would read as "that was all of them".
         """
-        highlights: list[str] = []
-        for raw in self.notes.splitlines():
-            line = raw.strip().lstrip("-*").strip()
-            if not line:
-                continue
-            low = line.lower()
-            if _FEAT_RE.match(raw) or any(p in low for p in _FEATURE_PHRASES):
-                highlights.append(line)
-            if len(highlights) >= _MAX_FEATURE_LINES:
-                break
-        return tuple(highlights)
+        return self._scan_features()[0]
+
+    @property
+    def features_dropped(self) -> int:
+        """How many feature lines the cap discarded. Never truncate silently."""
+        return self._scan_features()[1]
+
+    @property
+    def feature_scan_unrecognised(self) -> bool:
+        """True when there are notes, no features found, and no format we know.
+
+        The honest third state. `feature_highlights == ()` alone cannot tell
+        "this release adds nothing" from "these notes are prose we cannot parse",
+        and rendering the second as the first is how a whole release went unread:
+        graphify 0.9.27-0.9.30 groups its bullets under bold subheads rather than
+        `## Added`, so section detection finds no purchase there.
+        """
+        # Deliberately NOT `and not highlights`. That extra condition was the same
+        # masking bug one level up: in a multi-release jump, ONE readable release
+        # yielding a single feature suppressed the warning for the whole span, so
+        # "found 1 feature, and could not read 3 of the 4 releases" rendered as a
+        # confident list of 1. Whether the FORMAT was understood is independent of
+        # whether anything was found, and the reader needs both. (Cold lane.)
+        return bool(self.notes.strip()) and not self._scan_features()[2]
 
 
 def _pypi_json(package: str) -> tuple[dict[str, object], str]:
@@ -394,7 +612,10 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
         return UpstreamStatus(source="none")
     if err:
         return UpstreamStatus(source=source, reachable=False, error=err)
-    if latest == current or not github:
+    # `same_release`, not `==`: a decoration-only mismatch (`v2.1.220` vs `2.1.220`)
+    # is not a pending release, and reading notes for it is what produced an
+    # "Adopt it?" about a version already installed. (Cold lane, round 2.)
+    if same_release(latest, current) or not github:
         return UpstreamStatus(latest=latest, source=source)
 
     pending = versions_between(versions, current, latest) or (latest,)

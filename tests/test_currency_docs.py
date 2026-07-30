@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from kb_setup.currency import docs
+from kb_setup.fetch import content_hash
 
 _URL = "https://code.claude.com/docs/en/goal.md"
 _NOW = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
@@ -108,14 +109,72 @@ def test_a_failed_fetch_leaves_the_baseline_intact() -> None:
     assert after[_URL]["sha256"] == "good-digest"
 
 
-def test_a_drifted_page_updates_the_baseline() -> None:
-    """Recording is the point.
+def test_a_drifted_page_keeps_its_old_baseline_until_reviewed() -> None:
+    """Reversed 2026-07-29, deliberately. This test used to assert the opposite.
 
-    The NEXT run compares against what we have now seen, so without this a drift
-    would be reported again every run.
+    Its old rationale — "without this a drift would be reported again every run" —
+    named the desired behaviour as the thing to avoid. Recording here consumed the
+    signal on the very run that raised it, and docs drift is NOT a sync finding, so
+    nothing durable carried it: all three watched Claude Code pages changed, the
+    committed row read `claude-code 2.1.220, current: clean`, and the next run was
+    silent. A page therefore stays flagged until `mark_reviewed` rolls it forward.
     """
     _, after = docs.verify((_URL,), _store(_NOW, "old"), fetcher=lambda _u: ("new", ""))
-    assert after[_URL]["sha256"] != "old"
+    assert after[_URL]["sha256"] == "old"
+
+
+def test_the_drift_finding_is_still_raised_while_the_baseline_holds() -> None:
+    """Control arm: keeping the baseline must not also swallow the report."""
+    findings, _ = docs.verify((_URL,), _store(_NOW, "old"), fetcher=lambda _u: ("new", ""))
+    assert findings[0].drifted
+    assert "docs-reviewed" in findings[0].detail
+
+
+def test_drift_is_reported_on_every_run_until_reviewed() -> None:
+    """The property the reversal buys: the signal survives an unread console."""
+    store = _store(_NOW, "old")
+    for _ in range(3):
+        findings, store = docs.verify((_URL,), store, fetcher=lambda _u: ("new", ""))
+        assert findings[0].drifted
+
+
+def test_an_unchanged_page_still_refreshes_its_checked_at() -> None:
+    """Control arm: only a DRIFTED page withholds its update.
+
+    An unchanged page must keep proving it was looked at, or the offline staleness
+    check would start nagging about pages that are verified every run.
+    """
+    long_ago = datetime(2020, 1, 1, tzinfo=UTC)
+    body = "unchanged page body"
+    # The stored digest must be the REAL hash of the body, or the page reads as
+    # drifted and this would silently test the branch above instead.
+    before = _store(long_ago, content_hash(body))
+    findings, after = docs.verify((_URL,), before, fetcher=lambda _u: (body, ""))
+    assert not findings[0].drifted
+    assert after[_URL]["checked_at"] != long_ago.isoformat()
+
+
+def test_mark_reviewed_rolls_the_baseline_to_the_reviewed_content(tmp_path: Path) -> None:
+    """The deliberate second step, after a human has actually re-read the page."""
+    docs.save(tmp_path, _store(_NOW, "old"))
+    findings = docs.mark_reviewed(tmp_path, (_URL,), fetcher=lambda _u: ("new", ""))
+    assert findings[0].verified
+    rolled = docs.load(tmp_path)[_URL]["sha256"]
+    assert rolled != "old"
+    # The message must NOT claim this proves what the human read — it cannot.
+    assert "live now" in findings[0].detail
+    assert rolled[:12] in findings[0].detail
+    # And the drift is now genuinely resolved, not merely muted.
+    again, _ = docs.verify((_URL,), docs.load(tmp_path), fetcher=lambda _u: ("new", ""))
+    assert not again[0].drifted
+
+
+def test_mark_reviewed_refuses_to_roll_a_page_it_could_not_fetch(tmp_path: Path) -> None:
+    """Rolling to an unknown hash would silence the finding with nothing read."""
+    docs.save(tmp_path, _store(_NOW, "old"))
+    findings = docs.mark_reviewed(tmp_path, (_URL,), fetcher=lambda _u: ("", "HTTP 503"))
+    assert not findings[0].verified
+    assert docs.load(tmp_path)[_URL]["sha256"] == "old"
 
 
 def test_non_https_is_refused() -> None:

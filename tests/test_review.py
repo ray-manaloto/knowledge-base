@@ -1053,3 +1053,97 @@ def test_a_leading_space_in_a_pathname_survives_the_delta(
     # And it must NOT be treated as exempt: the exempt entry has no leading space.
     ok, summary = review.receipt_state(tmp_path, head, require_base="main")
     assert not ok, summary
+
+
+# ---------------------------- the one-lane policy skip (`by-policy-one-lane`) ----
+
+
+def test_by_policy_excuses_the_three_lanes_the_policy_stands_down(tmp_path: Path) -> None:
+    """The receipt shape the simplified one-lane review writes.
+
+    Ray's decision (2026-07-29): the review runs the COLD lane only. The other
+    three still have to be accounted for, because `LANES` is a closed set — so
+    they need a reason that is TRUE. `not-applicable-*` would not be: it asserts
+    the lane read this diff and had nothing to say, which is a judgement nobody
+    made.
+    """
+    ok, _ = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["cold:codex"],
+            lanes_skipped=[
+                "standards:by-policy-one-lane",
+                "spec:by-policy-one-lane",
+                "silent-failure:by-policy-one-lane",
+            ],
+        ),
+        _SHA,
+    )
+    assert ok
+
+
+def test_by_policy_can_never_excuse_the_cold_lane(tmp_path: Path) -> None:
+    """The one thing this reason must NOT be able to say.
+
+    The one-lane policy *is* "run cold", so `cold:by-policy-one-lane` is
+    self-contradictory: it cites the policy as grounds for skipping the lane the
+    policy exists to run. A lane-blind prefix in `_SKIP_ANY_LANE` would have
+    accepted it — the fourth instance of the hole this module has closed three
+    times — and the `records no lane that actually ran` backstop only fires when
+    ALL four lanes are skipped, so it would not have caught this.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=["standards", "spec", "silent-failure"],
+            lanes_skipped=["cold:by-policy-one-lane"],
+        ),
+        _SHA,
+    )
+    assert not ok
+    assert "not excused" in summary
+    assert "cold:by-policy-one-lane" in summary
+
+
+def test_by_policy_is_an_exact_token_not_a_prefix(tmp_path: Path) -> None:
+    """A near-miss must not pass. `startswith` already cost this module one defect."""
+    for bogus in ("standards:by-policy", "standards:by-policy-", "standards:by-policy-onelane"):
+        ok, summary = review.receipt_state(
+            _write(tmp_path, lanes_ran=["cold:codex"], lanes_skipped=[bogus]),
+            _SHA,
+        )
+        assert not ok, f"{bogus!r} should not excuse a lane"
+        assert "not excused" in summary
+
+
+def test_all_four_lanes_skipped_by_policy_is_still_refused(tmp_path: Path) -> None:
+    """Control arm on the `records no lane that actually ran` backstop.
+
+    It must skip ALL FOUR. Skipping only two was caught by the earlier
+    `lane(s) unaccounted for` check instead, so this test passed without ever
+    reaching the backstop its own name claims to exercise — a tautological probe.
+    (Cold lane.) `cold` is included here even though `by-policy-one-lane` cannot
+    excuse it, because the accounting check runs BEFORE the excuse check and this
+    test is about the backstop, not the scoping; the two are asserted apart below.
+    """
+    ok, summary = review.receipt_state(
+        _write(
+            tmp_path,
+            lanes_ran=[],
+            lanes_skipped=[f"{lane}:not-applicable-probe" for lane in review.LANES],
+        ),
+        _SHA,
+    )
+    assert not ok
+    assert "records no lane that actually ran" in summary
+
+
+def test_the_accepted_reason_help_names_the_new_reason() -> None:
+    """The error message must tell the author what IS accepted.
+
+    A gate that rejects without naming the alternative is how the previous
+    reasons got invented by hand in the first place.
+    """
+    help_text = review._skip_reason_help()
+    assert "by-policy-one-lane" in help_text
+    assert "not-applicable-" in help_text

@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from kb_setup.currency.upstream import UpstreamStatus, Version
+from kb_setup.currency.upstream import UpstreamStatus, Version, same_release
 
 if TYPE_CHECKING:
     from kb_setup.currency.issues import Observation
@@ -28,7 +28,14 @@ if TYPE_CHECKING:
 
 GATES = (
     "patch-level bump",
-    "PyPI latest has a matching GitHub tag",
+    # NOT "PyPI latest has a matching GitHub tag". What `_gate_tag` actually checks
+    # is `upstream.github_tag` — did a readable GitHub release exist for `latest` —
+    # and that is the same check whether the version came from PyPI or from GitHub
+    # itself. The old label hardcoded PyPI, so a GitHub-only tool's PASSING gate
+    # rendered as a check it never ran: `docs/currency/runs/2026-07-29-mise.md`
+    # committed `✅ PyPI latest has a matching GitHub tag` for mise, whose
+    # `currency.toml` block has no `pypi` key at all. (Cold lane, round 2.)
+    "latest version has a readable GitHub release",
     "no breaking/removal/deprecation marker",
     "extras unchanged",
     "no tracked issue moved",
@@ -44,6 +51,22 @@ class Ambiguity:
     question: str
     detail: str
     recommendation: str = ""
+
+
+def _has_upgrade(current: str, latest: str) -> bool:
+    """Whether `latest` is a different RELEASE from `current`, not a different string.
+
+    Module-level so `decide` can consult it while building the verdict and
+    `Verdict.has_upgrade` can expose it afterwards — one implementation, because
+    two would be free to disagree about the case that caused the bug. It now
+    delegates to `upstream.same_release` for the same reason, one level up: the
+    early-return in `decide` and the one in `upstream.probe` were still comparing
+    raw strings, so three call sites could disagree about whether `v2.1.220` and
+    `2.1.220` are the same release. (Cold lane, round 2.)
+    """
+    if not latest:
+        return False
+    return not same_release(current, latest)
 
 
 @dataclass(frozen=True)
@@ -62,11 +85,26 @@ class Verdict:
     # breaking marker fired. Empty when there is no upgrade or the notes announce
     # nothing feature-shaped.
     feature_review: tuple[str, ...] = ()
+    # How many feature lines the cap discarded, and whether the notes' format was
+    # recognisable at all. Both exist so an empty `feature_review` is never read as
+    # "there was nothing to adopt" — see `UpstreamStatus.feature_scan_unrecognised`.
+    features_dropped: int = 0
+    features_unreadable: bool = False
 
     @property
     def has_upgrade(self) -> bool:
-        """True when upstream offers a version we are not on."""
-        return bool(self.latest) and self.latest != self.current
+        """True when upstream offers a version we are not on.
+
+        Compared as PARSED VERSIONS, not as strings. `latest` carries whatever
+        decoration upstream ships — GitHub hands back the tag, so claude-code's
+        `2.1.220` was measured against `v2.1.220` and a plain `!=` called the same
+        release an upgrade. That one character then propagated: the landing page
+        rendered an arrow between two identical versions, `has_content` earned a
+        detail page for a run with no content, and notes were fetched for a bump
+        that did not exist. Falls back to string inequality only when a side will
+        not parse, where nothing better is available.
+        """
+        return _has_upgrade(self.current, self.latest)
 
     @property
     def needs_interview(self) -> bool:
@@ -114,6 +152,16 @@ def _gate_patch(current: str, latest: str) -> Ambiguity | None:
             detail="A non-numeric version cannot be classified as patch/minor/major.",
             recommendation="Hold — read the release manually before adopting.",
         )
+    if not (cur > new) and not (new > cur):
+        # SAME version, differing only in decoration (`2.1.220` vs the `v2.1.220`
+        # tag). There is nothing to adopt, so there is nothing to ask about — and
+        # asking anyway is worse than noise: claude-code sat exactly on its latest
+        # release and this gate demanded a decision on the non-bump every single
+        # run, which trains the reader to skip the one output this engine exists to
+        # produce. `is_patch_bump_from` already refuses the no-op in the APPLY
+        # direction (its docstring names the `1.2` vs `1.2.0` case); this is the
+        # same equality seen from the interview side, where it has to be silence.
+        return None
     if not new.is_patch_bump_from(cur):
         return Ambiguity(
             gate=GATES[0],
@@ -145,9 +193,13 @@ def _gate_tag(upstream: UpstreamStatus, latest: str) -> Ambiguity | None:
         )
     if upstream.github_tag:
         return None
+    # Name the source that actually supplied the version. Saying "PyPI has X" about
+    # a GitHub-only tool describes a lookup that never happened — the same
+    # mislabelling the `GATES[1]` comment records. (Cold lane, round 2.)
+    where = "PyPI" if upstream.source == "pypi" else "upstream"
     return Ambiguity(
         gate=GATES[1],
-        question=f"PyPI has {latest} but no matching GitHub release was found. Adopt it?",
+        question=f"{where} has {latest} but no matching GitHub release was found. Adopt it?",
         detail=(
             f"Could not read a release for {latest}"
             + (f" ({upstream.error})" if upstream.error else "")
@@ -346,7 +398,11 @@ def decide(
             tracked=upstream.tracked,
         )
 
-    if not latest or latest == current:
+    # `same_release`, not `==` — see `_has_upgrade`. A decoration-only mismatch has
+    # no upgrade to gate, so it must take this early return rather than fall through
+    # to `_gate_tag`/`_gate_markers`/`_gate_local`, none of which check that a real
+    # version delta exists before asking a human about it. (Cold lane, round 2.)
+    if not latest or same_release(current, latest):
         return Verdict(
             tool=sync.tool,
             current=current,
@@ -374,9 +430,16 @@ def decide(
         tool=sync.tool,
         current=current,
         latest=latest,
-        auto_apply=not ambiguities,
+        # An upgrade must actually EXIST to be auto-applied. `apply()` already
+        # refuses a no-op ("no upgrade pending"), so without this the verdict and
+        # the applier disagreed, and the landing page published the verdict's
+        # version: `claude-code 2.1.220 → v2.1.220: auto-applying (6/6 gates)`,
+        # which announces work on a release we are already running.
+        auto_apply=not ambiguities and _has_upgrade(current, latest),
         gates_passed=passed,
         ambiguities=ambiguities,
         tracked=upstream.tracked,
         feature_review=upstream.feature_highlights,
+        features_dropped=upstream.features_dropped,
+        features_unreadable=upstream.feature_scan_unrecognised,
     )

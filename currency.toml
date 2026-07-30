@@ -68,13 +68,73 @@ note = """`label_communities` (llm.py) has no JSON-schema constant, unlike
 probed on 0.9.25, 42/42 batches failed. Community names come from the free
 deterministic `label_communities_by_hub` instead. Re-probe on each bump.
 
-STILL PRESENT on 0.9.26 (re-probed 2026-07-26). The cheap re-probe is a file
-diff, not a batch run: `llm.py` is BYTE-IDENTICAL across the two installs, so
-the gap cannot have moved. Counts agree in both — `_EXTRACTION_JSON_SCHEMA` x2,
-label-side schema constant x0, `def label_communities` x1 — and a bogus symbol
-greps to 0 in the same file, so the zero is an absence rather than a broken
-probe. Do the diff first on the next bump; only run the 42-batch probe if the
-file actually changed."""
+STILL PRESENT on 0.9.30 (re-probed 2026-07-29). Counts unchanged —
+`_EXTRACTION_JSON_SCHEMA` x2, label-side schema constant x0,
+`def label_communities` x1 — with a bogus symbol at 0 in the same file, so the
+zero is an absence rather than a broken probe.
+
+The cheap byte-identical arm did NOT settle it this time: `llm.py` grew
+3070 -> 3115 lines between 0.9.26 and 0.9.30. Reading the diff did: every
+changed line is on the BEDROCK path (`_bedrock_response_text` for #2287, and
+the botocore timeout/retry config for #2284). **Zero** label-touching diff
+lines, so the gap provably cannot have moved — and Bedrock is a backend this
+repo forbids anyway (`AWS_REGION` is stripped by `graphify_env.clean_env()`).
+
+Method for the next bump, in order: diff `llm.py`; if it changed, grep the diff
+for `label` before assuming anything; only run the 42-batch probe if a
+label-touching line actually moved."""
+
+[[tool.graphify.watch]]
+kind = "local"
+ref = "mcp-major-pin-is-what-makes-kb-serve-installable"
+note = """0.9.30 (#2277/#2279/#2291) pins `mcp>=1,<2` in the `mcp` and `all`
+extras. That pin is load-bearing for THIS repo, because `mise run kb-serve` is
+the MCP server and we install `extras = ["all"]`.
+
+MEASURED 2026-07-29, both arms, in a throwaway venv:
+  fresh resolve of `graphifyy[all]==0.9.26`  -> mcp 2.0.0  -> server rc=1
+  fresh resolve of `graphifyy[all]==0.9.30`  -> mcp 1.29.0 -> server rc=0
+This host's pre-existing 0.9.26 env holds mcp 1.28.1 and works, so the defect
+was never a live outage here — it was an INVARIANT-3 (reproducibility) failure:
+a fresh clone could not stand up the server the old pin claimed to provide.
+
+TWO PROBES THAT LOOK CONCLUSIVE AND ARE NOT: under the broken combination,
+`import graphify.serve` exits 0 and `--help` exits 0, because the mcp imports
+are lazy (inside `_build_server`). Only actually STARTING the server fails. And
+the failure is misreported: graphify swallows the real
+`cannot import name 'AnyUrl' from 'mcp.types'` and re-raises
+`ImportError: mcp not installed. Run: pip install "graphifyy[mcp]"` — so the
+message says NOT INSTALLED while mcp is installed at the wrong major.
+
+Upstream tracks the port to the mcp 2.x API in #2308 (below). When that lands
+the `<2` ceiling lifts; until then, do not "helpfully" relax it."""
+
+[[tool.graphify.watch]]
+kind = "local"
+ref = "data-only-json-produces-zero-nodes"
+note = """`kb-build` emits 18 warnings covering ~330 files: "produced zero nodes
+and are absent from the graph". DISPOSITION (Ray, 2026-07-29): known upstream
+limitation, not a defect to fix here — but tracked so it is not rediscovered from
+build output every time.
+
+Every affected file is data-only `.json` inside a THIRD-PARTY cloned source
+(`sources/agents/`, `sources/ecc/`, `sources/fable-orchestrator/` —
+`marketplace.json`, `plugin.json`, settings schemas). None is ours, and a data
+file has no AST to extract, so zero nodes is arguably correct. The content we
+actually want IS in the graph by the other path: the committed prose extraction
+`sources/extractions/marketplace-inventory-docs.json`. graphify points at its own
+#1666 and asks for reports if it persists.
+
+UNKNOWN, and left explicitly unknown: whether 0.9.30 made this newly VISIBLE
+rather than newly happening. The message says "empties are no longer cached",
+which suggests they now retry and re-warn where they previously warned once and
+went quiet — but no committed prior build log exists to compare against, so do
+not repeat this as "new in 0.9.30". Re-probe by counting the warnings on the next
+bump."""
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2308"
 
 [[tool.graphify.watch]]
 kind = "issue"
@@ -133,8 +193,8 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.7.15"
-# `mise --version` prints `2026.7.15 macos-arm64 (2026-07-27)`, so the engine's
+expected = "2026.7.16"
+# `mise --version` prints `2026.7.16 macos-arm64 (2026-07-29)`, so the engine's
 # default last-whitespace-field heuristic returns the build DATE. Anchored at the
 # start so it reads the version and not some later digit run.
 # TOML literal string: a basic "..." would need doubled backslashes
@@ -153,6 +213,29 @@ have read (moves every time we review); `mise.toml` `min_version.soft` = the
 version we are verified against; `min_version.hard` = the oldest we will run at
 all (2026.7.14, where #11269/#11288/#11296 landed). soft must stay ABOVE hard or
 it is inert — hard errors across exactly the range soft would warn in."""
+
+[[tool.mise.watch]]
+kind = "local"
+ref = "dotfiles-command-deprecation"
+note = """v2026.7.16 (#11436) consolidated dotfiles management under
+`mise bootstrap dotfiles` and DEPRECATED the top-level `mise dotfiles` (hidden
+now, warnings in 2027.2.0, removal in 2028.2.0). This is the marker that stopped
+the 7.16 gate, and it is INERT here: 0 uses of `mise dotfiles` in this repo
+(control arm — `mise run` greps to 24 hits in mise.toml, so the probe
+discriminates). Recorded like the Tera item so the 2027.2.0 and 2028.2.0
+releases are not read as routine, and so a future session does not have to
+re-derive that the marker was harmless."""
+
+[[tool.mise.watch]]
+kind = "local"
+ref = "remote-version-fetch-failure-reporting"
+note = """Before v2026.7.16 (#11391) a NETWORK FAILURE while listing remote
+versions was reported as "no versions found matching date filter" — an outage
+wearing an authoritative empty answer's clothes, which is the exact shape
+`.claude/rules/probes-need-a-control-arm.md` exists to catch. Fixed in 7.16
+(reported as a fetch failure, and memoized per process). Kept as a watch item
+because any host still BELOW 7.16 will show the misleading form, so the
+signature table in `persistence-gate-retry.md` has to keep both."""
 
 [[tool.mise.watch]]
 kind = "local"

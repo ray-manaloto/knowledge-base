@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from kb_setup.currency import broad, config, run, sync
+import pytest
+from kb_setup.currency import broad, config, docs, run, sync
 
 
 def _repo(tmp_path: Path, *, extra_toml: str = "") -> Path:
@@ -193,3 +194,68 @@ def test_check_stays_quiet_about_a_tool_declared_for_another_platform(
     )
     assert run.check(tmp_path) == 0
     assert capsys.readouterr().out == ""
+
+
+# -------------------------------------------------- docs-reviewed (round 2) ----
+#
+# Two cold-lane findings on the SAME six lines, both about a signal this repo
+# exists to keep un-swallowed: consuming docs drift for tools nobody reviewed,
+# and reporting success for a roll that did not happen.
+
+
+def _docs_repo(tmp_path: Path, *urls: str) -> Path:
+    (tmp_path / "mise.toml").write_text("[tools]\n", encoding="utf-8")
+    watch = ", ".join(f'"{u}"' for u in urls)
+    (tmp_path / "currency.toml").write_text(
+        f'[tool.claude-code]\nbinary = "claude"\nexpected = "2.1.220"\ndocs_watch = [{watch}]\n',
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_docs_reviewed_without_a_tool_refuses_rather_than_rolling_every_tool(
+    tmp_path, monkeypatch
+) -> None:
+    """`_opt` reads a DANGLING `--tool` as absent, and absent used to mean ALL.
+
+    So `kb-setup currency docs-reviewed --tool` — the flag typed without its
+    value — rolled the drift fingerprint for every watched tool's pages, which is
+    the exact signal-consumption the two-step design exists to prevent. The
+    refusal must come with NO fetch at all: a guard that still reached the
+    network would have already overwritten a baseline by the time it returned 2.
+    """
+    root = _docs_repo(tmp_path, "https://example.com/a.md")
+    monkeypatch.setattr(docs, "_fetch", lambda _u: pytest.fail("refused, yet it still fetched"))
+    assert run.docs_reviewed(root, only="") == 2
+    assert not (root / "docs" / "currency" / "docs-fingerprints.json").exists()
+
+
+def test_docs_reviewed_with_a_tool_still_rolls_the_baseline(tmp_path, monkeypatch) -> None:
+    """CONTROL ARM for the guard above: naming the tool must still WORK.
+
+    Without this, `return 2` on every path would pass the test above while
+    disabling the command outright.
+    """
+    root = _docs_repo(tmp_path, "https://example.com/a.md")
+    monkeypatch.setattr(docs, "_fetch", lambda _u: ("live body", ""))
+    assert run.docs_reviewed(root, only="claude-code") == 0
+    assert docs.load(root)["https://example.com/a.md"]["sha256"]
+
+
+def test_docs_reviewed_reports_a_page_it_could_not_fetch(tmp_path, monkeypatch) -> None:
+    """A partial outage returned 0 — "the roll succeeded" — to any caller scripting it.
+
+    `mark_reviewed` correctly leaves an unfetchable page's baseline alone and says
+    `NOT CHECKED`, so the exit code was the only thing claiming otherwise. One
+    unrolled page is enough: the pages that DID roll do not make the run a success.
+    """
+    root = _docs_repo(tmp_path, "https://example.com/ok.md", "https://example.com/dead.md")
+    monkeypatch.setattr(
+        docs,
+        "_fetch",
+        lambda url: ("live body", "") if url.endswith("ok.md") else ("", "HTTP 503"),
+    )
+    assert run.docs_reviewed(root, only="claude-code") == 1
+    store = docs.load(root)
+    assert "https://example.com/ok.md" in store
+    assert "https://example.com/dead.md" not in store

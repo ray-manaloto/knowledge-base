@@ -10,6 +10,7 @@ one way the guard could not see.
 
 import json
 
+import pytest
 from kb_setup.currency import upstream
 
 
@@ -299,3 +300,255 @@ def test_feature_highlights_are_capped() -> None:
     """A giant changelog must not flood the interview."""
     notes = "\n".join(f"- feat: feature number {i}" for i in range(50))
     assert len(upstream.UpstreamStatus(notes=notes).feature_highlights) <= 12
+
+
+# ------------------------------- section-based notes (the real corpora) ----
+#
+# Every test above this line writes its fixture in the ONE format the detector
+# already understood — conventional-commits `feat:` lines and adoption prose. All
+# three passed while the detector scored **zero** on every real release this repo
+# tracks (control-armed 2026-07-29: mise v2026.7.16 = 0 matches across 10.8KB
+# with nine `## Added` bullets, graphify 0.9.27-0.9.30 = 0 across 9.2KB,
+# claude-code 2.1.220 = 0). A fixture shaped like the code under test cannot fail,
+# so the arms below are written in the formats upstream actually publishes.
+
+
+def _github_generated_notes() -> str:
+    """The shape `gh api /releases` returns and mise publishes: named sections."""
+    return (
+        "## v2026.7.16\n\n"
+        "A release summary paragraph that announces nothing by itself.\n\n"
+        "## Highlights\n"
+        "- The task output cache gains per-run controls (`--task-cache`)\n\n"
+        "## Added\n"
+        "- **task:** experimental `task.cache_dir` setting and `MISE_TASK_CACHE_DIR`\n"
+        "- **mcp:** new `list_commands` tool exposing each command's effect\n\n"
+        "## Fixed\n"
+        "- **npm:** reproducing a lockfile no longer requires `allow_low_downloads`\n\n"
+        "## New Contributors\n"
+        "* @someone made their first contribution\n"
+    )
+
+
+def test_bullets_under_a_feature_section_are_features_without_any_phrase() -> None:
+    """The regression that mattered: `## Added` bullets carry no `feat:` and no phrase.
+
+    This is why the detector reported nothing for mise across a 10.8KB changelog.
+    """
+    status = upstream.UpstreamStatus(notes=_github_generated_notes())
+    highlights = status.feature_highlights
+    assert any("task.cache_dir" in h for h in highlights)
+    assert any("list_commands" in h for h in highlights)
+    assert any("per-run controls" in h for h in highlights)
+    assert not status.feature_scan_unrecognised
+
+
+def test_a_fix_is_not_promoted_even_when_it_matches_a_feature_phrase() -> None:
+    """`no longer requires` under `## Fixed` is a fix. Section beats phrase."""
+    highlights = upstream.UpstreamStatus(notes=_github_generated_notes()).feature_highlights
+    assert not any("allow_low_downloads" in h for h in highlights)
+
+
+def test_contributor_lines_are_not_features() -> None:
+    """`New Contributors` must not prefix-match the `new` feature section."""
+    highlights = upstream.UpstreamStatus(notes=_github_generated_notes()).feature_highlights
+    assert not any("first contribution" in h for h in highlights)
+
+
+# ------------------------------------- the third state: unparsable notes ----
+
+
+def test_prose_notes_with_no_recognisable_format_report_could_not_tell() -> None:
+    """Graphify's real shape: bold subheads, mixed bullets, no `## Added`.
+
+    The scan must NOT answer this with an empty tuple that reads as "no features".
+    """
+    notes = (
+        "## v0.9.27\n\n"
+        "A large maintenance release.\n\n"
+        "**Install and data safety**\n\n"
+        "- `claude install` no longer overwrites a settings file it cannot parse\n"
+    )
+    status = upstream.UpstreamStatus(notes=notes)
+    assert status.feature_highlights == ()
+    assert status.feature_scan_unrecognised
+
+
+def test_a_recognised_fixes_only_release_is_a_confident_zero() -> None:
+    """Control arm for the state above — the two must not collapse into one.
+
+    A named `## Fixed` section means the format WAS understood, so "no features"
+    is an answer rather than a shrug.
+    """
+    status = upstream.UpstreamStatus(notes="## v1.0.1\n\n## Fixed\n\n- a typo\n")
+    assert status.feature_highlights == ()
+    assert not status.feature_scan_unrecognised
+
+
+def test_empty_notes_are_not_reported_as_unreadable() -> None:
+    """No notes is not a parse failure — ffmpeg has no release channel at all."""
+    assert not upstream.UpstreamStatus(notes="").feature_scan_unrecognised
+    assert not upstream.UpstreamStatus(notes="   \n").feature_scan_unrecognised
+
+
+def test_the_display_cap_reports_what_it_dropped() -> None:
+    """A silent truncation reads as 'that was all of them'."""
+    notes = "## Added\n" + "\n".join(f"- feature number {i}" for i in range(20))
+    status = upstream.UpstreamStatus(notes=notes)
+    assert len(status.feature_highlights) == 12
+    assert status.features_dropped == 8
+
+
+def test_no_cap_no_dropped_count() -> None:
+    """Control arm: the counter must stay 0 when nothing was cut."""
+    status = upstream.UpstreamStatus(notes="## Added\n- one thing\n")
+    assert status.features_dropped == 0
+
+
+# --------- the format check is PER RELEASE, not per body (cold-lane finding) ----
+#
+# `probe()` concatenates the notes of every release in a multi-patch jump, so a
+# single flag over the whole string let one release's `## Added` certify the span.
+
+
+def test_one_unreadable_release_in_a_span_is_reported_even_when_another_is_read() -> None:
+    """The masking case: v1.0.1 is sectioned, v1.0.2 is bold-subhead prose.
+
+    The features from the readable release are still surfaced, AND the span is
+    flagged unreadable — because the list is now known to be incomplete. Two
+    conditions had to change for this: the per-release flag, and dropping
+    `not highlights` from `feature_scan_unrecognised`.
+    """
+    notes = (
+        "## v1.0.1\n\n## Added\n- a real feature\n\n"
+        "## v1.0.2\n\nA prose release.\n\n**Bold subhead**\n\n- really a feature\n"
+    )
+    status = upstream.UpstreamStatus(notes=notes)
+    assert any("a real feature" in h for h in status.feature_highlights)
+    assert status.feature_scan_unrecognised
+
+
+def test_a_span_where_every_release_is_readable_is_not_flagged() -> None:
+    """Control arm: the per-release check must still be able to say 'all read'."""
+    notes = "## v1.0.1\n\n## Added\n- a\n\n## v1.0.2\n\n## Fixed\n- b\n"
+    assert not upstream.UpstreamStatus(notes=notes).feature_scan_unrecognised
+
+
+def test_the_preamble_before_the_first_version_heading_is_not_an_unread_release() -> None:
+    """A GitHub body opens with `## vX` then prose; that empty span is not evidence.
+
+    Counting it would make EVERY sectioned changelog report unreadable — which is
+    how the first version of this fix broke mise.
+    """
+    notes = "## v2026.7.16\n\nA summary paragraph.\n\n## Added\n- a thing\n"
+    status = upstream.UpstreamStatus(notes=notes)
+    assert any("a thing" in h for h in status.feature_highlights)
+    assert not status.feature_scan_unrecognised
+
+
+def test_a_version_heading_does_not_leak_the_previous_releases_section() -> None:
+    """A release boundary resets section state.
+
+    Otherwise a bullet directly under `## v1.0.2` would still be read as sitting
+    in the `## Added` that ended the previous release, and be reported as a
+    feature of the wrong release.
+    """
+    notes = "## v1.0.1\n\n## Added\n- real feature\n\n## v1.0.2\n\n- an unsectioned bullet\n"
+    highlights = upstream.UpstreamStatus(notes=notes).feature_highlights
+    assert any("real feature" in h for h in highlights)
+    assert not any("unsectioned bullet" in h for h in highlights)
+
+
+def test_prose_dates_and_counts_are_not_mistaken_for_version_headings() -> None:
+    """`_VERSION_HEADING_RE` needs two numeric components, so prose cannot reset."""
+    notes = "## 2 breaking changes\n\n## Added\n- a thing\n"
+    status = upstream.UpstreamStatus(notes=notes)
+    assert any("a thing" in h for h in status.feature_highlights)
+    assert not status.feature_scan_unrecognised
+
+
+def test_a_prose_heading_that_starts_with_a_version_is_not_a_release_boundary() -> None:
+    """`## 2.0 migration guide` split one release in two.
+
+    The predecessor regex was anchored only on the LEFT — it asked the heading to
+    START with a version and never asked what followed — so a prose section opened
+    a new span. The per-release `all(...)` then scored that span on its own, found
+    no recognised feature format in plain prose, and marked a fully-readable
+    release partially unrecognised. The sibling test above only covered
+    `## 2 breaking changes`, which fails on the two-numeric-components rule and so
+    never reached this gap.
+
+    THE PROSE MUST FOLLOW A RECOGNISED SECTION, and that is the whole test. A
+    first draft put the prose heading FIRST and was green under the bug: the
+    `## Added` simply landed in the second span and scored fine either way, so the
+    probe could not fail. Measured both ways on this shape: 2 spans / recognised
+    with the fix, 3 spans / UNRECOGNISED without it.
+    """
+    for prose in ("## 2.0 migration guide", "## 3.14 compatibility notes"):
+        notes = (
+            f"## v1.0.0\n\n## Added\n- a real feature\n\n"
+            f"{prose}\n\nPlain prose describing the upgrade path.\n"
+        )
+        status = upstream.UpstreamStatus(notes=notes)
+        assert any("a real feature" in h for h in status.feature_highlights), prose
+        assert not status.feature_scan_unrecognised, prose
+
+
+def test_real_release_headings_are_still_boundaries() -> None:
+    """CONTROL ARM for the tightening: the shapes this repo actually meets.
+
+    GitHub generates the tag alone; Keep-a-Changelog generates the dated form
+    (whose hyphens `_normalize` turns into spaces, hence the digit-led branch).
+    A rule that rejected these would silently restore the round-1 masking bug —
+    one release's `## Added` certifying the next.
+    """
+    for heading in ("## v1.0.2", "## 2026.7.16", "## v1.0.2 — a title", "## 1.0.2 - 2026-01-01"):
+        notes = f"## v1.0.1\n\n## Added\n- real feature\n\n{heading}\n\n- unsectioned bullet\n"
+        highlights = upstream.UpstreamStatus(notes=notes).feature_highlights
+        assert any("real feature" in h for h in highlights), heading
+        assert not any("unsectioned" in h for h in highlights), heading
+
+
+# ------------------------------------------- same_release (cold lane, round 2) ----
+
+
+def test_same_release_ignores_decoration_and_zero_padding() -> None:
+    """`v2.1.220` and `2.1.220` are ONE release; a raw `==` said otherwise.
+
+    Three call sites compared raw strings — `probe`'s early return, `decide`'s,
+    and `_has_upgrade` — so they were free to disagree about the same pair. They
+    now share this one function.
+    """
+    assert upstream.same_release("2.1.220", "v2.1.220")
+    assert upstream.same_release("v2.1.220", "2.1.220")
+    assert upstream.same_release("1.2", "1.2.0")
+
+
+def test_same_release_still_separates_genuinely_different_releases() -> None:
+    """CONTROL ARM: an always-True `same_release` must not pass.
+
+    It would satisfy the test above while disabling every upgrade this engine
+    exists to find.
+    """
+    assert not upstream.same_release("0.9.26", "0.9.30")
+    assert not upstream.same_release("v1.0.0", "v2.0.0")
+    # Unparsable on either side falls back to string equality, both ways.
+    assert not upstream.same_release("nightly", "0.9.30")
+    assert upstream.same_release("nightly", "nightly")
+
+
+def test_probe_does_not_fetch_notes_for_a_decoration_only_mismatch(monkeypatch) -> None:
+    """The behaviour the string `==` actually cost.
+
+    Notes were fetched for a release already installed, which `decide` then ran
+    its gates against.
+    """
+    monkeypatch.setattr(upstream, "github_versions", lambda _r: ("v2.1.220", ("v2.1.220",), ""))
+    monkeypatch.setattr(
+        upstream,
+        "release_for_tag",
+        lambda _r, _v: pytest.fail("fetched notes for a release already installed"),
+    )
+    status = upstream.probe(pypi="", github="anthropics/claude-code", current="2.1.220")
+    assert status.latest == "v2.1.220"
+    assert not status.notes

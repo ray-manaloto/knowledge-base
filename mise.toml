@@ -19,11 +19,14 @@
 # hard=2026.7.14 is where the env-file secret-expansion fix (#11269) and both
 # task-freshness correctness fixes (#11288, #11296) landed — below that there are
 # known-bad behaviours, even though this repo is not currently exposed to either
-# (no `env._.file`, no task `sources`/`outputs`). soft=2026.7.15 is the version
-# this repo has actually been verified against, so 7.14 runs with a nudge.
+# (no `env._.file`, no task `sources`/`outputs`). soft tracks the version this
+# repo has actually been verified against — 2026.7.16 as of the 2026-07-29
+# currency review — so anything from 7.14 up runs with a nudge rather than a stop.
+# Bump soft in the SAME change that bumps `currency.toml`'s `expected`, or the
+# comment and the value drift apart (they did, and the cold lane caught it).
 # Keep soft > hard or soft is inert: hard errors across exactly the range soft
 # would warn in, so an equal pair makes the warning unobservable.
-min_version = { hard = "2026.7.14", soft = "2026.7.15" }
+min_version = { hard = "2026.7.14", soft = "2026.7.16" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
@@ -36,7 +39,7 @@ typos = "1.48.0"
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.26", extras = ["all"] }
+"pipx:graphifyy" = { version = "0.9.30", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
@@ -205,6 +208,23 @@ description = "Reproduce graph.json from committed inputs (manifests + doc extra
 # Clones each sources/*.manifest at its pinned SHA (gitignored), AST-extracts code
 # (free), then replays the committed sources/extractions/*.json doc chunks. No
 # host-agent needed — reproduction is free. Logic in kb_setup.graph.
+#
+# DECIDED 2026-07-29 (Ray): do NOT put mise's task output cache on this task, and
+# this comment exists so it is not re-proposed as an obvious win. mise 7.16 ships
+# `--task-cache` / `task.cache_dir` / `cache.command_inputs`, and this is the most
+# expensive task here, so it looks like the natural candidate. It is not:
+#   1. A cache HIT skips the re-clone. This task's whole job is proving the corpus
+#      reproduces from committed inputs, and a manifest whose pinned SHA was
+#      force-pushed away would go undetected — `persistence-gate-retry.md` lists
+#      `reference is not a tree` as a REAL DEFECT signature, not a transient.
+#   2. `.currency-stamp.json` would be restored from cache, asserting a build that
+#      never ran in this environment. `currency.toml` requires that stamp to record
+#      the version that ACTUALLY RAN, "never the pin, which would launder drift".
+#   3. Each entry stores a ~119MB graph.json.
+# It trades "reproducible, verified by doing it" for "we did it once and
+# remembered" — and two of the three task-freshness fixes in our own
+# `min_version.hard` floor were cache-correctness bugs. The objection is
+# correctness, so a speedup measurement cannot answer it.
 run = "uv run kb-setup build"
 
 [tasks.kb-update]

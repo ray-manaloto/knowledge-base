@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "kb-setup: build | update <name> | prose | query <question> [--prose] | "
             "merge <chunk> | label | "
-            "transcribe <audio> | artifacts | currency [check|run|stamp] | "
+            "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | md-budget | goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
@@ -164,7 +164,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "(build | update [name] | prose | query <question> [--prose] | "
         "merge <chunk> [root] | label [--missing-only] "
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
-        "currency [check|run|stamp] [--tool T --json --no-write] | manifest-add <url> "
+        "currency [check|run|stamp|docs-reviewed] [--tool T --json --no-write] | "
+        "manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
         "brain [query|record|reflect|audit] | md-budget | cc | cc-doctor | "
         "eval [--live] [--slow] | "
@@ -316,7 +317,7 @@ def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
 
 
 def _currency(repo_root: Path, rest: list[str]) -> int:
-    """Dispatch `kb-setup currency {check|run|stamp}` (see kb_setup.currency.run)."""
+    """Dispatch `kb-setup currency {check|run|apply|daily|docs-reviewed|stamp}`."""
     from kb_setup.currency import run as currency_run
 
     only = _opt(rest, "--tool", "") or ""
@@ -348,6 +349,8 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
         return currency_run.apply(repo_root, only=only, as_json="--json" in rest)
     if mode == "daily":
         return currency_run.daily(repo_root)
+    if mode == "docs-reviewed":
+        return currency_run.docs_reviewed(repo_root, only=only)
     if mode == "stamp":
         if not only:
             print(
@@ -362,7 +365,8 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
             source_ref=_opt(rest, "--source-ref", "") or "",
         )
     print(
-        f"kb-setup currency: unknown mode {mode!r} (check | run | apply | daily | stamp)",
+        f"kb-setup currency: unknown mode {mode!r} "
+        "(check | run | apply | daily | docs-reviewed | stamp)",
         file=sys.stderr,
     )
     return 2
