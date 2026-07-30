@@ -1117,17 +1117,25 @@ def test_by_policy_is_an_exact_token_not_a_prefix(tmp_path: Path) -> None:
 
 
 def test_all_four_lanes_skipped_by_policy_is_still_refused(tmp_path: Path) -> None:
-    """Control arm on the backstop: a receipt with no lane that ran is not a review."""
+    """Control arm on the `records no lane that actually ran` backstop.
+
+    It must skip ALL FOUR. Skipping only two was caught by the earlier
+    `lane(s) unaccounted for` check instead, so this test passed without ever
+    reaching the backstop its own name claims to exercise — a tautological probe.
+    (Cold lane.) `cold` is included here even though `by-policy-one-lane` cannot
+    excuse it, because the accounting check runs BEFORE the excuse check and this
+    test is about the backstop, not the scoping; the two are asserted apart below.
+    """
     ok, summary = review.receipt_state(
         _write(
             tmp_path,
             lanes_ran=[],
-            lanes_skipped=[f"{lane}:by-policy-one-lane" for lane in ("standards", "spec")],
+            lanes_skipped=[f"{lane}:not-applicable-probe" for lane in review.LANES],
         ),
         _SHA,
     )
     assert not ok
-    assert summary
+    assert "records no lane that actually ran" in summary
 
 
 def test_the_accepted_reason_help_names_the_new_reason() -> None:

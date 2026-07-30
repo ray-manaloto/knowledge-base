@@ -104,8 +104,9 @@ def test_an_unparsable_observed_at_is_treated_as_stale() -> None:
 
 def test_recording_refreshes_the_observation() -> None:
     store = baseline.record({}, "graphify", "0.9.30", now=_NOW)
-    assert store["graphify"]["latest"] == "0.9.30"
-    assert store["graphify"]["observed_at"] == _NOW.isoformat()
+    # The store is typed `object`-valued on purpose (it is untrusted JSON), so the
+    # test asserts on the round-tripped shape rather than subscripting through it.
+    assert store == {"graphify": {"latest": "0.9.30", "observed_at": _NOW.isoformat()}}
 
 
 def test_recording_an_empty_latest_is_refused() -> None:
@@ -147,3 +148,79 @@ def test_an_unreadable_store_reads_as_empty_not_as_current(tmp_path) -> None:
 
 def test_a_missing_store_is_not_an_error(tmp_path) -> None:
     assert baseline.load(tmp_path) == {}
+
+
+# ----------------------- a crash is not a verdict (cold-lane findings) ----
+#
+# `load` guarded JSON *syntax* only, so a structurally-valid-but-wrong cache
+# parsed cleanly and then raised out of `behind()`. This runs in the SessionStart
+# hook, where an AttributeError surfaces as a broken session rather than as
+# "could not check".
+
+
+def test_a_non_dict_entry_is_unchecked_not_a_crash() -> None:
+    """`{"graphify": "oops"}` is valid JSON and used to raise AttributeError."""
+    found = baseline.behind("graphify", "0.9.26", {"graphify": "oops"}, now=_NOW)
+    assert found is not None
+    assert found.check == "upstream-cache"
+    # And MALFORMED is reported as itself, not as "nobody has ever run the loop".
+    assert "MALFORMED" in found.detail
+
+
+def test_malformed_and_never_recorded_are_different_messages() -> None:
+    """Two blocked comparisons, two causes. Collapsing them loses the fix.
+
+    One says run the loop; the other says the committed cache is corrupt.
+    """
+    absent = baseline.behind("graphify", "0.9.26", {}, now=_NOW)
+    corrupt = baseline.behind("graphify", "0.9.26", {"graphify": []}, now=_NOW)
+    assert absent is not None
+    assert corrupt is not None
+    assert absent.detail != corrupt.detail
+    assert "has ever been recorded" in absent.detail
+    assert "MALFORMED" in corrupt.detail
+
+
+def test_a_non_string_version_is_unchecked_not_a_crash() -> None:
+    """`{"latest": 123}` used to raise on `.strip()` inside Version.parse."""
+    found = baseline.behind("graphify", "0.9.26", {"graphify": {"latest": 123}}, now=_NOW)
+    assert found is not None
+    assert found.check == "upstream-cache"
+    assert "MALFORMED" in found.detail
+
+
+def test_a_non_string_observed_at_does_not_crash() -> None:
+    """The date field gets the same treatment as the version field."""
+    store = {"graphify": {"latest": "0.9.30", "observed_at": 12345}}
+    found = baseline.behind("graphify", "0.9.26", store, now=_NOW)
+    assert found is not None
+    assert found.check == "upstream-version"
+
+
+def test_an_unparsable_version_reports_unknown_not_a_direction() -> None:
+    """A string `!=` cannot know WHICH side is newer.
+
+    The old fallback rendered `pinned at 0.9.26 but upstream had nightly` — a
+    definite claim about ordering, from a comparison that never happened.
+    """
+    store = _cache("nightly")
+    found = baseline.behind("graphify", "0.9.26", store, now=_NOW)
+    assert found is not None
+    assert found.check == "upstream-cache"
+    assert "cannot compare" in found.detail
+    assert "UNKNOWN" in found.detail
+
+
+def test_an_unparsable_pin_is_also_unknown_not_behind() -> None:
+    """Symmetric: the unreadable side can be either one."""
+    found = baseline.behind("graphify", "not-a-version", _cache("0.9.30"), now=_NOW)
+    assert found is not None
+    assert found.check == "upstream-cache"
+    assert "cannot compare" in found.detail
+
+
+def test_a_comparable_pair_still_reports_a_real_direction() -> None:
+    """Control arm: the unknown-path must not have swallowed the real finding."""
+    found = baseline.behind("graphify", "0.9.26", _cache("0.9.30"), now=_NOW)
+    assert found is not None
+    assert found.check == "upstream-version"

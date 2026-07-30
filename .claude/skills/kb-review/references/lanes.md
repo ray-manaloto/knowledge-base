@@ -33,10 +33,22 @@ reference file had not.
 **By ref, and cold.** Hand it the range and nothing else:
 
 ```text
-Review <FIXED>...HEAD in this repository. Read the diff yourself.
+Review <FIXED>...HEAD in this repository. Read the diff yourself, using this
+exact scope — it excludes one tracked prose directory that is not code under
+review:
+
+    git diff <FIXED>...HEAD -- . ':(exclude)docs/research/**'
+
 Return a findings list: severity, a one-line claim, and file:line for each.
-Cite every claim or label it unverified.
+Cite every claim or label it unverified. Report NO FINDINGS explicitly if you
+find nothing, rather than inventing something.
 ```
+
+**The scope is IN the template, not just in SKILL.md.** It was described in the
+skill and missing from this prompt, so following this file verbatim reintroduced
+the 56%-prose context cost the exclusion exists to remove — the same
+skill-corrected/reference-not-corrected split as the `codex-reviewer` paragraph
+directly above. Found by the cold lane, on the change that added the exclusion.
 
 Do **not** tell it what the change was for. That is the point of the lane — a
 reviewer given the design intent confirms the happy path, which is the failure

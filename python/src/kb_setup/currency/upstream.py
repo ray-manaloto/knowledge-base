@@ -84,6 +84,12 @@ _MAX_FEATURE_LINES = 12
 
 # A markdown section heading, at any depth (`## Added`, `### New features`).
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*?)\s*#*\s*$")
+# A heading naming a RELEASE rather than a content section — `## v0.9.27`,
+# `## 2026.7.16`, `## v1.0.0 — title`. Matched against the NORMALISED heading, and
+# requiring two numeric components so prose like "2 breaking changes" cannot pass.
+# This boundary is what makes the format check per-release: without it, one
+# release's recognised sections certified an entire multi-version jump.
+_VERSION_HEADING_RE = re.compile(r"^v?\d+\.\d+")
 # Keep-a-Changelog / GitHub-generated-notes section names whose bullets ARE
 # features by construction. This is the detector's primary signal, and it exists
 # because the phrase/`feat:` heuristics alone matched NOTHING on any real corpus
@@ -171,6 +177,66 @@ class Version:
         return self.parts + (0,) * (width - len(self.parts))
 
 
+def _release_spans(notes: str) -> list[list[str]]:
+    """Split concatenated release notes into one line-list per release.
+
+    A version heading is a RELEASE BOUNDARY rather than a content section, so it
+    also stops the previous release's `## Added` from leaking onto the next
+    release's bullets. The leading span (the preamble before the first version
+    heading) is returned too, and is usually empty.
+    """
+    spans: list[list[str]] = []
+    current: list[str] = []
+    for raw in notes.splitlines():
+        heading = _HEADING_RE.match(raw)
+        if heading and _VERSION_HEADING_RE.match(_normalize(heading.group(1)).rstrip(":.")):
+            spans.append(current)
+            current = []
+            continue
+        current.append(raw)
+    spans.append(current)
+    return spans
+
+
+def _scan_release(lines: list[str], already: int) -> tuple[list[str], int, bool, bool]:
+    """Scan ONE release: `(highlights, dropped, recognised, had_content)`.
+
+    `already` is how many highlights the caller has collected across earlier
+    releases, so the display cap applies to the whole span rather than resetting
+    per release — a four-release jump must not quietly return 4x the cap.
+    """
+    highlights: list[str] = []
+    dropped = 0
+    section = ""
+    recognised = False
+    had_content = False
+    for raw in lines:
+        heading = _HEADING_RE.match(raw)
+        if heading:
+            section = _normalize(heading.group(1)).rstrip(":.")
+            had_content = True
+            if section in _FEATURE_SECTIONS or section in _NON_FEATURE_SECTIONS:
+                recognised = True
+            continue
+        line = raw.strip().lstrip("-*").strip()
+        if not line:
+            continue
+        had_content = True
+        phrased = any(p in line.lower() for p in _FEATURE_PHRASES)
+        is_feat = bool(_FEAT_RE.match(raw))
+        if is_feat or phrased:
+            recognised = True
+        if section in _NON_FEATURE_SECTIONS:
+            continue
+        bulleted_feature = raw.strip().startswith(("-", "*")) and section in _FEATURE_SECTIONS
+        if bulleted_feature or is_feat or phrased:
+            if already + len(highlights) >= _MAX_FEATURE_LINES:
+                dropped += 1
+                continue
+            highlights.append(line)
+    return highlights, dropped, recognised, had_content
+
+
 @dataclass(frozen=True)
 class UpstreamStatus:
     """What upstream currently offers, and whether we could read it at all.
@@ -217,7 +283,7 @@ class UpstreamStatus:
         return tuple(found)
 
     def _scan_features(self) -> tuple[tuple[str, ...], int, bool]:
-        """Walk the notes once: `(highlights, dropped, format_recognised)`.
+        """Walk the notes: `(highlights, dropped, format_recognised)`.
 
         Section state is what makes this reliable. A bullet under `## Added` is a
         feature because of WHERE it sits, which needs no phrase to match — and
@@ -229,35 +295,28 @@ class UpstreamStatus:
         body whose structure we do not understand is "could not tell". Collapsing
         those is the same absence-of-evidence trap `UpstreamStatus`'s three-state
         docstring above already avoids for reachability.
+
+        It is computed PER RELEASE. `probe()` concatenates the notes of every
+        release in a multi-patch jump (graphify 0.9.26 -> 0.9.30 arrives as four
+        bodies in one string), so one flag over the whole string let a single
+        `## Added` certify the entire span: a later release written in a style this
+        scan does not understand, with real features in it, was reported as a
+        confident zero. Recognised means EVERY release carrying content was
+        recognised. (Cold lane.)
         """
         highlights: list[str] = []
         dropped = 0
-        section = ""
-        recognised = False
-        for raw in self.notes.splitlines():
-            heading = _HEADING_RE.match(raw)
-            if heading:
-                section = _normalize(heading.group(1)).rstrip(":.")
-                if section in _FEATURE_SECTIONS or section in _NON_FEATURE_SECTIONS:
-                    recognised = True
-                continue
-            line = raw.strip().lstrip("-*").strip()
-            if not line:
-                continue
-            low = line.lower()
-            is_bullet = raw.strip().startswith(("-", "*"))
-            in_feature_section = section in _FEATURE_SECTIONS
-            phrased = any(p in low for p in _FEATURE_PHRASES)
-            if _FEAT_RE.match(raw) or phrased:
-                recognised = True
-            if section in _NON_FEATURE_SECTIONS:
-                continue
-            if (is_bullet and in_feature_section) or _FEAT_RE.match(raw) or phrased:
-                if len(highlights) >= _MAX_FEATURE_LINES:
-                    dropped += 1
-                    continue
-                highlights.append(line)
-        return tuple(highlights), dropped, recognised
+        per_release: list[bool] = []
+        for lines in _release_spans(self.notes):
+            found, cut, recognised, had_content = _scan_release(lines, len(highlights))
+            highlights.extend(found)
+            dropped += cut
+            # Spans with nothing in them are not evidence either way. The preamble
+            # before the first version heading is one, and counting it would make
+            # every sectioned changelog unrecognised.
+            if had_content:
+                per_release.append(recognised)
+        return tuple(highlights), dropped, bool(per_release) and all(per_release)
 
     @property
     def feature_highlights(self) -> tuple[str, ...]:
@@ -289,8 +348,13 @@ class UpstreamStatus:
         graphify 0.9.27-0.9.30 groups its bullets under bold subheads rather than
         `## Added`, so section detection finds no purchase there.
         """
-        highlights, _, recognised = self._scan_features()
-        return bool(self.notes.strip()) and not highlights and not recognised
+        # Deliberately NOT `and not highlights`. That extra condition was the same
+        # masking bug one level up: in a multi-release jump, ONE readable release
+        # yielding a single feature suppressed the warning for the whole span, so
+        # "found 1 feature, and could not read 3 of the 4 releases" rendered as a
+        # confident list of 1. Whether the FORMAT was understood is independent of
+        # whether anything was found, and the reader needs both. (Cold lane.)
+        return bool(self.notes.strip()) and not self._scan_features()[2]
 
 
 def _pypi_json(package: str) -> tuple[dict[str, object], str]:

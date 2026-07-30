@@ -161,6 +161,9 @@ def test_mark_reviewed_rolls_the_baseline_to_the_reviewed_content(tmp_path: Path
     assert findings[0].verified
     rolled = docs.load(tmp_path)[_URL]["sha256"]
     assert rolled != "old"
+    # The message must NOT claim this proves what the human read — it cannot.
+    assert "live now" in findings[0].detail
+    assert rolled[:12] in findings[0].detail
     # And the drift is now genuinely resolved, not merely muted.
     again, _ = docs.verify((_URL,), docs.load(tmp_path), fetcher=lambda _u: ("new", ""))
     assert not again[0].drifted

@@ -208,7 +208,7 @@ def _feature_section(verdict: Verdict) -> str:
     here for a human to skim and decide whether a new capability is worth a config
     change.
     """
-    if verdict.features_unreadable:
+    if verdict.features_unreadable and not verdict.feature_review:
         # NOT the same as "no features", and rendering nothing here is what let a
         # whole release go unread. Say that the scan could not parse the body, so
         # the reader knows the silence is ours and not upstream's.
@@ -228,11 +228,21 @@ def _feature_section(verdict: Verdict) -> str:
         if verdict.features_dropped
         else ""
     )
+    # A list AND a caveat, not one or the other. A multi-release jump can be partly
+    # readable, and rendering only the list would present an incomplete set as a
+    # complete one — the masking this pair of flags exists to prevent.
+    partial = (
+        "\n\n_**This list may be incomplete.** At least one release in this span "
+        "uses a changelog format the scan could not read, so features announced "
+        "there are missing from the list above — read those notes by hand._"
+        if verdict.features_unreadable
+        else ""
+    )
     return (
         "### Features to consider adopting\n\n"
         "_Advisory — these did not block the bump. Skim for a new capability "
         "worth a config change._\n\n"
-        f"{lines}{dropped}"
+        f"{lines}{dropped}{partial}"
     )
 
 

@@ -402,3 +402,65 @@ def test_no_cap_no_dropped_count() -> None:
     """Control arm: the counter must stay 0 when nothing was cut."""
     status = upstream.UpstreamStatus(notes="## Added\n- one thing\n")
     assert status.features_dropped == 0
+
+
+# --------- the format check is PER RELEASE, not per body (cold-lane finding) ----
+#
+# `probe()` concatenates the notes of every release in a multi-patch jump, so a
+# single flag over the whole string let one release's `## Added` certify the span.
+
+
+def test_one_unreadable_release_in_a_span_is_reported_even_when_another_is_read() -> None:
+    """The masking case: v1.0.1 is sectioned, v1.0.2 is bold-subhead prose.
+
+    The features from the readable release are still surfaced, AND the span is
+    flagged unreadable — because the list is now known to be incomplete. Two
+    conditions had to change for this: the per-release flag, and dropping
+    `not highlights` from `feature_scan_unrecognised`.
+    """
+    notes = (
+        "## v1.0.1\n\n## Added\n- a real feature\n\n"
+        "## v1.0.2\n\nA prose release.\n\n**Bold subhead**\n\n- really a feature\n"
+    )
+    status = upstream.UpstreamStatus(notes=notes)
+    assert any("a real feature" in h for h in status.feature_highlights)
+    assert status.feature_scan_unrecognised
+
+
+def test_a_span_where_every_release_is_readable_is_not_flagged() -> None:
+    """Control arm: the per-release check must still be able to say 'all read'."""
+    notes = "## v1.0.1\n\n## Added\n- a\n\n## v1.0.2\n\n## Fixed\n- b\n"
+    assert not upstream.UpstreamStatus(notes=notes).feature_scan_unrecognised
+
+
+def test_the_preamble_before_the_first_version_heading_is_not_an_unread_release() -> None:
+    """A GitHub body opens with `## vX` then prose; that empty span is not evidence.
+
+    Counting it would make EVERY sectioned changelog report unreadable — which is
+    how the first version of this fix broke mise.
+    """
+    notes = "## v2026.7.16\n\nA summary paragraph.\n\n## Added\n- a thing\n"
+    status = upstream.UpstreamStatus(notes=notes)
+    assert any("a thing" in h for h in status.feature_highlights)
+    assert not status.feature_scan_unrecognised
+
+
+def test_a_version_heading_does_not_leak_the_previous_releases_section() -> None:
+    """A release boundary resets section state.
+
+    Otherwise a bullet directly under `## v1.0.2` would still be read as sitting
+    in the `## Added` that ended the previous release, and be reported as a
+    feature of the wrong release.
+    """
+    notes = "## v1.0.1\n\n## Added\n- real feature\n\n## v1.0.2\n\n- an unsectioned bullet\n"
+    highlights = upstream.UpstreamStatus(notes=notes).feature_highlights
+    assert any("real feature" in h for h in highlights)
+    assert not any("unsectioned bullet" in h for h in highlights)
+
+
+def test_prose_dates_and_counts_are_not_mistaken_for_version_headings() -> None:
+    """`_VERSION_HEADING_RE` needs two numeric components, so prose cannot reset."""
+    notes = "## 2 breaking changes\n\n## Added\n- a thing\n"
+    status = upstream.UpstreamStatus(notes=notes)
+    assert any("a thing" in h for h in status.feature_highlights)
+    assert not status.feature_scan_unrecognised

@@ -19,8 +19,11 @@
 # hard=2026.7.14 is where the env-file secret-expansion fix (#11269) and both
 # task-freshness correctness fixes (#11288, #11296) landed — below that there are
 # known-bad behaviours, even though this repo is not currently exposed to either
-# (no `env._.file`, no task `sources`/`outputs`). soft=2026.7.15 is the version
-# this repo has actually been verified against, so 7.14 runs with a nudge.
+# (no `env._.file`, no task `sources`/`outputs`). soft tracks the version this
+# repo has actually been verified against — 2026.7.16 as of the 2026-07-29
+# currency review — so anything from 7.14 up runs with a nudge rather than a stop.
+# Bump soft in the SAME change that bumps `currency.toml`'s `expected`, or the
+# comment and the value drift apart (they did, and the cold lane caught it).
 # Keep soft > hard or soft is inert: hard errors across exactly the range soft
 # would warn in, so an equal pair makes the warning unobservable.
 min_version = { hard = "2026.7.14", soft = "2026.7.16" }

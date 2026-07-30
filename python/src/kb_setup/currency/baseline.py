@@ -30,6 +30,7 @@ and a fresh clone would start from "unknown" while looking green.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -56,8 +57,15 @@ class BaselineFinding:
     detail: str
 
 
-def load(repo_root: Path) -> dict[str, dict[str, str]]:
-    """The committed cache, or an empty mapping when it does not exist yet."""
+def load(repo_root: Path) -> dict[str, object]:
+    """The committed cache, or an empty mapping when it does not exist yet.
+
+    Typed `dict[str, object]`, which is what it actually is: the values come
+    straight from `json.loads` and are whatever the file held. The old
+    `dict[str, dict[str, str]]` was a claim this function never checked, and
+    `behind()` trusted it and crashed on `{"graphify": "oops"}`. A type that
+    over-promises is how the callers stopped validating.
+    """
     path = repo_root / BASELINE_FILE
     if not path.is_file():
         return {}
@@ -68,7 +76,7 @@ def load(repo_root: Path) -> dict[str, dict[str, str]]:
     return data if isinstance(data, dict) else {}
 
 
-def save(repo_root: Path, store: dict[str, dict[str, str]]) -> Path:
+def save(repo_root: Path, store: Mapping[str, object]) -> Path:
     """Write the cache back, sorted so a diff shows content and not reordering."""
     path = repo_root / BASELINE_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,12 +85,12 @@ def save(repo_root: Path, store: dict[str, dict[str, str]]) -> Path:
 
 
 def record(
-    store: dict[str, dict[str, str]],
+    store: Mapping[str, object],
     tool: str,
     latest: str,
     *,
     now: datetime | None = None,
-) -> dict[str, dict[str, str]]:
+) -> dict[str, object]:
     """Return `store` with `tool`'s observation refreshed.
 
     An empty `latest` is NOT recorded. A tool with no upstream channel (ffmpeg is
@@ -91,8 +99,8 @@ def record(
     offers nothing — the false-green this engine refuses everywhere else.
     """
     if not latest:
-        return store
-    updated = dict(store)
+        return dict(store)
+    updated: dict[str, object] = dict(store)
     updated[tool] = {
         "latest": latest,
         "observed_at": (now or datetime.now(UTC)).isoformat(),
@@ -113,7 +121,7 @@ def _stale(observed_at: str, now: datetime) -> bool:
 def behind(
     tool: str,
     pinned: str,
-    store: dict[str, dict[str, str]],
+    store: Mapping[str, object],
     *,
     now: datetime | None = None,
 ) -> BaselineFinding | None:
@@ -127,24 +135,57 @@ def behind(
       versions agree, because agreement with a months-old observation is not
       evidence of being current.
     * pinned genuinely behind — the finding this module exists for.
+    * an entry we cannot READ or cannot COMPARE — unchecked, same as no entry.
 
     Returns None when the pin matches (or leads) a fresh observation.
+
+    Every failure path yields a FINDING, never an exception. A crash is not a
+    verdict: this runs inside the SessionStart hook, where an `AttributeError`
+    from a hand-edited or half-written cache would surface as a broken session
+    rather than as "could not check". Found by the cold lane — `load` only
+    guarded JSON *syntax*, so `{"graphify": "oops"}` parsed fine and then blew up
+    on `.get`.
     """
     moment = now or datetime.now(UTC)
     entry = store.get(tool)
-    if not entry or not entry.get("latest"):
+    if entry is None or (isinstance(entry, dict) and not entry.get("latest")):
         return BaselineFinding(
             tool,
             "upstream-cache",
             "no upstream version has ever been recorded — run `mise run kb-currency` "
             "so the offline check can tell whether this pin is behind",
         )
-    latest = entry["latest"]
-    stale = _stale(entry.get("observed_at", ""), moment)
-    seen = entry.get("observed_at", "")[:10] or "an unknown date"
+    # MALFORMED is its own answer, not folded into "never recorded". Both block the
+    # comparison, but one says nobody has run the loop and the other says the cache
+    # is corrupt — and a hand-edited or half-written file deserves to be named as
+    # such rather than reported as a missing run.
+    latest = entry.get("latest") if isinstance(entry, dict) else None
+    if not isinstance(latest, str):
+        return BaselineFinding(
+            tool,
+            "upstream-cache",
+            f"the recorded upstream entry is MALFORMED ({type(entry).__name__}) — "
+            "delete it and re-run `mise run kb-currency`; until then whether this "
+            "pin is behind is UNKNOWN",
+        )
+    raw_observed = entry.get("observed_at") if isinstance(entry, dict) else None
+    observed = raw_observed if isinstance(raw_observed, str) else ""
+    stale = _stale(observed, moment)
+    seen = observed[:10] or "an unknown date"
     cur, new = Version.parse(pinned), Version.parse(latest)
-    is_behind = new > cur if (cur is not None and new is not None) else latest != pinned
-    if is_behind:
+    if cur is None or new is None:
+        # NOT a string `!=` fallback. Two strings being different says nothing
+        # about which is NEWER, so the old fallback reported "pinned at 0.9.26 but
+        # upstream had nightly" — a direction it had no way to know, in the words
+        # of a definite finding. Unorderable is unchecked. (Cold lane.)
+        return BaselineFinding(
+            tool,
+            "upstream-cache",
+            f"cannot compare pin {pinned!r} with the recorded upstream {latest!r} — "
+            "one of them is not a numeric version, so whether this pin is behind is "
+            "UNKNOWN rather than fine",
+        )
+    if new > cur:
         return BaselineFinding(
             tool,
             "upstream-version",

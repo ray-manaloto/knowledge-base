@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 
@@ -109,7 +110,7 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
 
 
 def _upstream_finding(
-    spec: config.ToolSpec, status: sync.SyncStatus, cache: dict[str, dict[str, str]]
+    spec: config.ToolSpec, status: sync.SyncStatus, cache: Mapping[str, object]
 ) -> list[baseline.BaselineFinding]:
     """The offline pin-vs-upstream verdict for one tool, as a 0-or-1 element list.
 

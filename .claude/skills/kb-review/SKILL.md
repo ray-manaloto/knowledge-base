@@ -65,6 +65,18 @@ Pass the exclusion to every lane, not just to your own `git diff`. Those files
 are still tracked, still promoted, still verbatim (`agent-report-persistence.md`
 is unchanged) — they are simply not code under review.
 
+**A branch touching ONLY `docs/research/**` therefore has an empty SCOPED diff,
+and that is a different state from a bad ref — do not report it as "nothing to
+review".** There is something to ship; it is simply all excluded from review.
+
+There is no receipt for this case, and that is deliberate. Every lane would be
+skipped, so `kb-review-receipt` refuses with `records no lane that actually ran`
+— correctly, because nothing was reviewed, and a receipt exists to say a review
+happened. Ship such a branch the way the #75 revert was shipped: state in the PR
+body that the whole diff is review-excluded prose, and let the local gates be the
+gate. Do not reach for `not-applicable-excluded-scope-only` or any other reason to
+manufacture a receipt for it.
+
 ### 2. Run ONE lane: the cold cross-family reviewer
 
 **One lane, always. There is no diff-type table and no multi-lane mode.**
@@ -135,6 +147,26 @@ write the receipt against the fixed SHA — **without a third lane round.** The
 gates are the verification at that point. Say so in the PR body; nothing in the
 receipt schema records it, and deliberately so — a `gate_verified_delta` field
 would be one more thing to maintain for a case the prose already covers.
+
+**That path needs one more step than it looks, and without it the gate refuses.**
+A receipt is always keyed to `HEAD`, and `_missing_reports` looks for
+`review-<that same sha>-<lane>.md` — so the moment you commit the fix, HEAD moves
+and the round-2 report, named for the pre-fix SHA, is invisible to it. The
+shortcut as first written was a dead end (found by the cold lane on this very
+change). So write a **short fix-round report at the new SHA**:
+
+```text
+.agent/kb/review/reports/review-<fixed-sha>-cold.md
+
+Round 2 reviewed <pre-fix-sha>; see review-<pre-fix-sha>-cold.md for the findings.
+No lane re-ran against <fixed-sha>. Verification for the fix is the local gates:
+<the gates you ran, and their rc>.
+```
+
+**Do not copy the round-2 report to the new name.** That would assert a lane read
+bytes it never saw, which is the "gap wearing a reason's clothes" this gate exists
+to refuse. The file above is honest precisely because it says a lane did *not*
+re-run — the receipt records that a review happened, and this records what kind.
 
 ### 5. Persist the lane's report, THEN write the receipt
 

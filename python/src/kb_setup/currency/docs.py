@@ -228,10 +228,17 @@ def mark_reviewed(
     """Roll a drifted page's baseline forward, AFTER a human has re-read it.
 
     The deliberate manual step that `verify` no longer performs for a drifted
-    page. Re-fetches so the recorded hash is the content that was actually
-    reviewed rather than whatever the last run happened to see, and a page that
-    cannot be fetched is left alone — rolling a baseline to an unknown hash would
-    silence the finding without anyone having read anything.
+    page. A page that cannot be fetched is left alone — rolling a baseline to an
+    unknown hash would silence the finding without anyone having read anything.
+
+    **What this records is the content live AT THIS MOMENT, which it cannot prove
+    is the content you read.** An earlier version of this docstring claimed the
+    recorded hash "is the content that was actually reviewed"; nothing here can
+    know that, and if the page changes between your reading it and your running
+    this, the new revision is silently adopted as reviewed. (Cold lane.) The
+    digest is therefore printed in the returned finding, so the roll is at least
+    attributable — and the honest usage is to run this immediately after reading,
+    not at the end of a long session.
     """
     get: Fetcher = fetcher or _fetch
     moment = (now or datetime.now(UTC)).isoformat()
@@ -242,10 +249,16 @@ def mark_reviewed(
         if err:
             findings.append(DocsFinding(url, "docs-fetch", f"NOT CHECKED — {err}"))
             continue
-        store[url] = {"sha256": content_hash(body), "checked_at": moment}
+        digest = content_hash(body)
+        store[url] = {"sha256": digest, "checked_at": moment}
         findings.append(
             DocsFinding(
-                url, "docs-baseline", "baseline rolled to the reviewed content", verified=True
+                url,
+                "docs-baseline",
+                f"baseline rolled to the content live now (sha256 {digest[:12]}…) — "
+                "this records what was fetched at this moment, not proof of what "
+                "you read",
+                verified=True,
             )
         )
     save(repo_root, store)

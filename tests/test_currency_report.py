@@ -562,7 +562,12 @@ def test_release_notes_are_fenced_so_upstream_markdown_is_inert(tmp_path) -> Non
     assert detail is not None
     body = detail.read_text(encoding="utf-8")
     assert "```text" in body
-    # The upstream heading must not be a live heading in our document.
+    # The CONTENT must survive inside the fence, not merely the delimiters —
+    # a regression emitting an empty fenced block passed the delimiter check.
+    fenced = body.split("```text", 1)[1].split("```", 1)[0]
+    assert "## Highlights" in fenced
+    assert "a thing" in fenced
+    # And the upstream heading must not be a live heading in OUR document.
     assert "\n## Highlights" not in body.split("```text")[0]
 
 
@@ -578,6 +583,13 @@ def test_the_fence_outgrows_a_code_block_inside_the_notes(tmp_path) -> None:
     body = detail.read_text(encoding="utf-8")
     assert "````text" in body
     assert body.count("````") == 2
+    # The inner fence and the notes after it must both survive inside the outer
+    # one; asserting only on the delimiters would pass on an empty block.
+    fenced = body.split("````text", 1)[1].split("````", 1)[0]
+    assert "```toml" in fenced
+    assert "[tasks.build]" in fenced
+    assert "## Added" in fenced
+    assert "a thing" in fenced
 
 
 def test_empty_notes_produce_no_fence_at_all(tmp_path) -> None:
