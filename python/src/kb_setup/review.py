@@ -171,6 +171,15 @@ EXEMPT_PATHS = ("graphify-out/memory/", "docs/goals/README.md")
 #: refs — the drift this module has now closed in four other places.
 DEFAULT_BASE_REF = "origin/main"
 
+#: How many leading SHA characters a lane report may use to name its commit.
+#:
+#: Twelve, matching the `sha[:12]` this module prints in every message — so the
+#: form a lane naturally quotes back is the form that is accepted. Deliberately
+#: NOT git's default abbreviation, which can be as short as 7: a 7-hex run
+#: appears in ordinary prose often enough to match by accident, and a check that
+#: can pass by coincidence asserts something it never verified. (#56)
+_SHA_ABBREV = 12
+
 #: How many disqualifying paths the refusal message names before summarising.
 #: A DISPLAY bound, so it states the remainder ("+3 more") rather than truncating
 #: silently — a bound that hides its own existence is how "absent" and
@@ -303,15 +312,38 @@ def _all_reasons(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
 
 
 def _evidence_gap(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
-    """Return why the claimed lanes lack reports on disk, or None if they don't."""
-    missing = _missing_reports(repo_root, data, sha)
+    """Return why the claimed lanes' reports are absent or unbound, or None."""
+    missing, unbound = _report_gaps(repo_root, data, sha)
     if missing:
         return (
             f"claims lane(s) {', '.join(missing)} ran, but no non-empty report is at "
             f"{REPORT_DIR}/review-{_safe_sha(sha)}-<lane>.md — a lane that left no "
             f"report is a claim, not a review"
         )
+    if unbound:
+        return (
+            f"lane(s) {', '.join(unbound)} left a report that never names {sha[:_SHA_ABBREV]} — "
+            f"a filename is not a binding, so state the reviewed commit IN the report "
+            f"(the fix-round template in kb-review/SKILL.md already does)"
+        )
     return None
+
+
+def _binds_sha(body: str, sha: str) -> bool:
+    """Return whether ``body`` DECLARES that it is about ``sha``.
+
+    The filename already encodes the commit, and a filename is chosen by the
+    orchestrator rather than by the lane — so on its own it records where a file
+    was put, not what was read. This asks the report to say so itself.
+
+    Accepts the full SHA or its :data:`_SHA_ABBREV`-character prefix, because
+    that is the form this module prints everywhere else (`sha[:12]`) and the form
+    a lane naturally quotes back. Shorter prefixes are refused: git's default
+    abbreviation can be as short as 7, and a 7-hex string is common enough in
+    ordinary prose to match by accident, which would make the check assert
+    something it had not checked.
+    """
+    return sha in body or (len(sha) >= _SHA_ABBREV and sha[:_SHA_ABBREV] in body)
 
 
 def _safe_sha(sha: str) -> str:
@@ -465,7 +497,7 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     """Return where ``lane``'s report for ``sha`` must be written.
 
     The `:variant` is STRIPPED: a lane recorded as `cold:codex` leaves
-    `…-cold.md`. `_missing_reports` already read it that way (via
+    `…-cold.md`. `_report_gaps` already read it that way (via
     `_lane_prefix`), so a caller passing the variant to this helper got
     `…-coldcodex.md` while the gate hunted `…-cold.md` — the same
     writer/reader divergence as the `_safe_lane` hyphen bug, one layer up, and
@@ -475,35 +507,44 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     return repo_root / REPORT_DIR / f"review-{_safe_sha(sha)}-{lane_file}.md"
 
 
-def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[str]:
-    """Return lanes claimed as RUN that have no non-empty report on disk.
+def _report_gaps(repo_root: Path, data: dict[str, Any], sha: str) -> tuple[list[str], list[str]]:
+    """Return ``(lanes with no usable report, lanes whose report names another commit)``.
 
-    **This is also what pins the receipt to the SHA the lanes actually read**,
-    which is not obvious and was filed as a design gap (#56): the CLI reads HEAD
-    at mint time and there is deliberately no `--sha`, so nothing *appears* to
-    stop a commit landing between the last lane finishing and the receipt being
-    written.
+    Two distinct failures, reported separately because the remedies differ: the
+    first means run the lane, the second means say what it read.
 
-    Something does. Reports are resolved through :func:`report_path` against the
-    RECEIPT's sha — which is that fresh HEAD — so if HEAD moved after the lanes
-    ran, their reports are named for the old commit, are invisible here, and the
-    receipt is refused for missing evidence. The window closes itself.
+    **The second half is #56.** The receipt is minted against fresh HEAD and
+    there is deliberately no `--sha`, so nothing bound "the commit the lanes
+    reviewed" to "the commit the receipt is for". The filename did *look* like
+    that binding — a report is resolved as `review-<receipt sha>-<lane>.md`, so a
+    moved HEAD leaves the old report invisible and the receipt refused — and for
+    the accidental case that is genuinely enough. But a filename is chosen by the
+    ORCHESTRATOR, not by the lane, so it records where a file was put rather than
+    what was read. The cold lane rated that P1 while reviewing PR #79 and Ray
+    reversed the earlier risk acceptance (2026-07-30).
 
-    What remains is authoring a report at the NEW sha, and that is not a hole to
-    plug: `kb-review/SKILL.md` step 4 PRESCRIBES exactly that for the fix-round
-    case (fix a round-2 finding, re-run the gates, write a short report at the
-    fixed sha stating plainly that no lane re-ran) and forbids copying the
-    round-2 report to the new name. #56's proposed fix — capture HEAD at lane
-    dispatch and refuse if it moved — would make that documented path
-    impossible, since committing the fix is what moves HEAD. Closed as
-    already-mitigated rather than implemented (Ray, 2026-07-30).
+    **The issue as written is still not what got built, and deliberately.**
+    Capturing HEAD at lane dispatch and refusing if it moved would make
+    `kb-review/SKILL.md` step 4's fix-round path impossible — committing the fix
+    is what moves HEAD. Asking the report to NAME its commit closes the same gap
+    while leaving that path open: the fix-round template already states the fixed
+    SHA, so an honest fix-round report passes, and it now passes *visibly* rather
+    than by convention.
+
+    It is still not proof — a determined caller can paste the SHA into a stub,
+    exactly as one could already write a stub at all (`lanes.md` says so). What
+    it removes is the case where a report is evidence for a commit **nobody ever
+    claimed it was about**, and it makes the honest path the easy one. Measured
+    on the two reports on disk when this landed: one named its SHA, one did not,
+    so the lane prompt now requires it.
     """
     # `data.get(k, [])`, matching `_check_lanes` — the THIRD idiom for one key
     # was here (`or []`), contradicting the "one key deserves one read" rule two
     # functions up. It is unreachable with a malformed value only because
     # `_all_reasons` runs `_reject_reason` first; that ordering is now stated
     # rather than relied on silently, and `or []` below is the belt to its braces.
-    missing = []
+    missing: list[str] = []
+    unbound: list[str] = []
     for entry in _as_entries(data.get("lanes_ran", [])) or []:
         lane = _lane_prefix(str(entry))
         path = report_path(repo_root, sha, lane)
@@ -528,7 +569,13 @@ def _missing_reports(repo_root: Path, data: dict[str, Any], sha: str) -> list[st
             body = ""
         if not body.strip():
             missing.append(lane)
-    return missing
+        elif not _binds_sha(body, sha):
+            # Checked only when a report EXISTS: "no report" and "a report that
+            # does not say what it read" are different states, and reporting the
+            # second for a lane that simply never ran would send the reader
+            # looking for a file that is not there.
+            unbound.append(lane)
+    return missing, unbound
 
 
 def _check_identity(data: dict[str, Any], sha: str) -> str | None:

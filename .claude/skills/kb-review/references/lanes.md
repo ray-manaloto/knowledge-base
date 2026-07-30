@@ -42,7 +42,18 @@ review:
 Return a findings list: severity, a one-line claim, and file:line for each.
 Cite every claim or label it unverified. Report NO FINDINGS explicitly if you
 find nothing, rather than inventing something.
+
+State the HEAD commit you reviewed, in full, at the top of your report.
+
+Save your full report to .agent/kb/review/reports/review-<HEAD SHA>-<lane>.md
 ```
+
+**The "state the HEAD commit" line is load-bearing, not politeness.** The receipt
+gate refuses a report that never names the commit it is evidence for (#56) — a
+filename is chosen by the orchestrator, so it records where a file was put rather
+than what was read. Measured when that check landed: of the two real lane reports
+on disk, **one named its SHA and one did not**, so this is a line the prompt has
+to carry rather than a habit lanes already have.
 
 **The scope is IN the template, not just in SKILL.md.** It was described in the
 skill and missing from this prompt, so following this file verbatim reintroduced
@@ -186,13 +197,27 @@ So pass `--fixed-point` only when you genuinely reviewed against something other
 than `origin/main`, and expect both tasks to refuse it.
 
 **A lane claimed as RUN must have left a report** at
-`.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty — where `<lane>` is
-the lane, with any `:variant` **stripped**. A lane recorded as `cold:codex` leaves
-`…-cold.md`, not `…-cold:codex.md`. Without that the
-whole receipt was honor-system: one command with four lane names minted full
-coverage having run nothing, which is the widest form of a hole whose narrower
-forms had already been closed twice. It raises the bar rather than proving
-anything — a stub file still passes — but the honest path is now the easy one.
+`.agent/kb/review/reports/review-<sha>-<lane>.md`, non-empty, **and that report
+must NAME `<sha>`** (full, or its first 12 characters) somewhere in its body.
+`<lane>` is the lane with any `:variant` **stripped** — a lane recorded as
+`cold:codex` leaves `…-cold.md`, not `…-cold:codex.md`.
+
+Without the file check the whole receipt was honor-system: one command with four
+lane names minted full coverage having run nothing, the widest form of a hole
+whose narrower forms had already been closed twice.
+
+Without the NAMING check the filename was doing work it cannot do (#56). The
+orchestrator picks the filename, so it records where a file was put, not what a
+lane read — which left a copied or stale report able to stand as evidence for a
+commit nobody claimed it was about. `_report_gaps` reports the two failures
+separately, because the remedies differ: run the lane, versus say what it read.
+
+Twelve characters is the floor, and seven — git's default abbreviation — is
+deliberately refused: a 7-hex run occurs in ordinary prose often enough to match
+by accident, and a check that can pass by coincidence has not checked anything.
+
+Both raise the bar rather than proving anything — a determined caller can paste a
+SHA into a stub — but the honest path is the easy one, and that is the claim.
 
 **Three skip reasons excuse a lane, and two of them are lane-scoped**:
 

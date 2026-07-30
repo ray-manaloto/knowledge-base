@@ -132,7 +132,7 @@ def _reviewed(tmp_path, oid: str) -> None:
     for lane in ("standards", "spec"):
         rp = review.report_path(tmp_path, oid, lane)
         rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("NO FINDINGS", encoding="utf-8")
+        rp.write_text(f"NO FINDINGS — reviewed {oid}", encoding="utf-8")
     review.write_receipt(
         tmp_path,
         review.Receipt(
@@ -384,7 +384,7 @@ def _write_valid_receipt(tmp_path, sha: str = _HEAD) -> None:
     for lane in ("standards", "spec"):
         rp = review.report_path(tmp_path, sha, lane)
         rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("NO FINDINGS", encoding="utf-8")
+        rp.write_text(f"NO FINDINGS — reviewed {sha}", encoding="utf-8")
     review.write_receipt(
         tmp_path,
         review.Receipt(
@@ -430,7 +430,8 @@ def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
 
     **Every other reason to refuse is removed first**, which is the whole
     difference between this and the version that shipped: it wrote a receipt
-    claiming four lanes and no report files at all, so `_missing_reports`
+    claiming four lanes and no report files at all, so `_report_gaps` (then
+    named `_missing_reports`)
     refused it before `_check_blocking` was ever consulted. Deleting the
     blocking check outright would have left the test green — a probe passing for
     a reason other than the one it names. (#59)
@@ -444,7 +445,7 @@ def test_ship_refuses_on_blocking_review_findings(monkeypatch, tmp_path):
     for lane in ("standards", "spec", "cold", "silent-failure"):
         rp = review.report_path(tmp_path, _HEAD, lane)
         rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text("one blocking finding", encoding="utf-8")
+        rp.write_text(f"one blocking finding — reviewed {_HEAD}", encoding="utf-8")
     review.write_receipt(
         tmp_path,
         review.Receipt(
