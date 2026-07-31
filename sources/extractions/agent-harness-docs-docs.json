@@ -1,0 +1,2802 @@
+{
+ "nodes": [
+  {
+   "id": "ahd_subagents_subagent",
+   "label": "Subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A subagent is a specialized AI assistant that handles a specific type of task. Each subagent runs in its own context window with a custom system prompt, specific tool access, and independent permissions; it works independently and returns only its results to the main conversation."
+  },
+  {
+   "id": "ahd_subagents_context_preservation",
+   "label": "Context preservation as the primary motive",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Use a subagent when a side task would flood the main conversation with search results, logs, or file contents you will not reference again: the subagent does that work in its own context and returns only the summary. Subagents also enforce constraints via tool limits, allow reuse across projects, specialize behavior, and control cost by routing to cheaper models like Haiku."
+  },
+  {
+   "id": "ahd_subagents_delegation_by_description",
+   "label": "Delegation is decided from the description field",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude uses each subagent's description to decide when to delegate, combined with the task description in the user's request and current context. Including phrases like 'use proactively' in the description encourages proactive delegation."
+  },
+  {
+   "id": "ahd_subagents_scope_boundary_vs_teams",
+   "label": "Subagents are single-session; teams and background agents are not",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Subagents work within a single session. Running many independent sessions in parallel and monitoring them from one place is background agents; sessions that communicate with each other are agent teams. For tasks needing sustained parallelism or exceeding the context window, agent teams give each worker its own independent context."
+  },
+  {
+   "id": "ahd_subagents_builtin_agents",
+   "label": "Built-in subagents",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude Code ships built-in subagents (Explore, Plan, general-purpose, plus helper agents) that Claude uses automatically when appropriate. Each inherits the parent conversation's permissions with additional tool restrictions, and they are registered by default in interactive sessions."
+  },
+  {
+   "id": "ahd_subagents_explore_agent",
+   "label": "Explore built-in subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Explore is a fast, read-only agent for file discovery, code search, and codebase exploration; Write and Edit are denied. When invoking it Claude specifies a thoroughness level of quick, medium, or very thorough."
+  },
+  {
+   "id": "ahd_subagents_explore_model_cap",
+   "label": "Explore inherits the session model, capped at Opus on the Claude API",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.198 Explore inherits the main conversation's model instead of always running on Haiku; on the Claude API the inherited model is capped at Opus, so Explore never runs on a more expensive model than the session already chose. On other providers (Bedrock, Google Cloud Agent Platform, Microsoft Foundry, Claude Platform on AWS) it inherits the main model directly."
+  },
+  {
+   "id": "ahd_subagents_explore_override_by_name",
+   "label": "A user/project subagent named Explore overrides the built-in",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A user or project subagent named `Explore` overrides the built-in and keeps its own `model` field, so defining one with `model: haiku` is the documented way to keep exploration on a lower-cost model."
+  },
+  {
+   "id": "ahd_subagents_plan_agent",
+   "label": "Plan built-in subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Plan is a research agent used during plan mode to gather context before presenting a plan. It inherits the main conversation's model, is read-only (Write and Edit denied), and keeps exploration output in a separate context window while the main conversation stays read-only."
+  },
+  {
+   "id": "ahd_subagents_general_purpose_agent",
+   "label": "General-purpose built-in subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "General-purpose is a capable agent for complex, multi-step tasks requiring both exploration and action. It inherits the main conversation's model and receives every tool available to subagents. Claude delegates to it when a task needs both exploration and modification, complex reasoning, or multiple dependent steps."
+  },
+  {
+   "id": "ahd_subagents_helper_agents",
+   "label": "Helper agents: statusline-setup and claude-code-guide",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Two additional helper agents are invoked automatically: statusline-setup runs on Sonnet when you run /statusline to configure the status line, and claude-code-guide runs on Haiku when you ask questions about Claude Code features."
+  },
+  {
+   "id": "ahd_subagents_explore_plan_skip_claude_md",
+   "label": "Explore and Plan skip CLAUDE.md and git status",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Explore and Plan skip the CLAUDE.md files and the parent session's git status to keep research fast and inexpensive; every other built-in and custom subagent loads both. They are the only subagents that omit them, and there is no frontmatter field or per-agent setting to change which agents skip them. If a rule must reach them, restate it in the delegation prompt."
+  },
+  {
+   "id": "ahd_subagents_restrict_builtins",
+   "label": "Restricting or removing built-in subagents",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Built-ins can be restricted four ways: add a type to permissions.deny; deny the `Agent` tool itself to stop all delegation; set CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS=1 (v2.1.198+) to remove only Explore and Plan so Claude reads files directly; or set CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS=1 in non-interactive mode and the Agent SDK to remove all built-in types."
+  },
+  {
+   "id": "ahd_subagents_file_format",
+   "label": "Subagent files are Markdown with YAML frontmatter",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A subagent file is Markdown with YAML frontmatter: the frontmatter defines metadata and configuration, and the Markdown body becomes the system prompt guiding behavior. Subagents receive only this system prompt plus basic environment details like the working directory — never the full Claude Code system prompt."
+  },
+  {
+   "id": "ahd_subagents_agents_command_wizard_removed",
+   "label": "/agents no longer opens a creation wizard (v2.1.198)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.198 the /agents command no longer opens the interactive creation wizard; it prints a reminder to ask Claude or edit .claude/agents/ directly. Subagent files, frontmatter fields, and the .claude/agents/ and ~/.claude/agents/ locations are unchanged — only the terminal wizard was removed. On v2.1.197 and earlier /agents opened a wizard with Running and Library tabs."
+  },
+  {
+   "id": "ahd_subagents_scope_precedence",
+   "label": "Five subagent scopes with fixed name-collision priority",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "When multiple subagents share a name, Claude Code uses the higher-priority location. Priority order: 1 managed settings (organization-wide), 2 the --agents CLI flag (current session), 3 .claude/agents/ (project), 4 ~/.claude/agents/ (all your projects), 5 a plugin's agents/ directory (lowest)."
+  },
+  {
+   "id": "ahd_subagents_project_scope",
+   "label": "Project subagents in .claude/agents/",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Project subagents live in .claude/agents/ and are ideal for codebase-specific agents; check them into version control so the team can use and improve them. They are discovered by walking up from the current working directory, so every .claude/agents/ between there and the repository root is scanned."
+  },
+  {
+   "id": "ahd_subagents_nested_closest_wins",
+   "label": "Nested project directories: closest to cwd wins (v2.1.178)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.178, when more than one of the nested .claude/agents/ directories found by walking up from cwd defines the same `name`, Claude Code uses the definition closest to the working directory."
+  },
+  {
+   "id": "ahd_subagents_add_dir_scanning",
+   "label": "--add-dir directories are scanned for agents",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A .claude/agents/ folder inside a directory added with --add-dir loads alongside project subagents. To share subagents across projects without --add-dir, use ~/.claude/agents/ or a plugin."
+  },
+  {
+   "id": "ahd_subagents_user_scope",
+   "label": "User subagents in ~/.claude/agents/",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "User subagents live in ~/.claude/agents/ and are personal subagents available in all of your projects on that machine."
+  },
+  {
+   "id": "ahd_subagents_recursive_scan_identity",
+   "label": "Recursive scanning; identity comes only from `name`",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude Code scans .claude/agents/ and ~/.claude/agents/ recursively, so definitions can be organized into subfolders such as agents/review/ or agents/research/. For project and user scopes the subdirectory path does not affect how a subagent is identified or invoked — identity comes only from the `name` frontmatter field."
+  },
+  {
+   "id": "ahd_subagents_duplicate_name_hazard",
+   "label": "Duplicate names in one directory resolve by filesystem read order",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "If two files under the same .claude/agents/ directory, including its subfolders, declare the same name, Claude Code loads only one of them, chosen by filesystem read order rather than a documented precedence — so `name` values must be kept unique across the whole tree."
+  },
+  {
+   "id": "ahd_subagents_doctor_duplicate_report",
+   "label": "/doctor reports same-directory duplicate names (v2.1.205)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.205 the /doctor setup checkup reports files in the same directory that share a name and proposes renaming or removing all but one. Before v2.1.205, /doctor opened a diagnostics screen listing duplicates and showing which definition was active."
+  },
+  {
+   "id": "ahd_subagents_plugin_scoped_identifier",
+   "label": "Plugin subfolders become part of the scoped identifier",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Plugin agents/ directories are scanned recursively, but unlike project and user scopes a subfolder becomes part of the scoped identifier: a file at agents/review/security.md in plugin my-plugin registers as `my-plugin:review:security`."
+  },
+  {
+   "id": "ahd_subagents_cli_agents_flag",
+   "label": "--agents CLI flag defines session-only subagents as JSON",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "CLI-defined subagents are passed as JSON when launching Claude Code, exist only for that session, and are not saved to disk — useful for quick testing or automation scripts. Multiple subagents can be defined in one --agents call. The JSON accepts the same fields as file frontmatter: description, prompt, tools, disallowedTools, model, permissionMode, mcpServers, hooks, maxTurns, skills, initialPrompt, memory, effort, background, isolation, and color, with `prompt` standing in for the markdown body."
+  },
+  {
+   "id": "ahd_subagents_managed_subagents",
+   "label": "Managed subagents deployed by administrators",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Managed subagents are deployed by organization administrators as markdown files in .claude/agents/ inside the managed settings directory, using the same frontmatter format. Managed definitions take precedence over project and user subagents with the same name."
+  },
+  {
+   "id": "ahd_subagents_plugin_subagents",
+   "label": "Plugin subagents",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Plugin subagents come from installed plugins, load automatically alongside custom subagents, and appear in the @-mention typeahead under their scoped name such as `my-plugin:code-reviewer`."
+  },
+  {
+   "id": "ahd_subagents_plugin_field_restrictions",
+   "label": "Plugin subagents ignore hooks, mcpServers, and permissionMode",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "For security reasons plugin subagents do not support the `hooks`, `mcpServers`, or `permissionMode` frontmatter fields; those fields are ignored when loading agents from a plugin. To use them, copy the agent file into .claude/agents/ or ~/.claude/agents/, or add rules to permissions.allow (which then apply to the entire session, not only that subagent)."
+  },
+  {
+   "id": "ahd_subagents_definitions_for_teammates",
+   "label": "Subagent definitions are reusable as agent-team teammates",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Subagent definitions from any scope are also available to agent teams: when spawning a teammate you can reference a subagent type, and the teammate uses its `tools` and `model` with the definition's body appended to the teammate's system prompt as additional instructions."
+  },
+  {
+   "id": "ahd_subagents_file_watching",
+   "label": "Agent directories are watched; edits apply without restart",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude Code watches ~/.claude/agents/ and .claude/agents/; a file added or edited on disk is detected within a few seconds and the next delegation uses the updated definition with no restart. Two cases still need a restart: the watcher covers only directories that existed when the session started (so creating a scope's first agent file in a new agents directory requires a restart), and sessions started with --disable-slash-commands do not watch these directories at all."
+  },
+  {
+   "id": "ahd_subagents_append_system_prompt_flag",
+   "label": "--append-subagent-system-prompt (v2.1.205)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "In non-interactive mode the --append-subagent-system-prompt flag appends the text you provide to the end of every subagent's system prompt, including nested subagents. Requires Claude Code v2.1.205 or later."
+  },
+  {
+   "id": "ahd_subagents_working_directory",
+   "label": "Subagent working directory and non-persistent cd",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A subagent starts in the main conversation's current working directory. Within a subagent, `cd` commands do not persist between Bash or PowerShell tool calls and do not affect the main conversation's working directory."
+  },
+  {
+   "id": "ahd_subagents_field_name",
+   "label": "Frontmatter field: name (required)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`name` is required: a unique identifier using lowercase letters and hyphens, and the filename does not have to match it. Hooks receive this value as `agent_type`. As of v2.1.218 names cannot contain `:` (reserved for plugin-scoped identifiers); Claude Code refuses to load such a file and logs an error to the debug log, whereas before v2.1.218 those names were accepted."
+  },
+  {
+   "id": "ahd_subagents_field_description",
+   "label": "Frontmatter field: description (required)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`description` is the second of only two required frontmatter fields, and states when Claude should delegate to this subagent."
+  },
+  {
+   "id": "ahd_subagents_field_tools",
+   "label": "Frontmatter field: tools (allowlist)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`tools` is an optional allowlist of the tools the subagent can use; if omitted the subagent inherits every tool available to subagents. To preload Skills into context use the `skills` field rather than listing `Skill` here."
+  },
+  {
+   "id": "ahd_subagents_field_disallowed_tools",
+   "label": "Frontmatter field: disallowedTools (denylist)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`disallowedTools` is an optional denylist of tools removed from the inherited or specified list. A subagent with only `disallowedTools: Write, Edit` inherits its whole tool pool except file writes, keeping Bash and MCP tools."
+  },
+  {
+   "id": "ahd_subagents_tools_precedence",
+   "label": "disallowedTools is applied before tools",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "If both fields are set, `disallowedTools` is applied first and then `tools` is resolved against the remaining pool, so a tool listed in both is removed."
+  },
+  {
+   "id": "ahd_subagents_mcp_tool_patterns",
+   "label": "MCP server-level patterns in tools/disallowedTools",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Both `tools` and `disallowedTools` accept MCP server-level patterns as well as exact tool names: `mcp__<server>` or `mcp__<server>__*` grants or removes every tool from that server, and in `disallowedTools` the pattern `mcp__*` removes every MCP tool from any server."
+  },
+  {
+   "id": "ahd_subagents_zero_tools_error",
+   "label": "Zero-resolving tools list refuses to launch (v2.1.208)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "When nothing in the `tools` list resolves to a tool — every entry misspelled or naming a tool unavailable to subagents — Claude Code usually refuses to launch the subagent and the Agent tool returns an error naming the unresolved entries. Before v2.1.208 the subagent launched with no tools and could return an empty or confusing result."
+  },
+  {
+   "id": "ahd_subagents_field_model",
+   "label": "Frontmatter field: model (defaults to inherit)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`model` accepts an alias (`sonnet`, `opus`, `haiku`, `fable`), a full model ID such as `claude-opus-5` or `claude-sonnet-5` (the same values as the --model flag), or `inherit`. Omitted, it defaults to `inherit` and uses the main conversation's model."
+  },
+  {
+   "id": "ahd_subagents_model_resolution_order",
+   "label": "Four-step model resolution order",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude Code resolves a subagent's model in this order: 1 the CLAUDE_CODE_SUBAGENT_MODEL environment variable when set to an alias or model ID, 2 the per-invocation `model` parameter Claude can pass, 3 the subagent definition's `model` frontmatter, 4 the main conversation's model."
+  },
+  {
+   "id": "ahd_subagents_subagent_model_env_inherit",
+   "label": "CLAUDE_CODE_SUBAGENT_MODEL=inherit equals unset (v2.1.196)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.196, setting CLAUDE_CODE_SUBAGENT_MODEL to `inherit` is the same as leaving it unset — resolution continues to the per-invocation parameter, then the frontmatter. In earlier versions `inherit` forced subagents onto the main conversation's model and ignored both of those sources."
+  },
+  {
+   "id": "ahd_subagents_available_models_allowlist",
+   "label": "Model values are checked against the availableModels allowlist",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude Code checks the environment variable, the per-invocation parameter, and the frontmatter value against the organization's `availableModels` allowlist; a value resolving to an excluded model is skipped and the subagent runs on the inherited model instead."
+  },
+  {
+   "id": "ahd_subagents_model_persists_on_resume",
+   "label": "Per-invocation model persists across resume (v2.1.211)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.211 a per-invocation `model` parameter also applies when the subagent is resumed or sent a follow-up message, so it stays on that model. Before v2.1.211 resuming dropped the per-invocation value and the subagent reverted to its definition's `model` field or the main conversation's model."
+  },
+  {
+   "id": "ahd_subagents_extended_thinking_inherited",
+   "label": "Extended thinking is inherited, with no per-subagent setting (v2.1.198)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.198 subagents inherit the main conversation's extended thinking configuration — on if the session has it on, off if off — and there is no per-subagent thinking setting. Before v2.1.198 subagents ran with extended thinking disabled regardless of the main conversation's setting."
+  },
+  {
+   "id": "ahd_subagents_two_tool_filters",
+   "label": "Subagent tool pool is narrowed by two filters",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Subagents inherit the built-in and MCP tools of the main conversation narrowed by two filters: the first removes a short list of tools from every subagent, and the second reduces the built-in tool set for subagents running in the background (the default). Forks skip both filters and receive the main conversation's exact tool pool."
+  },
+  {
+   "id": "ahd_subagents_always_removed_tools",
+   "label": "Tools removed from every subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The first filter removes these even when listed in `tools`: `Agent` (when the subagent is at the depth limit; in a fork it stays listed but errors instead of spawning), `AskUserQuestion`, `EndConversation` (which can end only the main conversation), `EnterPlanMode`, `ExitPlanMode` (unless permissionMode is `plan`), `ScheduleWakeup`, `TaskOutput`, `WaitForMcpServers`, and `Workflow`."
+  },
+  {
+   "id": "ahd_subagents_background_tool_subset",
+   "label": "Background subagents keep only a reduced built-in tool set",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A background subagent keeps every MCP tool but only these built-ins: Read, Grep, Glob, Bash, PowerShell, Edit, Write, NotebookEdit, WebFetch, WebSearch, TodoWrite, Skill, ToolSearch, EnterWorktree, ExitWorktree, Monitor, TaskStop, SendMessage, and Artifact. Every other built-in is removed whether inherited or listed in `tools`, so the same definition can resolve to different tools in the foreground and the background; the removal reports no error unless it leaves the list resolving to nothing."
+  },
+  {
+   "id": "ahd_subagents_teammate_extra_tools",
+   "label": "Agent-team teammates keep task and cron tools",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Teammates in agent teams additionally keep the task and cron tools: TaskCreate, TaskGet, TaskList, TaskUpdate, CronCreate, CronDelete, and CronList."
+  },
+  {
+   "id": "ahd_subagents_agent_type_allowlist",
+   "label": "Agent(agent_type) restricts which subagents can be spawned",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "When an agent runs as the main thread via `claude --agent`, `Agent(worker, researcher)` in its `tools` field is an allowlist: only those types can be spawned, any other request fails, and the agent sees only the allowed types in its prompt. Bare `Agent` allows any subagent; omitting `Agent` entirely prevents spawning any. The parenthesised type list applies only to a main-thread agent — inside a subagent definition, listing `Agent` permits nested spawning but any type list in the parentheses is ignored."
+  },
+  {
+   "id": "ahd_subagents_task_renamed_agent",
+   "label": "The Task tool was renamed Agent in v2.1.63",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "In version 2.1.63 the Task tool was renamed to Agent; existing `Task(...)` references in settings and agent definitions still work as aliases."
+  },
+  {
+   "id": "ahd_subagents_field_mcp_servers",
+   "label": "Frontmatter field: mcpServers",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`mcpServers` gives a subagent access to MCP servers not available in the main conversation. Each entry is either an inline server definition (same schema as .mcp.json entries, keyed by server name, supporting stdio, http, sse, and ws) or a string naming an already-configured server. Inline servers connect when the subagent starts and disconnect when it finishes; string references share the parent session's connection."
+  },
+  {
+   "id": "ahd_subagents_mcp_context_avoidance",
+   "label": "Inline MCP servers keep tool descriptions out of the main context",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Defining an MCP server inline in subagent frontmatter rather than in .mcp.json keeps it out of the main conversation entirely and avoids its tool descriptions consuming context there: the subagent gets the tools, the parent conversation does not."
+  },
+  {
+   "id": "ahd_subagents_mcp_restrictions_apply",
+   "label": "MCP restrictions cover subagent-declared servers (v2.1.153)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.153 the MCP restrictions that apply to the main session also cover servers declared in subagent frontmatter: --strict-mcp-config, --bare, enterprise managed MCP configuration, and allowedMcpServers/deniedMcpServers policies. A blocked server is skipped with a warning naming it. Managed-settings restrictions apply to every subagent however defined, but --strict-mcp-config does not filter servers passed inline via --agents or the SDK `agents` option, since those are explicit caller input."
+  },
+  {
+   "id": "ahd_subagents_field_permission_mode",
+   "label": "Frontmatter field: permissionMode",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`permissionMode` controls how the subagent handles permission prompts and accepts `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, or (v2.1.200+) `manual` as an alias for `default`. Subagents inherit the parent's permission context and can override the mode except where the parent takes precedence. It is ignored for plugin subagents."
+  },
+  {
+   "id": "ahd_subagents_permission_mode_semantics",
+   "label": "Permission mode behaviors",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`default` is standard permission checking with prompts; `acceptEdits` auto-accepts file edits and common filesystem commands for paths in the working directory or additionalDirectories; `auto` runs a background classifier over commands and protected-directory writes; `dontAsk` auto-denies prompts (explicitly allowed tools still work, but AskUserQuestion, org-`ask` connector tools, and MCP tools marked requiresUserInteraction are denied even if allowed); `bypassPermissions` skips prompts; `plan` is read-only exploration."
+  },
+  {
+   "id": "ahd_subagents_bypass_permissions_warning",
+   "label": "bypassPermissions caveats and residual prompts",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "bypassPermissions lets a subagent execute without approval, including writes to .git, .config/git, .claude, .vscode, .idea, .husky, .cargo, .devcontainer, .yarn, and .mvn. Explicit `ask` rules, org-`ask` connector tools, MCP tools marked requiresUserInteraction, and root/home directory removals such as `rm -rf /` still prompt."
+  },
+  {
+   "id": "ahd_subagents_parent_mode_precedence",
+   "label": "Parent permission mode can override the subagent's",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "If the parent uses bypassPermissions or acceptEdits, that takes precedence and cannot be overridden by the subagent. If the parent uses auto mode, the subagent inherits auto mode and its own frontmatter permissionMode is ignored — the classifier evaluates the subagent's tool calls with the same block and allow rules as the parent session."
+  },
+  {
+   "id": "ahd_subagents_field_skills",
+   "label": "Frontmatter field: skills (preload)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`skills` injects the FULL content of each listed skill into the subagent's context at startup, not only the description, giving it domain knowledge without runtime discovery. It controls what is preloaded, not what is reachable: without it the subagent can still discover and invoke project, user, and plugin skills via the Skill tool. To stop skill invocation entirely, omit `Skill` from `tools` or add it to `disallowedTools`."
+  },
+  {
+   "id": "ahd_subagents_skills_preload_limits",
+   "label": "Skills with disable-model-invocation cannot be preloaded",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Skills that set `disable-model-invocation: true` cannot be preloaded, since preloading draws from the same set of skills Claude can invoke; as of v2.1.215 this includes the bundled /verify and /code-review skills. A listed skill that is missing or disabled is skipped with a warning logged to the debug log."
+  },
+  {
+   "id": "ahd_subagents_skill_fork_inverse",
+   "label": "skills-in-subagent is the inverse of context: fork in a skill",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The `skills` field is the inverse of running a skill in a subagent: with `skills` the subagent controls the system prompt and loads the skill content, while with `context: fork` in a skill the skill content is injected into the agent you specify. Both use the same underlying system."
+  },
+  {
+   "id": "ahd_subagents_field_memory",
+   "label": "Frontmatter field: memory (persistent agent memory)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`memory` gives a subagent a persistent directory that survives across conversations, enabling cross-session learning about codebase patterns, debugging insights, and architectural decisions. Scopes: `user` → ~/.claude/agent-memory/<name>/, `project` → .claude/agent-memory/<name>/ (the recommended default, shareable via version control), `local` → .claude/agent-memory-local/<name>/ (project-specific but not checked in)."
+  },
+  {
+   "id": "ahd_subagents_memory_runtime_effects",
+   "label": "What enabling memory changes at runtime",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "With memory enabled, the subagent's system prompt gains instructions for reading and writing the memory directory plus the first 200 lines or 25KB of MEMORY.md (whichever comes first) with instructions to curate it if it exceeds that limit, and the Read, Write, and Edit tools are automatically enabled so it can manage its memory files."
+  },
+  {
+   "id": "ahd_subagents_memory_requires_auto_memory",
+   "label": "Subagent memory depends on auto memory being on",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Subagent memory is part of auto memory: if auto memory is turned off via the autoMemoryEnabled setting or CLAUDE_CODE_DISABLE_AUTO_MEMORY, the `memory` field has no effect and the subagent launches without the memory instructions or the memory tool access."
+  },
+  {
+   "id": "ahd_subagents_field_max_turns",
+   "label": "Frontmatter field: maxTurns",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`maxTurns` is an optional cap on the maximum number of agentic turns before the subagent stops."
+  },
+  {
+   "id": "ahd_subagents_field_effort",
+   "label": "Frontmatter field: effort",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`effort` sets the effort level while the subagent is active and overrides the session effort level; it defaults to inheriting from the session. Options are `low`, `medium`, `high`, `xhigh`, and `max`, with available levels depending on the model."
+  },
+  {
+   "id": "ahd_subagents_field_background",
+   "label": "Frontmatter field: background",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`background: true` always runs the subagent as a background task, even when Claude needs its result right away. When unset, Claude chooses — and as of v2.1.198 it runs subagents in the background by default."
+  },
+  {
+   "id": "ahd_subagents_field_isolation_worktree",
+   "label": "Frontmatter field: isolation: worktree",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`isolation: worktree` runs the subagent in a temporary git worktree — an isolated copy of the repository branched by default from your default branch rather than the parent session's HEAD. The worktree is automatically cleaned up if the subagent makes no changes."
+  },
+  {
+   "id": "ahd_subagents_worktree_escape_checks",
+   "label": "Worktree containment checks on Bash/PowerShell commands",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A worktree-isolated subagent runs its Bash and PowerShell commands inside the worktree; from v2.1.203 a command whose working directory resolves to the main checkout fails with an error instead of running there. From v2.1.210 the check covers the whole repository containing the launch directory (and the linked main checkout when the session runs in a worktree), not just the launch directory. From v2.1.216 Bash commands are also inspected: a command redirecting git into the main checkout fails whether via `git -C`, `--git-dir`, GIT_DIR/GIT_WORK_TREE, or a preceding `cd`, and a command too complex to check fails with an error telling Claude to split it; PowerShell gets only the working-directory check."
+  },
+  {
+   "id": "ahd_subagents_field_color",
+   "label": "Frontmatter field: color",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`color` sets the display color for the subagent in the task list and transcript, accepting `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, or `cyan`."
+  },
+  {
+   "id": "ahd_subagents_field_initial_prompt",
+   "label": "Frontmatter field: initialPrompt",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`initialPrompt` is auto-submitted as the first user turn when the agent runs as the MAIN session agent (via --agent or the `agent` setting). Commands and skills in it are processed, and it is prepended to any user-provided prompt."
+  },
+  {
+   "id": "ahd_subagents_field_hooks",
+   "label": "Frontmatter field: hooks",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`hooks` defines lifecycle hooks scoped to that subagent: they run only while it is active and are cleaned up when it finishes. All hook events are supported; the most common for subagents are PreToolUse (matcher = tool name), PostToolUse (matcher = tool name), and Stop. It is ignored for plugin subagents."
+  },
+  {
+   "id": "ahd_subagents_stop_becomes_subagentstop",
+   "label": "Frontmatter Stop hooks convert to SubagentStop",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "When the agent is invoked as a subagent, `Stop` hooks defined in its frontmatter are automatically converted to `SubagentStop` events at runtime."
+  },
+  {
+   "id": "ahd_subagents_frontmatter_hooks_contexts",
+   "label": "Frontmatter hooks fire as subagent and as main session",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Frontmatter hooks fire when the agent is spawned as a subagent through the Agent tool or an @-mention, and also when it runs as the main session via --agent or the `agent` setting; in the main-session case they run alongside any hooks defined in settings.json."
+  },
+  {
+   "id": "ahd_subagents_workspace_trust_hooks",
+   "label": "Project-subagent frontmatter hooks need workspace trust (v2.1.218)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "From v2.1.218 a project-level subagent's frontmatter hooks run only after accepting the workspace trust dialog for the folder containing the agent file; hooks from ~/.claude/agents/ and from --agents definitions run without this step, and an --add-dir folder outside the trusted repository must be trusted separately. Until trusted, the subagent still runs but Claude Code skips its frontmatter hooks and logs an error. Before v2.1.218 frontmatter hooks could run from untrusted folders, including in non-interactive sessions."
+  },
+  {
+   "id": "ahd_subagents_settings_hooks_apply",
+   "label": "settings.json, managed, and plugin hooks all fire inside subagents",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Hooks from settings files, managed policy settings, and plugins all apply inside subagents: a PreToolUse hook in settings.json runs before every tool a subagent uses, and PreToolUse/PostToolUse fire for a subagent's tool calls exactly as in the main conversation."
+  },
+  {
+   "id": "ahd_subagents_lifecycle_events",
+   "label": "SubagentStart and SubagentStop project-level events",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "settings.json can define SubagentStart (fires when a subagent begins execution) and SubagentStop (fires when it completes); both take a matcher whose input is the agent type name — the frontmatter `name` for project and user subagents, or the plugin-scoped identifier such as `my-plugin:db-agent` for plugin subagents."
+  },
+  {
+   "id": "ahd_subagents_matcher_is_regex",
+   "label": "Agent-type matchers are unanchored regular expressions",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A scoped name contains a colon and is evaluated as an unanchored regular expression, so it must be anchored (`^my-plugin:db-agent$`) to match only that agent. A hyphenated matcher such as `db-agent` matches exactly on v2.1.195 or later; on earlier versions it is unanchored regex and also fires for types containing it, such as `prod-db-agent`."
+  },
+  {
+   "id": "ahd_subagents_pretooluse_conditional_rules",
+   "label": "PreToolUse hooks for conditional per-command rules",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "PreToolUse hooks give finer control than the `tools` field by validating operations before they execute — allowing some uses of a tool while blocking others. Claude Code passes hook input as JSON via stdin; a validation script reads it, extracts `tool_input.command`, and exits with code 2 to block the operation and feed its stderr message back to Claude. On macOS and Linux the script must be made executable with chmod +x or the hook fails instead of blocking; on Windows write it in PowerShell and add `shell: powershell` to the hook entry."
+  },
+  {
+   "id": "ahd_subagents_hook_is_a_backstop",
+   "label": "The validating hook is a backstop, not the only control",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "In the db-reader example the system prompt tells the subagent to refuse write requests and the hook is a backstop: if the subagent attempts a write anyway, Claude Code blocks the command and the subagent sees the 'Blocked: Write operations not allowed. Use SELECT queries only.' message."
+  },
+  {
+   "id": "ahd_subagents_disable_specific",
+   "label": "Disable specific subagents with Agent(subagent-name)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Adding entries in the format `Agent(subagent-name)` to the permissions `deny` array in settings prevents Claude from using those subagents; it works for both built-in and custom subagents, and the same syntax is available via the --disallowedTools CLI flag."
+  },
+  {
+   "id": "ahd_subagents_explicit_invocation",
+   "label": "Three escalating ways to invoke a subagent explicitly",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Three patterns escalate from a one-off suggestion to a session-wide default: natural language (name the subagent and Claude decides whether to delegate), @-mention (guarantees that subagent runs for one task), and session-wide via the --agent flag or the `agent` setting."
+  },
+  {
+   "id": "ahd_subagents_at_mention",
+   "label": "@-mention controls which subagent, not its prompt",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "An @-mention picks the subagent from a typeahead the same way files are mentioned; your full message still goes to Claude, which writes the subagent's task prompt — the @-mention controls which subagent Claude invokes, not what prompt it receives. It can also be typed manually as `@agent-<name>`, or `@agent-my-plugin:code-reviewer` for plugin agents; while typing that form the typeahead shows file matches, but the mention still resolves on submit. Named background subagents currently running also appear in the typeahead with their status."
+  },
+  {
+   "id": "ahd_subagents_agent_flag_session",
+   "label": "--agent runs the whole session as that subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "`claude --agent <name>` starts a session where the main thread itself takes on that subagent's system prompt, tool restrictions, and model. The subagent's system prompt REPLACES the default Claude Code system prompt entirely, the same way --system-prompt does, while CLAUDE.md files and project memory still load through the normal message flow. The agent name appears as @<name> in the startup header."
+  },
+  {
+   "id": "ahd_subagents_agent_flag_resume_and_scoping",
+   "label": "--agent persists across resume; scoped names disambiguate plugins",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "--agent works with built-in and custom subagents and persists on resume: Claude Code restores the agent's system prompt, tool restrictions, and model with the conversation. As of v2.1.216, if the agent no longer exists on resume the session continues with default tools and system prompt and shows a warning naming it. A plugin agent can be named bare; if several plugins provide the same name, pass the scoped name (`my-plugin:security-reviewer`, or `my-plugin:review:security` for a subfolder)."
+  },
+  {
+   "id": "ahd_subagents_agent_setting_precedence",
+   "label": "The agent setting vs the --agent flag",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Setting `\"agent\": \"code-reviewer\"` in .claude/settings.json makes that agent the default for every session in the project; if both the setting and the CLI flag are present, the CLI flag overrides the setting."
+  },
+  {
+   "id": "ahd_subagents_foreground_vs_background",
+   "label": "Foreground vs background subagents",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Foreground subagents block the main conversation until complete and pass permission prompts straight through. Background subagents run concurrently while you keep working. As of v2.1.198 subagents run in the background by default, and Claude runs one in the foreground only when it needs the result before continuing. You can steer this by asking Claude, or press Ctrl+B to background a running task."
+  },
+  {
+   "id": "ahd_subagents_background_permission_prompts",
+   "label": "Background permission prompts surface in the main session (v2.1.186)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.186, when a background subagent reaches a tool call needing permission, the prompt surfaces in the main session and names the asking subagent; approving lets it continue, and Esc denies that one tool call without stopping the subagent. Before v2.1.186, background subagents auto-denied any tool call that would have prompted."
+  },
+  {
+   "id": "ahd_subagents_background_completion_notification",
+   "label": "Background results arrive as a completion notification (v2.1.211)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A background subagent's results reach Claude as a completion notification in a later turn; Claude waits for that notification before reporting results, and if asked about progress first it reports the subagent is still running. Before v2.1.211 Claude sometimes reported results for a background subagent that had not finished."
+  },
+  {
+   "id": "ahd_subagents_tasks_list_retention",
+   "label": "Completed background subagents stay in /tasks (v2.1.208)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.208 a completed background subagent stays listed in /tasks marked done and sorted below running work until the session cleans up the task list, and its detail view stays open. Subagents that fail or that you stop leave the list. Before v2.1.208 a completed subagent left the list immediately and its detail view closed."
+  },
+  {
+   "id": "ahd_subagents_disable_background_tasks",
+   "label": "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Setting CLAUDE_CODE_DISABLE_BACKGROUND_TASKS to 1 disables all background task functionality and keeps subagents synchronous; it takes precedence over fork mode, keeping subagents in the foreground even when CLAUDE_CODE_FORK_SUBAGENT is set."
+  },
+  {
+   "id": "ahd_subagents_api_errors",
+   "label": "API errors in subagents are reported as failures (v2.1.199)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.199 a subagent whose run ends on an API error (usage limit, repeated server error) reports the failure rather than returning error text as findings. In the foreground, a cut-off subagent that had produced text returns that partial output with a note it did not finish; one that produced nothing or only tool calls fails with 'Agent terminated early due to an API error' plus the detail (v2.1.200 — in v2.1.199 the tool-calls-only shape returned an empty partial result). In the background the subagent is marked failed and the message names the API error and includes its last output so partial work is not lost."
+  },
+  {
+   "id": "ahd_subagents_output_scanning",
+   "label": "Subagent output scanning (v2.1.210)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude Code scans each subagent's final report before Claude reads it, because a subagent may have read files, pages, or command output carrying instructions aimed at the main conversation. The scan never removes or rewords anything; it inserts a backslash into text imitating Claude Code's own output (a <system-reminder> tag, a line starting with 'Human:' or 'Assistant:'), and prepends a marker line beginning '[harness: subagent output matched instruction-shaped pattern(s):' when the report imitates such a tag or mentions permission settings like bypassPermissions or --dangerously-skip-permissions. Requires v2.1.210 or later."
+  },
+  {
+   "id": "ahd_subagents_scanning_is_not_a_control",
+   "label": "Output scanning is not a substitute for restricting a subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The scan does not judge whether content is malicious and does not change what an instruction in a report can do: a tool call the report leads Claude to make still goes through the session's permission checks and sandboxing. It is explicitly not a substitute for restricting what a subagent can reach."
+  },
+  {
+   "id": "ahd_subagents_pattern_isolate_output",
+   "label": "Pattern: isolate high-volume operations",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "One of the most effective uses of subagents is isolating operations that produce large output — running tests, fetching documentation, processing logs — so the verbose output stays in the subagent's context and only the relevant summary returns to the main conversation."
+  },
+  {
+   "id": "ahd_subagents_pattern_parallel_research",
+   "label": "Pattern: parallel research, with a context caveat",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "For independent investigations, multiple subagents can work simultaneously and Claude synthesizes the findings; this works best when the research paths do not depend on each other. The caveat: results return to the main conversation, so running many subagents that each return detailed results can itself consume significant context."
+  },
+  {
+   "id": "ahd_subagents_pattern_chaining",
+   "label": "Pattern: chain subagents in sequence",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "For multi-step workflows, ask Claude to use subagents in sequence: each completes its task and returns results to Claude, which then passes the relevant context to the next subagent."
+  },
+  {
+   "id": "ahd_subagents_when_to_use_main_conversation",
+   "label": "When to stay in the main conversation instead",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Use the main conversation when the task needs frequent back-and-forth or iterative refinement, when multiple phases share significant context, for a quick targeted change, or when latency matters — subagents start fresh and may need time to gather context. Use subagents when output is verbose and unneeded, when you want tool/permission restrictions enforced, or when the work is self-contained and can return a summary."
+  },
+  {
+   "id": "ahd_subagents_alternatives_skills_and_btw",
+   "label": "Alternatives: Skills and /btw",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Consider Skills instead when you want reusable prompts or workflows that run in the main conversation context rather than isolated subagent context. For a quick question about something already in the conversation, use /btw: it sees the full context but has no tool access, and the answer is discarded rather than added to history."
+  },
+  {
+   "id": "ahd_subagents_depth_limit",
+   "label": "Subagent nesting depth limit (default three layers)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "By default a subagent can spawn subagents of its own up to three layers below the main conversation. At the depth limit Claude Code withholds the `Agent` tool from every subagent except a fork, so a subagent at the limit does the delegated work itself and returns one summary; a fork at the limit keeps `Agent` listed but the tool returns an error instead of spawning. Only the top-level subagent's summary returns to the user."
+  },
+  {
+   "id": "ahd_subagents_depth_limit_env",
+   "label": "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH (v2.1.217)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "From v2.1.217 the nesting limit is set with CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH (for example `\"2\"` in settings.json env caps nesting at two layers; `1` turns nesting off). Version history: v2.1.172–v2.1.216 allowed up to five layers with no way to change it; v2.1.217–v2.1.218 defaulted the limit to one; v2.1.219 raised the default to three."
+  },
+  {
+   "id": "ahd_subagents_nested_config_and_panel",
+   "label": "Nested subagents resolve from the same scopes; panel shows the tree",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A nested subagent is configured exactly like a top-level one and resolves from the same scopes; to keep one from spawning while nesting is on, omit `Agent` from its `tools` or add it to `disallowedTools`. The subagent panel below the prompt input shows the full tree with a `(+N)` descendant count per row, and as of v2.1.193 opening a row shows that subagent's siblings and direct children with a path back to `main`."
+  },
+  {
+   "id": "ahd_subagents_session_limit",
+   "label": "Session subagent limit: 200 per session",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "By default Claude can spawn at most 200 subagents per session; CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION raises it to any positive whole number with no upper bound, but the limit cannot be turned off (requires v2.1.212+). When reached, the Agent tool fails with `Subagent spawn limit reached` and the error tells Claude to complete the remaining work with its own tools. /clear resets the count, unless work that can still spawn subagents (such as a running workflow) survives the clear."
+  },
+  {
+   "id": "ahd_subagents_session_limit_counting",
+   "label": "What counts toward the session subagent limit",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Counting toward the session limit: every subagent Claude spawns with the Agent tool, including nested subagents, forks, background subagents, and subagents spawned by a workflow's agents; an in-session fork started with /subtask spends the same budget, though the limit blocks only Agent-tool spawns so your own /subtask still starts after the limit; a finished subagent still counts. NOT counting: a session created with /fork (a separate background session with its own budget) and agents a workflow script spawns with `agent()` (workflows have their own per-run limit)."
+  },
+  {
+   "id": "ahd_subagents_concurrent_limit",
+   "label": "Concurrent subagent limit: 20 running",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "By default, when 20 subagents are running in a session, spawning another with the Agent tool fails with `Concurrent subagent limit reached` and the error tells Claude not to retry; spawning succeeds again when the running count drops. CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS changes the limit (requires v2.1.217+), and sessions with ultracode active are exempt. An in-session /subtask fork takes a slot but is never blocked, and resuming a finished subagent takes a fresh slot without checking the limit — so resumes can push the running count past it. Workflow agents and agent-team teammates follow their own limits."
+  },
+  {
+   "id": "ahd_subagents_three_limits",
+   "label": "Three independent subagent limits",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Three separate limits control subagent use, each with its own environment variable: the session limit caps the total spawned over a session, the concurrent limit stops Claude spawning more while too many are running, and the depth limit caps how deeply subagents nest."
+  },
+  {
+   "id": "ahd_subagents_startup_context",
+   "label": "What loads at a subagent's startup",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A non-fork subagent starts with a fresh, isolated context window — it does not see conversation history, previously invoked skills, or files Claude already read. Its initial context contains: the agent's own system prompt plus appended environment details (not the full Claude Code system prompt); the task/delegation message Claude writes; the CLAUDE.md hierarchy the main conversation loads (including ~/.claude/CLAUDE.md, project rules, CLAUDE.local.md, managed policy files); a git status snapshot taken at the start of the parent session; the full content of any preloaded skills; and a sibling roster."
+  },
+  {
+   "id": "ahd_subagents_git_status_conditions",
+   "label": "Git status snapshot conditions",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The git status a subagent receives is a snapshot taken at the start of the parent session. It is absent when the working directory is not a Git repository or when the `includeGitInstructions` setting is false, and Explore and Plan skip it regardless."
+  },
+  {
+   "id": "ahd_subagents_sibling_roster",
+   "label": "Sibling roster system reminder (v2.1.206)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The sibling roster is a system reminder listing `main` and every other named agent in the session, each a valid `to` value for SendMessage. Requires v2.1.206+. It appears only when the subagent's tools include SendMessage and at least one other agent has a name, and it is a snapshot taken when the subagent starts — agents named later do not appear."
+  },
+  {
+   "id": "ahd_subagents_state_not_inherited",
+   "label": "Main-conversation state that never reaches a non-fork subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Three kinds of main-conversation state never reach a non-fork subagent: output style (a subagent runs its own system prompt, so it is unshaped by yours, except in a fork); auto memory (the main conversation's auto memory is not loaded — use the `memory` field instead); and context window size (a subagent's window is sized by its OWN model, so delegating to a model with a smaller window gives that subagent the smaller window)."
+  },
+  {
+   "id": "ahd_subagents_resume",
+   "label": "Resuming a subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Each subagent invocation creates a new instance with fresh context, but a subagent can be resumed instead: a resumed subagent retains its full conversation history including all previous tool calls, results, and reasoning, and picks up exactly where it stopped. Resuming starts a new run under the same ID, so a previously failed or completed subagent shows as running again in the task list and SDK task events (before v2.1.205 it kept showing its earlier status while the resumed run worked)."
+  },
+  {
+   "id": "ahd_subagents_sendmessage_resume",
+   "label": "SendMessage is the resume mechanism",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Claude uses the SendMessage tool with the agent's ID or name as the `to` field to resume it; SendMessage does not require agent teams to be enabled — only structured team-protocol messages such as shutdown_request and plan_approval_response do. A completed subagent that receives a SendMessage auto-resumes in the background without a new Agent invocation, as does one Claude stopped with the TaskStop tool."
+  },
+  {
+   "id": "ahd_subagents_explore_plan_not_resumable",
+   "label": "Explore and Plan are one-shot and cannot be resumed",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "When a subagent completes, Claude receives its agent ID — but the built-in Explore and Plan agents are one-shot and return no agent ID, so they cannot be resumed; use general-purpose or a custom subagent when the work must be continued."
+  },
+  {
+   "id": "ahd_subagents_user_stopped_no_autoresume",
+   "label": "A user-stopped subagent does not auto-resume (v2.1.191)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.191, a subagent you stopped yourself with `x` in /tasks or an SDK stop_task request does not auto-resume: the SendMessage call returns a refusal telling Claude the agent was cancelled. Typing into that subagent's transcript in the subagent panel resumes it yourself and clears the stop, so later SendMessage calls can auto-resume it again."
+  },
+  {
+   "id": "ahd_subagents_sendmessage_identity_check",
+   "label": "SendMessage verifies the name still reaches the same agent (v2.1.199)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.199 SendMessage checks that a name still refers to the same agent it reached earlier in the conversation; if a newer agent has taken the name (a re-spawned background agent reusing it), Claude Code refuses the send rather than delivering it to the wrong agent, and the error reports which agent the name now reaches. Addressing the earlier agent by its agent ID still works. The check is scoped to the current conversation and resets on /clear."
+  },
+  {
+   "id": "ahd_subagents_agent_message_authority",
+   "label": "An agent's message is task direction, never approval (v2.1.198)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "As of v2.1.198 a subagent treats messages from the agent that launched it as normal task direction, including mid-task course corrections, acting on them within its own permission settings. Two limits hold regardless of sender: no message from any agent counts as the user's approval for a pending permission prompt, and no agent message can change a subagent's permission settings, CLAUDE.md, or configuration — only the permission system or the user's own messages can grant approval."
+  },
+  {
+   "id": "ahd_subagents_transcripts",
+   "label": "Subagent transcript files and retention",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Subagent transcripts live at ~/.claude/projects/{project}/{sessionId}/subagents/, each stored as `agent-{agentId}.jsonl`. They persist independently of the main conversation: main-conversation compaction leaves them unaffected because they are separate files, they persist within their session so a subagent can be resumed after restarting Claude Code by resuming the same session, and Claude Code deletes them after the `cleanupPeriodDays` retention period, 30 days by default."
+  },
+  {
+   "id": "ahd_subagents_auto_compaction",
+   "label": "Subagent auto-compaction",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Subagents support automatic compaction using the same logic and trigger conditions as the main conversation, and CLAUDE_AUTOCOMPACT_PCT_OVERRIDE applies to them too. Compaction events are logged in the subagent transcript as a system entry with subtype `compact_boundary` whose compactMetadata carries `trigger` and `preTokens`, the token count used before compaction."
+  },
+  {
+   "id": "ahd_subagents_fork",
+   "label": "Fork: a subagent that inherits the whole conversation",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A fork is a subagent that inherits the entire conversation so far instead of starting fresh, dropping the input isolation subagents otherwise provide: it sees the same system prompt, tools, model, and message history as the main session, so a side task needs no re-explanation. Its own tool calls still stay out of the conversation and only its final result returns, so the main context window stays clean. Use a fork when a named subagent would need too much background, or to try several approaches in parallel from the same starting point."
+  },
+  {
+   "id": "ahd_subagents_fork_prompt_cache",
+   "label": "A fork reuses the parent's prompt cache",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Because a fork's system prompt and tool definitions are identical to the parent's, its first request reuses the parent's prompt cache, making forking cheaper than spawning a fresh subagent for tasks that need the same context. A named subagent has a separate cache."
+  },
+  {
+   "id": "ahd_subagents_fork_vs_named",
+   "label": "Fork vs named subagent comparison",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A fork inherits everything the main session has at the moment it spawns; a named subagent starts from its own definition. Context: full conversation history vs fresh context with the passed prompt. System prompt and tools: same as main session vs from the definition file, filtered for background runs. Model: same as main session vs the `model` field. Permissions: prompts surface in your terminal vs in your main session when background. Prompt cache: shared vs separate."
+  },
+  {
+   "id": "ahd_subagents_subtask_command",
+   "label": "/subtask starts a fork (v2.1.212)",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A forked subagent is run with `/subtask <task>` (requires v2.1.212+), with or without the fork env var set; Claude Code names the fork from the first words of the task, and it runs in the background in a panel below the prompt, delivering its result as a message when it finishes. When agent view is turned off, /subtask is unavailable and /fork starts the forked subagent instead; otherwise /fork copies the whole session into a new background session. On v2.1.161–v2.1.211 the forked-subagent command was /fork."
+  },
+  {
+   "id": "ahd_subagents_fork_env_var",
+   "label": "CLAUDE_CODE_FORK_SUBAGENT and what fork mode changes",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "CLAUDE_CODE_FORK_SUBAGENT=1 enables fork mode explicitly and 0 disables it everywhere including a server-side rollout; it is honored in interactive mode, non-interactive mode, and via the SDK or `claude -p`. Enabling fork mode changes two things: Claude can spawn a fork by requesting the `fork` subagent type explicitly (an untyped request still gets general-purpose, and named subagents such as Explore spawn as before), and EVERY subagent runs in the background — which also makes the frontmatter `background` field ineffective, because fork mode removes the run_in_background parameter from the Agent tool."
+  },
+  {
+   "id": "ahd_subagents_fork_limitations",
+   "label": "Fork limitations and experimental status",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "A fork cannot spawn further forks. Letting Claude itself spawn forks is experimental and may change in future releases, and the capability may be enabled in interactive sessions as part of a staged rollout."
+  },
+  {
+   "id": "ahd_subagents_fork_worktree_isolation",
+   "label": "A fork can be spawned with isolation: worktree",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "When Claude spawns a fork through the Agent tool it can pass `isolation: \"worktree\"` so the fork's file edits are written to a separate git worktree instead of your checkout."
+  },
+  {
+   "id": "ahd_subagents_fork_panel_controls",
+   "label": "Fork panel keyboard controls",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Running forks appear in a panel below the prompt input with one row per fork plus the main session: ↑/↓ move between rows, Enter opens the selected fork's transcript and sends follow-up messages, `x` dismisses a finished fork or stops a running one, and Esc returns focus to the prompt input."
+  },
+  {
+   "id": "ahd_subagents_transcript_view_commands",
+   "label": "In an agent transcript view, built-in commands still hit the main conversation",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "With a fork's or subagent's transcript open, follow-up messages and skills go to that agent but built-in commands still run in the main conversation. As of v2.1.199, typing /model or /fast in that view shows a notice that it changes the main conversation's model or fast mode rather than running silently against the viewed agent."
+  },
+  {
+   "id": "ahd_subagents_best_practices",
+   "label": "Subagent design best practices",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "Four stated best practices: design focused subagents that each excel at one specific task; write detailed descriptions because Claude uses them to decide when to delegate; limit tool access, granting only necessary permissions for security and focus; and check project subagents into version control to share them with the team."
+  },
+  {
+   "id": "ahd_subagents_example_code_reviewer",
+   "label": "Example: code-reviewer subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The code-reviewer example is a read-only subagent with `tools: Read, Grep, Glob, Bash` and `model: inherit` that excludes Edit and Write, showing a focused agent with limited tool access and a detailed prompt specifying a review checklist and feedback organized by priority (critical issues, warnings, suggestions)."
+  },
+  {
+   "id": "ahd_subagents_example_debugger",
+   "label": "Example: debugger subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The debugger example both analyzes and fixes issues, so unlike the code reviewer its tools list includes Edit (`tools: Read, Edit, Bash, Grep, Glob`), and its prompt gives a clear workflow from diagnosis through minimal fix to verification."
+  },
+  {
+   "id": "ahd_subagents_example_data_scientist",
+   "label": "Example: data-scientist subagent",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The data-scientist example is a domain-specific subagent for SQL and BigQuery analysis with `tools: Bash, Read, Write`, and explicitly sets `model: sonnet` for more capable analysis — showing subagents built for specialized workflows outside typical coding tasks."
+  },
+  {
+   "id": "ahd_subagents_example_db_reader",
+   "label": "Example: db-reader subagent with a validating hook",
+   "file_type": "concept",
+   "source_file": "docs/claude-code/sub-agents.md",
+   "source_url": "https://code.claude.com/docs/en/sub-agents.md",
+   "captured_at": "2026-07-30",
+   "author": "Anthropic",
+   "contributor": "mrkhachaturov/agent-harness-docs@03853a01",
+   "rationale": "The db-reader example grants `tools: Bash` but attaches a PreToolUse hook matching Bash that runs ./scripts/validate-readonly-query.sh, which greps the command for INSERT/UPDATE/DELETE/DROP/CREATE/ALTER/TRUNCATE (and REPLACE/MERGE in the fuller script) and exits 2 to block writes — demonstrating conditional validation where the `tools` field alone is too coarse."
+  }
+ ],
+ "edges": [
+  {
+   "source": "ahd_subagents_subagent",
+   "target": "ahd_subagents_context_preservation",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_delegation_by_description",
+   "target": "ahd_subagents_field_description",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_subagent",
+   "target": "ahd_subagents_scope_boundary_vs_teams",
+   "relation": "bounded_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_builtin_agents",
+   "target": "ahd_subagents_explore_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_builtin_agents",
+   "target": "ahd_subagents_plan_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_builtin_agents",
+   "target": "ahd_subagents_general_purpose_agent",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_builtin_agents",
+   "target": "ahd_subagents_helper_agents",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_agent",
+   "target": "ahd_subagents_explore_model_cap",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_override_by_name",
+   "target": "ahd_subagents_explore_agent",
+   "relation": "overrides",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_override_by_name",
+   "target": "ahd_subagents_scope_precedence",
+   "relation": "requires",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_plan_skip_claude_md",
+   "target": "ahd_subagents_explore_agent",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_plan_skip_claude_md",
+   "target": "ahd_subagents_plan_agent",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_plan_skip_claude_md",
+   "target": "ahd_subagents_startup_context",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_restrict_builtins",
+   "target": "ahd_subagents_builtin_agents",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_file_format",
+   "target": "ahd_subagents_subagent",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agents_command_wizard_removed",
+   "target": "ahd_subagents_file_format",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_scope_precedence",
+   "target": "ahd_subagents_project_scope",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_scope_precedence",
+   "target": "ahd_subagents_user_scope",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_scope_precedence",
+   "target": "ahd_subagents_cli_agents_flag",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_scope_precedence",
+   "target": "ahd_subagents_managed_subagents",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_scope_precedence",
+   "target": "ahd_subagents_plugin_subagents",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_nested_closest_wins",
+   "target": "ahd_subagents_project_scope",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_add_dir_scanning",
+   "target": "ahd_subagents_project_scope",
+   "relation": "extends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_recursive_scan_identity",
+   "target": "ahd_subagents_field_name",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_recursive_scan_identity",
+   "target": "ahd_subagents_duplicate_name_hazard",
+   "relation": "causes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_doctor_duplicate_report",
+   "target": "ahd_subagents_duplicate_name_hazard",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_plugin_scoped_identifier",
+   "target": "ahd_subagents_recursive_scan_identity",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_plugin_scoped_identifier",
+   "target": "ahd_subagents_field_name",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_plugin_field_restrictions",
+   "target": "ahd_subagents_plugin_subagents",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_plugin_field_restrictions",
+   "target": "ahd_subagents_field_hooks",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_plugin_field_restrictions",
+   "target": "ahd_subagents_field_mcp_servers",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_plugin_field_restrictions",
+   "target": "ahd_subagents_field_permission_mode",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_cli_agents_flag",
+   "target": "ahd_subagents_file_format",
+   "relation": "mirrors",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_definitions_for_teammates",
+   "target": "ahd_subagents_scope_precedence",
+   "relation": "reuses",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_file_watching",
+   "target": "ahd_subagents_project_scope",
+   "relation": "monitors",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_file_watching",
+   "target": "ahd_subagents_user_scope",
+   "relation": "monitors",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_append_system_prompt_flag",
+   "target": "ahd_subagents_file_format",
+   "relation": "extends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_isolation_worktree",
+   "target": "ahd_subagents_working_directory",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_worktree_escape_checks",
+   "target": "ahd_subagents_field_isolation_worktree",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_name",
+   "target": "ahd_subagents_lifecycle_events",
+   "relation": "supplies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_tools",
+   "target": "ahd_subagents_two_tool_filters",
+   "relation": "constrained_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_tools_precedence",
+   "target": "ahd_subagents_field_tools",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_tools_precedence",
+   "target": "ahd_subagents_field_disallowed_tools",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_mcp_tool_patterns",
+   "target": "ahd_subagents_field_disallowed_tools",
+   "relation": "extends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_zero_tools_error",
+   "target": "ahd_subagents_field_tools",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_background_tool_subset",
+   "target": "ahd_subagents_zero_tools_error",
+   "relation": "can_trigger",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_two_tool_filters",
+   "target": "ahd_subagents_always_removed_tools",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_two_tool_filters",
+   "target": "ahd_subagents_background_tool_subset",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork",
+   "target": "ahd_subagents_two_tool_filters",
+   "relation": "bypasses",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_teammate_extra_tools",
+   "target": "ahd_subagents_background_tool_subset",
+   "relation": "extends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_always_removed_tools",
+   "target": "ahd_subagents_depth_limit",
+   "relation": "conditioned_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_always_removed_tools",
+   "target": "ahd_subagents_field_permission_mode",
+   "relation": "conditioned_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agent_type_allowlist",
+   "target": "ahd_subagents_agent_flag_session",
+   "relation": "applies_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agent_type_allowlist",
+   "target": "ahd_subagents_disable_specific",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_task_renamed_agent",
+   "target": "ahd_subagents_agent_type_allowlist",
+   "relation": "explains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_mcp_servers",
+   "target": "ahd_subagents_mcp_context_avoidance",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_mcp_restrictions_apply",
+   "target": "ahd_subagents_field_mcp_servers",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_permission_mode",
+   "target": "ahd_subagents_permission_mode_semantics",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_bypass_permissions_warning",
+   "target": "ahd_subagents_permission_mode_semantics",
+   "relation": "qualifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_parent_mode_precedence",
+   "target": "ahd_subagents_field_permission_mode",
+   "relation": "overrides",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_skills",
+   "target": "ahd_subagents_skills_preload_limits",
+   "relation": "constrained_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_skills",
+   "target": "ahd_subagents_skill_fork_inverse",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_skills",
+   "target": "ahd_subagents_field_tools",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_memory",
+   "target": "ahd_subagents_memory_runtime_effects",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_memory_requires_auto_memory",
+   "target": "ahd_subagents_field_memory",
+   "relation": "gates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_memory",
+   "target": "ahd_subagents_state_not_inherited",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_model",
+   "target": "ahd_subagents_model_resolution_order",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_subagent_model_env_inherit",
+   "target": "ahd_subagents_model_resolution_order",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_available_models_allowlist",
+   "target": "ahd_subagents_model_resolution_order",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_model_persists_on_resume",
+   "target": "ahd_subagents_resume",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_model",
+   "target": "ahd_subagents_context_preservation",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_extended_thinking_inherited",
+   "target": "ahd_subagents_field_model",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_hooks",
+   "target": "ahd_subagents_stop_becomes_subagentstop",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_hooks",
+   "target": "ahd_subagents_frontmatter_hooks_contexts",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_workspace_trust_hooks",
+   "target": "ahd_subagents_field_hooks",
+   "relation": "gates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_settings_hooks_apply",
+   "target": "ahd_subagents_field_hooks",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_lifecycle_events",
+   "target": "ahd_subagents_matcher_is_regex",
+   "relation": "constrained_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_pretooluse_conditional_rules",
+   "target": "ahd_subagents_field_tools",
+   "relation": "complements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_example_db_reader",
+   "target": "ahd_subagents_pretooluse_conditional_rules",
+   "relation": "demonstrates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_hook_is_a_backstop",
+   "target": "ahd_subagents_example_db_reader",
+   "relation": "qualifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explicit_invocation",
+   "target": "ahd_subagents_at_mention",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explicit_invocation",
+   "target": "ahd_subagents_agent_flag_session",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explicit_invocation",
+   "target": "ahd_subagents_delegation_by_description",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agent_setting_precedence",
+   "target": "ahd_subagents_agent_flag_session",
+   "relation": "overridden_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agent_flag_resume_and_scoping",
+   "target": "ahd_subagents_agent_flag_session",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_initial_prompt",
+   "target": "ahd_subagents_agent_flag_session",
+   "relation": "conditioned_on",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_background",
+   "target": "ahd_subagents_foreground_vs_background",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_foreground_vs_background",
+   "target": "ahd_subagents_background_tool_subset",
+   "relation": "causes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_background_permission_prompts",
+   "target": "ahd_subagents_foreground_vs_background",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_background_completion_notification",
+   "target": "ahd_subagents_foreground_vs_background",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_disable_background_tasks",
+   "target": "ahd_subagents_foreground_vs_background",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_disable_background_tasks",
+   "target": "ahd_subagents_fork_env_var",
+   "relation": "takes_precedence_over",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork_env_var",
+   "target": "ahd_subagents_field_background",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_tasks_list_retention",
+   "target": "ahd_subagents_foreground_vs_background",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_api_errors",
+   "target": "ahd_subagents_resume",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_output_scanning",
+   "target": "ahd_subagents_scanning_is_not_a_control",
+   "relation": "qualified_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_scanning_is_not_a_control",
+   "target": "ahd_subagents_field_tools",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_pattern_isolate_output",
+   "target": "ahd_subagents_context_preservation",
+   "relation": "demonstrates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_pattern_parallel_research",
+   "target": "ahd_subagents_concurrent_limit",
+   "relation": "constrained_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_pattern_parallel_research",
+   "target": "ahd_subagents_scope_boundary_vs_teams",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_pattern_chaining",
+   "target": "ahd_subagents_startup_context",
+   "relation": "constrained_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_when_to_use_main_conversation",
+   "target": "ahd_subagents_alternatives_skills_and_btw",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_when_to_use_main_conversation",
+   "target": "ahd_subagents_startup_context",
+   "relation": "explained_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_three_limits",
+   "target": "ahd_subagents_session_limit",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_three_limits",
+   "target": "ahd_subagents_concurrent_limit",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_three_limits",
+   "target": "ahd_subagents_depth_limit",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_depth_limit_env",
+   "target": "ahd_subagents_depth_limit",
+   "relation": "configures",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_nested_config_and_panel",
+   "target": "ahd_subagents_depth_limit",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_session_limit_counting",
+   "target": "ahd_subagents_session_limit",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_session_limit_counting",
+   "target": "ahd_subagents_fork",
+   "relation": "counts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_concurrent_limit",
+   "target": "ahd_subagents_resume",
+   "relation": "bypassed_by",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_startup_context",
+   "target": "ahd_subagents_git_status_conditions",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_startup_context",
+   "target": "ahd_subagents_sibling_roster",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_startup_context",
+   "target": "ahd_subagents_field_skills",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_sibling_roster",
+   "target": "ahd_subagents_sendmessage_resume",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork",
+   "target": "ahd_subagents_startup_context",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_state_not_inherited",
+   "target": "ahd_subagents_startup_context",
+   "relation": "complements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_resume",
+   "target": "ahd_subagents_sendmessage_resume",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_plan_not_resumable",
+   "target": "ahd_subagents_resume",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_explore_plan_not_resumable",
+   "target": "ahd_subagents_general_purpose_agent",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_user_stopped_no_autoresume",
+   "target": "ahd_subagents_sendmessage_resume",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_sendmessage_identity_check",
+   "target": "ahd_subagents_sendmessage_resume",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agent_message_authority",
+   "target": "ahd_subagents_sendmessage_resume",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_agent_message_authority",
+   "target": "ahd_subagents_field_permission_mode",
+   "relation": "cannot_change",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_transcripts",
+   "target": "ahd_subagents_resume",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_auto_compaction",
+   "target": "ahd_subagents_transcripts",
+   "relation": "logged_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork",
+   "target": "ahd_subagents_fork_vs_named",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork_prompt_cache",
+   "target": "ahd_subagents_fork",
+   "relation": "explains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_subtask_command",
+   "target": "ahd_subagents_fork",
+   "relation": "invokes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork_env_var",
+   "target": "ahd_subagents_fork",
+   "relation": "configures",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork_limitations",
+   "target": "ahd_subagents_fork",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork_worktree_isolation",
+   "target": "ahd_subagents_field_isolation_worktree",
+   "relation": "reuses",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_fork_panel_controls",
+   "target": "ahd_subagents_fork",
+   "relation": "observes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_transcript_view_commands",
+   "target": "ahd_subagents_fork_panel_controls",
+   "relation": "qualifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_best_practices",
+   "target": "ahd_subagents_field_description",
+   "relation": "recommends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_best_practices",
+   "target": "ahd_subagents_field_tools",
+   "relation": "recommends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_best_practices",
+   "target": "ahd_subagents_project_scope",
+   "relation": "recommends",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_example_code_reviewer",
+   "target": "ahd_subagents_field_tools",
+   "relation": "demonstrates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_example_debugger",
+   "target": "ahd_subagents_example_code_reviewer",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_example_data_scientist",
+   "target": "ahd_subagents_field_model",
+   "relation": "demonstrates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_example_code_reviewer",
+   "target": "ahd_subagents_field_memory",
+   "relation": "combines_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_max_turns",
+   "target": "ahd_subagents_subagent",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_effort",
+   "target": "ahd_subagents_subagent",
+   "relation": "configures",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_field_color",
+   "target": "ahd_subagents_subagent",
+   "relation": "configures",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_disable_specific",
+   "target": "ahd_subagents_builtin_agents",
+   "relation": "disables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_managed_subagents",
+   "target": "ahd_subagents_project_scope",
+   "relation": "takes_precedence_over",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_managed_subagents",
+   "target": "ahd_subagents_user_scope",
+   "relation": "takes_precedence_over",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_at_mention",
+   "target": "ahd_subagents_plugin_scoped_identifier",
+   "relation": "uses",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ahd_subagents_working_directory",
+   "target": "ahd_subagents_startup_context",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "docs/claude-code/sub-agents.md",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [],
+ "input_tokens": 0,
+ "output_tokens": 0
+}
