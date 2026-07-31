@@ -1,3 +1,37 @@
+> ## ⚠️ CALLER'S ANNOTATION — 2026-07-31, added at promotion. Read before the report.
+>
+> The report below is **verbatim and unedited**, per `docs/research/README.md`.
+> Four corrections, found by the cold lane reviewing the promotion itself. The
+> original text stands beneath so both the claim and its refutation are visible.
+>
+> 1. **"`kind = \"issue\"` is impossible for hk" is WRONG.** The report reasons
+>    from `has_issues: false` to "would 404 on every run". GitHub's issues
+>    endpoint serves PRs, and `issues.py` never checks `has_issues`. Measured,
+>    three arms: `repos/jdx/hk/issues/1099` (a PR) → **200**; `/issues/1098` (a
+>    discussion) → 404; `/issues/999999` → 404. So a watch on a hk PR number
+>    resolves. The real constraint is that hk's *tracker* is discussions, which
+>    404 permanently. **`currency.toml` already carries the corrected reasoning**
+>    — that file is the authority, not this report.
+>
+> 2. **The premise is superseded.** The report opens with "hk is absent from
+>    `currency.toml`". It is not, as of `06e1c73`: a `[tool.hk]` block landed in
+>    PR #97, differently worded, with different watch `ref`s. The paste-ready
+>    block near the end of the report is therefore a proposal that was adopted in
+>    spirit and not verbatim. Read `currency.toml` for what actually shipped.
+>
+> 3. **`#1099` "reaching this repo" is overstated.** The v1.53.0 note says the
+>    deadlock needs `fail_fast = false` **and** "any step with `depends` on it".
+>    This repo has the first (`hk.pkl:12`) and, by the very ban under discussion,
+>    **zero `depends` edges** — the single occurrence of `depends` in `hk.pkl` is
+>    the comment forbidding it (`:152`). So the deadlock could never have fired
+>    here; the ban is what made it unreachable. The fix is still the reason the
+>    ban is now a *choice* rather than a workaround, which is the load-bearing
+>    point, but "matches this repo's exact configuration" is not right.
+>
+> 4. **Two smaller slips.** `mixed_line_ending` is declared at `hk.pkl:164`, not
+>    `:166` (`:169` for `check_merge_conflict` is correct). And "every lint step
+>    is globbed" is false — `md_size_budget` (`hk.pkl:237-239`) has no `glob`.
+
 # hk currency research — issue #87
 
 **Date**: 2026-07-31
