@@ -15,7 +15,9 @@ local-markdown tracker when no tracker doc has been provided, and nothing else
 in the auto-loaded context names the file. It lives here rather than in the root
 `CLAUDE.md` because that file is at 199 of its 200-line budget.
 
-PRs still go through `mise run kb-ship` / `mise run kb-land`, never `gh pr`.
+PRs are opened and merged with `mise run kb-ship` / `mise run kb-land`, never
+`gh pr create` / `gh pr merge`. Read-only `gh pr view` / `gh pr checks` stay
+fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a PR.
 
 # Cross-vendor orchestration (Fable-5 architect + executor lanes)
 
