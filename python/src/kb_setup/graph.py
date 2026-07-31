@@ -103,6 +103,20 @@ def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
     out = repo_root / "graphify-out" / "graph.json"
+
+    # FIRST — before `mf.load_all` reads a single manifest. The direction is the
+    # point: an input edited mid-build did not reach this graph, so recording its
+    # pre-read digest makes the very next check FIRE. Digesting later would record
+    # content the build never saw and bless a graph the edit never reached, which
+    # is the one direction this detector must never fail in.
+    #
+    # It sat after `load_all` when this landed, which is 17 lines too late — the
+    # manifests were already `read_text`-ed by then, so an edit in that window
+    # produced exactly the false green the comment claimed to prevent. Keep this
+    # line at the top of the function; nothing above it may touch `sources/`.
+    # (Cold lane, round 1.)
+    inputs = _input_fingerprints(repo_root)
+
     manifests = mf.load_all(sources)
     if not manifests:
         raise SystemExit("no sources/*.manifest found")
@@ -113,14 +127,6 @@ def build(repo_root: Path) -> None:
     # stamp, which then asserted it was built by the pinned version. Clearing first
     # makes every abort fail closed as "never stamped".
     _clear_stamp(repo_root)
-
-    # Digest the committed inputs BEFORE reading any of them, and stamp THAT map
-    # at the end. The direction is the point: an input edited mid-build did not
-    # reach this graph, and recording its pre-edit digest makes the very next
-    # check FIRE. Digesting at the end would record the post-edit content and
-    # bless a graph the edit never reached — a false green, and the one direction
-    # this detector must never fail in.
-    inputs = _input_fingerprints(repo_root)
 
     print(f"[kb-build] {len(manifests)} source(s)")
     for m in manifests:

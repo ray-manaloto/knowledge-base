@@ -16,12 +16,9 @@ absorb". A fix that manufactures the failure it names is not a fix.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from kb_setup import graph
-
-if TYPE_CHECKING:
-    import pytest
 
 _PINNED_EXE = "/mise/installs/pipx-graphifyy/0.9.26/bin/graphify"
 
@@ -147,3 +144,29 @@ def test_the_selector_does_reach_the_stamp_for_graphify(
     graph._stamp_build(_repo(tmp_path))
 
     assert calls == [_PINNED_EXE]
+
+
+def test_inputs_are_fingerprinted_before_any_manifest_is_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ORDERING — the digest must be taken before `load_all` reads a manifest.
+
+    `sources/*.manifest` is one of the two fingerprinted input globs, so
+    digesting AFTER `mf.load_all` has `read_text`-ed them opens a window where the
+    build proceeds on the old content while the stamp records the new file's
+    digest — and the next staleness check then reports clean. That is precisely
+    the false green the comment above the call claims to prevent, and the call sat
+    17 lines too late when it landed (cold lane, round 1).
+
+    A call-order assertion rather than a timing race, because the realistic
+    regression is someone moving the line back down for readability — which this
+    fails on immediately.
+    """
+    order: list[str] = []
+    monkeypatch.setattr(graph, "_input_fingerprints", lambda _r: order.append("digest") or {})
+    monkeypatch.setattr(graph.mf, "load_all", lambda _s: order.append("read") or [])
+
+    with pytest.raises(SystemExit):
+        graph.build(tmp_path)
+
+    assert order == ["digest", "read"], f"inputs were fingerprinted in the wrong order: {order}"
