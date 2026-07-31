@@ -1,7 +1,8 @@
 > ## ⚠️ CALLER'S ANNOTATION — 2026-07-31, added at promotion. Read before the report.
 >
 > The report below is **verbatim and unedited**, per `docs/research/README.md`.
-> Four corrections, found by the cold lane reviewing the promotion itself. The
+> Five corrections in four numbered points (item 4 bundles two), found by the
+> cold lane reviewing the promotion itself. The
 > original text stands beneath so both the claim and its refutation are visible.
 >
 > 1. **"`kind = \"issue\"` is impossible for hk" is WRONG.** The report reasons
