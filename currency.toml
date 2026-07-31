@@ -377,11 +377,22 @@ re-derive it."""
 # a build date after the version; adding one here would only create a way for
 # the match to stop working.
 #
-# No `kind = "issue"` watch is possible for hk, and that is a hard constraint
-# rather than a preference: `jdx/hk` has `has_issues: false` (discussions only,
-# probed 2026-07-31 — control arm: this repo returns `has_issues: true`, so the
-# probe discriminates). An issue watch would 404 on every run, and an unreadable
-# watch blocks the unambiguous-bump gate forever. Every hk watch item is `local`.
+# Every hk watch item is `local`, and the reason is narrower than it first looks.
+# `jdx/hk` has `has_issues: false` — its tracker is DISCUSSIONS (probed
+# 2026-07-31; control arm: this repo returns `has_issues: true`). But that does
+# NOT mean `kind = "issue"` always 404s here, and the first version of this
+# comment claimed it did. Measured, all three arms:
+#
+#   repos/jdx/hk/issues/1099 -> 200  (a PR — GitHub's issues endpoint serves PRs)
+#   repos/jdx/hk/issues/1098 -> 404  (a DISCUSSION — not on that endpoint)
+#   repos/jdx/hk/issues/999999 -> 404  (control)
+#
+# So a watch pointing at a hk PR number would work, and `issues.py` never checks
+# `has_issues` before fetching, so nothing pre-empts either case. The real
+# constraint: the things worth watching on hk ARE discussions, and those 404
+# permanently — and a watch whose lookup fails blocks the unambiguous-bump gate
+# forever rather than failing loudly. Hence `local`, which states the fact
+# directly instead of depending on a lookup that cannot succeed.
 [tool.hk]
 mise_key = "hk"
 binary = "hk"

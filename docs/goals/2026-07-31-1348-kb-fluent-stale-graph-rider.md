@@ -132,9 +132,15 @@ precedent: a fingerprint proves THAT something changed, never WHAT.
 ### P3 — the not-verifiable state, and its ordering
 
 **Absent stamp or absent graph short-circuits to *never built* BEFORE any input
-is compared** (#89). A fresh clone moves **43 of 43** fingerprints on identical
-bytes and has neither artifact; comparing first would tell the very first session
-in a new clone that its whole corpus had gone stale.
+is compared** (#89). A fresh clone has neither artifact, so comparing first would
+tell the very first session in a new clone that its whole corpus had gone stale.
+
+The 43-of-43 figure from #89 belongs to THIS phase and not to P1, and the
+distinction matters: a fresh clone has **no recording to compare against at all**,
+which defeats every fingerprint scheme equally — sha256 included. It is not
+evidence against `size:mtime_ns` and must not be read as qualifying P1's claim
+that sha256 survives content-preserving git operations. It is the reason for the
+ordering rule above, and nothing else. (Cold lane, round 1.)
 
 An unreadable stamp reports *not verifiable*, never a false green. Test both
 directions.
@@ -168,13 +174,33 @@ justified by a note that was read is out of scope by posture.
 against old schemas, and the mismatch surfaces as a pkl error with nothing
 pointing at the pin.
 
-### P7 — close the loop, then ship
+### P7 — review, ship, THEN record the outcome
 
-`kb-remember` + `kb-reflect` + `kb-goal-outcome`, **then** the `kb-review` skill,
-**then** the receipt, **then** `kb-ship`. That order is not cosmetic: `kb-land`
-squash-merges, so a receipt written before landing is not an ancestor of the new
-`main` afterwards, and the `EXEMPT_PATHS` fallback cannot rescue artifacts written
-after the fact. Measured the hard way this session.
+Order, and every step of it is load-bearing:
+
+1. `kb-remember` + `kb-reflect` — the lessons, which are knowable now.
+2. The `kb-review` skill, then `mise run kb-review-receipt`.
+3. `mise run kb-ship`.
+4. **`mise run kb-goal-outcome` — only now**, and only with the result that
+   actually happened.
+5. Commit what step 4 wrote, and push it to the open PR.
+
+**Step 4 comes after step 3 because `ship: OK` is verification item 7** — the
+round's success is not knowable until ship has succeeded. Recording `achieved`
+before shipping means a later ship failure leaves a false `achieved` in
+`docs/goals/README.md` and in work-memory, where the next session reads it as
+settled. (Cold lane, round 1.)
+
+**Step 5 does not need a second review**, and this is exactly what
+`review.EXEMPT_PATHS` was built for (#66): `kb-goal-outcome` writes only
+`graphify-out/memory/**` and `docs/goals/README.md`, so `kb-land` accepts the
+ancestor receipt from step 2 for a HEAD whose entire delta is those paths. One
+reviewed path in that delta and it refuses, naming the file.
+
+**Do not invert 1 and 2 to `land` first.** `kb-land` squash-merges, so the
+reviewed SHA is not an ancestor of the new `main` afterwards and the exempt-path
+fallback has nothing to fall back to. Measured the hard way this session: a
+19-line work-memory file then needed a cold lane of its own.
 
 ## Sentinel formats
 
@@ -187,12 +213,18 @@ transcript at turn 0, and only a real run can attach a real SHA to one.
 |---|---|
 | `STALE-ARM+ @ <sha>` | the detector FIRED on a real input change; command and output pasted |
 | `STALE-ARM- @ <sha>` | the same detector stayed SILENT after a git op that left the bytes unchanged; command and output pasted |
-| `STALE-NEVER-BUILT @ <sha>` | absent stamp reported *never built* / *not verifiable*, NOT drift; output pasted |
+| `STALE-NEVER-BUILT @ <sha>` | an **absent** stamp reported *never built*, NOT drift; output pasted |
 | `NOTES-REVIEWED: <tool> <from>-><to> — <one sentence> @ <sha>` | one per tool read in P5 |
 | `GOAL-BLOCKED: <blocker> — tried: <probe1>; <probe2> @ <sha>` | the honest exit, naming two probes already pasted |
 
 `STALE-ARM+` without `STALE-ARM-` is not evidence — it is a check that has only
 ever passed (`probes-need-a-control-arm.md` rule 2). Both, or neither counts.
+
+**`STALE-NEVER-BUILT` means one outcome, not two.** It covers the ABSENT-artifact
+case only. P3 also tests the *unreadable*-stamp branch, which must report *not
+verifiable* — that is a test rather than a goal clause. Naming both under one
+sentinel would let a probe that only ever reached one branch satisfy a condition
+written about the other. (Cold lane, round 1.)
 
 ## Verification — the literal strings, and what prints them
 
