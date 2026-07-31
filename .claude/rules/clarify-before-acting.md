@@ -19,6 +19,38 @@ real Claude tokens and lands a committed chunk in `sources/extractions/`. A
 merged chunk becomes part of the graph other repos query. Guessing at what a
 source is *for* before ingesting it is the costly mistake here.
 
+## The channel: EVERY question is an `AskUserQuestion`
+
+Ray, 2026-07-30, verbatim: *"enforce this and always do this going forward — use
+the AskUserQuestion tool for questions you need from me"*.
+
+This is broader than the rest of this file. The rules below govern **when** to
+ask; this governs **how**, and it admits no exceptions:
+
+- Any question whose answer you need before proceeding goes through
+  `AskUserQuestion` — including a plain "confirm this?", a yes/no, and a
+  "which of these two?". A question in prose at the end of a
+  `SendUserMessage` does **not** count.
+- `SendUserMessage` may carry the findings and context around a question. The
+  question itself lives in the tool, never only in the prose.
+- Bundle related questions into ONE call (it takes up to four) rather than
+  several round trips.
+
+**Why:** a prose question buried at the end of a long message is easy to miss
+and gives the user nothing to act on. `AskUserQuestion` renders labelled
+options, a recommendation, and an "Other" escape — so the question is
+unmissable and answering it is one click. It also forces you to name the real
+options and pick one, instead of offloading an open-ended prompt.
+
+**The trigger, recorded so the narrow reading does not return:** a session
+charting a wayfinder map asked its first four questions correctly, then ended a
+message with two in prose — "confirm the map" and "want me to spawn the research
+subagent". Both read as too small to warrant the tool, because rule 1 below
+scopes asking to *ambiguous / multi-path / irreversible* work. Size is not the
+test. **The test is only whether you need an answer.**
+
+This does not license asking *more* — rule 3 still stands.
+
 ## Rules
 
 1. **Ask before acting on ambiguous / multi-path / irreversible work.**
