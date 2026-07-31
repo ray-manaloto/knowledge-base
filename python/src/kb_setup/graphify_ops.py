@@ -68,12 +68,20 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
 def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     """Re-derive the prose graph, reporting a failure as a non-zero rc.
 
-    The derivation's own failure modes raise (`ValueError` when nothing would
-    survive, `SystemExit` when there is no built graph), and both leave NO prose
+    The derivation's own failure modes raise, and all of them leave NO prose
     graph — `prose.derive` unlinks first precisely so an abort fails closed.
     That is the right artifact state and the wrong exit code: `graph.json` really
     did change, so returning 0 would report an operation whose `--prose` arm has
     just gone missing as an unqualified success.
+
+    All THREE are caught, and the first draft caught two. `ValueError` covers
+    nothing-survives and — since `json.JSONDecodeError` subclasses it — an
+    unreadable `graph.json`; `SystemExit` covers no-built-graph. **`OSError` is
+    the one that escaped**: a full disk, a vanished directory, a permissions
+    change. It is not hypothetical — `tests/test_prose_rederivation.py` injects
+    exactly that fault against `prose.derive`, so the module had a test for a
+    failure this wrapper then let propagate as an unhandled traceback instead of
+    the rc and the message below. (Cold lane, round 2.)
 
     `tag`/`did` name the CALLER, because this message is the only thing telling
     someone which of their two graphs is now absent — and "the chunk merged"
@@ -81,7 +89,7 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     """
     try:
         prose.derive_for(repo_root)
-    except (ValueError, SystemExit) as exc:
+    except (OSError, ValueError, SystemExit) as exc:
         print(
             f"[{tag}] {did}, but the prose graph could not be re-derived: "
             f"{exc}\n[{tag}] `kb-query --prose` has no corpus until "

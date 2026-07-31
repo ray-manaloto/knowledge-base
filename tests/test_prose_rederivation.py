@@ -238,3 +238,56 @@ def test_an_interrupted_write_leaves_no_partial_prose_graph(
 
     assert not out.exists(), "a partial write was left where a reader would find it"
     assert list(tmp_path.glob("*.tmp")) == [], "the temp file outlived the failure"
+
+
+def test_a_write_failure_becomes_an_rc_not_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An `OSError` from the derivation must reach the caller as rc=1 and a message.
+
+    The wrapper caught `ValueError` and `SystemExit` and not this — so a full disk
+    during a `kb-merge` surfaced as an unhandled traceback rather than the line
+    telling you `--prose` now has no corpus. The gap was visible from inside this
+    very file, which already injects an `OSError` against `prose.derive` one test
+    up. (Cold lane, round 2.)
+    """
+    repo = _repo(tmp_path)
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+
+    def boom(*_: object, **__: object) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(prose.json, "dump", boom)
+
+    assert graphify_ops.merge_chunk(repo, _chunk(tmp_path)) == 1
+    assert "kb-prose" in capsys.readouterr().err
+
+
+def test_a_derivation_does_not_clobber_another_ones_temp_file(tmp_path: Path) -> None:
+    """Two concurrent derivations must not share one temp path.
+
+    A temp name derived from `out_path` is the SAME path for every caller, so two
+    derivations running at once write into one file and each `replace` a graph the
+    other half-wrote — a torn WRITE in place of the torn read the temp file was
+    added to prevent. (Cold lane, round 2.)
+
+    Stated as the harm rather than as "mkstemp was called": the decoy stands in
+    for another derivation's in-flight temp file, and a fixed-name implementation
+    both overwrites it and then renames it away, so it fails on the read below
+    rather than on an implementation detail it might satisfy some other way.
+    """
+    src = tmp_path / "graph.json"
+    src.write_text(json.dumps(_MERGED), encoding="utf-8")
+    out = tmp_path / prose.PROSE_GRAPH_NAME
+
+    inflight = "another derivation is part-way through writing this"
+    decoy = out.with_name(out.name + ".tmp")
+    decoy.write_text(inflight, encoding="utf-8")
+
+    prose.derive(src, out)
+
+    assert decoy.exists(), "the other derivation's temp file was renamed away"
+    assert decoy.read_text(encoding="utf-8") == inflight, "it was written over"
+    derived = json.loads(out.read_text(encoding="utf-8"))
+    ids = [str(n["id"]) for n in cast("list[dict[str, object]]", derived["nodes"])]
+    assert ids == ["just_merged"], "the derivation itself did not land"

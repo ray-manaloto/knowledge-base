@@ -47,6 +47,8 @@ extractor"; `file_type` is a label the extractor also applies to prose.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -59,6 +61,11 @@ PROSE_GRAPH_NAME = "graph-prose.json"
 
 #: `_origin` value the AST extractor stamps on every node and link it produces.
 AST_ORIGIN = "ast"
+
+#: Permissions the derived graph carries. `mkstemp` creates 0600, so the mode is
+#: restored explicitly — the artifact was umask-default before the atomic write
+#: landed, and tightening it silently would be an unrelated behaviour change.
+_ARTIFACT_MODE = 0o644
 
 type Node = dict[str, object]
 type Link = dict[str, object]
@@ -177,10 +184,19 @@ def derive(graph_path: Path, out_path: Path) -> ProseStats:
         out["hyperedges"] = kept_edges
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out_path.with_name(out_path.name + ".tmp")
+    # `mkstemp`, not a name derived from `out_path`: a fixed `<name>.tmp` is the
+    # same path for every caller, so two derivations running at once would write
+    # into one file and each `replace` a graph the other half-wrote — trading a
+    # torn read for a torn write. Unique-per-call makes concurrent derivations
+    # merely redundant instead of destructive. (Cold lane, round 2.)
+    fd, tmp_name = tempfile.mkstemp(dir=out_path.parent, prefix=out_path.name + ".", suffix=".tmp")
+    tmp = Path(tmp_name)
     try:
-        with tmp.open("w", encoding="utf-8") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(out, fh, indent=2)
+        # mkstemp creates 0600; the artifact was umask-default before this and
+        # changing an unrelated observable property is not this change's job.
+        tmp.chmod(_ARTIFACT_MODE)
         tmp.replace(out_path)
     except BaseException:
         # A partial temp file is not the artifact and must not be left behind to
