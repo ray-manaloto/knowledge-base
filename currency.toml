@@ -128,7 +128,22 @@ the failure is misreported: graphify swallows the real
 message says NOT INSTALLED while mcp is installed at the wrong major.
 
 Upstream tracks the port to the mcp 2.x API in #2308 (below). When that lands
-the `<2` ceiling lifts; until then, do not "helpfully" relax it."""
+the `<2` ceiling lifts; until then, do not "helpfully" relax it.
+
+**RESOLVED in 0.9.31 — #2308 landed, and this repo bumped to it.** The cap is
+now `mcp>=1,<3`: `_build_server` binds the same handlers through either the 1.x
+decorator API or the 2.x `on_*` constructor callbacks at runtime, and adapts
+`Tool.inputSchema`, `Resource.uri` and the dropped `AnyUrl` re-export. Upstream
+reports full stdio handshakes verified under both mcp 1.29 and 2.0.
+
+The item is KEPT rather than deleted because its warning has outlived its
+version condition and inverted: the ceiling was load-bearing on 0.9.30 and is
+not on 0.9.31, so a reader who finds `mcp<2` reasoning in an older branch or a
+consumer repo needs to know which side of 0.9.31 it belongs to. The two probes
+that look conclusive and are not — `import graphify.serve` and `--help` both
+exiting 0 while the server is broken, because the mcp imports are lazy inside
+`_build_server` — still hold on ANY version, and are the reason `mise run
+kb-serve` is the only probe that answers this question."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -214,7 +229,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.7.16"
+expected = "2026.7.18"
 # `mise --version` prints `2026.7.16 macos-arm64 (2026-07-29)`, so the engine's
 # default last-whitespace-field heuristic returns the build DATE. Anchored at the
 # start so it reads the version and not some later digit run.
@@ -257,6 +272,35 @@ wearing an authoritative empty answer's clothes, which is the exact shape
 (reported as a fetch failure, and memoized per process). Kept as a watch item
 because any host still BELOW 7.16 will show the misleading form, so the
 signature table in `persistence-gate-retry.md` has to keep both."""
+
+[[tool.mise.watch]]
+kind = "local"
+ref = "path-dedup-lands-on-the-surface-this-engine-was-born-from"
+note = """v2026.7.18 (#11491): computed environments (`mise env`, `mise x` child
+PATHs, `mise doctor`) now collapse exact duplicate PATH entries first-wins,
+fixing runaway `_.path` accumulation in nested shells and IDE terminals that
+inherit an activated PATH without mise's state vars. **The live shell PATH is
+deliberately left untouched.**
+
+READ THIS ONE CAREFULLY BEFORE CONCLUDING IT FIXED ANYTHING HERE. It lands on
+the same surface as the founding defect of this whole engine — `MISE_ENV_CACHE=1`
+had baked a stale `.../installs/pipx-graphifyy/0.9.23/bin` into PATH *ahead* of
+the mise shims, so every bare `graphify` ran 0.9.23 under a 0.9.25 pin
+(`sync.py`'s module docstring). It is NOT the same bug and does not retire
+`resolve_from_path` / `_is_mise_shim` / `_mise_shim_dirs`: dedup removes EXACT
+duplicates, while ours was a DIFFERENT, stale directory ordered ahead of the
+shims — nothing to dedup. And the fix explicitly excludes the live shell PATH,
+which is exactly where step 1 looks. Reviewed at the 7.16 -> 7.18 bump.
+
+Nothing else in 7.17/7.18 reaches this repo, checked rather than assumed: the
+monorepo/Node-workspace task work (#11466/#11435/#11473/#11476/#11471) needs a
+`[monorepo]` table and workspace packages, of which this repo has none;
+`idiomatic_version_file_disable_files` (#11470) is unset; `mise prune --tools`
+(#11501), the Windows program-resolution fixes (#11486/#11489), GitLab
+pagination (#11507), Cargo install options (#11480), Aqua locked HTTP installs
+(#11499) and the asdf `bin/list-all` env plumbing (#11492) are all on paths this
+repo never takes. #11495 (installing a tool no longer touches loaded config
+files) DOES reach `mise install` here and is a pure improvement."""
 
 [[tool.mise.watch]]
 kind = "local"
