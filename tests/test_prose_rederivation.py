@@ -9,7 +9,7 @@ repaired it. Nothing failed; the answers were just older than the graph.
 
 The file is named for the CONTRACT rather than for `kb-merge`, because there are
 two writers and fixing one of them is not a fix. `graphify label` rewrites
-`graph.json` outright (installed 0.9.30, `graphify/cli.py:1546` -> :1836), and the
+`graph.json` outright (installed 0.9.30, `graphify/cli.py:1546` -> :1830), and the
 documented ingestion order is merge -> label — so a `merge_chunk` that re-derives
 while `label` does not is undone by the very next step of the workflow it fixes.
 That gap survived the first round of this change and was found by the cold lane.
@@ -187,7 +187,7 @@ def test_a_successful_label_re_derives_the_prose_graph(
 
     `graphify label` does not only touch sidecars — it ends in
     `to_json(G, communities, str(out / "graph.json"), …)` (installed 0.9.30,
-    `graphify/cli.py:1836`, reached from the `label` branch at :1546 with no
+    `graphify/cli.py:1830`, reached from the `label` branch at :1546 with no
     intervening branch). The documented order is merge -> label, so fixing only
     the merge would have left the prose graph stale again one step later, which
     is the whole failure this change exists to end.
