@@ -51,6 +51,18 @@ gitleaks = "8.30.1"
 # Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
 # on warnings-only, so without it every warning is invisible (dotfiles #250).
 "github:agent-sh/agnix" = "0.40.0"
+# fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
+# registry as `github:jdx/fnox`). Pinned here rather than left to the user's
+# GLOBAL mise, where it installs into a directory literally named `latest` and
+# self-updates out of band — so nothing could notice a version moving under us
+# (#86). Ray's call, 2026-07-31: track it "like hk", i.e. as an ordinary pinned
+# tool with a `mise_key`, not with `[tool.mise]`'s self-managed shape.
+#
+# ⚠️ Pinning it means the shim resolves to THIS version inside this directory
+# while the global install stays on `latest` — a deliberate, accepted skew.
+# This repo pins what fnox it EXPECTS; it does not touch `~/.config/fnox`, so
+# `do-not.md` #11 is not engaged. Bump alongside the global one.
+fnox = "1.31.1"
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
 # (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
