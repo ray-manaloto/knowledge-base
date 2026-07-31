@@ -31,6 +31,7 @@ minutes, or the sort breaks.
 | Pair | Headline word | Round | Status |
 |---|---|---|---|
 | `2026-07-27-1702-kb-redaction-legibility` | **Legible** | Why `mise run` masks its own output as `[redacted]` | achieved |
+| `2026-07-31-1348-kb-fluent-stale-graph` | **Fluent** | SessionStart stale-graph detection + the graphify/mise/hk/fnox release-notes review | not yet run |
 
 ## Why the goal file is capped at 4,000 characters
 

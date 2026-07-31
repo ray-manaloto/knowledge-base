@@ -363,3 +363,90 @@ disagreement about it: the "Claude Code overrides the hook and ends the turn aft
 2026-07-27 baseline and the current page, against a bogus term at 0. goal.md still
 never mentions a cap. The unreconciled-doc-disagreement node stays TRUE; do not
 re-derive it."""
+
+# ---------------------------------------------------------------------------
+# hk — the git-hook gate this repo's `mise run lint` IS (#87)
+# ---------------------------------------------------------------------------
+# The ordinary PINNED-tool shape, not `[tool.mise]`'s self-managed one: hk is in
+# this repo's `[tools]`, so `mise_key` resolves and `expected` is deliberately
+# ABSENT — the engine reads `expected` as "self-managed", which hk is not.
+#
+# No `version_pattern`: `hk --version` prints exactly `hk 1.52.0`, so the
+# engine's default `text.split()[-1].lstrip("v")` returns `1.52.0` already.
+# mise and claude-code need patterns because their output carries a platform and
+# a build date after the version; adding one here would only create a way for
+# the match to stop working.
+#
+# No `kind = "issue"` watch is possible for hk, and that is a hard constraint
+# rather than a preference: `jdx/hk` has `has_issues: false` (discussions only,
+# probed 2026-07-31 — control arm: this repo returns `has_issues: true`, so the
+# probe discriminates). An issue watch would 404 on every run, and an unreadable
+# watch blocks the unambiguous-bump gate forever. Every hk watch item is `local`.
+[tool.hk]
+mise_key = "hk"
+binary = "hk"
+github = "jdx/hk"
+
+[[tool.hk.watch]]
+kind = "local"
+ref = "depends-ban-is-now-a-choice-not-a-workaround"
+note = """`hk.pkl` bans `depends` in favour of `exclusive = true` because a failed
+dependency used to deadlock every dependent (`hk.pkl:152`, and the same doctrine
+in `long-running-command-hangs.md` rule 5 + dotfiles' `no_hk_depends` step). The
+trigger condition is `fail_fast = false`, which this repo sets at `hk.pkl:12`.
+
+**Upstream FIXED it in v1.53.0 (#1099): dependents no longer hang after a failed
+dependency.** So the ban is no longer a workaround for a live defect — it is a
+choice, and `tool-currency-and-native-first.md` says custom avoidance kept alive
+by a fixed defect is exactly what to re-examine.
+
+Deliberately NOT retired (Ray, 2026-07-31): `exclusive` works, the doctrine spans
+both repos, and dotfiles machine-enforces it — retiring it here alone would split
+the two repos' rules. Recorded WITH its version condition so a future reader knows
+which of the two it is, and so any revival is a decision rather than a rediscovery."""
+
+[[tool.hk.watch]]
+kind = "local"
+ref = "hk-version-is-written-three-times"
+note = """dotfiles' `hk_version_parity` step does not port — it exists because
+that repo carries THREE pkl files whose hk pins can drift apart, and this repo has
+exactly ONE (`hk.pkl`, verified 2026-07-31).
+
+But a drift surface remains on a DIFFERENT axis: the version appears three times
+across two files — `mise.toml`'s `hk` pin, and `hk.pkl`'s `amends` and `import`
+URLs. A `mise.toml`-only bump runs a new BINARY against the old SCHEMAS. Bump all
+three together, or the mismatch shows up as a pkl error with nothing pointing at
+the pin."""
+
+# ---------------------------------------------------------------------------
+# fnox — the credential tool the shell's secrets come from (#86)
+# ---------------------------------------------------------------------------
+# Ray's call, 2026-07-31: track it "like hk" — an ordinary pinned tool. So fnox
+# is now pinned in `[tools]` too, and this block takes `mise_key`, NOT
+# `[tool.mise]`'s self-managed `expected` shape.
+#
+# The problem it closes: fnox resolved from the user's GLOBAL mise, which
+# installs it into a directory literally named `latest` and self-updates out of
+# band. Installed 1.31.1 and upstream latest 1.31.1 (probed 2026-07-31, both
+# arms), so there was no drift — only no way to notice any.
+#
+# Scope, so the `do-not.md` #11 tension is not re-derived from scratch: this
+# tracks a VERSION and touches nothing under `~/.config/fnox`. fnox's real
+# enforcement — the `env = "exec"` baseline and the `mde-py bootstrap_config()`
+# wipe that silently drops the mode plus all four opt-ins — lives in dotfiles'
+# `doctor.toml` as `fnox-baseline`, and stays there. Before this, NOTHING tracked
+# fnox's version anywhere: dotfiles' `currency.toml` carries only `[tool.graphify]`
+# (control arm: `mise` appears 8 times in that file, so the grep discriminates).
+[tool.fnox]
+mise_key = "fnox"
+binary = "fnox"
+github = "jdx/fnox"
+
+[[tool.fnox.watch]]
+kind = "local"
+ref = "pinned-here-global-stays-on-latest"
+note = """Pinning fnox in this repo's `[tools]` means the shim resolves to the
+pinned version INSIDE this directory while the global install stays on `latest`
+— an accepted skew, chosen deliberately so this repo states the fnox it expects.
+Bump the two together; a bump here alone narrows the skew rather than closing it,
+and the global side is not this repo's to edit (`do-not.md` #11)."""
