@@ -114,6 +114,14 @@ def build(repo_root: Path) -> None:
     # makes every abort fail closed as "never stamped".
     _clear_stamp(repo_root)
 
+    # Digest the committed inputs BEFORE reading any of them, and stamp THAT map
+    # at the end. The direction is the point: an input edited mid-build did not
+    # reach this graph, and recording its pre-edit digest makes the very next
+    # check FIRE. Digesting at the end would record the post-edit content and
+    # bless a graph the edit never reached — a false green, and the one direction
+    # this detector must never fail in.
+    inputs = _input_fingerprints(repo_root)
+
     print(f"[kb-build] {len(manifests)} source(s)")
     for m in manifests:
         _ensure_clone(m)
@@ -169,7 +177,7 @@ def build(repo_root: Path) -> None:
     # inherited-number trap with extra steps. `kb-prose` re-derives it alone.
     prose.derive_for(repo_root)
 
-    _stamp_build(repo_root)
+    _stamp_build(repo_root, inputs)
     print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 
 
@@ -201,7 +209,27 @@ def _clear_stamp(repo_root: Path) -> None:
         print(f"[kb-build] WARNING: could not clear the currency stamp: {e}")
 
 
-def _stamp_build(repo_root: Path) -> None:
+def _input_fingerprints(repo_root: Path) -> dict[str, str] | None:
+    """sha256 over every committed input `currency.toml` declares, or None.
+
+    None means "could not be read", which `write_stamp` records as the ABSENCE of
+    an input map — so the staleness check reports *not verifiable* rather than
+    comparing against a partial one. Best-effort, like the stamp itself: a build
+    must not fail over its own bookkeeping.
+    """
+    try:
+        from kb_setup.currency import sync
+
+        spec = _currency_spec(repo_root)
+        if spec is None:
+            return None
+        return sync.input_fingerprints(repo_root, spec)
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-build] WARNING: could not fingerprint the corpus inputs: {e}")
+        return None
+
+
+def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
     """Record which graphify version built these artifacts (currency step 1).
 
     graphify stamps nothing itself — `export.to_json()` writes only
@@ -238,7 +266,9 @@ def _stamp_build(repo_root: Path) -> None:
         # PATH-resolved reading this exists to eliminate.
         version = sync.observed_version(graphify_exe(repo_root))
         source_ref = sync.manifest_ref(repo_root, spec)
-        path = sync.write_stamp(repo_root, spec, version=version, source_ref=source_ref)
+        path = sync.write_stamp(
+            repo_root, spec, version=version, source_ref=source_ref, inputs=inputs
+        )
         if version:
             print(f"[kb-build] stamped {path.name}: built by graphify {version}")
         else:

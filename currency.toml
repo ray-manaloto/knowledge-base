@@ -52,6 +52,27 @@ artifacts = [
   "graphify-out/graph.graphml",
   "graphify-out/wiki",
 ]
+# The committed INPUTS `kb_setup.graph.build()` actually reads — the two globs
+# and no more. Digested (sha256) into the same stamp, so step 1 can answer the
+# question nothing could answer before: does the built graph still match the
+# corpus it was built from? Editing a manifest or landing an extraction chunk
+# previously left a graph describing an older corpus with every check green.
+#
+# sha256 here while `artifacts` above stays `size:mtime_ns`, and the asymmetry is
+# measured, not stylistic: the inputs are 2.4 MB against the outputs' 341 MB
+# (142x), and a stat CANNOT discriminate on the input side — `git checkout --`,
+# a branch round-trip touching `sources/`, and a stash+pop each move it on
+# byte-identical files, firing on every row of that class
+# (docs/research/reports/2026-07-31-size-mtime-false-drift.md). sha256 is clean
+# on all three, still fires on a real edit, and costs 1.8 ms over 43 files.
+# `git hash-object` was checked as the tool built-in and is ~480x slower here
+# (subprocess start-up dominates a 2.4 MB hash) — recorded so nobody re-runs it.
+#
+# The CLONES under `sources/<name>/` are deliberately absent: they are gitignored
+# and re-fetched from the manifest's pinned SHA, so the manifest IS their
+# identity. Fingerprinting them would report drift every time a clone was
+# refreshed at the same pin.
+inputs = ["sources/*.manifest", "sources/extractions/*.json"]
 stamp = "graphify-out/.currency-stamp.json"
 # graphify is host-only here. On a Linux CI runner these checks must report
 # NOT-APPLICABLE rather than fail: "cannot check here" and "checked and wrong"

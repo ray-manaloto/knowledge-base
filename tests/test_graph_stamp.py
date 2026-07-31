@@ -59,16 +59,20 @@ def test_the_stamp_reads_the_binary_the_build_ran(
     monkeypatch.setattr(
         sync,
         "write_stamp",
-        lambda _root, _spec, *, version, source_ref: (
-            written.update(version=version, source_ref=source_ref),
+        lambda _root, _spec, *, version, source_ref, inputs=None: (
+            written.update(version=version, source_ref=source_ref, inputs=inputs),
             Path("stamp.json"),
         )[1],
     )
 
-    graph._stamp_build(_repo(tmp_path))
+    graph._stamp_build(_repo(tmp_path), {"sources/x.manifest": "sha256:abc"})
 
     assert seen == [_PINNED_EXE], f"stamp resolved {seen}, not the built binary"
     assert written["version"] == "0.9.26"
+    # The input map reaches the stamp UNCHANGED. `_stamp_build` must not compute
+    # or edit it: the digests belong to the build that read them, and the only
+    # caller allowed to produce them is `build()` — before it reads anything.
+    assert written["inputs"] == {"sources/x.manifest": "sha256:abc"}
 
 
 def test_a_path_resolved_stamp_would_have_recorded_the_other_version() -> None:

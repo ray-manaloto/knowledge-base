@@ -18,12 +18,14 @@ opt-in exceptions, never reached from the hook: `observed_version` (executes
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -49,6 +51,10 @@ BLIND = "blind"
 # map covering the primary graph AND the generated outputs (wiki/graphml/svg/…).
 _STAMP_VERSION = 3
 _SCAN_WINDOW = 4096
+# Streamed rather than slurped: an extraction chunk can run to tens of megabytes,
+# and the digest is the same either way. 1 MiB is well past the point where the
+# read syscall stops dominating.
+_DIGEST_CHUNK = 1 << 20
 # A SHA-shaped VALUE is required, so a node merely NAMED "built_at_commit"
 # cannot masquerade as the metadata key.
 _COMMIT_RE = re.compile(rb'"built_at_commit"\s*:\s*"([0-9a-fA-F]{7,40})"')
@@ -274,7 +280,81 @@ def artifact_fingerprints(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
     return prints
 
 
-def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: str = "") -> Path:
+def input_fingerprint(path: Path) -> str:
+    """A CONTENT identity for one committed input: `sha256:<hex>`, or "" if unreadable.
+
+    Deliberately NOT `artifact_fingerprint`'s `size:mtime_ns`. That stat is right
+    for outputs and measured wrong for inputs: three ordinary git operations that
+    leave the bytes identical — `git checkout --` of a reverted edit, a
+    round-trip through a branch touching `sources/`, and a stash+pop — move the
+    mtime on every affected file, so it fires on the whole class and cannot
+    discriminate at all (eight-row table in
+    `docs/research/reports/2026-07-31-size-mtime-false-drift.md`).
+
+    Digesting is affordable *here* and not there: the inputs are 2.4 MB against
+    the outputs' 341 MB — 142x — and sha256 over the input set measured 1.8 ms,
+    best of 5. `git hash-object` was checked as the tool built-in first and is
+    ~480x slower on this corpus (subprocess start-up dominates a 2.4 MB hash), so
+    in-process `hashlib` wins; that is recorded so nobody re-runs the comparison.
+    """
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as fh:
+            while chunk := fh.read(_DIGEST_CHUNK):
+                digest.update(chunk)
+    except OSError:
+        return ""
+    return f"sha256:{digest.hexdigest()}"
+
+
+def input_fingerprints(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
+    """`{relpath: sha256}` over every file matched by this tool's `inputs` globs.
+
+    Keyed by the repo-relative POSIX path so the map is portable across clones and
+    across platforms, and sorted so two builds of the same tree write byte-identical
+    maps — a stamp that reordered itself would look like drift to any diff.
+
+    An unreadable match is OMITTED rather than recorded as "": recording an empty
+    digest would make an unreadable file compare equal to a *different* unreadable
+    file, which is the false green this engine refuses everywhere else. Omitting it
+    surfaces instead as a removed path, which reads as drift — the safe direction.
+    """
+    prints: dict[str, str] = {}
+    for pattern in spec.inputs:
+        for path in sorted(repo_root.glob(pattern)):
+            if not path.is_file():
+                continue
+            fp = input_fingerprint(path)
+            if fp:
+                prints[path.relative_to(repo_root).as_posix()] = fp
+    return dict(sorted(prints.items()))
+
+
+def stamped_input_fingerprints(stamp: Mapping[str, object]) -> dict[str, str] | None:
+    """The recorded input map, or None when this stamp does not carry one.
+
+    None and `{}` are different answers and the caller depends on it: None means
+    "written by an engine that predates input fingerprinting, so the question was
+    never asked" (⇒ *not verifiable*), while `{}` means "asked, and this tool
+    declares no inputs" (⇒ nothing to compare). Collapsing them would render a
+    stamp that never recorded anything as a clean pass.
+    """
+    if "input_fingerprints" not in stamp:
+        return None
+    raw = stamp.get("input_fingerprints")
+    if not isinstance(raw, dict):
+        return None
+    return {str(k): str(v) for k, v in raw.items()}
+
+
+def write_stamp(
+    repo_root: Path,
+    spec: ToolSpec,
+    *,
+    version: str,
+    source_ref: str = "",
+    inputs: Mapping[str, str] | None = None,
+) -> Path:
     """Record which version built the artifacts, next to them.
 
     graphify does not stamp its own output — `export.to_json()` writes only
@@ -286,6 +366,19 @@ def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: st
     Fingerprints the PRIMARY graph and every declared generated output, so step 1
     catches a stale wiki/svg/GRAPH_REPORT.md the same way it catches a stale
     graph — Ray's "in sync with the graph AND generated outputs".
+
+    `inputs` is the committed-input digest map, and this function **never computes
+    it**. Only a real build has standing to say what the graph was built from, so
+    the caller supplies it (`graph._stamp_build` passes `input_fingerprints(...)`)
+    and `None` OMITS the key entirely. Making that the signature rather than a
+    convention is deliberate: a default that read the live tree would let
+    `restamp_artifacts` — which regenerates derived views and never re-reads
+    `sources/` — silently adopt whatever the inputs say *now* as what the graph
+    was built from, laundering the exact drift this records. Same reasoning that
+    keeps `version` carried forward rather than re-observed.
+
+    `None` is also distinct from `{}`: absent means "this stamp never recorded
+    inputs" (⇒ *not verifiable*), empty means "recorded, and there were none".
     """
     path = stamp_path(repo_root, spec)
     if path is None:
@@ -300,6 +393,8 @@ def write_stamp(repo_root: Path, spec: ToolSpec, *, version: str, source_ref: st
         "artifact_commit": _artifact_commit(artifact),
         "artifact_fingerprints": artifact_fingerprints(repo_root, spec),
     }
+    if inputs is not None:
+        payload["input_fingerprints"] = {str(k): str(v) for k, v in inputs.items()}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return path
@@ -324,6 +419,13 @@ def restamp_artifacts(repo_root: Path, spec: ToolSpec) -> Path | None:
         spec,
         version=str(existing.get("version", "")),
         source_ref=str(existing.get("source_ref", "")),
+        # Carried forward verbatim, INCLUDING the None that means "this stamp
+        # never recorded inputs". `kb-artifacts` reads graph.json and writes
+        # derived views; it never reads `sources/`, so it has no standing to
+        # restate what the graph was built from. Coercing None to `{}` here would
+        # be the subtle wrong move: it turns "never recorded" into "recorded, and
+        # there were none", which the staleness check reads as a clean pass.
+        inputs=stamped_input_fingerprints(existing),
     )
 
 
