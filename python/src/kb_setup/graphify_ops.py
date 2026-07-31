@@ -33,6 +33,18 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     Runs `_merge_docs.py` under graphify's bundled interpreter (it imports
     graphify) with a Gemini-free env. `root` is the source root for path
     relativization (defaults to the chunk's dir; moot for URL-sourced chunks).
+
+    A successful merge then RE-DERIVES the prose graph, exactly as
+    `graph.build()` does at its own last step. `graph-prose.json` is a pure
+    function of `graph.json`, so a merge that does not refresh it leaves the
+    corpus and its scoped view disagreeing — and `--prose` is the *recommended*
+    arm for a question about the documents, while the `kb-curator` ingestion
+    workflow is add -> merge -> label with no prose step. Measured 2026-07-30:
+    after merging a 132-node chunk, `kb-query --prose` still reported the
+    pre-merge 2,421 nodes and returned none of the just-merged material; the
+    only thing that had ever fixed it was the next unrelated `kb-build`. So
+    every merge-only ingestion had been silently answering document questions
+    from an older corpus.
     """
     chunk_path = Path(chunk)
     if not chunk_path.is_file():
@@ -43,7 +55,37 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     gpy = graphify_python(repo_root)
     cmd = [gpy, str(_MERGE_SCRIPT), str(chunk_path), src_root, str(out)]
     print(f"  $ {' '.join(cmd)}")
-    return subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+    rc = subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+    if rc != 0:
+        # Gated on the merge's rc, not run unconditionally: a failed merge may
+        # have left graph.json untouched or half-written, and deriving from
+        # either would replace a valid prose graph with one nobody asked for.
+        # The caller's job here is the failed merge, and this rc says so.
+        return rc
+    return _derive_prose(repo_root)
+
+
+def _derive_prose(repo_root: Path) -> int:
+    """Re-derive the prose graph, reporting a failure as a non-zero rc.
+
+    The derivation's own failure modes raise (`ValueError` when nothing would
+    survive, `SystemExit` when there is no built graph), and both leave NO prose
+    graph — `prose.derive` unlinks first precisely so an abort fails closed.
+    That is the right artifact state and the wrong exit code: the chunk really
+    did land in `graph.json`, so returning 0 would report a merge whose `--prose`
+    arm has just gone missing as an unqualified success.
+    """
+    try:
+        prose.derive_for(repo_root)
+    except (ValueError, SystemExit) as exc:
+        print(
+            f"[kb-merge] chunk merged, but the prose graph could not be re-derived: "
+            f"{exc}\n[kb-merge] `kb-query --prose` has no corpus until "
+            f"`mise run kb-prose` (or `mise run kb-build`) succeeds.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = False) -> int:

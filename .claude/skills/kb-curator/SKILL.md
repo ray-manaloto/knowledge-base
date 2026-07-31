@@ -49,7 +49,7 @@ The task map:
 | (re)label communities | `mise run kb-label` | ~~`graphify label`~~ |
 | transcribe local audio | `mise run kb-transcribe -- <audio>` | ~~`graphify.transcribe`~~ |
 | query | `mise run kb-query -- "<q>"`, plus `--prose` for a DOCUMENT question | ~~`graphify query`~~ |
-| re-derive the prose graph alone | `mise run kb-prose` (`kb-build` already writes it) | — |
+| re-derive the prose graph alone | `mise run kb-prose` (`kb-build` and `kb-merge` already write it) | — |
 | record / reflect | `mise run kb-remember` / `mise run kb-reflect` | ~~`graphify save-result`/`reflect`~~ |
 | artifacts | `mise run kb-artifacts` | — |
 
@@ -148,7 +148,9 @@ in `sources/REGISTRY.md`.
 3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
    or `mise run kb-build` to replay all committed chunks. Both re-cluster; Louvain
    renumbers communities globally + non-deterministically → **every merge staleifies
-   labels**, so relabel after.
+   labels**, so relabel after. Both also re-derive `graph-prose.json` — until
+   2026-07-30 `kb-merge` did not, so every merge-only ingestion left `--prose`,
+   the recommended arm for a document question, on the pre-merge corpus.
 4. **Label.** `mise run kb-label` — deterministic, no-LLM hub labels (Gemini-free,
    instant). Do NOT expect an LLM to name communities: graphify's only non-Gemini LLM
    backend is `claude-cli`, and it is broken for labeling (#2076 — prose-wrapped JSON).
