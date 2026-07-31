@@ -179,28 +179,39 @@ pointing at the pin.
 Order, and every step of it is load-bearing:
 
 1. `kb-remember` + `kb-reflect` — the lessons, which are knowable now.
-2. The `kb-review` skill, then `mise run kb-review-receipt`.
-3. `mise run kb-ship`.
-4. **`mise run kb-goal-outcome` — only now**, and only with the result that
+2. **Commit what step 1 wrote.**
+3. The `kb-review` skill, then `mise run kb-review-receipt`.
+4. `mise run kb-ship`.
+5. **`mise run kb-goal-outcome` — only now**, and only with the result that
    actually happened.
-5. Commit what step 4 wrote, and push it to the open PR.
+6. Commit what step 5 wrote, and push it to the open PR.
+7. `mise run kb-land -- <PR#>`.
 
-**Step 4 comes after step 3 because `ship: OK` is verification item 7** — the
+**Step 2 is not bookkeeping — without it step 4 cannot run.**
+`graphify-out/memory/` is TRACKED (`.gitignore` commits `memory/` and nothing
+else under `graphify-out/`), so `kb-remember` leaves the tree dirty, and
+`pr.py`'s `_ship_preflight` refuses a dirty tree — `ship: refusing — working tree
+is dirty` — before it looks at anything else. An earlier draft of this phase
+deferred every commit to the end and was therefore unrunnable. (Cold lane, round
+2, and a clean instance of a fix being the defect: round 1 correctly moved the
+outcome after ship, and moving the commit with it broke ship.)
+
+**Step 5 comes after step 4 because `ship: OK` is verification item 7** — the
 round's success is not knowable until ship has succeeded. Recording `achieved`
-before shipping means a later ship failure leaves a false `achieved` in
-`docs/goals/README.md` and in work-memory, where the next session reads it as
-settled. (Cold lane, round 1.)
+before shipping leaves a false `achieved` in `docs/goals/README.md` and in
+work-memory, where the next session reads it as settled. (Cold lane, round 1.)
 
-**Step 5 does not need a second review**, and this is exactly what
-`review.EXEMPT_PATHS` was built for (#66): `kb-goal-outcome` writes only
-`graphify-out/memory/**` and `docs/goals/README.md`, so `kb-land` accepts the
-ancestor receipt from step 2 for a HEAD whose entire delta is those paths. One
-reviewed path in that delta and it refuses, naming the file.
+**Step 6 does not need a second review**, and this is exactly what
+`review.EXEMPT_PATHS` was built for (#66): it is
+`("graphify-out/memory/", "docs/goals/README.md")` — precisely what
+`kb-goal-outcome` writes — so step 7 accepts the ancestor receipt from step 3 for
+a HEAD whose entire delta is those paths. One reviewed path in that delta and it
+refuses, naming the file.
 
-**Do not invert 1 and 2 to `land` first.** `kb-land` squash-merges, so the
-reviewed SHA is not an ancestor of the new `main` afterwards and the exempt-path
-fallback has nothing to fall back to. Measured the hard way this session: a
-19-line work-memory file then needed a cold lane of its own.
+**Do not land before step 5.** `kb-land` squash-merges, so the reviewed SHA stops
+being an ancestor of `main` and the exempt-path fallback has nothing to fall back
+to. Measured the hard way this session: a 19-line work-memory file then needed a
+cold lane of its own.
 
 ## Sentinel formats
 

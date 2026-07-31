@@ -377,22 +377,27 @@ re-derive it."""
 # a build date after the version; adding one here would only create a way for
 # the match to stop working.
 #
-# Every hk watch item is `local`, and the reason is narrower than it first looks.
-# `jdx/hk` has `has_issues: false` — its tracker is DISCUSSIONS (probed
-# 2026-07-31; control arm: this repo returns `has_issues: true`). But that does
-# NOT mean `kind = "issue"` always 404s here, and the first version of this
-# comment claimed it did. Measured, all three arms:
+# On `kind = "issue"` for hk — read this before adding one. `jdx/hk` has
+# `has_issues: false`; its tracker is DISCUSSIONS (probed 2026-07-31; control
+# arm: this repo returns `has_issues: true`, so the probe discriminates).
 #
-#   repos/jdx/hk/issues/1099 -> 200  (a PR — GitHub's issues endpoint serves PRs)
-#   repos/jdx/hk/issues/1098 -> 404  (a DISCUSSION — not on that endpoint)
+# That does NOT make `kind = "issue"` universally impossible here, and an earlier
+# version of this comment wrongly said it did. Measured, three arms:
+#
+#   repos/jdx/hk/issues/1099   -> 200  (a PR — the issues endpoint serves PRs)
+#   repos/jdx/hk/issues/1098   -> 404  (a DISCUSSION — not on that endpoint)
 #   repos/jdx/hk/issues/999999 -> 404  (control)
 #
-# So a watch pointing at a hk PR number would work, and `issues.py` never checks
-# `has_issues` before fetching, so nothing pre-empts either case. The real
-# constraint: the things worth watching on hk ARE discussions, and those 404
-# permanently — and a watch whose lookup fails blocks the unambiguous-bump gate
-# forever rather than failing loudly. Hence `local`, which states the fact
-# directly instead of depending on a lookup that cannot succeed.
+# So a watch pointing at a hk PR NUMBER would resolve, and `issues.py` never
+# checks `has_issues` before fetching, so nothing pre-empts it either way. What
+# cannot be watched is hk's actual tracker: a discussion 404s permanently, and a
+# watch whose lookup always fails blocks the unambiguous-bump gate forever rather
+# than failing loudly.
+#
+# The two items below are `local` for a different and simpler reason: neither is
+# an upstream item whose state we are waiting on. One records a DECISION (the
+# depends ban stays) and one a fact about this repo's SHAPE (the version is
+# written in three places). Nothing upstream will ever close them.
 [tool.hk]
 mise_key = "hk"
 binary = "hk"
