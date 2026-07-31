@@ -119,7 +119,10 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     does. `graphify label` is not a sidecar-only write: verified in the installed
     0.9.30 — `graphify/cli.py:1546` selects `label`, and that branch runs unbroken
     (no intervening `elif cmd`) to `to_json(G, communities, str(out /
-    "graph.json"), …)` at :1836 — so it rewrites `graph.json` outright. The
+    "graph.json"), …)` at :1830 — so it rewrites `graph.json` outright. (:1836 is
+    six lines further on and writes the LABELS SIDECAR; this docstring cited it by
+    mistake until the cold lane caught it, which had the citation pointing at
+    exactly the sidecar-only write the sentence exists to deny.) The
     documented ingestion order is merge -> label, so without this the merge's own
     re-derivation is undone by the very next step and `--prose` is stale again
     with nothing having failed. (Cold lane, round 1.)
