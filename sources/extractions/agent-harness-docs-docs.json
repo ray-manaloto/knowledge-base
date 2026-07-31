@@ -1482,8 +1482,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_builtin_agents",
-   "target": "ahd_subagents_explore_agent",
+   "source": "ahd_subagents_explore_agent",
+   "target": "ahd_subagents_builtin_agents",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1491,8 +1491,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_builtin_agents",
-   "target": "ahd_subagents_plan_agent",
+   "source": "ahd_subagents_plan_agent",
+   "target": "ahd_subagents_builtin_agents",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1500,8 +1500,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_builtin_agents",
-   "target": "ahd_subagents_general_purpose_agent",
+   "source": "ahd_subagents_general_purpose_agent",
+   "target": "ahd_subagents_builtin_agents",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1509,8 +1509,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_builtin_agents",
-   "target": "ahd_subagents_helper_agents",
+   "source": "ahd_subagents_helper_agents",
+   "target": "ahd_subagents_builtin_agents",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1599,8 +1599,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_scope_precedence",
-   "target": "ahd_subagents_project_scope",
+   "source": "ahd_subagents_project_scope",
+   "target": "ahd_subagents_scope_precedence",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1608,8 +1608,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_scope_precedence",
-   "target": "ahd_subagents_user_scope",
+   "source": "ahd_subagents_user_scope",
+   "target": "ahd_subagents_scope_precedence",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1617,8 +1617,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_scope_precedence",
-   "target": "ahd_subagents_cli_agents_flag",
+   "source": "ahd_subagents_cli_agents_flag",
+   "target": "ahd_subagents_scope_precedence",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1626,8 +1626,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_scope_precedence",
-   "target": "ahd_subagents_managed_subagents",
+   "source": "ahd_subagents_managed_subagents",
+   "target": "ahd_subagents_scope_precedence",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1635,8 +1635,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_scope_precedence",
-   "target": "ahd_subagents_plugin_subagents",
+   "source": "ahd_subagents_plugin_subagents",
+   "target": "ahd_subagents_scope_precedence",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1869,8 +1869,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_two_tool_filters",
-   "target": "ahd_subagents_always_removed_tools",
+   "source": "ahd_subagents_always_removed_tools",
+   "target": "ahd_subagents_two_tool_filters",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1878,8 +1878,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_two_tool_filters",
-   "target": "ahd_subagents_background_tool_subset",
+   "source": "ahd_subagents_background_tool_subset",
+   "target": "ahd_subagents_two_tool_filters",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2175,8 +2175,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_explicit_invocation",
-   "target": "ahd_subagents_at_mention",
+   "source": "ahd_subagents_at_mention",
+   "target": "ahd_subagents_explicit_invocation",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2184,8 +2184,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_explicit_invocation",
-   "target": "ahd_subagents_agent_flag_session",
+   "source": "ahd_subagents_agent_flag_session",
+   "target": "ahd_subagents_explicit_invocation",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2382,8 +2382,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_three_limits",
-   "target": "ahd_subagents_session_limit",
+   "source": "ahd_subagents_session_limit",
+   "target": "ahd_subagents_three_limits",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2391,8 +2391,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_three_limits",
-   "target": "ahd_subagents_concurrent_limit",
+   "source": "ahd_subagents_concurrent_limit",
+   "target": "ahd_subagents_three_limits",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2400,8 +2400,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_three_limits",
-   "target": "ahd_subagents_depth_limit",
+   "source": "ahd_subagents_depth_limit",
+   "target": "ahd_subagents_three_limits",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2420,9 +2420,9 @@
   {
    "source": "ahd_subagents_nested_config_and_panel",
    "target": "ahd_subagents_depth_limit",
-   "relation": "part_of",
-   "confidence": "EXTRACTED",
-   "confidence_score": 1,
+   "relation": "constrained_by",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
    "source_file": "docs/claude-code/sub-agents.md",
    "weight": 1
   },
@@ -2454,8 +2454,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_startup_context",
-   "target": "ahd_subagents_git_status_conditions",
+   "source": "ahd_subagents_git_status_conditions",
+   "target": "ahd_subagents_startup_context",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2463,8 +2463,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_startup_context",
-   "target": "ahd_subagents_sibling_roster",
+   "source": "ahd_subagents_sibling_roster",
+   "target": "ahd_subagents_startup_context",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -2472,8 +2472,8 @@
    "weight": 1
   },
   {
-   "source": "ahd_subagents_startup_context",
-   "target": "ahd_subagents_field_skills",
+   "source": "ahd_subagents_field_skills",
+   "target": "ahd_subagents_startup_context",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
