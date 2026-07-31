@@ -129,6 +129,15 @@ def test_label_runs_the_resolved_binary(tmp_path: Path, monkeypatch: pytest.Monk
     """kb-label — and its gate must not refuse the binary it just resolved."""
     exe = _sentinel(tmp_path)
     rec = _Recorder()
+    # A successful label now re-derives the prose graph, which needs a built
+    # graph to derive FROM. Completing the fixture rather than relaxing the
+    # assertion: the rc this test reads is still the one the PATH gate produces,
+    # and `graphify label` cannot succeed against a repo with no graph anyway.
+    (tmp_path / "graphify-out").mkdir(exist_ok=True)
+    (tmp_path / "graphify-out" / "graph.json").write_text(
+        '{"nodes": [{"id": "doc", "label": "doc"}], "links": [], "graph": {"hyperedges": []}}',
+        encoding="utf-8",
+    )
     monkeypatch.setattr(graphify_ops, "graphify_exe", lambda _root: exe)
     monkeypatch.setattr(graphify_ops.subprocess, "run", rec)
 
