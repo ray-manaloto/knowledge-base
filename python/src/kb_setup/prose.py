@@ -126,6 +126,17 @@ def derive(graph_path: Path, out_path: Path) -> ProseStats:
     corpus derived from a `graph.json` that has since been rebuilt. Same
     fail-closed rule, and the same reasoning, as `graph._clear_stamp`.
 
+    The new bytes then land via a temp file and one `replace`, so `out_path`
+    never exists in a half-written state. Both halves are needed and neither
+    substitutes for the other: unlinking first is what makes an abort fail
+    closed, and replacing atomically is what stops a reader seeing a truncated
+    graph. Writing straight into the path had a window between the first byte
+    and the last in which `kb-query --prose` — which checks only `.is_file()`
+    before handing the path to graphify — could read a partial file. That window
+    was as long as a full serialisation of the corpus, and this is now reached
+    on every `kb-merge` and `kb-label` rather than only on a build. (Cold lane,
+    round 1.)
+
     Raises:
         ValueError: if nothing survives. An empty graph resolves, answers
             nothing, and would report recall 0 for every query — i.e. it would
@@ -166,8 +177,18 @@ def derive(graph_path: Path, out_path: Path) -> ProseStats:
         out["hyperedges"] = kept_edges
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as fh:
-        json.dump(out, fh, indent=2)
+    tmp = out_path.with_name(out_path.name + ".tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as fh:
+            json.dump(out, fh, indent=2)
+        tmp.replace(out_path)
+    except BaseException:
+        # A partial temp file is not the artifact and must not be left behind to
+        # be mistaken for one — including on KeyboardInterrupt, which is why this
+        # catches BaseException rather than Exception. The error is re-raised
+        # untouched; this only cleans up after it.
+        tmp.unlink(missing_ok=True)
+        raise
 
     return ProseStats(
         nodes_in=len(nodes),

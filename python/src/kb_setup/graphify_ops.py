@@ -62,25 +62,29 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
         # either would replace a valid prose graph with one nobody asked for.
         # The caller's job here is the failed merge, and this rc says so.
         return rc
-    return _derive_prose(repo_root)
+    return _derive_prose(repo_root, tag="kb-merge", did="the chunk merged")
 
 
-def _derive_prose(repo_root: Path) -> int:
+def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     """Re-derive the prose graph, reporting a failure as a non-zero rc.
 
     The derivation's own failure modes raise (`ValueError` when nothing would
     survive, `SystemExit` when there is no built graph), and both leave NO prose
     graph — `prose.derive` unlinks first precisely so an abort fails closed.
-    That is the right artifact state and the wrong exit code: the chunk really
-    did land in `graph.json`, so returning 0 would report a merge whose `--prose`
-    arm has just gone missing as an unqualified success.
+    That is the right artifact state and the wrong exit code: `graph.json` really
+    did change, so returning 0 would report an operation whose `--prose` arm has
+    just gone missing as an unqualified success.
+
+    `tag`/`did` name the CALLER, because this message is the only thing telling
+    someone which of their two graphs is now absent — and "the chunk merged"
+    printed after a `kb-label` run would send them looking at the wrong step.
     """
     try:
         prose.derive_for(repo_root)
     except (ValueError, SystemExit) as exc:
         print(
-            f"[kb-merge] chunk merged, but the prose graph could not be re-derived: "
-            f"{exc}\n[kb-merge] `kb-query --prose` has no corpus until "
+            f"[{tag}] {did}, but the prose graph could not be re-derived: "
+            f"{exc}\n[{tag}] `kb-query --prose` has no corpus until "
             f"`mise run kb-prose` (or `mise run kb-build`) succeeds.",
             file=sys.stderr,
         )
@@ -102,6 +106,15 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     into it (falls back to deterministic on the inevitable failure), kept only so a
     future graphify fix can be re-probed through the task. clean_env() strips
     GEMINI/GOOGLE either way, so Gemini can never be auto-selected.
+
+    A successful label RE-DERIVES the prose graph, for the same reason `kb-merge`
+    does. `graphify label` is not a sidecar-only write: verified in the installed
+    0.9.30 — `graphify/cli.py:1546` selects `label`, and that branch runs unbroken
+    (no intervening `elif cmd`) to `to_json(G, communities, str(out /
+    "graph.json"), …)` at :1836 — so it rewrites `graph.json` outright. The
+    documented ingestion order is merge -> label, so without this the merge's own
+    re-derivation is undone by the very next step and `--prose` is stale again
+    with nothing having failed. (Cold lane, round 1.)
     """
     # Gate on the binary we are ABOUT TO RUN, not on PATH. The old
     # `shutil.which("graphify")` check sat directly in front of a
@@ -129,19 +142,32 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     if not claude_cli:
         # No --backend + GEMINI/GOOGLE stripped -> auto-detect finds nothing ->
         # deterministic hub labeler. The clean default.
-        return _run(base, "deterministic no-LLM hub labels (Gemini-free)")
+        return _labelled(repo_root, _run(base, "deterministic no-LLM hub labels (Gemini-free)"))
 
     rc = _run(
         [*base, "--backend=claude-cli", "--max-concurrency=1"],
         "claude-cli backend (opt-in; broken #2076 — expect fallback)",
     )
     if rc == 0:
-        return 0
+        return _labelled(repo_root, rc)
     print(
         "[kb-label] claude-cli backend failed (#2076) — deterministic no-LLM fallback.",
         file=sys.stderr,
     )
-    return _run(base, "deterministic fallback")
+    return _labelled(repo_root, _run(base, "deterministic fallback"))
+
+
+def _labelled(repo_root: Path, rc: int) -> int:
+    """Re-derive the prose graph after a labelling run that succeeded.
+
+    Gated on `rc` for the same reason `merge_chunk` gates: a labelling run that
+    failed may have left `graph.json` in any state, and deriving from it would
+    replace a valid prose graph off the back of a failure. The failing rc is the
+    caller's job, and returning it unchanged says so.
+    """
+    if rc != 0:
+        return rc
+    return _derive_prose(repo_root, tag="kb-label", did="communities were relabelled")
 
 
 #: The flag `kb-query` adds on top of `graphify query`. Not a graphify flag —
