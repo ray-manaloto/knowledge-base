@@ -3,6 +3,20 @@
 - **graphify** (`.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
 When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
 
+# Issue tracker
+
+GitHub Issues on `ray-manaloto/knowledge-base`, via `gh`. **See
+`docs/issue-tracker.md`** — it carries the conventions plus the "Wayfinding
+operations" section `/mattpocock-skills:wayfinder`, `to-spec`, `to-tickets`,
+`triage` and `code-review` read.
+
+This pointer is load-bearing, not a courtesy: those skills fall back to a
+local-markdown tracker when no tracker doc has been provided, and nothing else
+in the auto-loaded context names the file. It lives here rather than in the root
+`CLAUDE.md` because that file is at 199 of its 200-line budget.
+
+PRs still go through `mise run kb-ship` / `mise run kb-land`, never `gh pr`.
+
 # Cross-vendor orchestration (Fable-5 architect + executor lanes)
 
 - When the session model is Fable, without being reminded: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.

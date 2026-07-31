@@ -36,8 +36,14 @@ See `.claude/rules/mise-tasks-only.md`.
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line
   bodies.
 - **Read an issue**: `gh issue view <number> --comments`.
-- **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
+- **List issues**: `gh issue list --state open --limit 200 --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
   with `--label` / `--state` filters.
+
+  ⚠️ **`--limit` is not optional.** `gh issue list` defaults to **30** and
+  truncates silently — no warning, no count, just a short list that looks
+  complete. This repo is already past #90, so the default would hide issues on
+  any unfiltered listing. A bound that turns "absent" into "unreachable" is
+  exactly what `.claude/rules/probes-need-a-control-arm.md` rule 3 names.
 - **Comment**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
@@ -80,10 +86,30 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
   (`gh api repos/ray-manaloto/knowledge-base/issues/<n> --jq .id` — **not** the `#number` or
   `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only). A ticket
   is unblocked when every blocker is closed.
-- **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the
-  map's sub-issues), drop any with an open blocker
-  (`issue_dependencies_summary.blocked_by > 0`) or an assignee; first in map order wins.
+- **Frontier query**: the open, unblocked, unclaimed children, in map order. A bare
+  `gh issue list --state open` is **wrong here** — it is repo-wide, carries no blocker or
+  assignee data, and would happily hand back an unrelated issue. Walk the map's sub-issues
+  instead:
+
+  ```bash
+  R=ray-manaloto/knowledge-base; MAP=<map issue number>
+  for n in $(gh api "repos/$R/issues/$MAP/sub_issues" --jq '.[] | select(.state=="open") | .number'); do
+    gh api "repos/$R/issues/$n" \
+      --jq 'select((.issue_dependencies_summary.blocked_by // 0) == 0 and (.assignees|length) == 0)
+            | "\(.number)\t\(.title)"'
+  done
+  ```
+
+  Verified against map #85 on 2026-07-30, and it **discriminates**: 5 open children in,
+  4 out — it correctly withheld the one ticket carrying 4 blockers. A filter that
+  returned all 5 would have been a no-op wearing a filter's clothes.
 - **Claim**: `gh issue edit <n> --add-assignee @me` — the session's first write.
+
+  ⚠️ **This is not atomic, and GitHub offers nothing that is.** Two sessions can both
+  pass the frontier check and both assign themselves. Upstream accepts this — wayfinder's
+  SKILL.md says to "expect other sessions to be editing the tracker concurrently". So
+  claim FIRST, before any work, then **re-read the assignees** and stand down if someone
+  else is also on it. Racing is cheap to detect and expensive to ignore.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a
   context pointer to the map's Decisions-so-far.
 
