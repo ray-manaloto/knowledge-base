@@ -86,6 +86,16 @@ sources/raw/
 # webpages + downloaded audio like yt_*.m4a); the extraction chunk is the artifact
 /raw/
 
+# THIS repo's own code, extracted into scoped sub-graphs by `kb_setup.graph`'s
+# `_extract_self` and then merged into the aggregate. Ignored WHOLESALE, unlike the
+# root and brain/ blocks above, and the difference is the point: those two trees
+# each contain an authored `memory/` that must survive, so they can only ignore
+# named derived artifacts. Nothing under these two is authored — every byte is
+# regenerable by `mise run kb-build` — so a directory-level rule is both correct
+# and immune to graphify adding a new output filename we would forget to list.
+python/graphify-out/
+tests/graphify-out/
+
 # second-brain vault (brain/): the .md notes are the source of truth; the graph is
 # DERIVED (regenerable via `graphify update`). Mirror the root graphify-out rules —
 # ignore derived artifacts, commit ONLY the authored memory/ work-memory.

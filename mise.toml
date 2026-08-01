@@ -245,6 +245,15 @@ description = "Advance a source to latest upstream + incrementally re-extract: m
 # AST, free). Changed DOCS still need a host-agent pass in a Claude session.
 run = "uv run kb-setup update"
 
+[tasks.kb-watch]
+description = "Re-extract THIS repo's own code (python/ + tests/) into the aggregate graph + restamp"
+# NOT a watcher, despite the name it inherits from `graphify watch`. That
+# subcommand rebuilds only <path>/graphify-out/graph.json and exposes no
+# post-rebuild hook, so it cannot refresh the aggregate graph `affected` reads.
+# One-shot and incremental (`graphify update`, AST-only, free). Logic in
+# kb_setup.graph.refresh_self.
+run = "uv run kb-setup watch"
+
 [tasks.kb-prose]
 description = "Derive graphify-out/graph-prose.json (the graph minus the code-AST mass)"
 # A pure function of graph.json, so `kb-build` already writes it; this task is

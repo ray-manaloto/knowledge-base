@@ -99,6 +99,138 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     return bool(data.get("nodes"))
 
 
+#: THIS repo's own code, indexed into the aggregate graph beside the pinned
+#: sources. Two trees rather than one, and the second is not an afterthought:
+#: `python/` holds the library dotfiles consumes as a pinned git dependency, while
+#: the root `tests/` holds the 40 files (14,090 LOC) that answer "which tests cover
+#: this symbol?" — the blast-radius question with the most day-to-day value, and
+#: the one `python/` alone cannot answer. Ray widened this to include `tests/`
+#: (2026-07-31); indexing only the library would have shipped a graph that answers
+#: "who calls this" while still being silent about what verifies it.
+_SELF_TREES = ("python", "tests")
+
+
+def _extract_self(repo_root: Path) -> list[Path]:
+    """AST-extract this repo's OWN code; return each sub-graph for merging.
+
+    Why this exists at all. `graphify affected "<symbol>"` is the blast-radius
+    question, and it was unanswerable about our own code for a reason that had
+    nothing to do with graphify: `python/src/kb_setup/` was simply never
+    extracted — 0 of 37 tracked files, control-armed on `source_file` against
+    `graphify/extractors/` -> 429 and `cognee/api/` -> 793. Every such query
+    returned "No unique node match", which is the SAME string graphify returns for
+    a symbol that does not exist. A missing INDEX and a missing SYMBOL were
+    indistinguishable, so the failure announced nothing.
+
+    Emptiness is NOT tolerated here, unlike `_extract_code`. That function
+    swallows a non-zero status because a pinned upstream source may legitimately
+    be prose-only, and its content arrives later via the host-agent wave. These
+    two trees are ours and are always Python, so an empty sub-graph means the
+    extraction broke rather than that there was nothing to find — `_run`'s
+    check=True says so loudly instead of shipping a graph that silently cannot
+    answer the question this function exists to answer.
+
+    Paths are relative to `repo_root` (`_run` passes cwd), matching how
+    `_extract_code` addresses `sources/<name>`.
+    """
+    subs: list[Path] = []
+    for tree in _SELF_TREES:
+        _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
+        subs.append(repo_root / tree / "graphify-out" / "graph.json")
+    return subs
+
+
+def refresh_self(repo_root: Path) -> int:
+    """Re-extract this repo's own code into the AGGREGATE graph, then restamp.
+
+    The freshness half of self-indexing (`kb-watch`). `build()` indexes our code
+    once; this keeps it current between builds, incrementally and without an LLM.
+
+    WHY THIS IS NOT A WATCHER, recorded because the obvious reading of the task
+    name is wrong. `graphify watch <path>` was the intended mechanism and cannot
+    do this job: measured on the PINNED 0.9.31 — which is what `graphify_exe`
+    resolves, and NOT what a bare `graphify` reaches (a 0.9.32 also exists on
+    this host; reading the wrong one is how the first draft of this comment cited
+    the wrong version) — its entire CLI surface is one
+    positional path (`_watch(watch_path)` — no `--out`, no merge target, no
+    post-rebuild hook, control-armed against `merge-graphs`, which DOES parse
+    `--out`), and it rebuilds only `<path>/graphify-out/graph.json`. But `affected`
+    reads the AGGREGATE, and `currency.toml` fingerprints the aggregate, so a watch
+    on `python/` refreshes neither. Pointing it at the repo root instead would try
+    to overwrite the merged 130k-node graph with a root-only extraction; graphify's
+    `_check_shrink` refuses that, so it fails loudly rather than destroying the
+    corpus, but it is not a design. Ray chose the one-shot refresh over a
+    homegrown poll loop (2026-08-01) — this stays native, and `use-tool-builtins`
+    is satisfied because the loop we would have written has no tool feature behind
+    it.
+
+    Order matters. Each tree is re-extracted into its own sub-graph FIRST and
+    merged after, because merging a sub-graph we have not refreshed would restamp
+    a graph that gained nothing — a green stamp over stale content, which is the
+    one failure this whole currency mechanism exists to prevent.
+    """
+    out = repo_root / "graphify-out" / "graph.json"
+    if not out.is_file():
+        raise SystemExit(f"no {out.relative_to(repo_root)} — run `mise run kb-build` first")
+
+    for tree in _SELF_TREES:
+        sub = repo_root / tree / "graphify-out" / "graph.json"
+        if sub.is_file():
+            # Incremental: MD5-diffs the sub-graph's own manifest.json. Free.
+            _run([graphify_exe(repo_root), "update", tree], repo_root)
+        else:
+            # No sub-graph yet (a clone that has never built). `update` has nothing
+            # to diff against, so fall back to the full scan rather than letting it
+            # fail on a first run — the two paths differ in cost, not in result.
+            _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
+        _run(
+            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
+            repo_root,
+        )
+
+    # graph.json changed, so the prose graph derived FROM it is now stale. Every
+    # writer of graph.json re-derives it (`kb-build`/`kb-merge`/`kb-label`); a
+    # writer that skips this leaves `kb-query --prose` describing an older corpus.
+    prose.derive_for(repo_root)
+
+    _restamp_self(repo_root)
+    print("[kb-watch] refreshed python/ + tests/ into graphify-out/graph.json")
+    return 0
+
+
+def _restamp_self(repo_root: Path) -> None:
+    """Refresh the stamp's artifact fingerprints after a self-refresh.
+
+    `restamp_artifacts` and not `write_stamp`: the graph changed but the BUILDER
+    did not, so version and source_ref are carried forward rather than re-observed.
+    Re-observing would be worse than redundant — it would let a graphify upgrade
+    mid-session silently relabel a graph the previous version actually built.
+
+    Without this the refresh is actively harmful: `artifact_fingerprints` is
+    `size:mtime_ns`, so any rewrite of graph.json moves it, and every later
+    `kb-currency-check` reports the graph as not verifiably built by the pin —
+    a permanent red that means nothing, which is how a real signal gets ignored.
+    Best-effort, like every other stamp path here: a refresh must not fail over
+    its own bookkeeping.
+    """
+    try:
+        from kb_setup.currency import sync
+
+        spec = _currency_spec(repo_root)
+        if spec is None:
+            return
+        path = sync.restamp_artifacts(repo_root, spec)
+        if path is None:
+            print(
+                "[kb-watch] WARNING: no build stamp to refresh — run `mise run kb-build`; "
+                "currency step 1 will report this graph as never stamped."
+            )
+            return
+        print(f"[kb-watch] restamped {path.name}")
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-watch] WARNING: could not restamp: {e}")
+
+
 def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
@@ -162,6 +294,16 @@ def build(repo_root: Path) -> None:
     print(f"[kb-build] seeded graph.json from {seed}")
     for name in rest:
         sub = sources / name / "graphify-out" / "graph.json"
+        _run(
+            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
+            repo_root,
+        )
+
+    # Our own library and test tree, merged AFTER the pinned sources so the seed
+    # path above is unchanged: `build()` seeds graph.json from the first
+    # code-bearing MANIFEST, and letting our own code seed it instead would make
+    # the aggregate's identity depend on whether any source cloned successfully.
+    for sub in _extract_self(repo_root):
         _run(
             [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
             repo_root,

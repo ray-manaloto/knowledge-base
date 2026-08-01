@@ -24,10 +24,29 @@ The authoritative list of things agents (and humans) must not do in this repo.
    `~/.gemini/config/skills/graphify/SKILL.md`, and `graphify codex install`
    appends a `## graphify` block to `AGENTS.md` **with or without** `--project`.
 
-2. **Do NOT run `graphify --watch`, `graphify hook install`, `graphify extract
-   --global`, or `graphify global add`.** Shared mutable machine state is
-   non-reproducible and collides across hosts. The graph lives in this repo's
-   `graphify-out/`.
+2. **Do NOT run `graphify hook install`, `graphify extract --global`, or
+   `graphify global add`.** Shared mutable machine state is non-reproducible and
+   collides across hosts. The graph lives in this repo's `graphify-out/`.
+
+   **`watch` was in this list and never belonged to it** (narrowed 2026-08-01).
+   Two separate errors. The banned spelling `graphify --watch` is not a real
+   invocation at all — `--watch` occurs **0** times in the **pinned 0.9.31**
+   `cli.py`, against a control of **7** for `--force`, so the probe
+   discriminates; the real form is the subcommand `graphify watch <path>`. And
+   its effect is repo-local — it writes `<path>/graphify-out/`, never `~/` — so
+   this entry's own stated rationale never described it. A ban filed under a
+   reason that does not apply is one nobody can reason about later.
+
+   It is still the wrong tool here, for a better reason: `watch` refreshes only
+   that path's **scoped** sub-graph and exposes no post-rebuild hook, so it
+   cannot update the **aggregate** `graphify-out/graph.json` that both `affected`
+   and `currency.toml`'s `artifact` read. Use **`mise run kb-watch`**
+   (`kb_setup.graph.refresh_self`), which re-extracts `python/` + `tests/`,
+   merges them into the aggregate, re-derives the prose graph, and restamps.
+   Pointing `watch` at the repo root is the actively bad case — it attempts to
+   overwrite the merged graph with a root-only extraction, which graphify's
+   `_check_shrink` refuses rather than obeys. Running it by hand also still
+   fails rule 3, which is where a graphify-by-hand ban correctly lives.
 
 3. **Do NOT run graphify by hand at all — drive it through a `kb-*` mise task.**
    Machine-enforced by `kb_setup.hook_guard` (PreToolUse deny). Read-only
