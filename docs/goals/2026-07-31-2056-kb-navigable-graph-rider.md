@@ -108,8 +108,19 @@ they have no failing test to write first; that is stated rather than faked.
 1. **Depth test first.** A test asserting `python/src/kb_setup/**` nodes exist in
    the built graph. It must FAIL at HEAD (0 of 37 files today) — paste the
    failure before implementing.
-2. Index `python/src/kb_setup/` into the **aggregate** graph, same shape as
-   `graph.py::_extract_code` + `merge-graphs`.
+2. Index `python/` **and the root `tests/`** into the **aggregate** graph, same
+   shape as `graph.py::_extract_code` + `merge-graphs`. Add
+   `python/graphify-out/` and `tests/graphify-out/` to `.gitignore` in the same
+   change — there is precedent for the shape in the existing
+   `brain/graphify-out/` block.
+
+   **`tests/` is in scope by Ray's decision (2026-07-31, clear-prep), widening
+   what this rider originally said.** The reason is that "which tests cover this
+   symbol?" is the blast-radius question with the most day-to-day value, and it
+   is unanswerable from `python/` alone: 40 files and 14,090 LOC of tests sit
+   outside that tree. Verify by node count that `.venv/` and `.ruff_cache/` were
+   NOT walked — graphify honours VCS ignore files by default, but that is an
+   assumption until a count is pasted.
 3. `kb-watch` mise task wrapping `graphify watch`, which **restamps** after each
    incremental rebuild via the existing `restamp_artifacts` — otherwise the
    background rebuild changes `graph.json`'s `size:mtime_ns`, `artifact_fingerprints`
