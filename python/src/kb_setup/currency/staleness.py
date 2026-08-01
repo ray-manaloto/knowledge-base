@@ -114,23 +114,44 @@ def check_inputs(repo_root: Path, spec: ToolSpec) -> InputStatus:
     if missing is not None:
         return InputStatus(spec.name, NEVER_BUILT, missing)
 
-    stamp = _read_stamp_strict(stamp_file)
-    if stamp is None:
-        return InputStatus(spec.name, NOT_VERIFIABLE, f"{spec.stamp} is unreadable")
-
-    recorded = sync.stamped_input_fingerprints(stamp)
+    recorded, why_not = _recorded_inputs(spec, stamp_file)
     if recorded is None:
+        return InputStatus(spec.name, NOT_VERIFIABLE, why_not)
+
+    live = sync.input_fingerprints(repo_root, spec)
+    # BEFORE the diff. An input that exists but cannot be read was not verified,
+    # and `_diff` cannot say so: its `set(recorded) | set(live)` union only sees
+    # paths one side knows about, so a file that is NEW and unreadable is missing
+    # from both and the diff comes back empty — OK, for an input nobody read.
+    # Reproduced end to end by the cold lane, round 2.
+    blind = tuple(rel for rel, fp in live.items() if fp == sync.UNREADABLE)
+    if blind:
         return InputStatus(
             spec.name,
             NOT_VERIFIABLE,
-            "the stamp predates input fingerprinting — rebuild to record them",
+            f"{len(blind)} input(s) could not be read: {', '.join(blind)}",
         )
 
-    live = sync.input_fingerprints(repo_root, spec)
     changes = _diff(recorded, live)
     if changes:
         return InputStatus(spec.name, CHANGED, f"{len(changes)} input(s) moved", changes)
     return InputStatus(spec.name, OK)
+
+
+def _recorded_inputs(spec: ToolSpec, stamp_file: Path) -> tuple[dict[str, str] | None, str]:
+    """The stamp's recorded input map, or `(None, why it cannot be used)`.
+
+    The two reasons are different states and are worded as such: a stamp we
+    cannot parse, and one written by an engine that never asked the question.
+    Both report *not verifiable* — neither may report a pass.
+    """
+    stamp = _read_stamp_strict(stamp_file)
+    if stamp is None:
+        return None, f"{spec.stamp} is unreadable"
+    recorded = sync.stamped_input_fingerprints(stamp)
+    if recorded is None:
+        return None, "the stamp predates input fingerprinting — rebuild to record them"
+    return recorded, ""
 
 
 def _no_build_reason(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> str | None:

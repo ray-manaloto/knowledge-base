@@ -55,6 +55,11 @@ _SCAN_WINDOW = 4096
 # and the digest is the same either way. 1 MiB is well past the point where the
 # read syscall stops dominating.
 _DIGEST_CHUNK = 1 << 20
+#: Recorded in place of a digest for an input that exists but cannot be read.
+#: Deliberately not a valid `sha256:` value, so no comparison can mistake it for
+#: one — it means "this input was never verified", which is a third answer beside
+#: agreed and disagreed.
+UNREADABLE = "unreadable"
 # A SHA-shaped VALUE is required, so a node merely NAMED "built_at_commit"
 # cannot masquerade as the metadata key.
 _COMMIT_RE = re.compile(rb'"built_at_commit"\s*:\s*"([0-9a-fA-F]{7,40})"')
@@ -314,19 +319,27 @@ def input_fingerprints(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
     across platforms, and sorted so two builds of the same tree write byte-identical
     maps — a stamp that reordered itself would look like drift to any diff.
 
-    An unreadable match is OMITTED rather than recorded as "": recording an empty
-    digest would make an unreadable file compare equal to a *different* unreadable
-    file, which is the false green this engine refuses everywhere else. Omitting it
-    surfaces instead as a removed path, which reads as drift — the safe direction.
+    An unreadable match is recorded as :data:`UNREADABLE`, never omitted and never
+    "". Both alternatives were wrong, in opposite directions, and the omission
+    shipped before the cold lane reproduced it end to end:
+
+    * `""` would make one unreadable file compare EQUAL to a *different*
+      unreadable file.
+    * Omitting the key looked safe — a previously-readable file that goes
+      unreadable does surface, as a removed path — but a file that is **new AND
+      unreadable** is absent from the live map *and* from the recorded one, so
+      `staleness._diff`'s `set(recorded) | set(live)` union never sees it and the
+      check returns OK. An input nobody could read, reported as verified.
+
+    The sentinel is not a digest and must never be treated as one: `check_inputs`
+    short-circuits to *not verifiable* on seeing it, which is the honest answer.
     """
     prints: dict[str, str] = {}
     for pattern in spec.inputs:
         for path in sorted(repo_root.glob(pattern)):
             if not path.is_file():
                 continue
-            fp = input_fingerprint(path)
-            if fp:
-                prints[path.relative_to(repo_root).as_posix()] = fp
+            prints[path.relative_to(repo_root).as_posix()] = input_fingerprint(path) or UNREADABLE
     return dict(sorted(prints.items()))
 
 

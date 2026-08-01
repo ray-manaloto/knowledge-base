@@ -113,25 +113,59 @@ def test_fingerprint_is_content_not_stat(tmp_path):
     assert sync.input_fingerprint(manifest) != before
 
 
-def test_fingerprint_map_is_sorted_and_omits_unreadable(tmp_path):
-    """Sorted so two builds of one tree write byte-identical maps.
-
-    An unreadable match is omitted rather than recorded as "" — an empty digest
-    would make one unreadable file compare EQUAL to a different unreadable file.
-    Omission surfaces as a removed path instead, which reads as drift.
-    """
+def test_fingerprint_map_is_sorted(tmp_path):
+    """Sorted so two builds of one tree write byte-identical maps."""
     root = _repo(tmp_path)
     prints = sync.input_fingerprints(root, _spec(root))
     assert list(prints) == sorted(prints)
 
+
+def test_an_unreadable_input_is_recorded_not_omitted(tmp_path):
+    """It gets the sentinel, and the sentinel is not a digest anything can match."""
+    root = _repo(tmp_path)
     unreadable = root / "sources" / "gamma.manifest"
     unreadable.write_text("url = https://example/gamma\n", encoding="utf-8")
     unreadable.chmod(0o000)
     try:
-        assert "sources/gamma.manifest" not in sync.input_fingerprints(root, _spec(root))
+        prints = sync.input_fingerprints(root, _spec(root))
+        assert prints["sources/gamma.manifest"] == sync.UNREADABLE
+        assert not sync.UNREADABLE.startswith("sha256:")
     finally:
         unreadable.chmod(0o644)
-    assert "sources/gamma.manifest" in sync.input_fingerprints(root, _spec(root))
+    assert sync.input_fingerprints(root, _spec(root))["sources/gamma.manifest"].startswith(
+        "sha256:"
+    )
+
+
+def test_a_new_and_unreadable_input_is_not_verifiable_not_ok(tmp_path):
+    """THE round-2 regression: the false green that omission produced.
+
+    A file that is NEW *and* unreadable is absent from the live map (nothing to
+    digest) and absent from the recorded one (it did not exist at build time), so
+    `_diff`'s `set(recorded) | set(live)` union never sees it and the whole check
+    returned OK — an input nobody could read, reported as verified. Reproduced
+    end to end by the cold lane before it was fixed.
+
+    Note the arm this needs that the old test did not have: the previously-
+    readable-then-unreadable case surfaces as "removed" either way, so a suite
+    covering only that one passes on the broken code.
+    """
+    root = _repo(tmp_path)
+    _stamp(root)
+    assert _state(root) == staleness.OK  # control: clean before the new file
+
+    newcomer = root / "sources" / "delta.manifest"
+    newcomer.write_text("url = https://example/delta\n", encoding="utf-8")
+    newcomer.chmod(0o000)
+    try:
+        status = staleness.check_inputs(root, _spec(root))
+        assert status.state == staleness.NOT_VERIFIABLE, "an unread input must never read as OK"
+        assert "sources/delta.manifest" in status.detail
+    finally:
+        newcomer.chmod(0o644)
+    # And once it IS readable it is ordinary drift — so the guard above is not
+    # simply jamming the check into a permanent not-verifiable.
+    assert _state(root) == staleness.CHANGED
 
 
 # ------------------------------------------------------------ both arms -------
