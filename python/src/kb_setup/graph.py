@@ -109,6 +109,14 @@ def _extract_code(repo_root: Path, name: str) -> bool:
 #: "who calls this" while still being silent about what verifies it.
 _SELF_TREES = ("python", "tests")
 
+#: The aggregate as it stands BEFORE our own code is merged in — everything the
+#: pinned manifests and committed doc chunks contribute, and nothing of ours.
+#: `kb-watch` restarts from this rather than appending to graph.json, which is the
+#: only thing that makes repeated refreshes idempotent (see `refresh_self`).
+#: Public because the tests import it: a restated literal keeps passing after a
+#: rename, asserting on a filename nothing writes.
+BASE_GRAPH_NAME = ".base-graph.json"
+
 
 def _extract_self(repo_root: Path) -> list[Path]:
     """AST-extract this repo's OWN code; return each sub-graph for merging.
@@ -170,19 +178,33 @@ def refresh_self(repo_root: Path) -> int:
     one failure this whole currency mechanism exists to prevent.
     """
     out = repo_root / "graphify-out" / "graph.json"
-    if not out.is_file():
-        raise SystemExit(f"no {out.relative_to(repo_root)} — run `mise run kb-build` first")
+    base = out.parent / BASE_GRAPH_NAME
+    if not base.is_file():
+        raise SystemExit(f"no graphify-out/{BASE_GRAPH_NAME} — run `mise run kb-build` first")
+
+    # RESTART from the base, never append to graph.json. Measured on the real
+    # binary: merging our sub-graph into an aggregate that already holds it does
+    # not dedupe, because `merge-graphs` re-namespaces node ids per merge, so the
+    # second copy carries a genuinely distinct id (0 duplicate ids, and 2,080
+    # nodes where 1,040 belong). `affected` then answers "No unique node match" —
+    # the precise symptom self-indexing exists to remove. And since `build()`
+    # merges our code in, EVERY refresh after a build is a second merge, so no
+    # ordering rule could have avoided this; only a self-free base can.
+    shutil.copy(base, out)
 
     for tree in _SELF_TREES:
         sub = repo_root / tree / "graphify-out" / "graph.json"
-        if sub.is_file():
-            # Incremental: MD5-diffs the sub-graph's own manifest.json. Free.
-            _run([graphify_exe(repo_root), "update", tree], repo_root)
-        else:
-            # No sub-graph yet (a clone that has never built). `update` has nothing
-            # to diff against, so fall back to the full scan rather than letting it
-            # fail on a first run — the two paths differ in cost, not in result.
-            _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
+        # ONE extraction path, always `extract --force`, never `update`.
+        #
+        # The first draft branched — `update` when a sub-graph existed, `extract`
+        # otherwise — on the reasoning that "the two paths differ in cost, not in
+        # result". Measured, that was false: the same file came out as
+        # `source_file='src/kb_setup/graph.py'` down one path and
+        # `'python/src/kb_setup/graph.py'` down the other, so the aggregate ended
+        # up disagreeing with itself about where our own code lives. A cheaper
+        # path that yields different data is not the same path, and a comment
+        # asserting otherwise is how it survived review.
+        _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
         _run(
             [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
             repo_root,
@@ -299,16 +321,6 @@ def build(repo_root: Path) -> None:
             repo_root,
         )
 
-    # Our own library and test tree, merged AFTER the pinned sources so the seed
-    # path above is unchanged: `build()` seeds graph.json from the first
-    # code-bearing MANIFEST, and letting our own code seed it instead would make
-    # the aggregate's identity depend on whether any source cloned successfully.
-    for sub in _extract_self(repo_root):
-        _run(
-            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
-            repo_root,
-        )
-
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)
     chunks = sorted((sources / "extractions").glob("*.json"))
@@ -317,6 +329,23 @@ def build(repo_root: Path) -> None:
         name = chunk.stem.removesuffix("-docs")
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
+
+    # THE BASE SNAPSHOT — taken here, after every external contribution and before
+    # a single node of ours. Order is the entire correctness argument: a snapshot
+    # taken one step later would be a perfectly valid file that reintroduces the
+    # duplication it exists to prevent, and nothing downstream would notice.
+    base = out.parent / BASE_GRAPH_NAME
+    shutil.copy(out, base)
+    print(f"[kb-build] snapshotted {BASE_GRAPH_NAME} — the corpus without our own code")
+
+    # Our own library and test tree, merged LAST. They are also the only part
+    # `kb-watch` re-merges, so keeping them at the end is what lets that task
+    # reproduce this exact state from the snapshot above rather than append to it.
+    for sub in _extract_self(repo_root):
+        _run(
+            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
+            repo_root,
+        )
 
     # The prose-only derived graph, from the graph we just built. Here and not in
     # a separate task-you-must-remember: it is a pure function of graph.json, so

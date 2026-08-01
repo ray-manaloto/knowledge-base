@@ -25,6 +25,12 @@ graphify-out/graph.json
 # unscoped one looked like on the day of the commit.
 graphify-out/graph-prose.json
 graphify-out/manifest.json
+# The aggregate WITHOUT our own code — `kb-build` writes it, `kb-watch` restarts
+# from it so repeated refreshes are idempotent. Derived and roughly graph.json-
+# sized (~345MB), so it is ignored for both of the reasons graph.json is. NOT
+# covered by the `.graphify_*` rule below: that glob is graphify's own state,
+# whereas this file is ours.
+graphify-out/.base-graph.json
 graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/
