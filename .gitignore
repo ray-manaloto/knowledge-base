@@ -31,6 +31,11 @@ graphify-out/manifest.json
 # covered by the `.graphify_*` rule below: that glob is graphify's own state,
 # whereas this file is ours.
 graphify-out/.base-graph.json
+# `scope = study` sources — repos we ANALYSE rather than learn from. Derived
+# (87 MiB, rebuilt by `kb-build` from the same pinned manifests as everything
+# else) and kept out of the aggregate because merging it in took graph.json past
+# graphify's 512 MiB cap.
+graphify-out/study-graph.json
 graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/
