@@ -117,6 +117,14 @@ _SELF_TREES = ("python", "tests")
 #: rename, asserting on a filename nothing writes.
 BASE_GRAPH_NAME = ".base-graph.json"
 
+#: Where `scope = study` sources land — repos we are analysing rather than
+#: learning from. Kept out of the aggregate because merging them into it took
+#: graph.json 7.6 MiB past graphify's 512 MiB cap and failed the build outright:
+#: 71.0 MB of sub-graphs became >=155 MiB of aggregate growth, since
+#: `merge-graphs` re-namespaces ids and expands edges on every merge. They are
+#: still fully ingested — no exclusions — just not ranked beside the corpus.
+STUDY_GRAPH_NAME = "study-graph.json"
+
 
 def _extract_self(repo_root: Path) -> list[Path]:
     """AST-extract this repo's OWN code; return each sub-graph for merging.
@@ -253,6 +261,40 @@ def _restamp_self(repo_root: Path) -> None:
         print(f"[kb-watch] WARNING: could not restamp: {e}")
 
 
+def _build_study_graph(repo_root: Path, sources: Path, out_dir: Path, study: list[str]) -> None:
+    """Merge every `scope = study` source into its own graph, never the aggregate.
+
+    Extracted from `build()` rather than inlined — ruff flagged `build` at
+    complexity 12, and the honest fix for "this function grew a fourth job" is a
+    fourth function, not a suppression.
+
+    These repos are fully ingested; only their DESTINATION differs. That
+    distinction is the whole design: the standing instruction was "ingest all
+    three, no exclusions", and merging them into the corpus took graph.json 7.6
+    MiB past graphify's 512 MiB cap. Nothing that analyses them needs their nodes
+    ranked beside the corpus.
+    """
+    if not study:
+        return
+    study_out = out_dir / STUDY_GRAPH_NAME
+    seed, *rest = study
+    shutil.copy(sources / seed / "graphify-out" / "graph.json", study_out)
+    print(f"[kb-build] seeded {STUDY_GRAPH_NAME} from {seed} ({len(study)} study source(s))")
+    for name in rest:
+        sub = sources / name / "graphify-out" / "graph.json"
+        _run(
+            [
+                graphify_exe(repo_root),
+                "merge-graphs",
+                str(study_out),
+                str(sub),
+                "--out",
+                str(study_out),
+            ],
+            repo_root,
+        )
+
+
 def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
@@ -309,8 +351,19 @@ def build(repo_root: Path) -> None:
     if not with_code:
         raise SystemExit("no source produced code nodes")
 
-    # Seed graph.json from the first code-bearing source; merge the rest.
-    seed, *rest = with_code
+    # Partition by SCOPE before anything is seeded. Doing it here rather than in
+    # the merge loop below is the whole correctness argument: the seed is chosen
+    # first, so a partition applied only to merging would still let a study repo
+    # seed the aggregate whenever it sorted ahead of the corpus sources — and the
+    # corpus would then simply BE that repo, silently and totally.
+    study_names = {m.name for m in manifests if m.scope == "study"}
+    corpus = [n for n in with_code if n not in study_names]
+    study = [n for n in with_code if n in study_names]
+    if not corpus:
+        raise SystemExit("no CORPUS source produced code nodes (only scope=study ones did)")
+
+    # Seed graph.json from the first code-bearing CORPUS source; merge the rest.
+    seed, *rest = corpus
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(sources / seed / "graphify-out" / "graph.json", out)
     print(f"[kb-build] seeded graph.json from {seed}")
@@ -320,6 +373,8 @@ def build(repo_root: Path) -> None:
             [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
             repo_root,
         )
+
+    _build_study_graph(repo_root, sources, out.parent, study)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)

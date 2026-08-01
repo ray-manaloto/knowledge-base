@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+url = https://github.com/tirth8205/code-review-graph
+ref = main
+commit = c3f3a6681791f6c6d870e8e437ecfe4e8500e377
+kind = code
+scope = study
