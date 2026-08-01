@@ -279,7 +279,12 @@ description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N]
 # --idf IS THE BEST ARM as of #12 P1 (2026-07-26). It reads the same prose graph
 # --prose does, but ranks it with our own BM25/IDF scorer (kb_setup.lexical) over
 # each node's label + rationale, instead of graphify's printed order — which is
-# seed-then-BFS and applies NO relevance score at all. Measured over the golden
+# seed-then-BFS and applies no relevance score TO THE RETURNED SET. It is not
+# unscored: `serve.py:275 _compute_idf` is called from `_score_query` at `:468`,
+# so graphify ranks the SEEDS by IDF (plus a trigram prefilter and tiered label
+# matching) and then walks outward unranked. This comment said "NO relevance
+# score at all" until 2026-08-01, which a peer-tool review refuted against the
+# installed source. The measured gain below is unaffected. Measured over the golden
 # set: natural phrasings 3 of 8 pairs prose-scoped -> 5 of 8 with the scorer
 # (mean 0.38 -> 0.62), echo unchanged at 8 of 8, both negatives still clean. It
 # never shells out to graphify, so graphify's own flags (--budget, --depth) are
