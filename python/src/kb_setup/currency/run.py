@@ -21,7 +21,7 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 
-from kb_setup.currency import baseline, config, docs, issues, report, sync, upstream
+from kb_setup.currency import baseline, config, docs, issues, report, staleness, sync, upstream
 from kb_setup.currency.decide import decide
 
 
@@ -102,6 +102,12 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
 
     _report_check(drifted, unverifiable)
     _report_upstream(behind)
+    # The graph-vs-inputs verdict, under its OWN header rather than folded into
+    # the drift block above (#88). Deliberately after it: a tool that has drifted
+    # is a reason to distrust the graph, so the reader should meet that first.
+    # Same posture as everything else on this path — silent when clean, never a
+    # rebuild, and the return below is unconditionally 0.
+    staleness.report(staleness.check_inputs(repo_root, spec) for spec in _specs(repo_root, only))
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
         for tool, finding in stale:
@@ -452,6 +458,11 @@ def stamp(repo_root: Path, *, tool: str, version: str, source_ref: str = "") -> 
             file=sys.stderr,
         )
         return 2
+    # `inputs` deliberately omitted: a manual stamp has NOT just built, so it
+    # cannot say what the graph was built from. Omitting the key makes the
+    # staleness check report *not verifiable* rather than adopting whatever
+    # `sources/` says right now as the build's inputs — a false green that would
+    # be indistinguishable from a real rebuild.
     path = sync.write_stamp(repo_root, spec, version=resolved, source_ref=source_ref)
     print(f"[currency] stamped {path.relative_to(repo_root)} at {resolved}")
     return 0

@@ -80,6 +80,17 @@ class ToolSpec:
     # stat, so covering the derived set is cheap.
     artifact: str = ""
     artifacts: tuple[str, ...] = ()
+    # Repo-relative GLOBS naming the committed INPUTS the build reads. The
+    # mirror image of `artifacts`, and deliberately a separate field: outputs are
+    # fingerprinted by a stat (`size:mtime_ns`) because they run to hundreds of
+    # megabytes, while inputs are digested (sha256) because a stat cannot tell a
+    # content change from an ordinary git operation — measured over eight rows in
+    # `docs/research/reports/2026-07-31-size-mtime-false-drift.md`, where
+    # `git checkout --`, a branch round-trip and a stash+pop each moved the stat
+    # on byte-identical files. Left EMPTY here by default: a repo with no
+    # declared inputs simply has no staleness check, exactly like a tool with no
+    # manifest has no manifest check.
+    inputs: tuple[str, ...] = ()
     stamp: str = ""
     # The reviewed version of a SELF-MANAGED tool — one that bootstraps the
     # toolchain and therefore cannot honestly be pinned in `[tools]`. mise is the
@@ -208,6 +219,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         manifest=_str("manifest"),
         artifact=_str("artifact"),
         artifacts=_tuple("artifacts"),
+        inputs=_tuple("inputs"),
         stamp=_str("stamp"),
         expected=_str("expected"),
         version_pattern=_str("version_pattern"),

@@ -103,6 +103,20 @@ def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
     out = repo_root / "graphify-out" / "graph.json"
+
+    # FIRST — before `mf.load_all` reads a single manifest. The direction is the
+    # point: an input edited mid-build did not reach this graph, so recording its
+    # pre-read digest makes the very next check FIRE. Digesting later would record
+    # content the build never saw and bless a graph the edit never reached, which
+    # is the one direction this detector must never fail in.
+    #
+    # It sat after `load_all` when this landed, which is 17 lines too late — the
+    # manifests were already `read_text`-ed by then, so an edit in that window
+    # produced exactly the false green the comment claimed to prevent. Keep this
+    # line at the top of the function; nothing above it may touch `sources/`.
+    # (Cold lane, round 1.)
+    inputs = _input_fingerprints(repo_root)
+
     manifests = mf.load_all(sources)
     if not manifests:
         raise SystemExit("no sources/*.manifest found")
@@ -169,7 +183,7 @@ def build(repo_root: Path) -> None:
     # inherited-number trap with extra steps. `kb-prose` re-derives it alone.
     prose.derive_for(repo_root)
 
-    _stamp_build(repo_root)
+    _stamp_build(repo_root, inputs)
     print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 
 
@@ -201,7 +215,27 @@ def _clear_stamp(repo_root: Path) -> None:
         print(f"[kb-build] WARNING: could not clear the currency stamp: {e}")
 
 
-def _stamp_build(repo_root: Path) -> None:
+def _input_fingerprints(repo_root: Path) -> dict[str, str] | None:
+    """sha256 over every committed input `currency.toml` declares, or None.
+
+    None means "could not be read", which `write_stamp` records as the ABSENCE of
+    an input map — so the staleness check reports *not verifiable* rather than
+    comparing against a partial one. Best-effort, like the stamp itself: a build
+    must not fail over its own bookkeeping.
+    """
+    try:
+        from kb_setup.currency import sync
+
+        spec = _currency_spec(repo_root)
+        if spec is None:
+            return None
+        return sync.input_fingerprints(repo_root, spec)
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-build] WARNING: could not fingerprint the corpus inputs: {e}")
+        return None
+
+
+def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
     """Record which graphify version built these artifacts (currency step 1).
 
     graphify stamps nothing itself — `export.to_json()` writes only
@@ -238,7 +272,9 @@ def _stamp_build(repo_root: Path) -> None:
         # PATH-resolved reading this exists to eliminate.
         version = sync.observed_version(graphify_exe(repo_root))
         source_ref = sync.manifest_ref(repo_root, spec)
-        path = sync.write_stamp(repo_root, spec, version=version, source_ref=source_ref)
+        path = sync.write_stamp(
+            repo_root, spec, version=version, source_ref=source_ref, inputs=inputs
+        )
         if version:
             print(f"[kb-build] stamped {path.name}: built by graphify {version}")
         else:
