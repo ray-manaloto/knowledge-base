@@ -1,0 +1,20 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Matt Pocock's agent skills (MIT). Ingested 2026-08-02 so the corpus can answer questions about wayfinder/grilling/research/to-spec and the design rationale behind them (.changeset/, .out-of-scope/, docs/) rather than relying on a session's summary of a SKILL.md.
+# ⚠️ `ref` is the RELEASE branch, not `main`, and that is deliberate.
+# `kb-manifest-add` wrote `ref = main` while pinning f34d927 — a commit that is
+# NOT an ancestor of main (`git merge-base --is-ancestor` -> false; main is
+# 2ab9580, this commit's parent). f34d927 lives only on
+# origin/changeset-release/main, the changesets bot's release branch, and it is
+# the commit whose CHANGELOG.md carries the consumed changeset rationale that
+# sources/extractions/mattpocock-skills-docs.json was extracted from.
+#
+# Correcting `ref` rather than re-pinning to main keeps the manifest TRUTHFUL
+# about what was actually extracted; re-pinning to 2ab9580 would leave the
+# CHANGELOG chunk describing bytes absent from the pin. The cost is that a
+# release branch can be force-updated, which would surface as
+# `reference is not a tree` — a REAL defect signature, not a transient
+# (persistence-gate-retry.md), so it fails loudly rather than silently.
+url = https://github.com/mattpocock/skills
+ref = changeset-release/main
+commit = f34d927194a521688da962fff50708f6238d06af
+kind = docs
