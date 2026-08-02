@@ -132,3 +132,8 @@ brain/graphify-out/GRAPH_REPORT.md
 brain/graphify-out/.graphify_*
 brain/graphify-out/reflections/
 brain/graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+
+# The single self-extraction sub-graph (#101). `graphify extract .` would
+# default its output to the aggregate graphify-out/; --out redirects it here.
+# Derived, disposable, rebuilt by kb-build / kb-watch.
+/.self-graph/
