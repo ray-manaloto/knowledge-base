@@ -91,14 +91,19 @@ client-side per-tool filter — only server-level toggles. So the allowlist live
 here, in `kb_setup.mcp_serve`, and it is **opt-in**:
 
 ```bash
-KB_MCP_TOOLS=query_graph,shortest_path mise run kb-serve
-KB_MCP_RESOURCES=graphify://stats mise run kb-serve   # independent of the above
+KB_MCP_TOOLS=query_graph,shortest_path KB_MCP_RESOURCES=graphify://stats \
+  mise run kb-serve
 ```
 
+- The two variables are **independent** — set either alone to narrow only that
+  surface. They are shown together above because the measured figure below is
+  the combined one, and an env assignment scopes to the single command it
+  prefixes: two separate invocations would each narrow one surface and neither
+  would reproduce it.
 - **Unset = no filtering AND no relay** — the child inherits stdio directly.
 - **Blank or all-separators also means unset**, deliberately: it fails OPEN,
   because a server advertising zero tools looks exactly like a broken one.
-- Measured: unset → 10 tools / 5,828 B / 6 resources; the example above →
+- Measured: unset → 10 tools / 5,828 B / 6 resources; the invocation above →
   2 tools / 1,516 B / 1 resource.
 
 **Whether this is worth setting depends on the consumer, and the condition
