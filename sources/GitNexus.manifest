@@ -1,0 +1,10 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# GitNexus — client-side in-browser code knowledge graph + Graph RAG agent; the most architecturally distant peer. PolyForm Noncommercial 1.0.0. Ray, 2026-08-02.
+url = https://github.com/abhigyanpatwari/GitNexus
+ref = main
+commit = 911151e2304f298a995fcc69c738ad2c6db9393a
+kind = code
+# study, not corpus: 51 MB / 4,692 files, and sub-graph -> aggregate expansion is
+# far worse than 1:1 (71 MB once added >=155 MiB). Aggregate headroom measured
+# 2026-08-02 at ~147 MiB against graphify's 512 MiB cap, so this one stays out.
+scope = study

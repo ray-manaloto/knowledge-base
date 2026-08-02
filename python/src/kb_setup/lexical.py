@@ -39,7 +39,7 @@ fails any arm whose retriever returns nothing (`evals._arm_defect`) — a corpus
 that resolves and knows nothing. That check is only worth keeping if this
 retriever can actually produce it, so :func:`search` returns **only nodes that
 score above zero**, never the whole corpus padded with zeros. A real question
-against 2,105 documents shares at least one term with something; zero results
+against 2,553 documents shares at least one term with something; zero results
 therefore means the index or the tokenizer is broken, which is precisely the
 defect the check is for. Returning every node ranked would have made the check
 unfailable — the can-only-pass shape.
@@ -71,9 +71,11 @@ INDEXED_FIELDS = ("label", "rationale")
 #: grading itself.
 K1 = 1.2
 
-#: BM25 length normalisation. The standard 0.75. It matters here: 1,177 of 2,105
-#: nodes carry a `rationale` and 928 do not, so document length varies by ~3x and
-#: an unnormalised score would systematically favour the longer half.
+#: BM25 length normalisation. The standard 0.75. It matters here: 1,309 of 2,553
+#: nodes carry a `rationale` and 1,244 do not, so document length varies by ~3x
+#: and an unnormalised score would systematically favour the longer half.
+#: Re-derived 2026-08-02 against `graph-prose.json`; the previous figures
+#: (1,177 of 2,105) were measured on an earlier build and had gone stale.
 B = 0.75
 
 #: Tokens are runs of letters and digits, lowercased. Deliberately NOT a
@@ -160,7 +162,7 @@ class Index:
         (CodeRabbit, PR #33); measuring both sides is what settled it:
 
         * In this corpus the branch is unreachable. **No term reaches
-          ``df == size``** — the commonest, "the", is 1,418 of 2,105 (67%). So
+          ``df == size``** — the commonest, "the", is 1,848 of 2,553 (72%). So
           the clamp buys nothing where the scorer actually runs.
         * It is actively harmful on a small corpus, because ``df == size`` is
           not a rare pathology there but the NORMAL case: in a one-document

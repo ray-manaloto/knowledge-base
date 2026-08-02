@@ -1,12 +1,17 @@
-# The thirteen ambiguity tests
+# The fourteen ambiguity tests
 
 Apply **per clause, not per document** — a goal is only as unambiguous as its
 weakest clause. Any FAIL is a defect. Each test below gives the question, a bad
 example, and its rewrite.
 
 `mise run kb-goal-check` decides T2, T5, T6, T8, T9 and the structural checks
-mechanically. **T1, T3, T4, T7, T10, T11, T12, T13 need judgement** and are why this
-file exists.
+mechanically. **T1, T3, T4, T7, T10, T11, T12, T13, T14 need judgement** and are why
+this file exists.
+
+T14 is the odd one out and is placed last on purpose: it is the only test that
+asks about the **human** reader rather than the evaluator. Every other test
+serves the constraint quoted below; T14 exists because serving it perfectly
+still leaves the operator blind.
 
 The operating constraint every test serves:
 
@@ -39,7 +44,7 @@ Fails on: *good, clean, proper, reasonable, major, minor, adequate, complete,
 robust, comprehensive, well-formed, sensible, thorough.*
 
 - BAD: `the rubric is comprehensive and the scorecard is usable`
-- GOOD: `references/rubric.md contains a "## T13" heading and thirteen "## T<n> —" sections`
+- GOOD: `references/rubric.md contains a "## T14" heading and fourteen "## T<n> —" sections`
 
 > "Make it good" isn't a finish line. "Scores over 8+ out of 10 using my custom
 > grading skill" is.
@@ -210,6 +215,44 @@ planted, and the arm *with* the skill missed it. A rubric that only encodes
 what its author already knew cannot find this class; the honest response is to
 add the test, and to note where it came from.
 
+## T14 — operator visibility
+
+**While the loop runs, can the human who armed it tell that it is running — and
+where it has got to?**
+
+T1–T13 all ask whether the *evaluator* can settle the condition. None asks
+whether the *operator* can see anything before it ends. A goal can pass all
+thirteen and still run as an unbroken silence, which is indistinguishable from
+a hung session, a dead agent, or a finished round.
+
+- BAD: a condition specifying eight pasted-evidence sentinels and a 70-turn
+  bound, with no clause obliging a single word to the user until item 8 lands.
+- GOOD: the same condition, plus a rider section requiring a message at every
+  phase boundary, before any command expected to exceed ~2 minutes, and
+  carrying the turn count against the bound.
+
+Two things make this a test rather than a style note:
+
+1. **A turn bound already implies it.** *"Claude reports progress against that
+   clause each turn and the evaluator judges it from the conversation."* A goal
+   carrying a turn clause and no progress reporting is not merely quiet — it is
+   failing to do what the bound is for.
+2. **The failure mode is a WRONG BELIEF, not a slow round.** Silence reads as
+   completion. Worked case: a round was reported *by its operator* as "done and
+   agents completed" when the goal had been armed minutes earlier and no phase
+   had started; `TaskList` and `CronList` were both empty. Nothing in the pair
+   had been violated — nothing in the pair had asked for a word.
+
+**Put the obligation in the RIDER, never the goal.** The goal is capped at
+4,000 characters and every one spent on narration is one not spent on evidence;
+worse, a checkpoint promoted to a completion clause lets the round satisfy
+itself by announcing itself (T10, T12). Reporting obligations and completion
+obligations are different kinds and must not share a list.
+
+**Provenance:** found by the operator, not by this rubric — Ray asked why the
+skill had not caught it (2026-08-02). Same shape as T13, which the no-skill
+baseline found: both are classes the author did not think to plant.
+
 ## Scorecard
 
 Run down this list against a finished goal; each is answerable in under a minute.
@@ -227,6 +270,8 @@ Run down this list against a finished goal; each is answerable in under a minute
 - [ ] Subagent/background evidence must be restated in the main conversation (T11)
 - [ ] Every sentinel carries a run-specific value; condition-text disclaimed (T12)
 - [ ] A multi-clause condition states how its clauses combine (T13)
+- [ ] The operator can see progress before the round ends, via a rider
+      obligation that is never a completion clause (T14)
 
 ## The honest residual
 

@@ -11,9 +11,14 @@
 // feature, which `use-tool-builtins.md` exists to prevent. This script ROUTES to
 // them instead, and that is the only place the routing lives.
 //
-// Invoke (from a Claude session):
+// Invoke (from a Claude session) — by scriptPath, NEVER by name. A `name:`
+// resolves to a STALE CACHED COPY (#13, measured: kb-extract.js was edited,
+// re-invoked by name, and returned the old error text verbatim), so a by-name
+// run of this file would exercise a pre-patch script while reporting on the
+// committed one. This example said `name:` until 2026-08-02, which is the
+// documentation equivalent of the same bug.
 //   Workflow({
-//     name: 'kb-tool-review',
+//     scriptPath: '.claude/workflows/kb-tool-review.js',
 //     args: {
 //       reportDir: 'docs/research/reports',
 //       tools: [
@@ -92,8 +97,16 @@ Read the graph BEFORE any file: \`mise run kb-query -- "<q>" --prose --idf\`.
 The tool's own nodes are in graphify-out/study-graph.json (the STUDY graph, not
 the aggregate): \`graphify query "…" --graph graphify-out/study-graph.json\`.
 Control-arm every empty result against a term you KNOW is present.
-Write your report to .agent/kb/reports/agents/ INCREMENTALLY — update it as you
-go, never at the end. Agents that batched to the end have died holding everything.
+Write your report to BOTH, INCREMENTALLY — update as you go, never at the end.
+Agents that batched to the end have died holding everything.
+  1. .agent/kb/reports/agents/  — scratch, survives your death mid-run
+  2. ${reportDir}/<key>-retrieval-gap.md — TRACKED, survives a fresh clone
+Path 2 is not optional. On 2026-08-02 this workflow completed 31 agents and left
+NOTHING in ${reportDir}: only path 1 was named here, .agent/ is gitignored, and
+the script itself cannot write files (workflow scripts have no filesystem access
+— which is why this is an instruction to you rather than a write in the script).
+The 16,249-character synthesis existed solely in the run result and had to be
+extracted by hand from the task output before it was lost.
 `.trim()
 
 // pipeline, not parallel: a tool whose research finishes first should start
@@ -195,4 +208,64 @@ const synthesis = await agent(
 // which is a finding about the process rather than a clean result.
 if (refuted === 0) log('WARNING: 0 claims refuted across all tools — the verifier did not do its job')
 
-return { tools: done.length, verified, refuted, synthesis }
+// PERSIST. A workflow script has no filesystem access, so the only way this run
+// leaves a tracked artifact is an agent that writes one. Without this step the
+// synthesis — the single most expensive thing the run produces — exists only in
+// the returned object, which dies with the session (measured 2026-08-02: 31
+// agents, 4.59M tokens, zero files in reportDir).
+const persisted = await agent(
+  `Write these artifacts to disk, VERBATIM, then return their paths as ` +
+    `{"reports": ["<path>", …]}. Do not summarise, trim, or reformat any of it.\n\n` +
+    `1. ${reportDir}/peer-tool-synthesis-${done.map((d) => d.tool.key).join('-')}.md ` +
+    `— the synthesis below, under a provenance header naming the tool keys, their ` +
+    `pinned commits, and the counts (${verified} verified, ${refuted} refuted).\n` +
+    `2. For each tool, confirm ${reportDir}/<key>-retrieval-gap.md exists and is ` +
+    `non-empty; if a researcher failed to write it, reconstruct it from that ` +
+    `tool's claims and say so in the file.\n\n` +
+    `SYNTHESIS:\n${synthesis}\n\nPER-TOOL:\n${JSON.stringify(
+      done.map((d) => ({ tool: d.tool.key, surviving: d.surviving, review: d.review })),
+    )}`,
+  {
+    label: 'persist',
+    phase: 'Synthesize',
+    // SCHEMA, not bare text. Without it `agent()` returns the subagent's final
+    // MESSAGE as a string, so `reports` would be raw prose — and any caller
+    // trusting the `reports:[...]` in this file's header comment and calling
+    // `.map`/`.forEach` on it gets a TypeError, while a caller that just pastes
+    // it gets "Here are the paths: …" instead of a path list. Found by the cold
+    // lane on d713eb1: the contract was documented as an array and returned as
+    // text, one commit after this file was fixed for a different contract lie.
+    //
+    // OBJECT-wrapped, not a bare `type: 'array'`. Round 2 flagged that a bare
+    // array would be the only top-level non-object schema here — CLAIMS_SCHEMA
+    // and VERDICT_SCHEMA are both objects — and it could not confirm the
+    // structured-output path accepts one without running the workflow live. An
+    // unconfirmed shape in the fix for a contract defect is not worth the round
+    // trip, so this matches the two schemas already known to work.
+    schema: {
+      type: 'object',
+      required: ['reports'],
+      properties: { reports: { type: 'array', items: { type: 'string' } } },
+    },
+  },
+)
+
+// `unverified` is the claims that never reached the verifier: only NEGATIVE
+// claims are sent, so a positive claim is unchallenged rather than confirmed.
+// It was in this file's documented contract and missing from the return for as
+// long as the file has existed — the run that found that is the run that first
+// executed it.
+// `d.res.claims`, NOT `d.claims`: stage 2 returns `{tool, res, verdicts}`, so the
+// claim list is one level down. `d.claims` would be undefined, silently fall back
+// to `verdicts.length` (negatives only), and report unverified as 0 — the exact
+// shape of under-reporting this field was added to end.
+const claimed = done.reduce((n, d) => n + (d.res?.claims?.length ?? d.verdicts.length), 0)
+const unverified = Math.max(0, claimed - verified - refuted)
+
+// Unwrapped so the RETURN still matches the header's `reports:[...]`. The object
+// wrapper is a structured-output detail, not part of this workflow's contract —
+// leaking it would fix a contract lie by telling a different one.
+const reports = persisted?.reports ?? []
+if (!reports.length) log('WARNING: persist returned no report paths — nothing may have been written')
+
+return { tools: done.length, verified, refuted, unverified, synthesis, reports }

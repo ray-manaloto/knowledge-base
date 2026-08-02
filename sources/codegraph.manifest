@@ -1,0 +1,12 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# codegraph — pre-indexed local code knowledge graph for coding agents; the closest functional peer to graphify (same pitch, independent C implementation, auto-sync mirrors kb-watch). Ray, 2026-08-02.
+url = https://github.com/colbymchenry/codegraph
+ref = main
+commit = 49c11fc2e0c02170742be8411e66a31af611f4b7
+kind = code
+# corpus EXPLICITLY, though it is also the default. Stated because this round
+# measured that `scope = study` cannot reproduce the one mechanism the peer-tool
+# track has ever paid off through: cognee's 10,099 test<->src edges were visible
+# because a query over the AGGREGATE could reach them. A peer in study-graph.json
+# sits in a file nothing routinely queries. 16 MB / 678 files, MIT.
+scope = corpus

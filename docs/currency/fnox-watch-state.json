@@ -1,0 +1,8 @@
+{
+  "local:pinned-here-global-stays-on-latest": {
+    "comments": 0,
+    "state": "local",
+    "title": "Pinning fnox in this repo's `[tools]` means the shim resolves to the\npinned version INSIDE this directory while the global install stays on `latest`\n\u2014 an accepted skew, chosen deliberately so this repo states the fnox it expects.\nBump the two together; a bump here alone narrows the skew rather than closing it,\nand the global side is not this repo's to edit (`do-not.md` #11).",
+    "updated_at": ""
+  }
+}

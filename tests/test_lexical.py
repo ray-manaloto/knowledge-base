@@ -166,7 +166,7 @@ def test_a_ubiquitous_term_is_worth_far_less_than_a_discriminating_one() -> None
     CodeRabbit (PR #33) asked for an exact 0.0 at ``df == size``. That was tried
     and reverted; the reasoning is in `Index.idf`. Short version: the branch is
     unreachable in this corpus (no term reaches ``df == size``; the commonest is
-    1,418 of 2,105) and it makes a SMALL corpus unsearchable, because there
+    1,848 of 2,553) and it makes a SMALL corpus unsearchable, because there
     ``df == size`` is the normal case rather than a pathology.
 
     So this pins what is true and useful: a term almost everywhere is worth
@@ -205,8 +205,8 @@ def test_a_rarer_term_outweighs_a_commoner_one() -> None:
 def test_length_normalisation_does_not_let_padding_win() -> None:
     """A long document must not outrank a short one purely for repeating a term.
 
-    Load-bearing on the real corpus: 1,177 of 2,105 nodes carry a `rationale` and
-    928 do not, so document length varies ~3x and an unnormalised score would
+    Load-bearing on the real corpus: 1,309 of 2,553 nodes carry a `rationale` and
+    1,244 do not, so document length varies ~3x and an unnormalised score would
     systematically favour the longer half.
     """
     index = lexical.build_index(

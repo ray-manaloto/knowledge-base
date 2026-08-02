@@ -121,10 +121,36 @@ def _extract_code(repo_root: Path, name: str) -> bool:
 #: `python/`. `cognee` — one pinned source, ONE extraction run — has 10,099
 #: test<->src edges in the same graph file. One variable differs.
 #:
-#: What it does deliver is real and worth keeping: 1,935 nodes covering what
-#: tests exist and what is in them. Do not claim the coverage question until
-#: #101's depth test passes.
-_SELF_TREES = ("python", "tests")
+#: RESOLVED 2026-08-02 by the constants below. Kept as history because it is the
+#: only place the pre-fix measurement survives, and because the refuted reading
+#: ("a graphify limitation") is the one a future reader will reach for again.
+#:
+#: The `_SELF_TREES = ("python", "tests")` tuple this paragraph used to annotate
+#: is GONE, not merely unused. Once one root covers both trees it had no reader —
+#: a constant nothing consults is a claim about the code that the code does not
+#: make, and leaving it would have let a later edit "restore" the loop by
+#: consulting it again. The two trees are still exactly what gets indexed; the
+#: root below is simply what contains them.
+
+#: ONE extraction root covering both trees, which is THE FIX for the above.
+#: `merge-graphs` re-namespaces ids on every merge, so two runs can only ever
+#: produce two namespaces; the crossing edge has to exist *within a single
+#: extraction* or it cannot exist at all. graphify's `extract` takes exactly one
+#: path, so the one root that contains both of ours is the repo root.
+#:
+#: Indirect arm: `cognee` is one pinned source extracted in ONE run, and it has
+#: 10,099 test<->src edges in this same graph file. That is evidence the shape
+#: works, NOT evidence this change works — the direct arm is the depth test in
+#: `tests/test_affected_covers_tests.py`, which must move from red to green
+#: across the rebuild that carries this.
+_SELF_ROOT = "."
+
+#: Where the single self sub-graph is written, and the reason this constant
+#: exists at all. `graphify extract <path>` defaults its output to
+#: `<path>/graphify-out/`, so extracting the repo root would write the AGGREGATE
+#: `graphify-out/graph.json` — overwriting a 133k-node merged corpus with a
+#: root-only extraction. `--out` redirects it. Gitignored, derived, disposable.
+_SELF_OUT = ".self-graph"
 
 #: The aggregate as it stands BEFORE our own code is merged in — everything the
 #: pinned manifests and committed doc chunks contribute, and nothing of ours.
@@ -157,6 +183,30 @@ STUDY_GRAPH_NAME = "study-graph.json"
 BASE_GUARD_NAME = ".base-graph.sha256"
 
 
+def _self_subgraph(repo_root: Path) -> Path:
+    """The single sub-graph the self extraction writes. One place, one spelling."""
+    return repo_root / _SELF_OUT / "graphify-out" / "graph.json"
+
+
+def _self_extract_argv(repo_root: Path) -> list[str]:
+    """The ONE argv both self-extraction call sites use.
+
+    Stated once because the two call sites drifting apart is precisely how the
+    `update`-vs-`extract` defect arrived: two spellings of "extract our code",
+    one of which produced different `source_file` values. A shared builder makes
+    that class of drift unrepresentable rather than merely discouraged.
+    """
+    return [
+        graphify_exe(repo_root),
+        "extract",
+        _SELF_ROOT,
+        "--code-only",
+        "--force",
+        "--out",
+        _SELF_OUT,
+    ]
+
+
 def _extract_self(repo_root: Path) -> list[Path]:
     """AST-extract this repo's OWN code; return each sub-graph for merging.
 
@@ -180,11 +230,8 @@ def _extract_self(repo_root: Path) -> list[Path]:
     Paths are relative to `repo_root` (`_run` passes cwd), matching how
     `_extract_code` addresses `sources/<name>`.
     """
-    subs: list[Path] = []
-    for tree in _SELF_TREES:
-        _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
-        subs.append(repo_root / tree / "graphify-out" / "graph.json")
-    return subs
+    _run(_self_extract_argv(repo_root), repo_root)
+    return [_self_subgraph(repo_root)]
 
 
 def refresh_self(repo_root: Path) -> int:
@@ -211,10 +258,16 @@ def refresh_self(repo_root: Path) -> int:
     is satisfied because the loop we would have written has no tool feature behind
     it.
 
-    Order matters. Each tree is re-extracted into its own sub-graph FIRST and
-    merged after, because merging a sub-graph we have not refreshed would restamp
-    a graph that gained nothing — a green stamp over stale content, which is the
+    Order matters. Our code is re-extracted into its sub-graph FIRST and merged
+    after, because merging a sub-graph we have not refreshed would restamp a
+    graph that gained nothing — a green stamp over stale content, which is the
     one failure this whole currency mechanism exists to prevent.
+
+    This said "Each tree is re-extracted into its own sub-graph" until 2026-08-02
+    and described a per-tree loop the same commit had already replaced with one
+    root (#101). Caught by the cold lane — see the "ONE extraction run, over ONE
+    root" block in this function's body, which warns about the same class of
+    drift and lost a round to it too.
     """
     out = repo_root / "graphify-out" / "graph.json"
     base = out.parent / BASE_GRAPH_NAME
@@ -237,30 +290,33 @@ def refresh_self(repo_root: Path) -> int:
     staging = out.with_name(out.name + ".refresh")
     shutil.copy(base, staging)
 
-    for tree in _SELF_TREES:
-        sub = repo_root / tree / "graphify-out" / "graph.json"
-        # ONE extraction path, always `extract --force`, never `update`.
-        #
-        # The first draft branched — `update` when a sub-graph existed, `extract`
-        # otherwise — on the reasoning that "the two paths differ in cost, not in
-        # result". Measured, that was false: the same file came out as
-        # `source_file='src/kb_setup/graph.py'` down one path and
-        # `'python/src/kb_setup/graph.py'` down the other, so the aggregate ended
-        # up disagreeing with itself about where our own code lives. A cheaper
-        # path that yields different data is not the same path, and a comment
-        # asserting otherwise is how it survived review.
-        _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
-        _run(
-            [
-                graphify_exe(repo_root),
-                "merge-graphs",
-                str(staging),
-                str(sub),
-                "--out",
-                str(staging),
-            ],
-            repo_root,
-        )
+    # ONE extraction run, over ONE root, always `extract --force`, never `update`.
+    #
+    # Two separate constraints landed on this line, and both are load-bearing:
+    #
+    # * NEVER `update`. The first draft branched — `update` when a sub-graph
+    #   existed, `extract` otherwise — on the reasoning that "the two paths
+    #   differ in cost, not in result". Measured, that was false: the same file
+    #   came out as `source_file='src/kb_setup/graph.py'` down one path and
+    #   `'python/src/kb_setup/graph.py'` down the other, so the aggregate ended
+    #   up disagreeing with itself about where our own code lives. A cheaper path
+    #   that yields different data is not the same path, and a comment asserting
+    #   otherwise is how it survived review.
+    # * ONE root, not one per tree (#101). Per-tree runs put `python/` and
+    #   `tests/` in namespaces `merge-graphs` cannot bridge, so `affected` could
+    #   never answer "which tests cover this symbol" about our own code.
+    _run(_self_extract_argv(repo_root), repo_root)
+    _run(
+        [
+            graphify_exe(repo_root),
+            "merge-graphs",
+            str(staging),
+            str(_self_subgraph(repo_root)),
+            "--out",
+            str(staging),
+        ],
+        repo_root,
+    )
 
     # RE-CHECK IMMEDIATELY BEFORE THE SWAP. The check at the top of this function
     # is a time-of-check, and the swap below is the time-of-use — separated by a

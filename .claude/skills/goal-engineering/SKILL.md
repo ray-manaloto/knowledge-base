@@ -112,7 +112,7 @@ required sections, naming schema, headline-word count, sentinel format, turn
 bound, posture negations, preserve list, and the rider's structure.
 
 Then apply the judgement tests it cannot: **`references/rubric.md`** holds all
-thirteen, each with a bad example and its rewrite. The five the checker cannot
+fourteen, each with a bad example and its rewrite. The six the checker cannot
 reach, and which catch the expensive defects:
 
 - **T4 Goodhart** — could a lazy agent satisfy this clause by *destroying*
@@ -129,6 +129,15 @@ reach, and which catch the expensive defects:
   how they combine? Bullets then a bare `or` has no defined meaning, and both
   readings usually terminate on turn one. Added after the skill's own scoring
   round, where the **no-skill baseline** caught it and the skilled arm did not.
+- **T14 operator visibility** — while the loop runs, can the human who armed it
+  see that it is running and where it has got to? Every other test serves the
+  evaluator; a goal can pass all thirteen and still be an unbroken silence,
+  which reads to the operator as completion. Put the obligation in the rider
+  (phase-boundary messages, a warning before any long command, the turn count
+  against the bound) and **never** as a completion clause — a checkpoint the
+  goal can be satisfied by is a round announcing itself. Added after a round
+  was reported as "done and agents completed" minutes after being armed, with
+  nothing having run.
 
 **Cite the clause in every verdict — the passes as well as the failures.** Quote
 the substring you judged, or give its line. An audit that says "T4: fine" is
@@ -186,7 +195,7 @@ live docs are; this file is the technique built on top of them.
 
 ## References
 
-- `references/rubric.md` — the thirteen ambiguity tests, each with a bad example
+- `references/rubric.md` — the fourteen ambiguity tests, each with a bad example
   and its rewrite. Read this whenever auditing, and when a clause feels vague but
   you cannot say why.
 - `references/conventions.md` — the goal and rider recipes, the naming schema,

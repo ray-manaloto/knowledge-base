@@ -100,17 +100,16 @@ def test_our_own_library_reaches_the_aggregate_graph(monkeypatch, tmp_path):
     merged = [c for c in _run_build(monkeypatch, tmp_path) if "merge-graphs" in c]
     joined = " ".join(a for c in merged for a in c)
 
-    assert "python" in joined, (
+    # One root, so ONE sub-graph carries both trees (#101). This used to be two
+    # assertions on the substrings "python" and "tests", which was right while
+    # there were two runs and is a trap now: every tmp_path in this suite ends in
+    # a directory whose name contains neither, but a real repo root path could
+    # contain either by accident, so substring-matching tree names would pass
+    # without the self sub-graph being merged at all.
+    assert str(graph._self_subgraph(tmp_path)) in joined, (
         f"no self sub-graph reached merge-graphs; merge argv were {merged}. "
-        "python/src/kb_setup is 0 of 37 files in the graph without it."
-    )
-    # `tests/` is a SEPARATE assertion, not an extension of the one above:
-    # "which tests cover this symbol?" is the blast-radius question with the
-    # most day-to-day value, and the 40 test files / 14,090 LOC that answer it
-    # live outside `python/`. Ray widened P1 to include them (2026-07-31).
-    assert "tests" in joined, (
-        f"the test tree did not reach merge-graphs; merge argv were {merged}. "
-        "Without it, `affected` cannot answer which tests cover a symbol."
+        "python/src/kb_setup is 0 of 37 files in the graph without it, and "
+        "`affected` cannot answer which tests cover a symbol."
     )
 
 
@@ -180,12 +179,18 @@ def test_refresh_self_restamps_so_the_graph_stays_verifiable(monkeypatch, tmp_pa
     )
 
 
-def test_refresh_self_merges_both_self_trees(monkeypatch, tmp_path):
+def test_refresh_self_merges_the_self_subgraph(monkeypatch, tmp_path):
     """CONTROL ARM for the test above: restamping alone is not a refresh.
 
     A `refresh_self` that only restamped would satisfy the fingerprint assertion
     trivially — it never rewrites graph.json, so the stamp and the artifact agree
     by doing nothing. That is the cheapest wrong implementation, so it gets an arm.
+
+    It used to assert that BOTH `python` and `tests` reached `merge-graphs`,
+    which was a faithful description of the two-run arrangement and is now the
+    wrong question: one root produces one sub-graph, so what must be merged is
+    that sub-graph. Asserting on the two tree names after the change would pass
+    on the substring `python` in any path and prove nothing.
     """
     root = _stamped_repo(tmp_path)
     spec = config.load(root)[0]
@@ -197,9 +202,13 @@ def test_refresh_self_merges_both_self_trees(monkeypatch, tmp_path):
 
     graph.refresh_self(root)
 
-    merged = " ".join(a for c in calls if "merge-graphs" in c for a in c)
-    assert "python" in merged, f"python/ never reached merge-graphs; argv were {calls}"
-    assert "tests" in merged, f"tests/ never reached merge-graphs; argv were {calls}"
+    merges = [c for c in calls if "merge-graphs" in c]
+    assert len(merges) == 1, (
+        f"expected exactly one merge of the single self sub-graph; argv were {merges}"
+    )
+    assert str(graph._self_subgraph(root)) in merges[0], (
+        f"the self sub-graph never reached merge-graphs; argv were {merges[0]}"
+    )
 
 
 def test_build_snapshots_a_base_that_excludes_our_own_code(monkeypatch, tmp_path):
@@ -232,8 +241,12 @@ def test_build_snapshots_a_base_that_excludes_our_own_code(monkeypatch, tmp_path
 
     assert base.is_file(), f"build() wrote no {_BASE_NAME}; kb-watch has nothing to restart from"
 
+    # Identify OUR merge by the sub-graph path, not by the substring "python".
+    # One extraction root means one self sub-graph (#101), and its path is the
+    # only thing that distinguishes our merge from a pinned source's.
+    self_sub = str(graph._self_subgraph(tmp_path))
     self_merges = [
-        i for i, (j, _) in enumerate(existed_at) if "merge-graphs" in j and "python" in j
+        i for i, (j, _) in enumerate(existed_at) if "merge-graphs" in j and self_sub in j
     ]
     assert self_merges, "no self merge happened at all — the wrong test is failing"
     assert existed_at[self_merges[0]][1], (
@@ -442,15 +455,14 @@ def test_refresh_self_uses_one_extraction_path(monkeypatch, tmp_path):
     spec = config.load(root)[0]
     sync.write_stamp(root, spec, version="0.9.31", source_ref="", inputs=None)
 
-    # The sub-graphs MUST already exist, or this arm is dead. The branch being
-    # guarded against was `if sub.is_file(): update`, so a fixture without them
+    # The sub-graph MUST already exist, or this arm is dead. The branch being
+    # guarded against was `if sub.is_file(): update`, so a fixture without it
     # takes the extract path either way and the assertion passes against the very
     # mutation it exists to catch — verified: reintroducing the branch left the
-    # suite green until these two files were added.
-    for tree in graph._SELF_TREES:
-        sub = root / tree / "graphify-out" / "graph.json"
-        sub.parent.mkdir(parents=True, exist_ok=True)
-        sub.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    # suite green until this file was added.
+    sub = graph._self_subgraph(root)
+    sub.parent.mkdir(parents=True, exist_ok=True)
+    sub.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
 
     calls: list[list[str]] = []
     monkeypatch.setattr(graph, "_run", lambda argv, _r: calls.append([str(a) for a in argv]))
@@ -464,8 +476,19 @@ def test_refresh_self_uses_one_extraction_path(monkeypatch, tmp_path):
         f"{subcommands}. update and extract disagree on source_file, so mixing them "
         f"puts two spellings of the same file in one graph."
     )
-    assert subcommands.count("extract") == len(graph._SELF_TREES), (
-        f"expected one `extract` per self tree; subcommands were {subcommands}"
+    assert subcommands.count("extract") == 1, (
+        f"expected exactly ONE extraction run over one root (#101); subcommands were "
+        f"{subcommands}. Per-tree runs put python/ and tests/ in namespaces "
+        f"merge-graphs cannot bridge, which is the whole defect."
+    )
+    extract_argv = next(c for c in calls if len(c) > 1 and c[1] == "extract")
+    assert extract_argv[2] == graph._SELF_ROOT, (
+        f"the extraction root moved off {graph._SELF_ROOT!r}; argv was {extract_argv}"
+    )
+    assert "--out" in extract_argv, (
+        f"self extraction lost --out, so it writes the AGGREGATE graphify-out/ and "
+        f"overwrites the merged corpus with a root-only extraction; argv was "
+        f"{extract_argv}"
     )
 
 

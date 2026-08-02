@@ -53,6 +53,8 @@ _MUST_SKIP = (
     "brain/graphify-out/graph.json",
     "sources/some-repo/README.md",
     "raw/fetched.md",
+    ".self-graph/graphify-out/cache/stat-index.json",
+    ".self-graph/graphify-out/graph.json",
 )
 
 

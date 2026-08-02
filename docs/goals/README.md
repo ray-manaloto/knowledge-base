@@ -33,6 +33,7 @@ minutes, or the sort breaks.
 | `2026-07-27-1702-kb-redaction-legibility` | **Legible** | Why `mise run` masks its own output as `[redacted]` | achieved |
 | `2026-07-31-1348-kb-fluent-stale-graph` | **Fluent** | SessionStart stale-graph detection + the graphify/mise/hk/fnox release-notes review | achieved |
 | `2026-07-31-2056-kb-navigable-graph` | **Navigable** | Index our own library for blast radius, ingest three peer tools, stand up a reusable cross-family review team, fold in the graphify version-sync tail | stalled |
+| `2026-08-01-2116-kb-settled-claims` | **Settled** | Re-derive every deferred or inherited claim: #101's cross-namespace edges, the currency tail, two cross-report disagreements, and `kb-tool-review.js` exercised end-to-end on a fourth peer tool | achieved |
 
 ## Why the goal file is capped at 4,000 characters
 
