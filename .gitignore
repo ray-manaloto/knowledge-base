@@ -12,7 +12,10 @@ __pycache__/
 # graphify-out: graph.json is DERIVED — regenerable from committed inputs
 # (sources/*.manifest + sources/extractions/) via `mise run kb-build` (free, no
 # LLM). Per CLAUDE.md invariant 3 and graphify's design, it is GITIGNORED: at
-# aggregate scale it exceeds git/GitHub limits (119MB > 100MB), and consumers
+# aggregate scale it exceeds git/GitHub limits (382 MB / 364.7 MiB measured
+# 2026-08-01 — the long-standing "119MB" here was ~3x stale, and two peer-tool
+# reports disagreed 382 vs 119 because each inherited a different vintage of it),
+# and consumers
 # query via the MCP server (`mise run kb-serve`) or a pushed graph DB
 # (neo4j/falkordb), never a git blob. manifest.json (change-detection) and
 # .graphify_labels.json (labels keyed to NON-deterministic Louvain community ids
