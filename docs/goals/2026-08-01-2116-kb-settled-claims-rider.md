@@ -39,6 +39,38 @@ property of that text* — never a state of a file. A probe run inside a
 subagent, a `Workflow`, or a background task is **invisible** to it: its output
 must be restated in the main conversation to count (T11).
 
+## Progress checkpoints — the operator is a reader too
+
+The section above makes every clause legible to the *evaluator*. Nothing else
+in this pair makes the round legible to **Ray**, and on 2026-08-02 that cost a
+real misread: the goal was armed, no phase had started, and the silence was
+indistinguishable from a long-running agent — so the round was reported as
+*"done and agents completed"* when nothing had run at all. `TaskList` and
+`CronList` were both empty.
+
+`/goal`'s own documentation already assumes the opposite. With a turn or time
+clause in the condition, *"Claude reports progress against that clause each
+turn and the evaluator judges it from the conversation."* This round has one
+(70 turns, SOFT), so progress narration is not an extra — it is the documented
+behaviour of the bound this goal already carries.
+
+Binding for this round:
+
+- **A `SendUserMessage` at every phase boundary** — one starting a phase, one
+  closing it naming the sentinel that landed. Silence between phases is a
+  defect, not efficiency.
+- **A message BEFORE any command expected to exceed ~2 minutes**, saying what
+  is running and roughly how long. The P4 build is ~30 minutes and would
+  otherwise be half an hour of nothing.
+- **The turn count in each boundary message** (`turn n/70`). That is what the
+  documented per-turn progress report actually is.
+- **A hand-back is announced, not merely awaited.** P3 ends by waiting for
+  Ray; the wait must arrive as a question, never as a pause.
+
+These are *reporting* obligations, not completion ones. None is a sentinel and
+none gates the goal — a checkpoint message must never be offered as evidence
+for items 1–8, which the EVIDENCE RULE already forbids.
+
 ## The amendment budget is deliberate
 
 The goal measures **3,820 of 4,000 characters**, leaving ~180 spare. That is not
