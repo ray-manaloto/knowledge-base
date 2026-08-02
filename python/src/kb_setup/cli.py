@@ -22,6 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args:
         print(
             "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
+            "serve | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | md-budget | goal-check <path|--text ...> | "
@@ -67,6 +68,13 @@ def main(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.query(repo_root, rest)
+    if cmd == "serve":
+        from kb_setup import mcp_serve
+
+        # With no KB_MCP_TOOLS/KB_MCP_RESOURCES set this `execvpe`s and never
+        # returns, so the default path keeps nothing of ours between the client
+        # and `graphify-mcp`.
+        return mcp_serve.serve(repo_root, rest)
     if cmd == "artifacts":
         from kb_setup import artifacts
 
