@@ -102,11 +102,27 @@ def _extract_code(repo_root: Path, name: str) -> bool:
 #: THIS repo's own code, indexed into the aggregate graph beside the pinned
 #: sources. Two trees rather than one, and the second is not an afterthought:
 #: `python/` holds the library dotfiles consumes as a pinned git dependency, while
-#: the root `tests/` holds the 40 files (14,090 LOC) that answer "which tests cover
-#: this symbol?" — the blast-radius question with the most day-to-day value, and
-#: the one `python/` alone cannot answer. Ray widened this to include `tests/`
-#: (2026-07-31); indexing only the library would have shipped a graph that answers
-#: "who calls this" while still being silent about what verifies it.
+#: the root `tests/` holds the 41 files Ray widened this to include (2026-07-31).
+#:
+#: ⚠️ THAT WIDENING DOES NOT YET DELIVER WHAT IT WAS FOR — knowledge-base#101.
+#: Its purpose was "which tests cover this symbol?", and that is unavailable FOR
+#: OUR CODE. It is a config gap of ours, NOT a tool gap — a first pass here said
+#: otherwise and an adversarial verifier refuted it. `affected` links tests fine:
+#: `affected "_state"` returns 9 test functions under `tests/`, and a
+#: `conftest.py` fixture reaches 17 test functions across two modules.
+#:
+#: The cause is that these are TWO extraction runs and `merge-graphs`
+#: re-namespaces ids per merge, so the two halves land in disjoint namespaces
+#: (`knowledge-base::python::…` vs `tests::…`) and no edge can span them. A/B on
+#: byte-identical syntax: `sync.restamp_artifacts(...)` at `graph.py:252` gets an
+#: edge; the same call at `test_currency_staleness.py:378` does not. Edge census:
+#: 3,368 tests-touching, **0** crossing, against a control of 2,194 within
+#: `python/`. `cognee` — one pinned source, ONE extraction run — has 10,099
+#: test<->src edges in the same graph file. One variable differs.
+#:
+#: What it does deliver is real and worth keeping: 1,935 nodes covering what
+#: tests exist and what is in them. Do not claim the coverage question until
+#: #101's depth test passes.
 _SELF_TREES = ("python", "tests")
 
 #: The aggregate as it stands BEFORE our own code is merged in — everything the

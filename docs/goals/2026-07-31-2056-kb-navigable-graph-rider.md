@@ -115,10 +115,25 @@ they have no failing test to write first; that is stated rather than faked.
    `brain/graphify-out/` block.
 
    **`tests/` is in scope by Ray's decision (2026-07-31, clear-prep), widening
-   what this rider originally said.** The reason is that "which tests cover this
-   symbol?" is the blast-radius question with the most day-to-day value, and it
-   is unanswerable from `python/` alone: 40 files and 14,090 LOC of tests sit
-   outside that tree. Verify by node count that `.venv/` and `.ruff_cache/` were
+   what this rider originally said.** The reason was that "which tests cover this
+   symbol?" is the blast-radius question with the most day-to-day value.
+
+   ⚠️ **OUTCOME (2026-08-01): the widening did NOT deliver that question, and
+   the first diagnosis of why was WRONG** — knowledge-base#101. It is a config
+   gap of ours, not a tool gap; an adversarial verifier refuted the tool-gap
+   framing before it could be written up as a finding.
+
+   `affected` links tests perfectly well: `affected "_state"` returns 9 test
+   functions under `tests/`. The cause is that `_SELF_TREES` runs `extract`
+   TWICE and `merge-graphs` re-namespaces ids per merge, leaving disjoint
+   namespaces that no edge can span — 3,368 tests-touching edges, **0** crossing,
+   control 2,194 within `python/`. `cognee`, extracted in ONE run, has 10,099
+   test↔src edges in the same graph. One variable differs.
+
+   The tree IS indexed (1,935 nodes) and the gap is recorded rather than fixed
+   in-round, by Ray's call. **Still unproven:** that a single combined extraction
+   fixes it here — cognee is the indirect arm, and the direct arm is a
+   `kb_setup.graph` change plus a `kb-build`. Verify by node count that `.venv/` and `.ruff_cache/` were
    NOT walked — graphify honours VCS ignore files by default, but that is an
    assumption until a count is pasted.
 3. `kb-watch` mise task wrapping `graphify watch`, which **restamps** after each
