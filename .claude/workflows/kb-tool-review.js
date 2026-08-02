@@ -225,7 +225,18 @@ const reports = await agent(
     `SYNTHESIS:\n${synthesis}\n\nPER-TOOL:\n${JSON.stringify(
       done.map((d) => ({ tool: d.tool.key, surviving: d.surviving, review: d.review })),
     )}`,
-  { label: 'persist', phase: 'Synthesize' },
+  {
+    label: 'persist',
+    phase: 'Synthesize',
+    // SCHEMA, not bare text. Without it `agent()` returns the subagent's final
+    // MESSAGE as a string, so `reports` would be raw prose — and any caller
+    // trusting the `reports:[...]` in this file's header comment and calling
+    // `.map`/`.forEach` on it gets a TypeError, while a caller that just pastes
+    // it gets "Here are the paths: …" instead of a path list. Found by the cold
+    // lane on d713eb1: the contract was documented as an array and returned as
+    // text, one commit after this file was fixed for a different contract lie.
+    schema: { type: 'array', items: { type: 'string' } },
+  },
 )
 
 // `unverified` is the claims that never reached the verifier: only NEGATIVE

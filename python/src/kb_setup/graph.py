@@ -121,12 +121,18 @@ def _extract_code(repo_root: Path, name: str) -> bool:
 #: `python/`. `cognee` — one pinned source, ONE extraction run — has 10,099
 #: test<->src edges in the same graph file. One variable differs.
 #:
-#: What it does deliver is real and worth keeping: 1,935 nodes covering what
-#: tests exist and what is in them. Do not claim the coverage question until
-#: #101's depth test passes.
-_SELF_TREES = ("python", "tests")
+#: RESOLVED 2026-08-02 by the constants below. Kept as history because it is the
+#: only place the pre-fix measurement survives, and because the refuted reading
+#: ("a graphify limitation") is the one a future reader will reach for again.
+#:
+#: The `_SELF_TREES = ("python", "tests")` tuple this paragraph used to annotate
+#: is GONE, not merely unused. Once one root covers both trees it had no reader —
+#: a constant nothing consults is a claim about the code that the code does not
+#: make, and leaving it would have let a later edit "restore" the loop by
+#: consulting it again. The two trees are still exactly what gets indexed; the
+#: root below is simply what contains them.
 
-#: THE FIX for the paragraph above: ONE extraction root covering both trees.
+#: ONE extraction root covering both trees, which is THE FIX for the above.
 #: `merge-graphs` re-namespaces ids on every merge, so two runs can only ever
 #: produce two namespaces; the crossing edge has to exist *within a single
 #: extraction* or it cannot exist at all. graphify's `extract` takes exactly one
@@ -252,10 +258,16 @@ def refresh_self(repo_root: Path) -> int:
     is satisfied because the loop we would have written has no tool feature behind
     it.
 
-    Order matters. Each tree is re-extracted into its own sub-graph FIRST and
-    merged after, because merging a sub-graph we have not refreshed would restamp
-    a graph that gained nothing — a green stamp over stale content, which is the
+    Order matters. Our code is re-extracted into its sub-graph FIRST and merged
+    after, because merging a sub-graph we have not refreshed would restamp a
+    graph that gained nothing — a green stamp over stale content, which is the
     one failure this whole currency mechanism exists to prevent.
+
+    This said "Each tree is re-extracted into its own sub-graph" until 2026-08-02
+    and described a per-tree loop the same commit had already replaced with one
+    root (#101). Caught by the cold lane, three lines above a passage in this very
+    function warning that "a comment asserting otherwise is how it survived
+    review" — about a different stale comment, in the same docstring.
     """
     out = repo_root / "graphify-out" / "graph.json"
     base = out.parent / BASE_GRAPH_NAME
