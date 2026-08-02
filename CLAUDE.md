@@ -45,8 +45,9 @@ graphify's surface splits by transport AND by liveness:
 - CLI: `mise run kb-query -- "how does X work?"` (deterministic, no LLM,
   source-cited). Asking about the DOCUMENTS? **`--prose`** reads the prose-only
   graph (2,105 nodes, not 128,445 of which 126k are code AST crowding prose out
-  of the budget); **`--idf`** also ranks it by BM25/IDF rather than graphify's
-  unscored BFS — the best arm, natural recall 1/8 -> 3/8 -> 5/8 (#12 P0/P1).
+  of the budget); **`--idf`** also ranks the RETURNED SET by BM25/IDF — the best
+  arm, natural recall 1/8 -> 3/8 -> 5/8 (#12 P0/P1). NOT "graphify's unscored
+  BFS" — it ranks SEEDS by IDF; corrected 2026-08-01, evidence in `mise.toml`.
 - MCP: `mise run kb-serve` starts the read-only server pinned to this graph.
   A consumer repo reaches it via `mcp2cli` (one-off) or a `.mcp.json`
   registration (frequent use). All MCP tools are graph reads and spend **zero
@@ -165,7 +166,7 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `sources/*.manifest` | github-repo pins (url+SHA); the clone `sources/<name>/` is gitignored, re-fetched on build. |
 | `sources/media/` | Vendored non-refetchable sources (video transcripts, docs, PDFs) — committed. |
 | `sources/extractions/*.json` | Committed host-agent doc/media extraction chunks (not free to regenerate). |
-| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (at aggregate scale 119MB+ exceeds git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (by every task that writes `graph.json` — `kb-build`/`kb-merge`/`kb-label` — or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
+| `graphify-out/` | `graph.json` is DERIVED — **gitignored**, rebuilt via `kb-build` (**382 MB measured 2026-08-01**, a ~3x-stale "119MB" until then; far past git/GitHub limits; consumers query via `kb-serve` MCP or a pushed graph DB, not a git blob). `graph-prose.json` is derived from THAT (by every task that writes `graph.json` — `kb-build`/`kb-merge`/`kb-label` — or `kb-prose` alone): the same graph minus every `_origin=ast` node, which is what `kb-query --prose` reads. Committed: **only `memory/`** (authored work-memory). `manifest.json`, `.graphify_labels.json`, and all views (wiki/graphml/svg/obsidian/report) are derived — regenerable via `kb-build`/`kb-artifacts`. |
 | `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
 | `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
 | `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |

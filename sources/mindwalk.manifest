@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+url = https://github.com/cosmtrek/mindwalk
+ref = master
+commit = e208b6b8504138843f671e031f28129b66003a67
+kind = code
+scope = study

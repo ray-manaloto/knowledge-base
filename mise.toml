@@ -245,6 +245,15 @@ description = "Advance a source to latest upstream + incrementally re-extract: m
 # AST, free). Changed DOCS still need a host-agent pass in a Claude session.
 run = "uv run kb-setup update"
 
+[tasks.kb-watch]
+description = "Re-extract THIS repo's own code (python/ + tests/) into the aggregate graph + restamp"
+# NOT a watcher, despite the name it inherits from `graphify watch`. That
+# subcommand rebuilds only <path>/graphify-out/graph.json and exposes no
+# post-rebuild hook, so it cannot refresh the aggregate graph `affected` reads.
+# One-shot and incremental (`graphify update`, AST-only, free). Logic in
+# kb_setup.graph.refresh_self.
+run = "uv run kb-setup watch"
+
 [tasks.kb-prose]
 description = "Derive graphify-out/graph-prose.json (the graph minus the code-AST mass)"
 # A pure function of graph.json, so `kb-build` already writes it; this task is
@@ -270,7 +279,12 @@ description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N]
 # --idf IS THE BEST ARM as of #12 P1 (2026-07-26). It reads the same prose graph
 # --prose does, but ranks it with our own BM25/IDF scorer (kb_setup.lexical) over
 # each node's label + rationale, instead of graphify's printed order — which is
-# seed-then-BFS and applies NO relevance score at all. Measured over the golden
+# seed-then-BFS and applies no relevance score TO THE RETURNED SET. It is not
+# unscored: `serve.py:275 _compute_idf` is called from `_score_query` at `:468`,
+# so graphify ranks the SEEDS by IDF (plus a trigram prefilter and tiered label
+# matching) and then walks outward unranked. This comment said "NO relevance
+# score at all" until 2026-08-01, which a peer-tool review refuted against the
+# installed source. The measured gain below is unaffected. Measured over the golden
 # set: natural phrasings 3 of 8 pairs prose-scoped -> 5 of 8 with the scorer
 # (mean 0.38 -> 0.62), echo unchanged at 8 of 8, both negatives still clean. It
 # never shells out to graphify, so graphify's own flags (--budget, --depth) are

@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args:
         print(
-            "kb-setup: build | update <name> | prose | query <question> [--prose] | "
+            "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | md-budget | goal-check <path|--text ...> | "
@@ -50,6 +50,14 @@ def main(argv: list[str] | None = None) -> int:
         if not rest:  # update ALL sources
             return graph.update_all(repo_root)
         return graph.update(repo_root, rest[0])
+    if cmd == "watch":
+        from kb_setup import graph
+
+        # Named `watch` for the task it replaces, and it is NOT a watcher — see
+        # `graph.refresh_self`. One-shot by design: `graphify watch` refreshes
+        # only a scoped sub-graph and offers no post-rebuild hook, so it cannot
+        # keep the aggregate (the graph `affected` actually reads) current.
+        return graph.refresh_self(repo_root)
     if cmd == "prose":
         from kb_setup import prose
 

@@ -21,6 +21,18 @@ class Manifest:
     ref: str  # branch/tag to clone
     commit: str  # pinned SHA
     kind: str = "code"
+    #: Which graph this source lands in. `corpus` (default) merges into the
+    #: aggregate `graphify-out/graph.json`; `study` merges into
+    #: `graphify-out/study-graph.json` instead.
+    #:
+    #: A SECOND axis from `kind`, deliberately. `kind` says what the content IS
+    #: (code -> AST pass, docs -> no AST); `scope` says what it is FOR. A peer
+    #: tool being reverse-engineered is ordinary code — it needs the same AST
+    #: pass — but it is an object of study, not corpus, and collapsing the two
+    #: would force a choice between "don't extract it" and "put it in the
+    #: corpus". Both are wrong. Introduced when three pinned peer tools took
+    #: graph.json 7.6 MiB past the 512 MiB cap.
+    scope: str = "corpus"
 
     @property
     def clone_dir(self) -> Path:
@@ -52,6 +64,7 @@ def load(path: Path) -> Manifest:
         ref=f["ref"],
         commit=f["commit"],
         kind=f.get("kind", "code"),
+        scope=f.get("scope", "corpus"),
     )
 
 

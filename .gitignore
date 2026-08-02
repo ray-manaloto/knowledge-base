@@ -12,7 +12,10 @@ __pycache__/
 # graphify-out: graph.json is DERIVED — regenerable from committed inputs
 # (sources/*.manifest + sources/extractions/) via `mise run kb-build` (free, no
 # LLM). Per CLAUDE.md invariant 3 and graphify's design, it is GITIGNORED: at
-# aggregate scale it exceeds git/GitHub limits (119MB > 100MB), and consumers
+# aggregate scale it exceeds git/GitHub limits (382 MB / 364.7 MiB measured
+# 2026-08-01 — the long-standing "119MB" here was ~3x stale, and two peer-tool
+# reports disagreed 382 vs 119 because each inherited a different vintage of it),
+# and consumers
 # query via the MCP server (`mise run kb-serve`) or a pushed graph DB
 # (neo4j/falkordb), never a git blob. manifest.json (change-detection) and
 # .graphify_labels.json (labels keyed to NON-deterministic Louvain community ids
@@ -25,6 +28,23 @@ graphify-out/graph.json
 # unscoped one looked like on the day of the commit.
 graphify-out/graph-prose.json
 graphify-out/manifest.json
+# The aggregate WITHOUT our own code — `kb-build` writes it, `kb-watch` restarts
+# from it so repeated refreshes are idempotent. Derived and roughly graph.json-
+# sized (~345MB), so it is ignored for both of the reasons graph.json is. NOT
+# covered by the `.graphify_*` rule below: that glob is graphify's own state,
+# whereas this file is ours.
+graphify-out/.base-graph.json
+# `scope = study` sources — repos we ANALYSE rather than learn from. Derived
+# (87 MiB, rebuilt by `kb-build` from the same pinned manifests as everything
+# else) and kept out of the aggregate because merging it in took graph.json past
+# graphify's 512 MiB cap.
+graphify-out/study-graph.json
+# The base guard (sha256 of the graph.json the snapshot composes with) and
+# kb-watch's staging file. Both are per-clone machine state like the snapshot
+# itself; the staging file only exists mid-refresh and its presence afterwards
+# means a refresh died before the atomic swap.
+graphify-out/.base-graph.sha256
+graphify-out/graph.json.refresh
 graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/
@@ -85,6 +105,16 @@ sources/raw/
 # graphify `add`'s default fetch dir (./raw) — same policy: transient (fetched
 # webpages + downloaded audio like yt_*.m4a); the extraction chunk is the artifact
 /raw/
+
+# THIS repo's own code, extracted into scoped sub-graphs by `kb_setup.graph`'s
+# `_extract_self` and then merged into the aggregate. Ignored WHOLESALE, unlike the
+# root and brain/ blocks above, and the difference is the point: those two trees
+# each contain an authored `memory/` that must survive, so they can only ignore
+# named derived artifacts. Nothing under these two is authored — every byte is
+# regenerable by `mise run kb-build` — so a directory-level rule is both correct
+# and immune to graphify adding a new output filename we would forget to list.
+python/graphify-out/
+tests/graphify-out/
 
 # second-brain vault (brain/): the .md notes are the source of truth; the graph is
 # DERIVED (regenerable via `graphify update`). Mirror the root graphify-out rules —
