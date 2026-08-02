@@ -226,25 +226,8 @@ def refresh_self(repo_root: Path) -> int:
     # base over their output would discard it in silence — then restamp the
     # result as verified. Refusing costs a rebuild; not refusing costs the merge
     # AND the ability to notice it went missing.
-    expected = _read_base_guard(repo_root)
-    actual = _digest(out) if out.is_file() else ""
-    if expected and actual and expected != actual:
-        raise SystemExit(
-            f"graphify-out/graph.json has changed since {BASE_GRAPH_NAME} was written "
-            f"(expected sha256 {expected[:12]}, found {actual[:12]}).\n"
-            f"  `kb-merge` and `kb-label` both write graph.json and neither refreshes "
-            f"the snapshot, so restarting from it would silently discard their work.\n"
-            f"  Run `mise run kb-build` to rebuild the snapshot and the graph together."
-        )
+    _assert_base_guard(repo_root, "since the snapshot was written")
 
-    # RESTART from the base, never append to graph.json. Measured on the real
-    # binary: merging our sub-graph into an aggregate that already holds it does
-    # not dedupe, because `merge-graphs` re-namespaces node ids per merge, so the
-    # second copy carries a genuinely distinct id (0 duplicate ids, and 2,080
-    # nodes where 1,040 belong). `affected` then answers "No unique node match" —
-    # the precise symptom self-indexing exists to remove. And since `build()`
-    # merges our code in, EVERY refresh after a build is a second merge, so no
-    # ordering rule could have avoided this; only a self-free base can.
     # STAGED, then swapped in one `os.replace`. Writing straight into `out` meant
     # the copy above wiped every self node FIRST and the extract/merge loop then
     # rebuilt them on disk, so any failure part-way — a graphify crash, a Ctrl-C —
@@ -278,6 +261,15 @@ def refresh_self(repo_root: Path) -> int:
             ],
             repo_root,
         )
+
+    # RE-CHECK IMMEDIATELY BEFORE THE SWAP. The check at the top of this function
+    # is a time-of-check, and the swap below is the time-of-use — separated by a
+    # multi-minute extract+merge loop. A `kb-merge` landing inside that window was
+    # invisible to the first check, got clobbered by the swap, and then had the
+    # guard REARMED over it, certifying the corrupted graph as verified. Exactly
+    # the bug the guard was added to prevent, surviving inside the fix for it.
+    # (Cold lane round 2, 0f22927 — reproduced live against the shipped function.)
+    _assert_base_guard(repo_root, "during the refresh")
 
     # The swap. Atomic on POSIX, so graph.json is either wholly the old corpus or
     # wholly the new one — never a half-merged intermediate.
@@ -322,22 +314,67 @@ def _write_base_guard(repo_root: Path) -> None:
     digest = _digest(out)
     if not digest:
         return
-    (out.parent / BASE_GUARD_NAME).write_text(digest, encoding="utf-8")
-
-
-def _read_base_guard(repo_root: Path) -> str:
-    """The recorded digest, or "" when there is none.
-
-    An ABSENT guard reads as "" and lets the refresh proceed — deliberately. A
-    graph built before this guard existed has no recorded digest, and refusing
-    those would break every existing clone to catch a case that has not happened
-    there. The guard fires on DISAGREEMENT, which is the state that loses data;
-    absence is merely unknown, and `kb-build` writes one on the next run.
-    """
     try:
-        return (repo_root / "graphify-out" / BASE_GUARD_NAME).read_text(encoding="utf-8").strip()
-    except OSError:
-        return ""
+        (out.parent / BASE_GUARD_NAME).write_text(digest, encoding="utf-8")
+    except OSError as e:
+        # Loud, not silent: an unwritten guard makes the NEXT refresh proceed
+        # unchecked, so the operator must know the protection is off.
+        print(
+            f"[kb-watch] WARNING: could not write {BASE_GUARD_NAME}: {e} — "
+            f"the next refresh will not be able to detect a competing writer."
+        )
+
+
+def _read_base_guard(repo_root: Path) -> str | None:
+    """The recorded digest; None when the guard file does not exist.
+
+    ABSENT and UNREADABLE are different answers and must not collapse, which is
+    the distinction the first version got wrong: a bare `except OSError: return
+    ""` made a 0-byte guard (an interrupted write — realistic, this repo has a
+    whole rule about killing wedged processes) and a guard that is a directory
+    both read as "no guard", silently disabling a check whose own comment says
+    FAIL CLOSED. Reproduced by the cold lane: 0-byte guard -> silent revert,
+    exit 0, no error at all.
+
+    So: None means the file is not there — a graph built before this guard
+    existed, which proceeds, because refusing those would break every existing
+    clone to catch a case that cannot have happened there. Anything else that
+    goes wrong RAISES, and the caller refuses. Unknown is not permission.
+    """
+    path = repo_root / "graphify-out" / BASE_GUARD_NAME
+    if not path.exists():
+        return None
+    digest = path.read_text(encoding="utf-8").strip()
+    if not digest:
+        raise SystemExit(
+            f"graphify-out/{BASE_GUARD_NAME} exists but is EMPTY — most likely an "
+            f"interrupted write. Refusing rather than treating it as absent, because "
+            f"an unverifiable guard cannot certify that nothing else wrote graph.json.\n"
+            f"  Run `mise run kb-build` to rebuild the snapshot and the guard together."
+        )
+    return digest
+
+
+def _assert_base_guard(repo_root: Path, when: str) -> None:
+    """Refuse unless graph.json still matches the digest the snapshot composes with.
+
+    Called TWICE — once before the copy and once immediately before the atomic
+    swap. Both are needed: the pair brackets the extract+merge loop, which is
+    where a concurrent `kb-merge` would otherwise slip in unseen.
+    """
+    expected = _read_base_guard(repo_root)
+    if expected is None:
+        return
+    out = repo_root / "graphify-out" / "graph.json"
+    actual = _digest(out) if out.is_file() else ""
+    if actual and expected != actual:
+        raise SystemExit(
+            f"graphify-out/graph.json changed {when} "
+            f"(expected sha256 {expected[:12]}, found {actual[:12]}).\n"
+            f"  `kb-merge` and `kb-label` both write graph.json and neither refreshes "
+            f"the snapshot, so continuing would silently discard their work.\n"
+            f"  Run `mise run kb-build` to rebuild the snapshot and the graph together."
+        )
 
 
 def _restamp_self(repo_root: Path) -> None:

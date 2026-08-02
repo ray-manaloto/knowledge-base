@@ -136,7 +136,29 @@ const perTool = await pipeline(
           },
         })),
       ),
-    ).then((verdicts) => ({ tool: t, res, verdicts: verdicts.filter(Boolean) }))
+    ).then((verdicts) => {
+      // `??` above only covers agent() FULFILLING with null. A thunk that
+      // THROWS bypasses .then entirely and parallel() substitutes a bare null
+      // for the whole entry — which `filter(Boolean)` then drops silently, so
+      // the claim is neither refuted nor surviving, just gone. The "0 refuted"
+      // warning cannot see it either, since it only fires on a total zero.
+      // parallel() preserves order, so index i recovers the claim the null was
+      // standing in for. (Cold lane round 2 — the residual gap it carried over.)
+      const repaired = verdicts.map((v, i) =>
+        v ?? {
+          ...negatives[i],
+          verdict: {
+            refuted: true,
+            probe: 'none — the verification thunk threw',
+            control: 'none',
+            evidence: 'parallel() substituted null for this entry. Defaulting to refuted.',
+          },
+        },
+      )
+      const lost = verdicts.filter((v) => !v).length
+      if (lost) log(`WARNING: ${lost} verification(s) threw for ${t.key} — counted as refuted, not dropped`)
+      return { tool: t, res, verdicts: repaired }
+    })
   },
   // Cross-family review: the reviewer must NOT be the family that wrote the doc.
   // Every researcher above is Claude, so this is always codex here. If a future

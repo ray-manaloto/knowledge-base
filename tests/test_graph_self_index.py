@@ -315,8 +315,10 @@ def test_refresh_self_refuses_when_another_writer_touched_the_graph(monkeypatch,
     with pytest.raises(SystemExit) as exc:
         graph.refresh_self(root)
 
-    assert "has changed" in str(exc.value), (
-        f"refresh_self did not refuse a graph another writer had touched; it said {exc.value!r}"
+    assert "since the snapshot was written" in str(exc.value), (
+        f"refresh_self did not refuse a graph another writer had touched BEFORE the "
+        f"refresh started; it said {exc.value!r}. The phrase distinguishes this arm "
+        f"from the during-the-loop one, so the two cannot pass for each other."
     )
     assert "MERGED_DOC_CHUNK" in out.read_text(encoding="utf-8"), (
         "refresh_self destroyed the other writer's content before refusing — "
@@ -353,6 +355,69 @@ def test_refresh_self_leaves_the_graph_intact_when_a_merge_fails(monkeypatch, tm
         "a failed refresh damaged graph.json; the rebuild must be staged and "
         "swapped atomically so a crash leaves the previous graph untouched"
     )
+
+
+def test_refresh_self_catches_a_writer_that_lands_during_the_loop(monkeypatch, tmp_path):
+    """The guard must bracket the loop, not just precede it.
+
+    A single check at the top of `refresh_self` is a time-of-CHECK; the
+    destructive swap is the time-of-USE, and a multi-minute extract+merge loop
+    sits between them. A `kb-merge` landing inside that window was invisible to
+    the first check, was clobbered by the swap, and then had the guard REARMED
+    over it — certifying the corrupted graph as verified. The original bug,
+    surviving inside its own fix. (Cold lane round 2.)
+
+    The previous test only models a writer landing BEFORE the refresh starts, so
+    it passes against the one-check version and cannot catch this.
+    """
+    root = _stamped_repo(tmp_path)
+    out = root / "graphify-out" / "graph.json"
+    graph._write_base_guard(root)
+
+    def _write_midway(argv: list[str], _r: Path) -> None:
+        # Stand in for a concurrent `kb-merge` completing mid-loop.
+        if "extract" in [str(a) for a in argv]:
+            out.write_text('{"nodes": [], "CONCURRENT_MERGE": true}', encoding="utf-8")
+
+    monkeypatch.setattr(graph, "_run", _write_midway)
+    monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
+
+    with pytest.raises(SystemExit) as exc:
+        graph.refresh_self(root)
+
+    assert "during the refresh" in str(exc.value), (
+        f"the guard did not re-check before the swap; it said {exc.value!r}"
+    )
+    assert "CONCURRENT_MERGE" in out.read_text(encoding="utf-8"), (
+        "the concurrent writer's content was destroyed anyway — re-checking after "
+        "the swap would be too late to be a guard"
+    )
+
+
+def test_an_unreadable_guard_refuses_rather_than_reading_as_absent(tmp_path):
+    """ABSENT and UNREADABLE must not collapse into the same answer.
+
+    The first version caught OSError and returned "", so a 0-byte guard — a
+    realistic interrupted write, in a repo with a whole rule about killing wedged
+    processes — silently disabled a check whose own comment says FAIL CLOSED.
+    Exit 0, no error, data gone.
+
+    Absence still proceeds, and that asymmetry is the point: a graph built before
+    the guard existed genuinely has no digest, while a guard that exists and
+    cannot be read is a question nobody answered. Unknown is not permission.
+    """
+    root = _stamped_repo(tmp_path)
+    guard = root / "graphify-out" / graph.BASE_GUARD_NAME
+
+    # ABSENT -> proceeds (None, no raise). This arm is what stops the fix from
+    # being "refuse always", which would pass the assertion below for free.
+    assert graph._read_base_guard(root) is None, "a missing guard must read as None"
+
+    # EMPTY -> refuses.
+    guard.write_text("", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        graph._read_base_guard(root)
+    assert "EMPTY" in str(exc.value), f"an empty guard did not refuse; it said {exc.value!r}"
 
 
 def test_refresh_self_uses_one_extraction_path(monkeypatch, tmp_path):
