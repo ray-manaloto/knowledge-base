@@ -1,0 +1,70 @@
+# aihero.dev — page provenance for a SITE source (no git mirror exists).
+#
+# NOT a `*.manifest`: `kb_setup.manifest` requires url+ref+commit and clones with
+# git, and this upstream is a website. Named `.pages.toml` deliberately so
+# `sources/*.manifest` globbing cannot pick it up and fail the build.
+#
+# The BODIES ARE NOT COMMITTED. They live in gitignored `sources/aihero-skills/`
+# (matched by .gitignore `sources/*/`), the same posture as every pinned clone:
+# on disk for offline use, never republished. aihero.dev is a commercial site and
+# its editorial prose is all-rights-reserved; robots.txt permits CRAWLING
+# (`Allow: /`, GPTBot explicit) which is not permission to redistribute.
+#
+# These 8 are the pages with NO counterpart in the MIT `mattpocock/skills` repo.
+# The other 21 fetched on 2026-08-02 were dropped as REDUNDANT: measured 100%
+# token-set overlap with `docs/engineering|productivity/<name>.md` (388/388,
+# 304/304, 230/230, 313/313, 174/174), aihero adding only site chrome.
+#
+# Re-fetch: `mise run kb-fetch -- <url> --stem <stem>` then verify content_sha256.
+# Making this first-class needs a `kind = site` source type — see the tracker.
+
+sitemap = "https://www.aihero.dev/sitemap.xml"
+fetched_at = "2026-08-02"
+
+[[page]]
+stem = "aihero-5-agent-skills-i-use-every-day"
+url = "https://www.aihero.dev/5-agent-skills-i-use-every-day.md"
+content_sha256 = "19cb0d155711f123378ecbe5ca2cc33a3b8704ac8399eed68e5c016cc211042b"
+content_chars = 9597
+
+[[page]]
+stem = "aihero-burn-through-your-backlog-with-my-triage-skill"
+url = "https://www.aihero.dev/burn-through-your-backlog-with-my-triage-skill.md"
+content_sha256 = "c4d0f43fd950a074da9b6c5bfa6366f87609fa6f76a7b128536efb20a7619124"
+content_chars = 4709
+
+[[page]]
+stem = "aihero-learn-anything-with-my-teach-skill"
+url = "https://www.aihero.dev/learn-anything-with-my-teach-skill.md"
+content_sha256 = "55c64bc00a5b2704d8b2996c2fb268e9ab31bacde61fce090748e3c6df8b11a3"
+content_chars = 4458
+
+[[page]]
+stem = "aihero-my-grill-me-skill-has-gone-viral"
+url = "https://www.aihero.dev/my-grill-me-skill-has-gone-viral.md"
+content_sha256 = "c30f916e16afd14c70f12ae51f45d8faec6859f5aeb3325662ac78103365e8a5"
+content_chars = 3370
+
+[[page]]
+stem = "aihero-skill-test-driven-development-claude-code"
+url = "https://www.aihero.dev/skill-test-driven-development-claude-code.md"
+content_sha256 = "939f8c13e61fc9dda1da4fc4591a201ffe503d48eae3cbd430124e95df7c0786"
+content_chars = 7454
+
+[[page]]
+stem = "aihero-skills-catalog"
+url = "https://www.aihero.dev/skills-catalog.md"
+content_sha256 = "3ba064530581b5814899996bc2be5debb259edc741d96f2b7d63cc2a4e21839f"
+content_chars = 1789
+
+[[page]]
+stem = "aihero-skills-changelog-ubiquitous-language-grill-with-docs"
+url = "https://www.aihero.dev/skills-changelog-ubiquitous-language-grill-with-docs.md"
+content_sha256 = "dff4f6aa67744c44986049e875369fae8501389676d4e005dafc85db057890b4"
+content_chars = 8585
+
+[[page]]
+stem = "aihero-skills"
+url = "https://www.aihero.dev/skills.md"
+content_sha256 = "2149b2fef8feb72cfadacdfe7e4cb74e798ca99799287afdfd456f4faf36f4fe"
+content_chars = 4211

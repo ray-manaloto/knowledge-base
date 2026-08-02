@@ -133,8 +133,13 @@ in `sources/REGISTRY.md`.
      `mise run kb-transcribe -- raw/<yt>.m4a`.
    - Prose extraction = **Claude host-agent via the saved `kb-extract` workflow**
      (`.claude/workflows/kb-extract.js`) — invoke it with the Workflow tool, passing
-     `args = {scratchDir, sources:[{key,path,url,kind,note}]}` (`kind` ∈
-     `article|doc|designdoc|research_json|inventory|article_partial`). Each `agent()`
+     `args = {scratchDir, capturedAt, sources:[{key,path,url,kind,note}]}` (`kind` ∈
+     `article|doc|designdoc|research_json|inventory|article_partial`).
+     **`capturedAt` is REQUIRED — pass TODAY's date as `YYYY-MM-DD`.** It has no
+     default and the workflow throws without one: it was a hardcoded literal until
+     #93, so every node every run emitted carried one frozen date, and a default
+     cannot be computed inside a Workflow script (`Date.now()`/`new Date()` throw).
+     Each `agent()`
      reads one file, extracts a schema-valid `{nodes,edges}`, and WRITES it to
      `<scratchDir>/<key>.json`. Do NOT hand-roll an inline Workflow — the saved one is
      the reusable, resumable contract (an agent dying at source 13 of 20 leaves 13,

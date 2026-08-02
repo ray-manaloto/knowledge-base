@@ -12,6 +12,7 @@
 //     name: 'kb-extract',                     // or scriptPath to this file cross-repo
 //     args: {
 //       scratchDir: '/abs/scratch/extractions',
+//       capturedAt: '2026-08-02',             // REQUIRED — see below
 //       sources: [
 //         { key: 'addyosmani', path: '/abs/raw/addyosmani.md',
 //           url: 'https://addyosmani.com/blog/agent-harness-engineering/',
@@ -21,6 +22,13 @@
 //     },
 //   })
 // Returns { total, succeeded, results:[{key,wrote,node_count,edge_count,notes}] }.
+//
+// `capturedAt` is REQUIRED and has no default, deliberately (#93). It was the
+// literal "2026-07-23" in both prompts, so every node any run emitted carried
+// that date regardless of when it ran. A default cannot be computed here —
+// `Date.now()` / `new Date()` THROW inside a Workflow script (they would break
+// resume) — so the only honest options are "passed in" or "silently wrong", and
+// this throws rather than stamping a lie onto every node.
 
 export const meta = {
   name: 'kb-extract',
@@ -45,11 +53,35 @@ if (typeof cfg === 'string') {
 }
 const scratchDir = cfg.scratchDir
 const sources = cfg.sources
+const capturedAt = cfg.capturedAt
 if (!scratchDir || !Array.isArray(sources) || sources.length === 0) {
   throw new Error(
-    `kb-extract: args must be {scratchDir, sources:[{key,path,url,kind?,note?}]} ` +
+    `kb-extract: args must be {scratchDir, capturedAt, sources:[{key,path,url,kind?,note?}]} ` +
       `(got typeof=${typeof cfg}, scratchDir=${JSON.stringify(scratchDir)}, ` +
       `sources=${Array.isArray(sources) ? `array(${sources.length})` : typeof sources})`,
+  )
+}
+// Fail CLOSED on a missing/malformed date. The defect this replaces was a
+// hardcoded literal that stamped every node with one date forever; falling back
+// to any default here would reproduce it with extra steps.
+// Shape THEN calendar. A digit-shape regex alone accepts 2026-13-40 and 0000-00-00,
+// which would then be stamped onto every node of the whole fan-out — the same
+// silently-wrong-date failure this check exists to prevent, just harder to spot
+// than the frozen literal it replaced. `new Date()` is unavailable here, so the
+// range check is explicit arithmetic including the leap-year rule.
+const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(capturedAt ?? '')
+let calendarOk = false
+if (typeof capturedAt === 'string' && m) {
+  const y = +m[1], mo = +m[2], d = +m[3]
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+  const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  calendarOk = y >= 1970 && mo >= 1 && mo <= 12 && d >= 1 && d <= dim[mo - 1]
+}
+if (!calendarOk) {
+  throw new Error(
+    `kb-extract: args.capturedAt is REQUIRED and must be a REAL ISO date "YYYY-MM-DD" ` +
+      `(got ${JSON.stringify(capturedAt)}). It cannot be defaulted — Date.now()/new Date() ` +
+      `throw inside a Workflow script — so the invoking session must pass today's date.`,
   )
 }
 
@@ -85,7 +117,7 @@ NODE object (exact keys):
   file_type   : "concept"
   source_file : "${file}"
   source_url  : "${s.url}"
-  captured_at : "2026-07-23"
+  captured_at : "${capturedAt}"
   author      : the author name if the doc states one, else null
   contributor : null
   rationale   : 1-3 sentences of SUBSTANCE — the actual claim/definition/decision, self-contained and faithful to the source.
@@ -97,6 +129,21 @@ EDGE object (exact keys):
   confidence_score : 1 for EXTRACTED, 0.5 for INFERRED.
   source_file      : "${file}"
   weight           : 1
+
+EDGE DIRECTION — read every edge aloud as the sentence "<source> <relation> <target>".
+If that sentence is FALSE, you have the edge backwards. Emit it in the direction
+that makes the sentence true. The rules that decide it:
+  part_of                  : MEMBER -> CONTAINER. "retry_policy part_of http_client",
+                             NEVER "http_client part_of retry_policy". This is the one
+                             most often inverted — a previous run emitted all 22 of its
+                             part_of edges backwards — so check each one individually.
+  requires / depends_on    : DEPENDENT -> DEPENDENCY. "cache requires redis".
+  enables / defines /
+  mitigates / verifies /
+  routes_to                : the ACTOR -> the thing it acts on. "gate verifies receipt".
+  contrasts_with           : symmetric in meaning — emit exactly ONE edge, not both.
+Do NOT flip a whole relation type at the end as a batch. Direction is decided per
+edge from the source text; a blanket flip breaks the ones that were already right.
 
 Rules: only connect nodes that exist in THIS chunk; prefer faithful EXTRACTED edges; mark reasoned links INFERRED honestly; never invent facts not in the source.
 
@@ -112,9 +159,11 @@ function inventoryPrompt(s) {
 It is a curated inventory (one entry per item, e.g. marketplace plugins).${s.note ? `\nContext: ${s.note}` : ''}
 
 Produce a graphify chunk { "nodes":[...], "edges":[...], "hyperedges":[], "input_tokens":0, "output_tokens":0 }.
-- One NODE per item: id "${s.key}_" + item-slug (snake_case, globally unique); label = item name; file_type "concept"; source_file "${file}"; source_url "${s.url}"; captured_at "2026-07-23"; author null; contributor null; rationale = the item's one-line purpose/category.
+- One NODE per item: id "${s.key}_" + item-slug (snake_case, globally unique); label = item name; file_type "concept"; source_file "${file}"; source_url "${s.url}"; captured_at "${capturedAt}"; author null; contributor null; rationale = the item's one-line purpose/category.
 - ALSO create category NODES (id "${s.key}_cat_<slug>") for the main categories present.
 - EDGES: each item -> its category node, relation "part_of", confidence "EXTRACTED", confidence_score 1, source_file "${file}", weight 1.
+  DIRECTION: source = the ITEM, target = the CATEGORY (member -> container). Read it
+  aloud — "<item> part_of <category>" must be a true sentence; the reverse is not.
 Capture as many items as the file lists; do not invent entries.
 
 WRITE the chunk (Write tool) to ${scratchDir}/${s.key}.json.
