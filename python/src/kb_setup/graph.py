@@ -265,9 +265,9 @@ def refresh_self(repo_root: Path) -> int:
 
     This said "Each tree is re-extracted into its own sub-graph" until 2026-08-02
     and described a per-tree loop the same commit had already replaced with one
-    root (#101). Caught by the cold lane, three lines above a passage in this very
-    function warning that "a comment asserting otherwise is how it survived
-    review" — about a different stale comment, in the same docstring.
+    root (#101). Caught by the cold lane — see the "ONE extraction run, over ONE
+    root" block in this function's body, which warns about the same class of
+    drift and lost a round to it too.
     """
     out = repo_root / "graphify-out" / "graph.json"
     base = out.parent / BASE_GRAPH_NAME

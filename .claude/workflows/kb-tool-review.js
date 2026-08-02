@@ -213,9 +213,9 @@ if (refuted === 0) log('WARNING: 0 claims refuted across all tools — the verif
 // synthesis — the single most expensive thing the run produces — exists only in
 // the returned object, which dies with the session (measured 2026-08-02: 31
 // agents, 4.59M tokens, zero files in reportDir).
-const reports = await agent(
-  `Write these artifacts to disk, VERBATIM, then return their paths as a JSON ` +
-    `array of strings. Do not summarise, trim, or reformat any of it.\n\n` +
+const persisted = await agent(
+  `Write these artifacts to disk, VERBATIM, then return their paths as ` +
+    `{"reports": ["<path>", …]}. Do not summarise, trim, or reformat any of it.\n\n` +
     `1. ${reportDir}/peer-tool-synthesis-${done.map((d) => d.tool.key).join('-')}.md ` +
     `— the synthesis below, under a provenance header naming the tool keys, their ` +
     `pinned commits, and the counts (${verified} verified, ${refuted} refuted).\n` +
@@ -235,7 +235,18 @@ const reports = await agent(
     // it gets "Here are the paths: …" instead of a path list. Found by the cold
     // lane on d713eb1: the contract was documented as an array and returned as
     // text, one commit after this file was fixed for a different contract lie.
-    schema: { type: 'array', items: { type: 'string' } },
+    //
+    // OBJECT-wrapped, not a bare `type: 'array'`. Round 2 flagged that a bare
+    // array would be the only top-level non-object schema here — CLAIMS_SCHEMA
+    // and VERDICT_SCHEMA are both objects — and it could not confirm the
+    // structured-output path accepts one without running the workflow live. An
+    // unconfirmed shape in the fix for a contract defect is not worth the round
+    // trip, so this matches the two schemas already known to work.
+    schema: {
+      type: 'object',
+      required: ['reports'],
+      properties: { reports: { type: 'array', items: { type: 'string' } } },
+    },
   },
 )
 
@@ -250,5 +261,11 @@ const reports = await agent(
 // shape of under-reporting this field was added to end.
 const claimed = done.reduce((n, d) => n + (d.res?.claims?.length ?? d.verdicts.length), 0)
 const unverified = Math.max(0, claimed - verified - refuted)
+
+// Unwrapped so the RETURN still matches the header's `reports:[...]`. The object
+// wrapper is a structured-output detail, not part of this workflow's contract —
+// leaking it would fix a contract lie by telling a different one.
+const reports = persisted?.reports ?? []
+if (!reports.length) log('WARNING: persist returned no report paths — nothing may have been written')
 
 return { tools: done.length, verified, refuted, unverified, synthesis, reports }
