@@ -69,8 +69,55 @@ Plain dicts + NetworkX, no side effects outside `graphify-out/`.
 | graph DB | `export neo4j`/`falkordb` | `cypher.txt`, or `--push <uri>` to a live DB |
 | agent wiki | `export wiki` | `wiki/` index + article per community + god-node |
 | Obsidian | `export obsidian` | one `.md` per node ([[wikilinks]]) |
-| **MCP server** | `graphify-mcp <abs graph.json>` | stdio/http; **10 read-only tools**, zero LLM tokens; `project_path` routes per-project; NO add/mutate tool |
+| **MCP server** | `mise run kb-serve` | stdio/http; **10 read-only tools + 6 resources**, zero LLM tokens; `project_path` routes per-project; NO add/mutate tool. Narrow it with `KB_MCP_TOOLS` — see below |
 | analysis | `god-nodes` / `benchmark` / `diagnose multigraph` | stdout |
+
+## Serving over MCP — `mise run kb-serve`
+
+**`raw = true` on the task is REQUIRED, not tuning.** Without it `mise run` reads a
+task's stdio by line instead of connecting it, so the stdio server hits EOF on its
+first read and exits — rc=0, empty stderr. Measured 2026-08-02 (#105): the task
+served NOTHING while `graphify-mcp` on the same absolute path answered in 9.8s.
+A clean exit is why no check caught it; `tests/test_mcp_serve.py` now speaks real
+JSON-RPC against the task, which is the only arm that can.
+
+Expect the first reply to take **~10s** on the aggregate graph — that is the 393 MB
+load, not a hang (the 3.4 MB prose graph answers in 0.6s).
+
+### Narrowing the advertised surface
+
+graphify has no `--tools` flag in **0.9.31 or 0.9.32**, and Claude Code has no
+client-side per-tool filter — only server-level toggles. So the allowlist lives
+here, in `kb_setup.mcp_serve`, and it is **opt-in**:
+
+```bash
+KB_MCP_TOOLS=query_graph,shortest_path KB_MCP_RESOURCES=graphify://stats \
+  mise run kb-serve
+```
+
+- The two variables are **independent** — set either alone to narrow only that
+  surface. They are shown together above because the measured figure below is
+  the combined one, and an env assignment scopes to the single command it
+  prefixes: two separate invocations would each narrow one surface and neither
+  would reproduce it.
+- **Unset = no filtering AND no relay** — the child inherits stdio directly.
+- **Blank or all-separators also means unset**, deliberately: it fails OPEN,
+  because a server advertising zero tools looks exactly like a broken one.
+- Measured: unset → 10 tools / 5,828 B / 6 resources; the invocation above →
+  2 tools / 1,516 B / 1 resource.
+
+**Whether this is worth setting depends on the consumer, and the condition
+matters.** Under Claude Code's default *tool search*, MCP tools are deferred and
+only NAMES load (118 B ≈ 30 tokens), so trimming buys almost nothing. It buys the
+full 5,828 B back only where schemas load upfront — `ENABLE_TOOL_SEARCH=false`, a
+custom `ANTHROPIC_BASE_URL`, Bedrock, Google Cloud's Agent Platform, Microsoft
+Foundry. The other reason is independent of tokens: a tool's mere presence steers
+a model into picking it.
+
+An allowlist plus `--transport http` is **REFUSED (rc=2)** rather than served: the
+relay only rewrites JSON-RPC on the child's pipes, so it could not enforce the
+allowlist over a listener socket, and serving unfiltered under a "narrowed to N"
+banner is worse than not filtering.
 
 ## The Python-3.14 scientific-stack gap (bit us twice)
 
