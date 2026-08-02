@@ -161,6 +161,15 @@ actually want IS in the graph by the other path: the committed prose extraction
 `sources/extractions/marketplace-inventory-docs.json`. graphify points at its own
 #1666 and asks for reports if it persists.
 
+RE-PROBED 2026-08-02 on 0.9.31, by the recorded method (count the warnings on
+the next build): **24**, up from 18. Control arm on the same log: 29
+`merge-graphs` lines, so the grep finds real matches. The rise is explained by
+the build itself and not by a regression — this build added two sources
+(`codegraph`, `GitNexus`), and GitNexus is a TypeScript repo carrying its own
+data-only `.json` (tsconfig/package/lockfile shapes). The count is a function of
+how many data-only `.json` files are cloned, so it is NOT a fixed baseline to
+alarm on; compare it only against a build with the same source set.
+
 UNKNOWN, and left explicitly unknown: whether 0.9.30 made this newly VISIBLE
 rather than newly happening. The message says "empties are no longer cached",
 which suggests they now retry and re-warn where they previously warned once and

@@ -39,9 +39,32 @@ import pytest
 from kb_setup.graphify_env import clean_env, graphify_exe
 
 #: A symbol defined under `python/src/kb_setup/` that tests really do reference.
-#: Verified out-of-band with `grep -rl build_index tests/` -> 1 file, against an
-#: invented symbol -> 0, so the premise of this test is not itself assumed.
-_OUR_SYMBOL = "build_index"
+#:
+#: THIS TARGET WAS CHANGED ONCE, AND THE REASON MATTERS more than the target.
+#: It was `build_index`, chosen because `grep -rl build_index tests/` finds it.
+#: After the one-root rebuild it STILL returned no test node — and the census
+#: below showed why: `build_index` has no crossing edge even INSIDE the single
+#: extraction, where no merge namespacing exists to lose one. Tests call it as
+#: `lexical.build_index(...)`, module-qualified, and graphify's extractor does
+#: not resolve that form back to the `build_index()` node. So the original
+#: target could never have exhibited the defect this file is about, in either
+#: direction — it was a broken probe, not a failing capability.
+#:
+#: Changing a probe target until it passes is the Goodhart move, so the
+#: distinction is stated rather than assumed: the sub-graph census went from
+#: **0** crossing edges before the change to **314** after it (234 `calls`, 57
+#: `imports_from`, 22 `references`, 1 `indirect_call`), against controls of
+#: 1,952 within `python/` and 2,857 within `tests/`. The capability moved; the
+#: probe was re-aimed at a symbol that can observe it.
+_OUR_SYMBOL = "check_goal"
+
+#: KNOWN LIMITATION, recorded here because a green test would otherwise imply
+#: more than it proves: `affected` resolves DIRECT calls (`check_goal(...)`,
+#: 18 test functions; `audit_transcripts(...)`, 11) and does NOT resolve
+#: module-qualified ones (`lexical.build_index(...)`, 0). So "which tests cover
+#: this symbol" is answerable for our code, not universally answerable. Do not
+#: read a pass here as full coverage-query support.
+_UNRESOLVED_CALL_STYLE = "build_index"
 
 #: A symbol whose callers are test functions in the SAME namespace. This is the
 #: control: it is reachable with or without the one-root fix, so it separates
@@ -109,15 +132,6 @@ def test_affected_can_return_test_nodes_at_all() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#101: the one-extraction-root change is in the code but graphify-out/graph.json "
-        "still predates it. REMOVE THIS MARKER in the same commit as the rebuild that "
-        "carries the fix. strict=True on purpose — an unexpected PASS fails the suite, so "
-        "this marker cannot quietly outlive the state it describes."
-    ),
-)
 @pytest.mark.usefixtures("_graph_present")
 def test_affected_names_the_tests_that_cover_our_own_code() -> None:
     """#101. FAILS at HEAD before the one-extraction-root change — by design.

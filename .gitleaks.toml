@@ -43,6 +43,19 @@ description = "ingested corpus + DERIVED graphify artifacts — noise by constru
 # allowlist exists for. Nothing this repo authors writes there.
 paths = [
   '''^sources/''',
+  # The single self-extraction sub-graph (#101, 2026-08-02). Same derived class
+  # as `graphify-out/cache/` one path over, and it produced the same false
+  # positives the moment it existed: `gitleaks dir` scans directories rather
+  # than tracked files, so a brand-new gitignored output tree lands in scope
+  # immediately — 3 hits on `stat-index.json` content hashes.
+  #
+  # BROAD, and unlike `^graphify-out/` that is safe here rather than a residual:
+  # `graphify-out/` needed a narrow pattern because `memory/` under it IS
+  # committed. `.self-graph/` has no such subdirectory — `git ls-files
+  # .self-graph` is 0 against a control of 37 under `python/`, the whole tree is
+  # `/.self-graph/` in .gitignore, and only `graphify extract` ever writes it.
+  # If anything authored is ever put here, narrow this the way graphify-out was.
+  '''^\.self-graph/''',
   '''^raw/''',
   '''^graphify-out/[^/]+\.[A-Za-z0-9_]+$''',
   '''^graphify-out/(cache|converted|obsidian|reflections|transcripts|wiki)/''',
