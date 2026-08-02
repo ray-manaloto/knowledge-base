@@ -29,9 +29,17 @@ hypothetical one.
 Inherited stdio rather than `os.execvpe`, which would be a shade cleaner still
 (no waiting parent at all), for one reason: `os.exec*` trips ruff's S606, and
 this repo does not carry inline suppressions and does not widen the global ignore
-list for a preference. The parent only waits; what the two forms have in common
-is the part that matters, which is that the child's stdin and stdout ARE the
-client's.
+list for a preference. What the two forms have in common is the part that
+matters: the child's stdin and stdout ARE the client's.
+
+**But the waiting parent is not free, and calling the two "equivalent" hid a
+leak.** Exec has no parent to outlive, so termination reaches the server by
+construction; a parent that dies without forwarding leaves `graphify-mcp` holding
+a 393 MB graph, reparented to init, still bound to the client's descriptors.
+:func:`_run_inheriting` forwards SIGTERM/SIGINT/SIGHUP to buy back what exec gave
+away. (Cold lane, round 2.) The general lesson is worth more than the fix: when a
+substitution is justified as morally equivalent, the thing to go looking for is
+the property the original had for free.
 
 WHAT THE FILTER IS WORTH, WITH ITS CONDITION ATTACHED. Under Claude Code's
 default `tool search`, MCP tools are deferred and only NAMES load at session
@@ -57,6 +65,7 @@ import contextlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -66,7 +75,8 @@ from typing import TYPE_CHECKING
 from kb_setup.graphify_env import clean_env, graphify_exe
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
+    from types import FrameType
 
 #: Comma-separated tool names to advertise. UNSET or blank means "no filtering",
 #: which is a different state from "advertise nothing" — see :func:`parse_allowlist`.
@@ -249,6 +259,40 @@ class _Relay:
         return json.dumps(message) + "\n"
 
 
+def _run_inheriting(cmd: list[str], repo_root: Path | None) -> int:
+    """Run the server with inherited stdio, forwarding termination to it.
+
+    `subprocess.run` alone left an ORPHAN. A waiting parent that dies without
+    passing the signal on leaves `graphify-mcp` — holding a 393 MB graph —
+    reparented to init and still bound to the client's file descriptors. Exec
+    would have had this for free, which is precisely the kind of thing a
+    "morally equivalent" substitution loses quietly. (Cold lane, round 2.)
+
+    Handlers are restored afterwards so this does not mutate the interpreter's
+    signal disposition for whatever runs next in-process, such as a test.
+    """
+    child = subprocess.Popen(cmd, cwd=repo_root, env=clean_env())
+
+    def _forward(signum: int, _frame: object) -> None:
+        with contextlib.suppress(OSError, ProcessLookupError):
+            child.send_signal(signum)
+
+    # Typed as what `signal.signal` returns and accepts, so restoring is a
+    # round-trip the checker can see rather than an `object` cast back.
+    previous: dict[int, Callable[[int, FrameType | None], object] | int | None] = {}
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        # ValueError when not on the main thread — real in a test runner, and a
+        # reason to skip forwarding rather than to fail the server.
+        with contextlib.suppress(OSError, ValueError):
+            previous[sig] = signal.signal(sig, _forward)
+    try:
+        return child.wait()
+    finally:
+        for sig, handler in previous.items():
+            with contextlib.suppress(OSError, ValueError):
+                signal.signal(sig, handler)
+
+
 def _proxy(cmd: list[str], allow: dict[str, frozenset[str]], repo_root: Path) -> int:
     """Run `graphify-mcp` behind a filtering relay and return its exit code."""
     child = subprocess.Popen(
@@ -271,11 +315,19 @@ def _proxy(cmd: list[str], allow: dict[str, frozenset[str]], repo_root: Path) ->
 
 
 def serve(repo_root: Path, argv: list[str]) -> int:
-    """Start the MCP server for this repo's graph.
+    """Start the MCP server for this repo's graph, and return its exit code.
 
-    With no allowlist configured this NEVER RETURNS — it replaces the current
-    process with `graphify-mcp`, so nothing of this module remains between the
-    client and the server.
+    With no allowlist configured this process stays alive as a WAITING PARENT and
+    the child inherits its stdin/stdout, so nothing of this module sits in the
+    data path — but something of it does remain, and signals have to be forwarded
+    for that to be safe (:func:`_run_inheriting`).
+
+    This docstring said "NEVER RETURNS — it replaces the current process" until
+    the cold lane's round 2. That was true of the `os.execvpe` first draft and
+    false the moment it became `subprocess.run`; `cli.py` carried the same claim.
+    Two places asserting semantics the code does not have is the identical defect
+    this branch already fixed once in `mcp_probe` — when the implementation moves
+    under the prose, the prose is now wrong, not merely dated.
     """
     graph = repo_root / "graphify-out" / "graph.json"
     cmd = [mcp_binary(repo_root), str(graph), *argv]
@@ -290,7 +342,7 @@ def serve(repo_root: Path, argv: list[str]) -> int:
         # is talking to `graphify-mcp` directly and nothing here can corrupt,
         # buffer, or drop a frame. Any transport is fine here — nothing is being
         # claimed about the surface, so nothing can be silently unenforced.
-        return subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+        return _run_inheriting(cmd, repo_root)
     if (transport := wants_non_stdio(argv)) is not None:
         # REFUSE rather than serve unfiltered. Starting the server anyway would
         # hand out the full surface under a banner saying it was narrowed.

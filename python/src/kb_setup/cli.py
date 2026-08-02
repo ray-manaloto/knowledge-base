@@ -71,9 +71,11 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "serve":
         from kb_setup import mcp_serve
 
-        # With no KB_MCP_TOOLS/KB_MCP_RESOURCES set this `execvpe`s and never
-        # returns, so the default path keeps nothing of ours between the client
-        # and `graphify-mcp`.
+        # With no KB_MCP_TOOLS/KB_MCP_RESOURCES set the child inherits this
+        # process's stdio, so the default path keeps nothing of ours in the DATA
+        # path between the client and `graphify-mcp`. This comment claimed an
+        # `execvpe` that the code stopped doing; the cold lane found the two
+        # disagreeing.
         return mcp_serve.serve(repo_root, rest)
     if cmd == "artifacts":
         from kb_setup import artifacts

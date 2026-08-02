@@ -23,7 +23,11 @@ probe that cannot tell it from a healthy server would have certified the bug.
 from __future__ import annotations
 
 import json
+import os
+import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -254,3 +258,129 @@ def test_a_dropped_resources_list_is_not_zero_resources(tmp_path):
     assert result.resources == ()
     assert "resources/list" in result.detail
     assert "tools/list" not in result.detail
+
+
+# --------------------------------------------------------------------------
+# Cold-lane round 2. Three of the four were prose asserting what code did not do.
+# --------------------------------------------------------------------------
+
+#: Negotiates a version this probe did not ask for.
+_FAKE_OTHER_VERSION = _FAKE_SERVER.replace('"2024-11-05"', '"1999-01-01"')
+
+#: Answers `initialize` fine, then returns a JSON-RPC ERROR for `tools/list`.
+#: The reply IS a message, so "did it arrive" said yes and the surface read as
+#: an honest zero.
+_FAKE_ERRORS_ON_TOOLS = """
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    msg = json.loads(line)
+    mid = msg.get("id")
+    if mid is None:
+        continue
+    if msg["method"] == "tools/list":
+        body = {"error": {"code": -32000, "message": "tools exploded"}}
+    else:
+        body = {"result": {"protocolVersion": "2024-11-05"}}
+    sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": mid, **body}) + "\\n")
+    sys.stdout.flush()
+"""
+
+#: A wrapper that spawns a grandchild and then waits. Models `mise run kb-serve`,
+#: where the `Popen` is mise and the real server is one level further down.
+_FAKE_WRAPPER = """
+import subprocess, sys
+child = subprocess.Popen([sys.executable, sys.argv[1]],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+sys.stderr.write(str(child.pid) + "\\n"); sys.stderr.flush()
+child.wait()
+"""
+
+#: A grandchild that DOES NOT READ STDIN and simply sleeps.
+#:
+#: Both properties are the fixture's control arm, and the first version had
+#: neither. It reused the stdin-reading fake server, so when the wrapper died the
+#: grandchild hit EOF and exited ON ITS OWN — the test passed with the group
+#: signalling removed, which makes it a tautology rather than a check
+#: (`probes-need-a-control-arm.md` rule 8: could this setup have produced the
+#: other result?). Reading no stdin means only a delivered signal can end it.
+_FAKE_SLEEPER = "import time\ntime.sleep(120)\n"
+
+
+def test_a_negotiated_version_mismatch_is_reported(tmp_path):
+    """PROTOCOL_VERSION's docstring promised this; nothing checked it.
+
+    Not a handshake failure — a server may legitimately negotiate down — but the
+    result must carry the version it actually got.
+    """
+    result = mcp_probe.probe(_script(tmp_path, "ver.py", _FAKE_OTHER_VERSION), timeout=30)
+
+    assert result.initialized is True
+    assert "1999-01-01" in result.detail
+    assert mcp_probe.PROTOCOL_VERSION in result.detail
+
+
+def test_the_matching_version_adds_no_note(tmp_path):
+    """CONTROL ARM: agreement must stay silent, or every result carries noise."""
+    result = mcp_probe.probe(_script(tmp_path, "ok.py", _FAKE_SERVER), timeout=30)
+
+    assert result.initialized is True
+    assert result.detail == ""
+
+
+def test_an_error_on_tools_list_is_not_an_empty_tool_set(tmp_path):
+    """An error reply ARRIVED, so "did it arrive" said yes and the count read 0.
+
+    The second door into the same collapse round 1 closed: `_list_failures` only
+    looked for a missing message, and an error is a message.
+    """
+    result = mcp_probe.probe(_script(tmp_path, "err.py", _FAKE_ERRORS_ON_TOOLS), timeout=30)
+
+    assert result.initialized is True
+    assert result.tools == ()
+    assert "tools/list" in result.detail
+    assert "tools exploded" in result.detail
+
+
+def test_shutdown_reaps_a_grandchild(tmp_path):
+    """The server is a GRANDCHILD under `mise run`, and it must still be reaped.
+
+    Signalling only the top-level pid left `graphify-mcp` — holding a 393 MB
+    graph — alive and reparented. This session hit that for real.
+    """
+    server = tmp_path / "stubborn.py"
+    server.write_text(_FAKE_SLEEPER, encoding="utf-8")
+    wrapper = tmp_path / "wrapper.py"
+    wrapper.write_text(_FAKE_WRAPPER, encoding="utf-8")
+    marker = tmp_path / "pid.txt"
+
+    proc = subprocess.Popen(
+        [sys.executable, str(wrapper), str(server)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=marker.open("w"),
+        text=True,
+        bufsize=1,
+        start_new_session=True,
+    )
+    # Let the wrapper report its grandchild's pid.
+    for _ in range(100):
+        if marker.read_text().strip():
+            break
+        time.sleep(0.05)
+    grandchild = int(marker.read_text().strip())
+
+    mcp_probe._shutdown(proc)
+
+    # The grandchild must be gone. `kill(pid, 0)` raises once it is reaped; a
+    # surviving SIGTERM-ignoring process would answer happily.
+    for _ in range(100):
+        try:
+            os.kill(grandchild, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+    os.kill(grandchild, signal.SIGKILL)
+    pytest.fail(f"grandchild {grandchild} survived _shutdown — it was orphaned, not reaped")

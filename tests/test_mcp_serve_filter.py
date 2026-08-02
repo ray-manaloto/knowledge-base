@@ -15,7 +15,10 @@ the request that asked for it, and passes everything else through untouched.
 from __future__ import annotations
 
 import json
+import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 from kb_setup import mcp_probe, mcp_serve
@@ -244,3 +247,65 @@ def test_serve_refuses_an_allowlist_it_cannot_enforce(tmp_path, monkeypatch, cap
     assert "CANNOT be enforced" in err
     # It must not also claim to have narrowed anything.
     assert "narrowed to" not in err
+
+
+def test_run_inheriting_forwards_termination_to_the_child(tmp_path):
+    """A SIGTERM'd wrapper must PASS THE SIGNAL ON to the server it waits on.
+
+    `subprocess.run` alone left `graphify-mcp` — holding a 393 MB graph —
+    reparented to init and still bound to the client's descriptors. `os.execvpe`
+    had this for free, which is exactly what the "morally equivalent"
+    substitution gave away silently. (Cold lane, round 2.)
+
+    THE ASSERTION IS "THE CHILD RECEIVED IT", NOT "THE CHILD DIED", and the first
+    version of this test got that wrong. It used a child that IGNORES SIGTERM and
+    demanded it exit — but under `exec`, the form being emulated, a
+    SIGTERM-ignoring server survives too. The test was asserting a property the
+    thing it is modelled on does not have, and it hung rather than failed.
+
+    Control arm: strip the forwarding and this fails for the right reason — the
+    default disposition kills the wrapper outright, the child is never signalled,
+    and no marker is written.
+    """
+    marker = tmp_path / "got-sigterm.txt"
+    child_src = tmp_path / "child.py"
+    child_src.write_text(
+        "import signal, sys, time\n"
+        "def _bye(signum, frame):\n"
+        f"    open({str(marker)!r}, 'w').write(str(signum))\n"
+        "    sys.exit(0)\n"
+        "signal.signal(signal.SIGTERM, _bye)\n"
+        "sys.stderr.write('up\\n'); sys.stderr.flush()\n"
+        "time.sleep(120)\n",
+        encoding="utf-8",
+    )
+    driver = tmp_path / "driver.py"
+    driver.write_text(
+        "import sys\n"
+        "from kb_setup import mcp_serve\n"
+        "sys.exit(mcp_serve._run_inheriting([sys.executable, sys.argv[1]], None))\n",
+        encoding="utf-8",
+    )
+    up = tmp_path / "up.txt"
+
+    wrapper = subprocess.Popen(
+        [sys.executable, str(driver), str(child_src)],
+        stderr=up.open("w"),
+        start_new_session=True,
+    )
+    try:
+        for _ in range(200):
+            if "up" in up.read_text():
+                break
+            time.sleep(0.05)
+        assert "up" in up.read_text(), "the child never started — fixture broken, not the fix"
+
+        wrapper.terminate()
+        wrapper.wait(timeout=30)
+
+        assert marker.is_file(), "the child never received SIGTERM — the wrapper swallowed it"
+        assert marker.read_text().strip() == str(int(signal.SIGTERM))
+    finally:
+        if wrapper.poll() is None:
+            wrapper.kill()
+            wrapper.wait(timeout=30)

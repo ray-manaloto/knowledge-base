@@ -40,7 +40,10 @@ Those demand opposite fixes, so they are never merged into one boolean.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import signal
 import subprocess
 import threading
 import time
@@ -216,6 +219,10 @@ def probe(
         stderr=subprocess.DEVNULL,
         text=True,
         bufsize=1,
+        # Its own process group, so :func:`_shutdown` can signal the whole tree.
+        # REQUIRED, not incidental: without it the child shares OUR group, and
+        # the `killpg` below would take down the caller — pytest included.
+        start_new_session=True,
     )
     session = _Session(proc, deadline)
     try:
@@ -267,6 +274,18 @@ def _handshake(session: _Session, started: float) -> Advertised:
     # (Cold lane, round 1.)
     if (refusal := _error_detail(init)) is not None:
         return _no_handshake(started, f"server refused initialize: {refusal}")
+    # PROTOCOL_VERSION's docstring promises a server-side bump "shows up as a
+    # handshake failure we investigate, not as a silent renegotiation", and until
+    # now nothing checked — the promise lived only in the prose. A server may
+    # legitimately negotiate down, so this does NOT fail the handshake; it names
+    # the mismatch in `detail` so a probe result carries the version it actually
+    # got. (Cold lane, round 2.)
+    negotiated = _negotiated_version(init)
+    version_note = (
+        ""
+        if negotiated in {PROTOCOL_VERSION, None}
+        else f"protocolVersion negotiated to {negotiated!r}, not {PROTOCOL_VERSION!r}"
+    )
     elapsed = time.monotonic() - started
 
     # The notification is unacknowledged by design, so its only failure mode is a
@@ -292,11 +311,27 @@ def _handshake(session: _Session, started: float) -> Advertised:
         # timeout there rendered as a server with zero resources — the exact
         # collapse this class's docstring promises never to make, contradicted by
         # the code under it. (Cold lane, round 1.)
-        detail=_list_failures(
-            ("tools/list", tools_msg, tools_detail),
-            ("resources/list", resources_msg, resources_detail),
+        detail="; ".join(
+            part
+            for part in (
+                version_note,
+                _list_failures(
+                    ("tools/list", tools_msg, tools_detail),
+                    ("resources/list", resources_msg, resources_detail),
+                ),
+            )
+            if part
         ),
     )
+
+
+def _negotiated_version(init: dict[str, object]) -> str | None:
+    """The `protocolVersion` the server agreed to, or ``None`` if it named none."""
+    result = init.get("result")
+    if not isinstance(result, dict):
+        return None
+    version = result.get("protocolVersion")
+    return str(version) if isinstance(version, str) else None
 
 
 def _error_detail(message: dict[str, object]) -> str | None:
@@ -316,20 +351,55 @@ def _error_detail(message: dict[str, object]) -> str | None:
 
 
 def _list_failures(*asked: tuple[str, dict[str, object] | None, str]) -> str:
-    """Join the details of the list requests that never got an answer."""
-    return "; ".join(f"{method}: {detail}" for method, message, detail in asked if message is None)
+    """Join the details of the list requests that did not produce a real answer.
+
+    TWO ways to not answer, and the second one was missed. A message that never
+    arrived is ``None``; a message that arrived carrying a JSON-RPC **error** is a
+    dict, so it read as "answered" and `_result_list` then found no array and
+    returned `[]` — reporting `tools=()` with an empty detail, indistinguishable
+    from a server that really advertises nothing. That is the same collapse this
+    module's docstring disclaims, arriving through a second door after the first
+    was closed. (Cold lane, round 2.)
+    """
+    out = []
+    for method, message, detail in asked:
+        if message is None:
+            out.append(f"{method}: {detail}")
+        elif (error := _error_detail(message)) is not None:
+            out.append(f"{method}: server returned an error: {error}")
+    return "; ".join(out)
 
 
 def _shutdown(proc: subprocess.Popen[str]) -> None:
-    """Close stdin and end the server, escalating to kill if it will not go."""
-    try:
+    """Close stdin and end the server TREE, escalating to kill if it will not go.
+
+    The GROUP, not the process. The command this probe is pointed at in anger is
+    `mise run kb-serve`, so the `Popen` is *mise* and `graphify-mcp` is a
+    grandchild — signalling only the top-level pid left a server holding a 393 MB
+    graph alive and reparented to init. That is not hypothetical: this session
+    had to `pkill -f graphify-mcp` by hand before the leak was diagnosed.
+    (Cold lane, round 2.)
+    """
+    with contextlib.suppress(BrokenPipeError, ValueError):
         if proc.stdin is not None:
             proc.stdin.close()
-    except BrokenPipeError, ValueError:
-        pass
-    proc.terminate()
+    _signal_tree(proc, signal.SIGTERM)
     try:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        proc.kill()
+        _signal_tree(proc, signal.SIGKILL)
         proc.wait(timeout=10)
+
+
+def _signal_tree(proc: subprocess.Popen[str], sig: int) -> None:
+    """Signal the child's whole process group, falling back to the child alone.
+
+    The fallback matters on a host where the group lookup fails: reaching the
+    direct child is strictly better than reaching nothing, and a failure to clean
+    up must not raise out of a `finally`.
+    """
+    try:
+        os.killpg(os.getpgid(proc.pid), sig)
+    except OSError, ProcessLookupError:
+        with contextlib.suppress(OSError, ProcessLookupError):
+            proc.send_signal(sig)
