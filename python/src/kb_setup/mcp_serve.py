@@ -61,8 +61,12 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kb_setup.graphify_env import clean_env, graphify_exe
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 #: Comma-separated tool names to advertise. UNSET or blank means "no filtering",
 #: which is a different state from "advertise nothing" — see :func:`parse_allowlist`.
@@ -79,6 +83,37 @@ _FILTERED = {
 }
 
 _MCP_BINARY = "graphify-mcp"
+
+#: The flag that moves graphify-mcp off stdio. See :func:`wants_non_stdio`.
+_TRANSPORT_FLAG = "--transport"
+
+
+def wants_non_stdio(argv: Sequence[str]) -> str | None:
+    """The non-stdio transport ``argv`` asks for, or ``None`` for plain stdio.
+
+    THIS IS A FAIL-CLOSED GATE, not a convenience. The relay rewrites
+    line-delimited JSON-RPC on the child's stdin and stdout; an HTTP-transport
+    child serves on its own listener socket instead, which those pipes never
+    carry. So an allowlist plus `--transport http` produced a server advertising
+    its FULL surface while this process printed "narrowed to N" — a filter
+    reporting success without filtering anything, which is worse than no filter
+    at all because it is believed. `mise.toml` documents that exact invocation.
+    (Cold lane, round 1.)
+
+    Both spellings are recognised: argparse accepts `--transport http` and
+    `--transport=http`, so matching only the first would leave the second as a
+    silent bypass of the check that exists to stop a silent bypass.
+    """
+    for index, arg in enumerate(argv):
+        if arg.startswith(f"{_TRANSPORT_FLAG}="):
+            value = arg.split("=", 1)[1]
+        elif arg == _TRANSPORT_FLAG:
+            value = argv[index + 1] if index + 1 < len(argv) else ""
+        else:
+            continue
+        if value and value != "stdio":
+            return value
+    return None
 
 
 def parse_allowlist(raw: str | None) -> frozenset[str] | None:
@@ -253,8 +288,20 @@ def serve(repo_root: Path, argv: list[str]) -> int:
     if not allow:
         # No pipes: the child inherits this process's stdin/stdout, so the client
         # is talking to `graphify-mcp` directly and nothing here can corrupt,
-        # buffer, or drop a frame.
+        # buffer, or drop a frame. Any transport is fine here — nothing is being
+        # claimed about the surface, so nothing can be silently unenforced.
         return subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+    if (transport := wants_non_stdio(argv)) is not None:
+        # REFUSE rather than serve unfiltered. Starting the server anyway would
+        # hand out the full surface under a banner saying it was narrowed.
+        print(
+            f"[kb-serve] REFUSING: an allowlist is set ({', '.join(sorted(allow))}) but "
+            f"--transport {transport} does not go through stdio, so it CANNOT be enforced. "
+            f"Unset {TOOLS_ENV}/{RESOURCES_ENV} to serve the full surface over {transport}, "
+            f"or drop --transport to filter over stdio.",
+            file=sys.stderr,
+        )
+        return 2
     for method, names in sorted(allow.items()):
         # stderr, never stdout — stdout IS the JSON-RPC channel, and a banner
         # written there is a malformed frame the client must try to parse.

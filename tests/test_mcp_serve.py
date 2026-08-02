@@ -168,3 +168,89 @@ def test_kb_serve_actually_answers_mcp():
     assert len(result.tools) >= 1, result.detail
     assert "query_graph" in result.tools
     assert result.tool_schema_bytes > 0
+
+
+# --------------------------------------------------------------------------
+# Cold-lane round 1. Each of these FAILED before its fix.
+# --------------------------------------------------------------------------
+
+#: A server that answers `initialize` with a JSON-RPC ERROR. The reply carries
+#: the id the probe is waiting on, which is exactly why matching on the id alone
+#: accepted it as a successful handshake.
+_FAKE_REFUSES_INIT = """
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    msg = json.loads(line)
+    if msg.get("id") is None:
+        continue
+    sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": msg["id"],
+                                 "error": {"code": -32600, "message": "nope"}}) + "\\n")
+    sys.stdout.flush()
+"""
+
+#: Answers `initialize` and `tools/list`, then goes silent. `resources/list`
+#: never comes back — which used to render as a server advertising 0 resources.
+_FAKE_DROPS_RESOURCES = """
+import json, sys, time
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    msg = json.loads(line)
+    mid = msg.get("id")
+    if mid is None:
+        continue
+    if msg["method"] == "resources/list":
+        time.sleep(60)
+        continue
+    result = ({"tools": [{"name": "only", "inputSchema": {"type": "object"}}]}
+              if msg["method"] == "tools/list" else {"protocolVersion": "2024-11-05"})
+    sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": mid, "result": result}) + "\\n")
+    sys.stdout.flush()
+"""
+
+
+def test_an_error_reply_is_not_a_handshake(tmp_path):
+    """A server REFUSING to initialize must not be certified as initialized.
+
+    `await_id` matches on the id alone, and a refusal answers with that same id.
+    Before the fix this returned `initialized=True` — so the live gate would have
+    passed against a server that said no.
+    """
+    result = mcp_probe.probe(_script(tmp_path, "refuse.py", _FAKE_REFUSES_INIT), timeout=30)
+
+    assert result.initialized is False
+    assert "refused initialize" in result.detail
+    assert "nope" in result.detail
+
+
+def test_a_reply_with_neither_result_nor_error_is_refused(tmp_path):
+    """A protocol-violating reply is a refusal, not an empty surface."""
+    body = _FAKE_REFUSES_INIT.replace(
+        '"error": {"code": -32600, "message": "nope"}', '"jsonrpc2": "bogus"'
+    )
+    result = mcp_probe.probe(_script(tmp_path, "weird.py", body), timeout=30)
+
+    assert result.initialized is False
+    assert "neither result nor error" in result.detail
+
+
+def test_a_dropped_resources_list_is_not_zero_resources(tmp_path):
+    """A resources/list that never answers must say so, not report 0 resources.
+
+    The detail for that half used to be discarded outright, which is the exact
+    "answered no" / "never asked" collapse `Advertised`'s docstring promises not
+    to make.
+    """
+    result = mcp_probe.probe(_script(tmp_path, "drop.py", _FAKE_DROPS_RESOURCES), timeout=4)
+
+    assert result.initialized is True
+    # The half that worked still reports its answer.
+    assert result.tools == ("only",)
+    # The half that did not is NAMED, and named as the resources half.
+    assert result.resources == ()
+    assert "resources/list" in result.detail
+    assert "tools/list" not in result.detail

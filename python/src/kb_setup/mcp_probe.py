@@ -260,6 +260,13 @@ def _handshake(session: _Session, started: float) -> Advertised:
     init, detail = session.await_id(_INITIALIZE_ID)
     if init is None:
         return _no_handshake(started, detail)
+    # A reply is not an agreement. `await_id` matches on the id alone, so a
+    # server REFUSING to initialize answers with the very id we are waiting on —
+    # and treating that as success would let this probe certify a server that
+    # said no. That is the same class of mistake as reading rc=0 as "served".
+    # (Cold lane, round 1.)
+    if (refusal := _error_detail(init)) is not None:
+        return _no_handshake(started, f"server refused initialize: {refusal}")
     elapsed = time.monotonic() - started
 
     # The notification is unacknowledged by design, so its only failure mode is a
@@ -269,7 +276,7 @@ def _handshake(session: _Session, started: float) -> Advertised:
     session.send({"jsonrpc": "2.0", "id": _TOOLS_ID, "method": "tools/list", "params": {}})
     tools_msg, tools_detail = session.await_id(_TOOLS_ID)
     session.send({"jsonrpc": "2.0", "id": _RESOURCES_ID, "method": "resources/list", "params": {}})
-    resources_msg, _ = session.await_id(_RESOURCES_ID)
+    resources_msg, resources_detail = session.await_id(_RESOURCES_ID)
 
     tools = _result_list(tools_msg, "tools")
     resources = _result_list(resources_msg, "resources")
@@ -279,10 +286,38 @@ def _handshake(session: _Session, started: float) -> Advertised:
         resources=tuple(str(r.get("uri", "")) for r in resources),
         tool_schema_bytes=len(json.dumps(tools, separators=(",", ":")).encode()),
         elapsed_s=elapsed,
-        # A handshake that succeeded but whose tools/list never answered is a
-        # real, separate state — recorded rather than rendered as "0 tools".
-        detail="" if tools_msg is not None else tools_detail,
+        # BOTH lists report their own failure. An empty tuple means "answered,
+        # advertised none"; a non-empty detail means the question was never
+        # answered. The resources half used to discard its detail outright, so a
+        # timeout there rendered as a server with zero resources — the exact
+        # collapse this class's docstring promises never to make, contradicted by
+        # the code under it. (Cold lane, round 1.)
+        detail=_list_failures(
+            ("tools/list", tools_msg, tools_detail),
+            ("resources/list", resources_msg, resources_detail),
+        ),
     )
+
+
+def _error_detail(message: dict[str, object]) -> str | None:
+    """The message text when a reply is a JSON-RPC error, else ``None``.
+
+    A reply carrying neither `result` nor `error` violates the protocol; it is
+    reported as a refusal rather than accepted, because a probe cannot describe a
+    surface a server never sent.
+    """
+    error = message.get("error")
+    if isinstance(error, dict):
+        code = error.get("code", "?")
+        return f"[{code}] {error.get('message', 'no message')}"
+    if "result" not in message:
+        return "reply carried neither result nor error"
+    return None
+
+
+def _list_failures(*asked: tuple[str, dict[str, object] | None, str]) -> str:
+    """Join the details of the list requests that never got an answer."""
+    return "; ".join(f"{method}: {detail}" for method, message, detail in asked if message is None)
 
 
 def _shutdown(proc: subprocess.Popen[str]) -> None:

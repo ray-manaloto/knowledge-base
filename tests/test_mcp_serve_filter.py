@@ -194,3 +194,53 @@ def test_relay_does_not_rewrite_a_response_it_never_requested(tmp_path, monkeypa
     # which the successful handshake already proves.
     assert proc.tools == ()
     assert json.dumps(list(proc.resources))
+
+
+# --------------------------------------------------------------------------
+# Cold-lane round 1: an allowlist the transport cannot enforce must REFUSE.
+# --------------------------------------------------------------------------
+
+
+def test_stdio_is_not_flagged():
+    """CONTROL ARM: the transports that CAN be filtered are not refused."""
+    assert mcp_serve.wants_non_stdio([]) is None
+    assert mcp_serve.wants_non_stdio(["--transport", "stdio"]) is None
+    assert mcp_serve.wants_non_stdio(["--transport=stdio"]) is None
+    # A bare trailing flag names no transport; argparse would reject it, and this
+    # must not invent one.
+    assert mcp_serve.wants_non_stdio(["--transport"]) is None
+
+
+def test_http_transport_is_detected_in_both_spellings():
+    assert mcp_serve.wants_non_stdio(["--transport", "http"]) == "http"
+    assert mcp_serve.wants_non_stdio(["--transport=http"]) == "http"
+    assert mcp_serve.wants_non_stdio(["--port", "8080", "--transport", "http"]) == "http"
+
+
+def test_serve_refuses_an_allowlist_it_cannot_enforce(tmp_path, monkeypatch, capsys):
+    """`--transport http` + an allowlist must REFUSE, not serve unfiltered.
+
+    The relay only rewrites line-delimited JSON-RPC on the child's pipes; an
+    HTTP child serves on its own socket. Before this, the process started the
+    server anyway AND printed "narrowed to N" — a filter reporting success
+    without filtering. `mise.toml` documents that exact invocation.
+
+    The binary is stubbed to `true`, and that is a REQUIREMENT rather than
+    tidiness. Mutating the guard away and re-running this is how its FAIL
+    direction is proven — and with the real binary that mutation does not fail,
+    it HANGS, because the unguarded path genuinely starts an HTTP server and
+    waits forever. A test whose failure mode is a wedged suite cannot be used to
+    verify the thing it is testing, so the stub is what makes the mutation come
+    back fast and red.
+    """
+    monkeypatch.setenv(mcp_serve.TOOLS_ENV, "query_graph")
+    monkeypatch.setattr(mcp_serve, "mcp_binary", lambda _root=None: "true")
+
+    rc = mcp_serve.serve(tmp_path, ["--transport", "http", "--port", "8080"])
+
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "REFUSING" in err
+    assert "CANNOT be enforced" in err
+    # It must not also claim to have narrowed anything.
+    assert "narrowed to" not in err
