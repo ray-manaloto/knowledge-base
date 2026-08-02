@@ -119,7 +119,22 @@ const perTool = await pipeline(
           `Refute this claim about ${t.key}. Default to refuted:true if you cannot ` +
             `establish it.\n\nCLAIM: ${c.text}\nSTATED EVIDENCE: ${c.evidence || '(none given)'}`,
           { agentType: 'kb-adversarial-verifier', label: `verify:${t.key}`, phase: 'Verify', schema: VERDICT_SCHEMA },
-        ).then((v) => ({ ...c, verdict: v })),
+        ).then((v) => ({
+          // A dead or skipped verifier resolves to NULL per the agent() contract,
+          // and `{...c, verdict: null}` is TRUTHY — so `filter(Boolean)` keeps it
+          // and `!v.verdict?.refuted` reads TRUE, silently counting an unrun
+          // verification as "the claim survived". That inverts the fail-safe the
+          // verifier's own definition spends a paragraph establishing. Synthesize
+          // the refutation instead, so a lane that dies costs a claim rather than
+          // laundering one. (Cold lane, 04312f3.)
+          ...c,
+          verdict: v ?? {
+            refuted: true,
+            probe: 'none — the verifier agent died or was skipped',
+            control: 'none',
+            evidence: 'No verdict was returned. Defaulting to refuted per the fail-safe.',
+          },
+        })),
       ),
     ).then((verdicts) => ({ tool: t, res, verdicts: verdicts.filter(Boolean) }))
   },

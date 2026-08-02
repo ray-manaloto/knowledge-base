@@ -39,6 +39,12 @@ graphify-out/.base-graph.json
 # else) and kept out of the aggregate because merging it in took graph.json past
 # graphify's 512 MiB cap.
 graphify-out/study-graph.json
+# The base guard (sha256 of the graph.json the snapshot composes with) and
+# kb-watch's staging file. Both are per-clone machine state like the snapshot
+# itself; the staging file only exists mid-refresh and its presence afterwards
+# means a refresh died before the atomic swap.
+graphify-out/.base-graph.sha256
+graphify-out/graph.json.refresh
 graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/

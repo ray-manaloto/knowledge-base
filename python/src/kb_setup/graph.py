@@ -9,6 +9,7 @@ so consumers query on clone and `update` can diff incrementally.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -141,6 +142,20 @@ BASE_GRAPH_NAME = ".base-graph.json"
 #: still fully ingested — no exclusions — just not ranked beside the corpus.
 STUDY_GRAPH_NAME = "study-graph.json"
 
+#: sha256 of the `graph.json` that the base snapshot is known to compose with.
+#: `refresh_self` refuses unless the current `graph.json` still matches it.
+#:
+#: THIS EXISTS BECAUSE THE SNAPSHOT ALONE IS NOT SAFE, found by a cold review.
+#: `.base-graph.json` is written only by `build()`, but it is NOT the only writer
+#: of `graph.json` — `kb-merge` folds in a doc-extraction chunk and `kb-label`
+#: rewrites the graph outright, both documented as legitimate no-LLM steps
+#: BETWEEN builds. So `kb-build` → `kb-merge` → `kb-watch` restored a base that
+#: predates the merge, silently discarding it, and then restamped the result as
+#: verified — `kb-currency-check` reported clean. Silent data loss wearing a
+#: green light, which is the one failure mode the whole currency engine exists to
+#: prevent.
+BASE_GUARD_NAME = ".base-graph.sha256"
+
 
 def _extract_self(repo_root: Path) -> list[Path]:
     """AST-extract this repo's OWN code; return each sub-graph for merging.
@@ -206,6 +221,22 @@ def refresh_self(repo_root: Path) -> int:
     if not base.is_file():
         raise SystemExit(f"no graphify-out/{BASE_GRAPH_NAME} — run `mise run kb-build` first")
 
+    # FAIL CLOSED if anything else has written graph.json since the snapshot was
+    # composed. `kb-merge` and `kb-label` both legitimately do, and restoring the
+    # base over their output would discard it in silence — then restamp the
+    # result as verified. Refusing costs a rebuild; not refusing costs the merge
+    # AND the ability to notice it went missing.
+    expected = _read_base_guard(repo_root)
+    actual = _digest(out) if out.is_file() else ""
+    if expected and actual and expected != actual:
+        raise SystemExit(
+            f"graphify-out/graph.json has changed since {BASE_GRAPH_NAME} was written "
+            f"(expected sha256 {expected[:12]}, found {actual[:12]}).\n"
+            f"  `kb-merge` and `kb-label` both write graph.json and neither refreshes "
+            f"the snapshot, so restarting from it would silently discard their work.\n"
+            f"  Run `mise run kb-build` to rebuild the snapshot and the graph together."
+        )
+
     # RESTART from the base, never append to graph.json. Measured on the real
     # binary: merging our sub-graph into an aggregate that already holds it does
     # not dedupe, because `merge-graphs` re-namespaces node ids per merge, so the
@@ -214,7 +245,14 @@ def refresh_self(repo_root: Path) -> int:
     # the precise symptom self-indexing exists to remove. And since `build()`
     # merges our code in, EVERY refresh after a build is a second merge, so no
     # ordering rule could have avoided this; only a self-free base can.
-    shutil.copy(base, out)
+    # STAGED, then swapped in one `os.replace`. Writing straight into `out` meant
+    # the copy above wiped every self node FIRST and the extract/merge loop then
+    # rebuilt them on disk, so any failure part-way — a graphify crash, a Ctrl-C —
+    # left graph.json strictly WORSE than before the refresh started, with no
+    # rollback and `affected` back to "No unique node match". A refresh that can
+    # damage the artifact it refreshes is not a refresh. (Cold lane, 04312f3.)
+    staging = out.with_name(out.name + ".refresh")
+    shutil.copy(base, staging)
 
     for tree in _SELF_TREES:
         sub = repo_root / tree / "graphify-out" / "graph.json"
@@ -230,18 +268,76 @@ def refresh_self(repo_root: Path) -> int:
         # asserting otherwise is how it survived review.
         _run([graphify_exe(repo_root), "extract", tree, "--code-only", "--force"], repo_root)
         _run(
-            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
+            [
+                graphify_exe(repo_root),
+                "merge-graphs",
+                str(staging),
+                str(sub),
+                "--out",
+                str(staging),
+            ],
             repo_root,
         )
+
+    # The swap. Atomic on POSIX, so graph.json is either wholly the old corpus or
+    # wholly the new one — never a half-merged intermediate.
+    staging.replace(out)
 
     # graph.json changed, so the prose graph derived FROM it is now stale. Every
     # writer of graph.json re-derives it (`kb-build`/`kb-merge`/`kb-label`); a
     # writer that skips this leaves `kb-query --prose` describing an older corpus.
     prose.derive_for(repo_root)
 
+    # Re-arm the guard for the NEXT refresh, against the graph we just wrote.
+    # Skipping this would make the very next `kb-watch` refuse against its own
+    # output — a gate that fires on the honest path teaches people to remove it.
+    _write_base_guard(repo_root)
     _restamp_self(repo_root)
     print("[kb-watch] refreshed python/ + tests/ into graphify-out/graph.json")
     return 0
+
+
+def _digest(path: Path) -> str:
+    """sha256 of a file, or "" if it cannot be read.
+
+    Content, not `size:mtime_ns`. The stamp uses mtime for OUTPUTS because
+    digesting a 382 MB graph on every check is 142x slower (#89) — but this runs
+    once per `kb-watch`, not once per session, and it must survive a rewrite that
+    happens to land on the same size. "Cheap enough there" and "correct enough
+    here" are different questions.
+    """
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return ""
+
+
+def _write_base_guard(repo_root: Path) -> None:
+    """Record the digest of the graph.json the base snapshot composes with."""
+    out = repo_root / "graphify-out" / "graph.json"
+    digest = _digest(out)
+    if not digest:
+        return
+    (out.parent / BASE_GUARD_NAME).write_text(digest, encoding="utf-8")
+
+
+def _read_base_guard(repo_root: Path) -> str:
+    """The recorded digest, or "" when there is none.
+
+    An ABSENT guard reads as "" and lets the refresh proceed — deliberately. A
+    graph built before this guard existed has no recorded digest, and refusing
+    those would break every existing clone to catch a case that has not happened
+    there. The guard fires on DISAGREEMENT, which is the state that loses data;
+    absence is merely unknown, and `kb-build` writes one on the next run.
+    """
+    try:
+        return (repo_root / "graphify-out" / BASE_GUARD_NAME).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
 
 
 def _restamp_self(repo_root: Path) -> None:
@@ -425,6 +521,9 @@ def build(repo_root: Path) -> None:
     # inherited-number trap with extra steps. `kb-prose` re-derives it alone.
     prose.derive_for(repo_root)
 
+    # Arm the base guard against the graph we just produced, so a later
+    # `kb-watch` can tell whether anything else has written it since.
+    _write_base_guard(repo_root)
     _stamp_build(repo_root, inputs)
     print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 

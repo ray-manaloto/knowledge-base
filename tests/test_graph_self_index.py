@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from kb_setup import graph
 from kb_setup import manifest as mf
 from kb_setup.currency import config, sync
@@ -281,6 +282,76 @@ def test_refresh_self_restarts_from_the_base_snapshot(monkeypatch, tmp_path):
         "refresh_self merged into the existing graph instead of restarting from "
         "the base snapshot — this is how our nodes doubled to 2,080 and affected "
         "went back to 'No unique node match'."
+    )
+
+
+def test_refresh_self_refuses_when_another_writer_touched_the_graph(monkeypatch, tmp_path):
+    """`kb-merge` between build and watch must not be silently reverted.
+
+    THE DEFECT THIS EXISTS FOR, found by a cold review and invisible to every
+    other test here: `.base-graph.json` is written only by `build()`, but it is
+    not the only writer of `graph.json`. `kb-merge` folds in a doc chunk and
+    `kb-label` rewrites the graph, both legitimate between builds. Restarting
+    from the snapshot then discarded their work AND restamped the result as
+    verified, so `kb-currency-check` reported clean. Silent data loss with a
+    green light.
+
+    None of the sibling tests could catch it because none models a SECOND WRITER
+    touching graph.json between build and watch — the same blind spot that hid
+    the node-duplication bug. That is the point of this fixture: it writes to
+    graph.json behind refresh_self's back, which is precisely what a stub cannot
+    do to itself.
+    """
+    root = _stamped_repo(tmp_path)
+    out = root / "graphify-out" / "graph.json"
+    graph._write_base_guard(root)
+
+    # Stand in for `mise run kb-merge` — a legitimate third-party write.
+    out.write_text('{"nodes": [], "MERGED_DOC_CHUNK": true}', encoding="utf-8")
+
+    monkeypatch.setattr(graph, "_run", lambda _a, _r: None)
+    monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
+
+    with pytest.raises(SystemExit) as exc:
+        graph.refresh_self(root)
+
+    assert "has changed" in str(exc.value), (
+        f"refresh_self did not refuse a graph another writer had touched; it said {exc.value!r}"
+    )
+    assert "MERGED_DOC_CHUNK" in out.read_text(encoding="utf-8"), (
+        "refresh_self destroyed the other writer's content before refusing — "
+        "refusing after the damage is not refusing"
+    )
+
+
+def test_refresh_self_leaves_the_graph_intact_when_a_merge_fails(monkeypatch, tmp_path):
+    """A refresh that dies part-way must not leave graph.json worse than it found it.
+
+    Before staging, `shutil.copy(base, out)` wiped every self node FIRST and the
+    loop rebuilt them on disk, so a graphify crash or Ctrl-C left a graph with the
+    corpus but none of our code — `affected` back to "No unique node match", with
+    no rollback. Milder than the guard defect only because the stamp is not
+    rewritten on that path.
+    """
+    root = _stamped_repo(tmp_path)
+    out = root / "graphify-out" / "graph.json"
+    out.write_text('{"nodes": [], "PRE_EXISTING": true}', encoding="utf-8")
+    graph._write_base_guard(root)
+    before = out.read_text(encoding="utf-8")
+
+    def _boom(argv: list[str], _r: Path) -> None:
+        if "merge-graphs" in [str(a) for a in argv]:
+            raise RuntimeError("graphify crashed mid-merge")
+
+    monkeypatch.setattr(graph, "_run", _boom)
+    monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
+
+    with pytest.raises(RuntimeError):
+        graph.refresh_self(root)
+
+    assert out.read_text(encoding="utf-8") == before, (
+        "a failed refresh damaged graph.json; the rebuild must be staged and "
+        "swapped atomically so a crash leaves the previous graph untouched"
     )
 
 
