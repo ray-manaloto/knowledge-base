@@ -34,8 +34,14 @@ Adopted plugins (enabled in `.claude/settings.json`): `fable-orchestrator@fable-
 Opus fallback) and `antigravity@antigravity-for-claude-code` (Google Antigravity/Gemini 3.x lane via
 `agy`). The Claude architect plans and **verifies evidence** before "done"; only execution is delegated.
 
-Two more are enabled for skill self-improvement, both PROJECT-scope (`do-not.md` #11 —
-`extraKnownMarketplaces` + `enabledPlugins` here, never a write to `~/.claude`):
+Four more were enabled 2026-08-03 without needing a note here — `pr-review-toolkit`,
+`skill-creator`, `claude-md-management` (all `@claude-plugins-official`) and
+`mise@brentmitchell25`, all Ray's, all ordinary tooling. **Ten plugins are enabled in
+total**, which is what `md-size-budgets.md` § the skill-listing budget is about.
+
+Two are enabled for skill self-improvement and DO need a note, both PROJECT-scope
+(`do-not.md` #11 — `extraKnownMarketplaces` + `enabledPlugins` here, never a write to
+`~/.claude`):
 `plugin-eval@claude-code-workflows` (`/eval`, `/certify`, `/compare`; its static layer is what
 `mise run kb-skill-score` wraps) and `skillopt-sleep@skillopt-sleep` (`/skillopt-sleep`, from
 `microsoft/SkillOpt`, tracked as a `source_only` entry in `currency.toml`). SkillOpt-Sleep stages
