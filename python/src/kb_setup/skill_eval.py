@@ -48,6 +48,7 @@ is part of the result, not decoration. When no copy is reachable the run reports
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -85,6 +86,12 @@ _BASELINE_MD = "docs/skills/README.md"
 #: not a skill name — see `main`.
 _FLAGS = frozenset({"--write"})
 
+#: What `Scorer.code_id` fingerprints: the evaluator's OWN source plus the lock
+#: that decides which dependency versions it runs against. Deliberately not
+#: `**/*.py` — that would sweep in `.venv/` (715 files vs 31) and make the
+#: identity depend on where the plugin was installed rather than on what runs.
+_IDENTITY_GLOBS = ("src/**/*.py", "pyproject.toml", "uv.lock")
+
 _SCORE_TIMEOUT_S = 120.0
 
 #: `version = "0.1.0"` out of a pyproject, without a TOML parse of a file we do
@@ -99,6 +106,7 @@ class Scorer:
     root: Path
     origin: str
     version: str
+    code_id: str = ""
 
     def key(self) -> str:
         """The COMPARABILITY key — what two runs must share to be diffable.
@@ -108,8 +116,19 @@ class Scorer:
         artifact and (b) make every Δ vanish on any other machine, even when the
         identical plugin-eval build scored both. Version and origin are the facts
         that decide comparability; where the checkout happens to live is not.
+
+        **The declared version is not sufficient on its own**, which is why
+        `code_id` is here. `sources/agents.manifest` pins the fallback checkout
+        by COMMIT, while `plugins/plugin-eval/pyproject.toml` carries a static
+        `version = "0.1.0"` maintained independently of it — so advancing the pin
+        can change the evaluator's scoring code without moving the version, and
+        every subsequent Δ would then silently compare two different scorers. The
+        marketplace copy has the same shape: an update need not bump the version.
+        A digest of the evaluator's own source closes it, and costs ~70ms over
+        31 files.
         """
-        return f"plugin-eval {self.version or '(version unknown)'} [{self.origin}]"
+        code = self.code_id or "unknown"
+        return f"plugin-eval {self.version or '(version unknown)'} [{self.origin}] code:{code}"
 
     def label(self) -> str:
         """The key plus the checkout that produced it — console provenance."""
@@ -146,8 +165,51 @@ def resolve_scorer(repo_root: Path) -> Scorer | None:
     for origin, raw in _PLUGIN_ROOTS:
         root = Path(raw).expanduser() if raw.startswith("~") else repo_root / raw
         if (root / "pyproject.toml").is_file():
-            return Scorer(root=root, origin=origin, version=_version_of(root))
+            return Scorer(
+                root=root, origin=origin, version=_version_of(root), code_id=_code_id(root)
+            )
     return None
+
+
+def _code_id(root: Path) -> str:
+    """A digest of the evaluator's own source, or "" when nothing could be read.
+
+    Own source plus the dependency lock: a scoring change can arrive through
+    either, and `uv.lock` is what decides which version of a dependency the
+    static layer actually runs against. `.venv/` is excluded — hashing an
+    installed tree would make the identity depend on where it was installed
+    rather than on what will run.
+
+    "" is returned rather than the digest of nothing, which would be a CONSTANT
+    and would therefore make every unreadable checkout compare equal to every
+    other — a false identity, which is worse than none. `Baseline.delta` refuses
+    to compare when this is empty.
+
+    **Rendered in DECIMAL, not hex**, and that is not cosmetic: this string goes
+    into two committed files, and an arbitrary hex digest grows English-looking
+    letter runs by chance. The very first one this produced contained a
+    three-character run that `typos` corrects to a real word, and it failed the
+    lint. Any letter-bearing encoding has that failure mode, randomly, on some
+    future digest — so the choice is base 10 or a standing suppression on a
+    checker that was doing its job. Twelve digits is ~10^12 distinct values, far
+    past what "did the evaluator change?" needs.
+    """
+    digest = hashlib.sha256()
+    seen = 0
+    for pattern in _IDENTITY_GLOBS:
+        for path in sorted(root.glob(pattern)):
+            if not path.is_file():
+                continue
+            try:
+                body = path.read_bytes()
+            except OSError:
+                continue
+            digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+            digest.update(body)
+            seen += 1
+    if not seen:
+        return ""
+    return f"{int.from_bytes(digest.digest(), 'big') % 10**12:012d}"
 
 
 def vendored_names(repo_root: Path) -> frozenset[str]:
@@ -379,7 +441,12 @@ class Baseline:
         two `plugin-eval` builds would be the exact false-precision this module
         refuses everywhere else. Different scorer, no number.
         """
-        if self.scorer != scorer.key() or result.score is None:
+        # `not scorer.code_id` is its own clause, not folded into the key
+        # comparison: an unreadable checkout keys as `code:unknown`, and two
+        # unknowns are string-equal without being the same code. That is the
+        # false identity `_code_id` returns "" to avoid, and this is the guard
+        # that makes the empty value mean something.
+        if not scorer.code_id or self.scorer != scorer.key() or result.score is None:
             return "—"
         before = self.scores.get(result.name)
         if before is None:
@@ -406,11 +473,19 @@ def load_baseline(repo_root: Path) -> Baseline | None:
     if not isinstance(data, dict):
         return None
     raw = data.get("scores")
-    scores = {
-        str(k): float(v)
-        for k, v in (raw.items() if isinstance(raw, dict) else ())
-        if isinstance(v, (int, float))
-    }
+    if not isinstance(raw, dict) or not raw:
+        return None
+    scores: dict[str, float] = {}
+    for name, value in raw.items():
+        # PARTIAL corruption rejects the WHOLE baseline. Filtering bad entries out
+        # and returning the rest looked tolerant and was the false-green again: a
+        # dropped skill reports as `new` on the next run — an assertion that it
+        # has never been measured — where discarding the baseline reports "no Δ",
+        # which is merely an absence. `bool` is excluded explicitly because it is
+        # a subclass of `int`, so `true` would otherwise load as the score 1.0.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        scores[str(name)] = float(value)
     return Baseline(scorer=str(data.get("scorer", "")), scores=scores)
 
 
@@ -461,9 +536,35 @@ def write_baseline(
         "scorer": scorer.key(),
         "scores": {r.name: round(r.score, 1) for r in results if r.score is not None},
     }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (repo_root / _BASELINE_MD).write_text(rendered + "\n", encoding="utf-8")
+    # Rendered BEFORE either write, and the JSON written LAST, on purpose. These
+    # are two committed files and no filesystem makes two writes atomic, so the
+    # question is not whether a failure can split them but which split is safe.
+    # The JSON is the only input to the Δ; the README is a rendering of it. So a
+    # failed JSON write leaves the Δ computing against the intact OLD baseline —
+    # an honest, visible mismatch a human sees in `git status` — while the
+    # reverse would leave a new baseline that no README documents. Each write is
+    # temp-then-rename so neither file is ever observed half-written.
+    _atomic_write(repo_root / _BASELINE_MD, rendered + "\n")
+    _atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return path
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write `text` to `path` via a temp file and a rename, never in place.
+
+    `Path.write_text` truncates first, so an interrupted write leaves a
+    truncated committed artifact — for the baseline JSON that is a corrupt file
+    whose next read now (correctly) discards the whole thing, silently losing
+    every recorded score. A rename is atomic on POSIX; the temp file is removed
+    if the write fails so a crashed run leaves no debris beside the real file.
+    """
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _render(
@@ -636,12 +737,16 @@ def main(argv: list[str], repo_root: Path) -> int:
     if write:
         try:
             path = write_baseline(repo_root, scorer, results, previous=previous)
-        except ValueError as exc:
+        except (ValueError, OSError) as exc:
             # The table above still printed, so the reader sees WHICH skill failed
             # and why. What they do not get is a baseline missing that skill's
             # history — one transient timeout would otherwise erase a score
             # silently and report it as `new` on the next run.
-            print(f"[skill-score] {exc}", file=sys.stderr)
+            #
+            # OSError is caught alongside it because the writes really can fail
+            # (full disk, read-only checkout) and an uncaught traceback out of an
+            # advisory task is a worse report than a named rc 2.
+            print(f"[skill-score] baseline not written — {exc}", file=sys.stderr)
             return 2
         print(f"\n[skill-score] baseline written to {path.relative_to(repo_root)}")
     return 0

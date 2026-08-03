@@ -1,6 +1,6 @@
 # Skill scores — plugin-eval static layer (ADVISORY)
 
-Scorer: plugin-eval 0.1.0 [marketplace]
+Scorer: plugin-eval 0.1.0 [marketplace] code:946303247300
 
 | Skill | Score | Δ | Anti-patterns | Weakest reachable dimension | Note |
 |---|---|---|---|---|---|
