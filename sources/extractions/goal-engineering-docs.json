@@ -1,7 +1,7 @@
 {
  "nodes": [
   {
-   "id": "ceccarelli_doc",
+   "id": "ceccarelli_doc","_origin":"semantic",
    "label": "\"Goal Engineering: how I brief coding agents using paired goal+rider documents\" is a May 18, 2026 field-notes essay by Greg Ceccarelli (gregce, of SpecStory) describing a practice of writing two committed markdown files per round of autonomous coding-agent work: a goal (under 4,000 characters) and a rider (unbounded). It is explicitly modeled on Nicholas Carlini's \"How I Use AI\" and aims to \"exhaust you with examples\"; stated read time 10 minutes skimming, 25 if you open every quoted file.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -12,7 +12,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_tldr",
+   "id": "ceccarelli_tldr","_origin":"semantic",
    "label": "The essay's TL;DR: two markdown files per round of agent work — a goal (under 4,000 characters) and a rider (unbounded, with phases and named tests). The agent reads both, executes against them, and commits its work alongside them. The pair lives in docs/goals/ forever.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -23,7 +23,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_goal_document",
+   "id": "ceccarelli_goal_document","_origin":"semantic",
    "label": "A GOAL is the short, capped (<=4,000 char) spine of one round of agent work: a committed markdown file holding the headline sentence, the read-first list, the posture, the domain body, the phase pointer, the verification commands, and the stop-when clause. It is small enough to paste into a Codex or Claude Code /goal field.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -34,7 +34,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_document",
+   "id": "ceccarelli_rider_document","_origin":"semantic",
    "label": "A RIDER is the unbounded companion document (typically 10-35 KB) holding the prescriptive detail a goal cannot carry: data schemas, phase plans, depth-test names, verb signatures, algorithms, integration matrix, error footers, dependency policy, and out-of-scope lists. It is the 'longer instructions in a file' the harness itself tells you to write.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -45,7 +45,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_why_split",
+   "id": "ceccarelli_why_split","_origin":"semantic",
    "label": "The goal/rider split is forced by the harness, not by taste: the goal is what fits inside the 4,000-character /goal field, and the rider is the file the harness's own rejection message tells you to point at. The consequence is that the goal stays pasteable while the rider can be arbitrarily detailed without bloating the executor's working memory.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -56,7 +56,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_round_unit",
+   "id": "ceccarelli_round_unit","_origin":"semantic",
    "label": "Ceccarelli's unit of work is the ROUND, not the prompt: 'A prompt is the unit of one chat turn. A round is the unit I think in now.' One round is one goal+rider pair, eleven phases, and one architecture-doc update at the end. The pair is the brief that opens the round; everything else is the round playing out.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -67,7 +67,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_artifact_over_turn",
+   "id": "ceccarelli_artifact_over_turn","_origin":"semantic",
    "label": "The claimed shift is 'from thinking turn-by-turn to thinking artifact-by-artifact': the brief is a committed file with a sha, so you can git diff it, teammates can comment on it in a PR, and the agent can re-read it as many times as the round needs.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -78,7 +78,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_prompt_limitations",
+   "id": "ceccarelli_prompt_limitations","_origin":"semantic",
    "label": "What prompts cannot do, per Ceccarelli: a prompt is a single utterance that scrolls off; you cannot grep for it in three weeks, cannot diff it against the version that shipped last Tuesday, and cannot point a reviewer at it. A prompt has no integration matrix and no out-of-scope list, so the next round re-litigates scope — and a prompt cannot fail a build.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -89,7 +89,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_specstory_caveat",
+   "id": "ceccarelli_specstory_caveat","_origin":"semantic",
    "label": "Ceccarelli flags an exception to his own 'you cannot grep a prompt' claim: SpecStory captures every prompt-and-response turn from Cursor, Claude Code, Codex, Windsurf and Cline into searchable history files. His narrowed argument is that even a greppable prompt is not a checked-in artifact a reviewer can diff against last Tuesday's version. He discloses that he works at SpecStory.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -100,7 +100,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_authoring_cost_benefit",
+   "id": "ceccarelli_authoring_cost_benefit","_origin":"semantic",
    "label": "The stated trade of goal engineering: 'The cost is that I have to write the documents. The benefit is that one minute of careful authoring deletes ten minutes of mid-run intervention.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -111,7 +111,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_abort_record",
+   "id": "ceccarelli_abort_record","_origin":"semantic",
    "label": "Reported outcome across the two repos: 'I have not yet had to abort a run because the agent misunderstood scope. I have aborted runs because the depth tests caught a thin slice. That is the point.' — i.e. the aborts that happened were the tests working, not the brief failing.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -122,7 +122,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_naming_schema",
+   "id": "ceccarelli_naming_schema","_origin":"semantic",
    "label": "Both documents live at <project>/docs/goals/<YYYY-MM-DD>-<HHMM>-<project>-<topic>-{goal,rider}.md — a minute-precise timestamped path so that `ls docs/goals/` shows the project's authoring order at a glance and the pair lives in the repo forever.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -133,7 +133,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_hhmm_rationale",
+   "id": "ceccarelli_hhmm_rationale","_origin":"semantic",
    "label": "The <HHMM> in the filename is the local 24-hour authoring time; it makes `ls docs/goals/` sort in true authoring order rather than alphabetically by topic. The goal and rider MUST share one timestamp — 'never split them across minutes, or the alphabetical sort breaks.' Two pairs in the same minute fall back to alphabetical sort by topic, which is fine.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -144,7 +144,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_pair_listing_example",
+   "id": "ceccarelli_pair_listing_example","_origin":"semantic",
    "label": "A real listed pair: `ls docs/goals/ | grep 2026-05-17-2130` returns 2026-05-17-2130-findunmet-run-liveness-goal.md and -rider.md. That goal is 3,991 characters, the rider is 31 KB; together they specify twelve phases, name 47 depth tests, define a stage-aware Vercel-cron watchdog, and pin a failure_reason regex that becomes a depth-tested spec. The work landed across 13 commits between May 17, 2026 22:31 and May 18, 2026 00:46.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -155,7 +155,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_four_thousand_cap",
+   "id": "ceccarelli_four_thousand_cap","_origin":"semantic",
    "label": "The goal's 4,000-character cap is not arbitrary: it is the limit Codex's /goal command enforces on the objective text, which Claude Code matched twelve days later. Either harness refuses longer text and tells you to 'put longer instructions in a file and refer to that file in the goal' — which is exactly what the rider is.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -166,7 +166,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_cap_source_codex",
+   "id": "ceccarelli_cap_source_codex","_origin":"semantic",
    "label": "Footnote 8 pins the cap to source: `pub const MAX_THREAD_GOAL_OBJECTIVE_CHARS: usize = 4_000;` in codex-rs/protocol/src/protocol.rs, enforced by codex-rs/tui/src/chatwidget/goal_validation.rs, whose rejection message reads 'Put longer instructions in a file and refer to that file in the goal, for example: /goal follow the instructions in docs/goal.md'.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -177,7 +177,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_cap_as_forcing_function",
+   "id": "ceccarelli_cap_as_forcing_function","_origin":"semantic",
    "label": "The cap's real value is as a forcing function: 'it forces me to decide what the goal is before I write it.' Ceccarelli runs `wc -c` on the goal as a pre-commit habit; corpus precedents run 3,929 to 4,112 characters, and anything past 4,100 signals the goal is doing work that belongs in the rider. The authoring procedure follows from it: sketch the goal in a throwaway file, and if it will not fit, 'narrow the scope until you can. THE NARROWING IS THE POINT. The cap is a forcing function; it teaches you what one round looks like.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -188,7 +188,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_cap_is_schelling_point",
+   "id": "ceccarelli_cap_is_schelling_point","_origin":"semantic",
    "label": "Ceccarelli concedes a sixth objection: the cap is borrowed from Codex's MAX_THREAD_GOAL_OBJECTIVE_CHARS rather than derived from first principles. His defensible claim is only that SOME hard cap forces the round to be one round; the specific number 4,000 is 'a Schelling point, not a discovery.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -199,7 +199,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_five_section_skeleton",
+   "id": "ceccarelli_five_section_skeleton","_origin":"semantic",
    "label": "Below the headline, a goal follows a five-section skeleton in fixed order: Read first (absolute paths) / Posture (what does NOT change) / [domain body] (the what-to-build) / Phases (eleven, in the rider) / Verification (observable commands and assertions) / Stop when (one sentence tying verification to a final commit).",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -210,7 +210,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_section_read_first",
+   "id": "ceccarelli_section_read_first","_origin":"semantic",
    "label": "READ FIRST is the goal's first section: absolute paths to the architecture doc, the rider, the exemplars, and the prior riders in docs/goals/. It is 'non-negotiable' — the agent reads all of them before writing a line of code, and 'if I cannot point at the documents that ground the round, the round is not ready to start.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -221,7 +221,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_section_posture",
+   "id": "ceccarelli_section_posture","_origin":"semantic",
    "label": "POSTURE is the goal's second section: what does NOT change this round — schema, maturity tier, push policy, edit-directory scope. 'Posture is where most goal-engineering bugs hide.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -232,7 +232,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_section_domain_body",
+   "id": "ceccarelli_section_domain_body","_origin":"semantic",
    "label": "The DOMAIN BODY is the goal's third section and the only free-form one: modes, verbs, contracts — 'the what to build'. Its shape varies per round (a flag-rename diff in prose, a four-layer contract, a list of new verbs).",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -243,7 +243,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_section_phases",
+   "id": "ceccarelli_section_phases","_origin":"semantic",
    "label": "PHASES is the goal's fourth section and is only a pointer: eleven phases, defined in the rider, each following depth test -> implement -> green -> commit.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -254,7 +254,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_section_verification",
+   "id": "ceccarelli_section_verification","_origin":"semantic",
    "label": "VERIFICATION is the goal's fifth section: observable commands and assertions — the exit criteria a human could paste into a terminal.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -265,7 +265,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_section_stop_when",
+   "id": "ceccarelli_section_stop_when","_origin":"semantic",
    "label": "STOP WHEN is the goal's closing section: a single sentence tying verification to a final commit. Worked form: the round 'ends when the four verification commands return green and the architecture doc has section N. Anything else is a different round.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -276,7 +276,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_headline_word",
+   "id": "ceccarelli_headline_word","_origin":"semantic",
    "label": "Every goal picks exactly one HEADLINE WORD — Liveness, Coherent, Friendliness, Self-documenting, Default mode, Multi-agent, Single authority. It names the state of the world AFTER the round, not the work done during it.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -287,7 +287,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_headline_word_test",
+   "id": "ceccarelli_headline_word_test","_origin":"semantic",
    "label": "The headline word is a scope test, not decoration: 'The headline word is the test of whether the goal is one round. If I cannot pick a single word, the scope is too wide and I split the round in two.' Restated in the try-it-tomorrow instructions as 'Pick a headline word. / If you can't, you're still trying to do two rounds.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -298,7 +298,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_posture_as_negations",
+   "id": "ceccarelli_posture_as_negations","_origin":"semantic",
    "label": "Posture is written as a LIST OF NEGATIONS — things the round will not do. The run-liveness posture is six sentences of which five are negations: no schema changes, no new deps, no rebuild, no push, edits inside this directory. The sixth names the explicit blocker (v3 TLS-blocked) and the workaround in production.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -309,7 +309,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_posture_as_fence",
+   "id": "ceccarelli_posture_as_fence","_origin":"semantic",
    "label": "The stated reason posture exists: 'An autonomous agent under pressure will invent solutions. Posture is the fence that keeps it from inventing one outside this round.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -320,7 +320,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_posture_carries_guards",
+   "id": "ceccarelli_posture_carries_guards","_origin":"semantic",
    "label": "A goal+rider pair 'carries the posture: tier, schema-stability promises, the explicit \"no V1 invention\" guard that keeps an agent from inventing scope under pressure' — the guard is a named, written clause, not an implicit expectation.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -331,7 +331,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_drafting_prework",
+   "id": "ceccarelli_drafting_prework","_origin":"semantic",
    "label": "Drafting a pair starts with roughly ninety seconds of pre-work by the skill before it writes a line of output: it reads the project's architecture doc, the most recent goal+rider pair in docs/goals/, the CHANGELOG, the V1-CANDIDATES list, and any source files at HEAD the new pair will quote by name.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -342,7 +342,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_drafting_trigger",
+   "id": "ceccarelli_drafting_trigger","_origin":"semantic",
    "label": "A round begins with a one-sentence trigger to a skill — typos and all: `/goal-rider-author <command-args>I would like to create a goal and rider to evaluate this against the original unmet needs and how it currently works to figure out additional hardening and usability imrprovements</command-args>`. That sentence turns into two markdown documents the agent reads before touching code.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -353,7 +353,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_drafting_iteration",
+   "id": "ceccarelli_drafting_iteration","_origin":"semantic",
    "label": "Human iteration on a draft is a single follow-up sentence, not a rewrite: 'This is good but i want to allow network access by default' produced a surgical edit to the rider's posture section, then a commit. That day: nineteen turns, two hours, three pairs.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -364,7 +364,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_opening_convention",
+   "id": "ceccarelli_rider_opening_convention","_origin":"semantic",
    "label": "A rider opens by citing the goal's ABSOLUTE path and listing the prior riders whose invariants compose forward — e.g. 'This rider holds the prescriptive constraints for the goal at /Users/gdc/findunmet/docs/goals/2026-05-17-2130-findunmet-run-liveness-goal.md. It supersedes nothing in prior riders (notably 2026-05-17-1521-findunmet-multi-iter-cockpit-rider.md, whose P6 ranked heartbeat is the template for the rest of this work).'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -375,7 +375,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_as_code_review_in_advance",
+   "id": "ceccarelli_rider_as_code_review_in_advance","_origin":"semantic",
    "label": "Naming a prior artifact as the template tells the agent that half the implementation is a REFACTOR, not a green-field write: the rider names the source file and line range (emitRankHeartbeats in runner/rank.go:33-77) and says 'generalize the body.' Ceccarelli calls this 'goal engineering as code review in advance.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -386,7 +386,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_sections",
+   "id": "ceccarelli_rider_sections","_origin":"semantic",
    "label": "A typical rider carries roughly a dozen named sections — Posture, Data model, Algorithms, Verb signatures, Phases, Integration matrix, Out-of-scope, Dependencies, and a few project-specific ones.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -397,7 +397,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_validator",
+   "id": "ceccarelli_rider_validator","_origin":"semantic",
    "label": "The skill ships a mechanical validator that greps for the rider's headers and counts its phase blocks: 'If `grep -c \\'^### P[0-9]\\' rider.md` is not 11, the rider is not done.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -408,7 +408,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_depth_test_definition",
+   "id": "ceccarelli_depth_test_definition","_origin":"semantic",
    "label": "A DEPTH TEST is a test that pins one specific behavior, named precisely. Ceccarelli notes others call these characterization tests or behavioral tests — same idea; the name is his.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -419,7 +419,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_eleven_phases",
+   "id": "ceccarelli_eleven_phases","_origin":"semantic",
    "label": "Each rider has eleven phases, P1 through P11 — the standard shape of one round.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -430,7 +430,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_eleven_not_religion",
+   "id": "ceccarelli_eleven_not_religion","_origin":"semantic",
    "label": "CONDITION on the eleven-phase count: 'The eleven is a target, not a religion. Some pairs are 9. The run-liveness pair stretched to 12 because P11 split into sandbox-kill and watchdog work.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -441,7 +441,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_phase_loop",
+   "id": "ceccarelli_phase_loop","_origin":"semantic",
    "label": "Every phase follows the same five-step loop: (1) write the named depth tests first and watch them fail; (2) implement the slice that makes them pass; (3) run the project's full build+test+lint+fmt command — green on every commit; (4) make one conventional-commit local commit whose message ends `(rider PN)`; (5) append one line to CHANGELOG.md.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -452,7 +452,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_depth_tests_named_in_rider",
+   "id": "ceccarelli_depth_tests_named_in_rider","_origin":"semantic",
    "label": "Depth tests are NAMED IN THE RIDER before the implementation exists. The run-liveness P5 stall-guard tests were listed verbatim in the rider — stallguard_kills_after_no_output_growth_in_threshold_window, stallguard_does_not_kill_during_steady_output_growth, stallguard_sigterm_then_sigkill_after_grace_period, stallguard_sets_killed_true_and_kill_reason_no_output_threshold_seconds, stallguard_first_byte_grace_does_not_kill_before_any_stdout_growth, stallguard_respects_outer_timeout_as_upper_bound, stallguard_returns_stdout_and_stderr_collected_pre_kill — so the agent's first action in P5 was to create runner/stallguard_test.go with seven FAILING tests.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -463,7 +463,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_test_names_as_assertions",
+   "id": "ceccarelli_test_names_as_assertions","_origin":"semantic",
    "label": "The bar for a depth-test name: 'Read those test names aloud. Each one is a behavioral assertion you could defend in a code review.' A name like lifecycle_fail_truncates_suffix_not_prefix_when_over_cap passes; test_lifecycle_fail_5 does not.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -474,7 +474,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_mechanical_test_presence_check",
+   "id": "ceccarelli_mechanical_test_presence_check","_origin":"semantic",
    "label": "Presence of the named depth tests is enforced mechanically, not by trust: `grep -c '^ fn '` (Rust) or `grep -c '^func Test_'` (Go) on the test file counts them.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -485,7 +485,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_phase_p11_doc_only",
+   "id": "ceccarelli_phase_p11_doc_only","_origin":"semantic",
    "label": "Phase P11 is doc-only with no depth test: it adds a new top-level section to the architecture doc and a milestone line to CHANGELOG.md. Most of the author's architecture docs carry a 'what's shipped vs thin' two-column inventory near the top; P11 is where items move from the thin column to the shipped column. 'That honesty rule means the architecture doc never lies about what's done.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -496,7 +496,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_files_not_fields",
+   "id": "ceccarelli_files_not_fields","_origin":"semantic",
    "label": "FILES, NOT FIELDS: persistent per-feature state lives in files inside the working tree, not as new fields on a long-lived struct. The run-liveness rider invents /tmp/run/stage.current, a one-line sidecar written atomically (write to .tmp, os.Rename into place) before each stage; an in-memory currentStage field would have died with the runner, while the file survives the crash and os.Rename makes locking unnecessary.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -507,7 +507,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_specifies_write_protocol",
+   "id": "ceccarelli_rider_specifies_write_protocol","_origin":"semantic",
    "label": "The rider specifies the sidecar's write protocol EXPLICITLY 'because the agent will otherwise reach for a mutex' — a worked instance of pre-empting the agent's default reach with a written prescription.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -518,7 +518,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_no_schema_changes_frequency",
+   "id": "ceccarelli_no_schema_changes_frequency","_origin":"semantic",
    "label": "'No DB schema changes' appears in 14 of 15 findunmet riders; the single exception was the original schema-creation pair. When a phase reveals it needs a schema change, the rider's instruction is: stop, log it to docs/V1-CANDIDATES.md, do not silently expand scope.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -529,7 +529,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_v1_candidates",
+   "id": "ceccarelli_v1_candidates","_origin":"semantic",
    "label": "Every project has a docs/V1-CANDIDATES.md — the OVERFLOW VALVE. Anything an in-flight rider proves it should not do this round goes there. 'It is the pressure-relief valve that keeps the eleven-phase loop honest.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -540,7 +540,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_v1_candidates_examples",
+   "id": "ceccarelli_v1_candidates_examples","_origin":"semantic",
    "label": "Real V1-CANDIDATES entries written during the run-liveness round: per-stage timeout reduction (existing 20/45/30/30-minute outer caps stay); per-fetch-query stall guard (fetch goroutines are individually short); email notification on watchdog refund (belongs to the pricing rider's Surface E follow-up); a 'stage stalled' cockpit toast (the existing failed card is enough for alpha); backfill of existing failure_reason values (historical rows keep their strings). 'Each of those is a real engineering decision that could otherwise have eaten four hours.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -551,7 +551,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_out_of_scope_vs_v1_file",
+   "id": "ceccarelli_out_of_scope_vs_v1_file","_origin":"semantic",
    "label": "Naming the deferred items in the rider's Out-of-scope section 'is what makes the round shippable in a day instead of a week.' The V1-CANDIDATES file is the durable home for them; the rider's Out-of-scope section is the local copy.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -562,7 +562,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_friendliness_contract",
+   "id": "ceccarelli_friendliness_contract","_origin":"semantic",
    "label": "Both projects share a five-bullet contract for user-facing surfaces, lifted verbatim across riders: auto-detect don't ask (the obvious case is the default); preflight + preview before any state change; refuse with `try: <command>` lines; rollback is one command; lifecycle hints after every action. Each bullet is exercised by a depth test in the rider that introduces it — 'The contract is a build gate.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -573,7 +573,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_try_lines_parameterized_test",
+   "id": "ceccarelli_try_lines_parameterized_test","_origin":"semantic",
    "label": "The `try:` refusal lines are checked by a PARAMETERIZED test that fires every refusal code and asserts its recovery hint is present and non-empty — turning a prose UX promise into an enumerable build gate.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -584,7 +584,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_why_it_works",
+   "id": "ceccarelli_why_it_works","_origin":"semantic",
    "label": "The stated mechanism: 'Claude Opus running unattended for an hour can land 12 commits, write 40 tests, and refactor across 8 files. The bottleneck is the human, specifying what the round is.' Goal engineering moves that specification work from inside the run (where every misunderstanding costs an LLM round-trip) to before the run (where misunderstanding costs nothing because the agent hasn't started).",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -595,7 +595,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_five_forcings",
+   "id": "ceccarelli_five_forcings","_origin":"semantic",
    "label": "The five forcings of the practice, one per artifact: 'The cap forces decisions. The rider forces precision. The phases force sequencing. The depth tests force testability. The P11 architecture-doc update forces honesty about what shipped.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -606,7 +606,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_portability",
+   "id": "ceccarelli_portability","_origin":"semantic",
    "label": "Portability claim: the pattern has been run across Rust, TypeScript, Go, Python, and mixed stacks — 'The toolchain commands differ. The shape doesn't.' Two markdown files brief Codex, Claude Code, Cursor, or a human reviewer next quarter without modification; the harness changes, the artifact doesn't.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -617,7 +617,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_objection_journal_entry",
+   "id": "ceccarelli_objection_journal_entry","_origin":"semantic",
    "label": "Skeptic objection 1 — 'Eight days, two projects, both yours. This is a journal entry, not a methodology.' Answer: 'Correct. These are field notes, not a study. The only claim is that this is what I do, with the artifacts public so you can judge the shape for yourself.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -628,7 +628,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_objection_tdd_with_glossary",
+   "id": "ceccarelli_objection_tdd_with_glossary","_origin":"semantic",
    "label": "Skeptic objection 2 — 'This is TDD with a glossary.' Answer: mostly true; tests-first, vertical scope, deferring non-essentials and updating an architecture doc are Kent Beck's 1999 moves. The narrower novel claim is that the CHECKED-IN PAIR, not the practice, is what makes the round survive an unattended overnight agent.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -639,7 +639,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_objection_solo_greenfield",
+   "id": "ceccarelli_objection_solo_greenfield","_origin":"semantic",
    "label": "Skeptic objection 3 — 'You shipped fast because you're solo on greenfield Rust and Next.js.' Answer: true; both projects are alpha, solo, no migrations, no on-call, no CODEOWNERS. 'Whether the pair survives a multi-owner repo with a real review process is unknown; this should not pretend otherwise.' The only partial evidence is that the same pair briefs Codex, Claude Code, Cursor and a human without modification.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -650,7 +650,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_objection_ceremony",
+   "id": "ceccarelli_objection_ceremony","_origin":"semantic",
    "label": "Skeptic objection 5 — 'Headline word, posture, V1-CANDIDATES — this is ceremony for an audience of one.' Answer: partly fair; the vocabulary is for the author's own cross-round consistency. 'If you copy anything, copy the artifacts (a checked-in pair, named tests, a closed architecture doc) and leave the ritual behind.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -661,7 +661,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_evidence_base",
+   "id": "ceccarelli_evidence_base","_origin":"semantic",
    "label": "The evidence base, self-limited: eight days of use across two projects (deadreckon, open-source Rust CLI; findunmet, a private consumer research product), 37 goal+rider pairs and roughly 500 commits between them. The first goal+rider in the corpus is dated May 10, 2026; the drafting skill went up two days earlier.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -672,7 +672,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_deadreckon_project",
+   "id": "ceccarelli_deadreckon_project","_origin":"semantic",
    "label": "deadreckon is Ceccarelli's open-source Rust CLI (github.com/gregce/deadreckon): a harness around whichever coding agent you already use (Claude Code, Codex, Cursor), whose job is to let you start a long agent run, walk away, and trust the result. It turns a plain-English 'done' into executable checks, runs the agent in an isolated git worktree, and keeps the loop going until the checks pass.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -683,7 +683,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_findunmet_project",
+   "id": "ceccarelli_findunmet_project","_origin":"semantic",
    "label": "findunmet is the second, private project: a consumer-grade research product where you type a topic and an agent reads across Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub and the open web and returns a cited synthesis of what people are complaining about, trying, and paying for.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -694,7 +694,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_dr_gate",
+   "id": "ceccarelli_dr_gate","_origin":"semantic",
    "label": "dr-gate is deadreckon's headline feature: a SEPARATE WATCHDOG PROCESS that decides when a run is finished. Rather than asking a model, it re-runs the goal's executable checks itself and signs the result with a secret the agent process cannot read. 'The agent cannot forge a signature it has never seen, so the only path to \"done\" is real evidence an independent process can re-verify.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -705,7 +705,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_llm_as_judge_critique",
+   "id": "ceccarelli_llm_as_judge_critique","_origin":"semantic",
    "label": "The sharpest published criticism of the /goal feature: \"Codex's /goal and Claude Code's /goal both lean on an LLM-as-judge inside the same harness: the agent (or a sibling model) is asked whether it's done, which is OPINION, NOT EVIDENCE.\" dr-gate is offered as the contrast — executable checks re-run by an independent process.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -716,7 +716,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_altimeter_metaphor",
+   "id": "ceccarelli_altimeter_metaphor","_origin":"semantic",
    "label": "The framing metaphor: 'If the goal+rider is the flight plan, dr-gate is the altimeter that will not take the pilot's word for it. deadreckon exists so this survives an overnight run with no human watching.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -727,7 +727,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_dr_gate_mechanics",
+   "id": "ceccarelli_dr_gate_mechanics","_origin":"semantic",
    "label": "dr-gate mechanics (footnote 9): at startup it generates a per-run nonce held in its own memory; the agent is spawned as a child with NO read access to that memory. When the agent claims completion, dr-gate independently re-runs the goal's executable checks (tests, file shape, scripts), and only if those pass does it sign a work-complete marker with the nonce. Promotion of the run to a reviewable artifact requires that signature. 'The contrast with a same-harness LLM-as-judge is the contrast between a signed receipt and a verbal claim.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -738,7 +738,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_dr_gate_theater_objection",
+   "id": "ceccarelli_dr_gate_theater_objection","_origin":"semantic",
    "label": "Skeptic objection 4 — 'dr-gate is theater. An agent that writes the tests also writes tests that pass.' Answer: the objection conflates two layers. dr-gate runs checks compiled from def-done, written in plain English BEFORE the agent started, and the agent cannot forge the signing nonce. 'The residual risk is that I underspecify done, not that the agent grades itself.' The rider's depth tests are a separate layer the agent does write — and a human still reads those names before merging.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -749,7 +749,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_dr_gate_narrow_job",
+   "id": "ceccarelli_dr_gate_narrow_job","_origin":"semantic",
    "label": "dr-gate's scope is deliberately narrow: 'making sure the agent can't say done when my pre-declared checks haven't returned green.' It does not claim to make the agent's own tests good.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -760,7 +760,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_claude_code_goal_mechanism",
+   "id": "ceccarelli_claude_code_goal_mechanism","_origin":"semantic",
    "label": "How Claude Code's /goal actually works (footnote 7): shipped in v2.1.139 on May 12, 2026, twelve days after Codex. It is a session-scoped, PROMPT-BASED STOP HOOK — each time Claude finishes a turn, the condition plus the conversation so far go to the configured small fast model (Haiku by default), which returns a yes/no decision and a short reason; the hook blocks stopping until the answer is yes. Conditions carry the same 4,000-char cap as Codex; works in -p and Remote Control.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -771,7 +771,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_codex_goal_mechanism",
+   "id": "ceccarelli_codex_goal_mechanism","_origin":"semantic",
    "label": "How Codex's /goal works (footnote 6): shipped in Codex CLI v0.128.0 on April 30, 2026, initially behind `[features] goals = true` in config.toml. The command sets a session-scoped completion condition; the agent plans, edits, runs tests, and iterates until it judges the condition met OR hits the configured token budget — the token budget being the only harness-level bound.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -782,7 +782,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_discipline_table",
+   "id": "ceccarelli_discipline_table","_origin":"semantic",
    "label": "Four named disciplines, each on a different unit, none mutually exclusive: prompt engineering (unit: one chat turn; output: the prompt text; read by one LLM call; does not compound); context engineering (one inference call; an assembled context window; one LLM call; compounds only indirectly via retrieval/memory); compound engineering (the project; captured lessons; all future agent runs; compounds by design); goal engineering (one round; a committed goal+rider pair; read by the agent now, then humans, then future rounds; compounds — each pair joins the corpus the next pair reads).",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -793,7 +793,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_lessons_vs_promises",
+   "id": "ceccarelli_lessons_vs_promises","_origin":"semantic",
    "label": "The compact distinction: 'Compound engineering compounds LESSONS. Goal engineering compounds PROMISES.' Said most simply: 'compound engineering looks backward and ships forward. Goal engineering ships a promise and proves it landed.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -804,7 +804,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_compound_engineering",
+   "id": "ceccarelli_compound_engineering","_origin":"semantic",
    "label": "Compound engineering (Kieran Klaassen, Every, January 2026, out of building Cora) captures lessons from FINISHED work: the loop is Plan -> Work -> Assess -> Compound with roughly 80% of effort in planning and review; the plugin (~16,900 GitHub stars) ships 50+ subagents and 38+ skills, parallel persona reviewers grade the diff, and /ce-compound writes a structured solution doc to docs/solutions/<category>/. 'The artifact is hindsight, distilled.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -815,7 +815,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_they_stack",
+   "id": "ceccarelli_they_stack","_origin":"semantic",
    "label": "The two practices stack rather than compete: compound engineering's docs/solutions/ lessons feed exactly the goal-rider skill's pre-work, and goal engineering's P11 closure feeds compound engineering's substrate. 'The corpus grows from both ends.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -826,7 +826,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_divergence_cap",
+   "id": "ceccarelli_divergence_cap","_origin":"semantic",
    "label": "First divergence — THE CAP: a goal must fit the Codex /goal limit, while compound engineering's plans can run as long as the planner wants. 'The cap is the part of the practice that teaches you what one round actually is.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -837,7 +837,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_divergence_order",
+   "id": "ceccarelli_divergence_order","_origin":"semantic",
    "label": "Second divergence — THE ORDER: compound engineering writes its learning doc AFTER the work is done; the goal+rider is the test of done, written BEFORE any code, then used to judge whether the work landed.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -848,7 +848,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_divergence_verdict",
+   "id": "ceccarelli_divergence_verdict","_origin":"semantic",
    "label": "Third divergence — THE VERDICT: compound engineering's review is persona-agent consensus with confidence gating; goal engineering's verdict is a set of COMMANDS A HUMAN CAN PASTE INTO A TERMINAL (cargo test && cargo clippy, grep -c '^func Test_', an architecture-doc section that did not exist this morning). 'Opinions versus evidence; pair either with dr-gate for a signed receipt.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -859,7 +859,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_divergence_portability",
+   "id": "ceccarelli_divergence_portability","_origin":"semantic",
    "label": "Fourth divergence — PORTABILITY: two markdown files brief Codex, Claude Code, Cursor, or a human reviewer next quarter without modification, whereas compound engineering travels with its plugin ('the loop is the product'). 'The pair is just the spec, and any harness can run it.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -870,7 +870,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_round_has_hard_cap",
+   "id": "ceccarelli_round_has_hard_cap","_origin":"semantic",
    "label": "First thing goal engineering does that the others don't: the unit is one round AND THE ROUND HAS A HARD CAP. Compound engineering doesn't bound the round; context engineering doesn't bound the unit at all; prompt engineering bounds at one turn but has no notion of round.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -881,7 +881,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_brief_is_a_promise",
+   "id": "ceccarelli_brief_is_a_promise","_origin":"semantic",
    "label": "Second: the brief is a PROMISE that outlives the run. A prompt vanishes after the turn, a context window after the call, and a compound-engineering solution doc is written after something is learned — whereas the goal+rider is written before the round and stays as that round's spec for as long as the repo exists. Three weeks later `git log --grep \"rider P5\"` returns the one commit that landed P5 against a spec still readable at HEAD.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -892,7 +892,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_project_scoped_not_session_scoped",
+   "id": "ceccarelli_project_scoped_not_session_scoped","_origin":"semantic",
    "label": "Third and most important for /goal: THE SPEC IS PROJECT-SCOPED, NOT SESSION-SCOPED. A /goal completion contract 'tells the harness when to stop for this thread. That contract lives until the thread ends, then it is gone.' The goal+rider is the project-scoped artifact that surrounds it — 'The slash command is the runtime. The pair is the spec. The pair compounds; the slash command does not.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -903,7 +903,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_context_engineering_lineage",
+   "id": "ceccarelli_context_engineering_lineage","_origin":"semantic",
    "label": "Lineage: prompt engineering taught the field how to ask; context engineering — named June 2025 by Walden Yan, Tobi Lutke and Andrej Karpathy, then codified by Drew Breunig and Anthropic — taught it what to put in the window. Goal engineering points at a third axis: how to specify the END-STATE of one round so an agent can drive there on its own.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -914,7 +914,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_example",
+   "id": "ceccarelli_coherent_example","_origin":"semantic",
    "label": "WORKED EXAMPLE 1 — deadreckon's 'Coherent' pass (pair 2026-05-13-1900-deadreckon-coherence-{goal,rider}.md, headline word Coherent). On May 13, 2026 deadreckon had grown from one verb (run) to fifteen in four days, with a new orchestration surface (orchestrate, plan, fork, merge, history) and a third TUI; each verb had its own colour calls, kv-block layout, confirmation prompt and flag vocabulary.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -925,7 +925,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_audit_as_spec",
+   "id": "ceccarelli_coherent_audit_as_spec","_origin":"semantic",
    "label": "The Coherent round's spec was an AUDIT, not a wish: docs/design/USER-FACING-MATRIX.md came back with 108 numbered inconsistencies, and 'that audit became the spec. The round was: land all 108 fixes in one editorial pass without changing a single byte of internal state.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -936,7 +936,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_precedent_test",
+   "id": "ceccarelli_coherent_precedent_test","_origin":"semantic",
    "label": "Ceccarelli's stated test of done for a goal-engineering round: 'does the artifact become precedent?' The Coherent pair did — every deadreckon rider after it points back at 'Coherent' when it says 'follow the editorial bar.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -947,7 +947,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_goal_text",
+   "id": "ceccarelli_coherent_goal_text","_origin":"semantic",
    "label": "The actual Coherent GOAL text: 'GOAL: Make every user-facing surface of deadreckon say the same word, colour it the same, print on the same stream, respond to the same flag the same way. Keep the visual fun: the deadreckoning cyan banner, the * ^ . - course strip, magenta IDs, the spend gauge gradient, the step glyphs. The audit at docs/design/USER-FACING-MATRIX.md lists 108 inconsistencies; unpushed orchestration commits add five verbs and a third TUI (plan attach) that need the same model. One glossary, one style helper, one prompt builder, one kv-block, one palette, one truth for --force / --all / --branch / --max-spend / --strategy. Headline: Coherent.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -958,7 +958,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_preserve_list",
+   "id": "ceccarelli_preserve_list","_origin":"semantic",
    "label": "THE PRESERVE LIST is the single sharpest anti-gaming device in the essay. Halfway through, the Coherent goal names every visual flourish that must survive the refactor (cyan banner, course strip, magenta IDs, spend-gauge gradient, seven Unicode step glyphs). 'That list is not decoration. It is the agent's permission slip: change everything except these.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -969,7 +969,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_goodhart_failure_mode",
+   "id": "ceccarelli_goodhart_failure_mode","_origin":"semantic",
    "label": "The failure mode the preserve list prevents, stated concretely: 'Without that list, an agent doing an editorial pass eventually decides the cyan banner is \"inconsistent\" and removes it. REMOVING IT IMPROVES THE AUDIT METRIC.' The round's own success metric is satisfiable by deleting the thing the round exists to preserve — so the fix is not a better metric but an explicit preserve list inside the goal text.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -980,7 +980,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_posture",
+   "id": "ceccarelli_coherent_posture","_origin":"semantic",
    "label": "The Coherent POSTURE line: 'Stays alpha. No PipelineState schema changes. No RunStatus / ChainStatus / PlanTaskStatus variant renames; the displayed string changes via one status_label(). No git push. Larger renames go to docs/V1-CANDIDATES.md.' The one status_label() function is the engineering move — type-system variant names stay, displayed strings flow through one helper — and that single sentence shapes the rider's first phase.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -991,7 +991,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_flag_truth_body",
+   "id": "ceccarelli_coherent_flag_truth_body","_origin":"semantic",
    "label": "The Coherent goal's DOMAIN BODY was unusual: a flag-rename diff written in prose, six lines. 'Flag truth. --force splits into --escalate (kill), --overwrite (dest), --anyway (override). --all stays cross-project; cleanup/chain take --all-scopes; status takes --global. --budget-cap becomes --max-spend on doc. --branch splits: --branch-name on run, --into on apply/finish. --strategy collides three ways today; rename apply to --git-strategy and rename chain branch-policy value merge to linear-merge. Aliases kept one alpha.' Six sentences specifying eight flag renames, three flag splits, one aliasing rule.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1002,7 +1002,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_goal_decisions_rider_mechanics",
+   "id": "ceccarelli_goal_decisions_rider_mechanics","_origin":"semantic",
    "label": "The division of labour between the two documents, stated in one line: 'The goal carries the DECISIONS. The rider carries the MECHANICS.' The rider expands each goal decision into a phase with depth tests.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1013,7 +1013,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_verification",
+   "id": "ceccarelli_coherent_verification","_origin":"semantic",
    "label": "The Coherent VERIFICATION section is mostly grep tests and golden files: every status string in main.rs flows through status_label() with zero direct ANSI codes outside ui.rs (grep tests); the banner, course strip, step glyphs and gauge gradient render BYTE-FOR-BYTE as today (goldens); `status latest` on completed/failed/running runs shares one kv layout (golden); `chain show` and `chain attach` snapshot share one header at six-decimal precision.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1024,7 +1024,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_pin_the_bytes",
+   "id": "ceccarelli_pin_the_bytes","_origin":"semantic",
    "label": "The stated technique for preserving personality through a refactor: 'Byte-for-byte goldens for the visual flourishes. That is how you preserve personality through a refactor: PIN THE BYTES.' — i.e. convert an aesthetic promise into a mechanical assertion.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1035,7 +1035,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_matrix_wins_rule",
+   "id": "ceccarelli_matrix_wins_rule","_origin":"semantic",
    "label": "The Coherent rider opens by recording the audit anchor and a precedence rule: every fix cites an audit ID (S1-S4, V1-V17, F1-F15, C1-C11, O1-O17, T1-T14, L1-L3, P1-P24, Q1-Q5, R1-R15, CH1-CH6, J1-J3, D1-D2) from USER-FACING-MATRIX.md, and 'when the matrix and the rider disagree, THE MATRIX WINS; update the rider in the same commit.' The rider is the spec, the audit is the ground truth, and divergence is reconciled in the same commit — no stale specs.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1046,7 +1046,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_visual_identity_block",
+   "id": "ceccarelli_visual_identity_block","_origin":"semantic",
    "label": "The rider's 'Visual identity preserved' subsection names every flourish, cites its line number in main.rs, gives the cadence, specifies the tier change and pins it to a golden — e.g. 'The * ^ . - ASCII course strip rendered by deadreckoning_course_ascii (main.rs:6633-6652), used at full width in the run-TUI footer and at width 18 in cli_wait_status_line (6622-6631). Cadence: 200 ms per tick (run TUI), kept identical for chain and plan TUIs after this rider (T9 fix).' Read as a code-review checklist: the agent can't lose track of the cadence, refactor the helper out of existence, or decide width 18 was arbitrary.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1057,7 +1057,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_codex_session_scale",
+   "id": "ceccarelli_codex_session_scale","_origin":"semantic",
    "label": "The Coherent pair ran on OpenAI's Codex CLI: the session lasted 11 HOURS AND 24 MINUTES across 2,217 events — the scale of unattended run the checked-in brief is meant to survive.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1068,7 +1068,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_codex_active_thread_goal",
+   "id": "ceccarelli_codex_active_thread_goal","_origin":"semantic",
    "label": "CODEX'S ACTIVE THREAD GOAL: every turn, the harness silently RE-INJECTS the original goal text into the conversation along with a built-in completion audit, so 'the agent does not get to forget what round it is in.' Mechanically, at the start of every turn Codex sends a role=developer message wrapping the goal in an <untrusted_objective> envelope, followed by the audit text.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1079,7 +1079,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_codex_completion_audit",
+   "id": "ceccarelli_codex_completion_audit","_origin":"semantic",
    "label": "CODEX'S BUILT-IN COMPLETION AUDIT, verbatim: 'Before deciding that the goal is achieved, perform a completion audit against the actual current state. Restate the objective as concrete deliverables. Map every requirement, file, command, test, and gate to real evidence. DO NOT ACCEPT PROXY SIGNALS AS COMPLETION. TREAT UNCERTAINTY AS NOT ACHIEVED. Do more verification or continue the work.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1090,7 +1090,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_codex_first_response",
+   "id": "ceccarelli_codex_first_response","_origin":"semantic",
    "label": "The agent's first response under the Coherent brief, before touching any code, was one sentence: 'I'll first ground this in the repo state: read the matrix/rider/architecture/style docs, inspect the current branch and worktree, then choose the next concrete implementation slice from what is still missing.' Then five parallel reads (git status --short --branch, the audit matrix, the coherence rider, AS-BUILT section 26, STYLE.md), then work.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1101,7 +1101,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_brief_survives_every_turn",
+   "id": "ceccarelli_brief_survives_every_turn","_origin":"semantic",
    "label": "What checked-in buys you: 'The rider doesn't just brief one round. It SURVIVES EVERY TURN inside the round, with a completion audit attached. The harness can re-read the spec as many times as the round needs.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1112,7 +1112,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_outcome",
+   "id": "ceccarelli_coherent_outcome","_origin":"semantic",
    "label": "Coherent outcome: 11 phases and roughly 30 commits. Representative commit subjects — feat(tui): name shared coherence palette; fix: centralize status tones; fix: centralize ansi styling helpers; test: cover chain header parity; test: cover status kv layout parity; test: cover visual identity helpers. Two patterns visible: 'Centralize' (half the work was moving scattered logic to one helper) and 'Cover ... parity' (tests named for the property they enforce, not the artifact they exercise).",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1123,7 +1123,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_regret_goldens",
+   "id": "ceccarelli_coherent_regret_goldens","_origin":"semantic",
    "label": "Coherent retrospective 1: the Visual-identity block listed eight flourishes and was right about all of them, 'but it should have made the list MACHINE-CHECKABLE: a golden file per flourish, regenerated from the rider before each phase.' As written the agent had to read prose and act faithfully — it did, but pinning each to a named golden would have made the pattern mechanical, the way the depth tests are.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1134,7 +1134,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_coherent_regret_table",
+   "id": "ceccarelli_coherent_regret_table","_origin":"semantic",
    "label": "Coherent retrospective 2: the flag-rename block was one paragraph of PROSE; it worked but 'was harder to verify than the rest of the goal. A small table (old flag, new flag, deprecation alias, expiry milestone) would have read in three seconds and tested in fewer. The next goal that does a flag pass uses the table.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1145,7 +1145,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_example",
+   "id": "ceccarelli_liveness_example","_origin":"semantic",
    "label": "WORKED EXAMPLE 2 — findunmet's 'Liveness' round (pair 2026-05-17-2130-findunmet-run-liveness-{goal,rider}.md, headline word Liveness). findunmet runs research jobs in ephemeral E2B sandboxes across four stages (seed, fetch, rank, report), each spawning a claude subprocess. That subprocess would occasionally write all its output and never exit, blocking the runner in cmd.Wait(); only rank emitted heartbeats, so seed/fetch/report hangs were invisible until the 5-minute outer window tripped, the watchdog refunded the user, and the sandbox kept burning credits.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1156,7 +1156,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_goal_text",
+   "id": "ceccarelli_liveness_goal_text","_origin":"semantic",
    "label": "The actual Liveness GOAL opening: 'GOAL: Detect and recover from stage-subprocess hangs automatically, and kill sandboxes the moment a run reaches a terminal status. Current pain: claude subprocesses sometimes write their output and never exit (runner blocks in cmd.Wait()); only rank has a heartbeat (cr-iter P6), so seed/fetch/report hangs are invisible until the 5-minute outer window trips; and even when a run does terminate, no one kills the sandbox. The last week has been manual refund-run.mjs calls plus orphan sandboxes burning credits. Headline word: Liveness.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1167,7 +1167,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_goal_opens_with_verb",
+   "id": "ceccarelli_goal_opens_with_verb","_origin":"semantic",
    "label": "Three things to notice in the Liveness goal, offered as the general lesson: the GOAL line starts with a VERB ('detect and recover'), not with 'we should consider improving'; the current pain is named with real FILE PATHS AND FUNCTION NAMES (cmd.Wait(), refund-run.mjs) so 'the agent grounds itself in HEAD, not in an abstract description'; and a single headline word closes it.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1178,7 +1178,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_posture",
+   "id": "ceccarelli_liveness_posture","_origin":"semantic",
    "label": "The Liveness POSTURE line, verbatim: 'Posture. Alpha. No DB schema changes — heartbeats reuse system_log{phase,heartbeat:true}. No new runner deps. No sandbox template rebuild (v3 still TLS-blocked; hot-patches keep v2 current). Edits inside /Users/gdc/findunmet/. No git push.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1189,7 +1189,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_contract_over_numbers",
+   "id": "ceccarelli_contract_over_numbers","_origin":"semantic",
    "label": "The Liveness round's stated purpose: 'The point of this round wasn't to land perfect numbers. It was to land THE CONTRACT — four layers, one regex, one sidecar, one kill helper — so future rounds could move the numbers without re-litigating the architecture. The numbers will move; the contract holds.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1200,7 +1200,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_four_layer_contract",
+   "id": "ceccarelli_four_layer_contract","_origin":"semantic",
    "label": "The Liveness goal expressed the round as FOUR LAYERS under one contract: (1) stage heartbeats — seed/fetch-per-iter/rank-per-iter/report emit system_log{phase,heartbeat:true,iteration?,elapsed_ms} every 30s; (2) output-stall kill — runClaudeWithStallGuard samples stdout every 10s, no growth past a per-stage threshold triggers SIGTERM, 5s grace, SIGKILL, with a first-byte grace so the clock starts only after the first stdout byte; (3) diagnosable failure_reason — every terminal write follows '<stage>: <cause>'; (4) sandbox cleanup on terminal — every run reaching completed|failed|refunded|cancelled calls killSandbox(sandbox_id) exactly once.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1211,7 +1211,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_observable_claims",
+   "id": "ceccarelli_observable_claims","_origin":"semantic",
    "label": "Why the four bullets work as a goal body: 'Four bullets. Each is a phase or a phase pair in the rider. EACH IS A SINGLE OBSERVABLE CLAIM THE GOAL CAN BE TESTED AGAINST.' — the general test for whether a goal's domain body is well-formed.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1222,7 +1222,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_one_number_four_places",
+   "id": "ceccarelli_one_number_four_places","_origin":"semantic",
    "label": "Consistency discipline: the stall thresholds (90 / 180 / 240 / 90 seconds) appear in the goal, in the rider's algorithm section, in the rider's integration matrix, and in runner/stallguard.go after P5 lands. 'One number, four places, all in lockstep.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1233,7 +1233,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_calibration_table",
+   "id": "ceccarelli_calibration_table","_origin":"semantic",
    "label": "The Liveness rider includes a CALIBRATION TABLE ('I would not have written six pairs earlier') giving, per stage, the signal observed and its p50/p95/p99/max against the chosen threshold: seed stage-duration 37/44/—/46s -> 90s (~2x max); fetch per-query lifetime 91/121/167/521s -> 180s (~1.1x p99); rank stage-duration 219/352/—/367s -> 240s (covers TTFT); report inter-chunk gap 19/33/41/44s -> 90s (~2x max).",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1244,7 +1244,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_asymmetric_error_cost",
+   "id": "ceccarelli_asymmetric_error_cost","_origin":"semantic",
    "label": "The reasoning written beneath the calibration table: 'A false-positive kill costs a few minutes of refundable compute. A false negative costs a forever-hung run. So I sized against the upper bound.' Plus a stated commitment to RE-CALIBRATE AFTER 50 PRODUCTION RUNS.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1255,7 +1255,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_numbers_as_decisions",
+   "id": "ceccarelli_numbers_as_decisions","_origin":"semantic",
    "label": "Why the calibration paragraph earns its space: 'Without that paragraph, the numbers look arbitrary. With it, they are DECISIONS. Three weeks from now, future me will not change those numbers without re-reading the data.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1266,7 +1266,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_sidecar_spec",
+   "id": "ceccarelli_sidecar_spec","_origin":"semantic",
    "label": "The Liveness rider's sidecar spec: '/tmp/run/stage.current — a one-line file the runner writes/atomically-replaces before entering each stage. The entrypoint trap reads it on exit-1 to attribute the failure. Write protocol: write to /tmp/run/stage.current.tmp, os.Rename into place. Single writer (the runner main goroutine). Single reader (entrypoint trap on exit). No locking needed; rename is atomic on the same filesystem.' Files-not-fields: the data lives in a file so the trap, which runs AFTER THE RUNNER IS DEAD, can still read it.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1277,7 +1277,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_sidecar_before_after",
+   "id": "ceccarelli_sidecar_before_after","_origin":"semantic",
    "label": "The sidecar's observable payoff: before the rider the entrypoint trap posted reason 'entrypoint trap exit=1', which the dashboard rendered as a useless failed card; after, it reads /tmp/run/stage.current and posts stage 'fetch:2', becoming failure_reason = 'entrypoint: trap exit=1 stage=fetch' — the dashboard now names the failing stage.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1288,7 +1288,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_regex_as_spec",
+   "id": "ceccarelli_regex_as_spec","_origin":"semantic",
    "label": "A REGEX AS A SPEC: every terminal write to runs.failure_reason must match ^(seed|fetch|rank|report|entrypoint|watchdog|provision|unknown): .+ — and 'the regex IS a depth test'. tests/unit/failure-reason-shape.test.ts enumerates every writer and asserts the regex holds, so 'changing the regex changes the spec; the agent cannot quietly relax it.' Cap 500 chars, truncate the suffix not the prefix.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1299,7 +1299,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_regex_as_glossary",
+   "id": "ceccarelli_regex_as_glossary","_origin":"semantic",
    "label": "The eight-token disjunction doubles as a WORKING GLOSSARY: before the rider the dashboard showed values like 'Error: connection reset', 'entrypoint trap exit=1', 'Watchdog refunded after 5m stall'; after, every value starts with one of eight stage names, so the dashboard groups them by cause and colours them by stage. 'The shape is the user experience.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1310,7 +1310,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_twelve_phases",
+   "id": "ceccarelli_liveness_twelve_phases","_origin":"semantic",
    "label": "The Liveness rider's twelve phases: P1 extract heartbeat helper, P2-P4 wire into seed/fetch/report, P5 stall-guard helper, P6 wire it, P7 the sidecar, P8 lifecycle-fail accepts structured failure_reason, P9 watchdog moves to Vercel cron, P10 stage-aware thresholds, P11 idempotent killSandbox, P12 the doc closure. Each landed as one commit with a `(rider P{N})` suffix, so `git log --grep \"rider P5\"` returns the one commit that landed the stall-guard helper.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1321,7 +1321,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_commit_suffix_traceability",
+   "id": "ceccarelli_commit_suffix_traceability","_origin":"semantic",
    "label": "The `(rider PN)` commit-subject suffix is what makes the round archaeologically legible: 'Three weeks from now, someone wondering why runner/stallguard.go exists follows the suffix to the rider, reads the algorithm section, and gets the calibration table that explains 240 seconds.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1332,7 +1332,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_closure",
+   "id": "ceccarelli_liveness_closure","_origin":"semantic",
    "label": "P12 closed the Liveness round: section 20 in AS-BUILT-ARCHITECTURE.md (heartbeats, stall-guard, sidecar, failure-reason contract, cron watchdog, sandbox cleanup); 'watchdog as managed cron' moved from thin to shipped; one 'Run liveness (alpha) — May 17, 2026' block added to the CHANGELOG; one bullet dropped from V1-CANDIDATES. 'Three documents in agreement; two stale entries gone; 47 new tests. Round finished.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1343,7 +1343,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_regret_phases",
+   "id": "ceccarelli_liveness_regret_phases","_origin":"semantic",
    "label": "Liveness retrospective 1: the rider committed to twelve phases instead of eleven because P11 split sandbox-kill from watchdog. 'I should have written it as eleven from the start, with sandbox-kill folded into the P9 watchdog work, since both paths share killSandbox. The extra phase added one commit and one CHANGELOG line. It did not improve traceability.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1354,7 +1354,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_liveness_regret_calibration",
+   "id": "ceccarelli_liveness_regret_calibration","_origin":"semantic",
    "label": "Liveness retrospective 2 — a calibration mistake caught two weeks late: the report inter-chunk gap data (max 44s, threshold 90s) was the right RATIO, but the report stage runs claude in a different mode than the others, so the threshold should probably have been 60s. The proposed fix is a process one: 'A pre-author stage-by-stage CHECK THE ASSUMPTION HOLDS paragraph would have caught it; the next liveness rider does this.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1365,7 +1365,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_artifact",
+   "id": "ceccarelli_skill_artifact","_origin":"semantic",
    "label": "The drafting work is itself a Claude Code skill: goal-rider-author, living at ~/.agents/skills/goal-rider-author/SKILL.md, 414 lines, licensed Apache-2.0. 'The interesting parts are the pre-work order, the two recipes, the checklist, and the validation steps.' It triggers on phrases like 'draft a goal that addresses X' or 'new goal for the next agentic turn'.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1376,7 +1376,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_chronology",
+   "id": "ceccarelli_skill_chronology","_origin":"semantic",
    "label": "Chronology showing the pair outlives any one harness: the skill was written May 9, 2026, when Codex CLI had /goal (April 30) and Claude Code did not — so at first Claude Code ran the SKILL to draft goals that were pasted into Codex's /goal runner to execute ('Claude wrote the brief. Codex did the work.'). On May 12, 2026 Claude Code shipped its own /goal and the workflow collapsed into one tool; the skill did not change. 'That portability is what let the approach survive a tool boundary in its first week.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1387,7 +1387,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_prework_order",
+   "id": "ceccarelli_skill_prework_order","_origin":"semantic",
    "label": "The skill's PRE-WORK ORDER, executed before any drafting: (1) read the project's architecture doc, looking for the 'what's shipped vs thin' section; (2) read the two most recent goal+rider pairs in docs/goals/ to absorb voice and conventions, whose invariants compose forward; (3) `git log --oneline -30 -- docs/goals/` and `git log --oneline -30` for cadence and conventional-commit format; (4) source code AT HEAD for any data structure, path or function name the rider will quote — verify it matches HEAD before citing; (5) research or pain-point reports, to ground ergonomics in real pain.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1398,7 +1398,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_dont_invent_precedent",
+   "id": "ceccarelli_dont_invent_precedent","_origin":"semantic",
    "label": "THE KEY LINE of the skill: 'If the project has no prior pairs, the skill ASKS THE USER for a pointer instead of inventing one.' Rationale: 'Half of the bad rider drafts I've seen from other people were a model inventing a precedent that didn't exist.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1409,7 +1409,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_validator_five_checks",
+   "id": "ceccarelli_skill_validator_five_checks","_origin":"semantic",
    "label": "The skill's validator, run before declaring a pair done — five mechanical checks: (1) `wc -c \"$GOAL\"` expects <=4000; (2) `grep -c '^### P[0-9]' \"$RIDER\"` expects 11; (3) grep for the standard top-level rider sections Posture / Phases / Out of scope / Dependencies / Engineering invariants / Process invariants; (4) both files must cite each other's ABSOLUTE paths (grep -F each path in the other); (5) stage and commit both files. 'Five checks. Each is mechanical. Each catches a real failure I've made.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1420,7 +1420,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_right_size_of_round",
+   "id": "ceccarelli_right_size_of_round","_origin":"semantic",
    "label": "CONDITION — the right size of a round: 'Pick something you actually need to land this week, not a toy. The right size is ONE FEATURE, TWO TO FIVE FILES, HALF A DAY TO A DAY OF AGENT RUNTIME.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1431,7 +1431,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_try_it_recipe",
+   "id": "ceccarelli_try_it_recipe","_origin":"semantic",
    "label": "The try-it-tomorrow recipe: start with one round; sketch the goal in a throwaway file under the cap; pick a headline word (if you can't, you're still trying to do two rounds); write the goal properly into docs/goals/<YYYY-MM-DD>-<HHMM>-<project>-<topic>-goal.md using the skeleton (Read first, Posture, domain body, Phases, Verification, Stop when) — 'Put ABSOLUTE PATHS under Read first. Put NEGATIONS under Posture.' Then write the rider.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1442,7 +1442,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_section_order",
+   "id": "ceccarelli_rider_section_order","_origin":"semantic",
    "label": "The prescribed rider top-level section ORDER: Posture (decided — do not redesign) / Data model (files, not fields) / Algorithms / Verb signatures / Phases (eleven) / Integration matrix / Error-footer canonical pairs / Out of scope (explicitly not in this milestone) / Dependencies / Engineering invariants (do not violate) / Process invariants. For each of P1 through P11, list the DEPTH TESTS FIRST, then the implementation slice — tests by name.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1453,7 +1453,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_run_shape",
+   "id": "ceccarelli_run_shape","_origin":"semantic",
    "label": "What happens in the run: the agent reads the Read-first list, then the goal, then the rider; then Phase 1 — writes the depth tests, watches them fail, implements the slice, runs the project's build+test+lint+fmt, commits, appends one line to CHANGELOG. Then Phase 2. Then Phase 3.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1464,7 +1464,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_real_run_five_reads",
+   "id": "ceccarelli_real_run_five_reads","_origin":"semantic",
    "label": "A real Codex run (May 14, 2026): a thread was started, the goal attached with /goal and the goal body pasted; within seconds, before writing a line of code, Codex fired five parallel reads — `git status --short --branch`, the audit matrix, the coherence rider, the AS-BUILT section 26 range, and /Users/gdc/impeccable/STYLE.md.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1475,7 +1475,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_agent_not_smarter_than_inputs",
+   "id": "ceccarelli_agent_not_smarter_than_inputs","_origin":"semantic",
    "label": "A revealing defect in that run: the goal contained a TYPO in the architecture-doc path (AS-BUILT-ARCHITECT.md instead of AS-BUILT-ARCHITECTURE.md). 'The agent read the wrong filename, got an empty result, and moved on.' The lesson: 'The pattern doesn't depend on the agent being smarter than its inputs. It depends on THE RIDER BEING THE SPEC, NOT THE PATH.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1486,7 +1486,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_round_never_re_asked",
+   "id": "ceccarelli_round_never_re_asked","_origin":"semantic",
    "label": "Outcome of that 11h24m session: roughly thirty conventional commits landed and 'the agent never re-asked what the round was. The <untrusted_objective> envelope plus the completion audit kept the round in working memory for every turn.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1497,7 +1497,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_watch_first_phase",
+   "id": "ceccarelli_watch_first_phase","_origin":"semantic",
    "label": "THE ESCAPE HATCH: 'Watch the first phase. If the depth tests are wrong (too coarse, missing the case you cared about), kill the run, fix the rider, and restart. Better to lose one phase to a rider patch than to ship eleven phases that miss the property you wanted. After the first phase looks right, walk away.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1508,7 +1508,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_five_shipped_parts",
+   "id": "ceccarelli_five_shipped_parts","_origin":"semantic",
    "label": "The artifact you get back has five shipped parts BEYOND the code: 11 commits with rider-traceable messages; 30 to 80 depth tests each named after the behavior it pins; one new section in the architecture doc; one new milestone block in the CHANGELOG; and a longer docs/V1-CANDIDATES.md with the explicit list of what didn't ship and why.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1519,7 +1519,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_v1_candidates_seeds_next_round",
+   "id": "ceccarelli_v1_candidates_seeds_next_round","_origin":"semantic",
    "label": "Why the V1-CANDIDATES growth is 'the useful part': 'Every round leaves a list of the next round's candidates, ranked by the thinking you did while you were in this round; the next goal almost writes itself.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1530,7 +1530,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_when_it_doesnt_work",
+   "id": "ceccarelli_when_it_doesnt_work","_origin":"semantic",
    "label": "CONDITION — when the pattern does NOT apply: 'This isn't for you if your \"round\" is fifteen minutes of polish, a hot-fix, or a tiny PR. The brief overhead only amortizes against rounds that would otherwise run for HOURS of agent time across MULTIPLE FILES; a five-line CSS tweak doesn't need eleven phases.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1541,7 +1541,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_condition_needs_arch_doc",
+   "id": "ceccarelli_condition_needs_arch_doc","_origin":"semantic",
    "label": "SOFT GATING CONDITION 1 — 'The pattern wants a real architecture doc and a real CHANGELOG. If your project has neither, write a small AS-BUILT first; one round, one rider, one phase to describe what's shipped vs thin.' deadreckon's AS-BUILT-ARCHITECTURE.md and CHANGELOG.md are offered as live examples to crib.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1552,7 +1552,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_condition_cheap_tests",
+   "id": "ceccarelli_condition_cheap_tests","_origin":"semantic",
    "label": "SOFT GATING CONDITION 2 — 'The pattern wants depth tests to be CHEAP. If your test suite takes 40 minutes to run, the phase loop breaks down. Get a 30-second fast lane first.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1563,7 +1563,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_condition_not_a_roadmap",
+   "id": "ceccarelli_condition_not_a_roadmap","_origin":"semantic",
    "label": "SOFT GATING CONDITION 3 — 'The pattern is a per-round unit, NOT A ROADMAP. It does not replace the work of figuring out WHAT to build; it replaces the work of figuring out HOW THIS ROUND WILL KNOW IT'S DONE.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1574,7 +1574,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_frontmatter",
+   "id": "ceccarelli_skill_frontmatter","_origin":"semantic",
    "label": "The goal-rider-author skill's frontmatter: name goal-rider-author; license Apache-2.0; metadata author 'SpecStory, Inc.', version 1.0.0, argument-hint '<topic for the new goal>'; allowed-tools Bash, Read, Write, Edit, Glob, Grep. Its description triggers on 'draft a goal', 'new goal', 'write a goal+rider', 'goal+rider for the next agentic turn', 'rider for X', or anything shaped like 'brief the next agent on Y'.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1585,7 +1585,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_superpower",
+   "id": "ceccarelli_skill_superpower","_origin":"semantic",
    "label": "The pattern's stated SUPERPOWER, in the skill's own words: 'the goal stays small enough to paste into a Codex /goal or a Claude run prompt, while the rider can be arbitrarily detailed WITHOUT BLOATING THE EXECUTOR'S WORKING MEMORY.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1596,7 +1596,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_skill_project_agnostic",
+   "id": "ceccarelli_skill_project_agnostic","_origin":"semantic",
    "label": "CONDITION on portability from the skill itself: 'This skill is project-agnostic. It works for any codebase that has a docs/goals/ (or equivalent) directory, CONVENTIONAL COMMITS, and some form of AS-BUILT / architecture doc.' Project toolchain commands are substituted wherever the templates say <project's ... command>.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1607,7 +1607,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_goal_skeleton_template",
+   "id": "ceccarelli_goal_skeleton_template","_origin":"semantic",
    "label": "The skill's fill-in GOAL skeleton: a 'GOAL: <one-sentence headline>. <one paragraph: current pain -> what the goal lands -> headline word>' opener; **Read first.** as a bullet list of absolute paths (architecture doc, the rider being written, exemplars, prior riders); **Posture.** as one line of negations; a domain body; **Phases.** Eleven (P1-P11) in the rider; **Verification.** bullets of verifiable commands plus the no-edits-outside / no-push / no-schema-changes line; and **Stop when** verification passes, AS-BUILT updated, CHANGELOG has a milestone section, committed locally.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1618,7 +1618,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_trim_priority",
+   "id": "ceccarelli_trim_priority","_origin":"semantic",
    "label": "TRIM PRIORITY when the goal is over the 4,000-char budget, in order: (1) drop parenthetical detail already in the rider; (2) shorten Read-first descriptions to bare absolute paths; (3) compress Posture to one or two lines; (4) cut verification smoke bullets to two; (5) drop cross-rider 'do not preempt' notes, which live in the rider. A stated gotcha: the -HHMM- insert costs ~5 chars per internal rider reference, so leave a buffer when riders cross-cite.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1629,7 +1629,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_rider_skeleton_template",
+   "id": "ceccarelli_rider_skeleton_template","_origin":"semantic",
    "label": "The skill's RIDER skeleton opens with a title line, the goal's absolute path, an explicit 'It supersedes nothing in prior riders (<list dated rider filenames>) — their invariants still apply' clause, a one-line summary of what's new, and 'All paths absolute.' Its Posture section is headed 'Posture (decided — do not redesign)' and its Data model section is headed 'Data model (files, not fields)'. The Algorithms section carries pseudocode with the instruction 'The rider IS the spec — match it in the implementation.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1640,7 +1640,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_no_v1_invention_clause",
+   "id": "ceccarelli_no_v1_invention_clause","_origin":"semantic",
    "label": "The NO-V1-INVENTION clause, written into every rider's Posture: 'No V1 / next-tier invention. If a phase reveals a major architectural decision, log it in <V1-CANDIDATES path> and continue.' Restated as an engineering invariant: 'No silent expansion. Anything beyond P1-P11 goes into V1-CANDIDATES.md.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1651,7 +1651,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_phase_never_red_is_suspect",
+   "id": "ceccarelli_phase_never_red_is_suspect","_origin":"semantic",
    "label": "A named engineering invariant that makes tests-first auditable after the fact: 'One depth test before each phase implementation. A PHASE WHOSE TESTS WERE NEVER RED IS SUSPECT.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1662,7 +1662,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_spec_pinning_invariant",
+   "id": "ceccarelli_spec_pinning_invariant","_origin":"semantic",
    "label": "SPEC-PINNING INVARIANTS make formatting itself part of the contract — e.g. 'the preview block format is depth-tested; changing whitespace changes the spec.' The same move as the failure_reason regex: an agent cannot quietly relax what a test enumerates.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1673,7 +1673,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_process_invariants",
+   "id": "ceccarelli_process_invariants","_origin":"semantic",
    "label": "The rider's PROCESS INVARIANTS: phased local commits only, no git push; each phase ends with its depth tests passing and a CHANGELOG entry naming the SHA; after P11 optionally capture a demo (asciinema/screenshots/video), skipped when the change isn't user-visible; and if a phase reveals a V1-architecture decision, stop and log it in V1-CANDIDATES.md rather than silently expanding scope.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1684,7 +1684,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_dependencies_tier_policy",
+   "id": "ceccarelli_dependencies_tier_policy","_origin":"semantic",
    "label": "The rider's DEPENDENCIES section uses a three-tier policy: Tier 1 (utility, free) listed with a one-line justification each; Tier 2 (architectural) logged to DEPENDENCIES.md; Tier 3 (blocked) carrying the same blocks as prior riders.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1695,7 +1695,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_discipline_checklist",
+   "id": "ceccarelli_discipline_checklist","_origin":"semantic",
    "label": "The skill's eleven-item DISCIPLINE CHECKLIST: two documents / two budgets (wc -c the goal); timestamped filenames sharing one minute; phased local commits only, never git push; files-not-fields; depth tests first, listed by name so grep enforces presence; architecture-doc discipline at P11 with an honest thin list; V1 candidates for anything out of scope; conventional commits scoped (docs(goals): for the pair itself); frontmatter mirroring the project's own convention; friendliness verifiable by depth test; and 'judgment in markdown, invariants in code' — prefer a skill/prompt-template mechanism over a hardcoded const.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1706,7 +1706,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_anti_patterns",
+   "id": "ceccarelli_anti_patterns","_origin":"semantic",
    "label": "The skill's ANTI-PATTERNS list: inventing V1 architecture inside an alpha rider; schema changes without a stated strong reason; backwards-compatibility shims no caller uses; comments explaining WHAT the code does; half-finished implementations ('we'll finish in P12'); duplicating prior riders' invariants verbatim instead of referencing them; depth tests written AFTER implementation; stop conditions that don't tie to verification ('stop when it feels done' is not a stop condition); inventing CLI verbs not in the goal; adding emojis to written artifacts; and 'TODO: maybe add X' lines — either it's P-numbered in scope or it's a V1 candidate.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1717,7 +1717,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_stop_when_it_feels_done",
+   "id": "ceccarelli_stop_when_it_feels_done","_origin":"semantic",
    "label": "The single most transferable anti-pattern for authoring a completion condition: 'Stop conditions that don't tie to verification — \"stop when it feels done\" is NOT A STOP CONDITION.'",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1728,7 +1728,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_standard_phase_shape",
+   "id": "ceccarelli_standard_phase_shape","_origin":"semantic",
    "label": "The STANDARD 11-PHASE SHAPE (adapt names; eleven is a target, not a hard rule): P1 data model / plumbing with no behavior change yet; P2-P3 foundation (new primitive types, base mechanism); P4-P8 feature implementation, one phase per major slice each shipping end-to-end depth tests; P9 integration with prior verbs / modes / state machines; P10 a cross-cutting friendliness pass (--quiet / --plain flags, error-footer routing, post-action hints, help-text grouping); P11 architecture-doc update + CHANGELOG + optional demo capture, doc-only with no depth test.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1739,7 +1739,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_pair_commit_message",
+   "id": "ceccarelli_pair_commit_message","_origin":"semantic",
    "label": "The commit message for the goal-rider pair itself: `docs(goals): add <topic> goal+rider (<one-line headline>)` plus a 2-3 sentence body covering what the goal is for, what the rider prescribes, and what is explicitly out of scope — mentioning named depth-test discipline, files-not-fields posture, and the V1 invention guard. Add the project's standard Co-Authored-By footer if it uses one.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1750,7 +1750,7 @@
    "contributor": null
   },
   {
-   "id": "ceccarelli_reference_exemplars",
+   "id": "ceccarelli_reference_exemplars","_origin":"semantic",
    "label": "The skill's closing instruction on exemplars: read at least one recent goal+rider pair from the target project (docs/goals/, docs/specs/, docs/planning/) before drafting. 'If the project has no prior pairs, SUGGEST THE USER CREATE ONE from this template and treat it as the baseline' — optionally asking whether to crib voice and shape from another project's exemplar.",
    "file_type": "concept",
    "source_file": "goal-engineering-ceccarelli.md",
@@ -1761,7 +1761,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_doc",
+   "id": "sabrina_doc","_origin":"semantic",
    "label": "Sabrina Ramonov's post '6 INSANE Projects to Learn Claude Fable and /goal' (2026-07-11) supplies one 5-part /goal prompt template (TASK/WHY/OUTCOME/CONSTRAINTS/VERIFICATION) and six copy-paste worked /goal prompts — a 3D spider simulation, a dragon-flying game, a YouTube-scrape dashboard, a week of marketing content, a 24/7 A/B test, and a trip itinerary — each carrying its own verbatim VERIFICATION line.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1772,7 +1772,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_five_part_template",
+   "id": "sabrina_five_part_template","_origin":"semantic",
    "label": "Every /goal prompt in the article follows the same 5-part shape: 'TASK: [What Claude should do] / WHY: [Why this matters or who it is for] / OUTCOME: [The exact finished result] / CONSTRAINTS: [What Claude must or must not do] / VERIFICATION: [How Claude should prove the outcome is complete]'.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1783,7 +1783,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_field_task",
+   "id": "sabrina_field_task","_origin":"semantic",
    "label": "TASK field of the 5-part /goal template, glossed verbatim as 'the verb. What you want Claude to DO for you.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1794,7 +1794,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_field_why",
+   "id": "sabrina_field_why","_origin":"semantic",
    "label": "WHY field of the 5-part /goal template, glossed verbatim as 'who it's for or why it matters, the big picture. For Claude Fable, it's highly recommended to give this context.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1805,7 +1805,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_field_outcome",
+   "id": "sabrina_field_outcome","_origin":"semantic",
    "label": "OUTCOME field of the 5-part /goal template, glossed verbatim as 'the finished result, specific enough that \"done\" is clear; imagine talking to a coworker.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1816,7 +1816,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_field_constraints",
+   "id": "sabrina_field_constraints","_origin":"semantic",
    "label": "CONSTRAINTS field of the 5-part /goal template, glossed verbatim as 'the guardrails, limitations, things NOT to change, how many turns to stop at' — so the turn cap is a first-class job of this field, not a separate flag.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1827,7 +1827,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_field_verification",
+   "id": "sabrina_field_verification","_origin":"semantic",
    "label": "VERIFICATION field of the 5-part /goal template, glossed verbatim as 'the checker. How Claude proves it achieved your desired OUTCOME, not just lying to your face.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1838,7 +1838,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_verification_is_hardest_part",
+   "id": "sabrina_verification_is_hardest_part","_origin":"semantic",
    "label": "Sabrina Ramonov names the bottleneck of /goal prompting outright: 'Hardest part is defining a clear measurable VERIFICATION step.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1849,7 +1849,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_specific_outcome_blunt_constraints",
+   "id": "sabrina_specific_outcome_blunt_constraints","_origin":"semantic",
    "label": "Style rule for writing the two middle fields of a /goal: 'Be specific in OUTCOME and blunt in CONSTRAINTS.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1860,7 +1860,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_make_it_good_is_not_a_finish_line",
+   "id": "sabrina_make_it_good_is_not_a_finish_line","_origin":"semantic",
    "label": "The article's sharpest good-vs-bad pair for a completion condition: '\"Make it good\" isn't a finish line. \"Scores over 8+ out of 10 using my custom grading skill\" is.' — the difference being a named instrument plus a numeric threshold.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1871,7 +1871,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_verification_turns_prompt_into_goal",
+   "id": "sabrina_verification_turns_prompt_into_goal","_origin":"semantic",
    "label": "The recap's load-bearing claim about what makes a /goal different from a prompt: 'VERIFICATION is what turns a prompt into an actual /goal that AI can use to introspect and drive towards completion.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1882,7 +1882,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_missing_verification_stops_early_or_loops_forever",
+   "id": "sabrina_missing_verification_stops_early_or_loops_forever","_origin":"semantic",
    "label": "Both failure directions of a missing or weak VERIFICATION are named together: 'Without it, Claude has no way to prove OUTCOME actually happened, so it either stops too early or loops forever guessing.' — premature victory and non-termination are two faces of one defect.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1893,7 +1893,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_something_it_can_literally_check",
+   "id": "sabrina_something_it_can_literally_check","_origin":"semantic",
    "label": "The article's operational test for a good completion condition: 'A good VERIFICATION line gives Claude something it can literally check, like a video, a click-through rate, or an open-hours confirmation.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1904,7 +1904,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_checkable_exemplar_video",
+   "id": "sabrina_checkable_exemplar_video","_origin":"semantic",
    "label": "First exemplar of 'something it can literally check': a video — a produced artifact that either exists or does not, requiring no judgement call.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1915,7 +1915,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_checkable_exemplar_ctr",
+   "id": "sabrina_checkable_exemplar_ctr","_origin":"semantic",
    "label": "Second exemplar of 'something it can literally check': a click-through rate — a measured metric that can be compared against a stated target.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1926,7 +1926,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_checkable_exemplar_open_hours",
+   "id": "sabrina_checkable_exemplar_open_hours","_origin":"semantic",
    "label": "Third exemplar of 'something it can literally check': an open-hours confirmation — a fact lookup against the outside world rather than an assessment of quality.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1937,7 +1937,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project1_3d_simulation",
+   "id": "sabrina_project1_3d_simulation","_origin":"semantic",
    "label": "Worked /goal #1 (3D Simulation): TASK 'Make a spider learn to jump up stairs in Genesis-World'; OUTCOME 'Give me the code, the trained spider, and a video'; CONSTRAINTS 'Keep it simple and use Genesis World'; VERIFICATION 'Spider reaches the top at least 8 out of 10 times.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1948,7 +1948,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project1_verification_success_rate",
+   "id": "sabrina_project1_verification_success_rate","_origin":"semantic",
    "label": "Completion condition of the spider-simulation /goal, verbatim: 'Spider reaches the top at least 8 out of 10 times.' — an empirical success rate over repeated trials, the only condition in the set that is settled by rerunning an experiment.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1959,7 +1959,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project1_learn_by_failing_and_60_minutes",
+   "id": "sabrina_project1_learn_by_failing_and_60_minutes","_origin":"semantic",
    "label": "Framing and cost expectation for the spider project: 'Give an agent a body and a goal, let it fail THOUSANDS of times, and watch it learn the skill eventually', with 'Training a policy from scratch takes real compute time and a few rounds of tuning, even with Claude driving it, estimate 60 minutes.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1970,7 +1970,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project2_gaming",
+   "id": "sabrina_project2_gaming","_origin":"semantic",
    "label": "Worked /goal #2 (Gaming): TASK 'Build a game where I can fly a dragon through a fantasy world'; OUTCOME 'a playable game with flying, landing, fire breathing, and simple goals'; CONSTRAINTS 'Keep the controls simple, from the POV of sitting on top of dragon, Elden Ring themed'; VERIFICATION 'I can start the game, fly the dragon, complete a goal, and play without major bugs.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1981,7 +1981,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project2_verification_walkthrough",
+   "id": "sabrina_project2_verification_walkthrough","_origin":"semantic",
    "label": "Completion condition of the dragon-game /goal, verbatim: 'I can start the game, fly the dragon, complete a goal, and play without major bugs.' — a behavioural walkthrough whose final clause ('without major bugs') is the least measurable condition in the article's six.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -1992,7 +1992,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_claude_in_chrome_gives_the_loop_its_evidence",
+   "id": "sabrina_claude_in_chrome_gives_the_loop_its_evidence","_origin":"semantic",
    "label": "Tooling prerequisite that makes a browser-checkable VERIFICATION possible: 'Make sure you've installed Claude in Chrome, so that Claude can play your game and fix any issues. This tool gives Claude the ability to \"see and control\" your web browser, so that it can load the game, press the controls, and make sure things work.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2003,7 +2003,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project3_visualization",
+   "id": "sabrina_project3_visualization","_origin":"semantic",
    "label": "Worked /goal #3 (Visualization): TASK 'Scrape top YouTube creators with Apify, collect their top videos with 1M+ views, and analyze patterns in their video titles'; OUTCOME 'An interactive dashboard'; CONSTRAINTS 'Use real data, and exclude Youtube channels that are non-English, music, predominantly gaming …, media …, or for kids'; VERIFICATION 'Use browser to confirm the data loads correctly, the main interactions work, and results match the scraped data.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2014,7 +2014,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project3_verification_browser_three_clause",
+   "id": "sabrina_project3_verification_browser_three_clause","_origin":"semantic",
    "label": "Completion condition of the dashboard /goal, verbatim: 'Use browser to confirm the data loads correctly, the main interactions work, and results match the scraped data.' — a tool-verified three-clause functional check that names the instrument (the browser) as well as the criteria.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2025,7 +2025,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project3_constraints_exclude_noise",
+   "id": "sabrina_project3_constraints_exclude_noise","_origin":"semantic",
    "label": "The dashboard project is run 'in Claude Code, with Apify MCP connected', and its CONSTRAINTS field is doing analytical work: 'Notice the CONSTRAINTS excludes non-English channels, music, gaming, and media, so the patterns you find are actually relevant to YOUR niche, not noise from irrelevant channels.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2036,7 +2036,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project4_marketing",
+   "id": "sabrina_project4_marketing","_origin":"semantic",
    "label": "Worked /goal #4 (Marketing): TASK 'Install this plugin to create a week of content: https://github.com/Blotato-Inc/blotato-skills'; OUTCOME 'A complete week of ready-to-post content, visible in a Claude Artifact'; CONSTRAINTS 'Fit each platform's character limits, and match my brand voice'; VERIFICATION 'Run `/post-grader` on every post and improve each one until all scor above 8/10.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2047,7 +2047,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project4_verification_post_grader_threshold",
+   "id": "sabrina_project4_verification_post_grader_threshold","_origin":"semantic",
    "label": "Completion condition of the marketing /goal, verbatim (author's typo 'scor' preserved): 'Run `/post-grader` on every post and improve each one until all scor above 8/10.' — the article's flagship shape: named external grader + numeric threshold + explicit loop-until clause.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2058,7 +2058,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project4_post_grader_rubric_loop",
+   "id": "sabrina_project4_post_grader_rubric_loop","_origin":"semantic",
    "label": "How the marketing VERIFICATION works mechanically: 'the VERIFICATION step sends all posts through the skill /post-grader which scores them on a viral rubric. Then, Claude must loop and improve each post until they all score above 8/10.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2069,7 +2069,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project4_make_good_posts_is_the_anti_pattern",
+   "id": "sabrina_project4_make_good_posts_is_the_anti_pattern","_origin":"semantic",
    "label": "The named anti-pattern the marketing VERIFICATION is contrasted against: it 'doesn't just say \"make good posts\" which is vague and not measurable… (btw, you'd be shocked how many senior marketing leaders prompt like this…)' and 'This is a much better verification step than \"make it gud\".'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2080,7 +2080,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project4_expect_multiple_rewrite_rounds",
+   "id": "sabrina_project4_expect_multiple_rewrite_rounds","_origin":"semantic",
    "label": "Operator-side expectation for a thresholded loop: 'Don't expect 1 pass to clear 8/10 across the board. Claude will AUTOMATICALLY go through 2-3 rewrite rounds per post, and that's the whole point!' — iteration is the intended behaviour, not a sign the goal is malformed.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2091,7 +2091,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_self_grading_tension_post_grader",
+   "id": "sabrina_self_grading_tension_post_grader","_origin":"semantic",
    "label": "INFERENCE: project #4 has Claude grade its own output with /post-grader and this is presented as the GOOD example, so the article never confronts self-grading circularity head-on. What makes it acceptable in its own framing is that the grader is externalised, named, rubric-based and thresholded — 'externalised, named, thresholded grader' is not the same thing as 'check your work'.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2102,7 +2102,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_blotato_skills_plugin_is_free",
+   "id": "sabrina_blotato_skills_plugin_is_free","_origin":"semantic",
    "label": "The /post-grader skill used as project #4's completion instrument ships in the free Blotato-Inc/blotato-skills plugin: 'Note: this plugin is 100% FREE, you do NOT need to use Blotato.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2113,7 +2113,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project5_ab_testing",
+   "id": "sabrina_project5_ab_testing","_origin":"semantic",
    "label": "Worked /goal #5 (A/B Testing): TASK 'Use Claude in Chrome to run 50/50 A/B tests on my ManyChat new-follower DM to improve CTR to 40%'; OUTCOME 'Keep the winner, rewrite the loser with a new hook, and repeat every 4 hours'; CONSTRAINTS 'Track clicks with tags, log every round, and test curiosity, exclusivity, urgency, and social proof'; VERIFICATION 'Show each version's clicks and CTR, explain whether the difference is real or noise, and tell me when we have a clear winner.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2124,7 +2124,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project5_verification_significance",
+   "id": "sabrina_project5_verification_significance","_origin":"semantic",
    "label": "Completion condition of the A/B-testing /goal, verbatim: 'Show each version's clicks and CTR, explain whether the difference is real or noise, and tell me when we have a clear winner.' — the most sophisticated condition in the piece: it demands the evidence table, a signal-vs-noise judgement, and only then a verdict.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2135,7 +2135,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project5_significance_not_just_a_winner",
+   "id": "sabrina_project5_significance_not_just_a_winner","_origin":"semantic",
    "label": "Why the A/B VERIFICATION is shaped that way: 'The VERIFICATION step doesn't just ask for a winner. It asks for each test's numbers, whether the difference is real or just noise (e.g. do we have enough samples, how confident are we), and driving towards a clear copywriting winner.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2146,7 +2146,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project5_four_hour_cycle",
+   "id": "sabrina_project5_four_hour_cycle","_origin":"semantic",
    "label": "The unattended loop cycle of the A/B project, every 4 hours: check click-through rate results, rewrite the losing hook with a new angle (curiosity, exclusivity, urgency, social proof), launch a new A/B test, wait 4 hours for data, 'repeat… until achieving XX% CTR'.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2157,7 +2157,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project5_ran_three_days_tripled_conversion",
+   "id": "sabrina_project5_ran_three_days_tripled_conversion","_origin":"semantic",
    "label": "Reported real-world result of the A/B /goal — the article's strongest evidence that a well-shaped condition sustains an unattended run: 'It ran for 3 days continuously with minimal oversight. And TRIPLED my conversion rates'.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2168,7 +2168,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project5_framework_generalises",
+   "id": "sabrina_project5_framework_generalises","_origin":"semantic",
    "label": "The A/B loop is presented as a reusable frame, not a one-off: the same shape applies to website button CTR, GoHighLevel workflow automations, cold LinkedIn DMs, and Facebook ad copy, 'All running OVERNIGHT 24/7 while you sleep, launching a new A/B test, waiting to review results, and iterating.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2179,7 +2179,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project6_trip_planning",
+   "id": "sabrina_project6_trip_planning","_origin":"semantic",
    "label": "Worked /goal #6 (Trip Planning): TASK 'Plan a 3-day weekend trip for 4 friends in Salt Lake City based on everyone's preferences'; OUTCOME 'A complete itinerary with travel, lodging, restaurants, activities, and costs, shown in a Claude Artifact'; CONSTRAINTS 'Stay under $800 per person, include everyone's top choice, respect food needs, and avoid early mornings'; VERIFICATION 'Confirm every place is open on our dates, the schedule has no overlaps, and the total cost stays within budget.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2190,7 +2190,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project6_verification_three_clause_factual",
+   "id": "sabrina_project6_verification_three_clause_factual","_origin":"semantic",
    "label": "Completion condition of the trip-planning /goal, verbatim: 'Confirm every place is open on our dates, the schedule has no overlaps, and the total cost stays within budget.' — a three-clause conjunction of externally checkable facts (opening hours, schedule consistency, a budget sum).",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2201,7 +2201,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project6_verification_blocks_hallucination",
+   "id": "sabrina_project6_verification_blocks_hallucination","_origin":"semantic",
    "label": "Division of labour between the two guard fields in the trip project: 'The CONSTRAINTS line handles budget and food needs, while the VERIFICATION line forces Claude to actually confirm places are open on your dates instead of hallucinating an impractical plan.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2212,7 +2212,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_project6_rated_seven_point_five",
+   "id": "sabrina_project6_rated_seven_point_five","_origin":"semantic",
    "label": "Reported real-world result of the trip-planning /goal, self-assessed by a Salt Lake City local: 'I honestly rated the itinerary 7.5/10! Very good & practical.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2223,7 +2223,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_termination_outcome_met_or_turn_cap",
+   "id": "sabrina_termination_outcome_met_or_turn_cap","_origin":"semantic",
    "label": "The termination disjunction for a /goal run, verbatim from the FAQ: 'It's a command that gives Claude a finish line instead of a single instruction. Claude keeps working, checking its own progress, until the OUTCOME is met or it hits the turn cap you set in CONSTRAINTS.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2234,7 +2234,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_turn_cap_is_prose_in_constraints",
+   "id": "sabrina_turn_cap_is_prose_in_constraints","_origin":"semantic",
    "label": "The turn cap is not a flag or a parameter — it is natural-language prose written inside the CONSTRAINTS field: 'Add a turn cap in CONSTRAINTS, like \"stop after 30 turns.\"'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2245,7 +2245,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_goal_clear_stops_a_run_early",
+   "id": "sabrina_goal_clear_stops_a_run_early","_origin":"semantic",
    "label": "Manual kill switch for a /goal that runs forever or gets stuck: 'or /goal clear to stop it early.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2256,7 +2256,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_bare_goal_checks_status",
+   "id": "sabrina_bare_goal_checks_status","_origin":"semantic",
    "label": "Status check on a running loop: 'Type /goal by itself to check status' — the bare command is the introspection surface, distinct from /goal plus a 5-part body which starts a run.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2267,7 +2267,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_no_worked_prompt_contains_a_turn_cap",
+   "id": "sabrina_no_worked_prompt_contains_a_turn_cap","_origin":"semantic",
    "label": "INFERENCE (control-armed against all six prompts): none of the six worked /goal prompts actually contains a turn cap, despite CONSTRAINTS being glossed as the place for 'how many turns to stop at'. The turn-cap advice appears only in the FAQ, so the article demonstrates OUTCOME-met termination and merely mentions bounded termination.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2278,7 +2278,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_loop_engineering_removes_you_from_prompting",
+   "id": "sabrina_loop_engineering_removes_you_from_prompting","_origin":"semantic",
    "label": "The stated purpose of loop engineering: 'The purpose of \"loop engineering\" with /goal is to REMOVE YOU from prompting Claude every single time.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2289,7 +2289,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_give_claude_tools_to_evaluate_its_own_work",
+   "id": "sabrina_give_claude_tools_to_evaluate_its_own_work","_origin":"semantic",
    "label": "The operator's job in loop engineering, verbatim: 'Give Claude the tools it needs to evaluate its own work and keep improving to reach the finish line.' — supplying the instrument is as load-bearing as writing the condition.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2300,7 +2300,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_fable_built_for_long_agentic_runs",
+   "id": "sabrina_fable_built_for_long_agentic_runs","_origin":"semantic",
    "label": "Model framing: 'Claude Fable is built for long agentic runs where Claude works for many steps toward a finish line, not just a single chat reply' — Anthropic's newest model, and though 'You don't strictly need it to try /goal', it is the one the author points these projects at.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2311,7 +2311,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_prerequisites_paid_plan_claude_code_only",
+   "id": "sabrina_prerequisites_paid_plan_claude_code_only","_origin":"semantic",
    "label": "Prerequisites before running any of the six /goal prompts: 'Claude Code account on a paid plan (Pro or Max)' and '/goal command is limited to Claude Code'.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2322,7 +2322,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_template_is_domain_agnostic",
+   "id": "sabrina_template_is_domain_agnostic","_origin":"semantic",
    "label": "The 5-part template is claimed domain-agnostic: '/goal' handles non-coding tasks too — 'The same 5-part template works whether Claude is writing code or planning a weekend, the TASK and VERIFICATION lines just change.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2333,7 +2333,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_no_coding_needed_for_five_and_six",
+   "id": "sabrina_no_coding_needed_for_five_and_six","_origin":"semantic",
    "label": "Skill floor per project: 'No, for #5 and #6. #1 through #4 run in the Claude Code app, which is more technical, but Claude still writes and runs the code. You're steering, not typing syntax yourself.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2344,7 +2344,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_recap_role_of_each_field",
+   "id": "sabrina_recap_role_of_each_field","_origin":"semantic",
    "label": "The recap's one-line division of labour across the template: 'TASK and OUTCOME describe what you want to do and the deliverable. CONSTRAINTS help keep AI from running wild. VERIFICATION is what turns a prompt into an actual /goal.'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2355,7 +2355,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_pay_attention_to_verification_finish_line",
+   "id": "sabrina_pay_attention_to_verification_finish_line","_origin":"semantic",
    "label": "Closing directive of the article: 'Pay attention to VERIFICATION. That's the finish line. Let Claude prove to you it's done, not just lie to your face!'",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2366,7 +2366,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_scope_is_projects_followup_not_mechanics",
+   "id": "sabrina_scope_is_projects_followup_not_mechanics","_origin":"semantic",
    "label": "SCOPE CAVEAT: despite the 'loop engineering' slug, this post is the PROJECTS follow-up, not the mechanics explainer — 'Last newsletter, I wrote about loop engineering' and 'Who this is NOT for: if you haven't run your first /goal in Claude Code, start with this loop engineering intro' (the prior post 'Loop Engineering: Build Agents with Claude /goal + Routines'). Thin coverage of loop internals here is a property of THIS article, not evidence the author never covered them.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2377,7 +2377,7 @@
    "contributor": null
   },
   {
-   "id": "sabrina_not_covered_cost_and_evaluator_internals",
+   "id": "sabrina_not_covered_cost_and_evaluator_internals","_origin":"semantic",
    "label": "INFERENCE from a full read: the article covers no token or dollar cost, no character limit on a goal condition, no rollback semantics when a turn cap is hit before OUTCOME, no statement of whether VERIFICATION is judged by a separate model, and no composed or nested goals. Wall-clock figures given (60 minutes, 3 days, every 4 hours, 2-3 rewrite rounds) are expectations, not caps.",
    "file_type": "concept",
    "source_file": "loop-engineering-sabrina.md",
@@ -2388,7 +2388,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_doc",
+   "id": "ccgoal_doc","_origin":"semantic",
    "label": "Anthropic's official Claude Code documentation page \"Keep Claude working toward a goal\" (code.claude.com/docs/en/goal.md) specifies the `/goal` command: how to set a completion condition, how the evaluator judges it after every turn, how to bound, clear, resume, and run it non-interactively, and when the command is unavailable.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2399,7 +2399,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_evaluator_calls_no_tools",
+   "id": "ccgoal_evaluator_calls_no_tools","_origin":"semantic",
    "label": "THE CENTRAL CONSTRAINT on any /goal condition: the evaluator \"does not call tools, so it can only judge what Claude has already surfaced in the conversation.\" It runs no commands and reads no files independently, so any state the condition names must have been printed into the transcript by Claude itself before it can be judged true.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2410,7 +2410,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_write_what_output_demonstrates",
+   "id": "ccgoal_write_what_output_demonstrates","_origin":"semantic",
    "label": "The authoring rule that follows directly from the evaluator having no tools: \"write the condition as something Claude's own output can demonstrate.\" A condition naming a fact only the filesystem or a process knows is unjudgeable unless the condition also compels Claude to surface that fact in the conversation.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2421,7 +2421,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_transcript_evidence_example",
+   "id": "ccgoal_transcript_evidence_example","_origin":"semantic",
    "label": "The docs' worked example of a transcript-demonstrable condition: \"All tests in `test/auth` pass\" works because Claude runs the tests and the result lands in the transcript for the evaluator to read. The condition is judgeable not because it is precise but because running it produces evidence in the conversation.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2432,7 +2432,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_three_part_condition",
+   "id": "ccgoal_three_part_condition","_origin":"semantic",
    "label": "Anthropic's template for a /goal condition that holds up across many turns: it usually has three parts — one measurable end state, a stated check, and constraints that matter. These three bullets are the docs' own structure for an effective condition, not a community convention.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2443,7 +2443,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_part_measurable_end_state",
+   "id": "ccgoal_part_measurable_end_state","_origin":"semantic",
    "label": "Part 1 of an effective /goal condition — ONE MEASURABLE END STATE: \"a test result, a build exit code, a file count, an empty queue.\" The end state must be a single countable or pass/fail fact, not a quality aspiration.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2454,7 +2454,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_part_stated_check",
+   "id": "ccgoal_part_stated_check","_origin":"semantic",
    "label": "Part 2 of an effective /goal condition — A STATED CHECK, meaning \"how Claude should prove it, such as \\\"`npm test` exits 0\\\" or \\\"`git status` is clean\\\".\" The condition names the proof procedure, not only the desired state: it says which command Claude runs and what result counts as passing.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2465,7 +2465,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_part_constraints_that_matter",
+   "id": "ccgoal_part_constraints_that_matter","_origin":"semantic",
    "label": "Part 3 of an effective /goal condition — CONSTRAINTS THAT MATTER: \"anything that must not change on the way there, such as \\\"no other test file is modified\\\".\" These are the negative clauses that keep the agent from reaching the end state by an illegitimate route.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2476,7 +2476,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_char_limit_4000",
+   "id": "ccgoal_char_limit_4000","_origin":"semantic",
    "label": "A /goal condition can be up to 4,000 characters. That is the hard authoring budget for the whole condition text, which is re-sent to the evaluator alongside the conversation on every turn.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2487,7 +2487,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_one_per_session",
+   "id": "ccgoal_one_per_session","_origin":"semantic",
    "label": "One goal can be active per session, and the same `/goal` command sets, checks, and clears it depending on the argument given. There is no multi-goal mode.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2498,7 +2498,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_new_goal_replaces_active",
+   "id": "ccgoal_new_goal_replaces_active","_origin":"semantic",
    "label": "Setting a goal is `/goal` followed by the condition you want satisfied; if a goal is already active, the new one silently REPLACES it rather than erroring or stacking.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2509,7 +2509,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_setting_starts_a_turn",
+   "id": "ccgoal_setting_starts_a_turn","_origin":"semantic",
    "label": "Setting a goal STARTS A TURN IMMEDIATELY, with the condition itself as the directive — no separate prompt is needed. Consequence for authoring: the condition text is simultaneously a predicate the evaluator judges and the first instruction the working model receives, so it must read as a workable directive.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2520,7 +2520,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_active_indicator",
+   "id": "ccgoal_active_indicator","_origin":"semantic",
    "label": "While a goal is active, Claude Code displays a `◎ /goal active` indicator showing how long the goal has been running.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2531,7 +2531,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_example_set_command",
+   "id": "ccgoal_example_set_command","_origin":"semantic",
    "label": "The docs' canonical interactive example of setting a goal: `/goal all tests in test/auth pass and the lint step is clean` — a conjunction of two transcript-demonstrable checks.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2542,7 +2542,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_what_goals_are_for",
+   "id": "ccgoal_what_goals_are_for","_origin":"semantic",
    "label": "Goals are for substantial work with a verifiable end state. The docs' four examples: migrating a module to a new API until every call site compiles and tests pass; implementing a design doc until all acceptance criteria hold; splitting a large file into focused modules until each is under a size budget; working through a labeled issue backlog until the queue is empty.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2553,7 +2553,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_loop_summary",
+   "id": "ccgoal_loop_summary","_origin":"semantic",
    "label": "The /goal loop in one sentence: after each turn a small fast model checks whether the condition holds; if it does not, Claude starts another turn instead of returning control to the user, and the goal clears automatically once the condition is met.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2564,7 +2564,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_version_requirement",
+   "id": "ccgoal_version_requirement","_origin":"semantic",
    "label": "`/goal` requires Claude Code v2.1.139 or later; on earlier versions the command does not exist.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2575,7 +2575,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_is_session_scoped_stop_hook",
+   "id": "ccgoal_is_session_scoped_stop_hook","_origin":"semantic",
    "label": "MECHANISM: `/goal` is a wrapper around a session-scoped prompt-based Stop hook. It is not a separate subsystem — everything the Stop-hook and prompt-hook contracts say about wire behaviour applies to it.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2586,7 +2586,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_evaluator_is_small_fast_model",
+   "id": "ccgoal_evaluator_is_small_fast_model","_origin":"semantic",
    "label": "Each time Claude finishes a turn, the condition AND the conversation so far are sent to the session's configured small fast model. That model defaults to Haiku on the Claude API only — a third-party provider substitutes its own, and ANTHROPIC_DEFAULT_HAIKU_MODEL replaces it outright. The evaluator therefore reads the whole transcript, so evidence in a long run competes for attention with everything else in it. (Re-verified 2026-07-30; 'defaults to Haiku' was unqualified until then.)",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2597,7 +2597,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_evaluator_returns_yes_no_and_reason",
+   "id": "ccgoal_evaluator_returns_yes_no_and_reason","_origin":"semantic",
    "label": "The evaluator model returns a yes-or-no decision plus a short reason. A \"no\" tells Claude to keep working and includes the reason as guidance for the next turn; a \"yes\" clears the goal and records an achieved entry in the transcript.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2608,7 +2608,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_evaluator_uses_session_provider",
+   "id": "ccgoal_evaluator_uses_session_provider","_origin":"semantic",
    "label": "The /goal evaluator runs on whichever provider the session is configured for — it is not pinned to Anthropic's own API when the session points elsewhere.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2619,7 +2619,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_eval_token_billing",
+   "id": "ccgoal_eval_token_billing","_origin":"semantic",
    "label": "Evaluation tokens are billed on the small fast model configured for the provider and are \"typically negligible compared to main-turn spend\" — the per-turn evaluator is not a meaningful cost driver of a goal run.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2630,7 +2630,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_reason_visible_each_turn",
+   "id": "ccgoal_reason_visible_each_turn","_origin":"semantic",
    "label": "After each turn the evaluator returns a short reason explaining why the condition is or is not met, and the most recent reason appears both in the `/goal` status view and in the transcript, so a human can see what Claude is working toward next.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2641,7 +2641,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_hooks_tip_goal_is_shortcut",
+   "id": "ccgoal_hooks_tip_goal_is_shortcut","_origin":"semantic",
    "label": "The hooks reference confirms the same mechanism from the other side: \"The `/goal` command is a built-in shortcut for a session-scoped prompt-based Stop hook. Use it when you want Claude to keep working until a condition holds without writing hook configuration.\"",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2652,7 +2652,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_prompt_hook_three_steps",
+   "id": "ccgoal_prompt_hook_three_steps","_origin":"semantic",
    "label": "How a prompt-based hook (the machinery behind /goal) works: (1) the hook input and the prompt are sent to a Claude model, Haiku by default; (2) the LLM responds with structured JSON containing a decision; (3) Claude Code processes the decision automatically. No Bash command is executed.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2663,7 +2663,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_response_schema_ok_reason",
+   "id": "ccgoal_response_schema_ok_reason","_origin":"semantic",
    "label": "The exact JSON a prompt-hook evaluator must emit is `{\"ok\": true | false, \"reason\": \"Explanation for the decision\"}`. `ok: true` allows; `ok: false` produces a `decision: \"block\"`, and `reason` is REQUIRED when `ok` is false because it is used as the block reason.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2674,7 +2674,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_ok_false_reason_becomes_next_instruction",
+   "id": "ccgoal_ok_false_reason_becomes_next_instruction","_origin":"semantic",
    "label": "On `ok: false` for the `Stop` and `SubagentStop` events, \"the reason is fed back to Claude as its next instruction and the turn continues.\" The evaluator's rejection text therefore literally becomes the working model's prompt — a badly worded reason steers the next turn badly.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2685,7 +2685,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_prompt_hook_timeout_30s",
+   "id": "ccgoal_prompt_hook_timeout_30s","_origin":"semantic",
    "label": "A prompt-type hook has a default `timeout` of 30 seconds (versus 600 for command/http/mcp_tool hooks). The docs do not state what /goal does when its evaluator times out.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2696,7 +2696,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_continue_on_block_field",
+   "id": "ccgoal_continue_on_block_field","_origin":"semantic",
    "label": "Prompt hooks accept a `continueOnBlock` field (default `false`): when the prompt returns `ok: false`, feed the reason back to Claude and continue the turn instead of stopping. It is implemented as `continue: true` on the resulting `decision: \"block\"`. For `Stop` the reason is fed back regardless, so this field is the knob that could make /goal's continuation behaviour differ from a plain Stop hook's.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2707,7 +2707,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_prompt_hook_model_field",
+   "id": "ccgoal_prompt_hook_model_field","_origin":"semantic",
    "label": "A prompt hook accepts an optional `model` field selecting the model used for evaluation, defaulting to a fast model — which is why /goal's evaluator is described as \"your configured small fast model, which defaults to Haiku\" rather than as a fixed model.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2718,7 +2718,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_stop_event_when_it_runs",
+   "id": "ccgoal_stop_event_when_it_runs","_origin":"semantic",
    "label": "The `Stop` event — the event /goal is built on — \"runs when the main Claude Code agent has finished responding.\" It does NOT run if the stoppage occurred due to a user interrupt.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2729,7 +2729,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_api_error_fires_stopfailure",
+   "id": "ccgoal_api_error_fires_stopfailure","_origin":"semantic",
    "label": "When a turn ends due to an API error, `StopFailure` fires INSTEAD of `Stop`, and StopFailure hooks have no decision control (output and exit code are ignored). A goal turn killed by a rate limit or auth error is therefore not evaluated by the goal evaluator at all.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2740,7 +2740,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_stop_hook_active_field",
+   "id": "ccgoal_stop_hook_active_field","_origin":"semantic",
    "label": "Stop hooks receive a `stop_hook_active` input field that is `true` when Claude Code is already continuing as a result of a stop hook. The docs tell hook authors to check it \"to avoid blocking on a condition that will never resolve\" — the built-in signal that an unsatisfiable condition is the expected failure mode of this design.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2751,7 +2751,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_stop_decision_block_fields",
+   "id": "ccgoal_stop_decision_block_fields","_origin":"semantic",
    "label": "A Stop hook's decision-control fields: `decision: \"block\"` prevents Claude from stopping (omit it to allow the stop), `reason` is required with a block and tells Claude why it should continue, and `hookSpecificOutput.additionalContext` supplies non-error feedback that also continues the conversation but is labelled \"Stop hook feedback\" instead of a hook error.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2762,7 +2762,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_additionalcontext_same_loop_protections",
+   "id": "ccgoal_additionalcontext_same_loop_protections","_origin":"semantic",
    "label": "`additionalContext` on a Stop hook \"keeps the conversation going through the same loop protections as `decision: \\\"block\\\"`, namely the `stop_hook_active` input and the 8-consecutive-continuation cap\" — confirming the cap is a property of the Stop continuation machinery generally, not of one output shape.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2773,7 +2773,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_bound_with_turn_or_time_clause",
+   "id": "ccgoal_bound_with_turn_or_time_clause","_origin":"semantic",
    "label": "To bound how long a goal runs, the ONLY documented mechanism is to include a turn or time clause inside the condition text itself, such as `or stop after 20 turns`. Nothing outside the condition bounds a goal run.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2784,7 +2784,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_bound_is_self_reported",
+   "id": "ccgoal_bound_is_self_reported","_origin":"semantic",
    "label": "A turn/time bound in a /goal condition is NOT harness-enforced: \"Claude reports progress against that clause each turn and the evaluator judges it from the conversation.\" The bound is a self-report read out of the transcript, with the same no-tools limitation as every other clause.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2795,7 +2795,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_runs_until_met_or_cleared",
+   "id": "ccgoal_runs_until_met_or_cleared","_origin":"semantic",
    "label": "goal.md's stopping claim: \"A goal keeps running until the condition is met or you run `/goal clear`.\" The page states no turn cap, no iteration limit, and no automatic override anywhere in its text.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2806,7 +2806,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_eight_consecutive_block_cap",
+   "id": "ccgoal_eight_consecutive_block_cap","_origin":"semantic",
    "label": "hooks.md's opposing claim about the same machinery: \"Claude Code overrides the hook and ends the turn after 8 consecutive blocks.\" Stated as a property of Stop hooks generally, which is what /goal is implemented as.",
    "file_type": "concept",
    "source_file": "hooks.md",
@@ -2817,7 +2817,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_cap_disagreement_unreconciled",
+   "id": "ccgoal_cap_disagreement_unreconciled","_origin":"semantic",
    "label": "UNRECONCILED DOC DISAGREEMENT: hooks.md says Claude Code overrides a Stop hook after 8 consecutive blocks, while goal.md says a goal keeps running until the condition is met or cleared and never mentions any cap. /goal IS a prompt-based Stop hook, which argues the cap applies; goal.md's unbounded language and the `continueOnBlock` field argue the wrapper may set it differently. Neither page reconciles the other — do not design a condition assuming either statement governs.",
    "file_type": "concept",
    "source_file": "res-bestpractices.md",
@@ -2828,7 +2828,7 @@
    "contributor": "res-bestpractices agent report"
   },
   {
-   "id": "ccgoal_clear_command",
+   "id": "ccgoal_clear_command","_origin":"semantic",
    "label": "`/goal clear` removes an active goal before its condition is met. Claude prints `Goal cleared:` followed by the condition to confirm, or `No goal set` if nothing was active.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2839,7 +2839,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_clear_aliases",
+   "id": "ccgoal_clear_aliases","_origin":"semantic",
    "label": "`stop`, `off`, `reset`, `none`, and `cancel` are all accepted as aliases for `clear` — `/goal stop` and `/goal cancel` do exactly what `/goal clear` does.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2850,7 +2850,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_slash_clear_removes_goal",
+   "id": "ccgoal_slash_clear_removes_goal","_origin":"semantic",
    "label": "Running `/clear` to start a new conversation ALSO removes any active goal. The documented fix for a context polluted by failed approaches therefore destroys the goal at the same time.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2861,7 +2861,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_bare_goal_shows_status",
+   "id": "ccgoal_bare_goal_shows_status","_origin":"semantic",
    "label": "Running `/goal` with no arguments shows the current state rather than setting anything — it is the status verb of the same command.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2872,7 +2872,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_status_fields",
+   "id": "ccgoal_status_fields","_origin":"semantic",
    "label": "When a goal is active, `/goal` status shows five things: the condition, how long it has been running, how many turns have been evaluated, the current token spend, and the evaluator's most recent reason.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2883,7 +2883,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_status_after_first_evaluation",
+   "id": "ccgoal_status_after_first_evaluation","_origin":"semantic",
    "label": "In the `/goal` status view, the turn count and the most recent reason only appear AFTER the first evaluation has run — their absence right after setting a goal is expected, not a fault.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2894,7 +2894,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_status_shows_achieved_goal",
+   "id": "ccgoal_status_shows_achieved_goal","_origin":"semantic",
    "label": "If no goal is active but one was achieved earlier in the session, `/goal` status shows the achieved condition along with its duration, turn count, and token spend — a completed run stays inspectable for the rest of the session.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2905,7 +2905,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_resume_restores_condition",
+   "id": "ccgoal_resume_restores_condition","_origin":"semantic",
    "label": "A goal still active when a session ended IS restored when that session is resumed with `--resume` or `--continue`; the condition carries over intact.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2916,7 +2916,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_resume_resets_counters",
+   "id": "ccgoal_resume_resets_counters","_origin":"semantic",
    "label": "On resume, the turn count, the timer, and the token-spend baseline ALL RESET even though the condition carries over. A `or stop after 20 turns` clause therefore silently re-arms on every resume: a turn or time bound is not a durable budget across sessions.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2927,7 +2927,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_achieved_or_cleared_not_restored",
+   "id": "ccgoal_achieved_or_cleared_not_restored","_origin":"semantic",
    "label": "A goal that was already achieved or cleared is NOT restored on resume — only a goal that was still active when the session ended comes back.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2938,7 +2938,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_requires_trust_dialog",
+   "id": "ccgoal_requires_trust_dialog","_origin":"semantic",
    "label": "`/goal` runs only in workspaces where the trust dialog has been accepted, because the evaluator is part of the hooks system. An untrusted workspace has no /goal.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2949,7 +2949,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_disabled_by_disableallhooks",
+   "id": "ccgoal_disabled_by_disableallhooks","_origin":"semantic",
    "label": "`/goal` is unavailable when `disableAllHooks` is set at ANY settings level — because /goal is a hook, disabling hooks anywhere in the settings chain removes the command.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2960,7 +2960,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_disabled_by_allowmanagedhooksonly",
+   "id": "ccgoal_disabled_by_allowmanagedhooksonly","_origin":"semantic",
    "label": "`/goal` is also unavailable when `allowManagedHooksOnly` is set in MANAGED settings — an enterprise policy that permits only managed hooks blocks the session-scoped hook /goal installs.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2971,7 +2971,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_unavailability_is_explained",
+   "id": "ccgoal_unavailability_is_explained","_origin":"semantic",
    "label": "In every unavailability case — untrusted workspace, `disableAllHooks`, `allowManagedHooksOnly` — \"the command tells you why instead of silently doing nothing.\" A /goal that appears to do nothing is not the documented failure shape.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2982,7 +2982,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_does_not_change_permissions",
+   "id": "ccgoal_does_not_change_permissions","_origin":"semantic",
    "label": "A goal does NOT change permissions. In the default permission mode Claude still asks before tool calls that the settings don't already allow — including the very test command named in the condition — so an unattended goal run can stall on a permission prompt every turn.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -2993,7 +2993,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_pair_with_auto_mode",
+   "id": "ccgoal_pair_with_auto_mode","_origin":"semantic",
    "label": "To let goal turns run unattended, the docs' explicit instruction is to pair `/goal` with auto mode. Without it, permission prompts, not the condition, decide how far an unattended run gets.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3004,7 +3004,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_auto_mode_complementary",
+   "id": "ccgoal_auto_mode_complementary","_origin":"semantic",
    "label": "Auto mode and /goal are complementary and orthogonal: auto mode approves tool calls WITHIN a single turn but doesn't start a new one, while /goal starts new turns but doesn't approve tools. \"Auto mode removes per-tool prompts, and `/goal` removes per-turn prompts.\"",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3015,7 +3015,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_fresh_model_decides_completion",
+   "id": "ccgoal_fresh_model_decides_completion","_origin":"semantic",
    "label": "The design intent of /goal: it adds a separate evaluator that checks the condition after every turn, \"so completion is decided by a fresh model rather than the one doing the work.\" Without it, Claude stops when it judges the work done — the worker grades itself.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3026,7 +3026,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_comparison_pick_by_trigger",
+   "id": "ccgoal_comparison_pick_by_trigger","_origin":"semantic",
    "label": "Three approaches keep the current session running between prompts — `/goal`, `/loop`, and a Stop hook — and the docs say to pick based on WHAT SHOULD START THE NEXT TURN, not on what the work is.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3037,7 +3037,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_row_goal",
+   "id": "ccgoal_row_goal","_origin":"semantic",
    "label": "Comparison row for `/goal`: the next turn starts when the previous turn finishes, and it stops when A MODEL CONFIRMS THE CONDITION IS MET.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3048,7 +3048,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_row_loop",
+   "id": "ccgoal_row_loop","_origin":"semantic",
    "label": "Comparison row for `/loop`: the next turn starts when A TIME INTERVAL ELAPSES, and it stops when you stop it or Claude decides the work is done — i.e. /loop has no independent completion judge, unlike /goal.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3059,7 +3059,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_row_stop_hook",
+   "id": "ccgoal_row_stop_hook","_origin":"semantic",
    "label": "Comparison row for a Stop hook: the next turn starts when the previous turn finishes (same trigger as /goal), and it stops when YOUR OWN SCRIPT OR PROMPT DECIDES — the deterministic-check option.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3070,7 +3070,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_vs_stop_hook_scope",
+   "id": "ccgoal_vs_stop_hook_scope","_origin":"semantic",
    "label": "`/goal` and a Stop hook both fire after every turn; the difference is scope and authoring. /goal is a session-scoped shortcut you type as a condition and it is active for the current session only, while a Stop hook lives in a settings file, applies to every session in its scope, and can run a SCRIPT for deterministic checks or a prompt for model-evaluated ones.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3081,7 +3081,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_scheduling_is_a_different_axis",
+   "id": "ccgoal_scheduling_is_a_different_axis","_origin":"semantic",
    "label": "All three session-keeping approaches keep the CURRENT session running; work that must run independent of any open session (nightly tests, morning triage) belongs to the separate scheduling options — cloud routines and desktop scheduled tasks — not to /goal.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3092,7 +3092,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_surfaces_headless_desktop_remote",
+   "id": "ccgoal_surfaces_headless_desktop_remote","_origin":"semantic",
    "label": "`/goal` works in non-interactive (headless) mode, in the desktop app, and through Remote Control — it is not an interactive-TUI-only feature.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3103,7 +3103,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_p_flag_runs_to_completion",
+   "id": "ccgoal_p_flag_runs_to_completion","_origin":"semantic",
    "label": "Setting a goal with `-p` runs the whole loop to completion in a SINGLE invocation, e.g. `claude -p \"/goal CHANGELOG.md has an entry for every PR merged this week\"` — the process does not return until the condition is met or it is interrupted.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3114,7 +3114,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_headless_silent_until_done",
+   "id": "ccgoal_headless_silent_until_done","_origin":"semantic",
    "label": "With the default text output in headless mode, NOTHING PRINTS until the condition is met, so a goal that runs many turns can look stuck. Add `--output-format stream-json --verbose` to emit each message as the loop runs.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3125,7 +3125,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_ctrl_c_stops_headless",
+   "id": "ccgoal_ctrl_c_stops_headless","_origin":"semantic",
    "label": "Interrupt the process with Ctrl+C to stop a non-interactive goal before its condition is met — the headless equivalent of `/goal clear`.",
    "file_type": "concept",
    "source_file": "claude-code-goal-docs.md",
@@ -3136,7 +3136,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_slash_stacking_expansion_rules",
+   "id": "ccgoal_slash_stacking_expansion_rules","_origin":"semantic",
    "label": "Slash-stacking: several skills can be stacked at the start of one message (`/write-tests /fix-issue 123` loads both and passes the trailing text as `$ARGUMENTS` to each). Claude Code expands the first skill plus up to five more stacked after it.",
    "file_type": "concept",
    "source_file": "cc_slash-commands.md",
@@ -3147,7 +3147,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_forked_skill_terminates_expansion",
+   "id": "ccgoal_forked_skill_terminates_expansion","_origin":"semantic",
    "label": "Slash-command expansion STOPS at the first token that isn't an inline user-invocable skill — so a skill that runs as a FORKED SUBAGENT (such as `/code-review`), or one whose arguments may themselves start with a slash command (such as `/loop`), ends the expansion run there. That token and everything after it become the argument text for every already-expanded skill.",
    "file_type": "concept",
    "source_file": "cc_slash-commands.md",
@@ -3158,7 +3158,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_best_practices_stop_hook_rung",
+   "id": "ccgoal_best_practices_stop_hook_rung","_origin":"semantic",
    "label": "best-practices.md places /goal on a ladder of how hard a check gates the stop: in one prompt (ask Claude to run the check and iterate), across a session (a `/goal` condition re-checked by a separate evaluator after every turn), as a deterministic gate (a Stop hook script — \"Claude Code overrides the hook and ends the turn after 8 consecutive blocks\"), or by a second opinion (a verification subagent). This is the third page repeating the 8-block cap for Stop hooks.",
    "file_type": "concept",
    "source_file": "best-practices.md",
@@ -3169,7 +3169,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_verification_loop_prerequisite",
+   "id": "ccgoal_verification_loop_prerequisite","_origin":"semantic",
    "label": "The Claude Code glossary states a verification loop — a check Claude can run and iterate against — is the PREREQUISITE for `/goal`, unattended runs, and dynamic workflows: \"without one, the only thing deciding the agent is finished is the agent itself.\"",
    "file_type": "concept",
    "source_file": "glossary.md",
@@ -3180,7 +3180,7 @@
    "contributor": null
   },
   {
-   "id": "ccgoal_no_blocked_exit_primitive",
+   "id": "ccgoal_no_blocked_exit_primitive","_origin":"semantic",
    "label": "GAP: no Claude Code doc describes a way for a /goal condition to declare \"I am blocked, hand control back to the human\" as a first-class outcome. The only documented exits are: the evaluator returns yes; `/goal clear` or an alias; `/clear`; Ctrl+C in headless mode; and — for Stop hooks generally, disputed for /goal — the 8-consecutive-block override.",
    "file_type": "concept",
    "source_file": "res-bestpractices.md",

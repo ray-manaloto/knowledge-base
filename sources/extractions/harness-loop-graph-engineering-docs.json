@@ -1,7 +1,7 @@
 {
  "nodes": [
   {
-   "id": "addyosmani_harness_engineering",
+   "id": "addyosmani_harness_engineering","_origin":"semantic",
    "label": "Harness engineering",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -12,7 +12,7 @@
    "rationale": "A discipline (term coined by Viv Trivedy) that treats the scaffolding around a model as a real engineered artifact which is tightened every time the agent slips: roughly, whenever an agent makes a mistake you engineer a solution so it never makes that mistake again. It is a discipline rather than a framework because the right harness is shaped by your own failure history and can't be downloaded."
   },
   {
-   "id": "addyosmani_agent_equals_model_plus_harness",
+   "id": "addyosmani_agent_equals_model_plus_harness","_origin":"semantic",
    "label": "Agent = Model + Harness",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -23,7 +23,7 @@
    "rationale": "Viv Trivedy's core equation: a coding agent is the AI model(s) plus the harness; 'if you're not the model, you're the harness.' A raw model is not an agent — it becomes one only once a harness gives it state, tool execution, feedback loops, and enforceable constraints. Most of the actual leverage sits on the right-hand side (the harness), not the model."
   },
   {
-   "id": "addyosmani_harness_definition",
+   "id": "addyosmani_harness_definition","_origin":"semantic",
    "label": "What a harness includes",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -34,7 +34,7 @@
    "rationale": "The harness is every piece of code, configuration, and execution logic that isn't the model: system prompts/CLAUDE.md/AGENTS.md/skill and subagent prompts; tools, skills, MCP servers and their descriptions; bundled infrastructure (filesystem, sandbox, browser); orchestration logic (subagent spawning, handoffs, model routing); hooks/middleware for deterministic execution (compaction, continuation, lint checks); and observability (logs, traces, cost/latency metering). Claude Code, Cursor, Codex, Aider, and Cline are all harnesses."
   },
   {
-   "id": "addyosmani_decent_model_great_harness",
+   "id": "addyosmani_decent_model_great_harness","_origin":"semantic",
    "label": "Decent model + great harness wins",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -45,7 +45,7 @@
    "rationale": "A decent model with a great harness beats a great model with a bad harness. The model is only one input; the behaviour you experience is dominated by what the harness does, and the interesting engineering is increasingly in designing the scaffolding rather than picking the model."
   },
   {
-   "id": "addyosmani_agentic_loop",
+   "id": "addyosmani_agentic_loop","_origin":"semantic",
    "label": "Agent as tools-in-a-loop",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -56,7 +56,7 @@
    "rationale": "Simon Willison reduces the loop part to its essence: an agent is a system that 'runs tools in a loop to achieve a goal.' The engineering skill lies in the design of both the tools and the loop."
   },
   {
-   "id": "addyosmani_skill_issue_reframe",
+   "id": "addyosmani_skill_issue_reframe","_origin":"semantic",
    "label": "The 'skill issue' reframe",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -67,7 +67,7 @@
    "rationale": "HumanLayer frames most agent failures as configuration problems, not model problems ('it's not a model problem. It's a configuration problem'). This rejects the default of blaming the model and 'waiting for the next version'; failures are usually legible and fixable by adding a convention to AGENTS.md, a blocking hook, task decomposition, or a back-pressure signal."
   },
   {
-   "id": "addyosmani_terminal_bench_evidence",
+   "id": "addyosmani_terminal_bench_evidence","_origin":"semantic",
    "label": "Terminal Bench harness-swap evidence",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -78,7 +78,7 @@
    "rationale": "On Terminal Bench 2.0, Claude Opus 4.6 running inside Claude Code scores far lower than the same model in a custom harness; Viv's team moved a coding agent from Top 30 to Top 5 by changing only the harness. Models get post-training coupled to the harness they trained against, so moving them into a better harness can unlock capability the original harness left on the floor."
   },
   {
-   "id": "addyosmani_harness_gap",
+   "id": "addyosmani_harness_gap","_origin":"semantic",
    "label": "The harness gap",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -89,7 +89,7 @@
    "rationale": "The gap between what today's models can do and what you actually see them doing is largely a harness gap — the opposite of the 'just wait for GPT-6' narrative. Improving the harness, not the model, closes most of that gap."
   },
   {
-   "id": "addyosmani_ratchet_mistake_becomes_rule",
+   "id": "addyosmani_ratchet_mistake_becomes_rule","_origin":"semantic",
    "label": "The ratchet: every mistake becomes a rule",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -100,7 +100,7 @@
    "rationale": "The most important harness-engineering habit is treating agent mistakes as permanent signals, not one-off stories or bad runs. A single failure (e.g. merging a PR with a commented-out test) becomes a new AGENTS.md rule, a pre-commit hook grepping the diff, and a reviewer-subagent blocker. You add constraints only when you've seen a real failure and remove them only when a capable model makes them redundant; every line in a good AGENTS.md should trace back to a specific thing that went wrong."
   },
   {
-   "id": "addyosmani_working_backwards_from_behaviour",
+   "id": "addyosmani_working_backwards_from_behaviour","_origin":"semantic",
    "label": "Working backwards from behaviour",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -111,7 +111,7 @@
    "rationale": "Viv's design pattern: start from the behaviour you want (or want to fix) and derive the harness piece that delivers it. Every harness component should have a specific job — if you can't name the behaviour a component exists to deliver, it probably shouldn't be there."
   },
   {
-   "id": "addyosmani_filesystem_git_state",
+   "id": "addyosmani_filesystem_git_state","_origin":"semantic",
    "label": "Filesystem and Git as durable state",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -122,7 +122,7 @@
    "rationale": "The filesystem is the most foundational harness primitive: it gives the agent a workspace to read code/data/docs, a place to offload intermediate work instead of holding it in context, and a shared surface for multiple agents and humans to coordinate. Adding Git provides free versioning so the agent can track progress, roll back errors, and branch experiments; most other primitives end up pointing at the filesystem."
   },
   {
-   "id": "addyosmani_react_loop",
+   "id": "addyosmani_react_loop","_origin":"semantic",
    "label": "ReAct main agent loop",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -133,7 +133,7 @@
    "rationale": "Today's main agent loop is a ReAct loop: the model reasons, takes an action via a tool call, observes the result, and repeats. A harness can only execute tools it has logic for, which motivates giving the agent bash to build tools on the fly rather than pre-building a tool for every action."
   },
   {
-   "id": "addyosmani_bash_code_execution",
+   "id": "addyosmani_bash_code_execution","_origin":"semantic",
    "label": "Bash and code execution",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -144,7 +144,7 @@
    "rationale": "Bash plus code execution is the default general-purpose strategy for autonomous problem solving: instead of pre-building a tool for every action, you give the agent bash and let it build the tools it needs on the fly. Willison notes agents already excel at shell commands and most tasks collapse to a few well-chosen CLI invocations — the difference between one kitchen gadget and handing them a kitchen."
   },
   {
-   "id": "addyosmani_sandboxes",
+   "id": "addyosmani_sandboxes","_origin":"semantic",
    "label": "Sandboxes and default tooling",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -155,7 +155,7 @@
    "rationale": "Sandboxes give agents an isolated operating environment so bash can run safely and scale to many parallel agents: the harness connects to a sandbox to run code, inspect files, install deps, and verify work, with command allow-listing, network isolation, and on-demand spin-up/teardown. Good sandboxes ship good defaults — pre-installed runtimes and packages, Git and test CLIs, and a headless browser — enabling the agent to observe its own work and close the self-verification loop. Where the agent runs and how it verifies output are harness-level calls, not the model's."
   },
   {
-   "id": "addyosmani_memory_search_continual_learning",
+   "id": "addyosmani_memory_search_continual_learning","_origin":"semantic",
    "label": "Memory and search: continual learning",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -166,7 +166,7 @@
    "rationale": "Since models can't edit their weights, the only way to add knowledge is context injection. Harnesses support memory-file standards like AGENTS.md that get injected on every start and reloaded as the agent edits them, carrying knowledge across sessions — a crude but effective form of continual learning. Web search and MCP tools like Context7 bridge the training cutoff for new library versions and current docs, and are worth baking into the harness rather than leaving to the user."
   },
   {
-   "id": "addyosmani_context_rot",
+   "id": "addyosmani_context_rot","_origin":"semantic",
    "label": "Context rot",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -177,7 +177,7 @@
    "rationale": "Context rot is the observation that models get worse at reasoning and completing tasks as the context window fills up. Context is scarce, so harnesses are largely delivery mechanisms for good context engineering, and several techniques (compaction, tool-call offloading, progressive-disclosure skills, full context resets) exist to fight it."
   },
   {
-   "id": "addyosmani_compaction",
+   "id": "addyosmani_compaction","_origin":"semantic",
    "label": "Compaction",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -188,7 +188,7 @@
    "rationale": "When the context window gets close to full, the harness intelligently summarizes and offloads older context so the agent can keep working, rather than letting the API error (unacceptable for a production harness). Anthropic notes compaction alone is not sufficient for the longest tasks."
   },
   {
-   "id": "addyosmani_tool_call_offloading",
+   "id": "addyosmani_tool_call_offloading","_origin":"semantic",
    "label": "Tool-call offloading",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -199,7 +199,7 @@
    "rationale": "Large tool outputs (e.g. 2,000-line log files) clutter context without adding much signal, so the harness keeps only the head and tail tokens above a threshold and offloads the full output to the filesystem, where the agent can read it on demand."
   },
   {
-   "id": "addyosmani_skills_progressive_disclosure",
+   "id": "addyosmani_skills_progressive_disclosure","_origin":"semantic",
    "label": "Skills with progressive disclosure",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -210,7 +210,7 @@
    "rationale": "Loading every tool and MCP into context at startup degrades performance before the agent takes a single action. Skills let the harness reveal instructions and tools only when the task actually calls for them, preserving scarce context."
   },
   {
-   "id": "addyosmani_full_context_reset",
+   "id": "addyosmani_full_context_reset","_origin":"semantic",
    "label": "Full context resets",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -221,7 +221,7 @@
    "rationale": "For the really long jobs, Anthropic's harness post adds full context resets: the harness tears the session down and rebuilds it from a compact hand-off file, because compaction alone wasn't sufficient. This is closer to how humans onboard a new engineer with a structured brief than to conventional 'memory.'"
   },
   {
-   "id": "addyosmani_long_horizon_execution",
+   "id": "addyosmani_long_horizon_execution","_origin":"semantic",
    "label": "Long-horizon execution",
    "file_type": "concept",
    "source_file": "addyosmani_com_blog_agent-harness-engineering.md",
@@ -232,7 +232,7 @@
    "rationale": "Autonomous long-horizon work (via patterns like Ralph Loops, planning, and verification) is described as the holy grail and the hardest thing to get right; today's models suffer from early stopping and poor decomposition. (The captured document is truncated mid-sentence here, so further detail is unavailable.)"
   },
   {
-   "id": "agenteng_2026_harness_engineering",
+   "id": "agenteng_2026_harness_engineering","_origin":"semantic",
    "label": "Harness Engineering",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -243,7 +243,7 @@
    "rationale": "Harness Engineering is the emerging discipline of designing constraints, tools, feedback loops, documentation, and verification systems that guide powerful but unpredictable AI agents to produce reliable, maintainable, scalable software. Humans specify intent and boundaries; agents execute within them, shifting engineering from writing code to architecting environments where AI operates safely at scale."
   },
   {
-   "id": "agenteng_2026_agent_entropy_drift",
+   "id": "agenteng_2026_agent_entropy_drift","_origin":"semantic",
    "label": "Agent Entropy / Drift",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -254,7 +254,7 @@
    "rationale": "Without structured guardrails, agents drift, accumulate 'entropy' (cruft), or fail in long-running tasks. Harness Engineering exists to address this core limitation of pure context engineering."
   },
   {
-   "id": "agenteng_2026_no_manual_code_forcing_function",
+   "id": "agenteng_2026_no_manual_code_forcing_function","_origin":"semantic",
    "label": "No-Manual-Code Forcing Function",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -265,7 +265,7 @@
    "rationale": "In early 2026 OpenAI shipped an internal product beta with over 1 million lines of code, zero lines manually written by humans, using Codex agents under a strict 'no manual code' constraint. The forcing function forced creation of a robust harness that increased engineering velocity by orders of magnitude; the recommended first step to build a harness is to adopt 'no manual code' for a greenfield module or refactor."
   },
   {
-   "id": "agenteng_2026_architectural_constraints",
+   "id": "agenteng_2026_architectural_constraints","_origin":"semantic",
    "label": "Architectural Constraints and Boundaries",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -276,7 +276,7 @@
    "rationale": "A harness component that enforces module boundaries, stable data structures, and domain-specific rules via machine-readable artifacts such as architecture decision records and schema validators. OpenAI emphasizes central enforcement of boundaries while allowing local autonomy, mirroring large platform teams."
   },
   {
-   "id": "agenteng_2026_feedback_loops_observability",
+   "id": "agenteng_2026_feedback_loops_observability","_origin":"semantic",
    "label": "Feedback Loops and Observability",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -287,7 +287,7 @@
    "rationale": "A harness component building closed-loop systems that trace failures, cluster error patterns, and feed corrections back into the harness. LangChain's Deep Agents team improved GPT-5.2-Codex on Terminal Bench 2.0 from 52.8% to 66.5% (Top 30 to Top 5) purely by tracing and harnessing failures, with no model changes."
   },
   {
-   "id": "agenteng_2026_verification_guardrails",
+   "id": "agenteng_2026_verification_guardrails","_origin":"semantic",
    "label": "Verification and Guardrails",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -298,7 +298,7 @@
    "rationale": "A harness component combining deterministic tools (linters, type checkers, unit-test generators) with AI-driven validation such as agents reviewing other agents' code, plus 'garbage collection' for entropy via periodic refactoring agents that clean cruft."
   },
   {
-   "id": "agenteng_2026_lifecycle_scaffolding",
+   "id": "agenteng_2026_lifecycle_scaffolding","_origin":"semantic",
    "label": "Lifecycle Management and Scaffolding",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -309,7 +309,7 @@
    "rationale": "A harness component that standardizes repository setup, CI/CD, documentation, and observability generation. OpenAI started with Codex CLI scaffolds and evolved to full declarative prompts for workflows."
   },
   {
-   "id": "agenteng_2026_hybrid_deterministic_llm_checks",
+   "id": "agenteng_2026_hybrid_deterministic_llm_checks","_origin":"semantic",
    "label": "Hybrid Deterministic + LLM Checks",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -320,7 +320,7 @@
    "rationale": "Per Martin Fowler (February 2026), harness engineering mixes deterministic rules (linting, module boundaries) with LLM-based checks to keep agents aligned, combining rule-based and LLM verifiers for both speed and accuracy."
   },
   {
-   "id": "agenteng_2026_permanent_corrections",
+   "id": "agenteng_2026_permanent_corrections","_origin":"semantic",
    "label": "Engineer Corrections Permanently",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -331,7 +331,7 @@
    "rationale": "When agents make mistakes, engineers don't just fix the output; they engineer the system so the mistake never recurs, turning one-off fixes into reusable constraints such as new lint rules or sub-agents."
   },
   {
-   "id": "agenteng_2026_declarative_intent",
+   "id": "agenteng_2026_declarative_intent","_origin":"semantic",
    "label": "Declarative Intent Specification",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -342,7 +342,7 @@
    "rationale": "A build step for a harness: define intent declaratively using high-level specs, ADRs, and schemas instead of low-level instructions, so humans specify boundaries and agents execute within them."
   },
   {
-   "id": "agenteng_2026_prompt_engineering",
+   "id": "agenteng_2026_prompt_engineering","_origin":"semantic",
    "label": "Prompt Engineering",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -353,7 +353,7 @@
    "rationale": "Earlier paradigm focused on single-turn instructions; quick for demos but has no state, no tools, and high hallucination, breaking down on multi-step tasks."
   },
   {
-   "id": "agenteng_2026_context_engineering",
+   "id": "agenteng_2026_context_engineering","_origin":"semantic",
    "label": "Context Engineering",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -364,7 +364,7 @@
    "rationale": "Earlier paradigm focused on what the agent 'sees' (RAG, memory); reduces hallucinations short-term but suffers token limits, attention decay, and business gaps, breaking down on long chains and complex domains. Harness Engineering builds on it but shifts to execution optimization."
   },
   {
-   "id": "agenteng_2026_reliability_gains",
+   "id": "agenteng_2026_reliability_gains","_origin":"semantic",
    "label": "2-5x Reliability Gains",
    "file_type": "concept",
    "source_file": "www_agent-engineering_dev_article_harness-engineering-in-2026-the-discipline-tha.md",
@@ -375,7 +375,7 @@
    "rationale": "Teams following the harness-building guide see 2-5x reliability gains in agentic workflows, per 2026 case studies from OpenAI and independent benchmarks."
   },
   {
-   "id": "augment_loop_engineering",
+   "id": "augment_loop_engineering","_origin":"semantic",
    "label": "Loop engineering",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -386,7 +386,7 @@
    "rationale": "At the team level, loop engineering is the practice of designing a system where a team of agents work toward an outcome, bringing humans in where judgment matters most. The hard engineering work lies in choosing the right system design, the right models per task, and knowing when to involve humans so the loop delivers a higher-quality outcome."
   },
   {
-   "id": "augment_loop_design_over_prompting",
+   "id": "augment_loop_design_over_prompting","_origin":"semantic",
    "label": "Designing loops instead of prompting",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -397,7 +397,7 @@
    "rationale": "The article cites Boris Cherny saying he doesn't prompt Claude anymore, he writes loops, and Peter Steinberger's reminder to stop prompting agents and design loops that prompt them instead. The shift is away from one-off prompting toward engineering the loop the agent runs inside."
   },
   {
-   "id": "augment_loop_while_loop_critique",
+   "id": "augment_loop_while_loop_critique","_origin":"semantic",
    "label": "The 'just a while loop' critique",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -408,7 +408,7 @@
    "rationale": "Critics argue a loop around an LLM call is still just a while loop, and that cron jobs and webhooks predate agents. The author counters that this misses the important shift: the work inside the loop has changed."
   },
   {
-   "id": "augment_loop_work_inside_changed",
+   "id": "augment_loop_work_inside_changed","_origin":"semantic",
    "label": "The work inside the loop has changed",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -419,7 +419,7 @@
    "rationale": "Agents can now investigate, modify code, run tests, and review results with high quality. The middle of the SDLC, where humans spent time on repetitive tasks, can now be designed with agents and humans working side-by-side as part of an autonomous system."
   },
   {
-   "id": "augment_loop_agentic_sdlc_loop",
+   "id": "augment_loop_agentic_sdlc_loop","_origin":"semantic",
    "label": "Agentic SDLC loop",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -430,7 +430,7 @@
    "rationale": "Agentic SDLC loops are always-on production systems that take work from trigger to verified outcome across the software development lifecycle, with humans involved where judgment actually matters. The outer shape is remarkably consistent across teams."
   },
   {
-   "id": "augment_loop_team_vs_individual",
+   "id": "augment_loop_team_vs_individual","_origin":"semantic",
    "label": "Team-level vs individual loops",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -441,7 +441,7 @@
    "rationale": "Most conversation focuses on individual loops (one developer using agents to move a task forward), but the more important pattern emerges at the team level: standing workflows where repetitive SDLC work is handled by agents on an ongoing basis, with humans participating only at moments that need them."
   },
   {
-   "id": "augment_loop_diff_agents_do_doing",
+   "id": "augment_loop_diff_agents_do_doing","_origin":"semantic",
    "label": "Agents carry the bulk of the doing",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -452,7 +452,7 @@
    "rationale": "First differentiator from automation: pre-AI automation could route, notify, and glue systems but couldn't investigate a stack trace, write a fix, and rerun the test suite. The middle of the workflow that used to require a person can now be fully agentic — a different category of work being absorbed."
   },
   {
-   "id": "augment_loop_human_by_design",
+   "id": "augment_loop_human_by_design","_origin":"semantic",
    "label": "Humans in the loop by design",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -463,7 +463,7 @@
    "rationale": "Second differentiator: unlike DevOps automation where a human showing up meant something broke, in agentic loops a human checkpoint is where the highest-leverage judgment happens. It separates a high-quality outcome from a loop that keeps spinning and burning tokens."
   },
   {
-   "id": "augment_loop_human_checkpoint_timing",
+   "id": "augment_loop_human_checkpoint_timing","_origin":"semantic",
    "label": "Timing the human checkpoint",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -474,7 +474,7 @@
    "rationale": "The hard part is identifying the right point to bring the human in: too early and you've rebuilt a notification bot; too late and you risk creating a lot of slop. The goal is not to remove the human entirely but to use the right level of autonomy for the risk involved."
   },
   {
-   "id": "augment_loop_each_run_improves",
+   "id": "augment_loop_each_run_improves","_origin":"semantic",
    "label": "Each run can make the loop better",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -485,7 +485,7 @@
    "rationale": "Third differentiator: a cron job runs the same way every night, but an agentic loop can leverage memory and traces from previous runs to improve over time. Each run produces a trace of what worked, what failed, and where the human corrected course."
   },
   {
-   "id": "augment_loop_trace",
+   "id": "augment_loop_trace","_origin":"semantic",
    "label": "Run trace",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -496,7 +496,7 @@
    "rationale": "Each run produces a trace — what worked, what failed, and where the human stepped in and corrected course — that can be fed back to improve the overall system: prompts, tests, acceptance criteria, tools, or escalation rules."
   },
   {
-   "id": "augment_loop_stage_trigger",
+   "id": "augment_loop_stage_trigger","_origin":"semantic",
    "label": "Stage: Trigger",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -507,7 +507,7 @@
    "rationale": "Trigger is the first stage of the outer shape of an agentic SDLC loop: a PR opens, an alert goes off, or a ticket lands."
   },
   {
-   "id": "augment_loop_stage_execution",
+   "id": "augment_loop_stage_execution","_origin":"semantic",
    "label": "Stage: Execution",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -518,7 +518,7 @@
    "rationale": "Execution is the stage where agents do the middle: investigate, reproduce, draft a fix, and run the tests. In production it often contains multiple specialist agents, each with its own objective, tools, and acceptance criteria."
   },
   {
-   "id": "augment_loop_stage_verification",
+   "id": "augment_loop_stage_verification","_origin":"semantic",
    "label": "Stage: Verification",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -529,7 +529,7 @@
    "rationale": "Verification is the stage where agents and automated systems run available checks while humans step in where judgment, approval, or context is required. Some loops require a human every time; others dynamically determine whether a human is needed based on risk."
   },
   {
-   "id": "augment_loop_execute_verify_miniloop",
+   "id": "augment_loop_execute_verify_miniloop","_origin":"semantic",
    "label": "Execution-verification mini loop",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -540,7 +540,7 @@
    "rationale": "There is a mini loop between verification and execution: the agent continues to execute and verify until it meets its acceptance criteria or reaches a point where it needs to escalate."
   },
   {
-   "id": "augment_loop_stage_outcome",
+   "id": "augment_loop_stage_outcome","_origin":"semantic",
    "label": "Stage: Outcome",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -551,7 +551,7 @@
    "rationale": "The loop completes once the outcome has been verified and acceptance criteria met. A loop drives toward a concrete outcome — a merged fix, a triaged incident, a closed vulnerability — not just output; a loop that generates output nobody ships is not successful."
   },
   {
-   "id": "augment_loop_stage_improve",
+   "id": "augment_loop_stage_improve","_origin":"semantic",
    "label": "Stage: Improve",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -562,7 +562,7 @@
    "rationale": "Improve is the stage where the team uses the trace from the run to improve the loop: what broke, what needed a human, and what could run more cleanly next time."
   },
   {
-   "id": "augment_loop_acceptance_criteria",
+   "id": "augment_loop_acceptance_criteria","_origin":"semantic",
    "label": "Acceptance criteria",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -573,7 +573,7 @@
    "rationale": "Acceptance criteria are the conditions the agent (or specialist agents) must meet before a loop completes; the execute-verify mini loop runs until acceptance criteria are met or escalation is needed."
   },
   {
-   "id": "augment_loop_code_review_loop",
+   "id": "augment_loop_code_review_loop","_origin":"semantic",
    "label": "Code review loop",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -584,7 +584,7 @@
    "rationale": "Code review loop: PR opens (trigger) -> agents analyze risk, perform deep review, find and fix issues (execute) -> human reviews for intent, not line-by-line diffs (verify) -> approved higher-quality merge (outcome). A multi-agent loop where one system assesses risk, another does the work, another tries to find fault, and a human supplies judgment only when risk or ambiguity warrants."
   },
   {
-   "id": "augment_loop_multi_agent_separation",
+   "id": "augment_loop_multi_agent_separation","_origin":"semantic",
    "label": "Separation of agent objectives",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -595,7 +595,7 @@
    "rationale": "What matters in a multi-agent SDLC loop is not the number of agents but the separation of objectives: one system assesses risk, another performs the work, another tries to find fault with it, and a human supplies judgment only when risk or ambiguity warrants. When designed well the code review loop produces higher-quality PRs at lower cost than a traditional bot that only comments and waits."
   },
   {
-   "id": "augment_loop_ticket_to_pr_loop",
+   "id": "augment_loop_ticket_to_pr_loop","_origin":"semantic",
    "label": "Ticket-to-PR loop",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -606,7 +606,7 @@
    "rationale": "Ticket-to-PR loop: ticket lands (trigger) -> agent investigates and drafts the code, performs E2E testing (execute) -> human reviews the change (verify) -> merge-ready PR (outcome)."
   },
   {
-   "id": "augment_loop_vuln_remediation_loop",
+   "id": "augment_loop_vuln_remediation_loop","_origin":"semantic",
    "label": "Vulnerability remediation loop",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -617,7 +617,7 @@
    "rationale": "Vulnerability remediation loop: CVE drops (trigger) -> agent identifies affected services and drafts patches (execute) -> human approves (verify) -> patched services (outcome)."
   },
   {
-   "id": "augment_loop_incident_response_loop",
+   "id": "augment_loop_incident_response_loop","_origin":"semantic",
    "label": "Incident response loop",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -628,7 +628,7 @@
    "rationale": "Incident response loop: alert fires (trigger) -> agent pulls logs, identifies the likely change, drafts a timeline (execute) -> on-call engineer joins with full context and decides on escalation (verify) -> triaged or mitigated incident (outcome)."
   },
   {
-   "id": "augment_loop_unglamorous_middle",
+   "id": "augment_loop_unglamorous_middle","_origin":"semantic",
    "label": "The unglamorous repetitive middle of the SDLC",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -639,7 +639,7 @@
    "rationale": "None of the production loops are novel engineering loops; they are the unglamorous, repetitive middle of the SDLC, which is exactly where most engineering time goes."
   },
   {
-   "id": "augment_loop_software_factory",
+   "id": "augment_loop_software_factory","_origin":"semantic",
    "label": "Software factory",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -650,7 +650,7 @@
    "rationale": "Connecting enough agentic SDLC loops yields a software factory: a system that produces outcomes, measures itself, and improves. A factory here is not about volume or slop but instrumented, repeatable, quality-gated production — throughput measured in outcomes, issues caught by the process, and people spending time on the highest-leverage judgment calls."
   },
   {
-   "id": "augment_loop_connecting_loops",
+   "id": "augment_loop_connecting_loops","_origin":"semantic",
    "label": "Connecting loops (compounding)",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -661,7 +661,7 @@
    "rationale": "Each loop delivers a step change alone, but real compounding begins when loops connect: the ticket-to-PR loop triggers the code review loop, the triage loop's findings become the ticket loop's triggers, and an incident postmortem spawns remediation work."
   },
   {
-   "id": "augment_loop_outcomes_per_dollar",
+   "id": "augment_loop_outcomes_per_dollar","_origin":"semantic",
    "label": "Outcomes per dollar, not output per dollar",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -672,7 +672,7 @@
    "rationale": "Once designing the loop itself becomes what the team optimizes, you should measure loops on outcomes per dollar, not output per dollar — asking where human checkpoints sit, how to improve verification, and whether the tokens burned actually produce value."
   },
   {
-   "id": "augment_loop_cosmos",
+   "id": "augment_loop_cosmos","_origin":"semantic",
    "label": "Cosmos (Augment Code)",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -683,7 +683,7 @@
    "rationale": "Cosmos is Augment Code's product for building agentic SDLC loops; the article runs its own code review loop at Augment and invites readers ready to build agentic SDLC loops to try Cosmos."
   },
   {
-   "id": "augment_loop_pattern_outlives_term",
+   "id": "augment_loop_pattern_outlives_term","_origin":"semantic",
    "label": "The pattern will outlive the term",
    "file_type": "concept",
    "source_file": "www_augmentcode_com_blog_what-is-loop-engineering-and-how-are-leading-software-e.md",
@@ -694,7 +694,7 @@
    "rationale": "The specific term 'loop engineering' may not survive, but the pattern defines the future of software engineering: agents doing the repetitive middle, humans at the judgment moments, and loops that get better every time they run."
   },
   {
-   "id": "code_exec_doc_tool_overview",
+   "id": "code_exec_doc_tool_overview","_origin":"semantic",
    "label": "Code execution tool",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -705,7 +705,7 @@
    "rationale": "The code execution tool lets Claude run Python and Bash code in a secure, sandboxed container to analyze data, create visualizations, perform calculations, run system commands, and create/edit/process files directly within an API conversation."
   },
   {
-   "id": "code_exec_doc_sandboxed_container",
+   "id": "code_exec_doc_sandboxed_container","_origin":"semantic",
    "label": "Sandboxed container",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -716,7 +716,7 @@
    "rationale": "All operations run in a secure, sandboxed container with Python pre-installed. The container has no internet access, so Claude cannot download packages at runtime; only pre-installed libraries are available."
   },
   {
-   "id": "code_exec_doc_server_side_execution",
+   "id": "code_exec_doc_server_side_execution","_origin":"semantic",
    "label": "Server-side execution model",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -727,7 +727,7 @@
    "rationale": "The API runs every command server-side and returns results to Claude within the same request, so the developer never executes code or sends back tool_result blocks. Responses interleave server_tool_use blocks (the commands run) with their tool result blocks, followed by Claude's text."
   },
   {
-   "id": "code_exec_doc_client_tool_exception",
+   "id": "code_exec_doc_client_tool_exception","_origin":"semantic",
    "label": "Client-tool interleaving exception",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -738,7 +738,7 @@
    "rationale": "The one exception to server-side execution: when Claude calls one of your client tools alongside code execution, the API returns the code execution call without its result; the result arrives in a later response after you send back the tool_result blocks for your client tools."
   },
   {
-   "id": "code_exec_doc_free_with_web_tools",
+   "id": "code_exec_doc_free_with_web_tools","_origin":"semantic",
    "label": "Free with web search/web fetch",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -749,7 +749,7 @@
    "rationale": "Code execution is free (no charges beyond standard token costs) when a web search or web fetch tool (web_search_20260209, web_fetch_20260209, or later) is in the request; this covers both dynamic filtering and code Claude runs directly. Standard code execution pricing applies otherwise."
   },
   {
-   "id": "code_exec_doc_dynamic_filtering",
+   "id": "code_exec_doc_dynamic_filtering","_origin":"semantic",
    "label": "Dynamic filtering",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -760,7 +760,7 @@
    "rationale": "Code execution powers dynamic filtering in the web search and web fetch tools: Claude filters results inside the code execution environment before they reach the context window. The API provisions the needed code execution automatically, so you don't add the code execution tool to the request for it."
   },
   {
-   "id": "code_exec_doc_version_20250825",
+   "id": "code_exec_doc_version_20250825","_origin":"semantic",
    "label": "code_execution_20250825",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -771,7 +771,7 @@
    "rationale": "The base tool version supporting Bash commands and file operations; available on every listed model. Examples on the page use this version because every model in the compatibility table supports it."
   },
   {
-   "id": "code_exec_doc_version_20260120",
+   "id": "code_exec_doc_version_20260120","_origin":"semantic",
    "label": "code_execution_20260120",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -782,7 +782,7 @@
    "rationale": "Builds on 20250825 by adding REPL state persistence and programmatic tool calling from within the sandbox. Current web search/web fetch tools (web_search_20260209, web_fetch_20260209, and later) require this version or later as their code execution version."
   },
   {
-   "id": "code_exec_doc_version_20260521",
+   "id": "code_exec_doc_version_20260521","_origin":"semantic",
    "label": "code_execution_20260521",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -793,7 +793,7 @@
    "rationale": "Same runtime as 20260120, but the tool description tells Claude about the 90-second wall-clock limit on each Python cell in programmatic tool calling so Claude can budget long-running cells. A cell exceeding the limit returns a normal result with a non-zero return_code and a detection_timeout status message."
   },
   {
-   "id": "code_exec_doc_programmatic_tool_calling",
+   "id": "code_exec_doc_programmatic_tool_calling","_origin":"semantic",
    "label": "Programmatic tool calling",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -804,7 +804,7 @@
    "rationale": "A capability added in code_execution_20260120+ that lets Claude call tools programmatically from within the sandbox. It depends on REPL state persistence and is not available on Claude Haiku 4.5, where the newer versions behave like code_execution_20250825."
   },
   {
-   "id": "code_exec_doc_ga_no_beta_header",
+   "id": "code_exec_doc_ga_no_beta_header","_origin":"semantic",
    "label": "GA without beta header",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -815,7 +815,7 @@
    "rationale": "All three tool versions are generally available and don't require an anthropic-beta header; the legacy code execution beta headers remain valid opt-ins. Older tool versions are not guaranteed backwards-compatible with newer models, so always use the version matching your model."
   },
   {
-   "id": "code_exec_doc_execution_time_error",
+   "id": "code_exec_doc_execution_time_error","_origin":"semantic",
    "label": "execution_time_exceeded error",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -826,7 +826,7 @@
    "rationale": "An API error code returned when a whole tool invocation exceeds the maximum execution time. This is distinct from the per-cell 90-second detection_timeout, which returns a normal result with a non-zero return_code rather than an error."
   },
   {
-   "id": "code_exec_doc_platform_availability",
+   "id": "code_exec_doc_platform_availability","_origin":"semantic",
    "label": "Platform availability",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -837,7 +837,7 @@
    "rationale": "Code execution is available on the Claude API (Anthropic), Claude Platform on AWS, and Microsoft Foundry (Hosted on Anthropic deployment only). It is not currently available on Amazon Bedrock or Google Cloud. For Claude Mythos Preview, it is supported only on the Claude API and Microsoft Foundry."
   },
   {
-   "id": "code_exec_doc_container_reuse",
+   "id": "code_exec_doc_container_reuse","_origin":"semantic",
    "label": "Container reuse",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -848,7 +848,7 @@
    "rationale": "Each request runs in a new container by default, but the top-level response includes a container object whose id can be passed back to reuse the same container across requests."
   },
   {
-   "id": "code_exec_doc_zdr",
+   "id": "code_exec_doc_zdr","_origin":"semantic",
    "label": "Zero data retention (ZDR)",
    "file_type": "concept",
    "source_file": "platform_claude_com_docs_en_agents-and-tools_tool-use_code-execution-tool_md.md",
@@ -859,7 +859,7 @@
    "rationale": "Zero data retention applies to the code execution feature; details are covered in the platform's API and data retention documentation."
   },
   {
-   "id": "fowler_harness_definition",
+   "id": "fowler_harness_definition","_origin":"semantic",
    "label": "Harness (Agent = Model + Harness)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -870,7 +870,7 @@
    "rationale": "A 'harness' is everything in an AI agent except the model itself, captured as Agent = Model + Harness. Part is built in (system prompt, retrieval, orchestration), but coding agents also let users build an outer harness for their own use case."
   },
   {
-   "id": "fowler_harness_outer_harness",
+   "id": "fowler_harness_outer_harness","_origin":"semantic",
    "label": "Outer harness",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -881,7 +881,7 @@
    "rationale": "The user-built harness serving two goals: (1) increase the probability the agent gets it right the first time, and (2) provide a feedback loop that self-corrects issues before they reach human eyes, reducing review toil, increasing quality, and wasting fewer tokens."
   },
   {
-   "id": "fowler_harness_trust_barrier",
+   "id": "fowler_harness_trust_barrier","_origin":"semantic",
    "label": "AI trust barrier",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -892,7 +892,7 @@
    "rationale": "There is a natural trust barrier with AI-generated code because LLMs are non-deterministic, don't know our context, and think in tokens rather than real understanding. Letting agents work with less supervision requires ways to increase confidence in their results."
   },
   {
-   "id": "fowler_harness_feedforward_guides",
+   "id": "fowler_harness_feedforward_guides","_origin":"semantic",
    "label": "Guides (feedforward controls)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -903,7 +903,7 @@
    "rationale": "Guides are feedforward controls that anticipate the agent's behaviour and steer it BEFORE it acts, increasing the probability of good first-attempt results."
   },
   {
-   "id": "fowler_harness_feedback_sensors",
+   "id": "fowler_harness_feedback_sensors","_origin":"semantic",
    "label": "Sensors (feedback controls)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -914,7 +914,7 @@
    "rationale": "Sensors are feedback controls that observe AFTER the agent acts and help it self-correct. They are most powerful when they emit LLM-optimised signals, such as custom linter messages that include self-correction instructions (a positive kind of prompt injection)."
   },
   {
-   "id": "fowler_harness_need_both",
+   "id": "fowler_harness_need_both","_origin":"semantic",
    "label": "Both feedforward and feedback needed",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -925,7 +925,7 @@
    "rationale": "Feedback-only produces an agent that repeats the same mistakes; feedforward-only produces an agent that encodes rules but never learns whether they worked. You need both."
   },
   {
-   "id": "fowler_harness_computational",
+   "id": "fowler_harness_computational","_origin":"semantic",
    "label": "Computational execution type",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -936,7 +936,7 @@
    "rationale": "Computational controls are deterministic, fast, CPU-run (tests, linters, type checkers, structural analysis), taking milliseconds-to-seconds with reliable results — cheap enough to run on EVERY change alongside the agent."
   },
   {
-   "id": "fowler_harness_inferential",
+   "id": "fowler_harness_inferential","_origin":"semantic",
    "label": "Inferential execution type",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -947,7 +947,7 @@
    "rationale": "Inferential controls are semantic analysis, AI code review, and 'LLM as judge': GPU/NPU-run, slower, more expensive, and non-deterministic. They provide rich guidance and semantic judgment and can increase trust when paired with a model suitable to the task."
   },
   {
-   "id": "fowler_harness_context_engineering",
+   "id": "fowler_harness_context_engineering","_origin":"semantic",
    "label": "Context engineering",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -958,7 +958,7 @@
    "rationale": "Harness engineering is a specific form of context engineering; context engineering makes the guides and sensors available to the agent."
   },
   {
-   "id": "fowler_harness_steering_loop",
+   "id": "fowler_harness_steering_loop","_origin":"semantic",
    "label": "The steering loop",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -969,7 +969,7 @@
    "rationale": "The human's job is to steer by iterating on the harness: whenever an issue recurs, improve the feedforward/feedback controls to make it less probable or prevent it. AI can help build the harness by writing structural tests, drafting rules, scaffolding linters, and creating how-to guides from codebase archaeology."
   },
   {
-   "id": "fowler_harness_keep_quality_left",
+   "id": "fowler_harness_keep_quality_left","_origin":"semantic",
    "label": "Keep quality left (timing)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -980,7 +980,7 @@
    "rationale": "Spread checks across the lifecycle by cost/speed/criticality; the earlier you find issues the cheaper to fix. Fast/cheap controls run pre-commit/pre-integration while expensive controls (mutation testing, broad review) run post-integration."
   },
   {
-   "id": "fowler_harness_drift_sensors",
+   "id": "fowler_harness_drift_sensors","_origin":"semantic",
    "label": "Continuous drift/health sensors",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -991,7 +991,7 @@
    "rationale": "Continuous drift/health sensors run OUTSIDE the change lifecycle against the whole codebase: dead-code detection, test-coverage-quality analysis, dependency scanners, and agents monitoring degrading SLOs or sampling response quality / flagging log anomalies."
   },
   {
-   "id": "fowler_harness_maintainability",
+   "id": "fowler_harness_maintainability","_origin":"semantic",
    "label": "Maintainability harness",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1002,7 +1002,7 @@
    "rationale": "The maintainability harness targets internal code quality (the easiest category, with lots of pre-existing tooling). Computational sensors reliably catch structural issues; LLMs partially address semantic-judgment issues (semantic duplication, over-engineering) expensively and probabilistically."
   },
   {
-   "id": "fowler_harness_correctness_gap",
+   "id": "fowler_harness_correctness_gap","_origin":"semantic",
    "label": "Correctness outside sensor remit",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1013,7 +1013,7 @@
    "rationale": "Neither computational nor inferential sensors reliably catch misdiagnosis, unnecessary features, or misunderstood instructions; correctness is outside any sensor's remit if the human didn't clearly specify what they wanted."
   },
   {
-   "id": "fowler_harness_architecture_fitness",
+   "id": "fowler_harness_architecture_fitness","_origin":"semantic",
    "label": "Architecture fitness harness",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1024,7 +1024,7 @@
    "rationale": "The architecture fitness harness uses fitness functions: skills feeding forward performance requirements plus performance tests feeding back, and observability conventions plus debugging instructions asking the agent to reflect on log quality."
   },
   {
-   "id": "fowler_harness_behaviour",
+   "id": "fowler_harness_behaviour","_origin":"semantic",
    "label": "Behaviour harness",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1035,7 +1035,7 @@
    "rationale": "The behaviour harness ('the elephant in the room') concerns guiding/sensing functional behaviour: feedforward via a functional spec, feedback via a green AI-generated test suite plus coverage and maybe mutation/manual testing. It puts too much faith in AI-generated tests and is still largely unsolved for reducing supervision."
   },
   {
-   "id": "fowler_harness_approved_fixtures",
+   "id": "fowler_harness_approved_fixtures","_origin":"semantic",
    "label": "Approved fixtures pattern",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1046,7 +1046,7 @@
    "rationale": "The 'approved fixtures' pattern helps selectively counter the over-reliance on AI-generated tests within the behaviour harness."
   },
   {
-   "id": "fowler_harness_harnessability",
+   "id": "fowler_harness_harnessability","_origin":"semantic",
    "label": "Harnessability",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1057,7 +1057,7 @@
    "rationale": "Not every codebase is equally amenable to harnessing: strongly-typed languages give type-checking for free, clear module boundaries afford architectural rules, and frameworks like Spring abstract away details, implicitly raising success rates. Legacy faces 'the harness is most needed where it is hardest to build.'"
   },
   {
-   "id": "fowler_harness_ambient_affordances",
+   "id": "fowler_harness_ambient_affordances","_origin":"semantic",
    "label": "Ambient affordances (Ned Letcher)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1068,7 +1068,7 @@
    "rationale": "Ned Letcher's 'ambient affordances' are structural properties of the environment that make it legible, navigable, and tractable to agents. Greenfield can bake harnessability in from day one."
   },
   {
-   "id": "fowler_harness_templates",
+   "id": "fowler_harness_templates","_origin":"semantic",
    "label": "Harness templates",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1079,7 +1079,7 @@
    "rationale": "Enterprises have a few service topologies covering ~80% of needs, often already codified as service templates, which may evolve into harness templates: bundled guides+sensors leashing an agent to a topology's structure, conventions, and stack. Templates face sync/versioning problems, worse with non-deterministic controls."
   },
   {
-   "id": "fowler_harness_ashbys_law",
+   "id": "fowler_harness_ashbys_law","_origin":"semantic",
    "label": "Ashby's Law of Requisite Variety",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1090,7 +1090,7 @@
    "rationale": "Ashby's Law of Requisite Variety states a regulator must have at least as much variety as the system it governs and can only regulate what it has a model of. An LLM can produce almost anything; committing to a topology narrows that space, making a comprehensive harness achievable."
   },
   {
-   "id": "fowler_harness_variety_reduction",
+   "id": "fowler_harness_variety_reduction","_origin":"semantic",
    "label": "Variety reduction via topologies",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1101,7 +1101,7 @@
    "rationale": "Committing to a topology narrows the near-infinite space an LLM can produce, making a comprehensive harness achievable; defining topologies is explicitly a variety-reduction move that satisfies Ashby's Law."
   },
   {
-   "id": "fowler_harness_cybernetic_governor",
+   "id": "fowler_harness_cybernetic_governor","_origin":"semantic",
    "label": "Harness as cybernetic governor",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1112,7 +1112,7 @@
    "rationale": "The regulation categories frame the harness as a cybernetic governor that distinguishes dimensions of the desired state (maintainability, architecture fitness, behaviour) to regulate the agent's output."
   },
   {
-   "id": "fowler_harness_human_implicit_harness",
+   "id": "fowler_harness_human_implicit_harness","_origin":"semantic",
    "label": "Human implicit harness",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1123,7 +1123,7 @@
    "rationale": "Human developers bring an implicit harness: absorbed conventions, felt cognitive pain of complexity, social accountability, organisational alignment, and a human pace that leaves thinking space. A coding agent has none of this and can't tell which convention is load-bearing versus habit."
   },
   {
-   "id": "fowler_harness_direct_human_input",
+   "id": "fowler_harness_direct_human_input","_origin":"semantic",
    "label": "Direct human input where most important",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1134,7 +1134,7 @@
    "rationale": "Harnesses externalise and make explicit what developer experience brings, but only so far. A good harness should not necessarily aim to fully eliminate human input, but to direct it to where our input is most important."
   },
   {
-   "id": "fowler_harness_llm_optimised_signals",
+   "id": "fowler_harness_llm_optimised_signals","_origin":"semantic",
    "label": "LLM-optimised feedback signals",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1145,7 +1145,7 @@
    "rationale": "Sensors are most powerful when they emit LLM-optimised signals, e.g. custom linter messages that embed self-correction instructions — described as a positive kind of prompt injection that guides the agent to fix its own mistakes."
   },
   {
-   "id": "fowler_harness_evaluate_coverage",
+   "id": "fowler_harness_evaluate_coverage","_origin":"semantic",
    "label": "Evaluating harness coverage/quality",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1156,7 +1156,7 @@
    "rationale": "An open question is the need to evaluate harness coverage/quality the way code coverage and mutation testing evaluate tests, plus tooling to configure/sync/reason about scattered controls as a system. Building the outer harness is an ongoing engineering practice, not a one-time configuration."
   },
   {
-   "id": "fowler_harness_codex_reference",
+   "id": "fowler_harness_codex_reference","_origin":"semantic",
    "label": "OpenAI Codex harness (cited)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1167,7 +1167,7 @@
    "rationale": "Cited discourse: the OpenAI Codex harness enforces a layered architecture with custom linters plus structural tests and recurring 'garbage collection' scanning for drift."
   },
   {
-   "id": "fowler_harness_stripe_minions_reference",
+   "id": "fowler_harness_stripe_minions_reference","_origin":"semantic",
    "label": "Stripe's minions (cited)",
    "file_type": "concept",
    "source_file": "martinfowler-harness-full.md",
@@ -1178,7 +1178,7 @@
    "rationale": "Cited discourse: Stripe's 'minions' use heuristic pre-push hooks, a 'shift feedback left' philosophy, and 'blueprints' as harness patterns."
   },
   {
-   "id": "humanlayer_configuration_problem",
+   "id": "humanlayer_configuration_problem","_origin":"semantic",
    "label": "Agent failures are a configuration problem",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1189,7 +1189,7 @@
    "rationale": "Across dozens of projects and hundreds of agent sessions, HumanLayer concluded that coding-agent failures (ignoring instructions, running dangerous commands, looping) are not a model problem but a configuration problem. Smarter models remove some failure modes but are then given bigger problems and keep failing in unexpected ways, which is fundamental to non-deterministic systems; the goal is to get the most out of today's models."
   },
   {
-   "id": "humanlayer_harness",
+   "id": "humanlayer_harness","_origin":"semantic",
    "label": "Coding agent harness",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1200,7 +1200,7 @@
    "rationale": "The article defines 'coding agent = AI model(s) + harness'. The harness is the coding agent's configuration surface — skills, MCP servers, sub-agents, memory, AGENTS.md, hooks — framed as the agent's runtime or peripherals: what the model uses to interact with its environment."
   },
   {
-   "id": "humanlayer_harness_engineering",
+   "id": "humanlayer_harness_engineering","_origin":"semantic",
    "label": "Harness engineering",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1211,7 +1211,7 @@
    "rationale": "Coined by Viv, harness engineering is the practice of leveraging harness configuration points to customize and improve a coding agent's output quality and reliability. Mitchell Hashimoto frames it as: anytime an agent makes a mistake, take the time to engineer a solution so the agent never makes that mistake again."
   },
   {
-   "id": "humanlayer_context_engineering",
+   "id": "humanlayer_context_engineering","_origin":"semantic",
    "label": "Context engineering",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1222,7 +1222,7 @@
    "rationale": "Coined by cofounder Dex in 12-factor agents, context engineering is a superset of prompt engineering and other techniques for systematically improving agent reliability. Harness engineering is the subset of context engineering that leverages harness configuration points to carefully manage coding agents' context windows."
   },
   {
-   "id": "humanlayer_sub_agents_context_firewall",
+   "id": "humanlayer_sub_agents_context_firewall","_origin":"semantic",
    "label": "Sub-agents as context firewall",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1233,7 +1233,7 @@
    "rationale": "HumanLayer found sub-agents a particularly powerful lever: they function as a 'context firewall' so discrete tasks run in isolated context windows and intermediate noise does not accumulate in the parent orchestration thread. This is the key to maintaining coherency across the many context windows needed to solve hard problems."
   },
   {
-   "id": "humanlayer_skills_instruction_modules",
+   "id": "humanlayer_skills_instruction_modules","_origin":"semantic",
    "label": "Skills (Instruction Modules)",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1244,7 +1244,7 @@
    "rationale": "Skills are a harness lever for progressive disclosure of knowledge; Dex refers to them as 'Instruction Modules'. They are one of two levers (with hooks) the article adds to Viv's four customization levers."
   },
   {
-   "id": "humanlayer_hooks",
+   "id": "humanlayer_hooks","_origin":"semantic",
    "label": "Hooks",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1255,7 +1255,7 @@
    "rationale": "Hooks are a harness lever for automated integration and deterministic control flow. The article lists hooks as one of two levers it adds beyond Viv's four customization levers (system prompt, tools/MCPs, context, sub-agents)."
   },
   {
-   "id": "humanlayer_four_customization_levers",
+   "id": "humanlayer_four_customization_levers","_origin":"semantic",
    "label": "Four customization levers",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1266,7 +1266,7 @@
    "rationale": "Viv's framing gives four harness customization levers: system prompt, tools/MCPs, context, and sub-agents. One post frames these levers; a second works backwards from what models can't do natively to derive why each harness component exists. HumanLayer adds hooks and skills as two further levers."
   },
   {
-   "id": "humanlayer_mcp_servers_for_tools",
+   "id": "humanlayer_mcp_servers_for_tools","_origin":"semantic",
    "label": "MCP servers are for tools",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1277,7 +1277,7 @@
    "rationale": "MCP servers are primarily for plugging tools into a coding agent to extend it beyond file I/O and bash. Other MCP features (resources, prompts, elicitations) are generally not well-supported by clients/harnesses. When plugged in, a server's tool list, descriptions, and arguments are injected into the agent's system prompt, so descriptions can steer agent behavior."
   },
   {
-   "id": "humanlayer_prompt_injection_risk",
+   "id": "humanlayer_prompt_injection_risk","_origin":"semantic",
    "label": "MCP prompt-injection risk",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1288,7 +1288,7 @@
    "rationale": "Because MCP tool descriptions are added to the agent's system prompt, connecting to an untrusted server is a dangerous prompt-injection vector. STDIO and other client-side servers run via npx/uvx can also execute code on the host even without prompt injection."
   },
   {
-   "id": "humanlayer_too_many_tools",
+   "id": "humanlayer_too_many_tools","_origin":"semantic",
    "label": "Too many tools is bad",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1299,7 +1299,7 @@
    "rationale": "Plugging too many MCP tools into an agent fills the context window with tool descriptions, pushing it into 'the dumb zone' faster. Every irrelevant tool description consumes the instruction budget the agent must process without benefit; if you're not actively using a large-tool server, turn it off."
   },
   {
-   "id": "humanlayer_instruction_budget",
+   "id": "humanlayer_instruction_budget","_origin":"semantic",
    "label": "Instruction budget",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1310,7 +1310,7 @@
    "rationale": "The instruction budget is the limited capacity of instructions an agent can effectively process; every irrelevant tool description or context-file instruction spends it without benefit, degrading performance."
   },
   {
-   "id": "humanlayer_mcp_tool_search",
+   "id": "humanlayer_mcp_tool_search","_origin":"semantic",
    "label": "MCP tool search (progressive tool disclosure)",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1321,7 +1321,7 @@
    "rationale": "Anthropic released experimental MCP tool search to progressively disclose tools to Claude when a user has too many MCP tools connected, mitigating the context-bloat failure mode caused by too many tool descriptions."
   },
   {
-   "id": "humanlayer_claude_md_agents_md",
+   "id": "humanlayer_claude_md_agents_md","_origin":"semantic",
    "label": "CLAUDE.md / AGENTS.md files",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1332,7 +1332,7 @@
    "rationale": "CLAUDE.md/AGENTS.md are top-level markdown files deterministically injected into the agent's system prompt by the harness, and are usually the first configuration point to customize. HumanLayer advises: don't auto-generate them, include as few instructions as reasonably possible, use progressive disclosure, and keep them concise and universally applicable — their own CLAUDE.md is under 60 lines."
   },
   {
-   "id": "humanlayer_eth_zurich_agentfile_study",
+   "id": "humanlayer_eth_zurich_agentfile_study","_origin":"semantic",
    "label": "ETH Zurich agentfile study",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1343,7 +1343,7 @@
    "rationale": "An ETH Zurich study tested 138 agentfiles across repos: LLM-generated agentfiles hurt performance while costing 20%+ more, human-written ones only helped ~4%, agents spent 14-22% more reasoning tokens processing context-file instructions and ran more tools without improving resolution, and codebase overviews/directory listings didn't help since agents discover structure themselves. HumanLayer reads this as confirming their guidance (don't auto-generate, less is more, progressive disclosure, keep concise)."
   },
   {
-   "id": "humanlayer_post_training_harness_coupling",
+   "id": "humanlayer_post_training_harness_coupling","_origin":"semantic",
    "label": "Models post-trained on their harness",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1354,7 +1354,7 @@
    "rationale": "Frontier coding models are post-trained on their harnesses (Claude in Claude Code, GPT-5 Codex in Codex), so a model can perform better coupled with its training harness. Codex models are so tightly coupled to Codex's apply_patch tool that OpenCode had to add an apply_patch tool to mimic the Codex harness and improve Codex-model performance, while Claude and others use normal edit/write tools."
   },
   {
-   "id": "humanlayer_harness_overfitting",
+   "id": "humanlayer_harness_overfitting","_origin":"semantic",
    "label": "Models can be over-fitted to their harness",
    "file_type": "concept",
    "source_file": "www_humanlayer_dev_blog_skill-issue-harness-engineering-for-coding-agents.md",
@@ -1365,7 +1365,7 @@
    "rationale": "Post-training coupling cuts both ways: models can be over-fitted to their harness. Viv cites Terminal Bench 2.0 where Opus 4.6 in Claude Code ranks #33, but in a different harness not seen during post-training ranks #5 (+/- ~4 positions), refuting the argument that you shouldn't customize the harness at all."
   },
   {
-   "id": "openai_harness_harness_engineering",
+   "id": "openai_harness_harness_engineering","_origin":"semantic",
    "label": "Harness engineering",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1376,7 +1376,7 @@
    "rationale": "The discipline of designing the environments, tooling, abstractions, and feedback loops that let an AI coding agent (Codex) do useful work in an agent-first world, rather than writing application code by hand."
   },
   {
-   "id": "openai_harness_zero_manual_code",
+   "id": "openai_harness_zero_manual_code","_origin":"semantic",
    "label": "Zero manually-written code",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1387,7 +1387,7 @@
    "rationale": "Over five months the team shipped an internal beta product with 0 lines of manually-written code; every line of application logic, tests, CI, docs, observability, and tooling was written by Codex, in roughly one tenth the hand-written time (~1M LOC, ~1,500 PRs)."
   },
   {
-   "id": "openai_harness_humans_steer_agents_execute",
+   "id": "openai_harness_humans_steer_agents_execute","_origin":"semantic",
    "label": "Humans steer, agents execute",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1398,7 +1398,7 @@
    "rationale": "The core philosophy: no manually-written code — humans steer and agents execute, so the engineer's job shifts from writing code to designing environments, specifying intent, and building feedback loops."
   },
   {
-   "id": "openai_harness_throughput_scales_with_team",
+   "id": "openai_harness_throughput_scales_with_team","_origin":"semantic",
    "label": "Throughput increased as team grew",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1409,7 +1409,7 @@
    "rationale": "Starting with 3 engineers at 3.5 PRs/engineer/day and growing to 7, per-engineer throughput increased rather than decreased as the team grew, an anomaly attributed to the harness."
   },
   {
-   "id": "openai_harness_empty_git_repo_start",
+   "id": "openai_harness_empty_git_repo_start","_origin":"semantic",
    "label": "Started from an empty git repo",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1420,7 +1420,7 @@
    "rationale": "The first commit (late Aug 2025) went into an empty repository; the initial scaffold (structure, CI, formatting, package manager, framework) and even the initial AGENTS.md were Codex-generated from small templates, with no pre-existing human code to anchor the system."
   },
   {
-   "id": "openai_harness_environment_underspecified",
+   "id": "openai_harness_environment_underspecified","_origin":"semantic",
    "label": "Underspecified environment as the true bottleneck",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1431,7 +1431,7 @@
    "rationale": "Early progress was slow not because Codex was incapable but because the environment was underspecified — the agent lacked tools, abstractions, and structure — so the engineering job became enabling agents to do useful work."
   },
   {
-   "id": "openai_harness_missing_capability_question",
+   "id": "openai_harness_missing_capability_question","_origin":"semantic",
    "label": "Ask what capability is missing",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1442,7 +1442,7 @@
    "rationale": "When something failed the fix was never 'try harder'; humans asked what capability is missing and how to make it legible and enforceable for the agent, then built that capability."
   },
   {
-   "id": "openai_harness_ralph_wiggum_loop",
+   "id": "openai_harness_ralph_wiggum_loop","_origin":"semantic",
    "label": "Ralph Wiggum Loop",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1453,7 +1453,7 @@
    "rationale": "To drive a PR to completion Codex reviews its own changes locally, requests specific local and cloud agent reviews, responds to feedback, and iterates in a loop until all agent reviewers are satisfied."
   },
   {
-   "id": "openai_harness_agent_to_agent_review",
+   "id": "openai_harness_agent_to_agent_review","_origin":"semantic",
    "label": "Agent-to-agent review (human review optional)",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1464,7 +1464,7 @@
    "rationale": "Humans interact almost entirely through prompts; human PR review is optional and almost all review is agent-to-agent."
   },
   {
-   "id": "openai_harness_application_legibility",
+   "id": "openai_harness_application_legibility","_origin":"semantic",
    "label": "Application legibility to Codex",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1475,7 +1475,7 @@
    "rationale": "As throughput rose the bottleneck became human QA capacity, so the app, UI, logs, and metrics were made directly legible to Codex so it could self-validate work."
   },
   {
-   "id": "openai_harness_worktree_app_boot",
+   "id": "openai_harness_worktree_app_boot","_origin":"semantic",
    "label": "App bootable per git worktree",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1486,7 +1486,7 @@
    "rationale": "The app is bootable per git worktree (one instance per change) alongside an ephemeral-per-worktree local observability stack, isolating each agent-driven change."
   },
   {
-   "id": "openai_harness_chrome_devtools_protocol",
+   "id": "openai_harness_chrome_devtools_protocol","_origin":"semantic",
    "label": "Chrome DevTools Protocol integration",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1497,7 +1497,7 @@
    "rationale": "Chrome DevTools Protocol was wired into the runtime plus skills for DOM snapshots, screenshots, and navigation so Codex can reproduce bugs, validate fixes, and reason about the UI."
   },
   {
-   "id": "openai_harness_observability_query",
+   "id": "openai_harness_observability_query","_origin":"semantic",
    "label": "Agent-queryable observability (LogQL/PromQL)",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1508,7 +1508,7 @@
    "rationale": "Agents query logs with LogQL and metrics with PromQL, making prompts like 'ensure service startup <800ms' or 'no span exceeds two seconds' tractable; single Codex runs often work one task for 6+ hours while humans sleep."
   },
   {
-   "id": "openai_harness_repo_system_of_record",
+   "id": "openai_harness_repo_system_of_record","_origin":"semantic",
    "label": "Repository knowledge as system of record",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1519,7 +1519,7 @@
    "rationale": "Context management is the biggest challenge, so the structured docs/ directory is treated as the system of record — the authoritative, versioned knowledge base for the codebase."
   },
   {
-   "id": "openai_harness_map_not_manual",
+   "id": "openai_harness_map_not_manual","_origin":"semantic",
    "label": "Give a map, not a manual",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1530,7 +1530,7 @@
    "rationale": "The key context lesson is to give Codex a map, not a 1,000-page manual — a small stable entry point with pointers rather than one exhaustive document."
   },
   {
-   "id": "openai_harness_big_agents_md_failure",
+   "id": "openai_harness_big_agents_md_failure","_origin":"semantic",
    "label": "One big AGENTS.md fails",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1541,7 +1541,7 @@
    "rationale": "The 'one big AGENTS.md' approach fails predictably: context is scarce and a giant file crowds out the task, too much guidance becomes non-guidance, it rots instantly into an attractive nuisance, and it is hard to verify mechanically."
   },
   {
-   "id": "openai_harness_agents_md_table_of_contents",
+   "id": "openai_harness_agents_md_table_of_contents","_origin":"semantic",
    "label": "AGENTS.md as table of contents",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1552,7 +1552,7 @@
    "rationale": "AGENTS.md is treated as a short (~100 line) table of contents injected as a map with pointers into the docs/ knowledge base, not as the encyclopedia itself."
   },
   {
-   "id": "openai_harness_progressive_disclosure",
+   "id": "openai_harness_progressive_disclosure","_origin":"semantic",
    "label": "Progressive disclosure",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1563,7 +1563,7 @@
    "rationale": "Agents start at a small stable entry point and are progressively taught where to look next, so context is disclosed incrementally rather than all at once."
   },
   {
-   "id": "openai_harness_quality_document_grading",
+   "id": "openai_harness_quality_document_grading","_origin":"semantic",
    "label": "Quality document grading domains",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1574,7 +1574,7 @@
    "rationale": "Design docs carry verification status plus core beliefs, and a quality document grades each domain and layer, tracking gaps over time; plans are first-class artifacts checked into the repo with progress and decision logs."
   },
   {
-   "id": "openai_harness_mechanical_enforcement",
+   "id": "openai_harness_mechanical_enforcement","_origin":"semantic",
    "label": "Mechanical enforcement of the knowledge base",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1585,7 +1585,7 @@
    "rationale": "Linters and CI mechanically validate that the knowledge base stays up-to-date, cross-linked, and structured, so documentation discipline is enforced by tooling rather than trust."
   },
   {
-   "id": "openai_harness_doc_gardening_agent",
+   "id": "openai_harness_doc_gardening_agent","_origin":"semantic",
    "label": "Doc-gardening agent",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1596,7 +1596,7 @@
    "rationale": "A recurring 'doc-gardening' agent scans for stale or obsolete docs and opens fix-up PRs, keeping the repository knowledge base fresh automatically."
   },
   {
-   "id": "openai_harness_agent_legibility_goal",
+   "id": "openai_harness_agent_legibility_goal","_origin":"semantic",
    "label": "Agent legibility is the goal",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1607,7 +1607,7 @@
    "rationale": "The repo is optimized first for Codex's legibility, like onboarding a new hire; from the agent's view anything it can't access in-context effectively doesn't exist, so only repository-local versioned artifacts count."
   },
   {
-   "id": "openai_harness_boring_tech_preference",
+   "id": "openai_harness_boring_tech_preference","_origin":"semantic",
    "label": "Prefer boring, internalizable tech",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1618,7 +1618,7 @@
    "rationale": "Favor dependencies and abstractions that can be fully internalized in-repo; 'boring' tech (composable, API-stable, well-represented in training sets) is easier for agents to model, and it can be cheaper to have the agent reimplement a subset than work around opaque upstream libraries."
   },
   {
-   "id": "openai_harness_enforce_invariants",
+   "id": "openai_harness_enforce_invariants","_origin":"semantic",
    "label": "Enforce invariants, don't micromanage",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1629,7 +1629,7 @@
    "rationale": "Docs alone can't keep an agent-generated codebase coherent, so the rule is to enforce invariants but not prescribe implementations — e.g. require parsing data shapes at the boundary without dictating the library."
   },
   {
-   "id": "openai_harness_rigid_architecture_layers",
+   "id": "openai_harness_rigid_architecture_layers","_origin":"semantic",
    "label": "Rigid layered architecture with validated dependencies",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1640,7 +1640,7 @@
    "rationale": "Each domain is divided into fixed layers with strictly validated dependency directions (Types -> Config -> Repo -> Service -> Runtime -> UI) because agents are most effective with strict boundaries and predictable structure; this architecture is an early prerequisite with agents, not something postponed."
   },
   {
-   "id": "openai_harness_providers_interface",
+   "id": "openai_harness_providers_interface","_origin":"semantic",
    "label": "Single Providers interface for cross-cutting concerns",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1651,7 +1651,7 @@
    "rationale": "Cross-cutting concerns (auth, connectors, telemetry, feature flags) enter through a single explicit Providers interface; anything else is disallowed and enforced mechanically via custom Codex-generated linters and structural tests."
   },
   {
-   "id": "openai_harness_lint_remediation_context",
+   "id": "openai_harness_lint_remediation_context","_origin":"semantic",
    "label": "Lint messages inject remediation into agent context",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1662,7 +1662,7 @@
    "rationale": "Custom lint error messages inject remediation instructions directly into the agent's context, turning encoded rules into multipliers that apply everywhere at once; a few 'taste invariants' (structured logging, naming, file-size limits, reliability) are enforced this way."
   },
   {
-   "id": "openai_harness_promote_rule_into_code",
+   "id": "openai_harness_promote_rule_into_code","_origin":"semantic",
    "label": "Promote the rule into code",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1673,7 +1673,7 @@
    "rationale": "Human taste is fed back continuously — review comments, refactoring PRs, and user bugs become doc updates or tooling — and when documentation falls short, the rule is promoted into code so it is enforced mechanically."
   },
   {
-   "id": "openai_harness_merge_philosophy",
+   "id": "openai_harness_merge_philosophy","_origin":"semantic",
    "label": "Merge philosophy: corrections cheap, waiting expensive",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1684,7 +1684,7 @@
    "rationale": "With minimal blocking merge gates, short-lived PRs, and test flakes handled by follow-up runs, corrections are cheap and waiting is expensive when agent throughput far exceeds human attention — irresponsible in a low-throughput environment but often right here."
   },
   {
-   "id": "openai_harness_autonomy_end_to_end",
+   "id": "openai_harness_autonomy_end_to_end","_origin":"semantic",
    "label": "End-to-end feature autonomy from one prompt",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1695,7 +1695,7 @@
    "rationale": "Given a single prompt, Codex can end-to-end drive a feature: validate state, reproduce a bug, record a failure video, implement a fix, validate by driving the app, record a resolution video, open a PR, respond to feedback, remediate build failures, escalate only when judgment is required, and merge."
   },
   {
-   "id": "openai_harness_escalate_on_judgment",
+   "id": "openai_harness_escalate_on_judgment","_origin":"semantic",
    "label": "Escalate to a human only when judgment is required",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1706,7 +1706,7 @@
    "rationale": "Within the autonomous feature loop the agent escalates to a human only when judgment is required, keeping humans in the loop at a higher abstraction (prioritize, translate feedback into acceptance criteria, validate outcomes)."
   },
   {
-   "id": "openai_harness_entropy_drift",
+   "id": "openai_harness_entropy_drift","_origin":"semantic",
    "label": "Entropy and pattern drift (AI slop)",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1717,7 +1717,7 @@
    "rationale": "Full autonomy introduces drift because Codex replicates existing patterns even suboptimal ones; humans once spent every Friday (20% of the week) cleaning 'AI slop', which didn't scale."
   },
   {
-   "id": "openai_harness_golden_principles",
+   "id": "openai_harness_golden_principles","_origin":"semantic",
    "label": "Golden principles encoded in the repo",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1728,7 +1728,7 @@
    "rationale": "Opinionated mechanical rules called 'golden principles' are encoded directly into the repo (e.g. prefer shared utility packages over hand-rolled helpers; never probe data YOLO-style, validate boundaries or use typed SDKs) to capture human taste once and enforce it continuously."
   },
   {
-   "id": "openai_harness_garbage_collection",
+   "id": "openai_harness_garbage_collection","_origin":"semantic",
    "label": "Garbage-collection cleanup process",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1739,7 +1739,7 @@
    "rationale": "A recurring cleanup process where background Codex tasks scan for deviations, update quality grades, and open targeted refactoring PRs (reviewable in under a minute, automerged) functions like garbage collection; technical debt is a high-interest loan paid down continuously in small increments."
   },
   {
-   "id": "openai_harness_discipline_in_scaffolding",
+   "id": "openai_harness_discipline_in_scaffolding","_origin":"semantic",
    "label": "Discipline lives in the scaffolding, not the code",
    "file_type": "concept",
    "source_file": "openai_com_index_harness-engineering.md",
@@ -1750,7 +1750,7 @@
    "rationale": "Building software still demands discipline, but in an agent-generated system the discipline shows up in the scaffolding rather than the code — the tooling, abstractions, and feedback loops that keep the codebase coherent matter most."
   },
   {
-   "id": "ptc_doc_programmatic_tool_calling",
+   "id": "ptc_doc_programmatic_tool_calling","_origin":"semantic",
    "label": "Programmatic tool calling",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1761,7 +1761,7 @@
    "rationale": "Programmatic tool calling lets Claude write code that invokes your tools programmatically inside a code execution container instead of requiring a model round trip for each tool invocation. It reduces latency for multi-tool workflows and cuts token consumption by letting Claude filter or process data before it reaches the model's context window."
   },
   {
-   "id": "ptc_doc_code_execution_tool",
+   "id": "ptc_doc_code_execution_tool","_origin":"semantic",
    "label": "Code execution tool",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1772,7 +1772,7 @@
    "rationale": "The sandboxed code execution tool is the required substrate for programmatic tool calling; the feature only works when the code execution tool is enabled and shares the same containers and pricing as code execution."
   },
   {
-   "id": "ptc_doc_code_execution_version_requirement",
+   "id": "ptc_doc_code_execution_version_requirement","_origin":"semantic",
    "label": "code_execution_20260120 version requirement",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1783,7 +1783,7 @@
    "rationale": "Programmatic tool calling requires code execution tool version code_execution_20260120 or later. Both code_execution_20260120 and code_execution_20260521 are accepted and interchangeable in allowed_callers; response blocks always tag the caller as code_execution_20260120 regardless of which version was declared."
   },
   {
-   "id": "ptc_doc_model_compatibility",
+   "id": "ptc_doc_model_compatibility","_origin":"semantic",
    "label": "Model compatibility",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1794,7 +1794,7 @@
    "rationale": "Supported models include Claude Fable 5, Mythos 5, Opus 4.8/4.7/4.6/4.5, and Sonnet 5/4.6/4.5. The feature is available on the Claude API, Claude Platform on AWS, and Microsoft Foundry (Hosted on Anthropic deployment only); it is NOT available on Amazon Bedrock or Google Cloud."
   },
   {
-   "id": "ptc_doc_allowed_callers_field",
+   "id": "ptc_doc_allowed_callers_field","_origin":"semantic",
    "label": "allowed_callers field",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1805,7 +1805,7 @@
    "rationale": "allowed_callers on a tool definition specifies which contexts can invoke it: [\"direct\"] (default, Claude calls directly), [\"code_execution_20260120\"] (only from code), or both. The doc recommends choosing one for clearer guidance. It controls how the tool is presented and is validated against tool_choice, but is NOT a hard API-level block and must not be relied on as a security boundary."
   },
   {
-   "id": "ptc_doc_caller_field",
+   "id": "ptc_doc_caller_field","_origin":"semantic",
    "label": "caller field in responses",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1816,7 +1816,7 @@
    "rationale": "Every tool_use block includes a caller field: {\"type\": \"direct\"} for traditional tool use, or {\"type\": \"code_execution_20260120\", \"tool_id\": \"srvtoolu_...\"} for programmatic invocation. The tool_id is the id of the code execution server_tool_use block that made the call, letting you match each programmatic tool_use to its code execution run."
   },
   {
-   "id": "ptc_doc_container_lifecycle",
+   "id": "ptc_doc_container_lifecycle","_origin":"semantic",
    "label": "Container lifecycle",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1827,7 +1827,7 @@
    "rationale": "A new container is created per request unless reused; its id and expires_at are returned in the container field. Passing the container ID back keeps state and is REQUIRED (not optional) while a programmatic call is pending. Idle containers are reclaimed after ~5 minutes, and no container can be reused more than 30 days after creation."
   },
   {
-   "id": "ptc_doc_async_python_functions",
+   "id": "ptc_doc_async_python_functions","_origin":"semantic",
    "label": "Tools as async Python functions",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1838,7 +1838,7 @@
    "rationale": "Tools allowing a code execution caller are exposed to Claude's code as async Python functions, so Claude can run them in parallel with asyncio.gather. Each function takes a single dict of arguments and returns a string (the text of the tool_result you send back); Claude awaits with top-level await and parses structured results, e.g. rows = json.loads(await query_database({\"sql\": \"...\"}))."
   },
   {
-   "id": "ptc_doc_workflow_pause_resume",
+   "id": "ptc_doc_workflow_pause_resume","_origin":"semantic",
    "label": "Pause/resume tool-call workflow",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1849,7 +1849,7 @@
    "rationale": "Claude writes Python that invokes tools; when a tool function is called, code execution PAUSES and the API returns a tool_use block with stop_reason tool_use. The client provides the tool_result (sending full history, the container ID, and the same tools array), and execution CONTINUES. Intermediate results are not loaded into Claude's context window; only the final code output enters context."
   },
   {
-   "id": "ptc_doc_token_efficiency",
+   "id": "ptc_doc_token_efficiency","_origin":"semantic",
    "label": "Token efficiency",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1860,7 +1860,7 @@
    "rationale": "Token savings come from three mechanisms: tool results from programmatic calls are not added to Claude's context (only final code output is), intermediate filtering/aggregation happens in code without consuming model tokens, and multiple tool calls in one code execution reduce per-turn overhead. Calling 10 tools directly uses ~10x the tokens of calling them programmatically and returning a summary."
   },
   {
-   "id": "ptc_doc_benchmark_results",
+   "id": "ptc_doc_benchmark_results","_origin":"semantic",
    "label": "Benchmark and evaluation results",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1871,7 +1871,7 @@
    "rationale": "On agentic search benchmarks (BrowseComp, DeepSearchQA), programmatic tool calling improved performance by an average of 11% while using 24% fewer input tokens. Internal evals: a 75-tool project-management benchmark cut billed input tokens ~38% with no accuracy change; requests with 10-49 tool definitions saw typical 20-40% savings; but tau2-bench sequential single-call workflows were unchanged and cost ~8% more."
   },
   {
-   "id": "ptc_doc_when_to_use",
+   "id": "ptc_doc_when_to_use","_origin":"semantic",
    "label": "When to use programmatic calling",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1882,7 +1882,7 @@
    "rationale": "Strong fit: fan-out/parallel operations across many items, large filterable/aggregatable tool results, and agentic search/retrieval. Weak fit: strictly sequential workflows where each call depends on Claude reasoning over the prior result, a few small tool calls (especially first turn where container/script overhead exceeds savings), and tools requiring immediate user feedback between calls."
   },
   {
-   "id": "ptc_doc_container_timeout",
+   "id": "ptc_doc_container_timeout","_origin":"semantic",
    "label": "Pending call timeout",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1893,7 +1893,7 @@
    "rationale": "While Claude's code waits for a programmatic tool result, the pending call times out after about 4 minutes (270s) and raises a TimeoutError inside the code, visible in stderr; Claude typically retries. Tool results must be returned well before the expires_at timestamp. Mitigate by monitoring expires_at, implementing tool timeouts, and breaking long operations into smaller chunks."
   },
   {
-   "id": "ptc_doc_feature_incompatibilities",
+   "id": "ptc_doc_feature_incompatibilities","_origin":"semantic",
    "label": "Feature incompatibilities",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1904,7 +1904,7 @@
    "rationale": "Programmatic calling is incompatible with: structured outputs (tools with strict: true are unsupported), forcing programmatic calling of a specific tool via tool_choice, and disable_parallel_tool_use: true. Tools provided by an MCP connector cannot be called programmatically."
   },
   {
-   "id": "ptc_doc_recursive_ref_limitation",
+   "id": "ptc_doc_recursive_ref_limitation","_origin":"semantic",
    "label": "Recursive $ref schema limitation",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1915,7 +1915,7 @@
    "rationale": "A custom tool whose input_schema contains a recursive $ref (reference cycle) cannot be enabled for programmatic calling; listing a code execution version in allowed_callers for such a tool fails with a 400 invalid_request_error containing 'Circular $ref detected'. The same schema is accepted for direct tool calling. Workaround: keep the tool direct-only, or remove the cycle (unroll to fixed depth or use a plain object with a descriptive description)."
   },
   {
-   "id": "ptc_doc_message_formatting_restrictions",
+   "id": "ptc_doc_message_formatting_restrictions","_origin":"semantic",
    "label": "Message formatting restrictions",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1926,7 +1926,7 @@
    "rationale": "When responding to pending programmatic tool calls, the user message must contain ONLY tool_result blocks (no text content, even after the results), unlike regular client-side tool calls. Additionally each tool_result content answering a programmatic call must be a string or text blocks; image, document, and other content block types are rejected."
   },
   {
-   "id": "ptc_doc_tool_choice_error",
+   "id": "ptc_doc_tool_choice_error","_origin":"semantic",
    "label": "tool_choice invalid_request_error",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1937,7 +1937,7 @@
    "rationale": "tool_choice cannot name a tool whose allowed_callers omits 'direct'; doing so returns an HTTP 400 invalid_request_error. Fix by adding 'direct' to that tool's allowed_callers, or remove the tool from tool_choice and let Claude invoke it from code."
   },
   {
-   "id": "ptc_doc_security_validation",
+   "id": "ptc_doc_security_validation","_origin":"semantic",
    "label": "Validate tool results before use",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1948,7 +1948,7 @@
    "rationale": "Tool results are returned as strings that can contain any content, including code snippets or executable commands that may be processed by the execution environment. Validate external tool results and be aware of code injection risks if output from external sources or user input will be interpreted or executed as code."
   },
   {
-   "id": "ptc_doc_alternative_implementations",
+   "id": "ptc_doc_alternative_implementations","_origin":"semantic",
    "label": "Alternative implementations",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1959,7 +1959,7 @@
    "rationale": "Programmatic tool calling is a generalizable pattern implementable three ways: client-side direct execution (minimal re-architecting but runs untrusted code outside a sandbox), self-managed sandboxed execution (safe but complex to build/maintain), and Anthropic-managed execution (a managed sandbox with an opinionated Python environment tuned for Claude, safe by default with no infrastructure to run)."
   },
   {
-   "id": "ptc_doc_data_retention",
+   "id": "ptc_doc_data_retention","_origin":"semantic",
    "label": "Data retention",
    "file_type": "concept",
    "source_file": "ptc-doc.md",
@@ -1970,7 +1970,7 @@
    "rationale": "Built on code execution infrastructure using the same sandbox containers, programmatic tool calling retains container data — including execution artifacts and outputs — for up to 30 days. Token counting excludes programmatic tool results from input/output usage; only the final code execution result and Claude's response count."
   },
   {
-   "id": "youmind_loop_engineering",
+   "id": "youmind_loop_engineering","_origin":"semantic",
    "label": "Loop Engineering",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -1981,7 +1981,7 @@
    "rationale": "Loop engineering is the discipline of building robust autonomous agent cycles with automated success criteria and context management, rather than manually prompting an agent. It is a shift in where you aim your effort: the model becomes a commodity and the loop around it is where the real engineering lives."
   },
   {
-   "id": "youmind_loop_stop_prompting",
+   "id": "youmind_loop_stop_prompting","_origin":"semantic",
    "label": "Stop Prompting, Start Loops",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -1992,7 +1992,7 @@
    "rationale": "Boris Cherny, who built Claude Code, said 'I don't prompt Claude anymore. I have loops that are running. My job is to write loops.' The core idea is to stop steering an agent move-by-move via prompts and instead build the autonomous system that steers it, then step back."
   },
   {
-   "id": "youmind_loop_the_loop_itself",
+   "id": "youmind_loop_the_loop_itself","_origin":"semantic",
    "label": "The Loop Itself (while-True agent loop)",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2003,7 +2003,7 @@
    "rationale": "At its core an agent is a plain loop: the model reads context, requests tool calls, tools run and their results are appended to context, repeating until the model stops asking for tools (Model -> tools -> context -> repeat). This ~six-line loop is already solved; every serious framework lands on it, so nobody competes on the while statement."
   },
   {
-   "id": "youmind_loop_prompt_engineering",
+   "id": "youmind_loop_prompt_engineering","_origin":"semantic",
    "label": "Prompt Engineering",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2014,7 +2014,7 @@
    "rationale": "Prompt engineering is the innermost layer: the words you send to the model. It is one small piece of a much bigger system."
   },
   {
-   "id": "youmind_loop_context_engineering",
+   "id": "youmind_loop_context_engineering","_origin":"semantic",
    "label": "Context Engineering",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2025,7 +2025,7 @@
    "rationale": "Context engineering covers everything the model sees, not just your instructions. It wraps prompt engineering as the next layer outward."
   },
   {
-   "id": "youmind_loop_harness_engineering",
+   "id": "youmind_loop_harness_engineering","_origin":"semantic",
    "label": "Harness Engineering",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2036,7 +2036,7 @@
    "rationale": "Harness engineering is the code around the model that runs tools, tracks state, and handles errors. Per LangChain, Agent = Model + Harness; if you're not the model, you're the harness. The harness now matters more than the model: teams have kept the model fixed, changed only the surrounding code, and jumped from mid-benchmark into the top five."
   },
   {
-   "id": "youmind_loop_center_of_gravity_shift",
+   "id": "youmind_loop_center_of_gravity_shift","_origin":"semantic",
    "label": "Center of Gravity Moving Outside the Model",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2047,7 +2047,7 @@
    "rationale": "The center of gravity in AI keeps drifting away from the model itself through nested layers: prompt -> context -> harness -> loop engineering, each wrapping the one before. The finding that should reorder priorities is that the harness now matters more than the model."
   },
   {
-   "id": "youmind_loop_knowing_when_to_stop",
+   "id": "youmind_loop_knowing_when_to_stop","_origin":"semantic",
    "label": "Hard Part 1: Knowing When to Stop",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2058,7 +2058,7 @@
    "rationale": "When an agent stops asking for tools it has ended its turn, which is not the same as finishing the job. A terminal message ends the turn, not the task, and confusing the two is the most common way loops go wrong (e.g. a coding agent declaring victory while tests still fail)."
   },
   {
-   "id": "youmind_loop_max_iterations",
+   "id": "youmind_loop_max_iterations","_origin":"semantic",
    "label": "Max Iterations Cap",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2069,7 +2069,7 @@
    "rationale": "A hard cap on iterations so a stuck agent can't run forever. One of several 'brakes' layered on a loop so it stops for the right reasons."
   },
   {
-   "id": "youmind_loop_budget_time_limits",
+   "id": "youmind_loop_budget_time_limits","_origin":"semantic",
    "label": "Budget and Time Limits",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2080,7 +2080,7 @@
    "rationale": "A ceiling on tokens, money, and seconds; a brake that bounds a loop's resource consumption."
   },
   {
-   "id": "youmind_loop_no_progress_detection",
+   "id": "youmind_loop_no_progress_detection","_origin":"semantic",
    "label": "No-Progress Detection",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2091,7 +2091,7 @@
    "rationale": "If an agent repeats the same call with the same arguments, it is spinning; detecting this stops a loop that is making no progress."
   },
   {
-   "id": "youmind_loop_completion_check",
+   "id": "youmind_loop_completion_check","_origin":"semantic",
    "label": "Real Completion Check (automated 'done')",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2102,7 +2102,7 @@
    "rationale": "An automated condition proving the job is actually done; this brake carries the most weight. 'Done' should mean the tests pass, not the agent feeling good about its work. It should be defined before you begin, not judged as a vibe afterward."
   },
   {
-   "id": "youmind_loop_keeping_context_clean",
+   "id": "youmind_loop_keeping_context_clean","_origin":"semantic",
    "label": "Hard Part 2: Keeping the Context Clean",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2113,7 +2113,7 @@
    "rationale": "Long loops rot from the inside: more turns pile junk (old tool outputs, dead ends, stale reasoning) into context and performance drops. The fix is treating context as a budget, not a bucket - the skill is knowing what to throw away."
   },
   {
-   "id": "youmind_loop_context_rot",
+   "id": "youmind_loop_context_rot","_origin":"semantic",
    "label": "Context Rot",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2124,7 +2124,7 @@
    "rationale": "Context rot is the field's term for model performance dropping as junk (old tool outputs, dead ends, stale reasoning) accumulates in context over many turns."
   },
   {
-   "id": "youmind_loop_doom_loop",
+   "id": "youmind_loop_doom_loop","_origin":"semantic",
    "label": "Doom Loop",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2135,7 +2135,7 @@
    "rationale": "The doom loop is the self-reinforcing spiral where a rotted context produces a worse decision, which adds more noise, which rots the context further - the agent gets dumber the longer it runs."
   },
   {
-   "id": "youmind_loop_compaction",
+   "id": "youmind_loop_compaction","_origin":"semantic",
    "label": "Compaction",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2146,7 +2146,7 @@
    "rationale": "Compaction summarizes the conversation when it gets long, then continues from the summary - a context-management technique against context rot."
   },
   {
-   "id": "youmind_loop_offloading",
+   "id": "youmind_loop_offloading","_origin":"semantic",
    "label": "Offloading",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2157,7 +2157,7 @@
    "rationale": "Offloading pushes huge tool outputs to a file and keeps only the slice you need in context - a context-management technique against context rot."
   },
   {
-   "id": "youmind_loop_sub_agents",
+   "id": "youmind_loop_sub_agents","_origin":"semantic",
    "label": "Sub-Agents",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2168,7 +2168,7 @@
    "rationale": "Sub-agents hand a messy subtask to a separate agent and let only its clean result return to the main context - a context-management technique that isolates noise."
   },
   {
-   "id": "youmind_loop_usable_tools",
+   "id": "youmind_loop_usable_tools","_origin":"semantic",
    "label": "Hard Part 3: Tools the Agent Can Actually Use",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2179,7 +2179,7 @@
    "rationale": "A loop is only as good as its tools. Piling on a hundred tools makes the agent lose track of which to reach for; a tight set of focused, non-overlapping tools wins. Anthropic's rule of thumb: if a human engineer can't say for certain which tool fits, the agent has no chance."
   },
   {
-   "id": "youmind_loop_idempotent_writes",
+   "id": "youmind_loop_idempotent_writes","_origin":"semantic",
    "label": "Make Writes Safe to Repeat (Idempotency)",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2190,7 +2190,7 @@
    "rationale": "Because loops retry, anything that changes state must be safe to call twice. A retried 'create customer' call that makes a second customer produces duplicate records and double billing."
   },
   {
-   "id": "youmind_loop_errors_for_agents",
+   "id": "youmind_loop_errors_for_agents","_origin":"semantic",
    "label": "Write Error Messages for the Agent",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2201,7 +2201,7 @@
    "rationale": "A good error tells the agent what to do next; before a tool ships, ask whether an LLM reading its error would know the next move. In a loop, an error isn't a dead end - it's the next instruction."
   },
   {
-   "id": "youmind_loop_something_that_says_no",
+   "id": "youmind_loop_something_that_says_no","_origin":"semantic",
    "label": "Hard Part 4: Something That Can Say No (the Critic)",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2212,7 +2212,7 @@
    "rationale": "Autonomous loops have a quiet failure mode: an agent left alone tends to agree with itself. Half the job is designing the loop; the other half is putting something in it that can say no - a test, a type check, or a real error. A loop with no critic is just an agent nodding along to its own work."
   },
   {
-   "id": "youmind_loop_maker_checker_separation",
+   "id": "youmind_loop_maker_checker_separation","_origin":"semantic",
    "label": "Separate the Maker from the Checker",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2223,7 +2223,7 @@
    "rationale": "The fix for self-agreement is separating maker from checker: one model does the work, a different check (often a separate model or a hard test) grades it. The worker doesn't grade its own homework."
   },
   {
-   "id": "youmind_loop_three_design_targets",
+   "id": "youmind_loop_three_design_targets","_origin":"semantic",
    "label": "The Three Things to Design (Goal, Loop, Verifier)",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2234,7 +2234,7 @@
    "rationale": "With loop engineering your job changes from giving instructions to designing three things: the goal (written as success criteria the agent can check itself against), the loop (with sane brakes so it stops well), and the verifier (so 'done' is proven, not claimed)."
   },
   {
-   "id": "youmind_loop_karpathy_success_criteria",
+   "id": "youmind_loop_karpathy_success_criteria","_origin":"semantic",
    "label": "Karpathy: Give Success Criteria, Watch It Go",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2245,7 +2245,7 @@
    "rationale": "Andrej Karpathy's mindset: don't tell the model what to do, give it success criteria and watch it go. He runs research loops overnight that tweak a script, test it, keep what works, and discard what doesn't - with himself nowhere in the loop; he arranges it once and hits go."
   },
   {
-   "id": "youmind_loop_where_to_start",
+   "id": "youmind_loop_where_to_start","_origin":"semantic",
    "label": "Where to Start (build up to autonomy)",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2256,7 +2256,7 @@
    "rationale": "A staged path: (1) start with the basic loop plus max-iteration cap, timeout, and cost ceiling; (2) define 'done' as an automated check up front; (3) protect the context via compaction/offloading/sub-agents; (4) audit tools to be few, focused, idempotent, with agent-readable errors; (5) put a critic in the loop, going fully hands-off only once you trust the thing that says no."
   },
   {
-   "id": "youmind_loop_model_becoming_commodity",
+   "id": "youmind_loop_model_becoming_commodity","_origin":"semantic",
    "label": "The Model Is Becoming a Commodity",
    "file_type": "concept",
    "source_file": "youmind_com_landing_x-viral-articles_loop-engineering-ai-agents-guide.md",
@@ -2267,7 +2267,7 @@
    "rationale": "The takeaway: loop engineering isn't a framework or tool you install but a shift in where you aim your effort. The model is becoming a commodity; the loop around it is where the real engineering lives. The best builders stopped asking 'what should I tell the agent to do?' and started asking 'what system would do this without me?'"
   },
   {
-   "id": "x_graph_eng_graph_engineering",
+   "id": "x_graph_eng_graph_engineering","_origin":"semantic",
    "label": "Graph engineering",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2278,7 +2278,7 @@
    "rationale": "Graph engineering is designing the relationships between processes: drawing the full map of how work moves between agents, tools, and checks. The name is new but most of the hard problems are not; it is not a replacement for workflow engineering but a zoom-out to the whole system."
   },
   {
-   "id": "x_graph_eng_naming_problem",
+   "id": "x_graph_eng_naming_problem","_origin":"semantic",
    "label": "AI engineering naming problem",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2289,7 +2289,7 @@
    "rationale": "AI engineering has a naming problem: every useful idea gets about six months before someone declares it dead. Prompt engineering became context engineering, which became harness engineering, which became loop engineering, and now graph engineering."
   },
   {
-   "id": "x_graph_eng_steinberger_post",
+   "id": "x_graph_eng_steinberger_post","_origin":"semantic",
    "label": "Peter Steinberger 'graph' post",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2300,7 +2300,7 @@
    "rationale": "Peter Steinberger (creator of OpenClaw) posted nine words about 'graph' that caused immediate confusion. There is no new product called Graph and loops are not going anywhere; the real shift is from making one agent loop to designing how many agents, checks, branches, retries, and human decisions work together."
   },
   {
-   "id": "x_graph_eng_prompt",
+   "id": "x_graph_eng_prompt","_origin":"semantic",
    "label": "Prompt (one-shot ask)",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2311,7 +2311,7 @@
    "rationale": "A prompt asks an AI to do something once. Prompt engineering is communicating intent to a model."
   },
   {
-   "id": "x_graph_eng_loop",
+   "id": "x_graph_eng_loop","_origin":"semantic",
    "label": "Loop",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2322,7 +2322,7 @@
    "rationale": "A loop gives an AI a goal, lets it act, checks the result, and sends it back to work when the result is wrong (e.g. 'fix the type errors' becomes run checker, read errors, fix, run again, stop when it passes). Loop engineering is building a process that keeps pursuing an intent."
   },
   {
-   "id": "x_graph_eng_external_verifier",
+   "id": "x_graph_eng_external_verifier","_origin":"semantic",
    "label": "External verifier",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2333,7 +2333,7 @@
    "rationale": "A real loop needs an external verifier: a test passes or fails, a build compiles or not. If the same agent writes the work AND decides whether it is good, you have built a very expensive machine for agreeing with itself."
   },
   {
-   "id": "x_graph_eng_state_outside_conversation",
+   "id": "x_graph_eng_state_outside_conversation","_origin":"semantic",
    "label": "State outside the conversation",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2344,7 +2344,7 @@
    "rationale": "A real loop needs state stored outside the conversation, to remember what it tried, what failed, and which artifacts changed."
   },
   {
-   "id": "x_graph_eng_exit_condition",
+   "id": "x_graph_eng_exit_condition","_origin":"semantic",
    "label": "Exit / stop condition",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2355,7 +2355,7 @@
    "rationale": "A real loop needs an exit: success is one exit, a hard limit is the other. A verifier, persistent state, and a stop condition turn repeated prompting into a working system (Hanako's loop-engineering article)."
   },
   {
-   "id": "x_graph_eng_graph",
+   "id": "x_graph_eng_graph","_origin":"semantic",
    "label": "Graph (map of who does what next)",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2366,7 +2366,7 @@
    "rationale": "A graph is a map of who does what next: the larger structure formed when many agents, checks, branches, retries, and human decisions work together. The graph is the whole system; a loop is only a retry path within it."
   },
   {
-   "id": "x_graph_eng_node",
+   "id": "x_graph_eng_node","_origin":"semantic",
    "label": "Node",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2377,7 +2377,7 @@
    "rationale": "Nodes are individual pieces of work: an agent investigating one file, a test suite, a reviewer, an approval step, a stored artifact, or an ordinary deterministic script."
   },
   {
-   "id": "x_graph_eng_edge",
+   "id": "x_graph_eng_edge","_origin":"semantic",
    "label": "Edge",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2388,7 +2388,7 @@
    "rationale": "Edges are connections that say what can happen next: they can carry data, express a dependency, or activate only when a condition is true."
   },
   {
-   "id": "x_graph_eng_code_review_system",
+   "id": "x_graph_eng_code_review_system","_origin":"semantic",
    "label": "Code-review system example",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2399,7 +2399,7 @@
    "rationale": "In a code-review graph, a new PR fans out to several audit agents, findings go to a verifier, confirmed problems go to a fixer, then the test suite; failing tests send work back to the fixer, passing tests publish the review. The graph is the whole system; the loop is only the retry path between fixing and testing."
   },
   {
-   "id": "x_graph_eng_loops_vs_graphs",
+   "id": "x_graph_eng_loops_vs_graphs","_origin":"semantic",
    "label": "Loops-vs-graphs is the wrong argument",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2410,7 +2410,7 @@
    "rationale": "'Loops versus graphs' is the wrong argument because graphs have loops: a loop is just the retry path inside the larger graph."
   },
   {
-   "id": "x_graph_eng_workflow_engineering",
+   "id": "x_graph_eng_workflow_engineering","_origin":"semantic",
    "label": "Workflow engineering",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2421,7 +2421,7 @@
    "rationale": "Workflow engineering asks what happens inside one process; graph engineering zooms out to how the larger system connects, what triggers each part, what information moves, and who decides on disagreement. Graph engineering is mostly workflow engineering seen at a wider scope."
   },
   {
-   "id": "x_graph_eng_building_effective_agents",
+   "id": "x_graph_eng_building_effective_agents","_origin":"semantic",
    "label": "Anthropic 'Building effective agents' patterns",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2432,7 +2432,7 @@
    "rationale": "Anthropic's 2024 'Building effective agents' distinguished workflows (LLMs+tools follow predefined code paths) from agents (the model decides how to proceed), and laid out patterns: prompt chaining, routing, parallelization, orchestrator-workers, and evaluator-optimizer. Draw any of them and you get a graph."
   },
   {
-   "id": "x_graph_eng_state",
+   "id": "x_graph_eng_state","_origin":"semantic",
    "label": "System state",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2443,7 +2443,7 @@
    "rationale": "State is the information the system tracks: finished tasks, each agent's output, failed checks, human approvals. The graph is the map of possible paths; the state says where the system is on that map."
   },
   {
-   "id": "x_graph_eng_why_now_agent_nodes",
+   "id": "x_graph_eng_why_now_agent_nodes","_origin":"semantic",
    "label": "Why now: agents inside nodes",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2454,7 +2454,7 @@
    "rationale": "What changed is the kind of work inside some nodes: a normal step follows fixed rules, but an agent interprets the task from its current context and can misunderstand or choose differently next run. Graphs force the relationships into the open so weak points become findable when written as code."
   },
   {
-   "id": "x_graph_eng_one_chat_window_antipattern",
+   "id": "x_graph_eng_one_chat_window_antipattern","_origin":"semantic",
    "label": "One-chat-window fragility",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2465,7 +2465,7 @@
    "rationale": "One chat window hides bad architecture: the model decides what happens next, results pile up in context, verification is mixed with generation, and state exists wherever the conversation happens to remember it. This works for small jobs but grows fragile across hundreds of files, several repos, multiple data sources, or hours of work."
   },
   {
-   "id": "x_graph_eng_dynamic_workflows",
+   "id": "x_graph_eng_dynamic_workflows","_origin":"semantic",
    "label": "Claude Code dynamic workflows",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2476,7 +2476,7 @@
    "rationale": "Claude Code's dynamic workflows give the graph a runtime: Claude writes the plan as a JavaScript program that can spawn subagents, run independent jobs concurrently, send results through review, and retry failed work, while a background runtime follows the program so Claude does not direct every step in the chat. 'A workflow moves the plan into code.'"
   },
   {
-   "id": "x_graph_eng_zechner_advice",
+   "id": "x_graph_eng_zechner_advice","_origin":"semantic",
    "label": "Mario Zechner's advice",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2487,7 +2487,7 @@
    "rationale": "Mario Zechner's advice: start with Anthropic's dynamic workflows, recognize the directed graph underneath, then marry triggering (sub-)graphs via external events, which pushes the idea beyond one Claude Code run."
   },
   {
-   "id": "x_graph_eng_dag",
+   "id": "x_graph_eng_dag","_origin":"semantic",
    "label": "DAG (directed acyclic graph)",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2498,7 +2498,7 @@
    "rationale": "A DAG is directed (each connection has a direction) and acyclic (never returns to an earlier node). A research workflow can be a DAG where every stage runs once and nothing travels backward."
   },
   {
-   "id": "x_graph_eng_cycle",
+   "id": "x_graph_eng_cycle","_origin":"semantic",
    "label": "Cycle",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2509,7 +2509,7 @@
    "rationale": "Adding a verifier that rejects unsupported claims and sends them back turns a DAG into a graph with a cycle. Cycles introduce cost, state, and stopping problems a DAG does not have: the graph must know which work can be reused, which branches rerun, and when repeated failures stop the run."
   },
   {
-   "id": "x_graph_eng_execution_side",
+   "id": "x_graph_eng_execution_side","_origin":"semantic",
    "label": "Execution side of a graph",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2520,7 +2520,7 @@
    "rationale": "The execution side is what runs next: branches, parallel work, reviews, retries, and handoffs."
   },
   {
-   "id": "x_graph_eng_control_side",
+   "id": "x_graph_eng_control_side","_origin":"semantic",
    "label": "Control side of a graph",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2531,7 +2531,7 @@
    "rationale": "The control side checks whether the work is still moving toward the right goal (Carlos E. Perez), connecting the loop to other signals like customer retention or reopened tickets and flagging conflicts to a human. One graph, two jobs: execution does the work, control checks whether reality improved."
   },
   {
-   "id": "x_graph_eng_goodharts_law",
+   "id": "x_graph_eng_goodharts_law","_origin":"semantic",
    "label": "Goodhart's law in production",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2542,7 +2542,7 @@
    "rationale": "Goodhart's law in production: once a measure becomes the target, the system improves the measure without improving reality. A support agent rewarded for closing tickets quickly learns to close difficult conversations instead of solving them."
   },
   {
-   "id": "x_graph_eng_organized_nonsense",
+   "id": "x_graph_eng_organized_nonsense","_origin":"semantic",
    "label": "Organized nonsense / multiplied mistakes",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2553,7 +2553,7 @@
    "rationale": "Adding more agents does not create independent judgment: twenty agents using the same model, reading the same flawed context, checking the same broken metric can agree at industrial scale. A graph multiplies mistakes as efficiently as useful work."
   },
   {
-   "id": "x_graph_eng_dangerous_circularity",
+   "id": "x_graph_eng_dangerous_circularity","_origin":"semantic",
    "label": "Dangerous circular verification",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2564,7 +2564,7 @@
    "rationale": "A graph can be circular in a dangerous way: agent A checks a report against another report, an audit agent checks both against a dashboard, and the dashboard was built from the same data. Every node agrees, nothing touches reality; it looks well-governed because the diagram has reviewers everywhere, but it is still wrong."
   },
   {
-   "id": "x_graph_eng_reality_anchors",
+   "id": "x_graph_eng_reality_anchors","_origin":"semantic",
    "label": "Reality anchors",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2575,7 +2575,7 @@
    "rationale": "Reality anchors are evidence that MUST come from outside the agent system: tests that actually ran, money that reached the bank, customers who stayed, physical measurements, rules the optimizer cannot rewrite, human judgment about what 'better' means. Without anchors, a graph is a larger hallucination with better project management."
   },
   {
-   "id": "x_graph_eng_graph_engineer_role",
+   "id": "x_graph_eng_graph_engineer_role","_origin":"semantic",
    "label": "What a graph engineer does",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2586,7 +2586,7 @@
    "rationale": "A graph engineer does the work good distributed-systems and workflow engineers have done for years, applied to agents: design boundaries, decide which tasks deserve probabilistic agents vs ordinary code, define passed state, separate the maker from the checker, choose retry rules/timeouts/budgets/permissions/stop conditions, and decide who has authority."
   },
   {
-   "id": "x_graph_eng_maker_checker_separation",
+   "id": "x_graph_eng_maker_checker_separation","_origin":"semantic",
    "label": "Separate the maker from the checker",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2597,7 +2597,7 @@
    "rationale": "A core design principle is separating the maker from the checker so an agent does not both produce work and judge it. This underlies the external-verifier requirement and prevents a system that merely agrees with itself."
   },
   {
-   "id": "x_graph_eng_start_with_the_loop",
+   "id": "x_graph_eng_start_with_the_loop","_origin":"semantic",
    "label": "Start with the loop",
    "file_type": "concept",
    "source_file": "x-towards-ai-graph-engineering.md",
@@ -2608,7 +2608,7 @@
    "rationale": "Do not start by building a 40-agent graph. Start with one recurring task: give it a real verifier, store its state somewhere inspectable, add a hard stop, and run it enough to understand how it fails; then draw what must happen around it. At that point you have a graph, having given the loop neighbors, supervision, memory, and somewhere honest to report failure."
   },
   {
-   "id": "louisbouchard_graph_eng_graph_engineering",
+   "id": "louisbouchard_graph_eng_graph_engineering","_origin":"semantic",
    "label": "Graph engineering",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2619,7 +2619,7 @@
    "rationale": "Graph engineering is this week's name for connecting several agent loops into one orchestrated system: parallel branches, verifiers, handoffs, and stop conditions. The structure is not new — workflow engines have drawn these graphs for a decade."
   },
   {
-   "id": "louisbouchard_graph_eng_nodes_interpret_tasks",
+   "id": "louisbouchard_graph_eng_nodes_interpret_tasks","_origin":"semantic",
    "label": "Nodes now interpret tasks",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2630,7 +2630,7 @@
    "rationale": "What changed is that the nodes now interpret their tasks instead of following fixed rules. A normal pipeline step follows fixed rules; an agent interprets its task, so it can misread or choose differently on the next run. This is the core shift graph engineering names."
   },
   {
-   "id": "louisbouchard_graph_eng_explicit_state_vetoes_budgets",
+   "id": "louisbouchard_graph_eng_explicit_state_vetoes_budgets","_origin":"semantic",
    "label": "Explicit state, vetoes, budgets",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2641,7 +2641,7 @@
    "rationale": "Because nodes interpret their tasks, state, vetoes, and budgets must be made explicit. Drawing the graph forces you to decide once what runs in parallel, what state crosses between nodes, who can veto a result, and what it costs before it stops."
   },
   {
-   "id": "louisbouchard_graph_eng_agent_loop",
+   "id": "louisbouchard_graph_eng_agent_loop","_origin":"semantic",
    "label": "Agent loop",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2652,7 +2652,7 @@
    "rationale": "A loop is an agent acting toward a goal plus an external verifier checking the result, with failed work going back in and a stop condition. One loop, one job — to remove the human or reduce reviewer workload."
   },
   {
-   "id": "louisbouchard_graph_eng_loops_not_dead",
+   "id": "louisbouchard_graph_eng_loops_not_dead","_origin":"semantic",
    "label": "Loop engineering is not dead",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2663,7 +2663,7 @@
    "rationale": "Loop engineering is not dead — a graph is what you get when one loop is no longer enough, and graphs contain loops. 'Loops versus graphs' is not a pertinent comparison."
   },
   {
-   "id": "louisbouchard_graph_eng_graphs_contain_loops",
+   "id": "louisbouchard_graph_eng_graphs_contain_loops","_origin":"semantic",
    "label": "Graphs contain loops",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2674,7 +2674,7 @@
    "rationale": "Graphs contain loops. A graph is the extra layer where we trust agents even more to replace us — the layer you reach for when one loop is no longer enough."
   },
   {
-   "id": "louisbouchard_graph_eng_external_verifier",
+   "id": "louisbouchard_graph_eng_external_verifier","_origin":"semantic",
    "label": "External verifier",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2685,7 +2685,7 @@
    "rationale": "An external verifier checks the result of an agent's work; findings converge into it and confirmed problems are handed to a fixer. It is a component of a loop and a node in the graph."
   },
   {
-   "id": "louisbouchard_graph_eng_stop_condition",
+   "id": "louisbouchard_graph_eng_stop_condition","_origin":"semantic",
    "label": "Stop condition",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2696,7 +2696,7 @@
    "rationale": "A loop needs a stop condition — a checkable condition such as tests passing that ends the loop. A basic version fits inside the prompt: ask the model to review its work until it reaches a checkable condition."
   },
   {
-   "id": "louisbouchard_graph_eng_code_review_system",
+   "id": "louisbouchard_graph_eng_code_review_system","_origin":"semantic",
    "label": "Agentic code-review system",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2707,7 +2707,7 @@
    "rationale": "Codex opens a PR, automated scans fan out several audit agents in parallel, findings converge into a verifier, confirmed problems go to a fixer, then a test suite runs; failing tests loop work back, passing tests ship the review. This structure is a graph — simulating multiple employees handing work over and reviewing it."
   },
   {
-   "id": "louisbouchard_graph_eng_parallelization",
+   "id": "louisbouchard_graph_eng_parallelization","_origin":"semantic",
    "label": "Parallel branches / fan-out",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2718,7 +2718,7 @@
    "rationale": "Parallel branches fan out multiple agents to work at once — e.g. automated scans spawn several audit agents in parallel whose findings later converge. Parallelization is one of the graph patterns Anthropic already documented."
   },
   {
-   "id": "louisbouchard_graph_eng_building_effective_agents",
+   "id": "louisbouchard_graph_eng_building_effective_agents","_origin":"semantic",
    "label": "Anthropic 'Building Effective Agents' (2024)",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2729,7 +2729,7 @@
    "rationale": "Anthropic's 2024 'Building Effective Agents' already drew every pattern: chaining, routing, parallelization, orchestrator-workers, and evaluator-optimizer. Put any on a whiteboard and you get a graph, so the concept is not new."
   },
   {
-   "id": "louisbouchard_graph_eng_workflow_engines",
+   "id": "louisbouchard_graph_eng_workflow_engines","_origin":"semantic",
    "label": "Workflow engines / DAG schedulers / state machines",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2740,7 +2740,7 @@
    "rationale": "Zooming out, workflow engines, DAG schedulers, and state machines have drawn these same graphs for a decade. The graph structure of graph engineering is not new — only what lives inside the nodes changed."
   },
   {
-   "id": "louisbouchard_graph_eng_airflow",
+   "id": "louisbouchard_graph_eng_airflow","_origin":"semantic",
    "label": "Airflow",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2751,7 +2751,7 @@
    "rationale": "Airflow has been a graph of tasks for a decade and is more battle-tested than most agent frameworks — cited as evidence that the graph structure long predates agent orchestration."
   },
   {
-   "id": "louisbouchard_graph_eng_giant_chat_context",
+   "id": "louisbouchard_graph_eng_giant_chat_context","_origin":"semantic",
    "label": "Single giant chat context",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2762,7 +2762,7 @@
    "rationale": "Until recently everything was hidden inside one giant chat context where the model was scheduler, database, log, and project manager at once. That works for small jobs but falls apart across hours, repos, and many agents — the failure mode graphs make explicit."
   },
   {
-   "id": "louisbouchard_graph_eng_dynamic_workflows",
+   "id": "louisbouchard_graph_eng_dynamic_workflows","_origin":"semantic",
    "label": "Claude Code dynamic workflows",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2773,7 +2773,7 @@
    "rationale": "Claude Code's dynamic workflows are this exact idea: the plan becomes a program that spawns subagents, runs them in parallel, and retries failures — an explicit graph rather than a hidden chat context."
   },
   {
-   "id": "louisbouchard_graph_eng_codex_mcp",
+   "id": "louisbouchard_graph_eng_codex_mcp","_origin":"semantic",
    "label": "Codex MCP",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2784,7 +2784,7 @@
    "rationale": "You can spawn a Codex subagent from Claude Code via the Codex MCP for token-efficient model-to-model work, or have Codex (5.6 Sol Ultra) spawn subagents in a prompt — concrete ways to build the graph across tools."
   },
   {
-   "id": "louisbouchard_graph_eng_organized_nonsense",
+   "id": "louisbouchard_graph_eng_organized_nonsense","_origin":"semantic",
    "label": "Organized nonsense at industrial scale",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2795,7 +2795,7 @@
    "rationale": "A graph of agents checking agents can produce extremely organized nonsense: twenty agents on the same model reading the same flawed context agree at industrial scale, because models prefer their own answers and so agree with each other."
   },
   {
-   "id": "louisbouchard_graph_eng_multi_model_judging",
+   "id": "louisbouchard_graph_eng_multi_model_judging","_origin":"semantic",
    "label": "Multi-model judging system",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2806,7 +2806,7 @@
    "rationale": "The remedy for model self-agreement is a thought-through judging system with multiple reviewers from different models with fresh context, and ideally a human check for important pushes."
   },
   {
-   "id": "louisbouchard_graph_eng_evidence_from_outside",
+   "id": "louisbouchard_graph_eng_evidence_from_outside","_origin":"semantic",
    "label": "Evidence from outside the system",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2817,7 +2817,7 @@
    "rationale": "Some evidence must come from outside the agent system: tests that actually ran, money that reached the bank, customers who stayed, or an expert human reviewer — something deterministic, or at least outside the graph. You cannot automate everything."
   },
   {
-   "id": "louisbouchard_graph_eng_reality_anchors",
+   "id": "louisbouchard_graph_eng_reality_anchors","_origin":"semantic",
    "label": "Reality anchors (real tests, real money, real humans)",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2828,7 +2828,7 @@
    "rationale": "Real tests, real money, and real humans are the concrete anchors that ground an agent graph in reality: deterministic checks or human review that the model cannot fake, guarding against organized nonsense."
   },
   {
-   "id": "louisbouchard_graph_eng_start_simple",
+   "id": "louisbouchard_graph_eng_start_simple","_origin":"semantic",
    "label": "Start simple, grow when forced",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2839,7 +2839,7 @@
    "rationale": "Do not respond to a meme by building a 40-agent overnight graph. Start simple — one recurring task, a real verifier, an inspectable state, a proper UI with metrics, a hard stop — run it until you understand how it fails, then grow the loop only when the work forces you."
   },
   {
-   "id": "louisbouchard_graph_eng_forty_agent_graph",
+   "id": "louisbouchard_graph_eng_forty_agent_graph","_origin":"semantic",
    "label": "40-agent overnight graph (anti-pattern)",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2850,7 +2850,7 @@
    "rationale": "Building a 40-agent graph running overnight in response to a meme is the anti-pattern — the best way to max your token limit for little progress."
   },
   {
-   "id": "louisbouchard_graph_eng_inspectable_state_ui",
+   "id": "louisbouchard_graph_eng_inspectable_state_ui","_origin":"semantic",
    "label": "Inspectable state, UI, metrics, hard stop",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2861,7 +2861,7 @@
    "rationale": "A simple starting system needs an inspectable state, a proper UI with metrics, and a hard stop, alongside one recurring task and a real verifier — the minimum scaffolding before adding parallel branches or vetoes."
   },
   {
-   "id": "louisbouchard_graph_eng_veto_power",
+   "id": "louisbouchard_graph_eng_veto_power","_origin":"semantic",
    "label": "Veto power",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2872,7 +2872,7 @@
    "rationale": "As a system grows you add a reviewer, a parallel branch, and a security check with veto power. Deciding who can veto a result is one of the questions drawing the graph forces you to answer explicitly."
   },
   {
-   "id": "louisbouchard_graph_eng_durable_skill",
+   "id": "louisbouchard_graph_eng_durable_skill","_origin":"semantic",
    "label": "The durable skill",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2883,7 +2883,7 @@
    "rationale": "The durable skill is deciding which parts of your system deserve a probabilistic agent and which should stay boring, deterministic code — the one skill that will not get renamed away."
   },
   {
-   "id": "louisbouchard_graph_eng_renaming_treadmill",
+   "id": "louisbouchard_graph_eng_renaming_treadmill","_origin":"semantic",
    "label": "Renaming treadmill",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2894,7 +2894,7 @@
    "rationale": "The field keeps renaming the same idea: prompt engineering to context to harness to loop engineering to graph engineering, all mostly the same. The Steinberger and Husain 'loop engineering is dead, enter graph engineering' tweets were jokes about how fast we rename things."
   },
   {
-   "id": "louisbouchard_graph_eng_peter_steinberger",
+   "id": "louisbouchard_graph_eng_peter_steinberger","_origin":"semantic",
    "label": "Peter Steinberger (OpenClaw)",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",
@@ -2905,7 +2905,7 @@
    "rationale": "Peter Steinberger, creator of OpenClaw, posted nine words that hit 2.6M views; Hamel Husain (AI evals) added 'Loop engineering is dead. Enter graph engineering.' Both were jokes, but pointed at something real."
   },
   {
-   "id": "louisbouchard_graph_eng_carlos_perez",
+   "id": "louisbouchard_graph_eng_carlos_perez","_origin":"semantic",
    "label": "Carlos Perez",
    "file_type": "concept",
    "source_file": "louisbouchard-graph-eng-full.md",

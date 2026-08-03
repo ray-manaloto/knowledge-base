@@ -23,6 +23,37 @@ _NODE_REQUIRED = ("id", "label", "file_type", "source_file", "source_url", "capt
 _EDGE_REQUIRED = ("source", "target", "relation", "confidence", "confidence_score", "weight")
 _CONFIDENCE = ("EXTRACTED", "INFERRED")
 
+#: Every node in a host-agent chunk is semantic BY CONSTRUCTION — a chunk is the
+#: output of the LLM extraction wave, and the AST layer never travels this path.
+#: Stating it explicitly is not redundancy; it is what keeps graphify from
+#: GUESSING, and the guess is wrong for us.
+#:
+#: graphify 0.9.32 added `_is_ast_tier` (`build.py`), which trusts `_origin` when
+#: present and otherwise falls back to SHAPE: a `source_location` matching
+#: `^L\d` is read as AST, because deterministic extractors emit `L<line>` and the
+#: semantic spec emits null. Our extraction agents emit `L5`, `L13`, … unprompted
+#: — `kb-extract.js` never asked for `source_location` at all — so the fallback
+#: misread them.
+#:
+#: Measured on the 0.9.32 rebuild: **629 committed doc nodes** (621 from
+#: `claude-docs-docs.json`, 8 from `claude-commands-docs.json`) were stamped
+#: `_origin = "ast"` at load and vanished from `graph-prose.json`, taking it from
+#: 2,864 nodes to 2,235 — a 22% cut to the surface `kb-query --prose` reads, with
+#: no error and no warning. Control arm: chunks carrying `source_location` values
+#: that do NOT match `^L\d` (`claude-workflow-blogs-docs` 223/223,
+#: `goal-engineering-docs` 290/290) lost nothing, so the predictor is the regex
+#: and not the field.
+#:
+#: Upstream anticipated exactly this — `build_from_json` carries a comment saying
+#: fresh semantic chunks "may carry drifted 'L<line>' source_locations … and the
+#: shape fallback would misread them as AST" — and guards that one call site with
+#: a strict `_origin` check. The LOAD-TIME backfill has no such guard.
+#:
+#: Requiring it here rather than defaulting it at merge time is deliberate: a
+#: default would fix the graph while leaving the committed artifact ambiguous, so
+#: the next tool to infer a tier from our chunks would be free to guess again.
+_SEMANTIC_ORIGIN = "semantic"
+
 
 def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
     """Per-node schema/uniqueness problems; also returns the set of valid ids."""
@@ -42,6 +73,14 @@ def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
         missing = [k for k in _NODE_REQUIRED if k not in n]
         if missing:
             issues.append(f"{label}: node {nid!r} missing field(s) {missing}")
+        origin = n.get("_origin")
+        if origin != _SEMANTIC_ORIGIN:
+            issues.append(
+                f"{label}: node {nid!r} has _origin={origin!r}, must be "
+                f"{_SEMANTIC_ORIGIN!r} — without it graphify 0.9.32+ infers the tier "
+                f"from source_location and reads 'L<line>' as AST, which silently "
+                f"drops the node from graph-prose.json (629 lost that way)"
+            )
     return issues, ids
 
 

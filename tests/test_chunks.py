@@ -14,6 +14,11 @@ from kb_setup import chunks
 def _node(nid: str, **over: object) -> dict:
     n = {
         "id": nid,
+        # Every host-agent chunk node is semantic by construction. Without this
+        # literal, graphify 0.9.32+ infers the tier from `source_location` shape
+        # and reads an "L<line>" value as AST — which silently deleted 629 doc
+        # nodes from graph-prose.json on the first 0.9.32 build.
+        "_origin": "semantic",
         "label": nid.title(),
         "file_type": "concept",
         "source_file": "src.md",
@@ -123,3 +128,44 @@ def test_validate_files_maps_path_to_issues(tmp_path) -> None:
     assert res[good] == []
     assert res[bad]
     assert "JSON" in res[bad][0]
+
+
+def test_a_node_without_the_semantic_origin_marker_is_rejected() -> None:
+    r"""The 0.9.32 defect, made unrepresentable (#135).
+
+    graphify 0.9.32's `_is_ast_tier` trusts `_origin` when present and otherwise
+    GUESSES from shape: a `source_location` matching `^L\d` is read as AST,
+    because deterministic extractors emit `L<line>` and the semantic spec emits
+    null. Our extraction agents emit `L5`, `L13`, ... unprompted — `kb-extract.js`
+    never asked for the field — so 629 committed doc nodes were stamped
+    `_origin="ast"` at load and vanished from `graph-prose.json`, taking it from
+    2,864 nodes to 2,235. No error, no warning: the corpus simply answered 22%
+    less well.
+
+    Realistic break: an extraction agent omits the marker. That is not a
+    hypothesis — it is what every one of the 18 committed chunks did until
+    2026-08-03, and what a future wave will do again the moment the prompt drifts.
+    """
+    n = _node("a")
+    del n["_origin"]
+    issues = chunks.validate(_chunk([n], []), label="c")
+    assert any("_origin" in i for i in issues), (
+        f"an unstamped node passed validation; issues were {issues}. graphify would "
+        f"then infer its tier from source_location shape and could drop it from the "
+        f"prose graph silently."
+    )
+
+
+def test_the_marker_must_be_semantic_and_not_merely_present() -> None:
+    """CONTROL ARM: `_origin` present is not the property that matters.
+
+    A check for presence alone would pass a node carrying `_origin="ast"` — which
+    is precisely the value the 0.9.32 backfill wrote onto the 629 lost nodes. So
+    the assertion above could be satisfied by a chunk in exactly the broken state,
+    and the gate would certify the defect it exists to prevent.
+    """
+    issues = chunks.validate(_chunk([_node("a", _origin="ast")], []), label="c")
+    assert any("_origin" in i for i in issues), (
+        f"a node marked _origin='ast' passed validation; issues were {issues}. That "
+        f"is the exact state 0.9.32 left the 629 dropped nodes in."
+    )

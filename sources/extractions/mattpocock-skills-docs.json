@@ -1,7 +1,7 @@
 {
  "nodes": [
   {
-   "id": "aih_to_spec_skill",
+   "id": "aih_to_spec_skill","_origin":"semantic",
    "label": "/to-spec skill",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -12,7 +12,7 @@
    "rationale": "`to-spec` turns the current conversation and the agent's codebase understanding into a spec (also known as a PRD) and publishes it to the issue tracker. It synthesises what is already known rather than running a fresh round of interview questions."
   },
   {
-   "id": "aih_to_spec_spec_artifact",
+   "id": "aih_to_spec_spec_artifact","_origin":"semantic",
    "label": "The spec (PRD) artifact",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -23,7 +23,7 @@
    "rationale": "The document `to-spec` produces — the shared understanding of a change written down before any code is written. The doc notes readers may know this document as a PRD."
   },
   {
-   "id": "aih_to_spec_no_reinterview",
+   "id": "aih_to_spec_no_reinterview","_origin":"semantic",
    "label": "Does not re-interview",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -34,7 +34,7 @@
    "rationale": "`to-spec` explicitly does NOT interview you again. By the time you reach for it the alignment work is already done, so it synthesises existing context instead of asking new questions."
   },
   {
-   "id": "aih_to_spec_manual_invocation",
+   "id": "aih_to_spec_manual_invocation","_origin":"semantic",
    "label": "Manual /to-spec invocation",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -45,7 +45,7 @@
    "rationale": "The skill is invoked by the human typing `/to-spec`; the agent will not reach for it on its own."
   },
   {
-   "id": "aih_to_spec_alignment_precondition",
+   "id": "aih_to_spec_alignment_precondition","_origin":"semantic",
    "label": "Alignment and settled domain language",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -56,7 +56,7 @@
    "rationale": "The precondition for reaching for `to-spec`: the change has been talked through and the domain language is settled. If you have not aligned yet, you should grill first instead."
   },
   {
-   "id": "aih_to_spec_issue_tracker",
+   "id": "aih_to_spec_issue_tracker","_origin":"semantic",
    "label": "Issue tracker as publication target",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -67,7 +67,7 @@
    "rationale": "`to-spec` publishes the finished spec into the repo's configured issue tracker, so the spec becomes a tracked ticket rather than a chat artifact."
   },
   {
-   "id": "aih_to_spec_setup_skill",
+   "id": "aih_to_spec_setup_skill","_origin":"semantic",
    "label": "setup-matt-pocock-skills prerequisite",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -78,7 +78,7 @@
    "rationale": "Because `to-spec` publishes into an issue tracker, the `setup-matt-pocock-skills` skill must first have configured the tracker and the triage labels for the repo."
   },
   {
-   "id": "aih_to_spec_ready_for_agent_label",
+   "id": "aih_to_spec_ready_for_agent_label","_origin":"semantic",
    "label": "ready-for-agent label",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -89,7 +89,7 @@
    "rationale": "`to-spec` applies the `ready-for-agent` label to the published spec itself, so no separate triage pass is needed afterwards."
   },
   {
-   "id": "aih_to_spec_problem_statement",
+   "id": "aih_to_spec_problem_statement","_origin":"semantic",
    "label": "Problem statement section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -100,7 +100,7 @@
    "rationale": "States what is broken or missing and why it is worth solving, expressed in the project's own vocabulary."
   },
   {
-   "id": "aih_to_spec_solution_section",
+   "id": "aih_to_spec_solution_section","_origin":"semantic",
    "label": "Solution section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -111,7 +111,7 @@
    "rationale": "Describes the shape of the fix at a high level, deliberately before any implementation detail."
   },
   {
-   "id": "aih_to_spec_user_stories",
+   "id": "aih_to_spec_user_stories","_origin":"semantic",
    "label": "User stories section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -122,7 +122,7 @@
    "rationale": "An extensive, numbered list of the concrete behaviours the change must support, each one independently checkable."
   },
   {
-   "id": "aih_to_spec_implementation_decisions",
+   "id": "aih_to_spec_implementation_decisions","_origin":"semantic",
    "label": "Implementation decisions section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -133,7 +133,7 @@
    "rationale": "Records the choices already settled during the conversation so that they are not relitigated later."
   },
   {
-   "id": "aih_to_spec_testing_decisions",
+   "id": "aih_to_spec_testing_decisions","_origin":"semantic",
    "label": "Testing decisions section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -144,7 +144,7 @@
    "rationale": "Names the seams the feature will be tested at and what 'done' looks like for the change."
   },
   {
-   "id": "aih_to_spec_out_of_scope",
+   "id": "aih_to_spec_out_of_scope","_origin":"semantic",
    "label": "Out-of-scope items section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -155,7 +155,7 @@
    "rationale": "States what the change deliberately does NOT cover, in order to keep the resulting ticket bounded."
   },
   {
-   "id": "aih_to_spec_further_notes",
+   "id": "aih_to_spec_further_notes","_origin":"semantic",
    "label": "Further notes section",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -166,7 +166,7 @@
    "rationale": "A catch-all for anything else worth carrying forward that does not fit the spec's other sections."
   },
   {
-   "id": "aih_to_spec_seams",
+   "id": "aih_to_spec_seams","_origin":"semantic",
    "label": "Test seams",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -177,7 +177,7 @@
    "rationale": "The interfaces at which the feature will be tested. Before writing the spec, `to-spec` sketches these seams and checks them with the user."
   },
   {
-   "id": "aih_to_spec_deep_modules",
+   "id": "aih_to_spec_deep_modules","_origin":"semantic",
    "label": "Deep module opportunities",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -188,7 +188,7 @@
    "rationale": "A deep module is a lot of functionality hidden behind a small, stable interface. `to-spec` looks for these opportunities before writing the spec."
   },
   {
-   "id": "aih_to_spec_fewest_highest_seams",
+   "id": "aih_to_spec_fewest_highest_seams","_origin":"semantic",
    "label": "Prefer existing and highest seams",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -199,7 +199,7 @@
    "rationale": "The seam-selection rule: prefer existing seams to new ones, and prefer the highest seam possible — ideally just one across the whole change."
   },
   {
-   "id": "aih_to_spec_durable_test_targets",
+   "id": "aih_to_spec_durable_test_targets","_origin":"semantic",
    "label": "Durable test targets for agentic development",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -210,7 +210,7 @@
    "rationale": "Why seams and deep modules matter for agentic development: a good interface gives tests something durable to target, so the code underneath can change without the tests having to move."
   },
   {
-   "id": "aih_to_spec_working_if_signals",
+   "id": "aih_to_spec_working_if_signals","_origin":"semantic",
    "label": "\"It's working if\" signals",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -221,7 +221,7 @@
    "rationale": "Three success signals for a `to-spec` run: it starts writing the spec instead of asking a fresh round of questions; it checks the seams with you before writing and proposes as few as possible; and the spec comes back in your project's domain vocabulary, not generic boilerplate."
   },
   {
-   "id": "aih_to_spec_domain_vocabulary",
+   "id": "aih_to_spec_domain_vocabulary","_origin":"semantic",
    "label": "Project domain vocabulary",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -232,7 +232,7 @@
    "rationale": "The spec must come back in the project's own domain vocabulary rather than generic boilerplate; the problem statement in particular is written in the project's own words."
   },
   {
-   "id": "aih_to_spec_build_chain",
+   "id": "aih_to_spec_build_chain","_origin":"semantic",
    "label": "Main build chain",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -243,7 +243,7 @@
    "rationale": "The main build chain is grill-with-docs -> to-spec -> to-tickets -> implement -> code-review. `to-spec` sits after the plan and domain language are resolved and before the work is broken into implementation tickets."
   },
   {
-   "id": "aih_to_spec_grill_with_docs",
+   "id": "aih_to_spec_grill_with_docs","_origin":"semantic",
    "label": "grill-with-docs skill",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -254,7 +254,7 @@
    "rationale": "The neighbour that runs before `to-spec`: it sharpens the context and does the alignment interview so the resulting spec is precise. Use it if you have not aligned yet."
   },
   {
-   "id": "aih_to_spec_to_tickets",
+   "id": "aih_to_spec_to_tickets","_origin":"semantic",
    "label": "to-tickets skill",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -265,7 +265,7 @@
    "rationale": "The neighbour that runs after `to-spec`: it splits the finished spec into a set of implementation tickets."
   },
   {
-   "id": "aih_to_spec_implement",
+   "id": "aih_to_spec_implement","_origin":"semantic",
    "label": "implement skill",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -276,7 +276,7 @@
    "rationale": "The build-chain step that consumes the tickets produced by `to-tickets` and builds the change."
   },
   {
-   "id": "aih_to_spec_code_review",
+   "id": "aih_to_spec_code_review","_origin":"semantic",
    "label": "code-review skill",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -287,7 +287,7 @@
    "rationale": "The terminal step of the main build chain, running after `implement`."
   },
   {
-   "id": "aih_to_spec_ask_matt",
+   "id": "aih_to_spec_ask_matt","_origin":"semantic",
    "label": "ask-matt router",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -298,7 +298,7 @@
    "rationale": "When you are unsure which skill or flow fits, `ask-matt` routes you to the right one."
   },
   {
-   "id": "aih_to_spec_install_command",
+   "id": "aih_to_spec_install_command","_origin":"semantic",
    "label": "npx skills add/update install",
    "file_type": "concept",
    "source_file": "aihero-skills-to-spec.md",
@@ -309,7 +309,7 @@
    "rationale": "The skill is installed with `npx skills add mattpocock/skills --skill=to-spec` and refreshed with `npx skills update to-spec`; the source lives in mattpocock/skills under skills/engineering/to-spec."
   },
   {
-   "id": "aih_wayfinder_skill",
+   "id": "aih_wayfinder_skill","_origin":"semantic",
    "label": "/wayfinder skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -320,7 +320,7 @@
    "rationale": "`wayfinder` takes an effort too big for one agent session — wrapped in fog, where the way from here to the goal isn't visible yet — and charts it as a shared map of decision tickets on the repo's issue tracker, then resolves them one at a time until the way is clear."
   },
   {
-   "id": "aih_wayfinder_install_command",
+   "id": "aih_wayfinder_install_command","_origin":"semantic",
    "label": "npx skills add wayfinder",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -331,7 +331,7 @@
    "rationale": "The skill is installed with `npx skills add mattpocock/skills --skill=wayfinder` and refreshed with `npx skills update wayfinder`."
   },
   {
-   "id": "aih_wayfinder_source_repo",
+   "id": "aih_wayfinder_source_repo","_origin":"semantic",
    "label": "mattpocock/skills repository",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -342,7 +342,7 @@
    "rationale": "The skill's source lives at https://github.com/mattpocock/skills/tree/main/skills/engineering/wayfinder, under the engineering skills of the mattpocock/skills repo."
   },
   {
-   "id": "aih_wayfinder_shared_map",
+   "id": "aih_wayfinder_shared_map","_origin":"semantic",
    "label": "The shared map (wayfinder:map issue)",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -353,7 +353,7 @@
    "rationale": "The map is a single `wayfinder:map` issue whose tickets are its child issues — one shared URL the whole team can watch. It is the artifact wayfinder charts, and it is done when nothing is left to decide before someone goes and builds the thing."
   },
   {
-   "id": "aih_wayfinder_decision_ticket",
+   "id": "aih_wayfinder_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -364,7 +364,7 @@
    "rationale": "Every ticket on the map resolves a decision — a question to settle, not a slice of a build to execute. Tickets are the child issues of the `wayfinder:map` issue, and each decision lives in exactly one place: its ticket."
   },
   {
-   "id": "aih_wayfinder_plans_not_does",
+   "id": "aih_wayfinder_plans_not_does","_origin":"semantic",
    "label": "It plans, it doesn't do",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -375,7 +375,7 @@
    "rationale": "Wayfinder produces decisions, not deliverables: every ticket resolves a question to settle rather than a slice of a build to execute, and the map is complete when nothing is left to decide before building starts."
   },
   {
-   "id": "aih_wayfinder_manual_invocation",
+   "id": "aih_wayfinder_manual_invocation","_origin":"semantic",
    "label": "Explicit /wayfinder invocation",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -386,7 +386,7 @@
    "rationale": "You invoke the skill by typing `/wayfinder` — the agent will not reach for it on its own."
   },
   {
-   "id": "aih_wayfinder_too_big_for_one_session",
+   "id": "aih_wayfinder_too_big_for_one_session","_origin":"semantic",
    "label": "Effort bigger than one agent session, still foggy",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -397,7 +397,7 @@
    "rationale": "The trigger condition: reach for wayfinder when an effort is more than one agent session can hold and the route to its destination is still foggy — you can feel the shape of the work but can't yet write it down as a spec or a plan."
   },
   {
-   "id": "aih_wayfinder_destination",
+   "id": "aih_wayfinder_destination","_origin":"semantic",
    "label": "Destination",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -408,7 +408,7 @@
    "rationale": "Naming the destination is the first act — before any ticket exists — because it fixes the scope every ticket is measured against. Fog only gathers toward the destination."
   },
   {
-   "id": "aih_wayfinder_fog",
+   "id": "aih_wayfinder_fog","_origin":"semantic",
    "label": "Fog of war",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -419,7 +419,7 @@
    "rationale": "Beyond the live tickets lies the fog of war — decisions you can tell are coming but can't yet pin down. Resolving a ticket clears the fog ahead of it."
   },
   {
-   "id": "aih_wayfinder_frontier",
+   "id": "aih_wayfinder_frontier","_origin":"semantic",
    "label": "Frontier",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -430,7 +430,7 @@
    "rationale": "The frontier is the open, unblocked, unclaimed tickets — the edge of the known — and it is what the tracker's native blocking renders visually, so you see what's takeable without opening the map."
   },
   {
-   "id": "aih_wayfinder_graduating",
+   "id": "aih_wayfinder_graduating","_origin":"semantic",
    "label": "Graduating fog into tickets",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -441,7 +441,7 @@
    "rationale": "Resolving a ticket clears the fog ahead of it, graduating whatever is now specifiable into fresh tickets. Work ruled out of scope is closed and never graduates."
   },
   {
-   "id": "aih_wayfinder_out_of_scope",
+   "id": "aih_wayfinder_out_of_scope","_origin":"semantic",
    "label": "Out of scope",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -452,7 +452,7 @@
    "rationale": "Fog only gathers toward the destination; work past the destination is ruled out of scope, closed, and never graduates into a ticket."
   },
   {
-   "id": "aih_wayfinder_index_not_store",
+   "id": "aih_wayfinder_index_not_store","_origin":"semantic",
    "label": "The map is an index, not a store",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -463,7 +463,7 @@
    "rationale": "Each decision lives in exactly one place — its ticket — and the map only gists and links, never restates. That single-home rule is what makes the map an index rather than a store."
   },
   {
-   "id": "aih_wayfinder_low_resolution_load",
+   "id": "aih_wayfinder_low_resolution_load","_origin":"semantic",
    "label": "Load low-resolution, zoom on demand",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -474,7 +474,7 @@
    "rationale": "A session loads the map at low resolution and zooms into individual tickets on demand, rather than pulling every decision's detail into context at once."
   },
   {
-   "id": "aih_wayfinder_precise_question_test",
+   "id": "aih_wayfinder_precise_question_test","_origin":"semantic",
    "label": "Can you state the question precisely now?",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -485,7 +485,7 @@
    "rationale": "The test for whether something is a ticket or still fog is whether you can state the question precisely now — not whether you can answer it."
   },
   {
-   "id": "aih_wayfinder_hitl_ticket",
+   "id": "aih_wayfinder_hitl_ticket","_origin":"semantic",
    "label": "HITL ticket (human in the loop)",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -496,7 +496,7 @@
    "rationale": "A HITL ticket (grilling, prototype) resolves only through a live exchange with a human, so the agent never answers its own questions."
   },
   {
-   "id": "aih_wayfinder_afk_ticket",
+   "id": "aih_wayfinder_afk_ticket","_origin":"semantic",
    "label": "AFK ticket (agent alone)",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -507,7 +507,7 @@
    "rationale": "An AFK ticket is one the agent can resolve alone — research is the example. Research stays a real ticket, a shared blocker downstream decisions hang on, but it does not need a live human exchange."
   },
   {
-   "id": "aih_wayfinder_research_subagent",
+   "id": "aih_wayfinder_research_subagent","_origin":"semantic",
    "label": "/research subagent fan-out",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -518,7 +518,7 @@
    "rationale": "Because a research ticket is AFK, a session does not stop and read: it fires a `/research` subagent to burn the ticket down in parallel, keeping the frontier fast."
   },
   {
-   "id": "aih_wayfinder_research_branch",
+   "id": "aih_wayfinder_research_branch","_origin":"semantic",
    "label": "throwaway research/<name> branch",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -529,7 +529,7 @@
    "rationale": "The research subagent captures its findings on a throwaway `research/<name>` branch."
   },
   {
-   "id": "aih_wayfinder_one_ticket_per_session",
+   "id": "aih_wayfinder_one_ticket_per_session","_origin":"semantic",
    "label": "At most one ticket per session",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -540,7 +540,7 @@
    "rationale": "A session resolves at most one ticket (research tickets excepted), records the answer as a resolution comment, closes the ticket, and appends a one-line pointer to Decisions so far."
   },
   {
-   "id": "aih_wayfinder_decisions_so_far",
+   "id": "aih_wayfinder_decisions_so_far","_origin":"semantic",
    "label": "Decisions so far log",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -551,7 +551,7 @@
    "rationale": "Each resolved ticket appends a one-line pointer to a running 'Decisions so far' list — a pointer, consistent with the map gisting and linking rather than restating."
   },
   {
-   "id": "aih_wayfinder_ticket_naming",
+   "id": "aih_wayfinder_ticket_naming","_origin":"semantic",
    "label": "Refer to tickets by name, never a bare #42",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -562,7 +562,7 @@
    "rationale": "One map is one `wayfinder:map` issue; its tickets are its child issues and are referred to by name, never by a bare `#42`."
   },
   {
-   "id": "aih_wayfinder_no_fog_stop",
+   "id": "aih_wayfinder_no_fog_stop","_origin":"semantic",
    "label": "No fog means stop and skip the map",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -573,7 +573,7 @@
    "rationale": "If the opening grill surfaces no fog, wayfinder stops and tells you the journey is small enough to skip the map entirely."
   },
   {
-   "id": "aih_wayfinder_issue_tracker",
+   "id": "aih_wayfinder_issue_tracker","_origin":"semantic",
    "label": "Repo issue tracker",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -584,7 +584,7 @@
    "rationale": "The map and its tickets live on the repo's issue tracker (GitHub, GitLab, or local-markdown), which is what gives the effort one shared URL and native blocking semantics."
   },
   {
-   "id": "aih_wayfinder_wayfinding_operations_doc",
+   "id": "aih_wayfinder_wayfinding_operations_doc","_origin":"semantic",
    "label": "Wayfinding operations tracker doc",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -595,7 +595,7 @@
    "rationale": "A 'Wayfinding operations' section in the tracker doc describes how the map, child tickets, blocking, and frontier queries are expressed for GitHub, GitLab, or local-markdown. Wayfinder needs this wiring."
   },
   {
-   "id": "aih_wayfinder_setup_skill",
+   "id": "aih_wayfinder_setup_skill","_origin":"semantic",
    "label": "setup-matt-pocock-skills",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -606,7 +606,7 @@
    "rationale": "The setup-matt-pocock-skills skill lays down the tracker wiring wayfinder depends on, seeding the 'Wayfinding operations' section into the repo's tracker doc."
   },
   {
-   "id": "aih_wayfinder_local_markdown_fallback",
+   "id": "aih_wayfinder_local_markdown_fallback","_origin":"semantic",
    "label": "Local-markdown map fallback",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -617,7 +617,7 @@
    "rationale": "Absent the tracker doc, wayfinder defaults to a local-markdown map instead of refusing to run."
   },
   {
-   "id": "aih_wayfinder_native_blocking",
+   "id": "aih_wayfinder_native_blocking","_origin":"semantic",
    "label": "Tracker native blocking",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -628,7 +628,7 @@
    "rationale": "The tracker's own blocking relationships render the frontier visually, so what is takeable is visible without opening the map."
   },
   {
-   "id": "aih_wayfinder_to_spec",
+   "id": "aih_wayfinder_to_spec","_origin":"semantic",
    "label": "to-spec skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -639,7 +639,7 @@
    "rationale": "to-spec turns an already-clear thread into a spec. Once wayfinder has pushed the fog back and the way is clear, you hand off to to-spec to schedule the multi-session build (or implement directly if the effort turned out small)."
   },
   {
-   "id": "aih_wayfinder_to_tickets",
+   "id": "aih_wayfinder_to_tickets","_origin":"semantic",
    "label": "to-tickets skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -650,7 +650,7 @@
    "rationale": "to-tickets slices an already-understood plan into buildable tickets. Wayfinder sits upstream of it: wayfinder is what you run when there is too much fog to spec directly."
   },
   {
-   "id": "aih_wayfinder_grilling",
+   "id": "aih_wayfinder_grilling","_origin":"semantic",
    "label": "grilling skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -661,7 +661,7 @@
    "rationale": "Wayfinder leans on grilling to resolve individual tickets, and the opening grill is what determines whether there is any fog at all."
   },
   {
-   "id": "aih_wayfinder_domain_modeling",
+   "id": "aih_wayfinder_domain_modeling","_origin":"semantic",
    "label": "domain-modeling skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -672,7 +672,7 @@
    "rationale": "Wayfinder leans on domain-modeling, alongside grilling, to resolve individual decision tickets."
   },
   {
-   "id": "aih_wayfinder_prototype",
+   "id": "aih_wayfinder_prototype","_origin":"semantic",
    "label": "prototype skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -683,7 +683,7 @@
    "rationale": "Wayfinder uses prototype for the ticket types that need it; prototype is named as one of the HITL ticket kinds."
   },
   {
-   "id": "aih_wayfinder_research_skill",
+   "id": "aih_wayfinder_research_skill","_origin":"semantic",
    "label": "research skill",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -694,7 +694,7 @@
    "rationale": "Wayfinder uses the research skill for tickets that need it; research is the canonical AFK ticket type, dispatched as a subagent rather than resolved inline."
   },
   {
-   "id": "aih_wayfinder_ask_matt",
+   "id": "aih_wayfinder_ask_matt","_origin":"semantic",
    "label": "ask-matt router",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -705,7 +705,7 @@
    "rationale": "When you are unsure which skill or flow fits, ask-matt routes you to the right one."
   },
   {
-   "id": "aih_wayfinder_on_ramp",
+   "id": "aih_wayfinder_on_ramp","_origin":"semantic",
    "label": "Big-idea on-ramp to the main build flow",
    "file_type": "concept",
    "source_file": "aihero-skills-wayfinder.md",
@@ -716,7 +716,7 @@
    "rationale": "Wayfinder is a big-idea on-ramp: an effort too large and foggy to spec in one sitting generates a cleared map of decisions, which then merges onto the main build flow."
   },
   {
-   "id": "mps_adr_plugin_decision",
+   "id": "mps_adr_plugin_decision","_origin":"semantic",
    "label": "ADR 0002 decision: ship Claude plugin, defer Codex plugin",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -727,7 +727,7 @@
    "rationale": "The ADR decides to ship the native Claude Code plugin now as the headline v1.2 deliverable, keep skills.sh as the universal installer, and defer a native Codex plugin. The split is forced by how each ecosystem's plugin manifest selects skills against this repo's bucketed layout."
   },
   {
-   "id": "mps_adr_plugin_claude_code_plugin",
+   "id": "mps_adr_plugin_claude_code_plugin","_origin":"semantic",
    "label": "Native Claude Code plugin",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -738,7 +738,7 @@
    "rationale": "The shipped plugin consists of `.claude-plugin/plugin.json` plus `.claude-plugin/marketplace.json`, curated to exactly the promoted skill set. It is the plug-and-play, read-only, always-current distribution the ADR delivers."
   },
   {
-   "id": "mps_adr_plugin_codex_plugin_deferred",
+   "id": "mps_adr_plugin_codex_plugin_deferred","_origin":"semantic",
    "label": "Deferred native Codex plugin",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -749,7 +749,7 @@
    "rationale": "A native Codex plugin (`.codex-plugin/plugin.json`) is deferred until the project decides between restructuring `skills/` to promoted-only versus committing a generated flat copy. Both are structural decisions the ADR declines to bundle into shipping the Claude plugin."
   },
   {
-   "id": "mps_adr_plugin_skills_sh_installer",
+   "id": "mps_adr_plugin_skills_sh_installer","_origin":"semantic",
    "label": "skills.sh universal installer",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -760,7 +760,7 @@
    "rationale": "`npx skills add mattpocock/skills` copies editable skill files into a user's project across Claude Code, Codex, and other Agent-Skills-standard harnesses. It is kept as the universal installer, so no Codex user is left without an install path."
   },
   {
-   "id": "mps_adr_plugin_plug_and_play_request",
+   "id": "mps_adr_plugin_plug_and_play_request","_origin":"semantic",
    "label": "Plug-and-play distribution request",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -771,7 +771,7 @@
    "rationale": "A recurring user request is to subscribe to the skill set as a read-only, always-current bundle you don't edit, rather than a fork you own. Native plugin systems are exactly what provide that."
   },
   {
-   "id": "mps_adr_plugin_constraint",
+   "id": "mps_adr_plugin_constraint","_origin":"semantic",
    "label": "Constraint: bucketed skills vs single-path selection",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -782,7 +782,7 @@
    "rationale": "The governing constraint is that a plugin must expose only the promoted skills, which span two bucket folders, while each harness's manifest selects skills differently. Claude Code can name explicit paths; Codex cannot express a curated subset of a bucketed repo."
   },
   {
-   "id": "mps_adr_plugin_bucketed_layout",
+   "id": "mps_adr_plugin_bucketed_layout","_origin":"semantic",
    "label": "Bucketed skills layout",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -793,7 +793,7 @@
    "rationale": "Skills live in bucket folders under `skills/`. Some buckets are promoted (shipped) and some are not, so any plugin manifest must select across folders rather than take the tree wholesale."
   },
   {
-   "id": "mps_adr_plugin_promoted_buckets",
+   "id": "mps_adr_plugin_promoted_buckets","_origin":"semantic",
    "label": "Promoted buckets (engineering, productivity)",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -804,7 +804,7 @@
    "rationale": "`engineering/` and `productivity/` are the promoted (shipped) bucket folders. The promoted set spans these two folders, which is precisely why a single-path manifest cannot express it."
   },
   {
-   "id": "mps_adr_plugin_non_promoted_buckets",
+   "id": "mps_adr_plugin_non_promoted_buckets","_origin":"semantic",
    "label": "Non-promoted buckets (misc, personal, in-progress, deprecated)",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -815,7 +815,7 @@
    "rationale": "`misc/`, `personal/`, `in-progress/`, and `deprecated/` are not promoted: retired, draft, and personal skills that are deliberately not shipped. The local dev workflow relies on `in-progress/` and `personal/` existing under `skills/`."
   },
   {
-   "id": "mps_adr_plugin_skills_array_selection",
+   "id": "mps_adr_plugin_skills_array_selection","_origin":"semantic",
    "label": "Claude plugin.json skills array of explicit paths",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -826,7 +826,7 @@
    "rationale": "`.claude-plugin/plugin.json` accepts `skills` as an array of explicit skill-directory paths. That lets the promoted skills be listed one by one and everything else excluded with zero ambiguity."
   },
   {
-   "id": "mps_adr_plugin_codex_single_path",
+   "id": "mps_adr_plugin_codex_single_path","_origin":"semantic",
    "label": "Codex plugin.json single-path skills field",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -837,7 +837,7 @@
    "rationale": "`.codex-plugin/plugin.json` accepts `skills` only as a single path string — arrays are rejected with `missing or invalid plugin.json` — and Codex discovers `SKILL.md` files recursively under it. There is no way to name two bucket folders, or to curate a subset, from one path."
   },
   {
-   "id": "mps_adr_plugin_marketplace_manifest",
+   "id": "mps_adr_plugin_marketplace_manifest","_origin":"semantic",
    "label": "marketplace.json single-plugin marketplace",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -848,7 +848,7 @@
    "rationale": "`.claude-plugin/marketplace.json` is added so the repo is its own single-plugin marketplace, making `marketplace add` → `install` the distribution path."
   },
   {
-   "id": "mps_adr_plugin_validation_verified",
+   "id": "mps_adr_plugin_validation_verified","_origin":"semantic",
    "label": "End-to-end plugin verification",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -859,7 +859,7 @@
    "rationale": "The Claude plugin was verified end to end: `claude plugin validate . --strict` passes, and `marketplace add` followed by `install` resolves all promoted skills."
   },
   {
-   "id": "mps_adr_plugin_escape_hatches_rejected",
+   "id": "mps_adr_plugin_escape_hatches_rejected","_origin":"semantic",
    "label": "Two Codex escape hatches tested and rejected",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -870,7 +870,7 @@
    "rationale": "Two escape hatches around Codex's single-path `skills` field were tested and rejected: pointing at `./skills/` wholesale, and a curated flat directory of symlinks into the buckets."
   },
   {
-   "id": "mps_adr_plugin_rejected_whole_skills_dir",
+   "id": "mps_adr_plugin_rejected_whole_skills_dir","_origin":"semantic",
    "label": "Rejected: point Codex at ./skills/",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -881,7 +881,7 @@
    "rationale": "Pointing Codex's single path at `./skills/` would also ship `deprecated/`, `in-progress/`, `personal/`, and `misc/` — retired, draft, and personal skills that are deliberately not promoted."
   },
   {
-   "id": "mps_adr_plugin_rejected_symlink_dir",
+   "id": "mps_adr_plugin_rejected_symlink_dir","_origin":"semantic",
    "label": "Rejected: curated flat directory of symlinks",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -892,7 +892,7 @@
    "rationale": "A curated flat directory of symlinks into the buckets does not survive install: Codex copies the plugin tree into its cache and drops symlinks, so the skills arrive empty."
   },
   {
-   "id": "mps_adr_plugin_option_restructure",
+   "id": "mps_adr_plugin_option_restructure","_origin":"semantic",
    "label": "Option A: restructure skills/ to promoted-only",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -903,7 +903,7 @@
    "rationale": "One robust way to give Codex a single promoted-only path is to restructure so `skills/` contains only promoted skills, moving the non-promoted buckets out. Blast radius is large: `CLAUDE.md`, `scripts/link-skills.sh`, the bucket READMEs, and the local dev workflow relying on `in-progress/` and `personal/`."
   },
   {
-   "id": "mps_adr_plugin_option_duplicate_copies",
+   "id": "mps_adr_plugin_option_duplicate_copies","_origin":"semantic",
    "label": "Option B: commit duplicate flat copies",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -914,7 +914,7 @@
    "rationale": "The other robust way is to commit duplicate copies of the promoted skills into a flat directory. That imposes a sync burden and creates a second source of truth."
   },
   {
-   "id": "mps_adr_plugin_revisit_trigger",
+   "id": "mps_adr_plugin_revisit_trigger","_origin":"semantic",
    "label": "Revisit trigger for the Codex plugin",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -925,7 +925,7 @@
    "rationale": "The deferral is revisited when Codex either supports a `skills` array / include-list, or preserves symlinks on install. Either change removes the single-path constraint that forced the deferral."
   },
   {
-   "id": "mps_adr_plugin_invariant_entry_per_skill",
+   "id": "mps_adr_plugin_invariant_entry_per_skill","_origin":"semantic",
    "label": "Invariant: every promoted skill has a plugin.json entry",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -936,7 +936,7 @@
    "rationale": "Every promoted skill must have an entry in `.claude-plugin/plugin.json`'s `skills` array. This already stood as a `CLAUDE.md` rule; it now also gates the plugin's contents."
   },
   {
-   "id": "mps_adr_plugin_invariant_version_sync",
+   "id": "mps_adr_plugin_invariant_version_sync","_origin":"semantic",
    "label": "Invariant: plugin version tracks package.json version",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -947,7 +947,7 @@
    "rationale": "`.claude-plugin/plugin.json`'s `version` tracks `package.json`'s version, and both must be bumped together on release."
   },
   {
-   "id": "mps_adr_plugin_update_signal",
+   "id": "mps_adr_plugin_update_signal","_origin":"semantic",
    "label": "Plugin version as the user update signal",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -958,7 +958,7 @@
    "rationale": "Claude uses the plugin `version` to decide when installed users see an update, which is why the version-sync invariant matters at release time."
   },
   {
-   "id": "mps_adr_plugin_historical_reason",
+   "id": "mps_adr_plugin_historical_reason","_origin":"semantic",
    "label": "Half-remembered reason no plugin shipped earlier",
    "file_type": "concept",
    "source_file": "0002-ship-as-a-claude-code-plugin.md",
@@ -969,7 +969,7 @@
    "rationale": "The ADR notes this is very likely the original, half-remembered reason a plugin wasn't shipped earlier: the manifest formats didn't cleanly express a curated subset of a bucketed repo."
   },
   {
-   "id": "mps_changelog_dual_harness_metadata",
+   "id": "mps_changelog_dual_harness_metadata","_origin":"semantic",
    "label": "Dual-harness skill metadata",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -980,7 +980,7 @@
    "rationale": "Codex metadata is carried alongside each skill's Claude Code frontmatter so one skill set works in both harnesses without generated copies. The decision is explicitly against duplicating skills per harness."
   },
   {
-   "id": "mps_changelog_openai_agents_yaml",
+   "id": "mps_changelog_openai_agents_yaml","_origin":"semantic",
    "label": "agents/openai.yaml beside every SKILL.md",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -991,7 +991,7 @@
    "rationale": "An `agents/openai.yaml` file sits beside every `SKILL.md` carrying Codex UI metadata (`interface.display_name`, `interface.short_description`), so Codex renders the skill without a separate generated copy."
   },
   {
-   "id": "mps_changelog_allow_implicit_invocation_false",
+   "id": "mps_changelog_allow_implicit_invocation_false","_origin":"semantic",
    "label": "policy.allow_implicit_invocation: false",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1002,7 +1002,7 @@
    "rationale": "Every user-invoked skill is marked `policy.allow_implicit_invocation: false` — the Codex analog of Claude Code's `disable-model-invocation: true` — so Codex excludes it from implicit invocation while explicit `$skill` invocation still works."
   },
   {
-   "id": "mps_changelog_agents_md_symlink",
+   "id": "mps_changelog_agents_md_symlink","_origin":"semantic",
    "label": "AGENTS.md as a symlink to CLAUDE.md",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1013,7 +1013,7 @@
    "rationale": "`AGENTS.md` is a symlink to `CLAUDE.md` so Codex reads exactly the same repo instructions rather than a second file that can drift."
   },
   {
-   "id": "mps_changelog_invocation_doc",
+   "id": "mps_changelog_invocation_doc","_origin":"semantic",
    "label": "Dual-harness invocation model documented",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1024,7 +1024,7 @@
    "rationale": "The dual-harness invocation model is documented in `.agents/invocation.md`, `CLAUDE.md`, and the promoted-bucket READMEs, so the Claude/Codex equivalence is stated in the places a reader actually starts."
   },
   {
-   "id": "mps_changelog_prototype_primary_source",
+   "id": "mps_changelog_prototype_primary_source","_origin":"semantic",
    "label": "The prototype is a primary source",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1035,7 +1035,7 @@
    "rationale": "Rather than being deleted once it has answered its question, a prototype is captured as runnable evidence on a throwaway `prototype/<name>` branch off main, with a context pointer left on the implementation issue. Main keeps only the validated decision while the exploration stays findable; the answer (verdict + question) is still captured durably in an issue/ADR/commit."
   },
   {
-   "id": "mps_changelog_throwaway_branch_context_pointer",
+   "id": "mps_changelog_throwaway_branch_context_pointer","_origin":"semantic",
    "label": "Throwaway branch plus context pointer",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1046,7 +1046,7 @@
    "rationale": "The recurring artifact pattern: exploratory output lives on a throwaway branch (`prototype/<name>`, `research/<name>`) out of main, with a context pointer left on the relevant ticket, so main carries only validated decisions while the evidence remains findable."
   },
   {
-   "id": "mps_changelog_claude_code_plugin",
+   "id": "mps_changelog_claude_code_plugin","_origin":"semantic",
    "label": "Ship the skill set as a native Claude Code plugin",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1057,7 +1057,7 @@
    "rationale": "The skills ship as a native Claude Code plugin so users can subscribe to the promoted skills as a managed, read-only bundle instead of copying editable files (`/plugin marketplace add mattpocock/skills`, `/plugin install mattpocock-skills@mattpocock`)."
   },
   {
-   "id": "mps_changelog_single_plugin_marketplace",
+   "id": "mps_changelog_single_plugin_marketplace","_origin":"semantic",
    "label": "Repo is its own single-plugin marketplace",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1068,7 +1068,7 @@
    "rationale": "`.claude-plugin/plugin.json` gains full marketplace metadata (version, description, author, license, keywords) and a sibling `.claude-plugin/marketplace.json` lists the single plugin, so the repo is simultaneously the plugin and the marketplace that serves it."
   },
   {
-   "id": "mps_changelog_skills_sh_installer",
+   "id": "mps_changelog_skills_sh_installer","_origin":"semantic",
    "label": "skills.sh remains the universal installer",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1079,7 +1079,7 @@
    "rationale": "`skills.sh` stays the universal installer and is the installation path for Codex and other harnesses today, so adopting a Claude-native plugin does not strand non-Claude users."
   },
   {
-   "id": "mps_changelog_codex_plugin_deferred",
+   "id": "mps_changelog_codex_plugin_deferred","_origin":"semantic",
    "label": "Native Codex plugin deferred (ADR 0002)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1090,7 +1090,7 @@
    "rationale": "A native Codex plugin is deliberately deferred; the reasoning is recorded in `.agents/adr/0002-ship-as-a-claude-code-plugin.md` rather than left implicit in the release."
   },
   {
-   "id": "mps_changelog_wayfinder_research_subagents",
+   "id": "mps_changelog_wayfinder_research_subagents","_origin":"semantic",
    "label": "Wayfinder burns research tickets down with subagents",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1101,7 +1101,7 @@
    "rationale": "Because research is AFK, charting does not stop and read it: after creating tickets the charting session fires a `/research` subagent per research ticket to burn them down in parallel, capturing findings on a throwaway `research/<name>` branch with a context pointer, instead of parking them for a separately-launched session."
   },
   {
-   "id": "mps_changelog_research_ticket_type",
+   "id": "mps_changelog_research_ticket_type","_origin":"semantic",
    "label": "Research ticket type",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1112,7 +1112,7 @@
    "rationale": "Research stays a real wayfinder ticket type because it is a genuine shared blocker that downstream decisions hang on — and that dependency is exactly what the frontier's blocking edges exist to render."
   },
   {
-   "id": "mps_changelog_one_ticket_per_session",
+   "id": "mps_changelog_one_ticket_per_session","_origin":"semantic",
    "label": "One ticket per session",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1123,7 +1123,7 @@
    "rationale": "Wayfinder's default working rule is one ticket per session; research tickets are named as the single explicit exception, since they are resolved by parallel subagents during charting."
   },
   {
-   "id": "mps_changelog_blocking_edges",
+   "id": "mps_changelog_blocking_edges","_origin":"semantic",
    "label": "Blocking edges render the frontier",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1134,7 +1134,7 @@
    "rationale": "Each ticket declares its blocking edges; any ticket whose blockers are done is on the frontier, so several agents can run at once. The edges live in the ticket regardless of tracker — the medium only decides whether anything acts on them in parallel."
   },
   {
-   "id": "mps_changelog_yagni_scoping_filter",
+   "id": "mps_changelog_yagni_scoping_filter","_origin":"semantic",
    "label": "YAGNI scoping filter on Explore",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1145,7 +1145,7 @@
    "rationale": "Instead of scanning the whole repo evenly, the Explore step scopes to where change is actually landing: it takes a named direction, otherwise reads the last ~20 commit messages to bias exploration toward actively-developed paths. A deepening opportunity in code nobody touches is a refactor you will never cash in."
   },
   {
-   "id": "mps_changelog_improve_codebase_architecture",
+   "id": "mps_changelog_improve_codebase_architecture","_origin":"semantic",
    "label": "improve-codebase-architecture skill",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1156,7 +1156,7 @@
    "rationale": "The architecture-improvement skill no longer carries its own vocabulary: it draws architecture language from `/codebase-design` and its domain model from `/domain-modeling`, and its Explore step is YAGNI-scoped to actively-developed paths."
   },
   {
-   "id": "mps_changelog_ask_matt_router",
+   "id": "mps_changelog_ask_matt_router","_origin":"semantic",
    "label": "ask-matt router",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1167,7 +1167,7 @@
    "rationale": "`ask-matt` is a user-invoked router that points you at the right skill or flow for your situation. Breaking by design: it routes over the other user-invoked skills in the repo, so it expects them to be installed."
   },
   {
-   "id": "mps_changelog_router_maintenance_rule",
+   "id": "mps_changelog_router_maintenance_rule","_origin":"semantic",
    "label": "Router re-check maintenance rule",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1178,7 +1178,7 @@
    "rationale": "A maintenance rule in `CLAUDE.md` makes any future skill add/rename/remove or flow change trigger an `ask-matt` re-check, beside the existing docs-page re-sync rule — a router that never mentions a new skill, or still routes to a dead one, is a router that lies."
   },
   {
-   "id": "mps_changelog_wayfinder_overreach_guard",
+   "id": "mps_changelog_wayfinder_overreach_guard","_origin":"semantic",
    "label": "Wayfinder is the heaviest flow — do not over-reach for it",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1189,7 +1189,7 @@
    "rationale": "The router flags wayfinder as the heaviest, most cognitively demanding flow — slower and denser than a single grill — and reserves it for the idea that genuinely will not fit one session. A well-scoped feature belongs on `/grill-with-docs` instead."
   },
   {
-   "id": "mps_changelog_wayfinder_handoff_to_spec",
+   "id": "mps_changelog_wayfinder_handoff_to_spec","_origin":"semantic",
    "label": "Wayfinder hands off at /to-spec, it does not build",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1200,7 +1200,7 @@
    "rationale": "When the map clears, wayfinder merges onto the main flow at `/to-spec`, which collapses the map's linked decisions into a buildable plan, rather than looping the map straight into `/implement`. Straight-to-`/implement` is only for efforts that turned out genuinely small."
   },
   {
-   "id": "mps_changelog_setup_skill_simplification",
+   "id": "mps_changelog_setup_skill_simplification","_origin":"semantic",
    "label": "setup-matt-pocock-skills asks fewer, conditional questions",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1211,7 +1211,7 @@
    "rationale": "Setup is made friendlier: triage labels are asked about only when the `triage` skill is installed and then as one recommended-yes question; domain docs default to single-context without asking, with multi-context offered only on monorepo signals; external PRs stop being a setup question."
   },
   {
-   "id": "mps_changelog_one_file_per_ticket",
+   "id": "mps_changelog_one_file_per_ticket","_origin":"semantic",
    "label": "One markdown file per ticket",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1222,7 +1222,7 @@
    "rationale": "Local-markdown tickets are one file per ticket under `.scratch/<feature>/issues/<NN>-<slug>.md` — never a single combined `tickets.md` — and the spec file is `spec.md` (not `PRD.md`) so `/to-tickets` and the local issue-tracker template agree with `/to-spec`."
   },
   {
-   "id": "mps_changelog_external_prs_toggle",
+   "id": "mps_changelog_external_prs_toggle","_origin":"semantic",
    "label": "External PRs as a request surface (a toggle, not a question)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1233,7 +1233,7 @@
    "rationale": "Treating external PRs as a request surface is no longer a setup question: the GitHub/GitLab templates carry the flag defaulted off, and a user can flip it in `docs/agents/issue-tracker.md` later."
   },
   {
-   "id": "mps_changelog_grilling_general_use",
+   "id": "mps_changelog_grilling_general_use","_origin":"semantic",
    "label": "Grilling reworded for general use",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1244,7 +1244,7 @@
    "rationale": "The `grilling` description and body no longer scope the interview to a software plan (\"this plan\" → \"this\", \"enact the plan\" → \"act on it\", \"exploring the codebase\" → \"exploring the environment\"). The technique is unchanged; it now reads as a stress-test of any plan, decision, or idea."
   },
   {
-   "id": "mps_changelog_decision_ticket",
+   "id": "mps_changelog_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1255,7 +1255,7 @@
    "rationale": "The wayfinder unit is named a decision ticket — a question whose resolution is a decision — because people kept reading it as an ordinary implementation ticket, a slice of a build to execute. `CONTEXT.md` records \"Decision ticket\" as a domain term so the \"avoid: ticket\" guidance no longer contradicts wayfinder's deliberate use of the word."
   },
   {
-   "id": "mps_changelog_code_review_promotion",
+   "id": "mps_changelog_code_review_promotion","_origin":"semantic",
    "label": "code-review promoted and hardened",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1266,7 +1266,7 @@
    "rationale": "The in-progress `review` skill is renamed `code-review` and moved from `in-progress/` into `engineering/`: it ships in the plugin, is listed as Model-invoked in the top-level and Engineering READMEs, gains `docs/engineering/code-review.md`, and `/implement` points at it."
   },
   {
-   "id": "mps_changelog_fowler_smell_baseline",
+   "id": "mps_changelog_fowler_smell_baseline","_origin":"semantic",
    "label": "Always-on Fowler smell baseline",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1277,7 +1277,7 @@
    "rationale": "code-review's Standards axis gains ~12 curated high-signal \"Bad Smells in Code\" inlined into SKILL.md as a fixed baseline alongside whatever the repo documents — not a third axis. Two binding rules keep it safe: a documented repo standard overrides the baseline, and every smell is reported as a judgement call, never a hard violation."
   },
   {
-   "id": "mps_changelog_grilling_confirmation_gate",
+   "id": "mps_changelog_grilling_confirmation_gate","_origin":"semantic",
    "label": "Grilling confirmation gate",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1288,7 +1288,7 @@
    "rationale": "The agent will not enact the plan until the human confirms shared understanding has been reached — turning grilling's existing \"shared understanding\" completion criterion into an explicit stop-gate."
   },
   {
-   "id": "mps_changelog_facts_vs_decisions",
+   "id": "mps_changelog_facts_vs_decisions","_origin":"semantic",
    "label": "Facts vs. decisions",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1299,7 +1299,7 @@
    "rationale": "Grilling splits facts (look them up — explore the codebase) from decisions (put each one to the human and wait). The old blanket \"if a question can be answered by exploring the codebase, explore instead\" was written for the live-human case and, inside a resolve-the-ticket frame, read as license to answer decisions autonomously."
   },
   {
-   "id": "mps_changelog_leading_word",
+   "id": "mps_changelog_leading_word","_origin":"semantic",
    "label": "Leading word recruitment",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1310,7 +1310,7 @@
    "rationale": "Skill descriptions deliberately recruit pretrained \"leading words\" the model already holds — grill, prototype, fog of war/frontier/map, destination, seam, red-green — to sharpen invocation and let the skill drop prose that merely restates what the word already carries."
   },
   {
-   "id": "mps_changelog_negation_failure_mode",
+   "id": "mps_changelog_negation_failure_mode","_origin":"semantic",
    "label": "Negation (the elephant)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1321,7 +1321,7 @@
    "rationale": "Steering by prohibition backfires: naming what NOT to do drags the forbidden behaviour into context and makes it more available, not less (don't think of an elephant). The cure is to prompt the positive."
   },
   {
-   "id": "mps_changelog_negative_space_failure_mode",
+   "id": "mps_changelog_negative_space_failure_mode","_origin":"semantic",
    "label": "Negative Space (the void)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1332,7 +1332,7 @@
    "rationale": "Blindness to the steering done by what a skill leaves out: every decision a skill declines is delegated to the agent's priors rather than left neutral. The cure is to read a draft for its silences and decide each omission deliberately — fill it, or leave it open as a real branch."
   },
   {
-   "id": "mps_changelog_writing_great_skills",
+   "id": "mps_changelog_writing_great_skills","_origin":"semantic",
    "label": "writing-great-skills",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1343,7 +1343,7 @@
    "rationale": "`write-a-skill` is removed and replaced by `writing-great-skills` plus its `GLOSSARY.md` — a reference for the vocabulary and principles that make a skill predictable, hunting no-ops down to the sentence level. Each failure mode is carried as a full glossary entry plus a SKILL.md bullet."
   },
   {
-   "id": "mps_changelog_prototype_model_invoked",
+   "id": "mps_changelog_prototype_model_invoked","_origin":"semantic",
    "label": "prototype made model-invoked",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1354,7 +1354,7 @@
    "rationale": "`prototype` becomes model-invoked so the agent (and other skills) can reach for it autonomously. Its description is rewritten around the leading word prototype — throwaway code that answers a design question — with one trigger per branch: state/logic sanity-check, or UI exploration."
   },
   {
-   "id": "mps_changelog_research_skill",
+   "id": "mps_changelog_research_skill","_origin":"semantic",
    "label": "research skill",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1365,7 +1365,7 @@
    "rationale": "A small model-invoked skill that spins up a background agent to investigate a question against primary sources (official docs, source code, specs, first-party APIs) and leaves a single cited Markdown file where the repo keeps such notes — delegable reading legwork you can grill, plan, or design against."
   },
   {
-   "id": "mps_changelog_wide_refactor",
+   "id": "mps_changelog_wide_refactor","_origin":"semantic",
    "label": "Wide refactor and blast radius",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1376,7 +1376,7 @@
    "rationale": "A wide refactor is a single mechanical change (such as renaming a column) whose blast radius fans across the whole codebase, breaking thousands of call sites at once so no vertical slice can land green."
   },
   {
-   "id": "mps_changelog_expand_contract",
+   "id": "mps_changelog_expand_contract","_origin":"semantic",
    "label": "Expand–contract slicing",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1387,7 +1387,7 @@
    "rationale": "A wide refactor is sliced by expand–contract: expand the new form beside the old, migrate call sites in batches sized by blast radius, then contract the old form away — so CI stays green batch to batch, or, when it cannot, only at a final integrate-and-verify issue."
   },
   {
-   "id": "mps_changelog_vertical_slice",
+   "id": "mps_changelog_vertical_slice","_origin":"semantic",
    "label": "Vertical slice / tracer bullet",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1398,7 +1398,7 @@
    "rationale": "The default ticket shape is a tracer-bullet vertical slice that can land green on its own; the vertical-slice rules are a co-located reference block the drafting step points at, and the idea is also folded into `tdd`'s anti-patterns."
   },
   {
-   "id": "mps_changelog_to_spec_rename",
+   "id": "mps_changelog_to_spec_rename","_origin":"semantic",
    "label": "to-prd renamed to to-spec",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1409,7 +1409,7 @@
    "rationale": "`to-prd` is renamed `to-spec` so \"spec\" is the single through-line term across the planning skills; it still opens with \"you may know this document as a PRD\" for discoverability."
   },
   {
-   "id": "mps_changelog_to_tickets_merge",
+   "id": "mps_changelog_to_tickets_merge","_origin":"semantic",
    "label": "to-plan and to-issues merged into to-tickets",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1420,7 +1420,7 @@
    "rationale": "The planning skills are unified: `to-plan` and `to-issues` merge into one `to-tickets` skill and `to-issues` is deleted. `to-tickets` breaks a plan, spec, or conversation into tickets — tracer-bullet vertical slices, each declaring its blocking edges."
   },
   {
-   "id": "mps_changelog_tracker_medium",
+   "id": "mps_changelog_tracker_medium","_origin":"semantic",
    "label": "The tracker medium decides parallelism, not the artifact",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1431,7 +1431,7 @@
    "rationale": "One ticket artifact reads two ways depending on the configured tracker: a local file writes blocking edges as text worked top-to-bottom by hand; a real tracker writes them as native blocking links so several agents can run the frontier at once. The edges live in the ticket either way."
   },
   {
-   "id": "mps_changelog_native_tracker_relationships",
+   "id": "mps_changelog_native_tracker_relationships","_origin":"semantic",
    "label": "Prefer native sub-issues and blocking links",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1442,7 +1442,7 @@
    "rationale": "Publishing prefers the tracker's native sub-issues for parent → slice and native blocking edges for `Blocked by` where supported, keeping `## Parent` / `## Blocked by` body sections only as a fallback — native links render the frontier in the tracker's own UI so a human sees what is takeable without opening the map."
   },
   {
-   "id": "mps_changelog_main_flow",
+   "id": "mps_changelog_main_flow","_origin":"semantic",
    "label": "Main flow: idea → /to-spec → /to-tickets → /implement",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1453,7 +1453,7 @@
    "rationale": "`ask-matt`'s main flow routes idea → `/to-spec` → `/to-tickets` → `/implement`, with human-facing docs pages at `docs/engineering/to-spec.md` and `docs/engineering/to-tickets.md`."
   },
   {
-   "id": "mps_changelog_wayfinder_situational_onramp",
+   "id": "mps_changelog_wayfinder_situational_onramp","_origin":"semantic",
    "label": "Wayfinder is a situational on-ramp, not the main entry flow",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1464,7 +1464,7 @@
    "rationale": "Wayfinder is settled in the docs as a situational on-ramp; the grill-led idea → ship chain stays the front door, because crowning wayfinder as the default spine is a v2-sized move, not a 1.1. Its concrete triggers are named: a greenfield project or a huge feature build too big for one session."
   },
   {
-   "id": "mps_changelog_wayfinder_graduation",
+   "id": "mps_changelog_wayfinder_graduation","_origin":"semantic",
    "label": "decision-mapping renamed and graduated to wayfinder",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1475,7 +1475,7 @@
    "rationale": "`decision-mapping` is renamed `wayfinder` and moves out of `in-progress/` into `engineering/` as a mature skill. \"Decision map\" was jargony and inaccurate — only one ticket type is actually a decision — so the reframe charts a route through a foggy problem, giving one coherent leading-word frame: fog of war, frontier, the map."
   },
   {
-   "id": "mps_changelog_destination_field",
+   "id": "mps_changelog_destination_field","_origin":"semantic",
    "label": "Destination as the leading word",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1486,7 +1486,7 @@
    "rationale": "Wayfinding finds the way to a destination; it does not charge at building it. Naming the destination is the first act of charting — it fixes scope and shapes every ticket — so the map gains a `## Destination` field every session orients to, and triage pins it before any ticket exists."
   },
   {
-   "id": "mps_changelog_plan_dont_do",
+   "id": "mps_changelog_plan_dont_do","_origin":"semantic",
    "label": "Plan, don't do — decisions, not deliverables",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1497,7 +1497,7 @@
    "rationale": "The wayfinder map produces decisions, not deliverables; it is done when nothing is left to decide before someone builds the thing. An individual effort can override this in its Notes."
   },
   {
-   "id": "mps_changelog_map_is_index",
+   "id": "mps_changelog_map_is_index","_origin":"semantic",
    "label": "The map is an index, not a store",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1508,7 +1508,7 @@
    "rationale": "A decision lives in exactly one place — its ticket — so the map only gists and links, never restates. Graduating fog into a ticket clears the graduated patch so nothing lingers in two places."
   },
   {
-   "id": "mps_changelog_collaborative_map",
+   "id": "mps_changelog_collaborative_map","_origin":"semantic",
    "label": "The map is collaborative by default (on the tracker)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1519,7 +1519,7 @@
    "rationale": "The map moves off a local Markdown file onto the repo's issue tracker: a single `wayfinder:map` issue whose tickets are its child issues — one shared URL the team can watch. Sessions load the map at low resolution and zoom into tickets on demand; wayfinder stays tracker-agnostic behind a pointer."
   },
   {
-   "id": "mps_changelog_claim_by_assignment",
+   "id": "mps_changelog_claim_by_assignment","_origin":"semantic",
    "label": "Claim by assignment, not a label",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1530,7 +1530,7 @@
    "rationale": "A session claims a ticket by assigning it to the driving dev — the assignee IS the claim — which frees the label vocabulary to `wayfinder:<type>` alone."
   },
   {
-   "id": "mps_changelog_fog_vs_out_of_scope",
+   "id": "mps_changelog_fog_vs_out_of_scope","_origin":"semantic",
    "label": "Fog vs. out of scope, split",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1541,7 +1541,7 @@
    "rationale": "Two plainly-named map sections keep beyond-destination work from reading as takeable frontier: `## Not yet specified` is in-scope fog that graduates as the frontier advances, while `## Out of scope` is work ruled beyond the destination — closed, never graduating."
   },
   {
-   "id": "mps_changelog_task_ticket_type",
+   "id": "mps_changelog_task_ticket_type","_origin":"semantic",
    "label": "A fourth `task` ticket type",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1552,7 +1552,7 @@
    "rationale": "A `task` ticket covers literal manual work that blocks a decision (provisioning access, moving data, signing up for a service) — the one type that does rather than decides, earning its place by unblocking a decision."
   },
   {
-   "id": "mps_changelog_hitl_afk",
+   "id": "mps_changelog_hitl_afk","_origin":"semantic",
    "label": "HITL / AFK ticket classification",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1563,7 +1563,7 @@
    "rationale": "Every ticket type is classified HITL (human in the loop — grilling, prototype) or AFK (agent alone — research; task is either). A HITL ticket only resolves through the live exchange, so \"wait for the human\" falls out of the label, and a grilling agent that answers its own questions has by definition broken HITL. This fixed reports of `/wayfinder` grilling itself."
   },
   {
-   "id": "mps_changelog_no_fog_early_exit",
+   "id": "mps_changelog_no_fog_early_exit","_origin":"semantic",
    "label": "No-fog early exit",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1574,7 +1574,7 @@
    "rationale": "If the opening breadth-first grilling surfaces no fog, the journey is small enough for one session — so wayfinder stops and asks how you would like to proceed rather than building a map nobody needs."
   },
   {
-   "id": "mps_changelog_tdd_reference_only",
+   "id": "mps_changelog_tdd_reference_only","_origin":"semantic",
    "label": "tdd reshaped as a reference-only skill",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1585,7 +1585,7 @@
    "rationale": "The red → green → refactor loop is anchored by leading words the model already holds, so the step-by-step Workflow was largely restating it: the Workflow and per-cycle checklist are dropped, their one durable idea (vertical slices / tracer bullets) folded into Anti-patterns and a short Rules-of-the-loop list. The refactor stage is dropped too — TDD is now red → green, and refactoring belongs to the review stage."
   },
   {
-   "id": "mps_changelog_seam",
+   "id": "mps_changelog_seam","_origin":"semantic",
    "label": "Seam",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1596,7 +1596,7 @@
    "rationale": "\"Seam\" is introduced as the leading word for where tests go: test only at pre-agreed seams, confirmed with the user before any test is written. It is also part of the deep-module vocabulary (module, interface, depth, seam, adapter)."
   },
   {
-   "id": "mps_changelog_tautological_test",
+   "id": "mps_changelog_tautological_test","_origin":"semantic",
    "label": "Tautological-test anti-pattern",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1607,7 +1607,7 @@
    "rationale": "A test whose assertion is recomputed the way the code computes it passes by construction and gives zero confidence — distinct from implementation coupling. Carried as a peer at three sites: a Philosophy principle (expected values must come from an independent source of truth), a checklist gate, and a BAD/GOOD example pair."
   },
   {
-   "id": "mps_changelog_triage_external_prs",
+   "id": "mps_changelog_triage_external_prs","_origin":"semantic",
    "label": "triage extended to external pull requests",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1618,7 +1618,7 @@
    "rationale": "A PR is treated as an issue with attached code running through the same roles and state machine: PRs flow inline alongside issues (gated by a per-repo setup toggle), discovery surfaces only external PRs, the bug-only \"reproduce\" step generalizes to \"verify the claim\", and a redundancy check resolves already-implemented requests to `wontfix` without polluting the out-of-scope knowledge base."
   },
   {
-   "id": "mps_changelog_tracker_indirection",
+   "id": "mps_changelog_tracker_indirection","_origin":"semantic",
    "label": "Issue-tracker pointer indirection",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1629,7 +1629,7 @@
    "rationale": "Skills never name a tracker doc path: they resolve the tracker through the `### Issue tracker` block that `setup-matt-pocock-skills` writes into `CLAUDE.md` / `AGENTS.md`, which points at the tracker doc wherever it lives. This indirection is what the rest of the suite relies on."
   },
   {
-   "id": "mps_changelog_wayfinder_path_hardcode_fix",
+   "id": "mps_changelog_wayfinder_path_hardcode_fix","_origin":"semantic",
    "label": "Fix: wayfinder hardcoded the tracker doc path",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1640,7 +1640,7 @@
    "rationale": "Wayfinder pinned the literal `docs/agents/issue-tracker.md`, so in a repo keeping agent docs elsewhere it silently fell back to the local-markdown tracker even when `CLAUDE.md` clearly declared GitHub issues. It now resolves the doc via the shared pointer and reads its \"Wayfinding operations\" section by name."
   },
   {
-   "id": "mps_changelog_teach_reuse_first",
+   "id": "mps_changelog_teach_reuse_first","_origin":"semantic",
    "label": "teach is reuse-first",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1651,7 +1651,7 @@
    "rationale": "Lessons are built from reusable components in `./assets/` — stylesheets, quiz widgets, simulators, diagram helpers. Reuse is the default: the agent reads `./assets/` before authoring a lesson, builds from what is there, and extracts anything new and reusable into a component rather than inlining it."
   },
   {
-   "id": "mps_changelog_codebase_design",
+   "id": "mps_changelog_codebase_design","_origin":"semantic",
    "label": "codebase-design skill (deep-module vocabulary)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1662,7 +1662,7 @@
    "rationale": "A shared skill holding the deep-module vocabulary (module, interface, depth, seam, adapter) and the principles for putting a lot of behaviour behind a small interface. The language previously in `improve-codebase-architecture/LANGUAGE.md` moves here, generalized for reuse across skills."
   },
   {
-   "id": "mps_changelog_domain_modeling",
+   "id": "mps_changelog_domain_modeling","_origin":"semantic",
    "label": "domain-modeling skill",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1673,7 +1673,7 @@
    "rationale": "A shared skill that actively builds and sharpens a project's domain model, stress-testing terms against the glossary and keeping `CONTEXT.md` and ADRs current."
   },
   {
-   "id": "mps_changelog_remove_caveman_zoom_out",
+   "id": "mps_changelog_remove_caveman_zoom_out","_origin":"semantic",
    "label": "caveman and zoom-out removed",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1684,7 +1684,7 @@
    "rationale": "Breaking removal of two skills: `caveman` was a duplicate of another skill under test and was never meant to be public, and `zoom-out` went unused in practice."
   },
   {
-   "id": "mps_changelog_diagnose_rename",
+   "id": "mps_changelog_diagnose_rename","_origin":"semantic",
    "label": "diagnose renamed to diagnosing-bugs",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1695,7 +1695,7 @@
    "rationale": "Breaking rename: the `diagnose` skill becomes `diagnosing-bugs`, invoked as `/diagnosing-bugs`; the old `/diagnose` name no longer exists. It later gains a \"Something's broken\" on-ramp in the router, which previously had no route for a bug."
   },
   {
-   "id": "mps_changelog_grilling_shared_primitive",
+   "id": "mps_changelog_grilling_shared_primitive","_origin":"semantic",
    "label": "grilling exposed as the shared interview primitive",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1706,7 +1706,7 @@
    "rationale": "`grilling` is exposed as a model-invoked skill — the reusable interview loop behind `grill-me` and `grill-with-docs` — so other skills can run the interview instead of restating it."
   },
   {
-   "id": "mps_changelog_resolving_merge_conflicts",
+   "id": "mps_changelog_resolving_merge_conflicts","_origin":"semantic",
    "label": "resolving-merge-conflicts skill",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1717,7 +1717,7 @@
    "rationale": "A loop for resolving an in-progress git merge or rebase conflict — deliberately standalone, with no dependencies on other skills."
   },
   {
-   "id": "mps_changelog_invocation_taxonomy",
+   "id": "mps_changelog_invocation_taxonomy","_origin":"semantic",
    "label": "User-invoked / Model-invoked taxonomy",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1728,7 +1728,7 @@
    "rationale": "The taxonomy is renamed from Commands/Skills to User-invoked/Model-invoked, defined in `docs/invocation.md`: user-invoked skills are reachable only when typed and exist to orchestrate; model-invoked skills can also be reached automatically when the task fits. A user-invoked skill may invoke model-invoked skills, but never another user-invoked one."
   },
   {
-   "id": "mps_changelog_promoted_buckets",
+   "id": "mps_changelog_promoted_buckets","_origin":"semantic",
    "label": "Promoted buckets (engineering/, productivity/)",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1739,7 +1739,7 @@
    "rationale": "Graduating a skill out of `in-progress/` into a promoted bucket is what makes it ship: it enters the plugin's skills array, is listed under User-invoked or Model-invoked in the top-level and bucket READMEs, gains a human-facing docs page, and gets a route in `ask-matt`."
   },
   {
-   "id": "mps_changelog_docs_page_resync",
+   "id": "mps_changelog_docs_page_resync","_origin":"semantic",
    "label": "Docs-page re-sync rule",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1750,7 +1750,7 @@
    "rationale": "Every promoted skill carries a human-facing docs page that is created or re-synced whenever the skill is added, renamed, or changed — the standing rule the router re-check rule was added beside."
   },
   {
-   "id": "mps_changelog_grill_front_doors",
+   "id": "mps_changelog_grill_front_doors","_origin":"semantic",
    "label": "grill-me and grill-with-docs as the front doors",
    "file_type": "concept",
    "source_file": "CHANGELOG.md",
@@ -1761,7 +1761,7 @@
    "rationale": "The two grill front doors are where a reader actually starts, so they signpost UP to wayfinder for an effort too big to hold in one session; `grill-with-docs` also builds the domain model inline via `/domain-modeling`."
   },
   {
-   "id": "mps_context_ubiquitous_language",
+   "id": "mps_context_ubiquitous_language","_origin":"semantic",
    "label": "Matt Pocock Skills ubiquitous language (CONTEXT.md)",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1772,7 +1772,7 @@
    "rationale": "CONTEXT.md is the project's ubiquitous-language document: it fixes the precise definition of each domain term, states the relationships between them, and records flagged ambiguities that have been resolved. It is structured as three sections — Language, Relationships, and Flagged ambiguities."
   },
   {
-   "id": "mps_context_skills_collection",
+   "id": "mps_context_skills_collection","_origin":"semantic",
    "label": "Matt Pocock Skills collection",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1783,7 +1783,7 @@
    "rationale": "The project is a collection of agent skills — slash commands and behaviors — loaded by Claude Code. The skills are organized into buckets and consumed by per-repo configuration."
   },
   {
-   "id": "mps_context_setup_command",
+   "id": "mps_context_setup_command","_origin":"semantic",
    "label": "/setup-matt-pocock-skills per-repo configuration",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1794,7 +1794,7 @@
    "rationale": "`/setup-matt-pocock-skills` emits the per-repo configuration through which the skills are consumed. That generated configuration is the seam between the shared skill collection and an individual repository."
   },
   {
-   "id": "mps_context_issue_tracker",
+   "id": "mps_context_issue_tracker","_origin":"semantic",
    "label": "Issue tracker (canonical term)",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1805,7 +1805,7 @@
    "rationale": "The Issue tracker is the tool that hosts a repo's issues — GitHub Issues, Linear, a local `.scratch/` markdown convention, or similar. The synonyms 'backlog manager', 'backlog backend' and 'issue host' are explicitly to be avoided."
   },
   {
-   "id": "mps_context_issue",
+   "id": "mps_context_issue","_origin":"semantic",
    "label": "Issue (canonical term)",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1816,7 +1816,7 @@
    "rationale": "An Issue is a single tracked unit of work inside an Issue tracker — a bug, task, spec, or slice produced by `to-tickets`. The word 'ticket' is to be avoided for it, except when quoting external systems that call them tickets or when naming a Decision ticket."
   },
   {
-   "id": "mps_context_decision_ticket",
+   "id": "mps_context_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1827,7 +1827,7 @@
    "rationale": "A Decision ticket is a `wayfinder` unit: a child Issue of a `wayfinder:map` that holds a question whose resolution is a decision. The 'decision' qualifier is what keeps it distinct from an implementation ticket; `wayfinder` introduces the term and thereafter uses 'ticket'."
   },
   {
-   "id": "mps_context_implementation_slice",
+   "id": "mps_context_implementation_slice","_origin":"semantic",
    "label": "Implementation ticket / slice of a build",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1838,7 +1838,7 @@
    "rationale": "An implementation ticket is a slice of a build to execute — the ordinary kind of Issue, of which `to-tickets` produces slices. It is the contrast class that the 'decision' qualifier of a Decision ticket exists to exclude."
   },
   {
-   "id": "mps_context_wayfinder_map",
+   "id": "mps_context_wayfinder_map","_origin":"semantic",
    "label": "wayfinder:map",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1849,7 +1849,7 @@
    "rationale": "A `wayfinder:map` is the parent unit under which Decision tickets are filed as child Issues. It is the `wayfinder` skill's structure for organising open questions."
   },
   {
-   "id": "mps_context_triage_role",
+   "id": "mps_context_triage_role","_origin":"semantic",
    "label": "Triage role",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1860,7 +1860,7 @@
    "rationale": "A Triage role is a canonical state-machine label applied to an Issue during triage (e.g. `needs-triage`, `ready-for-afk`). An Issue carries exactly one Triage role at a time."
   },
   {
-   "id": "mps_context_triage_labels_doc",
+   "id": "mps_context_triage_labels_doc","_origin":"semantic",
    "label": "docs/agents/triage-labels.md role-to-label mapping",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1871,7 +1871,7 @@
    "rationale": "`docs/agents/triage-labels.md` is the indirection layer that maps each canonical Triage role to a real label string in the Issue tracker, so the state machine stays canonical while the concrete labels remain per-repo."
   },
   {
-   "id": "mps_context_tracker_consumer_skills",
+   "id": "mps_context_tracker_consumer_skills","_origin":"semantic",
    "label": "Tracker-consuming skills (to-tickets, to-spec, triage, qa)",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1882,7 +1882,7 @@
    "rationale": "Skills such as `to-tickets`, `to-spec`, `triage` and `qa` read from and write to the Issue tracker. `to-tickets` in particular produces the slices that become Issues."
   },
   {
-   "id": "mps_context_flagged_ambiguities",
+   "id": "mps_context_flagged_ambiguities","_origin":"semantic",
    "label": "Flagged ambiguities section",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1893,7 +1893,7 @@
    "rationale": "The glossary carries an explicit 'Flagged ambiguities' section recording terms that were once ambiguous and how each was resolved, so the resolution is visible rather than implicit in the definitions."
   },
   {
-   "id": "mps_context_backlog_retired",
+   "id": "mps_context_backlog_retired","_origin":"semantic",
    "label": "'backlog' retired as a domain term",
    "file_type": "concept",
    "source_file": "CONTEXT.md",
@@ -1904,7 +1904,7 @@
    "rationale": "'backlog' previously meant both the tool hosting issues and the body of work inside it. Resolved: the tool is the Issue tracker, and 'backlog' is no longer used as a domain term at all; 'backlog backend' and 'backlog manager' were collapsed into Issue tracker."
   },
   {
-   "id": "mps_oos_trackers_mainstream_only_decision",
+   "id": "mps_oos_trackers_mainstream_only_decision","_origin":"semantic",
    "label": "Out-of-scope: mainstream issue trackers only",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1915,7 +1915,7 @@
    "rationale": "`setup-matt-pocock-skills` offers first-class support only for mainstream issue trackers. Requests to add support for niche, new, or single-vendor experimental trackers are explicitly out of scope and are rejected."
   },
   {
-   "id": "mps_oos_trackers_setup_skill",
+   "id": "mps_oos_trackers_setup_skill","_origin":"semantic",
    "label": "setup-matt-pocock-skills",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1926,7 +1926,7 @@
    "rationale": "The setup skill that configures the skill suite, including which issue-tracker backend a user's project is wired to. It is the surface whose supported-tracker list this scope decision governs."
   },
   {
-   "id": "mps_oos_trackers_hardcoded_cli_shape",
+   "id": "mps_oos_trackers_hardcoded_cli_shape","_origin":"semantic",
    "label": "Each backend hard-codes a CLI shape",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1937,7 +1937,7 @@
    "rationale": "Every issue-tracker backend hard-codes a CLI shape into the skills — the commands, the flags, and the output parsing. The integration is therefore coupled to that specific tool's command-line surface."
   },
   {
-   "id": "mps_oos_trackers_maintenance_surface_cost",
+   "id": "mps_oos_trackers_maintenance_surface_cost","_origin":"semantic",
    "label": "Permanent maintenance surface per backend",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1948,7 +1948,7 @@
    "rationale": "Each new backend is permanent maintenance surface: it must keep working as the tool's CLI evolves and must keep being tested against the consuming skills. That cost is only worth paying for trackers a meaningful fraction of users actually have."
   },
   {
-   "id": "mps_oos_trackers_consuming_skills",
+   "id": "mps_oos_trackers_consuming_skills","_origin":"semantic",
    "label": "Core skills that consume a tracker backend",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1959,7 +1959,7 @@
    "rationale": "The skills that drive an issue tracker — `/to-spec`, `/to-tickets`, `/triage`, and friends. Every supported backend must keep being tested against all of them, which is what multiplies the maintenance cost of each additional backend."
   },
   {
-   "id": "mps_oos_trackers_mainstream_judgment_call",
+   "id": "mps_oos_trackers_mainstream_judgment_call","_origin":"semantic",
    "label": "\"Mainstream\" is a judgment call",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1970,7 +1970,7 @@
    "rationale": "\"Mainstream\" is deliberately a judgment call, not a numeric bar. No threshold of stars, age, or downloads decides admission; the maintainer weighs the evidence and decides."
   },
   {
-   "id": "mps_oos_trackers_recognition_rule",
+   "id": "mps_oos_trackers_recognition_rule","_origin":"semantic",
    "label": "The recognition rule",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1981,7 +1981,7 @@
    "rationale": "The stated rule is: would a typical engineer recognise this tool and have plausibly chosen it for their team? That question, not any metric, is what decides whether a tracker counts as mainstream."
   },
   {
-   "id": "mps_oos_trackers_signals_not_rules",
+   "id": "mps_oos_trackers_signals_not_rules","_origin":"semantic",
    "label": "Stars, age and downloads are signals, not the rule",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -1992,7 +1992,7 @@
    "rationale": "Stars, age, and download counts are useful signals when making the call, but none of them is the rule. They inform the judgment without ever being able to settle it on their own."
   },
   {
-   "id": "mps_oos_trackers_mainstream_examples",
+   "id": "mps_oos_trackers_mainstream_examples","_origin":"semantic",
    "label": "Mainstream examples: GitHub, GitLab, Backlog.md",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -2003,7 +2003,7 @@
    "rationale": "GitHub, GitLab, and Backlog.md are given as the kind of tools that would be considered mainstream — broadly known, widely used, and well past the experimental phase."
   },
   {
-   "id": "mps_oos_trackers_non_mainstream_example",
+   "id": "mps_oos_trackers_non_mainstream_example","_origin":"semantic",
    "label": "Non-mainstream example: a brand-new few-hundred-star tool",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -2014,7 +2014,7 @@
    "rationale": "A brand-new agent-focused tool with a few hundred GitHub stars is not mainstream, no matter how interesting the design. Design quality is explicitly not a route in."
   },
   {
-   "id": "mps_oos_trackers_escape_hatches",
+   "id": "mps_oos_trackers_escape_hatches","_origin":"semantic",
    "label": "Escape hatches for non-mainstream trackers",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -2025,7 +2025,7 @@
    "rationale": "Escape hatches for non-mainstream trackers already exist, so the scope limit does not leave those users stranded. Neither hatch requires the core skills to know about the specific tool."
   },
   {
-   "id": "mps_oos_trackers_local_markdown",
+   "id": "mps_oos_trackers_local_markdown","_origin":"semantic",
    "label": "`local markdown` tracker option",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -2036,7 +2036,7 @@
    "rationale": "`local markdown` is the built-in option for lightweight in-repo issue tracking, available to anyone whose tracker is not first-class supported."
   },
   {
-   "id": "mps_oos_trackers_other_custom",
+   "id": "mps_oos_trackers_other_custom","_origin":"semantic",
    "label": "`other/custom` tracker option",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -2047,7 +2047,7 @@
    "rationale": "`other/custom` is the option for users who want to wire a tracker up themselves. It moves the integration cost to the user rather than into the core skills."
   },
   {
-   "id": "mps_oos_trackers_prior_request_99",
+   "id": "mps_oos_trackers_prior_request_99","_origin":"semantic",
    "label": "Prior request #99 — dex as a tracker backend",
    "file_type": "concept",
    "source_file": "mainstream-issue-trackers-only.md",
@@ -2058,7 +2058,7 @@
    "rationale": "Request #99 asked to \"Add dex as an issue tracker backend\"; dex was roughly 3 months old with about 300 GitHub stars at the time. It is recorded as a prior request refused under this scope decision."
   },
   {
-   "id": "mps_wayfinder_docs_wayfinder_skill",
+   "id": "mps_wayfinder_docs_wayfinder_skill","_origin":"semantic",
    "label": "wayfinder skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2069,7 +2069,7 @@
    "rationale": "`wayfinder` takes an effort too big for one agent session — wrapped in fog, where the way from here to the goal isn't visible yet — and charts it as a shared map of decision tickets on the repo's issue tracker, then resolves them one at a time until the way is clear."
   },
   {
-   "id": "mps_wayfinder_docs_shared_map",
+   "id": "mps_wayfinder_docs_shared_map","_origin":"semantic",
    "label": "the map (wayfinder:map issue)",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2080,7 +2080,7 @@
    "rationale": "The map is a single `wayfinder:map` issue whose tickets are its child issues — one shared URL the whole team can watch. One map is one `wayfinder:map` issue."
   },
   {
-   "id": "mps_wayfinder_docs_decision_ticket",
+   "id": "mps_wayfinder_docs_decision_ticket","_origin":"semantic",
    "label": "decision ticket",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2091,7 +2091,7 @@
    "rationale": "Every ticket resolves a decision — a question to settle, not a slice of a build to execute. Tickets are the child issues of the map, and each decision lives in exactly one place: its ticket."
   },
   {
-   "id": "mps_wayfinder_docs_plans_not_does",
+   "id": "mps_wayfinder_docs_plans_not_does","_origin":"semantic",
    "label": "it plans, it doesn't do",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2102,7 +2102,7 @@
    "rationale": "Wayfinder plans, it doesn't do: the map is done when nothing is left to decide before someone goes and builds the thing, so it produces decisions, not deliverables."
   },
   {
-   "id": "mps_wayfinder_docs_user_invocation",
+   "id": "mps_wayfinder_docs_user_invocation","_origin":"semantic",
    "label": "user-invoked via /wayfinder",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2113,7 +2113,7 @@
    "rationale": "You invoke wayfinder by typing `/wayfinder` — the agent won't reach for it on its own."
   },
   {
-   "id": "mps_wayfinder_docs_fog_criterion",
+   "id": "mps_wayfinder_docs_fog_criterion","_origin":"semantic",
    "label": "when to reach for it (too big + foggy)",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2124,7 +2124,7 @@
    "rationale": "Reach for wayfinder when an effort is more than one agent session can hold and the route to its destination is still foggy — you can feel the shape of the work but can't yet write it down as a spec or a plan."
   },
   {
-   "id": "mps_wayfinder_docs_to_spec",
+   "id": "mps_wayfinder_docs_to_spec","_origin":"semantic",
    "label": "to-spec skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2135,7 +2135,7 @@
    "rationale": "`to-spec` turns an already-clear thread into a spec. Wayfinder sits upstream of it: once the fog is pushed back and the way is clear, you hand off to to-spec to schedule the multi-session build."
   },
   {
-   "id": "mps_wayfinder_docs_to_tickets",
+   "id": "mps_wayfinder_docs_to_tickets","_origin":"semantic",
    "label": "to-tickets skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2146,7 +2146,7 @@
    "rationale": "`to-tickets` slices an already-understood plan into buildable tickets. Wayfinder sits upstream of it and is what you run when there's too much fog to spec directly."
   },
   {
-   "id": "mps_wayfinder_docs_setup_skill",
+   "id": "mps_wayfinder_docs_setup_skill","_origin":"semantic",
    "label": "setup-matt-pocock-skills",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2157,7 +2157,7 @@
    "rationale": "`setup-matt-pocock-skills` lays down the issue-tracker wiring wayfinder needs, including seeding the 'Wayfinding operations' section of the tracker doc."
   },
   {
-   "id": "mps_wayfinder_docs_tracker_wiring",
+   "id": "mps_wayfinder_docs_tracker_wiring","_origin":"semantic",
    "label": "issue-tracker wiring (prerequisite)",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2168,7 +2168,7 @@
    "rationale": "The map and its tickets live on the repo's issue tracker, so wayfinder needs tracker wiring — a tracker doc describing how the map, child tickets, blocking, and frontier queries are expressed."
   },
   {
-   "id": "mps_wayfinder_docs_wayfinding_operations_section",
+   "id": "mps_wayfinder_docs_wayfinding_operations_section","_origin":"semantic",
    "label": "Wayfinding operations section",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2179,7 +2179,7 @@
    "rationale": "A 'Wayfinding operations' section describing how the map, child tickets, blocking, and frontier queries are expressed for GitHub, GitLab, or local-markdown."
   },
   {
-   "id": "mps_wayfinder_docs_local_markdown_fallback",
+   "id": "mps_wayfinder_docs_local_markdown_fallback","_origin":"semantic",
    "label": "local-markdown map default",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2190,7 +2190,7 @@
    "rationale": "Absent the tracker doc, wayfinder defaults to a local-markdown map."
   },
   {
-   "id": "mps_wayfinder_docs_index_not_store",
+   "id": "mps_wayfinder_docs_index_not_store","_origin":"semantic",
    "label": "the map is an index, not a store",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2201,7 +2201,7 @@
    "rationale": "The map is an index, not a store: each decision lives in exactly one place (its ticket), and the map only gists and links, never restates."
   },
   {
-   "id": "mps_wayfinder_docs_progressive_resolution",
+   "id": "mps_wayfinder_docs_progressive_resolution","_origin":"semantic",
    "label": "low-resolution load, zoom on demand",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2212,7 +2212,7 @@
    "rationale": "A session loads the map at low resolution and zooms into individual tickets on demand."
   },
   {
-   "id": "mps_wayfinder_docs_fog_of_war",
+   "id": "mps_wayfinder_docs_fog_of_war","_origin":"semantic",
    "label": "fog of war",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2223,7 +2223,7 @@
    "rationale": "Beyond the live tickets lies the fog of war — decisions you can tell are coming but can't yet pin down."
   },
   {
-   "id": "mps_wayfinder_docs_ticket_test",
+   "id": "mps_wayfinder_docs_ticket_test","_origin":"semantic",
    "label": "ticket-vs-fog test",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2234,7 +2234,7 @@
    "rationale": "The test for whether something is a ticket or still fog is whether you can state the question precisely now — not whether you can answer it."
   },
   {
-   "id": "mps_wayfinder_docs_graduation",
+   "id": "mps_wayfinder_docs_graduation","_origin":"semantic",
    "label": "graduating fog into tickets",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2245,7 +2245,7 @@
    "rationale": "Resolving a ticket clears the fog ahead of it, graduating whatever's now specifiable into fresh tickets."
   },
   {
-   "id": "mps_wayfinder_docs_frontier",
+   "id": "mps_wayfinder_docs_frontier","_origin":"semantic",
    "label": "the frontier",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2256,7 +2256,7 @@
    "rationale": "The frontier is the open, unblocked, unclaimed tickets — the edge of the known — and it shows what is takeable without opening the map."
   },
   {
-   "id": "mps_wayfinder_docs_native_blocking",
+   "id": "mps_wayfinder_docs_native_blocking","_origin":"semantic",
    "label": "tracker-native blocking",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2267,7 +2267,7 @@
    "rationale": "The tracker's native blocking is what renders the frontier visually, so you can see what's takeable without opening the map."
   },
   {
-   "id": "mps_wayfinder_docs_destination",
+   "id": "mps_wayfinder_docs_destination","_origin":"semantic",
    "label": "the destination",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2278,7 +2278,7 @@
    "rationale": "Naming the destination is the first act — before any ticket exists — because it fixes the scope every ticket is measured against. Fog only gathers toward the destination."
   },
   {
-   "id": "mps_wayfinder_docs_out_of_scope",
+   "id": "mps_wayfinder_docs_out_of_scope","_origin":"semantic",
    "label": "out of scope ruling",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2289,7 +2289,7 @@
    "rationale": "Work past the destination is ruled out of scope: closed, and never graduating into tickets."
   },
   {
-   "id": "mps_wayfinder_docs_hitl_ticket",
+   "id": "mps_wayfinder_docs_hitl_ticket","_origin":"semantic",
    "label": "HITL ticket",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2300,7 +2300,7 @@
    "rationale": "A HITL (human in the loop) ticket — grilling or prototype — only resolves through a live exchange, so the agent never answers its own questions."
   },
   {
-   "id": "mps_wayfinder_docs_afk_ticket",
+   "id": "mps_wayfinder_docs_afk_ticket","_origin":"semantic",
    "label": "AFK ticket",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2311,7 +2311,7 @@
    "rationale": "An AFK ticket is one the agent can resolve alone — research is the named example. Every ticket is either HITL or AFK."
   },
   {
-   "id": "mps_wayfinder_docs_research_ticket",
+   "id": "mps_wayfinder_docs_research_ticket","_origin":"semantic",
    "label": "research ticket",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2322,7 +2322,7 @@
    "rationale": "Research stays a real ticket — a shared blocker downstream decisions hang on — but because it's AFK, a session doesn't stop and read it."
   },
   {
-   "id": "mps_wayfinder_docs_research_subagent",
+   "id": "mps_wayfinder_docs_research_subagent","_origin":"semantic",
    "label": "/research subagent fan-out",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2333,7 +2333,7 @@
    "rationale": "A session fires a `/research` subagent to burn a research ticket down in parallel, keeping the frontier fast."
   },
   {
-   "id": "mps_wayfinder_docs_research_branch",
+   "id": "mps_wayfinder_docs_research_branch","_origin":"semantic",
    "label": "throwaway research/<name> branch",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2344,7 +2344,7 @@
    "rationale": "Research findings are captured on a throwaway `research/<name>` branch."
   },
   {
-   "id": "mps_wayfinder_docs_one_ticket_per_session",
+   "id": "mps_wayfinder_docs_one_ticket_per_session","_origin":"semantic",
    "label": "at most one ticket per session",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2355,7 +2355,7 @@
    "rationale": "A session resolves at most one ticket (research tickets excepted), records the answer as a resolution comment, closes the ticket, and appends a one-line pointer to 'Decisions so far'."
   },
   {
-   "id": "mps_wayfinder_docs_resolution_comment",
+   "id": "mps_wayfinder_docs_resolution_comment","_origin":"semantic",
    "label": "resolution comment",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2366,7 +2366,7 @@
    "rationale": "The answer to a ticket is recorded as a resolution comment on that ticket before the ticket is closed."
   },
   {
-   "id": "mps_wayfinder_docs_decisions_so_far",
+   "id": "mps_wayfinder_docs_decisions_so_far","_origin":"semantic",
    "label": "Decisions so far log",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2377,7 +2377,7 @@
    "rationale": "After closing a ticket the session appends a one-line pointer to a 'Decisions so far' list — consistent with the map gisting and linking rather than restating."
   },
   {
-   "id": "mps_wayfinder_docs_ticket_naming",
+   "id": "mps_wayfinder_docs_ticket_naming","_origin":"semantic",
    "label": "refer to tickets by name",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2388,7 +2388,7 @@
    "rationale": "Tickets are referred to by name, never by a bare `#42`."
   },
   {
-   "id": "mps_wayfinder_docs_no_fog_stop",
+   "id": "mps_wayfinder_docs_no_fog_stop","_origin":"semantic",
    "label": "no-fog stop condition",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2399,7 +2399,7 @@
    "rationale": "If the opening grill surfaces no fog, wayfinder stops and tells you the journey is small enough to skip the map."
   },
   {
-   "id": "mps_wayfinder_docs_on_ramp",
+   "id": "mps_wayfinder_docs_on_ramp","_origin":"semantic",
    "label": "big-idea on-ramp",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2410,7 +2410,7 @@
    "rationale": "An on-ramp: an effort too large and foggy to spec in one sitting generates a cleared map of decisions, which then merges onto the main build flow."
   },
   {
-   "id": "mps_wayfinder_docs_grilling",
+   "id": "mps_wayfinder_docs_grilling","_origin":"semantic",
    "label": "grilling skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2421,7 +2421,7 @@
    "rationale": "Wayfinder leans on `grilling` to resolve individual tickets; the opening grill is also what determines whether there is any fog at all."
   },
   {
-   "id": "mps_wayfinder_docs_domain_modeling",
+   "id": "mps_wayfinder_docs_domain_modeling","_origin":"semantic",
    "label": "domain-modeling skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2432,7 +2432,7 @@
    "rationale": "Wayfinder leans on `domain-modeling` to resolve individual tickets."
   },
   {
-   "id": "mps_wayfinder_docs_prototype",
+   "id": "mps_wayfinder_docs_prototype","_origin":"semantic",
    "label": "prototype skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2443,7 +2443,7 @@
    "rationale": "Wayfinder leans on `prototype` for the ticket types that need it; prototype is named as one of the HITL ticket kinds."
   },
   {
-   "id": "mps_wayfinder_docs_research_skill",
+   "id": "mps_wayfinder_docs_research_skill","_origin":"semantic",
    "label": "research skill",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2454,7 +2454,7 @@
    "rationale": "Wayfinder leans on `research` for the ticket types that need it; research is the named AFK ticket kind."
   },
   {
-   "id": "mps_wayfinder_docs_ask_matt",
+   "id": "mps_wayfinder_docs_ask_matt","_origin":"semantic",
    "label": "ask-matt router",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2465,7 +2465,7 @@
    "rationale": "When you're unsure which skill or flow fits, `ask-matt` routes you."
   },
   {
-   "id": "mps_wayfinder_docs_install_command",
+   "id": "mps_wayfinder_docs_install_command","_origin":"semantic",
    "label": "npx skills add/update quickstart",
    "file_type": "concept",
    "source_file": "wayfinder.md",
@@ -2476,7 +2476,7 @@
    "rationale": "Install with `npx skills add mattpocock/skills --skill=wayfinder` and refresh with `npx skills update wayfinder`."
   },
   {
-   "id": "mps_wayfinder_skill_wayfinder_skill",
+   "id": "mps_wayfinder_skill_wayfinder_skill","_origin":"semantic",
    "label": "Wayfinder skill",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2487,7 +2487,7 @@
    "rationale": "Wayfinder plans a chunk of work too big for one agent session as a shared map of decision tickets on the repo's issue tracker, then resolves them one at a time until the way to the destination is clear. Wayfinding is about finding the way, not charging at the destination."
   },
   {
-   "id": "mps_wayfinder_skill_destination",
+   "id": "mps_wayfinder_skill_destination","_origin":"semantic",
    "label": "Destination",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2498,7 +2498,7 @@
    "rationale": "The destination is what reaching the end of the map looks like — a spec to hand off, a decision to lock, or a change made in place. It varies per effort, naming it is the first act of charting, it shapes every ticket, and every session orients to it before choosing a ticket."
   },
   {
-   "id": "mps_wayfinder_skill_map",
+   "id": "mps_wayfinder_skill_map","_origin":"semantic",
    "label": "The Map",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2509,7 +2509,7 @@
    "rationale": "The map is a single issue on the repo's issue tracker labelled `wayfinder:map` — the canonical artifact — whose body is the whole effort at low resolution, loaded once per session. It is domain-agnostic (engineering work, course content, whatever fits the shape)."
   },
   {
-   "id": "mps_wayfinder_skill_decision_ticket",
+   "id": "mps_wayfinder_skill_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2520,7 +2520,7 @@
    "rationale": "A ticket is a child issue of the map whose body is a single `## Question` — the decision or investigation it resolves. Tickets are questions whose resolution is a decision, not slices of a build to execute; the tracker's issue id is the ticket's identity."
   },
   {
-   "id": "mps_wayfinder_skill_plan_not_do",
+   "id": "mps_wayfinder_skill_plan_not_do","_origin":"semantic",
    "label": "Plan, don't do",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2531,7 +2531,7 @@
    "rationale": "Wayfinder is planning by default: each ticket resolves a decision and the map is done when nothing is left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you have reached the edge of the map and it is time to hand off — absent an override, produce decisions, not deliverables."
   },
   {
-   "id": "mps_wayfinder_skill_refer_by_name",
+   "id": "mps_wayfinder_skill_refer_by_name","_origin":"semantic",
    "label": "Refer by name",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2542,7 +2542,7 @@
    "rationale": "Every map and ticket is an issue, so it has a name — its title — and everything the human reads must refer to it by that name, never by a bare id, number, or slug. A wall of `#42, #43, #44` is illegible; the id and URL ride inside the name as its link but never stand in for it."
   },
   {
-   "id": "mps_wayfinder_skill_map_index_not_store",
+   "id": "mps_wayfinder_skill_map_index_not_store","_origin":"semantic",
    "label": "Map is an index, not a store",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2553,7 +2553,7 @@
    "rationale": "The map lists the decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket — so the map never restates it, only gists it and links. Open tickets are not listed in the body at all; they are found by query."
   },
   {
-   "id": "mps_wayfinder_skill_notes_block",
+   "id": "mps_wayfinder_skill_notes_block","_origin":"semantic",
    "label": "Notes block",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2564,7 +2564,7 @@
    "rationale": "The map's `## Notes` section carries the domain, the skills every session should consult, and standing preferences for the effort. It is also where an effort can override the plan-don't-do default and carry execution into the map itself."
   },
   {
-   "id": "mps_wayfinder_skill_decisions_so_far",
+   "id": "mps_wayfinder_skill_decisions_so_far","_origin":"semantic",
    "label": "Decisions so far",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2575,7 +2575,7 @@
    "rationale": "The map's index section: one line per closed ticket — the ticket title linked, plus a one-line gist of the answer — enough to judge relevance before zooming the link for the detail the ticket holds. It records the route actually walked."
   },
   {
-   "id": "mps_wayfinder_skill_not_yet_specified",
+   "id": "mps_wayfinder_skill_not_yet_specified","_origin":"semantic",
    "label": "Not yet specified section",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2586,7 +2586,7 @@
    "rationale": "The map section where the dim view is written down — the suspected question, the area to revisit later — as loosely or as fully as the view allows. It excludes what is already decided, what is already a live ticket, and what is out of scope, and it doubles as a signpost for collaborators reading where the effort is headed."
   },
   {
-   "id": "mps_wayfinder_skill_out_of_scope",
+   "id": "mps_wayfinder_skill_out_of_scope","_origin":"semantic",
    "label": "Out of scope",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2597,7 +2597,7 @@
    "rationale": "Work consciously ruled beyond the destination gets its own map section: scope, not sharpness, lands it here. Out-of-scope work never graduates — it returns only if the destination is redrawn, and then as a fresh effort, not a resumption. An existing ticket found to sit past the destination is closed with one line here explaining why."
   },
   {
-   "id": "mps_wayfinder_skill_issue_tracker",
+   "id": "mps_wayfinder_skill_issue_tracker","_origin":"semantic",
    "label": "Issue tracker (tracker-specific operations)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2608,7 +2608,7 @@
    "rationale": "Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific; the tracker doc's \"Wayfinding operations\" section says how this repo expresses them. The tracker should have been provided (run `/setup-matt-pocock-skills` if not); with none provided, default to the local-markdown tracker."
   },
   {
-   "id": "mps_wayfinder_skill_wayfinder_labels",
+   "id": "mps_wayfinder_skill_wayfinder_labels","_origin":"semantic",
    "label": "wayfinder:* labels",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2619,7 +2619,7 @@
    "rationale": "The map issue carries the label `wayfinder:map`, and each ticket carries a `wayfinder:<type>` label — one of `research`, `prototype`, `grilling`, `task`. The labels are how the artifacts are identified on the tracker."
   },
   {
-   "id": "mps_wayfinder_skill_ticket_session_sizing",
+   "id": "mps_wayfinder_skill_ticket_session_sizing","_origin":"semantic",
    "label": "One-session ticket sizing",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2630,7 +2630,7 @@
    "rationale": "A ticket's body is the question, sized to one 100K token agent session. That budget is the unit of decomposition for the whole map."
   },
   {
-   "id": "mps_wayfinder_skill_claim_by_assignment",
+   "id": "mps_wayfinder_skill_claim_by_assignment","_origin":"semantic",
    "label": "Claiming a ticket by assignment",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2641,7 +2641,7 @@
    "rationale": "A session claims a ticket by assigning it to the dev driving the map first, before any work, so concurrent sessions skip it. The assignee is the claim: an open, unassigned ticket is unclaimed."
   },
   {
-   "id": "mps_wayfinder_skill_native_blocking",
+   "id": "mps_wayfinder_skill_native_blocking","_origin":"semantic",
    "label": "Native blocking relationship",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2652,7 +2652,7 @@
    "rationale": "Blocking uses the tracker's native dependency relationship — essential because it renders the frontier visually in the tracker's own UI, so the human sees what is takeable without opening the map. Only a tracker lacking native blocking falls back to a body convention."
   },
   {
-   "id": "mps_wayfinder_skill_unblocked",
+   "id": "mps_wayfinder_skill_unblocked","_origin":"semantic",
    "label": "Unblocked ticket",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2663,7 +2663,7 @@
    "rationale": "A ticket is unblocked when every ticket blocking it is closed. Unblocked-ness is a property computed from the tracker's dependency edges, not asserted in the ticket body."
   },
   {
-   "id": "mps_wayfinder_skill_frontier",
+   "id": "mps_wayfinder_skill_frontier","_origin":"semantic",
    "label": "Frontier",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2674,7 +2674,7 @@
    "rationale": "The frontier is the set of open, unblocked, unclaimed child tickets — the edge of the known. A working session without a named ticket takes the first frontier ticket in order."
   },
   {
-   "id": "mps_wayfinder_skill_resolution_recording",
+   "id": "mps_wayfinder_skill_resolution_recording","_origin":"semantic",
    "label": "Recording a resolution",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2685,7 +2685,7 @@
    "rationale": "The answer is never part of the ticket body: on resolution you post it as a resolution comment, close the issue, and append a context pointer to the map's Decisions-so-far. Resolving also clears the fog ahead of that ticket."
   },
   {
-   "id": "mps_wayfinder_skill_assets_linked_not_pasted",
+   "id": "mps_wayfinder_skill_assets_linked_not_pasted","_origin":"semantic",
    "label": "Assets linked, not pasted",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2696,7 +2696,7 @@
    "rationale": "Assets created while resolving a ticket — prototypes, research output — are linked from the issue, not pasted into it. This keeps ticket bodies at question-size and detail in exactly one place."
   },
   {
-   "id": "mps_wayfinder_skill_hitl",
+   "id": "mps_wayfinder_skill_hitl","_origin":"semantic",
    "label": "HITL ticket (human in the loop)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2707,7 +2707,7 @@
    "rationale": "A HITL ticket is worked with a human who speaks for themselves and only resolves through that live exchange. The agent never stands in for the human's side of it — a grilling agent that answers its own questions has broken this."
   },
   {
-   "id": "mps_wayfinder_skill_afk",
+   "id": "mps_wayfinder_skill_afk","_origin":"semantic",
    "label": "AFK ticket (agent alone)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2718,7 +2718,7 @@
    "rationale": "An AFK ticket is driven by the agent alone, with no human required in the loop. Every ticket is either HITL or AFK."
   },
   {
-   "id": "mps_wayfinder_skill_research_ticket",
+   "id": "mps_wayfinder_skill_research_ticket","_origin":"semantic",
    "label": "Research ticket type",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2729,7 +2729,7 @@
    "rationale": "Research (AFK): reading documentation, third-party APIs, or local resources like knowledge bases to surface a fact a decision waits on. Resolved by a `/research` subagent; used when knowledge outside the current working directory is required."
   },
   {
-   "id": "mps_wayfinder_skill_prototype_ticket",
+   "id": "mps_wayfinder_skill_prototype_ticket","_origin":"semantic",
    "label": "Prototype ticket type",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2740,7 +2740,7 @@
    "rationale": "Prototype (HITL): raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to — an outline, a rough take, a stub, or UI/logic code via the /prototype skill. Used when \"how should it look\" or \"how should it behave\" is the key question; the prototype is linked as an asset."
   },
   {
-   "id": "mps_wayfinder_skill_grilling_ticket",
+   "id": "mps_wayfinder_skill_grilling_ticket","_origin":"semantic",
    "label": "Grilling ticket type",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2751,7 +2751,7 @@
    "rationale": "Grilling (HITL): conversation via the /grilling and /domain-modeling skills, one question at a time. It is the default ticket type."
   },
   {
-   "id": "mps_wayfinder_skill_task_ticket",
+   "id": "mps_wayfinder_skill_task_ticket","_origin":"semantic",
    "label": "Task ticket type",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2762,7 +2762,7 @@
    "rationale": "Task (HITL or AFK): manual work that must happen before a decision can be made — signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. It is the one type that does rather than decides, and earns its place by unblocking a decision; its answer records what was done plus facts later tickets depend on (credentials location, new URLs, row counts)."
   },
   {
-   "id": "mps_wayfinder_skill_companion_skills",
+   "id": "mps_wayfinder_skill_companion_skills","_origin":"semantic",
    "label": "Companion skills (/grilling, /domain-modeling, /prototype)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2773,7 +2773,7 @@
    "rationale": "Wayfinder delegates the actual conversation and artifact-making to other skills: /grilling and /domain-modeling for pinning down the destination and for any ticket in doubt, /prototype for concrete UI or logic artifacts. The map's Notes block names which skills a given effort's sessions should consult."
   },
   {
-   "id": "mps_wayfinder_skill_research_subagent",
+   "id": "mps_wayfinder_skill_research_subagent","_origin":"semantic",
    "label": "/research subagent",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2784,7 +2784,7 @@
    "rationale": "Research tickets are resolved by a `/research` subagent; during charting they are fired in parallel, each capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket."
   },
   {
-   "id": "mps_wayfinder_skill_fog_of_war",
+   "id": "mps_wayfinder_skill_fog_of_war","_origin":"semantic",
    "label": "Fog of war",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2795,7 +2795,7 @@
    "rationale": "Beyond the live tickets lies the fog of war — the dim view of decisions and investigations you can tell are coming but cannot yet pin down because they hang on questions still open. The map is deliberately incomplete: don't chart what you can't yet see; fog only ever gathers toward the destination and is all in scope, just not sharp enough to ticket."
   },
   {
-   "id": "mps_wayfinder_skill_fog_or_ticket_test",
+   "id": "mps_wayfinder_skill_fog_or_ticket_test","_origin":"semantic",
    "label": "Fog-or-ticket test",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2806,7 +2806,7 @@
    "rationale": "The test is whether you can state the question precisely now — not whether you can answer it now. Ticket when the question is already sharp, even if blocked; leave it in Not yet specified when you cannot phrase it that sharply, and don't pre-slice the fog into ticket-sized pieces since one patch may graduate into several tickets or none."
   },
   {
-   "id": "mps_wayfinder_skill_chart_the_map",
+   "id": "mps_wayfinder_skill_chart_the_map","_origin":"semantic",
    "label": "Chart the map (invocation mode)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2817,7 +2817,7 @@
    "rationale": "The user invokes with a loose idea and the session: names the destination, maps the frontier breadth-first, creates the map issue, creates the tickets it can specify then wires blocking in a second pass, fires the research subagents, and stops. Charting is one session's work and it hand-resolves nothing."
   },
   {
-   "id": "mps_wayfinder_skill_work_through_the_map",
+   "id": "mps_wayfinder_skill_work_through_the_map","_origin":"semantic",
    "label": "Work through the map (invocation mode)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2828,7 +2828,7 @@
    "rationale": "The user invokes with a map (URL or number) and optionally a ticket; without one the agent picks the next decision, not the user. The session loads the low-res map, chooses and claims a ticket, resolves it zooming as needed, records the resolution, then adds newly-surfaced tickets and graduates fog."
   },
   {
-   "id": "mps_wayfinder_skill_one_ticket_per_session",
+   "id": "mps_wayfinder_skill_one_ticket_per_session","_origin":"semantic",
    "label": "Never resolve more than one ticket per session",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2839,7 +2839,7 @@
    "rationale": "In either invocation mode, never resolve more than one ticket per session — with the exception of research tickets, which may be run in parallel by subagents."
   },
   {
-   "id": "mps_wayfinder_skill_create_then_wire",
+   "id": "mps_wayfinder_skill_create_then_wire","_origin":"semantic",
    "label": "Create-then-wire (two-pass ticket creation)",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2850,7 +2850,7 @@
    "rationale": "Tickets are created as child issues of the map first, then blocking edges are wired in a second pass, because issues need ids before they can reference each other. Wiring sorts the new tickets into the frontier and the blocked."
   },
   {
-   "id": "mps_wayfinder_skill_breadth_first_grilling",
+   "id": "mps_wayfinder_skill_breadth_first_grilling","_origin":"semantic",
    "label": "Breadth-first frontier mapping",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2861,7 +2861,7 @@
    "rationale": "After the destination is settled, charting grills again breadth-first: fanning out across the whole space rather than going deep on any one thread, surfacing the open decisions and the first steps takeable now."
   },
   {
-   "id": "mps_wayfinder_skill_no_fog_no_map",
+   "id": "mps_wayfinder_skill_no_fog_no_map","_origin":"semantic",
    "label": "No fog means no map is needed",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2872,7 +2872,7 @@
    "rationale": "If breadth-first frontier mapping surfaces no fog — the way to the destination is already clear and the whole journey fits one session — you don't need a map. Stop and ask the user how they'd like to proceed."
   },
   {
-   "id": "mps_wayfinder_skill_zoom_as_needed",
+   "id": "mps_wayfinder_skill_zoom_as_needed","_origin":"semantic",
    "label": "Zoom as needed",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2883,7 +2883,7 @@
    "rationale": "A working session loads the map at low resolution, not every ticket body, and fetches the full body of any related or closed ticket on demand while resolving. If in doubt it invokes /grilling and /domain-modeling."
   },
   {
-   "id": "mps_wayfinder_skill_concurrent_sessions",
+   "id": "mps_wayfinder_skill_concurrent_sessions","_origin":"semantic",
    "label": "Concurrent sessions on one map",
    "file_type": "concept",
    "source_file": "SKILL.md",
@@ -2894,7 +2894,7 @@
    "rationale": "The user may run unblocked tickets in parallel, so a session must expect other sessions to be editing the tracker concurrently. That concurrency is why claiming happens before any work."
   },
   {
-   "id": "mps_wayfinder_skill_user_invoked_only",
+   "id": "mps_wayfinder_skill_user_invoked_only","_origin":"semantic",
    "label": "User-invoked only (disable-model-invocation)",
    "file_type": "concept",
    "source_file": "SKILL.md",
