@@ -121,29 +121,169 @@ def test_weakest_is_empty_when_every_dimension_is_unreachable():
 # ------------------------------------------------------------- discovery ----
 
 
+def _skills(root: Path, *names: str) -> None:
+    """A `.claude/skills/` tree holding one real skill per name."""
+    for name in names:
+        d = root / ".claude" / "skills" / name
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
+
+
 def test_skill_dirs_requires_a_skill_md_file(tmp_path: Path):
     """`.claude/skills/` also holds `references/` and `scripts/` subtrees.
 
     Handing one of those to plugin-eval scores a fragment as if it were a skill,
     so the presence of `SKILL.md` — not merely being a directory — is the test.
     """
-    base = tmp_path / ".claude" / "skills"
-    (base / "real").mkdir(parents=True)
-    (base / "real" / "SKILL.md").write_text("---\nname: real\n---\n", encoding="utf-8")
-    (base / "not-a-skill").mkdir()
+    _skills(tmp_path, "real")
+    (tmp_path / ".claude" / "skills" / "not-a-skill").mkdir()
 
-    found = [p.name for p in skill_eval.skill_dirs(tmp_path)]
-    assert found == ["real"]
+    found, unknown = skill_eval.skill_dirs(tmp_path)
+    assert [p.name for p in found] == ["real"]
+    assert unknown == []
 
 
 def test_skill_dirs_is_empty_when_there_is_no_skills_dir(tmp_path: Path):
-    assert skill_eval.skill_dirs(tmp_path) == []
+    assert skill_eval.skill_dirs(tmp_path) == ([], [])
 
 
 def test_this_repos_own_skills_are_discovered():
     """Control arm for the two negatives above, against the real tree."""
-    names = {p.name for p in skill_eval.skill_dirs(_REPO)}
+    names = {p.name for p in skill_eval.skill_dirs(_REPO)[0]}
     assert {"clear-prep", "kb-review", "kb-curator"} <= names
+
+
+def test_an_unresolved_name_is_reported_not_dropped(tmp_path: Path):
+    """The #139 defect: a typo rendered identically to an empty corpus.
+
+    `mise run kb-skill-score -- clear-prpe` printed "no skill directories under
+    .claude/skills" with 7 skills present, because the filter dropped names with
+    no `SKILL.md` silently. The unresolved name must survive to the caller.
+    """
+    _skills(tmp_path, "real")
+    found, unknown = skill_eval.skill_dirs(tmp_path, ["reeal", "real"])
+    assert [p.name for p in found] == ["real"]
+    assert unknown == ["reeal"]
+
+
+def test_main_exits_2_on_a_typod_skill_name_and_names_it(tmp_path: Path, capsys):
+    """FAIL arm. Advisory covers findings, never a malformed request."""
+    _skills(tmp_path, "real")
+    assert skill_eval.main(["reeal"], tmp_path) == 2
+    err = capsys.readouterr().err
+    assert "reeal" in err
+    assert "real" in err  # what IS present, so the typo is fixable from the message
+
+
+def test_main_still_exits_0_when_the_corpus_really_is_empty(tmp_path: Path, capsys):
+    """Control arm for the above: absence is a different answer, and stays rc 0."""
+    (tmp_path / ".claude" / "skills").mkdir(parents=True)
+    assert skill_eval.main([], tmp_path) == 0
+    assert "no skill directories" in capsys.readouterr().err
+
+
+def test_write_refuses_a_partial_run(tmp_path: Path):
+    """A baseline written from one skill deletes every other skill's record."""
+    _skills(tmp_path, "real", "other")
+    assert skill_eval.main(["--write", "real"], tmp_path) == 2
+
+
+# -------------------------------------------------------------- vendored ----
+
+
+def test_vendored_names_come_from_currency_toml(tmp_path: Path):
+    (tmp_path / "currency.toml").write_text(
+        '[tool.graphify]\nmise_key = "graphify"\nskill_dir = ".claude/skills/graphify"\n'
+        '[tool.hk]\nmise_key = "hk"\n',
+        encoding="utf-8",
+    )
+    assert skill_eval.vendored_names(tmp_path) == frozenset({"graphify"})
+
+
+def test_vendored_names_are_empty_without_a_config(tmp_path: Path):
+    assert skill_eval.vendored_names(tmp_path) == frozenset()
+
+
+def test_a_malformed_config_does_not_kill_the_scoring_run(tmp_path: Path, capsys):
+    """`config.load` RAISES on a bad table; an advisory scorer must not die of it."""
+    (tmp_path / "currency.toml").write_text("[tool.broken]\npypi = 'x'\n", encoding="utf-8")
+    assert skill_eval.vendored_names(tmp_path) == frozenset()
+    assert "currency.toml" in capsys.readouterr().err
+
+
+def test_this_repos_real_config_still_declares_the_vendored_skill():
+    """Control arm against the real tree — the hardcoded set this replaced."""
+    assert "graphify" in skill_eval.vendored_names(_REPO)
+
+
+# ------------------------------------------------------------- baseline ----
+
+
+def test_baseline_round_trips_and_deltas_against_the_same_scorer(tmp_path: Path):
+    scorer = skill_eval.Scorer(root=Path("/x"), origin="marketplace", version="0.1.0")
+    skill_eval.write_baseline(tmp_path, scorer, [skill_eval.SkillScore(name="a", score=60.0)])
+
+    loaded = skill_eval.load_baseline(tmp_path)
+    assert loaded is not None
+    assert loaded.delta(skill_eval.SkillScore(name="a", score=61.4), scorer) == "+1.4"
+    assert loaded.delta(skill_eval.SkillScore(name="b", score=61.4), scorer) == "new"
+
+
+def test_an_unchanged_score_is_never_rendered_as_a_regression():
+    """Measured: re-running against a fresh baseline printed `-0.0` for 3 of 7.
+
+    The baseline stores 1dp and the live score carries full precision, so a
+    skill nobody touched differenced raw shows a minus sign — on the one column
+    whose entire purpose is to say whether anything moved.
+    """
+    scorer = skill_eval.Scorer(root=Path("/x"), origin="marketplace", version="0.1.0")
+    baseline = skill_eval.Baseline(scorer=scorer.key(), scores={"a": 61.1})
+    assert baseline.delta(skill_eval.SkillScore(name="a", score=61.14159), scorer) == "0.0"
+    assert baseline.delta(skill_eval.SkillScore(name="a", score=61.0501), scorer) == "0.0"
+    # Control arm: a real move of the same size still shows, with its sign.
+    assert baseline.delta(skill_eval.SkillScore(name="a", score=61.2), scorer) == "+0.1"
+    assert baseline.delta(skill_eval.SkillScore(name="a", score=61.0), scorer) == "-0.1"
+
+
+def test_no_delta_across_two_different_scorers(tmp_path: Path):
+    """Two scores from different plugin-eval builds are not comparable.
+
+    The provenance line exists for this reason; a Δ that quietly spanned two
+    builds would be exactly the false precision the module refuses elsewhere.
+    """
+    first = skill_eval.Scorer(root=Path("/x"), origin="marketplace", version="0.1.0")
+    later = skill_eval.Scorer(root=Path("/x"), origin="pinned-clone", version="0.2.0")
+    skill_eval.write_baseline(tmp_path, first, [skill_eval.SkillScore(name="a", score=60.0)])
+
+    loaded = skill_eval.load_baseline(tmp_path)
+    assert loaded is not None
+    assert loaded.delta(skill_eval.SkillScore(name="a", score=61.4), later) == "—"
+    # ...and the reader is told WHY, rather than shown a column of dashes.
+    out = skill_eval._render(later, [skill_eval.SkillScore(name="a", score=61.4)], baseline=loaded)
+    assert "different scorer" in out
+
+
+def test_a_failed_skill_is_not_recorded_as_a_number(tmp_path: Path):
+    """Otherwise the next run's Δ measures a placeholder."""
+    scorer = skill_eval.Scorer(root=Path("/x"), origin="marketplace", version="0.1.0")
+    skill_eval.write_baseline(
+        tmp_path,
+        scorer,
+        [
+            skill_eval.SkillScore(name="a", score=60.0),
+            skill_eval.SkillScore(name="b", score=None, error="boom"),
+        ],
+    )
+    loaded = skill_eval.load_baseline(tmp_path)
+    assert loaded is not None
+    assert set(loaded.scores) == {"a"}
+
+
+def test_an_unreadable_baseline_is_the_same_answer_as_none(tmp_path: Path):
+    path = tmp_path / "docs" / "skills"
+    path.mkdir(parents=True)
+    (path / "baseline.json").write_text("{ not json", encoding="utf-8")
+    assert skill_eval.load_baseline(tmp_path) is None
 
 
 # ------------------------------------------------------------- provenance ----
@@ -183,6 +323,21 @@ def test_version_is_empty_rather_than_wrong_when_unreadable(tmp_path: Path, monk
     assert "version unknown" in scorer.label()
 
 
+def test_the_comparability_key_carries_no_absolute_path():
+    """It is written into a TRACKED file and compared across machines.
+
+    Keying on `root` would commit one developer's home directory and make every
+    Δ vanish on any other host, even when the identical build scored both.
+    """
+    scorer = skill_eval.Scorer(
+        root=Path("/Users/someone/.claude/plugins/x"), origin="marketplace", version="0.1.0"
+    )
+    assert scorer.key() == "plugin-eval 0.1.0 [marketplace]"
+    assert "/Users/" not in scorer.key()
+    # Control arm: the console label DOES still name the checkout that ran.
+    assert "/Users/someone" in scorer.label()
+
+
 def test_marketplace_copy_wins_over_the_pinned_clone(tmp_path: Path, monkeypatch):
     """Order is the contract: the copy whose `/eval` a session reaches scores first."""
     for rel in ("mkt/plugin-eval", "vendor/plugin-eval"):
@@ -203,7 +358,9 @@ def test_marketplace_copy_wins_over_the_pinned_clone(tmp_path: Path, monkeypatch
 
 def test_a_run_that_measured_nothing_says_so_instead_of_averaging_zero():
     scorer = skill_eval.Scorer(root=Path("/x"), origin="pinned-clone", version="0.1.0")
-    out = skill_eval._render(scorer, [skill_eval.SkillScore(name="a", score=None, error="boom")])
+    out = skill_eval._render(
+        scorer, [skill_eval.SkillScore(name="a", score=None, error="boom")], baseline=None
+    )
     assert "NOT VERIFIABLE HERE" in out
     assert "0.0/100" not in out
 
@@ -216,6 +373,7 @@ def test_a_scored_run_reports_the_mean_and_names_its_scorer():
             skill_eval.SkillScore(name="a", score=60.0),
             skill_eval.SkillScore(name="b", score=70.0),
         ],
+        baseline=None,
     )
     assert "65.0/100" in out
     assert "marketplace" in out
