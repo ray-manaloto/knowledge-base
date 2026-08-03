@@ -77,6 +77,11 @@ class SkillResult:
     ran: bool
     changed: tuple[str, ...] = ()
     repaired: tuple[str, ...] = ()
+    #: Paths the installer dirtied that are STILL dirty after the repair ran.
+    #: Non-empty means damage is sitting in the working tree right now, and the
+    #: only honest thing to do is name the files — a caller who commits after
+    #: reading a cheerful note picks the damage up with the bump.
+    unrepaired: tuple[str, ...] = ()
     note: str = ""
 
 
@@ -88,6 +93,55 @@ def _git(repo_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         timeout=_TIMEOUT,
     )
+
+
+def _repair(repo_root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Revert whatever the installer dirtied in `_REPAIR`; return (reverted, still-dirty).
+
+    **The rc is not enough, and neither is one call.** `git checkout -- a b` is
+    ATOMIC across its pathspecs: if any one of them is unresolvable from the index
+    the whole invocation fails with rc=1 and reverts *nothing*, including the paths
+    that would have worked. The previous version knew that — its comment says so —
+    and still discarded the `CompletedProcess`, so the one case it did not narrow
+    away silently reported success over unreverted damage.
+
+    That case is reachable: `_dirty` reads `git status --porcelain`, whose `??`
+    lines are UNTRACKED files. An untracked `_REPAIR` path (a consumer with no
+    committed root `CLAUDE.md`, which this module's docstring explicitly invites)
+    therefore lands in the checkout argv and poisons the whole batch. Control-armed
+    in a scratch repo: `git checkout -- tracked untracked` → rc=1, and `tracked`
+    keeps its damaged contents.
+
+    So the batch is attempted first (cheap, and the normal case), then each path is
+    retried alone so one bad pathspec cannot veto the rest — and the ANSWER comes
+    from re-reading the tree, not from any exit code. What a caller needs to know is
+    "is the file clean now", and only `git status` can say that.
+    """
+    dirty = _dirty(repo_root, _REPAIR)
+    if not dirty:
+        return (), ()
+    _git(repo_root, "checkout", "--", *dirty)
+    still = _dirty(repo_root, _REPAIR)
+    for path in still:
+        _git(repo_root, "checkout", "--", path)
+    remaining = _dirty(repo_root, _REPAIR)
+    return tuple(p for p in dirty if p not in remaining), remaining
+
+
+def _clear_backups(repo_root: Path, skill_dir: Path) -> None:
+    """Delete the `.graphify-bak` files the installer leaves beside what it rewrote.
+
+    Scoped to where a backup can actually land — the skill directory, plus the
+    parent of every `_REPAIR` path — rather than to `skill.parent.parent`, which
+    was both too wide and too narrow: for `.claude/skills/graphify` it resolved to
+    `.claude/`, sweeping any `*.graphify-bak` anywhere under it while never
+    reaching a backup beside the ROOT `CLAUDE.md`, which is in `_REPAIR`.
+    """
+    roots = {skill_dir, *((repo_root / p).parent for p in _REPAIR)}
+    for root in roots:
+        if root.is_dir():
+            for bak in root.rglob("*.graphify-bak"):
+                bak.unlink(missing_ok=True)
 
 
 def _dirty(repo_root: Path, paths: tuple[str, ...]) -> tuple[str, ...]:
@@ -136,34 +190,50 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         env=clean_env(),
     )
     if proc.returncode != 0:
+        # REPAIR ON THE FAILURE PATH TOO. The pre-flight above proved the tree
+        # started clean, so anything dirty in `_REPAIR` now was written by this
+        # run — a half-finished installer (disk full, permission error, its own
+        # assertion) leaves exactly the machine-specific absolute path in
+        # settings.json that this module exists to prevent. Returning early with
+        # only "installer failed" left that sitting in the working tree, unnamed,
+        # for whoever commits the bump next.
+        reverted, still = _repair(repo_root)
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]
         return SkillResult(
             ran=False,
-            note=f"installer failed (rc={proc.returncode}): {' / '.join(tail)}",
+            repaired=reverted,
+            unrepaired=still,
+            note=(
+                f"installer failed (rc={proc.returncode}): {' / '.join(tail)}"
+                + (f". Reverted {', '.join(reverted)}" if reverted else "")
+                + (f". ⚠ STILL DIRTY, fix before committing: {', '.join(still)}" if still else "")
+            ),
         )
 
-    # Revert only what the installer ACTUALLY dirtied, not the whole `_REPAIR`
-    # list. `git checkout -- a b` fails outright when `b` is not in the index, so
-    # naming a path this repo happens not to have (a consumer with no root
-    # `CLAUDE.md`) aborted the entire repair and left settings.json damaged —
-    # caught by the unit test the moment `CLAUDE.md` joined the list.
-    repaired = _dirty(repo_root, _REPAIR)
-    if repaired:
-        _git(repo_root, "checkout", "--", *repaired)
-    # The installer also leaves a `.graphify-bak` beside the file it rewrote.
-    for bak in skill.parent.parent.rglob("*.graphify-bak"):
-        bak.unlink(missing_ok=True)
+    repaired, unrepaired = _repair(repo_root)
+    _clear_backups(repo_root, skill)
 
     changed = _dirty(repo_root, (spec.skill_dir,))
     return SkillResult(
+        # `ran` describes the INSTALL, which did run. Whether the tree is clean
+        # afterwards is `unrepaired`'s job — collapsing the two would make a
+        # successful install with unreverted damage indistinguishable from an
+        # installer that never started.
         ran=True,
         changed=changed,
         repaired=repaired,
+        unrepaired=unrepaired,
         note=(
             f"skill refreshed; {len(changed)} file(s) changed"
             + (
                 f"; repaired {', '.join(repaired)} after the installer rewrote it"
                 if repaired
+                else ""
+            )
+            + (
+                f". ⚠ COULD NOT REVERT {', '.join(unrepaired)} — the installer's changes "
+                f"are still in the working tree; inspect them before committing"
+                if unrepaired
                 else ""
             )
             + ". Review the diff — a version bump often changes NOTHING here "

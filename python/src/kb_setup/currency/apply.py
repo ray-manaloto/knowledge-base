@@ -177,6 +177,17 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     notes = ["rebuild pending — run `mise run kb-build` locally to re-stamp the graph"]
     if spec.skill_dir:
         notes.append(f"skill: {skill_result.note}")
+    # Lead with unreverted damage rather than leaving it mid-sentence in the skill
+    # note. This is the only consumer of `SkillResult`, and the note is what a human
+    # reads to decide the bump is clean — so the one condition that makes it NOT
+    # clean has to be readable without parsing prose. `_repair` reports it by
+    # re-reading `git status`, not by trusting an exit code.
+    if skill_result.unrepaired:
+        notes.insert(
+            0,
+            f"⚠ working tree still dirty: {', '.join(skill_result.unrepaired)} — "
+            f"the installer's changes were NOT reverted; inspect before committing",
+        )
     return ApplyResult(
         tool=spec.name,
         from_version=verdict.current,

@@ -123,3 +123,109 @@ def test_it_repairs_settings_json_after_a_successful_install(tmp_path) -> None:
     assert any("SKILL.md" in c for c in result.changed), (
         f"changed did not name the skill: {result.changed}"
     )
+
+
+# --------------------------------------------------------------------------
+# Cold-lane findings, PR round 1 (report `review-a95e0aa-cold.md`).
+#
+# The fixtures above could not exhibit either defect: the happy-path repair test
+# only dirties files that already exist in the base commit, and the failure test
+# uses `false`, which never touches disk. Both gaps are the same shape — a test
+# whose fixture cannot reach the failure it is named for.
+# --------------------------------------------------------------------------
+
+
+def _installer(script: str) -> tuple[str, ...]:
+    """A real installer that touches disk, as argv. `sh -c` keeps it one file."""
+    return ("sh", "-c", script)
+
+
+def test_an_untracked_repair_path_does_not_veto_the_whole_repair(tmp_path) -> None:
+    """`git checkout -- a b` is ATOMIC: one bad pathspec reverts NEITHER.
+
+    Control-armed in a scratch repo before fixing: with `tracked` modified and
+    `untracked` present, `git checkout -- tracked untracked` exits 1 and `tracked`
+    keeps its damaged contents. `_dirty` reads `git status --porcelain`, whose
+    `??` lines are untracked files, so an untracked `_REPAIR` path lands in that
+    argv — reachable for any consumer with no committed root `CLAUDE.md`, which
+    this module's docstring explicitly invites.
+
+    Before the fix this reported `repaired=(settings.json, CLAUDE.md)` and a note
+    saying both were repaired, while settings.json sat on disk still damaged.
+    """
+    repo = _repo(tmp_path)
+    # The installer damages a TRACKED repair path and creates an UNTRACKED one.
+    result = skill.refresh(
+        repo,
+        _spec(
+            skill_install=_installer(
+                'printf \'{"hooks": "DAMAGED"}\\n\' > .claude/settings.json; '
+                "printf 'untracked\\n' > CLAUDE.md",
+            )
+        ),
+    )
+
+    assert result.ran is True
+    settings = (repo / ".claude" / "settings.json").read_text(encoding="utf-8")
+    assert "ORIGINAL" in settings, "the tracked path must be reverted despite the untracked one"
+    assert ".claude/settings.json" in result.repaired
+    # The untracked file cannot be reverted — git has no version to restore. That
+    # is reported, not hidden: it is real dirt in the working tree.
+    assert "CLAUDE.md" in result.unrepaired
+    assert "COULD NOT REVERT" in result.note
+
+
+def test_a_clean_repair_reports_nothing_unrepaired(tmp_path) -> None:
+    """Control arm for the test above — the ordinary case must stay quiet."""
+    repo = _repo(tmp_path)
+    result = skill.refresh(
+        repo,
+        _spec(
+            skill_install=_installer('printf \'{"hooks": "DAMAGED"}\\n\' > .claude/settings.json')
+        ),
+    )
+    assert result.ran is True
+    assert result.unrepaired == ()
+    assert "COULD NOT REVERT" not in result.note
+    assert "ORIGINAL" in (repo / ".claude" / "settings.json").read_text(encoding="utf-8")
+
+
+def test_a_half_finished_installer_does_not_leave_damage_unmentioned(tmp_path) -> None:
+    """The pre-flight proved the tree was clean, so this dirt is OURS.
+
+    A multi-file installer failing partway (disk full, permission error, its own
+    assertion) is ordinary. Returning only "installer failed" left a
+    machine-specific absolute path in settings.json for whoever committed next —
+    the exact defect `_REPAIR` exists to prevent, reached by the one path it did
+    not guard.
+    """
+    repo = _repo(tmp_path)
+    result = skill.refresh(
+        repo,
+        _spec(
+            skill_install=_installer(
+                'printf \'{"hooks": "/abs/PARTIAL"}\\n\' > .claude/settings.json; exit 1'
+            )
+        ),
+    )
+
+    assert result.ran is False
+    assert "installer failed" in result.note
+    assert "ORIGINAL" in (repo / ".claude" / "settings.json").read_text(encoding="utf-8")
+    assert ".claude/settings.json" in result.repaired
+
+
+def test_backups_beside_a_root_repair_path_are_cleared(tmp_path) -> None:
+    """The old glob was `skill.parent.parent` — `.claude/`, for a `.claude/skills/*` skill.
+
+    Both too wide (any `*.graphify-bak` anywhere under `.claude/`) and too narrow
+    (never reaching a backup beside the ROOT `CLAUDE.md`, which is in `_REPAIR`).
+    """
+    repo = _repo(tmp_path)
+    (repo / "CLAUDE.md.graphify-bak").write_text("stale\n", encoding="utf-8")
+    (repo / ".claude" / "settings.json.graphify-bak").write_text("stale\n", encoding="utf-8")
+
+    skill.refresh(repo, _spec())
+
+    assert not (repo / "CLAUDE.md.graphify-bak").exists()
+    assert not (repo / ".claude" / "settings.json.graphify-bak").exists()
