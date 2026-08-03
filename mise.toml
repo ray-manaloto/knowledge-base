@@ -20,19 +20,19 @@
 # task-freshness correctness fixes (#11288, #11296) landed — below that there are
 # known-bad behaviours, even though this repo is not currently exposed to either
 # (no `env._.file`, no task `sources`/`outputs`). soft tracks the version this
-# repo has actually been verified against — 2026.7.18 as of the 2026-07-31
+# repo has actually been verified against — 2026.8.0 as of the 2026-08-03
 # currency review — so anything from 7.14 up runs with a nudge rather than a stop.
 # Bump soft in the SAME change that bumps `currency.toml`'s `expected`, or the
 # comment and the value drift apart (they did, and the cold lane caught it).
 # Keep soft > hard or soft is inert: hard errors across exactly the range soft
 # would warn in, so an equal pair makes the warning unobservable.
-min_version = { hard = "2026.7.14", soft = "2026.7.18" }
+min_version = { hard = "2026.7.14", soft = "2026.8.0" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.6"
 uv = "0.11.28"
-hk = "1.52.0"
+hk = "1.54.0"
 pkl = "0.32.0"
 typos = "1.48.0"
 # graphify [all] resolves on host Python 3.14 (leiden/graspologic extra
@@ -62,7 +62,7 @@ gitleaks = "8.30.1"
 # while the global install stays on `latest` — a deliberate, accepted skew.
 # This repo pins what fnox it EXPECTS; it does not touch `~/.config/fnox`, so
 # `do-not.md` #11 is not engaged. Bump alongside the global one.
-fnox = "1.31.1"
+fnox = "1.32.0"
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
 # (yuting0624/antigravity-for-claude-code). Canonical mise registry short names

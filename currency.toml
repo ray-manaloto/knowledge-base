@@ -266,7 +266,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.7.18"
+expected = "2026.8.0"
 # `mise --version` prints `2026.7.16 macos-arm64 (2026-07-29)`, so the engine's
 # default last-whitespace-field heuristic returns the build DATE. Anchored at the
 # start so it reads the version and not some later digit run.
@@ -285,7 +285,13 @@ straight on every bump: `currency.toml` `expected` = the version whose notes we
 have read (moves every time we review); `mise.toml` `min_version.soft` = the
 version we are verified against; `min_version.hard` = the oldest we will run at
 all (2026.7.14, where #11269/#11288/#11296 landed). soft must stay ABOVE hard or
-it is inert — hard errors across exactly the range soft would warn in."""
+it is inert — hard errors across exactly the range soft would warn in.
+
+MOVED 2026-08-03 for v2026.8.0: `soft` 2026.7.18 -> 2026.8.0 in the SAME change as
+`expected` above, which is exactly what this item exists to enforce. `hard` stays
+at 2026.7.14 — nothing between 7.18 and 8.0 introduces a known-bad behaviour that
+would justify raising the floor — and soft (8.0) > hard (7.14), so the warning
+band stays observable."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -297,7 +303,16 @@ the 7.16 gate, and it is INERT here: 0 uses of `mise dotfiles` in this repo
 (control arm — `mise run` greps to 24 hits in mise.toml, so the probe
 discriminates). Recorded like the Tera item so the 2027.2.0 and 2028.2.0
 releases are not read as routine, and so a future session does not have to
-re-derive that the marker was harmless."""
+re-derive that the marker was harmless.
+
+RE-PROBED 2026-08-03 for v2026.8.0: still INERT, but the probe needs a caveat that
+did not exist before. Every hit for `mise dotfiles` in this repo is now THIS
+item's own text plus prior currency reports — documentation OF the deprecation,
+not a use of it. A naive grep returns 8 and reads as a regression: **a watch item
+that names a token makes itself grep-positive forever**, so exclude
+`currency.toml` and `docs/currency/` or the item refutes its own claim. Control
+arm: `mise run` -> 27 hits in `mise.toml`. 2026.8.0 touches `dotfiles add` only
+through `config --path <dir>`, which this repo does not use."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -308,7 +323,11 @@ wearing an authoritative empty answer's clothes, which is the exact shape
 `.claude/rules/probes-need-a-control-arm.md` exists to catch. Fixed in 7.16
 (reported as a fetch failure, and memoized per process). Kept as a watch item
 because any host still BELOW 7.16 will show the misleading form, so the
-signature table in `persistence-gate-retry.md` has to keep both."""
+signature table in `persistence-gate-retry.md` has to keep both.
+
+RE-PROBED 2026-08-03 for v2026.8.0: unchanged, and still correct to keep. This
+host is far above the 7.16 floor so the misleading form cannot appear here; the
+item survives for hosts that are not."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -337,7 +356,28 @@ monorepo/Node-workspace task work (#11466/#11435/#11473/#11476/#11471) needs a
 pagination (#11507), Cargo install options (#11480), Aqua locked HTTP installs
 (#11499) and the asdf `bin/list-all` env plumbing (#11492) are all on paths this
 repo never takes. #11495 (installing a tool no longer touches loaded config
-files) DOES reach `mise install` here and is a pure improvement."""
+files) DOES reach `mise install` here and is a pure improvement.
+
+RE-PROBED 2026-08-03 for v2026.8.0, and it lands on this surface AGAIN — read as
+carefully as the 7.18 entry above. **hook-env now detects and restores drift**: if
+a shell command overwrites a mise-managed variable or removes a PATH entry mise
+added, hook-env puts it back.
+
+It does NOT retire `resolve_from_path` / `_is_mise_shim` / `_mise_shim_dirs`, for
+the same reason 7.18's dedup did not. Ours is a stale, DIFFERENT directory ordered
+AHEAD of the shims — nothing was removed and nothing is duplicated, so neither
+dedup nor restore-what-was-removed reaches it. Measured the same day at 0.9.31:
+`command -v graphify` still resolves to
+`~/.local/share/mise/installs/pipx-graphifyy/<ver>/bin/graphify` rather than a
+shim, which is why `mise.toml`'s `GRAPHIFY_MAX_GRAPH_BYTES` does not reach a bare
+`graphify` call and why `mise exec -- graphify …` is required above the cap.
+
+Nothing else in 2026.8.0 reaches this repo, checked rather than assumed: the
+monorepo workspace inference (#11554 Cargo, #11556 uv, Go, Node) needs workspace
+metadata — control-armed, `[tool.uv.workspace]` appears **0** times in
+`pyproject.toml`; precompiled Ruby, aqua BOM checksums (#11552), brew-cask pours,
+the forgejo `fj` key path (#11545) and the asdf `depends` PATH fix are all on
+paths this repo never takes."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -345,7 +385,11 @@ ref = "tera-v1-escape-hatch-removal"
 note = """mise moved templates from Tera v1 to v2 in v2026.7.1 (#10756) with a
 `tera_v1` / `MISE_TERA_V1` escape hatch scheduled for REMOVAL in 2027.4.0
 (#10817). This repo sets neither, so it is already on v2 — the item is here so
-the 2027.4.0 release is not read as routine."""
+the 2027.4.0 release is not read as routine.
+
+RE-PROBED 2026-08-03 for v2026.8.0: `tera_v1` / `MISE_TERA_V1` -> **0** occurrences
+(control arm: `[env]` -> 1 in the same file, so the grep discriminates). Already
+on v2; nothing to do until 2027.4.0."""
 
 [tool.claude-code]
 # The harness itself. Tracked NOT for a mise pin — Claude Code manages its own
@@ -525,7 +569,12 @@ by a fixed defect is exactly what to re-examine.
 Deliberately NOT retired (Ray, 2026-07-31): `exclusive` works, the doctrine spans
 both repos, and dotfiles machine-enforces it — retiring it here alone would split
 the two repos' rules. Recorded WITH its version condition so a future reader knows
-which of the two it is, and so any revival is a decision rather than a rediscovery."""
+which of the two it is, and so any revival is a decision rather than a rediscovery.
+
+RE-PROBED 2026-08-03 for v1.54.0: unchanged in substance. 1.53.0 carried the
+#1099 fix already recorded; 1.54.0 adds `check_failed_files`, command-effect
+declarations and perf (17% smaller binary, 31% faster startup) with no
+dependency-graph change. The ban stays a CHOICE, still deliberately not retired."""
 
 [[tool.hk.watch]]
 kind = "local"
@@ -538,7 +587,13 @@ But a drift surface remains on a DIFFERENT axis: the version appears three times
 across two files — `mise.toml`'s `hk` pin, and `hk.pkl`'s `amends` and `import`
 URLs. A `mise.toml`-only bump runs a new BINARY against the old SCHEMAS. Bump all
 three together, or the mismatch shows up as a pkl error with nothing pointing at
-the pin."""
+the pin.
+
+RE-PROBED 2026-08-03 at the 1.52.0 -> 1.54.0 bump, and the method held: the
+version occurred exactly TWICE in `hk.pkl` (`amends` + `import`) and once in
+`mise.toml`. All three moved in one edit, asserted on the count rather than
+replaced blindly, then `hk validate` (rc=0) and `mise run lint` (rc=0) confirmed
+the new binary agrees with the new schemas — which is this item's whole point."""
 
 # ---------------------------------------------------------------------------
 # fnox — the credential tool the shell's secrets come from (#86)
@@ -571,4 +626,12 @@ note = """Pinning fnox in this repo's `[tools]` means the shim resolves to the
 pinned version INSIDE this directory while the global install stays on `latest`
 — an accepted skew, chosen deliberately so this repo states the fnox it expects.
 Bump the two together; a bump here alone narrows the skew rather than closing it,
-and the global side is not this repo's to edit (`do-not.md` #11)."""
+and the global side is not this repo's to edit (`do-not.md` #11).
+
+RE-PROBED 2026-08-03 at the 1.31.1 -> 1.32.0 bump: the skew is UNCHANGED and
+still accepted. 1.32.0 is purely additive (credential proxy, `exec --replace`,
+Azure App Configuration provider, AWS IAM role assumption) with no change to how
+a pinned shim resolves. Checked and explicitly NOT true: it does not address
+knowledge-base #74 (`env="exec"` silently emptying env-var credentials) —
+`exec --replace` is a new process-replacement MODE, not a fix to that path, so
+#74 stays open. **The global fnox bump is still owed** and is Ray's to make."""

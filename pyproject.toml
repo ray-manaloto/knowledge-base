@@ -9,6 +9,14 @@ dependencies = []
 kb-setup = "kb_setup.cli:main"
 
 [project.optional-dependencies]
+# DELIBERATELY a floor and not an `==`, unlike the dev group below — this is the
+# one dependency table that REACHES A CONSUMER. dotfiles installs this package as
+# a SHA-pinned git dependency (`dotfiles/python/pyproject.toml:37`), so an exact
+# pin here would force that exact trafilatura on a repo with its own resolution
+# to satisfy, and turn any conflict there into an unresolvable one. Applying
+# CLAUDE.md's "exact pins" rule literally here would export our preference as
+# someone else's constraint. Reproducibility for us is `uv.lock`, which records
+# 2.1.0 regardless.
 # Article-body extraction for the rendered-page fetch path (kb_setup.fetch).
 # Apache-2.0 — the same licence as graphify, which matters: graphify removed
 # html2text purely on copyleft grounds (PR #586), so a GPL extractor would be
@@ -19,7 +27,18 @@ fetch = ["trafilatura>=2.0"]
 [dependency-groups]
 # trafilatura is in dev too so `ty` can resolve the optional import rather than
 # reporting an unresolved module (this repo forbids inline suppressions).
-dev = ["ruff>=0.11", "ty>=0.0.1a1", "pytest>=8", "trafilatura>=2.0"]
+#
+# EXACT pins, per CLAUDE.md's "no floating ranges". The ranges these replace were
+# badly stale — `ruff>=0.11` against a resolved 0.15.22, `pytest>=8` against
+# 9.1.1 — so the declared floor described a toolchain nobody had run in months,
+# and a fresh clone could resolve a different linter than the one every gate here
+# was verified against. `ty` matters most: it is pre-1.0, so `>=0.0.1a1` admitted
+# every future breaking release by construction.
+#
+# Safe to pin exactly BECAUSE this is a `[dependency-groups]` table (PEP 735):
+# dev groups are not installed by consumers, so an `==` here binds nobody but us.
+# Contrast `[project.optional-dependencies]` below, which IS exported.
+dev = ["ruff==0.15.22", "ty==0.0.62", "pytest==9.1.1", "trafilatura==2.1.0"]
 
 [build-system]
 requires = ["hatchling"]
