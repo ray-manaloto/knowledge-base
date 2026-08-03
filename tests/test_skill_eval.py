@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from kb_setup import skill_eval
 
 _REPO = Path(__file__).parent.parent.absolute()
@@ -90,6 +91,50 @@ def test_anti_patterns_are_read_per_layer_not_top_level():
 
     top_level = json.dumps({"composite": {"score": 1.0}, "anti_patterns": ["OVER_CONSTRAINED"]})
     assert skill_eval._parse("x", top_level, vendored=False).anti_patterns == ()
+
+
+def test_anti_patterns_are_read_from_the_key_plugin_eval_actually_emits():
+    """`flag` — measured from plugin-eval 0.1.0, not assumed.
+
+    The reader looked for `name`/`type`/`pattern` and reported **0
+    anti-patterns for all 7 of this repo's skills when 5 had one**. The claim
+    reached the committed baseline, a commit message and a session handoff. The
+    test above passed the whole time because its fixture used `name`: code and
+    test shared one wrong assumption and agreed with each other, which is why a
+    green suite proved nothing (`probes-need-a-control-arm.md`).
+
+    This payload is copied from a real run, verbatim.
+    """
+    real = json.dumps(
+        {
+            "composite": {"score": 62.8, "anti_pattern_penalty": 0.95},
+            "layers": [
+                {
+                    "layer": "static",
+                    "anti_patterns": [
+                        {
+                            "flag": "DEAD_CROSS_REF",
+                            "description": "Cross-reference to skill/agent 'baseline' cannot be "
+                            "resolved. Dead links degrade ecosystem coherence.",
+                            "severity": 0.05,
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    got = skill_eval._parse("clear-prep", real, vendored=False)
+    assert got.anti_patterns == ("DEAD_CROSS_REF",)
+    # The penalty is carried too: it is the ONLY term that explains a composite
+    # falling while every reported dimension improved.
+    assert got.penalty == 0.95
+
+
+def test_the_penalty_defaults_to_a_no_op_when_absent():
+    """Control arm: a clean skill must not be rendered as penalised."""
+    got = skill_eval._parse("x", _report(), vendored=False)
+    assert got.penalty == 1.0
+    assert got.anti_patterns == ()
 
 
 # ------------------------------------------------------- weakest dimension ----
@@ -188,6 +233,32 @@ def test_write_refuses_a_partial_run(tmp_path: Path):
     assert skill_eval.main(["--write", "real"], tmp_path) == 2
 
 
+def test_an_unrecognised_flag_is_refused_like_an_unknown_name(tmp_path: Path, capsys):
+    """Cold lane, round 1: a bad flag ran a normal scoring pass and returned 0.
+
+    Splitting argv on a leading `-` dropped every unrecognised flag out of
+    `names`, and only an exact `"--write"` ever set the flag — so `--dry-run`, or
+    a misspelling of `--write`, took the same path as a well-formed no-argument
+    request, having done none of what was asked. The rule the module applies to
+    an unknown SKILL has to apply here too.
+
+    `--dry-run` rather than a misspelling on purpose: a plausible flag someone
+    assumes exists is the case that actually happens, and it does not need a
+    spell-checker exemption to sit in the test suite.
+    """
+    _skills(tmp_path, "real")
+    assert skill_eval.main(["--dry-run"], tmp_path) == 2
+    err = capsys.readouterr().err
+    assert "--dry-run" in err
+    assert "--write" in err  # what IS accepted, so the mistake is fixable from the message
+    assert not (tmp_path / "docs" / "skills" / "baseline.json").exists()
+
+
+def test_the_accepted_flag_still_works(tmp_path: Path):
+    """Control arm for the above: rejection must not swallow the real flag."""
+    assert skill_eval.main(["--write"], tmp_path) == 0  # no skills here -> rc 0, not 2
+
+
 # -------------------------------------------------------------- vendored ----
 
 
@@ -263,20 +334,49 @@ def test_no_delta_across_two_different_scorers(tmp_path: Path):
     assert "different scorer" in out
 
 
-def test_a_failed_skill_is_not_recorded_as_a_number(tmp_path: Path):
-    """Otherwise the next run's Δ measures a placeholder."""
+def test_a_failed_skill_refuses_the_whole_write_rather_than_erasing_its_history():
+    """Cold lane, round 1 — the P2. Writing would DELETE `b`'s last known score.
+
+    The payload is built from this run's results, so a skill with no number stops
+    being a key and the next successful run reports it as `new` — a delta that
+    silently never happened. One `subprocess.TimeoutExpired`, the case the
+    timeout handling exists for, is enough to trigger it.
+    """
     scorer = skill_eval.Scorer(root=Path("/x"), origin="marketplace", version="0.1.0")
-    skill_eval.write_baseline(
-        tmp_path,
-        scorer,
-        [
-            skill_eval.SkillScore(name="a", score=60.0),
-            skill_eval.SkillScore(name="b", score=None, error="boom"),
-        ],
-    )
+    with pytest.raises(ValueError, match="did not score"):
+        skill_eval.write_baseline(
+            Path("/nonexistent-should-not-be-reached"),
+            scorer,
+            [
+                skill_eval.SkillScore(name="a", score=60.0),
+                skill_eval.SkillScore(name="b", score=None, error="boom"),
+            ],
+        )
+
+
+def test_the_refusal_leaves_the_existing_baseline_untouched(tmp_path: Path):
+    """It must refuse BEFORE writing — a truncated file is the harm itself."""
+    scorer = skill_eval.Scorer(root=Path("/x"), origin="marketplace", version="0.1.0")
+    good = [
+        skill_eval.SkillScore(name="a", score=60.0),
+        skill_eval.SkillScore(name="b", score=70.0),
+    ]
+    skill_eval.write_baseline(tmp_path, scorer, good)
+    before = (tmp_path / "docs" / "skills" / "baseline.json").read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="did not score"):
+        skill_eval.write_baseline(
+            tmp_path,
+            scorer,
+            [
+                skill_eval.SkillScore(name="a", score=61.0),
+                skill_eval.SkillScore(name="b", score=None),
+            ],
+        )
+    assert (tmp_path / "docs" / "skills" / "baseline.json").read_text(encoding="utf-8") == before
     loaded = skill_eval.load_baseline(tmp_path)
     assert loaded is not None
-    assert set(loaded.scores) == {"a"}
+    assert loaded.scores == {"a": 60.0, "b": 70.0}  # b's history survived
 
 
 def test_an_unreadable_baseline_is_the_same_answer_as_none(tmp_path: Path):
@@ -378,6 +478,21 @@ def test_a_scored_run_reports_the_mean_and_names_its_scorer():
     assert "65.0/100" in out
     assert "marketplace" in out
     assert "NOT VERIFIABLE HERE" not in out
+
+
+def test_every_accepted_flag_appears_in_the_cli_usage_text():
+    """Every accepted flag must appear in `kb-setup`'s own usage line.
+
+    Cold lane, round 1 — the P3. `--write` reached mise.toml and the rule file
+    and never reached `kb-setup`'s own usage line, which is the one place a
+    reader looks when the task's `--` passthrough is what confused them.
+
+    Asserted against `_FLAGS` rather than the literal string, so a flag added
+    later fails here instead of quietly repeating the omission.
+    """
+    usage = (Path(skill_eval.__file__).parent / "cli.py").read_text(encoding="utf-8")
+    for flag in skill_eval._FLAGS:
+        assert f"skill-score [{flag}]" in usage, f"{flag} missing from cli.py usage"
 
 
 def test_main_is_advisory_even_with_no_scorer(tmp_path: Path, monkeypatch):

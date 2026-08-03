@@ -81,6 +81,10 @@ _SKILLS_DIR = ".claude/skills"
 _BASELINE_JSON = "docs/skills/baseline.json"
 _BASELINE_MD = "docs/skills/README.md"
 
+#: Every flag `main` accepts. Anything else prefixed `-` is a malformed request,
+#: not a skill name — see `main`.
+_FLAGS = frozenset({"--write"})
+
 _SCORE_TIMEOUT_S = 120.0
 
 #: `version = "0.1.0"` out of a pyproject, without a TOML parse of a file we do
@@ -119,6 +123,13 @@ class SkillScore:
     name: str
     score: float | None
     anti_patterns: tuple[str, ...] = ()
+    #: `composite.anti_pattern_penalty` — a MULTIPLIER on the composite, not a
+    #: dimension. Carried because without it the score is unexplainable from the
+    #: report: an edit to `clear-prep` improved every reported dimension
+    #: (token_efficiency 0.988→0.989, ecosystem_coherence 0.990→1.000) and the
+    #: composite still fell 66.1→62.8, purely because a x0.95 penalty appeared.
+    #: A reader shown only dimensions would conclude the tool was broken.
+    penalty: float = 1.0
     weakest: str = ""
     error: str = ""
     vendored: bool = False
@@ -256,10 +267,12 @@ def _parse(name: str, stdout: str, *, vendored: bool) -> SkillScore:
     raw = composite.get("score") if isinstance(composite, dict) else None
     if not isinstance(raw, (int, float)):
         return SkillScore(name=name, score=None, error="no composite score", vendored=vendored)
+    penalty = composite.get("anti_pattern_penalty") if isinstance(composite, dict) else None
     return SkillScore(
         name=name,
         score=float(raw),
         anti_patterns=_anti_patterns(data),
+        penalty=float(penalty) if isinstance(penalty, (int, float)) else 1.0,
         weakest=_weakest(data),
         vendored=vendored,
     )
@@ -272,6 +285,20 @@ def _anti_patterns(data: Mapping[str, object]) -> tuple[str, ...]:
     so a top-level lookup silently returns none — a count of 0 that means "not
     where I looked", not "none found". Exactly the shape of false-green this
     repo's probe rule exists to stop, which is why it is read per-layer here.
+
+    **`flag` is the real key, and getting it wrong reproduced the same false
+    green one level down.** plugin-eval 0.1.0 emits
+    `{"flag": "DEAD_CROSS_REF", "description": ..., "severity": 0.05}`; this
+    function read `name`/`type`/`pattern`, matched none of them, and reported
+    **0 anti-patterns for all 7 of this repo's skills when 5 had one** — a
+    claim that reached the committed baseline, a commit message and a session
+    handoff before anyone questioned it. The unit test passed throughout because
+    its fixture used `name`, so the test and the code shared one wrong
+    assumption and agreed with each other (`probes-need-a-control-arm.md`; the
+    fixture-shaped-test failure mode).
+
+    Measured, not guessed: the key list below is ordered by what plugin-eval
+    actually emits, with the others kept as tolerant fallbacks.
     """
     layers = data.get("layers")
     if not isinstance(layers, list):
@@ -287,7 +314,9 @@ def _anti_patterns(data: Mapping[str, object]) -> tuple[str, ...]:
             if isinstance(item, str):
                 names.append(item)
             elif isinstance(item, dict):
-                label = item.get("name") or item.get("type") or item.get("pattern")
+                label = (
+                    item.get("flag") or item.get("name") or item.get("type") or item.get("pattern")
+                )
                 if isinstance(label, str):
                     names.append(label)
     return tuple(names)
@@ -394,13 +423,32 @@ def write_baseline(
 ) -> Path:
     """Record this run as the committed baseline; returns the JSON path.
 
-    Only SCORED skills are recorded. A skill that failed to score has no number,
-    and writing a placeholder would make the next run's Δ measure the placeholder.
+    **Raises `ValueError` unless every result scored.** Writing a baseline from a
+    run where a skill failed would DELETE that skill's last known score: the
+    payload is built from this run's results, so a skill with no number simply
+    stops being a key, and the next successful run reports it as `new` rather
+    than showing the delta it actually moved. One `subprocess.TimeoutExpired` —
+    the case the timeout handling exists for — is enough to trigger it, which is
+    what makes silence the wrong answer.
+
+    Refusing rather than carrying the old value forward is the same rule
+    `--write` already applies to a name-filtered run: a baseline is the FULL
+    table or it is a trap. Carrying forward would put a number in the file that
+    this run did not measure, and nothing downstream could tell the two apart.
 
     The rendered `README.md` carries the Δ against the baseline being REPLACED,
     which is the only moment that movement is knowable — the old numbers are gone
     the instant the JSON is rewritten.
     """
+    unscored = [r.name for r in results if r.score is None]
+    if unscored:
+        # Checked HERE, at the point of use, rather than only in `main`: this is
+        # the function that destroys the old file, so it is the function that has
+        # to refuse.
+        raise ValueError(
+            f"refusing to write a baseline: {', '.join(sorted(unscored))} did not score, "
+            f"and writing would delete the last score they had"
+        )
     path = repo_root / _BASELINE_JSON
     path.parent.mkdir(parents=True, exist_ok=True)
     rendered = _render(
@@ -445,7 +493,11 @@ def _render(
     ]
     for r in sorted(results, key=lambda x: (x.score is None, -(x.score or 0.0), x.name)):
         cell = f"{r.score:.1f}" if r.score is not None else "—"
+        # The multiplier rides along with the flags: it is the only term that
+        # explains a composite moving against every dimension in the report.
         found = ", ".join(r.anti_patterns) if r.anti_patterns else "0"
+        if r.penalty != 1.0:
+            found += f" (x{r.penalty:g})"
         note = r.error or ("vendored — regenerated by `kb-currency`" if r.vendored else "")
         delta = baseline.delta(r, scorer) if baseline else "—"
         lines.append(f"| `{r.name}` | {cell} | {delta} | {found} | {r.weakest or '—'} | {note} |")
@@ -480,39 +532,68 @@ def _render(
     return "\n".join(lines)
 
 
-def main(argv: list[str], repo_root: Path) -> int:
-    """`mise run kb-skill-score [--write] [-- <skill>...]`.
+class BadRequestError(ValueError):
+    """A malformed invocation — rc 2, never a measurement outcome.
 
-    Returns 0 for every measurement outcome, including "nothing here could
-    measure anything" — advisory means a score never fails a caller's gate. It
-    returns **2** for a malformed request (a skill name that matches nothing),
-    the same split `currency.run` draws for an unknown `--tool`.
+    Kept distinct from every "could not measure" path so the two cannot be
+    collapsed by a later edit: advisory governs findings, and a request nobody
+    can honour is not a finding.
+    """
+
+
+def parse_request(argv: list[str], repo_root: Path) -> tuple[list[Path], bool]:
+    """`(skill directories to score, whether to re-baseline)`, or raise `BadRequestError`.
+
+    Validated BEFORE the scorer is resolved, deliberately: a typo is a typo on a
+    machine that has no plugin-eval installed too, and reporting
+    NOT VERIFIABLE HERE for a misspelled name would send the reader off to
+    install a plugin that was never the problem.
     """
     names = [a for a in argv if not a.startswith("-")]
+    # Unrecognised flags are rejected, not ignored. Splitting argv on a leading
+    # `-` silently swallowed every typo: a misspelled `--write` dropped out of
+    # `names`, never matched the exact `"--write"` test, and ran an ordinary
+    # scoring pass at rc 0 — the same output as a well-formed request, having
+    # done none of what was asked. The name check below already refuses a typo'd
+    # SKILL; a bad FLAG has to be refused by the same rule, or the rule is only
+    # half applied.
+    bad_flags = [a for a in argv if a.startswith("-") and a not in _FLAGS]
+    if bad_flags:
+        raise BadRequestError(
+            f"unknown option {', '.join(repr(f) for f in bad_flags)}; "
+            f"accepted: {', '.join(sorted(_FLAGS))}"
+        )
     write = "--write" in argv
     if write and names:
         # A baseline is the FULL table or it is a trap: writing one from a
         # single-skill run would silently delete every other skill's recorded
         # score, and the next full run would report six `new` rows as though
         # nothing had ever been measured.
-        print(
-            "[skill-score] --write records the whole table; drop the skill names",
-            file=sys.stderr,
-        )
-        return 2
-
-    # The request is validated BEFORE the scorer, deliberately: a typo is a typo
-    # on a machine that has no plugin-eval installed too, and reporting
-    # NOT VERIFIABLE HERE for a misspelled name would send the reader to install
-    # a plugin that was never the problem.
+        raise BadRequestError("--write records the whole table; drop the skill names")
     targets, unknown = skill_dirs(repo_root, names or None)
     if unknown:
         known = ", ".join(sorted(p.name for p in skill_dirs(repo_root)[0])) or "(none)"
-        print(
-            f"[skill-score] unknown skill {', '.join(repr(n) for n in unknown)}"
-            f" under {_SKILLS_DIR}; present: {known}",
-            file=sys.stderr,
+        raise BadRequestError(
+            f"unknown skill {', '.join(repr(n) for n in unknown)}"
+            f" under {_SKILLS_DIR}; present: {known}"
         )
+    return targets, write
+
+
+def main(argv: list[str], repo_root: Path) -> int:
+    """`mise run kb-skill-score [--write] [-- <skill>...]`.
+
+    Returns 0 for every measurement outcome, including "nothing here could
+    measure anything" — advisory means a score never fails a caller's gate. It
+    returns **2** for a malformed request, the same split `currency.run` draws
+    for an unknown `--tool`. Three shapes count as malformed: an unrecognised
+    flag, a skill name that matches nothing, and a `--write` that cannot record
+    a complete table.
+    """
+    try:
+        targets, write = parse_request(argv, repo_root)
+    except BadRequestError as exc:
+        print(f"[skill-score] {exc}", file=sys.stderr)
         return 2
     if not targets:
         print(f"[skill-score] no skill directories under {_SKILLS_DIR}", file=sys.stderr)
@@ -553,6 +634,14 @@ def main(argv: list[str], repo_root: Path) -> int:
     previous = load_baseline(repo_root)
     print(_render(scorer, results, baseline=previous))
     if write:
-        path = write_baseline(repo_root, scorer, results, previous=previous)
+        try:
+            path = write_baseline(repo_root, scorer, results, previous=previous)
+        except ValueError as exc:
+            # The table above still printed, so the reader sees WHICH skill failed
+            # and why. What they do not get is a baseline missing that skill's
+            # history — one transient timeout would otherwise erase a score
+            # silently and report it as `new` on the next run.
+            print(f"[skill-score] {exc}", file=sys.stderr)
+            return 2
         print(f"\n[skill-score] baseline written to {path.relative_to(repo_root)}")
     return 0
