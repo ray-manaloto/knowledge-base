@@ -253,9 +253,12 @@ from the handoff."*
 This repo can measure its own skills, so use that rather than taste:
 
 - `mise run kb-skill-score` scores every project skill with `plugin-eval`'s
-  deterministic static layer — free, no LLM, and comparable run to run. It is
-  advisory and always exits 0; compare a score against the *same skill's
-  previous* score, since there is no validated floor yet.
+  deterministic static layer — free, no LLM, and comparable run to run. Read the
+  **Δ column**, not the score: it is computed against the committed baseline in
+  `docs/skills/baseline.json`, so the comparison is the task's job and not
+  yours. Re-baseline with `-- --write` once a change is deliberate. A score
+  never fails a gate (there is no validated floor), but a skill name matching
+  nothing exits **2** rather than reporting an empty corpus.
 - Read the number with its condition attached. `triggering_accuracy` is a regex
   over the description, so it rewards the literal words "proactively" and
   "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague

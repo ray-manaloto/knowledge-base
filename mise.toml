@@ -522,12 +522,18 @@ description = 'Validate + combine host-agent extraction chunks: mise run kb-asse
 run = "uv run kb-setup assemble"
 
 [tasks.kb-skill-score]
-description = 'Score project skills with plugin-eval (static layer, no LLM): mise run kb-skill-score [-- <skill>...]'
-# ADVISORY — always exits 0, same posture as kb-currency and kb-goal-check. There is
-# no measured baseline yet, so a floor would be invented; Ray's call 2026-08-03 was
-# "advisory now, ratchet later". Wires ONLY plugin-eval's layer 1 (pure python, no
+description = 'Score project skills with plugin-eval (static layer, no LLM): mise run kb-skill-score [-- [--write] <skill>...]'
+# ADVISORY on its FINDINGS — a score never fails a gate, same posture as kb-currency
+# and kb-goal-check. No floor is enforced; Ray's call 2026-08-03 was "advisory now,
+# ratchet later". It DOES exit 2 for a malformed request — a skill name matching
+# nothing, or --write with names (which would clobber the other skills' baseline) —
+# exactly the split currency.run draws for an unknown --tool, because a silent 0
+# hides a typo. Wires ONLY plugin-eval's layer 1 (pure python, no
 # LLM, deterministic) because only a free deterministic score is comparable run to
 # run; the judge and Monte-Carlo layers stay a by-hand `--depth standard`/`certify`.
+# `-- --write` records docs/skills/baseline.json + README.md (committed), and every
+# later run prints a Δ against it: an absolute score has no floor behind it, so the
+# movement is the only reading that means anything.
 # Names WHICH plugin-eval copy scored you — the marketplace install and this repo's
 # pinned wshobson/agents clone can differ, and two scores from different scorers are
 # not comparable. Logic in kb_setup.skill_eval.

@@ -26,7 +26,8 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `gh pr create` (+ push + gates by hand) | `mise run kb-ship` |
 | `gh pr merge` (+ watch + validate by hand) | `mise run kb-land -- <PR#>` |
 | a manual version-drift check | `mise run kb-currency-check` (offline) / `mise run kb-currency` |
-| judging a skill by eye, or a raw `plugin-eval score` | `mise run kb-skill-score [-- <skill>...]` — advisory, always rc 0; names WHICH plugin-eval copy scored you, since two scorers are not comparable |
+| judging a skill by eye, or a raw `plugin-eval score` | `mise run kb-skill-score [-- [--write] <skill>...]` — advisory on findings (a score never fails a gate) but **rc 2 on a malformed request**, e.g. a skill name matching nothing; names WHICH plugin-eval copy scored you, since two scorers are not comparable |
+| eyeballing whether a skill got better, or diffing two transcripts | the committed baseline: `docs/skills/baseline.json` + `README.md`, written by `kb-skill-score -- --write` and shown as a Δ column on every later run |
 | a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD (one exception: a commit whose ENTIRE delta since the receipt is `graphify-out/memory/**` or `docs/goals/README.md`, so the round's own closing tasks can land — `kb_setup.review.EXEMPT_PATHS`, #66) |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
 | `<gate> 2>&1 \| tail -40` | `<gate> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file — a pipe returns `tail`'s exit code, masking a failed gate |

@@ -1,0 +1,12 @@
+{
+  "scorer": "plugin-eval 0.1.0 [marketplace] code:946303247300",
+  "scores": {
+    "clear-prep": 62.8,
+    "goal-engineering": 63.4,
+    "graphify": 61.4,
+    "kb-curator": 61.1,
+    "kb-review": 62.1,
+    "orchestrator-routing": 59.9,
+    "tool-currency": 68.4
+  }
+}
