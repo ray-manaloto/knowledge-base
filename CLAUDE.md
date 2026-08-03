@@ -173,11 +173,11 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `docs/goals/` | Committed goal+rider PAIRS — one round of agent work each. `*-goal.md` is the ≤4,000-char `/goal` payload (its bytes ARE the artifact, so it is excluded from hk's md builtins); `*-rider.md` is the unbounded detail. Audit with `kb-goal-check`; record how a round went with `kb-goal-outcome`. |
 | `.claude/workflows/` | Saved Claude workflows the skills compose — `kb-extract.js` (host-agent extraction fan-out). |
 | `tests/` | Pytest (`uv run pytest tests/`); config in the root `pyproject.toml`. |
-| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-prose`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`/`kb-goal-check`/`kb-goal-outcome`/`kb-review-receipt`. |
+| `mise.toml` | Tool pins + tasks: `kb-build`/`kb-prose`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`/`kb-goal-check`/`kb-goal-outcome`/`kb-review-receipt`/`kb-skill-score`. |
 | `pyproject.toml` | The ONE python config (repo root): `[project]` + ruff (`select=ALL`) + ty + pytest. `uv run` uses it for `python/src` AND `tests/`. |
 | `hk.pkl` | Git-hook lint: ruff/ty (python), taplo (toml), rumdl (md), gitleaks (secrets), typos, pkl, hygiene + `no-lint-skip`. All logic in `kb_setup` (zero-bash). |
 | `docs/graphify-reference.md` | Expert operational reference for graphify itself. |
-| `.claude/` | Skills (graphify, kb-curator, goal-engineering, kb-review, tool-currency, orchestrator-routing) + project-scoped settings/hooks/rules. `kb-review` is the REAL review gate — ONE cold cross-family lens, bounded at 2 rounds, then a receipt BOTH `kb-ship` and `kb-land` refuse without; CodeRabbit is advisory, never blocks. |
+| `.claude/` | Skills (graphify, kb-curator, goal-engineering, kb-review, tool-currency, orchestrator-routing, clear-prep) + project-scoped settings/hooks/rules. Skills are SCORED by `kb-skill-score` (plugin-eval's static layer, advisory) — a structure check, not a correctness one. `kb-review` is the REAL review gate — ONE cold cross-family lens, bounded at 2 rounds, then a receipt BOTH `kb-ship` and `kb-land` refuse without; CodeRabbit is advisory, never blocks. |
 
 ## Stack conventions
 

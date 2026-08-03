@@ -34,6 +34,14 @@ Adopted plugins (enabled in `.claude/settings.json`): `fable-orchestrator@fable-
 Opus fallback) and `antigravity@antigravity-for-claude-code` (Google Antigravity/Gemini 3.x lane via
 `agy`). The Claude architect plans and **verifies evidence** before "done"; only execution is delegated.
 
+Two more are enabled for skill self-improvement, both PROJECT-scope (`do-not.md` #11 —
+`extraKnownMarketplaces` + `enabledPlugins` here, never a write to `~/.claude`):
+`plugin-eval@claude-code-workflows` (`/eval`, `/certify`, `/compare`; its static layer is what
+`mise run kb-skill-score` wraps) and `skillopt-sleep@skillopt-sleep` (`/skillopt-sleep`, from
+`microsoft/SkillOpt`, tracked as a `source_only` entry in `currency.toml`). SkillOpt-Sleep stages
+bounded edits to memory and skills behind a held-out gate and changes **nothing** until
+`/skillopt-sleep adopt` — that human review is the control, not a formality.
+
 - **Route with the graph.** Before a non-trivial routing/fallback decision, ground it in this repo's
   KB graph: `mise run kb-query -- "<routing question>"` (the doctrine lives there — advisor/executor,
   cheapest-adequate lane, five-part spec, Fable-5→Opus fallback). See

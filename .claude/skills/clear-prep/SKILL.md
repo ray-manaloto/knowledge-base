@@ -1,275 +1,305 @@
 ---
 name: clear-prep
-description: "Prepare for a /clear: bring all documentation up to date with this session's changes, persist recovery context (memory + handoff), and emit a copy-paste resume prompt so the next session begins the next task with zero context loss. Invoke explicitly as /clear-prep [next-task]."
+description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Invoke explicitly as /clear-prep [next-task]."
 disable-model-invocation: true
 argument-hint: "[one-line description of the next task, optional]"
 ---
 
 # Clear-Prep — Session Handoff Before `/clear`
 
-> ⚠️ **VERBATIM COPY from the dotfiles repo, pending adaptation — do not treat the
-> repo-specific lines below as correct here.** Copied 2026-08-03 from
-> `dotfiles/.claude/skills/clear-prep/SKILL.md` @ `d85afaad563d` so `/clear-prep`
-> loads in knowledge-base sessions at all; it was previously reachable only from a
-> dotfiles session, which is why four tracked docs here cite a command this repo
-> could not run.
->
-> **Known-wrong for this repo, and deliberately left unedited so the fork is
-> visible rather than silently half-right:**
->
-> - the memory path names `…-dotfiles/memory/`, not this project's directory;
-> - `dotfiles-setup check-doc-refs` / `dotfiles-setup verify run` are that repo's
->   commands and do not exist here — ours are `mise run lint` / `mise run test`;
-> - `':!.omc*'` predates this repo's `.agent/` rename;
-> - it knows nothing of this repo's actual closing loop — `kb-remember`,
->   `kb-reflect`, `kb-goal-outcome`, the `kb-review` receipt, or the ordering trap
->   that the loop must be closed BEFORE `kb-ship` (a squash-merge makes the
->   reviewed SHA a non-ancestor, so `EXEMPT_PATHS` cannot rescue it afterwards).
->
-> Adapting it is the NEXT round (Ray, 2026-08-03): rebuild it via `/skill-creator`
-> as a self-improving skill wired to `SkillOpt` and `wshobson/agents`'
-> `plugin-eval`, grounded in `docs/direction/2026-08-02-ray-directives.md` and
-> driven through `/graphify` + the knowledge-base query tools. Until then, read
-> every command here against THIS repo before running it.
+Run this **before** `/clear` so the next session loses nothing. Three jobs, in
+this order: (1) find out what the next task actually is, (2) put everything
+worth keeping somewhere that survives the clear, (3) print one line to paste
+afterwards.
 
-Run this **before** `/clear` to (1) make every doc reflect the latest changes,
-(2) persist recovery context that survives the clear, and (3) print a resume
-prompt to paste after `/clear`. `$ARGUMENTS` (optional) is the next task; if it
-is empty, infer the next task from open issues / the prior handoff and state
-your guess.
+`$ARGUMENTS` is the next task, if the user named one. If it is empty, infer the
+next task from open issues and the prior handoff, and *say what you inferred* —
+a guess the user never saw is a guess nobody corrected.
 
-Work top-to-bottom. Do not skip the validation gate. Keep the final resume
-prompt short — durable detail lives in memory + the handoff, not the prompt.
+Work top-to-bottom. The ordering in step 2 is not stylistic; it is the one thing
+in this skill that cannot be reordered without losing work.
 
-## 0. Resolve next-task ambiguity FIRST — mandatory (Ray, 2026-07-08)
+> **This skill is model-invisible on purpose.** `disable-model-invocation: true`
+> removes it from the skill listing entirely, so it fires only when a human types
+> `/clear-prep`. That is deliberate — a handoff that auto-triggers mid-task
+> writes a handoff for work that is not finished. It also means the
+> `triggering_accuracy` dimension in `mise run kb-skill-score` is permanently
+> low for this skill and should be ignored here: it measures a trigger this
+> skill is designed not to have.
 
-**Before writing the handoff, drive the next-task scope to zero ambiguity by
-asking the user clarifying questions** (`AskUserQuestion`), and keep asking
-across rounds until nothing material is unresolved. The handoff's "Next task"
-section is only as good as this step — a vague next-task line makes the whole
-`/clear` lossy. This is a hard requirement, not a courtesy: if the next task
-admits multiple interpretations, scope forks, an undecided B-vs-C, or an
-unstated end-goal, you MUST surface each and get the user's answer, then encode
-the answers verbatim in the handoff. Skipping this because the task "seems
-clear" is the failure mode this step exists to prevent.
+## 0. Resolve next-task ambiguity FIRST (Ray, 2026-07-08)
 
-**Then double-check nothing will be lost by `/clear`** (see step 3c + the
-final checklist): every findings-bearing agent/research report is on disk,
-every decision + open question is in the handoff, and the resume prompt +
-memory + handoff together reconstruct the full working context. Verify by
-asking: "if I `/clear` right now and only have MEMORY.md + the handoff + the
-research artifacts, can the next session continue with no gaps?" If the answer
-is no, fix it before emitting the resume prompt.
+**Before writing anything, drive the next task to zero ambiguity by asking the
+user via `AskUserQuestion`** — and keep asking across rounds until nothing
+material is unresolved. Every question goes through that tool, including a plain
+yes/no; a question in prose at the end of a message is easy to miss and gives
+the user nothing to click (`clarify-before-acting.md`).
+
+The handoff's "next task" section is only as good as this step. If the task
+admits multiple readings, a scope fork, an undecided B-vs-C, or an unstated
+end-goal, surface each one, get the answer, and encode it **verbatim** — a
+paraphrase of a decision is a decision the next session gets to relitigate.
+Skipping this because the task "seems clear" is the exact failure this step
+exists to prevent.
+
+Then ask the losing-nothing question directly: *if I `/clear` right now and the
+next session has only auto-memory + the handoff + the persisted reports, can it
+continue with no gaps?* If the answer is no, fix that before step 7.
 
 ## 1. Snapshot the working state
 
-Gather, don't guess:
+Gather, don't recall:
 
 ```bash
 git status --short
 git branch --show-current
 git log --oneline -8
-gh pr list --head "$(git branch --show-current)" --json number,title,state 2>/dev/null
+gh pr list --head "$(git branch --show-current)" --json number,title,state
 ```
 
-Note: current branch, staged/unstaged/untracked files, open PR + its CI state
-(`gh pr checks <n> --json name,state`), and any in-flight task from the prior
+Note the branch, the staged/unstaged/untracked split, any open PR and its state
+(`gh pr checks <n>`), and the in-flight task from the previous
 `.agent/plans/session-*.md`.
 
-Also inventory **session runtime state**: in-flight background tasks/agents
-and any scheduled wakeups or crons created this session. Stop what should not
-outlive the session; note anything intentionally left running in the handoff.
-A stale wakeup firing after handoff re-triggers work that is already done
-(observed 2026-07-05).
+Also inventory **session-local runtime state**: background tasks and agents
+still running, and any scheduled wakeups or crons created this session. Stop
+what should not outlive the session and note anything deliberately left running.
+A stale wakeup firing after the handoff re-triggers work that is already done.
 
-**Distinguish session-LOCAL state from session-INDEPENDENT autonomous
-processes — do NOT block `/clear` on the latter (Ray, 2026-07-08).** GitHub-side
-processes — running GHA runs, and autonomous bots like **Renovate** that
-continuously open/merge PRs on their own schedule — execute on GitHub
-regardless of whether you `/clear`, start a new session, or none. They are NOT
-"background tasks of this session." Trying to wait for `main` to "settle"
-before `/clear` is futile when Renovate is active: merging one PR immediately
-triggers its promote run + the next queued PR (observed 2026-07-08 — #188
-merged → promote in-flight + #189 building + #192 failing, all at once).
-Correct handling: **INVENTORY** in-flight autonomous PRs / CI runs in the
-handoff (number, what each is, expected outcome, any that are legitimately
-failing and why), pin the handoff to the current HEAD, note that `main` is
-bot-advanced and the next session just `git pull`s the latest — then `/clear`.
-Do not idle waiting for a quiescent `main` that an active bot will never
-produce. (Only wait on a GHA run if YOU need its result to finish THIS
-session's task — e.g. a merge you must confirm landed.)
+**Do not block `/clear` on anything that runs without this session.** GitHub
+Actions runs and bots like Renovate execute on GitHub's schedule whether you
+clear or not — they are not this session's background tasks. Inventory them in
+the handoff (number, what each is, expected outcome, any legitimately failing
+and why), pin the handoff to the current HEAD, note that `main` is bot-advanced
+and the next session just pulls. Waiting for a quiet `main` an active bot will
+never produce is waiting forever. Wait on a run only when *you* need its result
+to finish *this* session's task.
 
-## 2. Documentation sync — make docs match reality
+## 2. Close the corpus loop — and do it BEFORE `kb-ship`
 
-For everything changed this session (uncommitted **and** recent commits not yet
-reflected in docs), find and update every affected doc. Walk these in order:
+This is the step the sibling repo's version of this skill has no equivalent for,
+and the one with a real ordering trap.
 
-1. **Directory docs.** For each touched directory, update its `AGENTS.md`
-   (the `CLAUDE.md` is a thin `@AGENTS.md` stub — edit `AGENTS.md`). Root
-   `AGENTS.md` for cross-cutting changes (pipeline shape, build types, tasks).
-2. **Cross-references.** Grep for anything renamed, moved, deleted, or
-   re-timed and fix every hit:
+**The trap:** `mise run kb-land` squash-merges. The squash commit is a *new*
+commit, so the SHA your `kb-review` receipt was written against stops being an
+ancestor of `main`. `review.EXEMPT_PATHS` (`graphify-out/memory/`,
+`docs/goals/README.md`) exists so a round can commit its own closing artifacts
+under an ancestor's receipt — but that rescue only works while the reviewed
+commit *is* an ancestor. Run `kb-remember` after the land and there is no
+receipt that covers it, so the artifacts either never land or force a whole new
+review round for a memory file.
 
-   ```bash
-   git grep -nE "<old-filename>|<old-command>|<old-cron>|<renamed-symbol>" \
-     -- ':!.omc*' ':!*.lock'
-   ```
-
-   Common sources: workflow/file renames, mise task names/descriptions,
-   CLI command names, cron timings, env-var names, moved docs.
-3. **Spec / design docs** under `docs/` — update status banners and phased
-   checklists; keep point-in-time analysis legible (mark the old state as
-   baseline rather than rewriting the reasoning). Add any newly-consulted
-   repos to a `## GitHub repos touched` section
-   (`.claude/rules/research-repo-enumeration.md`).
-4. **Issue / epic checklists** on GitHub — tick boxes, file follow-ups,
-   cross-link (`gh issue edit`, `gh issue comment`).
-5. **Doc-ref integrity — machine-gated; do NOT hand-roll a grep sweep.**
-   Stale refs predating the session escape the diff-scoped greps above (a
-   deleted file's mentions can linger for months — the `home/AGENTS.md` case,
-   deleted in PR #80, found 2026-07-05). That sweep is now the **`doc_refs`
-   hk step** (`dotfiles-setup check-doc-refs`, logic in
-   `python/src/dotfiles_setup/doc_refs.py`, pinned by `tests/test_doc_refs.py`),
-   so `mise run lint` already covers it — nothing extra to run here.
-
-   **This step used to print an ad-hoc `git grep | while read` loop, and it
-   was retired 2026-07-24 because it was actively misleading**: it matched
-   bare basenames and reported **~120 false MISSING hits** in one run (a
-   `.claude/rules/*.md` "see also" cites `do-not.md`, which resolves at
-   `.claude/rules/do-not.md`). Filtering by "does this basename exist anywhere
-   in `git ls-files`" still left 58, nearly all legitimately external —
-   container paths, gitignored artifacts, memory files living outside the
-   repo, illustrative examples. Exactly one was real. The checker encodes all
-   of that as `_ALLOWED_ABSENT`, each entry justified; the loop encoded none
-   of it. A sweep whose output is ~99% noise does not get read.
-
-   So: if `mise run lint` is green, doc refs are clean. When the gate DOES
-   fire, judge the hit — fix the ref, or add a justified `_ALLOWED_ABSENT`
-   entry (prefer fixing). Widening the checker's scope is a `DOC_PATHSPECS`
-   change plus a coverage assertion in `tests/test_doc_refs.py`; do not
-   re-add a manual loop.
-
-**Constraints (machine-enforced — respect or the gate fails):**
-
-- Markdown size is **class-aware** — see `.claude/rules/md-size-budgets.md`
-  for the table (hk step **`md_size_budget`**, which replaced the retired
-  `claude_md_size_limit`). An `AGENTS.md` additionally carries agnix
-  AGM-003's 12,000-char cap — **Windsurf's rule, not Anthropic's** — which
-  binds first. Do NOT restate a flat "200-line / 12,000-char" limit: that
-  misattribution is exactly what `md-size-budgets.md` exists to kill.
-  Verify with `mise run lint` + `mise run lint-docs`; when a file sits near
-  a limit, record in the handoff which future edit must trim. Any
-  addition needs an offsetting trim — prefer collapsing duplication to a
-  pointer (rule files / `action.yml` / other docs are the authority) over
-  deleting load-bearing facts. Long single-line table rows are more
-  line-efficient than wrapped prose.
-- Project docs/rules/cross-refs point to `CLAUDE.md` (which imports
-  `AGENTS.md`), never reference `AGENTS.md` directly
-  (`feedback_refer_to_claude_md_not_agents_md`).
-- Follow `.claude/rules/` (zero-skip, ci-local-parity, use-tool-builtins).
-
-## 3. Persist recovery context — two layers
-
-Both, every time. They cover different recovery surfaces.
-
-### a. Durable memory (survives `/clear` AND fresh clones; auto-loaded each session)
-
-Write or update a `project_*` (or `feedback_*`) file under
-`~/.claude/projects/-Users-rmanaloto-dev-github-ray-manaloto-dotfiles/memory/`
-with frontmatter (`name`, `description`, `metadata.type`). Record: what
-shipped, what's next (with issue/PR numbers), locked decisions, and any
-non-obvious gotcha. Convert relative dates to absolute. Add a one-line
-pointer to `MEMORY.md` (`- [Title](file.md) — hook`). Update an existing
-file rather than duplicating; delete memories proven wrong.
-
-### b. Local handoff (survives `/clear`; gitignored, this-clone-only)
-
-Write `.agent/plans/session-<YYYY-MM-DD>[-letter].md`
-(`.claude/rules/agent-artifact-conventions.md` — handoffs are plans). The
-handoff must be **self-sufficient** — the resume prompt (step 5) only points
-here, so *everything the next session needs lives in this file*. Include:
-**State at handoff** (branch/PR/merge state, gate results), **what shipped**,
-**next task + preload pointers** (epic/issue/spec links), and **gotchas**. If
-a prior handoff exists for today, append a letter suffix rather than
-overwriting.
-
-### c. Research artifacts — verbatim, receipt-time (audit coverage here)
-
-Full subagent reports must already be on disk per
-`.claude/rules/agent-report-persistence.md`: every findings-bearing agent's
-final report persisted VERBATIM under `docs/research/runs/<topic>/agents/` at the
-moment it was received — condensed notepad summaries do NOT count (near-loss
-observed 2026-07-05: 13 reports existed only in context until a manual
-round-2 pass). At clear-prep, audit coverage: enumerate every agent launched
-this session; each findings-bearing one must map to an artifact file (or an
-explicit N/A in the handoff). Anything missing: write it now, verbatim from
-context, before `/clear` destroys the only copy.
-
-## 4. Validate, then commit doc changes
-
-Run only the gates relevant to what changed; all must exit 0 before committing:
+So close the loop while the branch is still unmerged:
 
 ```bash
-mise run pin-actions                            # only if .github/ touched
-mise run lint                                   # always (timeout-wrapped hk)
-uv run --project python pytest tests/ -x -q     # if python/ or tests/ touched
-dotfiles-setup verify run                       # if .devcontainer/ or contracts touched
+mise run kb-remember -- --question "<what this round asked>" \
+                       --answer "<what was actually learned>" --outcome useful
+mise run kb-reflect                       # aggregate -> reflections/LESSONS.md
+mise run kb-goal-outcome -- <pair> --result <r> [--turns N]   # if a /goal ran
 ```
 
-Stage specific paths (never `git add .` — phantom `.agent/state/**` files;
-`.claude/rules/do-not.md`). Commit doc updates with the standard trailers.
-The handoff (`.agent/plans/`) is gitignored and memory lives outside the repo —
-neither is committed. If on `main`, branch first; open a PR only if the user
-asks.
+`kb-remember` is what makes the corpus compound: a lesson that lives only in a
+transcript is private to a session nobody will re-read. `kb-reflect` turns the
+accumulated work-memory into the learning overlay every future query benefits
+from. Both are cheap; skipping them is how a round's real finding evaporates.
 
-## 5. Self-verify the handoff — claims must match reality
+Also write anything durable into **auto-memory** (step 4a) — the two layers
+answer different questions. `graphify-out/memory/` teaches the *corpus*;
+auto-memory teaches the *next session*.
 
-The handoff is written by paraphrase; wrong details cost the next session
-more than missing ones. Before printing the resume prompt, verify:
+## 3. Documentation sync — make the docs match what happened
 
-- every repo path the handoff cites exists (run the step-2.5 ref loop
-  against the handoff file itself — it is gitignored, so the hk gate never
-  sees it);
-- spot-check every `file:line` claim (Read the cited line; a stale line
-  number sends the next session spelunking);
-- every `mise run <task>` / CLI command it names exists (`mise tasks ls`);
-- gate results it reports match the recorded `rc` files, not memory.
+For everything this session changed (uncommitted **and** commits not yet
+reflected in docs):
 
-## 6. Emit the resume prompt — keep it MINIMAL
+1. **Root `CLAUDE.md`** for cross-cutting changes — new tasks, changed
+   invariants, a new derived artifact. It sits near its 200-line budget, so any
+   addition needs an offsetting trim; prefer collapsing duplication into a
+   pointer over deleting a load-bearing fact.
+2. **`.claude/rules/*.md`** when a lesson generalises past this round.
+   `.claude/CLAUDE.md` for anything about the issue tracker or the executor
+   lanes.
+3. **Cross-references.** Grep for anything renamed, moved, deleted or re-timed:
 
-All context lives in memory (auto-loaded) + the handoff (step 3b). The resume
-prompt is therefore a **one-line pointer**, nothing more. Do NOT inline the
-task plan, issue summaries, gotchas, preload lists, or gate commands — those
-are all in the handoff; duplicating them in the prompt is the failure mode
-this skill exists to prevent.
+   ```bash
+   git grep -nE "<old-filename>|<old-task>|<renamed-symbol>" -- ':!.agent*' ':!*.lock'
+   ```
 
-Print exactly this (single line, no extra sections):
+   Common sources: mise task names, `kb_setup` module names, doc paths, issue
+   numbers that got superseded.
+4. **`docs/` specs and `sources/REGISTRY.md`.** Update status banners; keep
+   point-in-time analysis legible by marking the old state as baseline rather
+   than rewriting the reasoning. Any repo an agent read this session goes in a
+   `## GitHub repos touched` section and into the registry backlog
+   (`research-repo-enumeration.md`).
+5. **GitHub issues** — tick checklists, file follow-ups, cross-link
+   (`gh issue edit`, `gh issue comment`). An issue that a round silently
+   resolved but never closed is the same defect as a stale doc.
+
+**Never rewrite `sources/**` to match a rename.** Corpus content records what a
+source said at ingestion time; editing it to keep links tidy falsifies the
+provenance the manifest exists to guarantee. Fix the pointer in the authored
+doc instead.
+
+Markdown size is **class-aware** — the table lives in
+`.claude/rules/md-size-budgets.md` and the gate is the `md_size_budget` hk step.
+Do not restate a flat "200 lines / 12,000 chars": the 12,000 figure is
+Windsurf's, and misattributing it is what that rule exists to kill.
+
+## 4. Persist recovery context — three layers
+
+Different layers survive different things. Do all three.
+
+| Layer | Survives `/clear` | Survives a fresh clone | Answers |
+|---|---|---|---|
+| auto-memory (`~/.claude/projects/…/memory/`) | yes | yes | what the next session must know |
+| `.agent/plans/session-*.md` | yes | **no** — gitignored | how to resume *this* work |
+| `.agent/kb/reports/agents/*.md` | yes | **no** — gitignored | the evidence behind a finding |
+| `graphify-out/memory/` (via `kb-remember`) | yes | yes — committed | what the *corpus* learned |
+
+### a. Auto-memory — survives `/clear` AND a fresh clone
+
+Write or update one fact per file under
+`~/.claude/projects/-Users-rmanaloto-dev-github-ray-manaloto-knowledge-base/memory/`
+with the usual frontmatter (`name`, `description`, `metadata.type`), then add a
+one-line pointer to `MEMORY.md`. Record what shipped, what is next with issue
+and PR numbers, decisions that are now settled, and any non-obvious gotcha.
+Convert relative dates to absolute — "yesterday" is unreadable next week.
+
+Update an existing memory rather than adding a near-duplicate, and delete one
+that turned out to be wrong. A wrong memory is worse than a missing one because
+it is auto-loaded and believed.
+
+### b. The handoff — survives `/clear`, dies with the clone
+
+Write `.agent/plans/session-<YYYY-MM-DD>[-letter].md`. Append a letter suffix
+rather than overwriting an existing handoff for the same day.
+
+It must be **self-sufficient**: step 7's resume prompt only points here, so
+everything the next session needs is in this file. Include state at handoff
+(branch, PR, gate results with their real exit codes), what shipped, the next
+task with preload pointers, and the gotchas — especially any probe that
+misled you, since that is what the next session would otherwise repeat.
+
+### c. Findings-bearing agent reports — verbatim, at receipt
+
+Per `agent-report-persistence.md` these should already be on disk at
+`.agent/kb/reports/agents/<agent-name>.md`, written the moment each report
+arrived. At clear-prep, **audit the coverage**: list every agent launched this
+session; each findings-bearing one maps to a file, or to an explicit N/A in the
+handoff. Anything missing gets written now, verbatim from context, before
+`/clear` destroys the only copy.
+
+If a report is now load-bearing — something tracked cites it —
+**promote a copy to `docs/research/reports/`**. `.agent/` is gitignored and dies
+to any `git clean -xdf`, and a citation only one machine can open is not a
+citation. `kb-review` lane reports are the exception with a stricter rule: they
+live at `.agent/kb/review/reports/review-<sha>-<lane>.md` with any `:variant`
+stripped from the lane, because `kb_setup.review` *reads* those filenames.
+
+## 5. Validate, then commit
+
+Run the gates that apply to what changed; each must exit 0 before you commit.
+`verify-before-advancing.md` has the full matrix — the common rows:
+
+```bash
+mise run lint                       # always
+mise run test                       # always
+mise run lint-docs                  # CLAUDE.md / .claude/** touched
+mise run kb-skill-score             # .claude/skills/** touched (advisory)
+mise run kb-currency-check          # mise.toml pins touched
+mise run kb-build                   # sources/** touched — reproduce from committed inputs
+```
+
+Capture the real exit code. `<gate> 2>&1 | tail -40` returns *tail's* status and
+will report success for a gate that failed; redirect to a file, record `rc=$?`,
+and read the file.
+
+Stage specific paths rather than `git add .`. If you are on `main`, branch
+**first** — `kb-land` ends by syncing `main`, so it leaves you checked out there
+and the next commit lands on the default branch (`do-not.md` #7). Open a PR only
+if the user asked; the handoff and auto-memory are not committed.
+
+## 6. Self-verify the handoff against reality
+
+The handoff is written from memory, and a wrong detail costs the next session
+more than a missing one. Before printing the resume prompt:
+
+- every path it cites exists;
+- every `file:line` is real — read the cited line, do not eyeball it off a `sed`
+  window, which is how a `:1836` that was really `:1830` reached three files;
+- every `mise run <task>` it names is in `mise tasks ls`;
+- every gate result matches the recorded `rc`, not your recollection;
+- every number it repeats was measured *this* session, or is labelled as
+  inherited and unverified (`probes-need-a-control-arm.md` rule 6).
+
+## 7. Emit the resume prompt — one line
+
+All the context is in auto-memory (loaded automatically) and the handoff. The
+prompt is therefore a pointer and nothing more. Inlining the task plan, issue
+summaries or gate commands is the duplication this skill exists to prevent —
+and a prompt that disagrees with the handoff sends the next session to the
+wrong one.
 
 ```text
 Read and follow .agent/plans/session-<date>.md
 ```
 
-At most, echo the task for the human's benefit on the same line:
+Then one line for the human: *"Run `/clear`, paste that, and the session resumes
+from the handoff."*
 
-```text
-Resume <task>: read and follow .agent/plans/session-<date>.md
-```
+## Keeping this skill honest over time
 
-Then a one-line reminder: *"Run `/clear`, paste that line, and the session
-resumes from the handoff."*
+This repo can measure its own skills, so use that rather than taste:
 
-## Checklist (all true before you're done)
+- `mise run kb-skill-score` scores every project skill with `plugin-eval`'s
+  deterministic static layer — free, no LLM, and comparable run to run. It is
+  advisory and always exits 0; compare a score against the *same skill's
+  previous* score, since there is no validated floor yet.
+- Read the number with its condition attached. `triggering_accuracy` is a regex
+  over the description, so it rewards the literal words "proactively" and
+  "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague
+  description is not. For this skill the dimension is inert (see the banner).
+- `/skillopt-sleep` (SkillOpt-Sleep, enabled project-scope) is the offline
+  consolidation layer: it mines past sessions and stages **bounded** edits to
+  memory and skills behind a held-out validation gate. Nothing changes until you
+  run `/skillopt-sleep adopt`, and that review is not optional — an unreviewed
+  self-edit is how a skill drifts away from what the repo actually does.
+- The durable record of how a round went is `mise run kb-remember` (step 2), not
+  a comment in this file.
 
-- [ ] **Next-task ambiguity driven to zero via clarifying questions (step 0, mandatory); answers encoded in the handoff.**
-- [ ] **No-context-lost self-check passed: MEMORY.md + handoff + research artifacts alone reconstruct the full working context.**
+## Checklist
+
+- [ ] Next-task ambiguity driven to zero via `AskUserQuestion`; answers encoded verbatim.
+- [ ] Nothing-lost check passed: auto-memory + handoff + persisted reports reconstruct the working context.
 - [ ] Working state snapshotted; open PR/CI state known.
-- [ ] Session-LOCAL background tasks/agents + scheduled wakeups inventoried; stale ones cancelled or noted.
-- [ ] Session-INDEPENDENT autonomous processes (running GHA runs, Renovate PRs) inventoried in the handoff — NOT waited/blocked on; `main` noted as bot-advanced.
-- [ ] Every doc affected by this session's changes updated; cross-refs grep-clean.
-- [ ] Repo-wide doc-ref sweep run (step 2.5); every MISSING hit fixed or justified in place.
-- [ ] `mise run lint` + `mise run lint-docs` green (class-aware `md_size_budget` + agnix AGM-003); at-limit files flagged in the handoff.
-- [ ] Every findings-bearing agent report persisted verbatim under `docs/research/kb/reports/agents/`; coverage audited.
-- [ ] Durable memory written + `MEMORY.md` pointer added.
-- [ ] Local handoff written under `.agent/plans/` and self-verified (paths, file:line, task names, gate rcs).
-- [ ] Relevant local gate green; doc commit made (if appropriate).
-- [ ] Resume prompt printed for the user to paste after `/clear`.
+- [ ] Session-local background tasks, agents and wakeups inventoried; stale ones stopped.
+- [ ] Session-independent processes (GHA runs, Renovate) inventoried, not waited on.
+- [ ] **Corpus loop closed BEFORE `kb-ship`**: `kb-remember` + `kb-reflect` (+ `kb-goal-outcome` if a goal ran).
+- [ ] Docs, rules, issues and `sources/REGISTRY.md` match what happened; cross-refs grep-clean.
+- [ ] Applicable gates green with their real `rc`; at-budget markdown files flagged in the handoff.
+- [ ] Every findings-bearing agent report on disk verbatim; load-bearing ones promoted to `docs/research/`.
+- [ ] Auto-memory written + `MEMORY.md` pointer added.
+- [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
+- [ ] Branch is not `main`; commit made if appropriate.
+- [ ] One-line resume prompt printed.
+
+## See also
+
+Related skills and rules this one defers to rather than restating:
+
+- `.claude/skills/kb-review/SKILL.md` — the review that must precede `kb-ship`;
+  its receipt is what step 2's ordering trap is about.
+- `.claude/skills/kb-curator/SKILL.md` — the ingestion loop that owns
+  `kb-remember` / `kb-reflect` in full; step 2 only covers closing them out at
+  handoff time.
+- `.claude/skills/goal-engineering/SKILL.md` — the companion for a round that
+  ran a `/goal`, and the owner of `kb-goal-outcome`.
+- `.claude/rules/clarify-before-acting.md` — why step 0 uses `AskUserQuestion`
+  for every question, including the small ones.
+- `.claude/rules/agent-report-persistence.md` — the verbatim-at-receipt contract
+  step 4c audits.
+- `.claude/rules/verify-before-advancing.md` — the full gate matrix step 5
+  samples from.
+- `.claude/rules/md-size-budgets.md` — the per-class markdown budgets, and why
+  no flat character limit is quoted here.

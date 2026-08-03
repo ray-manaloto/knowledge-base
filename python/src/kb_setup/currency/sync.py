@@ -659,6 +659,74 @@ def _check_self_managed(spec: ToolSpec) -> SyncStatus:
     )
 
 
+def _check_source_only(repo_root: Path, spec: ToolSpec) -> SyncStatus:
+    """Step 1 for a tracked thing that is INGESTED rather than installed.
+
+    Every binary- and pin-shaped check is inapplicable by construction here (see
+    `ToolSpec.source_only`), so none of them run — reporting a missing binary for
+    something that was never meant to be installed is the false-red that makes a
+    check ignorable. What remains is the one question the corpus can answer
+    offline: does the committed manifest still describe the clone the graph was
+    built from?
+
+    `pinned` carries the manifest's `ref`, which is what `_run_one` feeds to the
+    upstream probe as "current" — so the new-release check in steps 2-3 compares
+    against what we actually ingested, not against a version nobody declared.
+    """
+    ref = manifest_ref(repo_root, spec)
+    if not ref:
+        return SyncStatus(
+            tool=spec.name,
+            pinned="",
+            resolved="",
+            findings=(Finding("manifest", DRIFT, f"{spec.manifest} has no readable `ref =` line"),),
+        )
+
+    commit = _manifest_field(repo_root, spec, "commit")
+    findings = [Finding("manifest", OK, f"{spec.manifest} pins `ref = {ref}`")]
+    if not commit:
+        findings.append(
+            Finding("manifest", DRIFT, f"{spec.manifest} has no readable `commit =` line")
+        )
+        return SyncStatus(tool=spec.name, pinned=ref, resolved="", findings=tuple(findings))
+
+    findings.append(_check_source_clone(repo_root, spec, commit))
+    return SyncStatus(tool=spec.name, pinned=ref, resolved=commit[:12], findings=tuple(findings))
+
+
+def _check_source_clone(repo_root: Path, spec: ToolSpec, commit: str) -> Finding:
+    """Is the on-disk clone at the commit the manifest pins?
+
+    A clone that has drifted ahead is the `clean-git-state.md` trap in its corpus
+    form: the graph then describes bytes no fresh checkout would reproduce. An
+    ABSENT clone is BLIND rather than DRIFT — `sources/<name>/` is gitignored and
+    re-fetched by `kb-build`, so not having it yet is the normal state of a fresh
+    checkout and says nothing about whether the pin is current.
+    """
+    clone = repo_root / "sources" / spec.name
+    head_file = clone / ".git" / "HEAD"
+    if not head_file.exists():
+        return Finding(
+            "clone",
+            BLIND,
+            f"sources/{spec.name}/ is not cloned here; `mise run kb-build` fetches it",
+        )
+    head = head_file.read_text(encoding="utf-8").strip()
+    if head.startswith("ref:"):
+        ref_path = clone / ".git" / head.partition("ref:")[2].strip()
+        head = ref_path.read_text(encoding="utf-8").strip() if ref_path.exists() else ""
+    if not head:
+        return Finding("clone", BLIND, f"sources/{spec.name}/ HEAD could not be read")
+    if head != commit:
+        return Finding(
+            "clone",
+            DRIFT,
+            f"sources/{spec.name}/ is at {head[:12]} but {spec.manifest} pins "
+            f"{commit[:12]} — `mise run kb-update -- {spec.name}` moves the pin",
+        )
+    return Finding("clone", OK, f"sources/{spec.name}/ is at the pinned {commit[:12]}")
+
+
 def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
     if not spec.extras:
         if declared:
@@ -943,6 +1011,9 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
                 ),
             ),
         )
+
+    if spec.source_only:
+        return _check_source_only(repo_root, spec)
 
     if spec.self_managed:
         return _check_self_managed(spec)

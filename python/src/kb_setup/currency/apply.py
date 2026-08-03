@@ -112,6 +112,16 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     and propagates `manifest.resolve_tag`'s error if the target tag does not
     exist in git (the v1.0.0-trap guard).
     """
+    if spec.source_only:
+        # Fail closed, and say what the real remedy is. A source-only tool has no
+        # `[tools]` entry, so the pin edit below would fail anyway — but it would
+        # fail with a KeyError about a mise key nobody declared, which reads as a
+        # bug in the engine rather than as "this is the wrong verb for this tool".
+        raise NotAuthorizedError(
+            f"{spec.name} is an ingested source, not an installed tool — advance it with "
+            f"`mise run kb-update -- {spec.name}`, which moves {spec.manifest} and "
+            f"re-extracts, rather than editing a mise pin that does not exist"
+        )
     if not verdict.auto_apply:
         raise NotAuthorizedError(
             f"{spec.name}: verdict is not auto-apply — "

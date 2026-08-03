@@ -68,7 +68,9 @@
     "pr-review-toolkit@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "mise@brentmitchell25": true
+    "mise@brentmitchell25": true,
+    "plugin-eval@claude-code-workflows": true,
+    "skillopt-sleep@skillopt-sleep": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {
@@ -93,6 +95,22 @@
       "source": {
         "source": "github",
         "repo": "astral-sh/claude-code-plugins"
+      }
+    },
+    "claude-code-workflows": {
+      "source": {
+        "source": "github",
+        "repo": "wshobson/agents"
+      }
+    },
+    "skillopt-sleep": {
+      "source": {
+        "source": "github",
+        "repo": "microsoft/SkillOpt",
+        "path": "plugins/claude-code/.claude-plugin/marketplace.json",
+        "sparsePaths": [
+          "plugins/claude-code"
+        ]
       }
     }
   },
