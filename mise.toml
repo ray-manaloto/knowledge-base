@@ -521,6 +521,18 @@ description = 'Validate + combine host-agent extraction chunks: mise run kb-asse
 # id-collision problem. Logic in kb_setup.chunks.assemble.
 run = "uv run kb-setup assemble"
 
+[tasks.kb-skill-score]
+description = 'Score project skills with plugin-eval (static layer, no LLM): mise run kb-skill-score [-- <skill>...]'
+# ADVISORY — always exits 0, same posture as kb-currency and kb-goal-check. There is
+# no measured baseline yet, so a floor would be invented; Ray's call 2026-08-03 was
+# "advisory now, ratchet later". Wires ONLY plugin-eval's layer 1 (pure python, no
+# LLM, deterministic) because only a free deterministic score is comparable run to
+# run; the judge and Monte-Carlo layers stay a by-hand `--depth standard`/`certify`.
+# Names WHICH plugin-eval copy scored you — the marketplace install and this repo's
+# pinned wshobson/agents clone can differ, and two scores from different scorers are
+# not comparable. Logic in kb_setup.skill_eval.
+run = "uv run kb-setup skill-score"
+
 [tasks.kb-goal-check]
 description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'
 # ADVISORY — always exits 0. A goal document is authored input, not repo source, so a

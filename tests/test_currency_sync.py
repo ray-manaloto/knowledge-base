@@ -829,10 +829,16 @@ def test_a_self_managed_tool_needs_no_mise_key(tmp_path) -> None:
     assert _self_managed(tmp_path).mise_key == ""
 
 
-def test_a_tool_declaring_neither_mise_key_nor_expected_is_rejected(tmp_path) -> None:
-    """CONTROL ARM: the relaxation must not accept a spec that declares nothing."""
+def test_a_tool_declaring_none_of_the_three_kinds_is_rejected(tmp_path) -> None:
+    """CONTROL ARM: the relaxation must not accept a spec that declares nothing.
+
+    Three kinds now, not two — `source_only` joined mise-managed and self-managed
+    when SkillOpt needed declaring (see `tests/test_currency_source_only.py`). The
+    assertion widened with the contract rather than being deleted: what must hold
+    is that a spec naming NO kind is still refused.
+    """
     (tmp_path / "currency.toml").write_text('[tool.x]\nbinary = "x"\n', encoding="utf-8")
-    with pytest.raises(ValueError, match=r"mise_key.*or.*expected"):
+    with pytest.raises(ValueError, match=r"mise_key.*expected.*source_only"):
         config.load(tmp_path)
 
 

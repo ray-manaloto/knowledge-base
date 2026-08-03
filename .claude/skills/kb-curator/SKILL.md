@@ -150,6 +150,19 @@ in `sources/REGISTRY.md`.
      `sources/extractions/<name>-docs.json`, failing loud on any problem. Never
      hand-assemble or hand-validate. (`mise run kb-validate-chunks -- <chunk...>` is
      the standalone gate.)
+   - ⚠️ **Every node MUST carry `"_origin": "semantic"`.** `kb-extract.js` asks for
+     it and the validator REJECTS a chunk without it, so a hand-written or drifted
+     chunk now fails the build rather than merging. graphify 0.9.32 infers the tier
+     from shape when the marker is absent — a `source_location` matching `^L\d` reads
+     as AST — and our agents emit `L5`/`L13` unprompted, which silently deleted **629
+     doc nodes** (22% of the prose graph) on the first 0.9.32 build. Since 2026-08-03
+     both consumers validate FAIL-CLOSED before any merge subprocess runs, so this is
+     enforced rather than advised.
+   - Endpoints resolve across the WHOLE committed set, not per chunk — an edge
+     pointing at a node another chunk contributes is legitimate, because graphify's
+     merge resolves against the combined node set. Do not "clean up" a cross-chunk
+     edge the single-file view calls dangling: doing exactly that deleted four real
+     relationships on 2026-08-03.
 3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
    or `mise run kb-build` to replay all committed chunks. Both re-cluster; Louvain
    renumbers communities globally + non-deterministically → **every merge staleifies

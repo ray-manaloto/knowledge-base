@@ -25,7 +25,8 @@ def main(argv: list[str] | None = None) -> int:
             "serve | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
-            "brain [record|reflect|audit] | md-budget | goal-check <path|--text ...> | "
+            "brain [record|reflect|audit] | md-budget | skill-score [skill...] | "
+            "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
             "ensure-deps | version"
@@ -132,6 +133,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import goal
 
         return goal.outcome_main(rest, repo_root)
+    if cmd == "skill-score":
+        from kb_setup import skill_eval
+
+        return skill_eval.main(rest, repo_root)
     if cmd == "cc":
         from kb_setup import launch
 
@@ -187,7 +192,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "currency [check|run|stamp|docs-reviewed] [--tool T --json --no-write] | "
         "manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
-        "brain [query|record|reflect|audit] | md-budget | cc | cc-doctor | "
+        "brain [query|record|reflect|audit] | md-budget | skill-score [skill...] | "
+        "cc | cc-doctor | "
         "eval [--live] [--slow] | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,

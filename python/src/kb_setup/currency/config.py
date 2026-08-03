@@ -72,6 +72,20 @@ class ToolSpec:
     # naive "every extra must import" check would report drift that is not drift.
     extra_probes: tuple[str, ...] = ()
     manifest: str = ""
+    # The PROJECT-SCOPED agent skill this tool ships, and the argv that reinstalls
+    # it. A skill is the fourth thing a version bump has to carry — after the pin,
+    # the manifest and the clone — and it was the one nothing moved: at 0.9.32 the
+    # stamp still read 0.9.23 for eight releases, leaving a skill that documented a
+    # tool we no longer ran. Declared here rather than hardcoded in
+    # `currency.skill` so this stays a config-not-code engine, like every other
+    # per-tool fact.
+    #
+    # `skill_install` is a full argv, NOT a version-substituted template, and that
+    # is deliberate: `--project` is the flag separating "writes ./.claude" from
+    # "mutates ~/.claude" (`do-not.md` #1), so it must be visible in the config a
+    # human reviews rather than assembled at runtime where a refactor could drop it.
+    skill_dir: str = ""
+    skill_install: tuple[str, ...] = ()
     # `artifact` is the PRIMARY build output — the one whose `built_at_commit` is
     # read for identity (graphify writes it only into graph.json). `artifacts` is
     # the wider set of GENERATED outputs (wiki/graphml/svg/GRAPH_REPORT.md) that
@@ -105,6 +119,24 @@ class ToolSpec:
     # gap analysis. Drift here means "the tool changed underfoot", which for a
     # self-updating tool is a statement about the host, not about the config.
     expected: str = ""
+    # A tracked thing that is INGESTED, not installed: a `sources/<name>.manifest`
+    # whose upstream we want to hear about, with no binary on PATH and no
+    # `[tools]` pin. `microsoft/SkillOpt` is the founding case — its Claude Code
+    # plugin runs from a git checkout and never `pip install`s, so every
+    # binary-shaped check is inapplicable by construction.
+    #
+    # Without this flag such a tool cannot be declared honestly. `binary` defaults
+    # to the tool's own name, and `_check_resolution` reports a missing binary as
+    # DRIFT rather than SKIP — correctly, for something that SHOULD be installed.
+    # So declaring SkillOpt would emit `skillopt is not installed on this host`
+    # forever: a permanent red that is not a defect, which is how a check earns
+    # being ignored and then earns being deleted.
+    #
+    # What still runs is the part Ray actually asked for (2026-08-03): steps 2-4,
+    # the new-release probe off `github`, its notes, and the watch items. The
+    # remedy is `mise run kb-update -- <name>`, never a pin edit, so an auto-apply
+    # is refused in `currency.apply`.
+    source_only: bool = False
     # Regex with ONE capture group pulling the version out of `--version` output.
     # Needed because the default heuristic (last whitespace field) is wrong for
     # any tool that prints more than "<name> <version>": mise prints
@@ -194,11 +226,16 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
     # tool manages itself, compare the binary against the reviewed version".
     # Demanding `mise_key` from a self-managed tool would force a fake pin
     # pointing at a `[tools]` entry that must not exist.
-    if "mise_key" not in table and not table.get("expected"):
+    if "mise_key" not in table and not table.get("expected") and not table.get("source_only"):
         raise ValueError(
-            f"{CONFIG_NAME}: [tool.{name}] needs either 'mise_key' (mise-managed) "
-            f"or 'expected' (self-managed)"
+            f"{CONFIG_NAME}: [tool.{name}] needs one of 'mise_key' (mise-managed), "
+            f"'expected' (self-managed) or 'source_only' (ingested, not installed)"
         )
+    if table.get("source_only") and not table.get("manifest"):
+        # A source-only tool with no manifest has nothing whatsoever to check, and
+        # would report a cheerful all-clear over an empty set of checks. Refuse the
+        # config rather than let it render as green.
+        raise ValueError(f"{CONFIG_NAME}: [tool.{name}] is source_only and needs a 'manifest'")
 
     def _str(key: str) -> str:
         value = table.get(key, "")
@@ -216,12 +253,15 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         github=_str("github"),
         extras=_tuple("extras"),
         extra_probes=_tuple("extra_probes"),
+        skill_dir=_str("skill_dir"),
+        skill_install=_tuple("skill_install"),
         manifest=_str("manifest"),
         artifact=_str("artifact"),
         artifacts=_tuple("artifacts"),
         inputs=_tuple("inputs"),
         stamp=_str("stamp"),
         expected=_str("expected"),
+        source_only=bool(table.get("source_only", False)),
         version_pattern=_str("version_pattern"),
         os=_tuple("os"),
         watch=_watch_items(table.get("watch")),
