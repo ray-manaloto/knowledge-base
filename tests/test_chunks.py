@@ -223,10 +223,23 @@ def test_kb_build_refuses_a_chunk_that_fails_validation(monkeypatch, tmp_path) -
     monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
     monkeypatch.setattr(graph, "_run", _must_not_merge)
 
+    # Seeded BEFORE the call: the refusal must be atomic with respect to the
+    # artifact it protects. Round 1 validated AFTER `_merge_sources_into` had
+    # already replaced the aggregate with a code-only composition, so one bad
+    # chunk cost the working graph and left a partial one that `kb-query` will
+    # serve — it checks only that the file exists. (Cold lane, round 2.)
+    agg = tmp_path / "graphify-out" / "graph.json"
+    agg.parent.mkdir(parents=True, exist_ok=True)
+    agg.write_text('{"nodes": [], "SENTINEL_PREEXISTING": true}', encoding="utf-8")
+
     with pytest.raises(SystemExit) as exc:
         graph.build(tmp_path)
     assert "failed validation" in str(exc.value), (
         f"build() exited for some other reason: {exc.value!r}"
+    )
+    assert "SENTINEL_PREEXISTING" in agg.read_text(encoding="utf-8"), (
+        "build() overwrote the existing graph before refusing — a refusal that is "
+        "not atomic has already done the damage it exists to prevent"
     )
 
 
@@ -285,4 +298,80 @@ def test_kb_merge_still_accepts_a_valid_chunk(monkeypatch, tmp_path) -> None:
         "a VALID chunk was refused before the merge subprocess — the gate is too "
         "greedy, and `merge_chunk` returning 2 unconditionally would pass the "
         "sibling refusal test while breaking every real ingestion"
+    )
+
+
+def test_a_cross_chunk_edge_is_not_reported_as_dangling(tmp_path) -> None:
+    """Validating a SET is a different question from validating one chunk.
+
+    THE ROUND-1 FIX WAS THE DEFECT. `validate_files` applied the strict
+    per-chunk rule to every file independently, so four edges in
+    `goal-and-skills-workflow-docs.json` whose targets live in
+    `claude-docs-docs.json` were reported dangling — and acting on that report
+    DELETED four real relationships. graphify does not work that way:
+    `build_merge` loads the nodes already in the graph, prepends them as a base
+    chunk, and resolves endpoints against the COMBINED set, so an edge pointing
+    at an earlier chunk's node is legitimate. (Cold lane, round 2.)
+    """
+    a = tmp_path / "a.json"
+    b = tmp_path / "b.json"
+    a.write_text(json.dumps(_chunk([_node("target_in_a")], [])), encoding="utf-8")
+    b.write_text(
+        json.dumps(_chunk([_node("src_in_b")], [_edge("src_in_b", "target_in_a")])),
+        encoding="utf-8",
+    )
+
+    together = chunks.validate_files([a, b])
+    assert together[b] == [], (
+        f"a cross-chunk edge was reported as dangling when the whole set was "
+        f"validated: {together[b]}. Deleting on that report is what removed four "
+        f"real relationships."
+    )
+
+    # CONTROL ARM: the strict reading must survive for a SINGLE chunk, because
+    # `kb-merge` takes one fresh chunk and `kb-extract.js` tells agents to
+    # "only connect nodes that exist in THIS chunk". If widening leaked into the
+    # single-file path, a genuine agent error would stop being caught.
+    alone = chunks.validate_files([b])
+    assert any("dangling" in i for i in alone[b]), (
+        f"widening leaked into single-chunk validation; issues were {alone[b]}"
+    )
+
+
+def test_a_dangling_hyperedge_member_is_caught() -> None:
+    """Hyperedges were outside the gate entirely, and one was really broken.
+
+    `validate()` read only `nodes` and `edges`, while the chunk shape this module
+    documents has always included `hyperedges`. Measured on real committed data:
+    `graphify-docs.json` carried `graphify_pipeline_stages` naming seven members
+    that existed in no chunk, and the validator returned CLEAN. graphify drops
+    unresolved members and then the whole hyperedge, so a green gate permitted a
+    committed relationship to vanish at ingestion (#134).
+    """
+    c = _chunk([_node("a")], [])
+    c["hyperedges"] = [{"label": "h", "nodes": ["a", "ghost"]}]
+    assert any("hyperedge" in i for i in chunks.validate(c, label="c"))
+
+    # CONTROL ARM: a fully-resolvable hyperedge must still pass, or the fix is
+    # "reject all hyperedges" — which would have deleted the two VALID ones in
+    # graphify-docs.json alongside the broken one. That over-deletion actually
+    # happened during this fix and was caught by re-reading the validator output.
+    ok = _chunk([_node("a"), _node("b")], [])
+    ok["hyperedges"] = [{"label": "h", "nodes": ["a", "b"]}]
+    assert chunks.validate(ok, label="c") == []
+
+
+def test_a_valid_json_non_object_refuses_instead_of_raising(tmp_path) -> None:
+    """`validate()` promises it never raises; a JSON array made it AttributeError.
+
+    Harmless while only the CLI called it, and an unhandled traceback the moment
+    `build()` and `merge_chunk` did — which this round is precisely the round
+    that wired them up. (Cold lane, round 2.)
+    """
+    p = tmp_path / "arr.json"
+    p.write_text("[]", encoding="utf-8")
+    issues = chunks.validate_files([p])[p]
+    assert issues, "a top-level array produced no issue at all — it raised instead"
+    assert "expected a JSON object" in issues[0], (
+        f"a top-level array did not produce a controlled refusal: {issues}"
     )

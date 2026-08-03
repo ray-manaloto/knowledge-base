@@ -104,14 +104,70 @@ def _edge_issues(edges: list, ids: set[str], label: str) -> list[str]:
     return issues
 
 
-def validate(chunk: dict, *, label: str = "chunk") -> list[str]:
+def _hyperedge_issues(hyperedges: object, ids: set[str], label: str) -> list[str]:
+    """Members of a hyperedge must resolve, exactly as an edge's endpoints must.
+
+    `validate()` read only `nodes` and `edges` until 2026-08-03, while the chunk
+    shape this module documents has always included `hyperedges` — so a whole
+    relationship class was outside the gate. Measured, and it was not theoretical:
+    `graphify-docs.json` carries `graphify_pipeline_stages` naming SEVEN members
+    (`graphify_detect`/`extract`/`build`/`cluster`/`analyze`/`report`/`export`),
+    none of which exists in that chunk's 43 nodes — and the validator returned
+    clean. graphify drops unresolved members and then drops the hyperedge once
+    none survive, so a green gate was permitting a committed relationship to
+    vanish at ingestion. That is a large part of why the corpus's own description
+    of graphify's pipeline is disconnected (#134). Found by the cold lane, round 2.
+    """
+    if hyperedges is None:
+        return []
+    if not isinstance(hyperedges, list):
+        return [f"{label}: 'hyperedges' is not a list"]
+    issues: list[str] = []
+    for i, h in enumerate(hyperedges):
+        if not isinstance(h, dict):
+            issues.append(f"{label}: hyperedge[{i}] is not an object")
+            continue
+        members = h.get("nodes", h.get("members"))
+        if not isinstance(members, list):
+            issues.append(f"{label}: hyperedge[{i}] has no 'nodes' list")
+            continue
+        missing = [m for m in members if m not in ids]
+        if missing:
+            issues.append(f"{label}: hyperedge[{i}] dangling member(s) {missing}")
+    return issues
+
+
+def validate(
+    chunk: object, *, label: str = "chunk", known_ids: set[str] | None = None
+) -> list[str]:
     """Return a list of schema/integrity problems in one chunk (empty == clean).
 
-    Checks: nodes/edges are lists; every node carries the required fields and a
-    non-empty string id; ids are unique WITHIN the chunk; every edge references a
-    node present in the chunk (no dangling endpoints) and carries required fields;
-    confidence is EXTRACTED|INFERRED. Never raises — the caller decides.
+    Checks: the chunk is an object; nodes/edges are lists; every node carries the
+    required fields, a non-empty string id and `_origin="semantic"`; ids are
+    unique WITHIN the chunk; every edge and hyperedge member resolves; confidence
+    is EXTRACTED|INFERRED. Never raises — the caller decides.
+
+    `known_ids` widens endpoint resolution beyond this chunk, and exists because
+    the strict per-chunk rule does not match how graphify actually merges.
+    `build_merge` loads the nodes already in the graph, prepends them as a base
+    chunk, and resolves endpoints against the COMBINED set — so an edge pointing
+    at a node contributed by an earlier chunk is legitimate, not dangling.
+    Without this, `validate_files` reported four real cross-chunk relationships in
+    `goal-and-skills-workflow-docs.json` as dangling; acting on that report
+    DELETED them, which is a fix causing the damage it was cleaning up after.
+    (Cold lane, round 2 — the round-1 fix was the defect.)
+
+    A single fresh chunk still gets the strict reading: `kb-extract.js` instructs
+    agents to "only connect nodes that exist in THIS chunk", so `kb-merge` passes
+    no `known_ids` and an unresolved endpoint there is a genuine agent error.
     """
+    if not isinstance(chunk, dict):
+        # `validate_files` used to hand whatever `json.loads` produced straight
+        # to `.get()`, so a valid-JSON array crashed with AttributeError against
+        # this function's own "never raises" contract — harmless while only the
+        # CLI called it, and an unhandled traceback the moment `build()` and
+        # `merge_chunk` did. (Cold lane, round 2.)
+        return [f"{label}: top level is {type(chunk).__name__}, expected a JSON object"]
     nodes = chunk.get("nodes")
     edges = chunk.get("edges")
     if not isinstance(nodes, list):
@@ -119,12 +175,37 @@ def validate(chunk: dict, *, label: str = "chunk") -> list[str]:
     if not isinstance(edges, list):
         return [f"{label}: 'edges' is not a list"]
     issues, ids = _node_issues(nodes, label)
-    issues.extend(_edge_issues(edges, ids, label))
+    resolvable = ids | (known_ids or set())
+    issues.extend(_edge_issues(edges, resolvable, label))
+    issues.extend(_hyperedge_issues(chunk.get("hyperedges"), resolvable, label))
     return issues
 
 
+def _collect_ids(paths: list[Path]) -> set[str]:
+    """Every node id across `paths`, for cross-chunk endpoint resolution."""
+    ids: set[str] = set()
+    for p in paths:
+        try:
+            chunk = json.loads(p.read_text(encoding="utf-8"))
+        except OSError, json.JSONDecodeError:
+            continue
+        if not isinstance(chunk, dict):
+            continue
+        for n in chunk.get("nodes") or []:
+            if isinstance(n, dict) and isinstance(n.get("id"), str):
+                ids.add(n["id"])
+    return ids
+
+
 def validate_files(paths: list[Path]) -> dict[Path, list[str]]:
-    """Validate each chunk file; return {path: issues} (issues empty == clean)."""
+    """Validate each chunk file; return {path: issues} (issues empty == clean).
+
+    Endpoints resolve against the UNION of every path passed in, matching what
+    graphify does at merge time. Validating a SET is a different question from
+    validating one chunk, and conflating them is what made a correct cross-chunk
+    edge look like corruption.
+    """
+    known = _collect_ids(paths) if len(paths) > 1 else None
     out: dict[Path, list[str]] = {}
     for p in paths:
         try:
@@ -132,7 +213,7 @@ def validate_files(paths: list[Path]) -> dict[Path, list[str]]:
         except (OSError, json.JSONDecodeError) as e:
             out[p] = [f"{p.name}: unreadable/invalid JSON: {e}"]
             continue
-        out[p] = validate(chunk, label=p.name)
+        out[p] = validate(chunk, label=p.name, known_ids=known)
     return out
 
 

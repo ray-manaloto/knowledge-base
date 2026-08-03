@@ -577,6 +577,28 @@ def build(repo_root: Path) -> None:
     if not manifests:
         raise SystemExit("no sources/*.manifest found")
 
+    # VALIDATE EVERY COMMITTED CHUNK **FIRST** — before the stamp is cleared,
+    # before a single clone, and above all before anything writes graph.json.
+    #
+    # This sat after the corpus merge until the cold lane's round 2. It refused,
+    # correctly, but only AFTER `_merge_sources_into` had already replaced the
+    # aggregate with a code-only composition — so a bad chunk cost the working
+    # graph and left a partial one that `kb-query` will happily serve, since it
+    # checks only that the file exists. A refusal that is not atomic with respect
+    # to the artifact it protects is a refusal that has already done the damage.
+    # Cheap enough to be free here: 18 files, a few milliseconds, no network.
+    from kb_setup import chunks as _chunks
+
+    chunk_paths = sorted((sources / "extractions").glob("*.json"))
+    problems = {p: i for p, i in _chunks.validate_files(chunk_paths).items() if i}
+    if problems:
+        lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
+        raise SystemExit(
+            f"{len(problems)} extraction chunk(s) failed validation — refusing to build:\n"
+            + "\n".join(lines)
+            + "\nRun `mise run kb-validate-chunks -- sources/extractions/*.json` for the full list."
+        )
+
     # Invalidate the stamp BEFORE anything touches graph.json. `build()` overwrites
     # the artifact at the seed step but only stamps at the very end, so any abort in
     # between — a merge failure, Ctrl-C — used to leave a NEW artifact under the OLD
@@ -637,31 +659,7 @@ def build(repo_root: Path) -> None:
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)
-    chunk_paths = sorted((sources / "extractions").glob("*.json"))
-
-    # VALIDATE BEFORE MERGING — fail closed. Added 2026-08-03 after a cold review
-    # found the validator was reachable only from `mise run kb-validate-chunks`,
-    # i.e. only when a human remembered. That is the same defect this repo had
-    # just filed as #134: `kb-validate-chunks` had evidently NEVER been run over
-    # the committed set, and 37 dangling edges had been sitting in two chunks
-    # through every build. A rule added to a validator nothing calls protects
-    # nothing — which is exactly what the `_origin` marker would have been.
-    #
-    # Here rather than at assemble time because assembly is not the only door:
-    # a chunk can be hand-edited, or arrive from a branch, and `build()` is the
-    # one path every committed chunk must pass through.
-    from kb_setup import chunks as _chunks
-
-    bad = _chunks.validate_files(chunk_paths)
-    problems = {p: issues for p, issues in bad.items() if issues}
-    if problems:
-        lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
-        raise SystemExit(
-            f"{len(problems)} extraction chunk(s) failed validation — refusing to merge:\n"
-            + "\n".join(lines)
-            + "\nRun `mise run kb-validate-chunks -- sources/extractions/*.json` for the full list."
-        )
-
+    # Already validated at the TOP of build(), before anything wrote graph.json.
     print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
     for chunk in chunk_paths:
         name = chunk.stem.removesuffix("-docs")
