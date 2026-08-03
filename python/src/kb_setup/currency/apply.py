@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from kb_setup import manifest as mf
+from kb_setup.currency import skill
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -147,12 +148,31 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
         mf.write_pin(manifest_obj, ref=manifest_ref, commit=manifest_commit)
     mise_path.write_text(new_text, encoding="utf-8")
 
+    # THE SKILL, refreshed here rather than by a task someone must remember (Ray,
+    # 2026-08-03). A project-scoped agent skill is the fourth thing a bump has to
+    # carry — the pin and manifest are written above, the clone follows from
+    # `graph._ensure_clone` on the next build — and it was the one nothing moved:
+    # graphify's skill stamp sat at 0.9.23 across eight releases.
+    #
+    # AFTER the atomic writes, deliberately. It shells out to an installer, which
+    # is the one step here that can fail for reasons unrelated to the version
+    # (missing binary, dirty tree). Running it first would mean an installer
+    # failure blocked a pin move that was otherwise fully authorized; running it
+    # last means a failure is REPORTED in the note while the pin still lands.
+    # `refresh` returns rather than raises for exactly that reason.
+    skill_result = skill.refresh(repo_root, spec)
+    if skill_result.changed:
+        changed.extend(skill_result.changed)
+
+    notes = ["rebuild pending — run `mise run kb-build` locally to re-stamp the graph"]
+    if spec.skill_dir:
+        notes.append(f"skill: {skill_result.note}")
     return ApplyResult(
         tool=spec.name,
         from_version=verdict.current,
         to_version=verdict.latest,
-        changed=tuple(changed),
+        changed=tuple(dict.fromkeys(changed)),
         manifest_ref=manifest_ref,
         manifest_commit=manifest_commit,
-        note="rebuild pending — run `mise run kb-build` locally to re-stamp the graph",
+        note="; ".join(notes),
     )

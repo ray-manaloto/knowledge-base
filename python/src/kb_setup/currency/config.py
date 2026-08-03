@@ -72,6 +72,20 @@ class ToolSpec:
     # naive "every extra must import" check would report drift that is not drift.
     extra_probes: tuple[str, ...] = ()
     manifest: str = ""
+    # The PROJECT-SCOPED agent skill this tool ships, and the argv that reinstalls
+    # it. A skill is the fourth thing a version bump has to carry — after the pin,
+    # the manifest and the clone — and it was the one nothing moved: at 0.9.32 the
+    # stamp still read 0.9.23 for eight releases, leaving a skill that documented a
+    # tool we no longer ran. Declared here rather than hardcoded in
+    # `currency.skill` so this stays a config-not-code engine, like every other
+    # per-tool fact.
+    #
+    # `skill_install` is a full argv, NOT a version-substituted template, and that
+    # is deliberate: `--project` is the flag separating "writes ./.claude" from
+    # "mutates ~/.claude" (`do-not.md` #1), so it must be visible in the config a
+    # human reviews rather than assembled at runtime where a refactor could drop it.
+    skill_dir: str = ""
+    skill_install: tuple[str, ...] = ()
     # `artifact` is the PRIMARY build output — the one whose `built_at_commit` is
     # read for identity (graphify writes it only into graph.json). `artifacts` is
     # the wider set of GENERATED outputs (wiki/graphml/svg/GRAPH_REPORT.md) that
@@ -216,6 +230,8 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         github=_str("github"),
         extras=_tuple("extras"),
         extra_probes=_tuple("extra_probes"),
+        skill_dir=_str("skill_dir"),
+        skill_install=_tuple("skill_install"),
         manifest=_str("manifest"),
         artifact=_str("artifact"),
         artifacts=_tuple("artifacts"),

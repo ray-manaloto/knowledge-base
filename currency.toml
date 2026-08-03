@@ -28,6 +28,27 @@ extras = ["all"]
 extra_probes = ["faster_whisper", "tree_sitter", "tree_sitter_cpp"]
 # The ingested corpus must describe the release we actually run.
 manifest = "sources/graphify.manifest"
+# The project-scoped `/graphify` skill, refreshed by `currency.apply` in the SAME
+# step that moves the pin — so the skill can never describe a version we stopped
+# running. It sat at 0.9.23 while the pin reached 0.9.32: eight releases of drift
+# that nothing reported, because `.graphify_version` is gitignored (`.gitignore:72`)
+# and therefore leaves no tracked trace.
+#
+# `--project` is load-bearing and is spelled out here on purpose (`do-not.md` #1):
+# WITHOUT it the installer mutates `~/.claude`, appends a `# graphify` H1 to
+# `~/.claude/CLAUDE.md`, and sprays version stamps into every other platform's
+# user skill dir. With it, control-armed 2026-08-03, home is untouched.
+skill_dir = ".claude/skills/graphify"
+# `mise exec --` and NOT a bare `graphify`, which is the whole point. Measured
+# 2026-08-03, minutes after this field was first written with the bare name:
+# `command -v graphify` reached
+# `~/.local/share/mise/installs/pipx-graphifyy/0.9.31/bin/graphify` while the pin
+# was already 0.9.32, so the refresh reinstalled the OLD skill and the stamp came
+# back reading 0.9.31 — a refresh that ran, reported success, and changed nothing.
+# That is the same stale-install-dir-ahead-of-the-shims defect this whole currency
+# engine was written for (`sync.py`'s module docstring), reached through the one
+# path `graphify_env.graphify_exe` cannot cover: an argv in a config file.
+skill_install = ["mise", "exec", "--", "graphify", "install", "--project"]
 # graphify stamps no version into its own output (`export.to_json()` writes only
 # `built_at_commit`), so the build task writes this sidecar instead — otherwise
 # "which version built this graph?" is unanswerable from the artifact.
