@@ -30,8 +30,21 @@ tracker"*), which would plan away from the GitHub issues this repo actually uses
 > `code-review` working here, hand it this path explicitly rather than moving the file into
 > `docs/agents/`, which `mise run lint-docs` rejects.
 >
-> **Do not run `/setup-matt-pocock-skills`** to generate this — it writes the rejected path and
-> also edits the root `CLAUDE.md`.
+> **Do not run `/setup-matt-pocock-skills` verbatim** to generate this — it writes the rejected
+> path and also edits the root `CLAUDE.md`.
+>
+> Both halves were **re-probed on 2026-08-03** against the current agnix and the current budget,
+> because a claim about a tool ages and this one gates a skill the repo otherwise wants:
+> an identical frontmatter-less file returned **rc=1** at `docs/agents/probe.md`
+> (*"Agent file must have YAML frontmatter"*) against **rc=0** at `docs/probe-control.md`, so the
+> probe discriminates on path alone; and appending the skill's `## Agent skills` block took the
+> root `CLAUDE.md` from 200 to **214 lines**, failing `md_size_budget` (rc=1). Both still hold.
+>
+> It **was** run that day, adapted: its three sections were satisfied at gate-safe paths —
+> this file (already richer than the template, left untouched), `docs/triage-labels.md`, and
+> `docs/domain.md`, with the pointer added to `.claude/CLAUDE.md` instead of the root file. The
+> four missing canonical triage labels were created. So the ban is on the skill's **output
+> paths**, not on its content; re-running it verbatim would still break two gates.
 
 ## PRs are not opened with `gh`
 
