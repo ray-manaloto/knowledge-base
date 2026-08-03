@@ -1,0 +1,1111 @@
+{
+ "nodes": [
+  {
+   "id": "claude-code-plugins_plugin",
+   "label": "Claude Code plugin",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "A plugin extends Claude Code with custom functionality that can be shared across projects and teams. It is a self-contained directory holding skills, agents, hooks, MCP servers, LSP servers, or background monitors, optionally alongside a .claude-plugin/plugin.json manifest."
+  },
+  {
+   "id": "claude-code-plugins_standalone_configuration",
+   "label": "Standalone .claude/ configuration",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The alternative to plugins: skills, agents and hooks placed directly in a project's .claude/ directory. Skill names stay short (/hello), and it suits personal workflows, project-specific customizations and quick experiments that do not need sharing. The docs recommend starting standalone for fast iteration and converting to a plugin when ready to share."
+  },
+  {
+   "id": "claude-code-plugins_plugin_root",
+   "label": "Plugin root directory",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The plugin root is the individual plugin's own directory — the one passed to --plugin-dir or the one containing .claude-plugin/plugin.json. It is never ~/.claude/; for example Claude Code does not read a .mcp.json placed at ~/.claude/.mcp.json. All component directories must sit at this level."
+  },
+  {
+   "id": "claude-code-plugins_claude_plugin_directory",
+   "label": ".claude-plugin/ directory",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The .claude-plugin/ directory at the plugin root contains the plugin.json manifest and nothing else. A common mistake is putting commands/, agents/, skills/ or hooks/ inside it; only plugin.json belongs there and every other directory must be at the plugin root level."
+  },
+  {
+   "id": "claude-code-plugins_plugin_manifest",
+   "label": "Plugin manifest (plugin.json)",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The manifest at .claude-plugin/plugin.json defines the plugin's identity — name, description, version and author — and Claude Code uses that metadata to display the plugin in the plugin manager. It is optional when components use default locations; additional fields include homepage, repository and license."
+  },
+  {
+   "id": "claude-code-plugins_manifest_name_field",
+   "label": "Manifest name field",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The manifest `name` is the plugin's unique identifier and its skill namespace: skills are prefixed with it, e.g. /my-first-plugin:hello. Changing the namespace prefix means updating this field."
+  },
+  {
+   "id": "claude-code-plugins_manifest_description_field",
+   "label": "Manifest description field",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The manifest `description` is what is shown in the plugin manager when users browse or install plugins."
+  },
+  {
+   "id": "claude-code-plugins_manifest_version_field",
+   "label": "Manifest version field",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The manifest `version` is optional. If set, users only receive updates when the author bumps it; if omitted and the plugin is distributed via git, the commit SHA is used instead and every commit counts as a new version."
+  },
+  {
+   "id": "claude-code-plugins_manifest_author_field",
+   "label": "Manifest author field",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The manifest `author` object (e.g. {\"name\": \"Your Name\"}) is optional and exists for attribution."
+  },
+  {
+   "id": "claude-code-plugins_skill_namespacing",
+   "label": "Plugin skill namespacing",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Plugin skills are always namespaced as /plugin-name:skill-name to prevent conflicts when multiple plugins define skills with the same name. Standalone .claude/ skills keep short unprefixed names like /hello."
+  },
+  {
+   "id": "claude-code-plugins_skills_directory",
+   "label": "skills/ directory",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Skills live in a skills/ directory at the plugin root, each skill being a folder containing a SKILL.md file. The folder name becomes the skill name, prefixed with the plugin namespace — hello/ inside a plugin named my-first-plugin yields /my-first-plugin:hello."
+  },
+  {
+   "id": "claude-code-plugins_skill_md",
+   "label": "SKILL.md file",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Each SKILL.md contains YAML frontmatter plus instructions. Including a `description` is what tells Claude when to use the skill; the frontmatter may also carry flags such as disable-model-invocation."
+  },
+  {
+   "id": "claude-code-plugins_skill_arguments",
+   "label": "$ARGUMENTS skill placeholder",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The $ARGUMENTS placeholder inside a SKILL.md captures any text the user types after the skill name, making the skill dynamic — e.g. /my-first-plugin:hello Alex passes \"Alex\" into the instruction body."
+  },
+  {
+   "id": "claude-code-plugins_model_invoked_skills",
+   "label": "Model-invoked skills",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Agent Skills bundled in a plugin are model-invoked: Claude automatically uses them based on the task context rather than requiring an explicit slash invocation."
+  },
+  {
+   "id": "claude-code-plugins_single_skill_root_layout",
+   "label": "Single-skill root SKILL.md layout",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "A plugin shipping exactly one skill may place SKILL.md directly at the plugin root instead of creating a skills/ directory; Claude Code loads it as a single skill and takes the invocation name from the frontmatter `name` field. The skills/ layout is preferred for plugins that may grow beyond one skill."
+  },
+  {
+   "id": "claude-code-plugins_commands_directory",
+   "label": "commands/ directory (legacy skills)",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "commands/ at the plugin root holds skills as flat Markdown files. The docs direct new plugins to use skills/ instead. It also matters for /reload-plugins, whose skills count covers only commands/ directories."
+  },
+  {
+   "id": "claude-code-plugins_agents_directory",
+   "label": "agents/ directory",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "agents/ at the plugin root holds custom agent definitions (subagents) shipped with the plugin. Installed agents can be checked in /context under Custom Agents or @-mentioned by their scoped name."
+  },
+  {
+   "id": "claude-code-plugins_hooks_directory",
+   "label": "hooks/hooks.json",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "hooks/ at the plugin root holds event handlers in hooks.json, using the same format as the `hooks` object in .claude/settings.json, so a standalone config can be copied over verbatim. A hook command receives its input as JSON on stdin (e.g. jq -r '.tool_input.file_path')."
+  },
+  {
+   "id": "claude-code-plugins_mcp_json",
+   "label": ".mcp.json (plugin MCP servers)",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": ".mcp.json at the plugin root carries MCP server configurations for external tool integration. It is only read at the plugin root — a .mcp.json placed at ~/.claude/.mcp.json is ignored."
+  },
+  {
+   "id": "claude-code-plugins_lsp_json",
+   "label": ".lsp.json (LSP servers)",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "An .lsp.json file at the plugin root configures Language Server Protocol servers, giving Claude real-time code intelligence (e.g. {\"go\": {\"command\": \"gopls\", \"args\": [\"serve\"], \"extensionToLanguage\": {\".go\": \"go\"}}}). Pre-built LSP plugins exist for common languages like TypeScript, Python and Rust; write a custom one only for uncovered languages. An entry with invalid configuration is silently skipped — run claude --debug to see why."
+  },
+  {
+   "id": "claude-code-plugins_language_server_binary",
+   "label": "Language server binary prerequisite",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Users installing an LSP plugin must have the language server binary installed on their own machine. When it is missing, the server fails to start and appears in the /plugin Errors tab with a message such as `Executable not found in $PATH`."
+  },
+  {
+   "id": "claude-code-plugins_monitors",
+   "label": "Background monitors (monitors/monitors.json)",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "monitors/monitors.json at the plugin root holds an array of monitor entries (name, command, description) that watch logs, files or external status in the background. Claude Code starts each monitor automatically while the plugin is active, and every stdout line from the command is delivered to Claude as a session notification."
+  },
+  {
+   "id": "claude-code-plugins_bin_directory",
+   "label": "bin/ executables on the Bash PATH",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "bin/ at the plugin root contains executables that are added to the Bash tool's PATH for as long as the plugin is enabled."
+  },
+  {
+   "id": "claude-code-plugins_plugin_settings_json",
+   "label": "Plugin settings.json defaults",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "A settings.json at the plugin root applies default configuration when the plugin is enabled. Only the `agent` and `subagentStatusLine` keys are currently supported; unknown keys are silently ignored, and these settings take priority over `settings` declared in plugin.json."
+  },
+  {
+   "id": "claude-code-plugins_agent_setting",
+   "label": "`agent` setting (main-thread agent)",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Setting `agent` in a plugin's settings.json activates one of the plugin's custom agents as the main thread, applying that agent's system prompt, tool restrictions and model — letting a plugin change how Claude Code behaves by default when enabled."
+  },
+  {
+   "id": "claude-code-plugins_plugin_dir_flag",
+   "label": "--plugin-dir flag",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "claude --plugin-dir ./my-plugin loads a plugin directly from disk without installing it, and the flag can be repeated to load several plugins at once. When a --plugin-dir plugin shares a name with an installed marketplace plugin, the local copy takes precedence for that session — except for plugins that managed settings force-enable or force-disable, which it cannot override."
+  },
+  {
+   "id": "claude-code-plugins_plugin_dir_zip",
+   "label": "--plugin-dir .zip archive support",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "--plugin-dir also accepts a .zip archive of the plugin directory (claude --plugin-dir ./my-plugin.zip). This requires Claude Code v2.1.128 or later."
+  },
+  {
+   "id": "claude-code-plugins_plugin_url_flag",
+   "label": "--plugin-url flag",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "--plugin-url loads a .zip plugin hosted at a URL (such as a CI build artifact): Claude Code fetches the archive at startup and loads it for that session only. If the fetch fails or the archive is invalid, Claude Code starts without the plugin and records a load error in the /plugin Errors tab. The flag can be repeated, or given space-separated URLs in one quoted argument, and the usual plugin trust considerations apply."
+  },
+  {
+   "id": "claude-code-plugins_reload_plugins_command",
+   "label": "/reload-plugins",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "/reload-plugins picks up plugin changes without restarting Claude Code, reloading plugins, skills, agents, hooks, plugin MCP servers and plugin LSP servers. Its summary skills count covers only commands/ directories, so it can report `0 skills` even when a skills/ SKILL.md you just edited did reload."
+  },
+  {
+   "id": "claude-code-plugins_plugin_command",
+   "label": "/plugin command and plugin manager",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "/plugin opens the plugin manager, where plugin metadata from the manifest is displayed and plugins are installed. If the command is absent, Claude Code needs updating to the latest version."
+  },
+  {
+   "id": "claude-code-plugins_plugin_errors_tab",
+   "label": "/plugin Errors tab",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The Errors tab of the /plugin manager surfaces plugin load failures — a language server that fails to start, or an archive that --plugin-url could not fetch or parse."
+  },
+  {
+   "id": "claude-code-plugins_local_testing",
+   "label": "Local plugin testing",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Testing a plugin during development means loading it without installation and exercising each component: invoking skills with /plugin-name:skill-name, confirming agents appear in /context, and triggering the event each hook matches to confirm its effect."
+  },
+  {
+   "id": "claude-code-plugins_hooks_debug_log",
+   "label": "Hook debug log",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude Code records which hooks matched, their exit codes and their output in the debug log, which is how a plugin author confirms a hook (for example a PostToolUse hook fired by asking Claude to edit a file) actually ran."
+  },
+  {
+   "id": "claude-code-plugins_context_command_agents",
+   "label": "/context Custom Agents check",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "To verify a plugin's agents loaded, check that they appear in /context under Custom Agents, or @-mention one by its scoped name."
+  },
+  {
+   "id": "claude-code-plugins_help_custom_commands_tab",
+   "label": "/help Custom commands tab",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Running /help and opening the Custom commands tab lists a loaded plugin's skills under its plugin namespace, confirming both that the skill loaded and what its namespaced invocation is."
+  },
+  {
+   "id": "claude-code-plugins_skills_directory_plugin",
+   "label": "Skills-directory plugin",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "A plugin kept inside the skills directory (e.g. ~/.claude/skills/my-tool/) is loaded automatically by Claude Code on the next session as my-tool@skills-dir, with no marketplace and no install step — avoiding the need to pass --plugin-dir on every launch. Auto-load rules, personal vs project scope, and the workspace-trust requirement are documented in the plugins reference."
+  },
+  {
+   "id": "claude-code-plugins_plugin_init_command",
+   "label": "claude plugin init",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "`claude plugin init my-tool` scaffolds a skills-directory plugin: it creates ~/.claude/skills/my-tool/ containing a .claude-plugin/plugin.json manifest and a starter SKILL.md."
+  },
+  {
+   "id": "claude-code-plugins_debug_plugin_issues",
+   "label": "Debugging a plugin that will not work",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "The documented debugging order is: check the structure (directories at the plugin root, not inside .claude-plugin/), test each skill, agent and hook individually, then reach for the CLI validation and debugging tools in the plugins reference."
+  },
+  {
+   "id": "claude-code-plugins_migration_from_standalone",
+   "label": "Converting standalone config to a plugin",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Migration means creating a plugin directory with .claude-plugin/plugin.json alongside the existing .claude/ folder, copying .claude/commands, .claude/agents and .claude/skills into the plugin root, moving the settings `hooks` object into hooks/hooks.json, and testing with --plugin-dir. What changes: one-project scope becomes marketplace-shareable, and manual copying becomes /plugin install."
+  },
+  {
+   "id": "claude-code-plugins_migration_override_semantics",
+   "label": "Post-migration override semantics",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "After migrating, remove the originals from .claude/ to avoid duplicates: project and user .claude/agents/ definitions override same-named plugin agents, so the plugin version only takes effect once the originals are gone. Skills behave differently — plugin skills are namespaced, so the original /skill-name and the plugin's /plugin-name:skill-name both remain available rather than one overriding the other."
+  },
+  {
+   "id": "claude-code-plugins_marketplace",
+   "label": "Plugin marketplace",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Marketplaces are how plugins are distributed and installed (/plugin install). A marketplace hosted in a private repository keeps a plugin internal to a team."
+  },
+  {
+   "id": "claude-code-plugins_official_marketplace",
+   "label": "claude-plugins-official marketplace",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "claude-plugins-official is a curated set of plugins maintained by Anthropic, registered automatically the first time Claude Code is started interactively; a non-interactive script running before that first launch must add it explicitly with `claude plugin marketplace add anthropics/claude-plugins-official`. It is curated at Anthropic's discretion — there is no application process, and the community submission form does not add plugins to it."
+  },
+  {
+   "id": "claude-code-plugins_community_marketplace",
+   "label": "claude-community marketplace",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "claude-community is the public marketplace where third-party submissions land after review; users add it with `/plugin marketplace add anthropics/claude-plugins-community` and install from it as @claude-community. Approved plugins are pinned to a specific commit SHA in the anthropics/claude-plugins-community catalog, CI bumps the pin as new commits are pushed, and the public catalog syncs nightly — so approval and installability can lag."
+  },
+  {
+   "id": "claude-code-plugins_submission_forms",
+   "label": "Community-marketplace submission forms",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Plugins are submitted for community-marketplace review through one of two in-app forms: the claude.ai directory-submissions form, which requires a Team or Enterprise organization plus directory management access (Owners have it by default), or the Console form at platform.claude.com/plugins/submit, which individual authors outside such an organization can use."
+  },
+  {
+   "id": "claude-code-plugins_plugin_validate",
+   "label": "claude plugin validate",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "`claude plugin validate ./your-plugin` runs locally the same check the submission review pipeline runs on every submission (alongside automated safety screening). It prints `✔ Validation passed`, or `✔ Validation passed with warnings`; warnings do not fail validation unless --strict is added to treat them as errors."
+  },
+  {
+   "id": "claude-code-plugins_plugin_hints",
+   "label": "CLI plugin hints",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "If Anthropic lists a plugin in the official marketplace, that plugin's own CLI can prompt Claude Code users to install it — documented as \"Recommend your plugin from your CLI\"."
+  },
+  {
+   "id": "claude-code-plugins_share_checklist",
+   "label": "Plugin sharing checklist",
+   "file_type": "concept",
+   "source_file": "plugins.md",
+   "source_url": "https://code.claude.com/docs/en/plugins",
+   "captured_at": "2026-08-02",
+   "author": null,
+   "contributor": null,
+   "rationale": "Before sharing a plugin: add a README.md with installation and usage instructions, choose a versioning strategy (explicit `version` vs relying on the git commit SHA), create or use a marketplace for distribution, and have team members test it before wider release."
+  }
+ ],
+ "edges": [
+  {
+   "source": "claude-code-plugins_plugin_root",
+   "target": "claude-code-plugins_plugin",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_claude_plugin_directory",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_manifest",
+   "target": "claude-code-plugins_claude_plugin_directory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_manifest_name_field",
+   "target": "claude-code-plugins_plugin_manifest",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_manifest_description_field",
+   "target": "claude-code-plugins_plugin_manifest",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_manifest_version_field",
+   "target": "claude-code-plugins_plugin_manifest",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_manifest_author_field",
+   "target": "claude-code-plugins_plugin_manifest",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_manifest_name_field",
+   "target": "claude-code-plugins_skill_namespacing",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_manifest_description_field",
+   "target": "claude-code-plugins_plugin_command",
+   "relation": "displayed_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin",
+   "target": "claude-code-plugins_standalone_configuration",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skills_directory",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_commands_directory",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_agents_directory",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_hooks_directory",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_mcp_json",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_lsp_json",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_monitors",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_bin_directory",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_settings_json",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skill_md",
+   "target": "claude-code-plugins_skills_directory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skill_arguments",
+   "target": "claude-code-plugins_skill_md",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skill_md",
+   "target": "claude-code-plugins_model_invoked_skills",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skills_directory",
+   "target": "claude-code-plugins_commands_directory",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_single_skill_root_layout",
+   "target": "claude-code-plugins_skills_directory",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skill_namespacing",
+   "target": "claude-code-plugins_skills_directory",
+   "relation": "applies_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_lsp_json",
+   "target": "claude-code-plugins_language_server_binary",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_errors_tab",
+   "target": "claude-code-plugins_language_server_binary",
+   "relation": "reports",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_errors_tab",
+   "target": "claude-code-plugins_plugin_command",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_errors_tab",
+   "target": "claude-code-plugins_plugin_url_flag",
+   "relation": "reports",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_agent_setting",
+   "target": "claude-code-plugins_plugin_settings_json",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_agent_setting",
+   "target": "claude-code-plugins_agents_directory",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_settings_json",
+   "target": "claude-code-plugins_plugin_manifest",
+   "relation": "overrides",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_dir_flag",
+   "target": "claude-code-plugins_local_testing",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_url_flag",
+   "target": "claude-code-plugins_local_testing",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_dir_zip",
+   "target": "claude-code-plugins_plugin_dir_flag",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_dir_flag",
+   "target": "claude-code-plugins_plugin_url_flag",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skills_directory_plugin",
+   "target": "claude-code-plugins_plugin_dir_flag",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_init_command",
+   "target": "claude-code-plugins_skills_directory_plugin",
+   "relation": "creates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_reload_plugins_command",
+   "target": "claude-code-plugins_plugin",
+   "relation": "reloads",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_reload_plugins_command",
+   "target": "claude-code-plugins_commands_directory",
+   "relation": "counts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_reload_plugins_command",
+   "target": "claude-code-plugins_local_testing",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_local_testing",
+   "target": "claude-code-plugins_plugin",
+   "relation": "verifies",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_context_command_agents",
+   "target": "claude-code-plugins_agents_directory",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_help_custom_commands_tab",
+   "target": "claude-code-plugins_skill_namespacing",
+   "relation": "verifies",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_hooks_debug_log",
+   "target": "claude-code-plugins_hooks_directory",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_debug_plugin_issues",
+   "target": "claude-code-plugins_plugin_root",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_debug_plugin_issues",
+   "target": "claude-code-plugins_plugin_validate",
+   "relation": "routes_to",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_migration_from_standalone",
+   "target": "claude-code-plugins_standalone_configuration",
+   "relation": "converts",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_migration_from_standalone",
+   "target": "claude-code-plugins_plugin_manifest",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_migration_from_standalone",
+   "target": "claude-code-plugins_hooks_directory",
+   "relation": "creates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_migration_override_semantics",
+   "target": "claude-code-plugins_migration_from_standalone",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_standalone_configuration",
+   "target": "claude-code-plugins_agents_directory",
+   "relation": "overrides",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_skill_namespacing",
+   "target": "claude-code-plugins_migration_override_semantics",
+   "relation": "explains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_marketplace",
+   "target": "claude-code-plugins_plugin",
+   "relation": "distributes",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_official_marketplace",
+   "target": "claude-code-plugins_marketplace",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_community_marketplace",
+   "target": "claude-code-plugins_marketplace",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_submission_forms",
+   "target": "claude-code-plugins_community_marketplace",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_submission_forms",
+   "target": "claude-code-plugins_official_marketplace",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_submission_forms",
+   "target": "claude-code-plugins_plugin_validate",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_validate",
+   "target": "claude-code-plugins_plugin",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_community_marketplace",
+   "target": "claude-code-plugins_manifest_version_field",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_hints",
+   "target": "claude-code-plugins_official_marketplace",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_share_checklist",
+   "target": "claude-code-plugins_marketplace",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_share_checklist",
+   "target": "claude-code-plugins_manifest_version_field",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  },
+  {
+   "source": "claude-code-plugins_plugin_command",
+   "target": "claude-code-plugins_marketplace",
+   "relation": "installs_from",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "plugins.md",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [],
+ "input_tokens": 0,
+ "output_tokens": 0
+}
