@@ -72,7 +72,7 @@ fnox = "1.31.1"
 # symlink the antigravity plugin drives). The Claude architect stays in the
 # chair; these are the executor lanes only. auth is per-user (codex login /
 # Google account) — mise manages the binaries, not the credentials.
-codex = "0.145.0"
+codex = "0.146.0"
 antigravity-cli = "1.1.5"
 
 [settings]
