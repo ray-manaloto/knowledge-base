@@ -136,11 +136,20 @@ def _clear_backups(repo_root: Path, skill_dir: Path) -> None:
     was both too wide and too narrow: for `.claude/skills/graphify` it resolved to
     `.claude/`, sweeping any `*.graphify-bak` anywhere under it while never
     reaching a backup beside the ROOT `CLAUDE.md`, which is in `_REPAIR`.
+
+    The `_REPAIR` parents are globbed NON-recursively, and that is not fastidiousness.
+    `CLAUDE.md`'s parent is the repo root, so an `rglob` there would descend into
+    `.git/`, `sources/` and `graphify-out/` — **10.7 GB measured on this machine** —
+    on every skill refresh, to find a file the installer writes directly beside the
+    one it rewrote. Recursion buys nothing here and costs a full-tree walk. Only the
+    skill directory keeps `rglob`, because the installer really does write nested
+    files there.
     """
-    roots = {skill_dir, *((repo_root / p).parent for p in _REPAIR)}
-    for root in roots:
-        if root.is_dir():
-            for bak in root.rglob("*.graphify-bak"):
+    for bak in skill_dir.rglob("*.graphify-bak") if skill_dir.is_dir() else ():
+        bak.unlink(missing_ok=True)
+    for parent in {(repo_root / p).parent for p in _REPAIR}:
+        if parent.is_dir():
+            for bak in parent.glob("*.graphify-bak"):
                 bak.unlink(missing_ok=True)
 
 

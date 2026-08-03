@@ -85,12 +85,16 @@ def _repo(tmp_path: Path, *, mise=_TABLE, manifest=False) -> Path:
     return tmp_path
 
 
-def _spec(*, manifest: bool = False) -> ToolSpec:
+def _spec(*, manifest: bool = False, skill: bool = False) -> ToolSpec:
     return ToolSpec(
         name="graphify",
         mise_key="pipx:graphifyy",
         binary="graphify",
         manifest="sources/graphify.manifest" if manifest else "",
+        # `skill_dir` is what gates the skill note in `apply()`; without it the
+        # refresh result is never read at all, which is why the warning branch
+        # went untested.
+        skill_dir=".claude/skills/graphify" if skill else "",
     )
 
 
@@ -164,3 +168,57 @@ def test_a_tag_that_resolves_nowhere_aborts_before_touching_mise(tmp_path, monke
     assert (root / "mise.toml").read_text(encoding="utf-8") == before
     # The manifest, too, is untouched.
     assert "ref = v0.9.25" in (root / "sources" / "graphify.manifest").read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------
+# Cold-lane round 2 (`review-17e946d8adf4-cold.md`) — a COVERAGE GAP, not a defect.
+#
+# Every case above builds a ToolSpec with no `skill_dir`, so `skill.refresh()`
+# always takes its "no project-scoped skill" no-op path and `unrepaired` is always
+# empty. The branch that warns about a working tree the installer left dirty had
+# therefore never been executed by a test — verified by inspection only, which is
+# exactly the standard this repo does not accept for a warning nobody would
+# otherwise see.
+# --------------------------------------------------------------------------
+
+
+def test_unrepaired_paths_are_hoisted_to_the_front_of_the_note(tmp_path, monkeypatch) -> None:
+    """A warning buried mid-sentence in a note nobody parses is not a warning.
+
+    `apply()` runs the skill refresh AFTER writing the pin and manifest, on purpose
+    — a skill failure must not block an authorized bump. The cost of that ordering
+    is that damage can be on disk while the bump looks clean, so the one condition
+    that makes it NOT clean has to be the first thing in the note.
+    """
+    root = _repo(tmp_path)
+    monkeypatch.setattr(
+        apply_mod.skill,
+        "refresh",
+        lambda _root, _spec: apply_mod.skill.SkillResult(
+            ran=True,
+            unrepaired=(".claude/settings.json",),
+            note="skill refreshed; ⚠ COULD NOT REVERT .claude/settings.json",
+        ),
+    )
+
+    result = apply(root, _spec(skill=True), _verdict())
+
+    assert result.note.startswith("⚠ working tree still dirty: .claude/settings.json"), (
+        f"the warning is not first — a reader sees the bump before the damage: {result.note}"
+    )
+    assert "inspect before committing" in result.note
+
+
+def test_a_clean_refresh_adds_no_warning(tmp_path, monkeypatch) -> None:
+    """CONTROL ARM: the note must not cry wolf on the ordinary path."""
+    root = _repo(tmp_path)
+    monkeypatch.setattr(
+        apply_mod.skill,
+        "refresh",
+        lambda _root, _spec: apply_mod.skill.SkillResult(ran=True, note="skill refreshed"),
+    )
+
+    result = apply(root, _spec(skill=True), _verdict())
+
+    assert "working tree still dirty" not in result.note
+    assert result.note.startswith("rebuild pending")
