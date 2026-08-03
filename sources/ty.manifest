@@ -1,0 +1,26 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Re-clone at build time; the working tree under sources/ty/ is gitignored.
+#
+# TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
+#
+# ⚠️ INVARIANT: this pin MUST track the version we actually run.
+#   version source: pyproject.toml `[dev]` floor `ty>=0.0.1a1`; RESOLVED version from `uv run ty --version`
+#   pinned here:    0.0.62
+# A pin that drifts from the installed version makes the corpus answer questions
+# about code we are not running. Not hypothetical — `sources/graphify.manifest`
+# records exactly that failure: it sat two releases behind for weeks, so every
+# "how does graphify work?" answer came from the wrong source.
+#
+# Pin the RELEASE TAG, never a branch head — a branch drifts ahead of the release.
+# To bump: change the version in its source above, then
+#   git ls-remote --tags --refs https://github.com/astral-sh/ty | grep <version>
+# and set ref/commit here to match, then `mise run kb-build`.
+#
+# kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
+# SOURCE and skips every .md by design — the tool's DOCS are a separate
+# `kind = docs` mirror (#123), not this manifest.
+url = https://github.com/astral-sh/ty
+ref = 0.0.62
+commit = df75992e7fd0cc73cb0f66e864df3f6e4fc4e1a6
+kind = code
+added = 2026-08-02

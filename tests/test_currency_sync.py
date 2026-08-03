@@ -12,6 +12,7 @@ reported a correctly-pinned tool as "outside mise".
 """
 
 import json
+import subprocess
 import time
 from pathlib import Path
 
@@ -46,10 +47,10 @@ def _spec(tmp_path) -> config.ToolSpec:
     return config.load(tmp_path)[0]
 
 
-def _write_manifest(root, ref: str) -> None:
+def _write_manifest(root, ref: str, commit: str = "abc123") -> None:
     path = root / "sources" / "graphify.manifest"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"url = https://example/x\nref = {ref}\ncommit = abc123\n", encoding="utf-8")
+    path.write_text(f"url = https://example/x\nref = {ref}\ncommit = {commit}\n", encoding="utf-8")
 
 
 def _finding(status: sync.SyncStatus, check: str) -> sync.Finding:
@@ -224,12 +225,75 @@ def test_manifest_tracking_a_different_release_is_drift(tmp_path, monkeypatch) -
     assert _finding(sync.check_sync(root, _spec(root)), "manifest").status == sync.DRIFT
 
 
+def _clone_at(root, ref: str) -> str:
+    """A real git clone under `sources/graphify` with `ref` tagged. Returns the SHA.
+
+    A real repository, not a stub, because the check under test resolves the tag
+    with `git rev-list` against the tree `kb-build` will actually check out. A
+    fake would only confirm the fake.
+    """
+    clone = root / "sources" / "graphify"
+    clone.mkdir(parents=True, exist_ok=True)
+
+    def run(*a: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(clone), *a], capture_output=True, text=True, check=True, timeout=30
+        )
+
+    subprocess.run(["git", "init", "-q", str(clone)], check=True, timeout=30)
+    run("config", "user.email", "t@example.com")
+    run("config", "user.name", "T")
+    run("config", "commit.gpgsign", "false")
+    run("config", "tag.gpgsign", "false")
+    (clone / "f.txt").write_text("x\n", encoding="utf-8")
+    run("add", "--", "f.txt")
+    run("commit", "-q", "-m", "c")
+    run("tag", ref)
+    return run("rev-parse", "HEAD").stdout.strip()
+
+
 def test_manifest_matching_the_pin_is_ok(tmp_path, monkeypatch) -> None:
     """The `v` prefix is the tag convention; the pin has no prefix."""
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     root = _repo(tmp_path)
-    _write_manifest(root, "v0.9.25")
+    sha = _clone_at(root, "v0.9.25")
+    _write_manifest(root, "v0.9.25", commit=sha)
     assert _finding(sync.check_sync(root, _spec(root)), "manifest").status == sync.OK
+
+
+def test_manifest_whose_commit_is_not_the_tag_is_drift(tmp_path, monkeypatch) -> None:
+    """A matching `ref` is NOT the invariant — `kb-build` checks out `commit`.
+
+    THE DEFECT THIS EXISTS FOR (cold lane, round 2): the check compared only
+    `ref`, so a manifest reading `ref = v1.54.0` beside the PREVIOUS release's
+    commit reported OK while the build extracted the old code. Same false-green
+    the check exists to prevent, through a narrower mutation — and it was found
+    the day this check was first armed for hk and fnox.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo(tmp_path)
+    _clone_at(root, "v0.9.25")
+    _write_manifest(root, "v0.9.25", commit="0" * 40)
+    finding = _finding(sync.check_sync(root, _spec(root)), "manifest")
+    assert finding.status == sync.DRIFT, (
+        f"a stale commit under a correct ref reported {finding.status}: {finding.detail}"
+    )
+
+
+def test_an_unresolvable_commit_reports_skip_not_ok(tmp_path, monkeypatch) -> None:
+    """CONTROL ARM: could-not-check must never render as green.
+
+    Without a clone the tag cannot be resolved, and the honest answer is SKIP.
+    Returning OK there would restore the exact hole above on every host that has
+    not run `kb-build` yet — which is every fresh clone.
+    """
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+    root = _repo(tmp_path)
+    _write_manifest(root, "v0.9.25", commit="a" * 40)
+    finding = _finding(sync.check_sync(root, _spec(root)), "manifest")
+    assert finding.status == sync.SKIP, (
+        f"an unverifiable commit reported {finding.status}, not SKIP: {finding.detail}"
+    )
 
 
 # ---------------------------------------------------------------- stamp ----

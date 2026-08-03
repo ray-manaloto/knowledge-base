@@ -1,7 +1,7 @@
 {
   "nodes": [
     {
-      "id": "mp_main_flow",
+      "id": "mp_main_flow","_origin":"semantic",
       "label": "mattpocock-skills main flow: idea to ship",
       "file_type": "pattern",
       "source_file": "yt_67bbfd314b17.txt",
@@ -12,7 +12,7 @@
       "rationale": "/grill-with-docs (interview, stateful in CONTEXT.md + ADRs) then a fork: settle every question in conversation, or detour through /prototype bridged by /handoff in both directions. Then multi-session? yes -> /to-spec -> /to-tickets -> /implement per ticket; no -> /implement in place. /implement drives /tdd internally one red-green slice at a time and closes with /code-review before committing."
     },
     {
-      "id": "mp_context_hygiene",
+      "id": "mp_context_hygiene","_origin":"semantic",
       "label": "Keep grill through tickets in one unbroken context window",
       "file_type": "constraint",
       "source_file": "yt_67bbfd314b17.txt",
@@ -23,7 +23,7 @@
       "rationale": "Steps 1-3 (grilling, spec, tickets) must share one window so they build on the same thinking — do not compact or clear until after /to-tickets. Each /implement then starts fresh from the ticket, and the guidance is to clear between every single ticket."
     },
     {
-      "id": "mp_smart_zone",
+      "id": "mp_smart_zone","_origin":"semantic",
       "label": "Smart zone (context budget heuristic)",
       "file_type": "concept",
       "source_file": "yt_67bbfd314b17.txt",
@@ -34,7 +34,7 @@
       "rationale": "The window within which the model still reasons sharply; beyond it, attention degradation and hallucination. UNOWNED FIGURE — the ask-matt SKILL.md says ~120k tokens while the video says ~140k, both estimated informally on Opus 4.8 at medium effort in auto mode. The effect is real; the threshold does not transfer to a different model or context budget without re-measuring."
     },
     {
-      "id": "mp_user_invoked_by_design",
+      "id": "mp_user_invoked_by_design","_origin":"semantic",
       "label": "Most mattpocock skills are user-invoked to protect context budget",
       "file_type": "rationale",
       "source_file": "yt_67bbfd314b17.txt",
@@ -45,7 +45,7 @@
       "rationale": "A deliberate design choice, not an accident: 13 of the plugin's 22 promoted skills carry disable-model-invocation: true, so only the human can reach them. Descriptions are kept short and precise so the whole installed set costs roughly 660 tokens of context load. Verified against the installed 1.2.0 plugin: disable-model-invocation explains all 13 model-unreachable skills with zero mismatches."
     },
     {
-      "id": "mp_ask_matt_router",
+      "id": "mp_ask_matt_router","_origin":"semantic",
       "label": "/ask-matt is the router over the skill set",
       "file_type": "concept",
       "source_file": "yt_67bbfd314b17.txt",
@@ -56,7 +56,7 @@
       "rationale": "The single map of every user-reachable skill and how the flows relate: main flow, on-ramps (/triage for issues you did not create, /diagnosing-bugs, /wayfinder for fog too big for one session), codebase health (/improve-codebase-architecture), vocabulary layers (/domain-modeling, /codebase-design), session crossing (/handoff forks, /compact continues), standalone (/grill-me, /prototype, /research, /teach, /writing-great-skills). It is user-invoked, so a model cannot reach it."
     },
     {
-      "id": "mp_review_in_subagents",
+      "id": "mp_review_in_subagents","_origin":"semantic",
       "label": "Review in subagents because the author cannot review its own code",
       "file_type": "rationale",
       "source_file": "yt_67bbfd314b17.txt",
@@ -67,7 +67,7 @@
       "rationale": "/implement runs /code-review in subagents deliberately: an agent that just wrote the code judges it as fine because it wrote it, and agents are poor at improving code they just produced. A spawned agent gets a clear context window and reviews much better. Independent corroboration of the cross-family cold-review principle in the brain vault, arrived at from a different direction — fresh context rather than a different model family. The vault's rule is the stronger form."
     },
     {
-      "id": "mp_code_review_two_axes",
+      "id": "mp_code_review_two_axes","_origin":"semantic",
       "label": "/code-review scores two axes: spec and standards",
       "file_type": "pattern",
       "source_file": "yt_67bbfd314b17.txt",
@@ -78,7 +78,7 @@
       "rationale": "Axis one compares the work done against the original spec, catching acceptance criteria the agent forgot or the tickets left unspecified. Axis two checks against the repo's own documented coding standards, falling back to classic Martin-Fowler-style code smells when a repo documents none — so a repo that does document standards gets more out of this axis."
     },
     {
-      "id": "mp_ticket_is_one_window",
+      "id": "mp_ticket_is_one_window","_origin":"semantic",
       "label": "A ticket is sized to one context window",
       "file_type": "pattern",
       "source_file": "yt_67bbfd314b17.txt",
@@ -89,7 +89,7 @@
       "rationale": "/to-spec compresses the whole thread into a spec on the issue tracker (the destination); /to-tickets slices it into tracer-bullet tickets declaring blocking edges (the route). Each ticket is deliberately one context window of work, with most acceptance criteria left in the parent spec so the ticket only says what to build this session. Worked example: one spec with 11 sub-issues, one session each."
     },
     {
-      "id": "goal_vs_clear_between_tickets",
+      "id": "goal_vs_clear_between_tickets","_origin":"semantic",
       "label": "Conflict: one /goal cannot span a clear-between-tickets build",
       "file_type": "constraint",
       "source_file": "yt_67bbfd314b17.txt",

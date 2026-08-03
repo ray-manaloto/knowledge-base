@@ -27,6 +27,13 @@ if TYPE_CHECKING:
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 
 
+#: How many validation issues a refusal prints before truncating. A chunk with a
+#: systematic fault (every node missing `_origin`) can produce hundreds; the
+#: point of the message is to name the CLASS, and the full list is one
+#: `mise run kb-validate-chunks` away.
+_MAX_SHOWN_ISSUES = 10
+
+
 def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     """Merge one host-agent extraction chunk into graphify-out/graph.json.
 
@@ -49,6 +56,24 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     chunk_path = Path(chunk)
     if not chunk_path.is_file():
         print(f"[kb-merge] no such chunk: {chunk}", file=sys.stderr)
+        return 2
+
+    # VALIDATE BEFORE MERGING — the same gate `build()` applies, for the same
+    # reason (cold review, 2026-08-03). Existing-file was the ONLY check here, so
+    # a chunk with a missing `_origin` marker or a dangling edge merged happily
+    # and the damage showed up later as a node that had quietly stopped being
+    # retrievable. `kb-merge` is the sharper of the two doors: it is the one used
+    # for a FRESH extraction, straight off an agent, which is precisely the input
+    # least likely to be well-formed.
+    from kb_setup import chunks as _chunks
+
+    issues = _chunks.validate_files([chunk_path]).get(chunk_path) or []
+    if issues:
+        print(f"[kb-merge] {chunk_path.name} failed validation — refusing:", file=sys.stderr)
+        for i in issues[:_MAX_SHOWN_ISSUES]:
+            print(f"  {i}", file=sys.stderr)
+        if len(issues) > _MAX_SHOWN_ISSUES:
+            print(f"  … and {len(issues) - _MAX_SHOWN_ISSUES} more", file=sys.stderr)
         return 2
     out = repo_root / "graphify-out" / "graph.json"
     src_root = root or str(chunk_path.resolve().parent)

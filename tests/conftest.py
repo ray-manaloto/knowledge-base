@@ -30,6 +30,45 @@ _GIT_TIMEOUT = 30
 LANES_RAN = ("standards", "spec", "cold:codex", "silent-failure")
 
 
+def apply_merge(argv: list[str]) -> None:
+    """Model on disk what `graphify merge-graphs <in...> --out X` does.
+
+    Not a convenience — a correctness requirement of every `build()` test that
+    stubs `_run`. `build()` used to seed `graph.json` with an un-stubbed
+    `shutil.copy`, so the file existed no matter what the stub did and the tests
+    could assert on its CONTENT. Composing every corpus source in one merge (#120)
+    removed that copy, so a stub that only records argv leaves `graph.json`
+    missing and `build()` dies at the base snapshot — six tests failed that way,
+    none of them about anything this stub understands.
+
+    Concatenating the inputs is enough because the fixtures give each source
+    distinguishable bytes; what the assertions need is "did THIS source
+    contribute", not a real graph. Missing inputs are skipped so the self merge
+    still models correctly when `graphify extract` was stubbed out and wrote no
+    sub-graph.
+    """
+    a = [str(x) for x in argv]
+    if "merge-graphs" not in a or "--out" not in a:
+        return
+    out = Path(a[a.index("--out") + 1])
+    inputs = [Path(p) for p in a[a.index("merge-graphs") + 1 : a.index("--out")]]
+    # Read every input BEFORE writing: `out` is itself an input on the self merge,
+    # so writing first would truncate what we are about to read.
+    body = "".join(p.read_text(encoding="utf-8") for p in inputs if p.is_file())
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(body, encoding="utf-8")
+
+
+def merge_recorder(calls: list[list[str]]) -> Callable[..., None]:
+    """A `graph._run` stub that records argv AND applies :func:`apply_merge`."""
+
+    def run(argv: list[str], _root: Path) -> None:
+        calls.append([str(a) for a in argv])
+        apply_merge(argv)
+
+    return run
+
+
 @pytest.fixture
 def git(tmp_path: Path) -> Callable[..., str]:
     """Return a `git(*args) -> stdout` bound to a fresh repo on a `work` branch.

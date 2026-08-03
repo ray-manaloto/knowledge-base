@@ -522,6 +522,11 @@ def stamped_fingerprints(stamp: dict[str, object]) -> dict[str, str]:
     return {str(k): str(v) for k, v in raw.items()}
 
 
+#: Length of a full git object id — what `rev-list -n1` must return for the
+#: answer to be a resolved commit rather than an error string.
+_SHA_LEN = 40
+
+
 # ------------------------------------------------------------ the manifest ----
 
 
@@ -764,7 +769,85 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
             f"{spec.manifest} pins {ref} but mise installs {pinned} — "
             f"the corpus describes code we do not run",
         )
-    return Finding("manifest", OK, f"{spec.manifest} tracks the installed {ref}")
+    return _check_manifest_commit(repo_root, spec, ref)
+
+
+def _check_manifest_commit(repo_root: Path, spec: ToolSpec, ref: str) -> Finding:
+    """Does the manifest's `commit` actually name the tag its `ref` claims?
+
+    `ref` agreeing with the installed version is NOT the invariant.`_ensure_clone`
+    clones the ref and then checks out `commit`, so those two fields are what the
+    corpus is really built from — and they are independent. A manifest reading
+    `ref = v1.54.0` beside the PREVIOUS release's commit reported OK while
+    `kb-build` extracted the old code: the same false-green `_check_manifest`
+    exists to prevent, reached by a narrower mutation. The cold lane found it by
+    executing exactly that, against the check that had just been armed for hk
+    and fnox.
+
+    Verified against the LOCAL clone rather than the network: it is the tree the
+    build will actually use, it costs no round trip, and a missing clone is an
+    UNKNOWN rather than a pass — "could not check" is never rendered green here.
+    """
+    commit = _manifest_field(repo_root, spec, "commit")
+    if not commit:
+        return Finding("manifest", DRIFT, f"{spec.manifest} has no readable `commit =` line")
+    resolved = _tag_commit(repo_root, spec, ref)
+    if resolved is None:
+        return Finding(
+            "manifest",
+            SKIP,
+            f"{spec.manifest} pins {ref}; its clone is absent so `commit` could not be "
+            f"checked against the tag — run `mise run kb-build`",
+        )
+    if resolved != commit:
+        return Finding(
+            "manifest",
+            DRIFT,
+            f"{spec.manifest} pins `ref = {ref}` but `commit = {commit[:12]}`, and {ref} "
+            f"resolves to {resolved[:12]} — kb-build checks out the COMMIT, so the corpus "
+            f"would describe code the ref does not name",
+        )
+    return Finding("manifest", OK, f"{spec.manifest} tracks the installed {ref} at {commit[:12]}")
+
+
+def _manifest_field(repo_root: Path, spec: ToolSpec, key: str) -> str:
+    """One `<key> =` line from this tool's source manifest, or ""."""
+    if not spec.manifest:
+        return ""
+    path = repo_root / spec.manifest
+    if not path.exists():
+        return ""
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line.startswith(key) and "=" in line:
+            return line.partition("=")[2].strip()
+    return ""
+
+
+def _tag_commit(repo_root: Path, spec: ToolSpec, ref: str) -> str | None:
+    """What `ref` resolves to in the local clone, or None when unresolvable.
+
+    None means UNKNOWN — no clone, no such tag, no git — and the caller reports
+    SKIP for it rather than OK. Distinguishing "checked and agrees" from "could
+    not check" is the whole posture of this engine.
+    """
+    if not spec.manifest:
+        return None
+    clone = repo_root / Path(spec.manifest).with_suffix("")
+    if not (clone / ".git").is_dir():
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(clone), "rev-list", "-n1", ref],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    sha = out.stdout.strip()
+    return sha if out.returncode == 0 and len(sha) == _SHA_LEN else None
 
 
 def _check_artifact_identity(

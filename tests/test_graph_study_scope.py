@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from conftest import merge_recorder
 from kb_setup import graph
 from kb_setup import manifest as mf
 
@@ -44,8 +45,10 @@ def _manifest(tmp_path: Path, name: str, scope: str = "corpus") -> None:
 
 def _build(monkeypatch, tmp_path: Path) -> list[list[str]]:
     calls: list[list[str]] = []
-    # `aaa-corpus` sorts first so it is the SEED. That is load-bearing, not
-    # incidental — see the seeding test below.
+    # `aaa-corpus` sorts first. Since #120 there is no SEED — every corpus source
+    # goes into one `merge-graphs` call — but sort order is still load-bearing:
+    # it is what the ordering test below manipulates to try to get a study source
+    # in ahead of the corpus.
     _manifest(tmp_path, "aaa-corpus")
     _manifest(tmp_path, "mmm-corpus2")
     _manifest(tmp_path, "zzz-study", scope="study")
@@ -63,7 +66,7 @@ def _build(monkeypatch, tmp_path: Path) -> list[list[str]]:
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
     monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
-    monkeypatch.setattr(graph, "_run", lambda argv, _root: calls.append([str(a) for a in argv]))
+    monkeypatch.setattr(graph, "_run", merge_recorder(calls))
 
     graph.build(tmp_path)
     return calls
@@ -120,13 +123,20 @@ def test_a_study_source_is_still_ingested_into_the_study_graph(monkeypatch, tmp_
 
 
 def test_a_study_source_never_seeds_the_corpus_graph(monkeypatch, tmp_path):
-    """A study repo must not become the corpus's identity by sorting first.
+    """A study repo must not reach the corpus graph by sorting first.
 
-    `build()` seeds graph.json by copying the FIRST code-bearing source, so a
-    partition applied only to the merge loop would still let a study repo seed the
-    aggregate whenever it happened to sort ahead of the corpus ones — or whenever
-    a corpus clone failed. The failure would be silent and total: the corpus would
-    BE the study repo.
+    Originally: `build()` seeded graph.json by copying the FIRST code-bearing
+    source, so a partition applied only to the merge loop would still let a study
+    repo seed the aggregate whenever it sorted ahead of the corpus ones — silently
+    and totally, because the corpus would then simply BE the study repo.
+
+    THE SEED IS GONE since #120 — every corpus source is composed in one
+    `merge-graphs` call — so that specific mechanism can no longer fire. The test
+    is kept rather than deleted because the property it guards did not go away
+    with its mechanism: the partition is still computed from a sorted source list,
+    and a future edit that partitions the merge inputs but not the list they are
+    drawn from would reintroduce it in a new shape. The name is kept too, so the
+    history stays greppable from the issue that produced it.
     """
     name = "a-study-sorts-first"
     _manifest(tmp_path, name, scope="study")
@@ -141,12 +151,12 @@ def test_a_study_source_never_seeds_the_corpus_graph(monkeypatch, tmp_path):
 
     _build(monkeypatch, tmp_path)
 
-    seeded = (tmp_path / "graphify-out" / "graph.json").read_text(encoding="utf-8")
-    assert name not in seeded, (
-        f"the corpus graph was SEEDED from a scope=study source; graph.json holds "
-        f"{seeded!r}. Partitioning only the merge loop is not enough — the seed is "
-        f"chosen first, so the corpus would simply BE the study repo."
+    composed = (tmp_path / "graphify-out" / "graph.json").read_text(encoding="utf-8")
+    assert name not in composed, (
+        f"a scope=study source reached the corpus graph by sorting ahead of every "
+        f"corpus one; graph.json holds {composed!r}. Partitioning the merge inputs "
+        f"is not enough if the list they are drawn from is not partitioned too."
     )
-    assert "aaa-corpus" in seeded, (
-        f"graph.json was not seeded from the first CORPUS source; it holds {seeded!r}"
+    assert "aaa-corpus" in composed, (
+        f"graph.json did not receive the first CORPUS source; it holds {composed!r}"
     )

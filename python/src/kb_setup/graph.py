@@ -143,6 +143,12 @@ def _extract_code(repo_root: Path, name: str) -> bool:
 #: works, NOT evidence this change works — the direct arm is the depth test in
 #: `tests/test_affected_covers_tests.py`, which must move from red to green
 #: across the rebuild that carries this.
+#:
+#: CONFIRMED GENERALLY 2026-08-03: the rebuilt aggregate has **0 cross-namespace
+#: edges of 815,481** across 40 namespaces (control-armed — injecting one crossing
+#: moves the count to 1). So "no edge can span two namespaces" is not a quirk of
+#: our two trees; it is what `merge-graphs` does to every input, and one extraction
+#: root is the only way any cross-tree edge can exist.
 _SELF_ROOT = "."
 
 #: Where the single self sub-graph is written, and the reason this constant
@@ -161,11 +167,24 @@ _SELF_OUT = ".self-graph"
 BASE_GRAPH_NAME = ".base-graph.json"
 
 #: Where `scope = study` sources land — repos we are analysing rather than
-#: learning from. Kept out of the aggregate because merging them into it took
-#: graph.json 7.6 MiB past graphify's 512 MiB cap and failed the build outright:
-#: 71.0 MB of sub-graphs became >=155 MiB of aggregate growth, since
-#: `merge-graphs` re-namespaces ids and expands edges on every merge. They are
-#: still fully ingested — no exclusions — just not ranked beside the corpus.
+#: learning from. They are still fully ingested — no exclusions — just not ranked
+#: beside the corpus.
+#:
+#: ⚠️ THE ORIGINAL RATIONALE WAS PARTLY A BUG, corrected 2026-08-03 (#120). This
+#: said the partition existed because merging study sources took graph.json 7.6 MiB
+#: past the 512 MiB cap — "71.0 MB of sub-graphs became >=155 MiB of aggregate
+#: growth, since `merge-graphs` re-namespaces ids and expands edges on every merge".
+#: The re-namespacing was real; the >=2x expansion was not inherent to it. It came
+#: from `build()` merging PAIRWISE and re-prefixing its own accumulator once per
+#: source. After the N-ary fix, duplicate-prefix waste measures 0.00% and id depth
+#: is 1-2 rather than 1-22.
+#:
+#: The partition SURVIVES the correction on its own merits — nothing analysing a
+#: study repo needs its nodes ranked beside the corpus, and Ray's instruction was
+#: "ingest all three, no exclusions", which routing satisfies and dropping would
+#: not. But do not carry the byte figure forward as an argument: it was inflated,
+#: and a reader reaching for it to justify the next partition would be reasoning
+#: from a defect. See `_merge_sources_into`.
 STUDY_GRAPH_NAME = "study-graph.json"
 
 #: sha256 of the `graph.json` that the base snapshot is known to compose with.
@@ -466,6 +485,54 @@ def _restamp_self(repo_root: Path) -> None:
         print(f"[kb-watch] WARNING: could not restamp: {e}")
 
 
+def _merge_sources_into(repo_root: Path, out: Path, inputs: list[Path]) -> None:
+    """Compose `inputs` into `out` with ONE `merge-graphs` call — never pairwise.
+
+    THE FIX FOR #120, and the reason it is a shared helper rather than two edits.
+
+    graphify's `merge-graphs` takes N graph paths (`cli.py` parses every
+    non-`--out` argument into `graph_paths`) and prefixes each input's node ids
+    with a distinct `<repo_tag>::` so same-stem nodes from different repos cannot
+    collide (#1729). `prefix_graph_for_global` (`build.py:1449`) applies that
+    prefix UNCONDITIONALLY — `relabel = {n: f"{repo_tag}::{n}" ...}` with no
+    already-prefixed guard.
+
+    So feeding the accumulator back in as an input, once per source, re-prefixes
+    everything already merged. Measured on the 2026-08-03 aggregate: of 218,243
+    node ids only 9,645 (4.4%) carried a single `::`; 90,795 carried ten and
+    11,932 carried twenty-two. Across every id-bearing field (`id`, `source`,
+    `target`, `_src`, `_tgt`) that is 296,904,672 bytes where 112,626,720 would
+    do — **184 MB, 33% of the whole file**, which is what pushed graph.json past
+    graphify's 512 MiB read cap and made the entire aggregate unqueryable.
+
+    Calling the N-ary form once gives every input exactly one prefix, which is
+    the invariant `tests/test_merge_prefixes_once.py` asserts. It is also
+    `use-tool-builtins.md` in the literal: the loop was ours, the N-ary merge is
+    graphify's, and the loop was the defect.
+
+    Two related workarounds in this file were written believing the blowup was
+    inherent to merging rather than a bug in how we called it — the
+    `STUDY_GRAPH_NAME` partition ("71.0 MB of sub-graphs became >=155 MiB of
+    aggregate growth") and the #101 disjoint-namespace note. Neither is retired
+    here: study partitioning still has an independent ranking rationale, and #101
+    was fixed by extracting one root. But a future reader weighing either should
+    know the cost figure behind them was inflated by this.
+
+    A single input is COPIED, not merged: `merge-graphs` requires two paths and
+    exits 1 on one. That leaves a lone source unprefixed while N>=2 sources each
+    carry one — an asymmetry inherited from the code this replaces, harmless
+    because it is reachable only with exactly one code-bearing corpus source.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if len(inputs) == 1:
+        shutil.copy(inputs[0], out)
+        return
+    _run(
+        [graphify_exe(repo_root), "merge-graphs", *[str(p) for p in inputs], "--out", str(out)],
+        repo_root,
+    )
+
+
 def _build_study_graph(repo_root: Path, sources: Path, out_dir: Path, study: list[str]) -> None:
     """Merge every `scope = study` source into its own graph, never the aggregate.
 
@@ -482,22 +549,10 @@ def _build_study_graph(repo_root: Path, sources: Path, out_dir: Path, study: lis
     if not study:
         return
     study_out = out_dir / STUDY_GRAPH_NAME
-    seed, *rest = study
-    shutil.copy(sources / seed / "graphify-out" / "graph.json", study_out)
-    print(f"[kb-build] seeded {STUDY_GRAPH_NAME} from {seed} ({len(study)} study source(s))")
-    for name in rest:
-        sub = sources / name / "graphify-out" / "graph.json"
-        _run(
-            [
-                graphify_exe(repo_root),
-                "merge-graphs",
-                str(study_out),
-                str(sub),
-                "--out",
-                str(study_out),
-            ],
-            repo_root,
-        )
+    print(f"[kb-build] composing {STUDY_GRAPH_NAME} from {len(study)} study source(s)")
+    _merge_sources_into(
+        repo_root, study_out, [sources / n / "graphify-out" / "graph.json" for n in study]
+    )
 
 
 def build(repo_root: Path) -> None:
@@ -521,6 +576,28 @@ def build(repo_root: Path) -> None:
     manifests = mf.load_all(sources)
     if not manifests:
         raise SystemExit("no sources/*.manifest found")
+
+    # VALIDATE EVERY COMMITTED CHUNK **FIRST** — before the stamp is cleared,
+    # before a single clone, and above all before anything writes graph.json.
+    #
+    # This sat after the corpus merge until the cold lane's round 2. It refused,
+    # correctly, but only AFTER `_merge_sources_into` had already replaced the
+    # aggregate with a code-only composition — so a bad chunk cost the working
+    # graph and left a partial one that `kb-query` will happily serve, since it
+    # checks only that the file exists. A refusal that is not atomic with respect
+    # to the artifact it protects is a refusal that has already done the damage.
+    # Cheap enough to be free here: 18 files, a few milliseconds, no network.
+    from kb_setup import chunks as _chunks
+
+    chunk_paths = sorted((sources / "extractions").glob("*.json"))
+    problems = {p: i for p, i in _chunks.validate_files(chunk_paths).items() if i}
+    if problems:
+        lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
+        raise SystemExit(
+            f"{len(problems)} extraction chunk(s) failed validation — refusing to build:\n"
+            + "\n".join(lines)
+            + "\nRun `mise run kb-validate-chunks -- sources/extractions/*.json` for the full list."
+        )
 
     # Invalidate the stamp BEFORE anything touches graph.json. `build()` overwrites
     # the artifact at the seed step but only stamps at the very end, so any abort in
@@ -567,25 +644,24 @@ def build(repo_root: Path) -> None:
     if not corpus:
         raise SystemExit("no CORPUS source produced code nodes (only scope=study ones did)")
 
-    # Seed graph.json from the first code-bearing CORPUS source; merge the rest.
-    seed, *rest = corpus
-    out.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(sources / seed / "graphify-out" / "graph.json", out)
-    print(f"[kb-build] seeded graph.json from {seed}")
-    for name in rest:
-        sub = sources / name / "graphify-out" / "graph.json"
-        _run(
-            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
-            repo_root,
-        )
+    # Compose graph.json from every code-bearing CORPUS source in ONE merge (#120).
+    # Not a seed-plus-loop: that fed the accumulator back in per source and
+    # re-prefixed it each time — see `_merge_sources_into`. It also mistagged the
+    # seed, which sat at `graphify-out/graph.json` when `distinct_repo_tags` read
+    # `parent.parent`, so the first source's nodes were labelled with the REPO name
+    # instead of their own. Every source now carries its own tag, exactly once.
+    print(f"[kb-build] composing graph.json from {len(corpus)} corpus source(s)")
+    _merge_sources_into(
+        repo_root, out, [sources / n / "graphify-out" / "graph.json" for n in corpus]
+    )
 
     _build_study_graph(repo_root, sources, out.parent, study)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)
-    chunks = sorted((sources / "extractions").glob("*.json"))
-    print(f"[kb-build] merging {len(chunks)} committed doc extraction(s)")
-    for chunk in chunks:
+    # Already validated at the TOP of build(), before anything wrote graph.json.
+    print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
+    for chunk in chunk_paths:
         name = chunk.stem.removesuffix("-docs")
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)

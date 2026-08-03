@@ -114,6 +114,7 @@ Produce a graphify DOC-EXTRACTION CHUNK: a JSON object
 NODE object (exact keys):
   id          : globally-unique slug, MUST start with "${s.key}_" then a short concept slug (snake_case). Never reuse an id.
   label       : short human name of the concept/entity.
+  _origin     : "semantic"   <- EXACTLY this literal on EVERY node. Not optional.
   file_type   : "concept"
   source_file : "${file}"
   source_url  : "${s.url}"
@@ -145,6 +146,14 @@ that makes the sentence true. The rules that decide it:
 Do NOT flip a whole relation type at the end as a batch. Direction is decided per
 edge from the source text; a blanket flip breaks the ones that were already right.
 
+WHY \`_origin: "semantic"\` IS MANDATORY: graphify 0.9.32+ decides a node's tier from
+\`_origin\` when present, and otherwise GUESSES from shape — a \`source_location\` that
+looks like \`L<line>\` is read as AST. Extraction agents have emitted \`source_location\`
+values like "L5" unprompted (this prompt never asked for the field), and that guess
+silently deleted **629 nodes** from the prose graph in one build, with no error. The
+literal marker makes the guess unreachable. \`mise run kb-validate-chunks\` REJECTS a
+chunk whose nodes lack it.
+
 Rules: only connect nodes that exist in THIS chunk; prefer faithful EXTRACTED edges; mark reasoned links INFERRED honestly; never invent facts not in the source.
 
 After building the chunk, WRITE it (Write tool) to:
@@ -159,7 +168,7 @@ function inventoryPrompt(s) {
 It is a curated inventory (one entry per item, e.g. marketplace plugins).${s.note ? `\nContext: ${s.note}` : ''}
 
 Produce a graphify chunk { "nodes":[...], "edges":[...], "hyperedges":[], "input_tokens":0, "output_tokens":0 }.
-- One NODE per item: id "${s.key}_" + item-slug (snake_case, globally unique); label = item name; file_type "concept"; source_file "${file}"; source_url "${s.url}"; captured_at "${capturedAt}"; author null; contributor null; rationale = the item's one-line purpose/category.
+- One NODE per item: id "${s.key}_" + item-slug (snake_case, globally unique); label = item name; **_origin "semantic"** (exactly this literal, on every node, mandatory); file_type "concept"; source_file "${file}"; source_url "${s.url}"; captured_at "${capturedAt}"; author null; contributor null; rationale = the item's one-line purpose/category.
 - ALSO create category NODES (id "${s.key}_cat_<slug>") for the main categories present.
 - EDGES: each item -> its category node, relation "part_of", confidence "EXTRACTED", confidence_score 1, source_file "${file}", weight 1.
   DIRECTION: source = the ITEM, target = the CATEGORY (member -> container). Read it

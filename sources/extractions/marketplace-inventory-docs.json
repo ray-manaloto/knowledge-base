@@ -1,7 +1,7 @@
 {
  "nodes": [
   {
-   "id": "marketplace_cat_browser",
+   "id": "marketplace_cat_browser","_origin":"semantic",
    "label": "Browser Automation",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -12,7 +12,7 @@
    "rationale": "Marketplace category: Browser Automation"
   },
   {
-   "id": "marketplace_cat_debate",
+   "id": "marketplace_cat_debate","_origin":"semantic",
    "label": "Debate / Council",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -23,7 +23,7 @@
    "rationale": "Marketplace category: Debate / Council"
   },
   {
-   "id": "marketplace_cat_domain",
+   "id": "marketplace_cat_domain","_origin":"semantic",
    "label": "Domain-Specific",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -34,7 +34,7 @@
    "rationale": "Marketplace category: Domain-Specific"
   },
   {
-   "id": "marketplace_cat_graph",
+   "id": "marketplace_cat_graph","_origin":"semantic",
    "label": "Knowledge Graph",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -45,7 +45,7 @@
    "rationale": "Marketplace category: Knowledge Graph"
   },
   {
-   "id": "marketplace_cat_harness",
+   "id": "marketplace_cat_harness","_origin":"semantic",
    "label": "Harness / Workflow",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -56,7 +56,7 @@
    "rationale": "Marketplace category: Harness / Workflow"
   },
   {
-   "id": "marketplace_cat_memory",
+   "id": "marketplace_cat_memory","_origin":"semantic",
    "label": "Memory",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -67,7 +67,7 @@
    "rationale": "Marketplace category: Memory"
   },
   {
-   "id": "marketplace_cat_multi_agent",
+   "id": "marketplace_cat_multi_agent","_origin":"semantic",
    "label": "Multi-Agent",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -78,7 +78,7 @@
    "rationale": "Marketplace category: Multi-Agent"
   },
   {
-   "id": "marketplace_cat_observability",
+   "id": "marketplace_cat_observability","_origin":"semantic",
    "label": "Observability",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -89,7 +89,7 @@
    "rationale": "Marketplace category: Observability"
   },
   {
-   "id": "marketplace_cat_orchestration",
+   "id": "marketplace_cat_orchestration","_origin":"semantic",
    "label": "Orchestration",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -100,7 +100,7 @@
    "rationale": "Marketplace category: Orchestration"
   },
   {
-   "id": "marketplace_cat_research",
+   "id": "marketplace_cat_research","_origin":"semantic",
    "label": "Research",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -111,7 +111,7 @@
    "rationale": "Marketplace category: Research"
   },
   {
-   "id": "marketplace_cat_review",
+   "id": "marketplace_cat_review","_origin":"semantic",
    "label": "Code Review",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -122,7 +122,7 @@
    "rationale": "Marketplace category: Code Review"
   },
   {
-   "id": "marketplace_cat_security",
+   "id": "marketplace_cat_security","_origin":"semantic",
    "label": "Security / Governance",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -133,7 +133,7 @@
    "rationale": "Marketplace category: Security / Governance"
   },
   {
-   "id": "marketplace_cat_session_handoff",
+   "id": "marketplace_cat_session_handoff","_origin":"semantic",
    "label": "Session Handoff",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -144,7 +144,7 @@
    "rationale": "Marketplace category: Session Handoff"
   },
   {
-   "id": "marketplace_cat_spec_workflow",
+   "id": "marketplace_cat_spec_workflow","_origin":"semantic",
    "label": "Spec-Driven Workflow",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -155,7 +155,7 @@
    "rationale": "Marketplace category: Spec-Driven Workflow"
   },
   {
-   "id": "marketplace_cat_task_management",
+   "id": "marketplace_cat_task_management","_origin":"semantic",
    "label": "Task Management",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -166,7 +166,7 @@
    "rationale": "Marketplace category: Task Management"
   },
   {
-   "id": "marketplace_16minds",
+   "id": "marketplace_16minds","_origin":"semantic",
    "label": "16minds",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -177,7 +177,7 @@
    "rationale": "Summons agents modeled on 16 personality types to debate and review"
   },
   {
-   "id": "marketplace_8_habit_ai_dev",
+   "id": "marketplace_8_habit_ai_dev","_origin":"semantic",
    "label": "8-habit-ai-dev",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -188,7 +188,7 @@
    "rationale": "Structured 7-step AI dev workflow: Research to Build Brief"
   },
   {
-   "id": "marketplace_adversarial_spec",
+   "id": "marketplace_adversarial_spec","_origin":"semantic",
    "label": "adversarial-spec",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -199,7 +199,7 @@
    "rationale": "Refine product specs through multi-model debate until consensus"
   },
   {
-   "id": "marketplace_aeon_flux",
+   "id": "marketplace_aeon_flux","_origin":"semantic",
    "label": "aeon-flux",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -210,7 +210,7 @@
    "rationale": "Bash-loop operating mode for Claude Code: action over explanation"
   },
   {
-   "id": "marketplace_ag2_claude_plugins",
+   "id": "marketplace_ag2_claude_plugins","_origin":"semantic",
    "label": "ag2-claude-plugins",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -221,7 +221,7 @@
    "rationale": "Marketplace for building AG2 (AutoGen) multi-agent workflows"
   },
   {
-   "id": "marketplace_al_development_collection_for_claude_code",
+   "id": "marketplace_al_development_collection_for_claude_code","_origin":"semantic",
    "label": "al-development-collection-for-claude-code",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -232,7 +232,7 @@
    "rationale": "AI-assisted toolkit for Microsoft Dynamics 365 Business Central"
   },
   {
-   "id": "marketplace_aldc_al_development_plugin_for_business_central",
+   "id": "marketplace_aldc_al_development_plugin_for_business_central","_origin":"semantic",
    "label": "aldc-al-development-plugin-for-business-central",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -243,7 +243,7 @@
    "rationale": "Business Central extension development toolkit"
   },
   {
-   "id": "marketplace_anamnese_core",
+   "id": "marketplace_anamnese_core","_origin":"semantic",
    "label": "anamnese-core",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -254,7 +254,7 @@
    "rationale": "Secure, portable, cloud-persistent memory across every conversation"
   },
   {
-   "id": "marketplace_anti_ai_writing",
+   "id": "marketplace_anti_ai_writing","_origin":"semantic",
    "label": "anti-ai-writing",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -265,7 +265,7 @@
    "rationale": "Edits drafts to remove AI-writing tells and banned words"
   },
   {
-   "id": "marketplace_aomi_build",
+   "id": "marketplace_aomi_build","_origin":"semantic",
    "label": "aomi-build",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -276,7 +276,7 @@
    "rationale": "Build agents hosted by Aomi Labs (Rust API client agentic apps)"
   },
   {
-   "id": "marketplace_aomi_transact",
+   "id": "marketplace_aomi_transact","_origin":"semantic",
    "label": "aomi-transact",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -287,7 +287,7 @@
    "rationale": "Build natural-language crypto/web3 trading agents"
   },
   {
-   "id": "marketplace_architecture_studio",
+   "id": "marketplace_architecture_studio","_origin":"semantic",
    "label": "architecture-studio",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -298,7 +298,7 @@
    "rationale": "Plugin system for architects, designers, AEC professionals"
   },
   {
-   "id": "marketplace_atelier",
+   "id": "marketplace_atelier","_origin":"semantic",
    "label": "atelier",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -309,7 +309,7 @@
    "rationale": "Universal multi-agent project harness discovery to release"
   },
   {
-   "id": "marketplace_atelier_pipeline",
+   "id": "marketplace_atelier_pipeline","_origin":"semantic",
    "label": "atelier-pipeline",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -320,7 +320,7 @@
    "rationale": "Multi-agent orchestration with eleven specialized personas"
   },
   {
-   "id": "marketplace_attacca",
+   "id": "marketplace_attacca","_origin":"semantic",
    "label": "attacca",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -331,7 +331,7 @@
    "rationale": "Multi-agent coding orchestrator: Manager/Engineer/Security"
   },
   {
-   "id": "marketplace_audit_project",
+   "id": "marketplace_audit_project","_origin":"semantic",
    "label": "audit-project",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -342,7 +342,7 @@
    "rationale": "Multi-agent iterative code review until zero issues remain"
   },
   {
-   "id": "marketplace_avicenna",
+   "id": "marketplace_avicenna","_origin":"semantic",
    "label": "avicenna",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -353,7 +353,7 @@
    "rationale": "Code knowledge graph MCP: semantic search, symbol/dependency analysis"
   },
   {
-   "id": "marketplace_axme_code",
+   "id": "marketplace_axme_code","_origin":"semantic",
    "label": "axme-code",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -364,7 +364,7 @@
    "rationale": "Persistent memory, architectural decisions, safety guardrails"
   },
   {
-   "id": "marketplace_backpack_ontology",
+   "id": "marketplace_backpack_ontology","_origin":"semantic",
    "label": "backpack-ontology",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -375,7 +375,7 @@
    "rationale": "Persistent knowledge graph engine giving structured searchable memory"
   },
   {
-   "id": "marketplace_belmont",
+   "id": "marketplace_belmont","_origin":"semantic",
    "label": "belmont",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -386,7 +386,7 @@
    "rationale": "Structured coding sessions managing a PRD and orchestration"
   },
   {
-   "id": "marketplace_blue_collar_governance",
+   "id": "marketplace_blue_collar_governance","_origin":"semantic",
    "label": "blue-collar-governance",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -397,7 +397,7 @@
    "rationale": "Deterministic AI governance runtime; 22 JS engines"
   },
   {
-   "id": "marketplace_blueprint_sdlc",
+   "id": "marketplace_blueprint_sdlc","_origin":"semantic",
    "label": "blueprint-sdlc",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -408,7 +408,7 @@
    "rationale": "27 slash commands turning Claude Code into an engineering team"
   },
   {
-   "id": "marketplace_briefing",
+   "id": "marketplace_briefing","_origin":"semantic",
    "label": "briefing",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -419,7 +419,7 @@
    "rationale": "Subagents declare required skills in frontmatter, loaded first"
   },
   {
-   "id": "marketplace_browser_harness",
+   "id": "marketplace_browser_harness","_origin":"semantic",
    "label": "browser-harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -430,7 +430,7 @@
    "rationale": "Open-source browser agent driven via CDP for direct control"
   },
   {
-   "id": "marketplace_building_multiagent_systems",
+   "id": "marketplace_building_multiagent_systems","_origin":"semantic",
    "label": "building-multiagent-systems",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -441,7 +441,7 @@
    "rationale": "Architecture patterns for multi-agent orchestrators/sub-agents"
   },
   {
-   "id": "marketplace_cc_native",
+   "id": "marketplace_cc_native","_origin":"semantic",
    "label": "cc-native",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -452,7 +452,7 @@
    "rationale": "Keeps Claude Code config aware of weekly feature changes"
   },
   {
-   "id": "marketplace_cc_orchestrador_subagents",
+   "id": "marketplace_cc_orchestrador_subagents","_origin":"semantic",
    "label": "cc-orchestrador-subagents",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -463,7 +463,7 @@
    "rationale": "Turns Claude Code into a technical execution manager of subagents"
   },
   {
-   "id": "marketplace_cc10x_router_owned_harness",
+   "id": "marketplace_cc10x_router_owned_harness","_origin":"semantic",
    "label": "cc10x-router-owned-harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -474,7 +474,7 @@
    "rationale": "Orchestrated skills, subagents, persistent memory"
   },
   {
-   "id": "marketplace_challenger",
+   "id": "marketplace_challenger","_origin":"semantic",
    "label": "challenger",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -485,7 +485,7 @@
    "rationale": "Adversarial plugin stress-testing decisions via challenge rounds"
   },
   {
-   "id": "marketplace_chess_coach_ai",
+   "id": "marketplace_chess_coach_ai","_origin":"semantic",
    "label": "chess-coach-ai",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -496,7 +496,7 @@
    "rationale": "Multi-agent chess coaching system with 4 specialized agents"
   },
   {
-   "id": "marketplace_chrome_extension_builder",
+   "id": "marketplace_chrome_extension_builder","_origin":"semantic",
    "label": "chrome-extension-builder",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -507,7 +507,7 @@
    "rationale": "Scaffold/validate/test/publish Manifest V3 browser extensions"
   },
   {
-   "id": "marketplace_claude_alloy",
+   "id": "marketplace_claude_alloy","_origin":"semantic",
    "label": "claude-alloy",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -518,7 +518,7 @@
    "rationale": "Multi-agent orchestration harness with 11 specialized agents"
   },
   {
-   "id": "marketplace_claude_code_survival_kit",
+   "id": "marketplace_claude_code_survival_kit","_origin":"semantic",
    "label": "claude-code-survival-kit",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -529,7 +529,7 @@
    "rationale": "10 slash commands + 3 agent definitions from daily CC use"
   },
   {
-   "id": "marketplace_claude_cognis",
+   "id": "marketplace_claude_cognis","_origin":"semantic",
    "label": "claude-cognis",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -540,7 +540,7 @@
    "rationale": "Persistent memory loading relevant context each session"
   },
   {
-   "id": "marketplace_claude_context_optimizer",
+   "id": "marketplace_claude_context_optimizer","_origin":"semantic",
    "label": "claude-context-optimizer",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -551,7 +551,7 @@
    "rationale": "Audit/optimize Claude Code context window usage, 9-phase"
   },
   {
-   "id": "marketplace_claude_crew",
+   "id": "marketplace_claude_crew","_origin":"semantic",
    "label": "claude-crew",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -562,7 +562,7 @@
    "rationale": "Mobile agent harness with 8 specialist agents for iOS/Android"
   },
   {
-   "id": "marketplace_claude_handoff",
+   "id": "marketplace_claude_handoff","_origin":"semantic",
    "label": "claude-handoff",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -573,7 +573,7 @@
    "rationale": "Auto-generate handoff prompts and restart with fresh context"
   },
   {
-   "id": "marketplace_claude_harness",
+   "id": "marketplace_claude_harness","_origin":"semantic",
    "label": "claude-harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -584,7 +584,7 @@
    "rationale": "Autonomous Plan-Work-Review cycle with runtime guardrails"
   },
   {
-   "id": "marketplace_claude_lens",
+   "id": "marketplace_claude_lens","_origin":"semantic",
    "label": "claude-lens",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -595,7 +595,7 @@
    "rationale": "Fast statusline with quota/pace tracking"
   },
   {
-   "id": "marketplace_claude_library",
+   "id": "marketplace_claude_library","_origin":"semantic",
    "label": "claude-library",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -606,7 +606,7 @@
    "rationale": "23 reusable skills, 2 agents, smart hooks for any project"
   },
   {
-   "id": "marketplace_claude_mem",
+   "id": "marketplace_claude_mem","_origin":"semantic",
    "label": "claude-mem",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -617,7 +617,7 @@
    "rationale": "Persistent memory system preserving context across sessions"
   },
   {
-   "id": "marketplace_claude_perfectionist",
+   "id": "marketplace_claude_perfectionist","_origin":"semantic",
    "label": "claude-perfectionist",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -628,7 +628,7 @@
    "rationale": "Audits the Claude Code instruction harness for contradictions"
   },
   {
-   "id": "marketplace_claude_project_context_manager",
+   "id": "marketplace_claude_project_context_manager","_origin":"semantic",
    "label": "claude-project-context-manager",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -639,7 +639,7 @@
    "rationale": "Reads/enforces project architecture documentation"
   },
   {
-   "id": "marketplace_claude_review_loop",
+   "id": "marketplace_claude_review_loop","_origin":"semantic",
    "label": "claude-review-loop",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -650,7 +650,7 @@
    "rationale": "Automated code review + swarm remediation for large changesets"
   },
   {
-   "id": "marketplace_claude_skills_gov",
+   "id": "marketplace_claude_skills_gov","_origin":"semantic",
    "label": "claude-skills-gov",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -661,7 +661,7 @@
    "rationale": "Open-source skills for local government work (68 skills)"
   },
   {
-   "id": "marketplace_claude_train_prep",
+   "id": "marketplace_claude_train_prep","_origin":"semantic",
    "label": "claude-train-prep",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -672,7 +672,7 @@
    "rationale": "AI consulting training material workflow with multi-agent parallelism"
   },
   {
-   "id": "marketplace_claude2figma",
+   "id": "marketplace_claude2figma","_origin":"semantic",
    "label": "claude2figma",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -683,7 +683,7 @@
    "rationale": "Design System compliance harness for Claude Code + Figma"
   },
   {
-   "id": "marketplace_claudetokensap",
+   "id": "marketplace_claudetokensap","_origin":"semantic",
    "label": "claudetokensap",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -694,7 +694,7 @@
    "rationale": "Marketplace focused on reducing context waste, session efficiency"
   },
   {
-   "id": "marketplace_clawket",
+   "id": "marketplace_clawket","_origin":"semantic",
    "label": "clawket",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -705,7 +705,7 @@
    "rationale": "LLM-native work management; 10 lifecycle hooks auto-track workflow"
   },
   {
-   "id": "marketplace_closedloop",
+   "id": "marketplace_closedloop","_origin":"semantic",
    "label": "closedloop",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -716,7 +716,7 @@
    "rationale": "Multi-agent software delivery: plan-first SDLC, review, judges"
   },
   {
-   "id": "marketplace_cloudplayplus",
+   "id": "marketplace_cloudplayplus","_origin":"semantic",
    "label": "cloudplayplus",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -727,7 +727,7 @@
    "rationale": "Channel plugin bridging Claude Code to a CloudPlayPlus Flutter app"
   },
   {
-   "id": "marketplace_cmux_ultimate",
+   "id": "marketplace_cmux_ultimate","_origin":"semantic",
    "label": "cmux-ultimate",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -738,7 +738,7 @@
    "rationale": "Complete cmux integration: CLI reference + browser automation"
   },
   {
-   "id": "marketplace_co_dialectic",
+   "id": "marketplace_co_dialectic","_origin":"semantic",
    "label": "co-dialectic",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -749,7 +749,7 @@
    "rationale": "Real-time prompt coaching with persistent status line"
   },
   {
-   "id": "marketplace_code_review_harness",
+   "id": "marketplace_code_review_harness","_origin":"semantic",
    "label": "code-review-harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -760,7 +760,7 @@
    "rationale": "Code review via Generator-Evaluator harness that runs the code"
   },
   {
-   "id": "marketplace_codealive",
+   "id": "marketplace_codealive","_origin":"semantic",
    "label": "codealive",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -771,7 +771,7 @@
    "rationale": "CodeAlive context engine for semantic code search and Q&A"
   },
   {
-   "id": "marketplace_codealive_context_engine",
+   "id": "marketplace_codealive_context_engine","_origin":"semantic",
    "label": "codealive-context-engine",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -782,7 +782,7 @@
    "rationale": "CodeAlive semantic code search and codebase understanding"
   },
   {
-   "id": "marketplace_codeflash",
+   "id": "marketplace_codeflash","_origin":"semantic",
    "label": "codeflash",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -793,7 +793,7 @@
    "rationale": "Background agent auto-optimizing code for performance"
   },
   {
-   "id": "marketplace_codesmith",
+   "id": "marketplace_codesmith","_origin":"semantic",
    "label": "codesmith",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -804,7 +804,7 @@
    "rationale": "Enforces spec-to-TDD-to-parallel-multi-agent-review lifecycle"
   },
   {
-   "id": "marketplace_colosseum",
+   "id": "marketplace_colosseum","_origin":"semantic",
    "label": "colosseum",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -815,7 +815,7 @@
    "rationale": "Debate arena scoring on accuracy/independence with Devil's Advocate"
   },
   {
-   "id": "marketplace_compounded",
+   "id": "marketplace_compounded","_origin":"semantic",
    "label": "compounded",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -826,7 +826,7 @@
    "rationale": "Turns skills into a trust-gradient system earning autonomy"
   },
   {
-   "id": "marketplace_conductor",
+   "id": "marketplace_conductor","_origin":"semantic",
    "label": "conductor",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -837,7 +837,7 @@
    "rationale": "Orchestrate microservices/business processes with Conductor"
   },
   {
-   "id": "marketplace_coremem",
+   "id": "marketplace_coremem","_origin":"semantic",
    "label": "coremem",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -848,7 +848,7 @@
    "rationale": "Persistent memory across sessions via structured mems"
   },
   {
-   "id": "marketplace_cost_guard",
+   "id": "marketplace_cost_guard","_origin":"semantic",
    "label": "cost-guard",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -859,7 +859,7 @@
    "rationale": "Real-time USD cost enforcement halting runaway loops"
   },
   {
-   "id": "marketplace_crowdcast",
+   "id": "marketplace_crowdcast","_origin":"semantic",
    "label": "crowdcast",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -870,7 +870,7 @@
    "rationale": "Multi-agent social simulation for prediction and exploration"
   },
   {
-   "id": "marketplace_csitrep_generator",
+   "id": "marketplace_csitrep_generator","_origin":"semantic",
    "label": "csitrep-generator",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -881,7 +881,7 @@
    "rationale": "Multi-agent SitRep generator; 25 specialist agents"
   },
   {
-   "id": "marketplace_ddw",
+   "id": "marketplace_ddw","_origin":"semantic",
    "label": "ddw",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -892,7 +892,7 @@
    "rationale": "Development harness enforcing decisions-before-code discipline"
   },
   {
-   "id": "marketplace_debate",
+   "id": "marketplace_debate","_origin":"semantic",
    "label": "debate",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -903,7 +903,7 @@
    "rationale": "Structured multi-round debate with proposer/challenger roles"
   },
   {
-   "id": "marketplace_decibel_peers",
+   "id": "marketplace_decibel_peers","_origin":"semantic",
    "label": "decibel-peers",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -914,7 +914,7 @@
    "rationale": "Peer network patterns for agent specialization/messaging"
   },
   {
-   "id": "marketplace_decision_council",
+   "id": "marketplace_decision_council","_origin":"semantic",
    "label": "decision-council",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -925,7 +925,7 @@
    "rationale": "AI advisory panel debating decisions from multiple angles"
   },
   {
-   "id": "marketplace_deep_research",
+   "id": "marketplace_deep_research","_origin":"semantic",
    "label": "deep-research",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -936,7 +936,7 @@
    "rationale": "Multi-agent deep research pipelines: internet, repo, schema"
   },
   {
-   "id": "marketplace_deeplake_hivemind",
+   "id": "marketplace_deeplake_hivemind","_origin":"semantic",
    "label": "deeplake-hivemind",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -947,7 +947,7 @@
    "rationale": "Cloud-backed persistent memory capturing all session activity"
   },
   {
-   "id": "marketplace_demo_stage",
+   "id": "marketplace_demo_stage","_origin":"semantic",
    "label": "demo-stage",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -958,7 +958,7 @@
    "rationale": "Deploy static sites/demos to demo.st from Claude Code"
   },
   {
-   "id": "marketplace_dev_forge",
+   "id": "marketplace_dev_forge","_origin":"semantic",
    "label": "dev-forge",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -969,7 +969,7 @@
    "rationale": "SQLite-backed multi-agent dev team with sprint contracts"
   },
   {
-   "id": "marketplace_devils_advocate",
+   "id": "marketplace_devils_advocate","_origin":"semantic",
    "label": "devils-advocate",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -980,7 +980,7 @@
    "rationale": "Devil's advocate agent delivering final critical review"
   },
   {
-   "id": "marketplace_dj_claude",
+   "id": "marketplace_dj_claude","_origin":"semantic",
    "label": "dj-claude",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -991,7 +991,7 @@
    "rationale": "Live music and multi-agent jam band capabilities"
   },
   {
-   "id": "marketplace_drift_detect",
+   "id": "marketplace_drift_detect","_origin":"semantic",
    "label": "drift-detect",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1002,7 +1002,7 @@
    "rationale": "Repo analysis realigning plans with actual code reality"
   },
   {
-   "id": "marketplace_enam",
+   "id": "marketplace_enam","_origin":"semantic",
    "label": "enam",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1013,7 +1013,7 @@
    "rationale": "Persistent memory at ~350 tokens ambient cost, no Docker/MCP"
   },
   {
-   "id": "marketplace_engram",
+   "id": "marketplace_engram","_origin":"semantic",
    "label": "engram",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1024,7 +1024,7 @@
    "rationale": "Persistent memory for agents: semantic recall, consolidation"
   },
   {
-   "id": "marketplace_epic_harness",
+   "id": "marketplace_epic_harness","_origin":"semantic",
    "label": "epic-harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1035,7 +1035,7 @@
    "rationale": "Replaces 30+ commands with 6, auto-triggers/evolves skills"
   },
   {
-   "id": "marketplace_ergo",
+   "id": "marketplace_ergo","_origin":"semantic",
    "label": "ergo",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1046,7 +1046,7 @@
    "rationale": "Toolkits for distributed actor-based systems with Ergo (Go)"
   },
   {
-   "id": "marketplace_experimental_engineer",
+   "id": "marketplace_experimental_engineer","_origin":"semantic",
    "label": "experimental-engineer",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1057,7 +1057,7 @@
    "rationale": "Subagent exploring first-principles solutions to hard problems"
   },
   {
-   "id": "marketplace_fde_os",
+   "id": "marketplace_fde_os","_origin":"semantic",
    "label": "fde-os",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1068,7 +1068,7 @@
    "rationale": "Makes Claude operate like a Forward Deployed Engineer"
   },
   {
-   "id": "marketplace_fellowship",
+   "id": "marketplace_fellowship","_origin":"semantic",
    "label": "fellowship",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1079,7 +1079,7 @@
    "rationale": "LotR-themed multi-agent system; Gandalf orchestrates nine"
   },
   {
-   "id": "marketplace_flow",
+   "id": "marketplace_flow","_origin":"semantic",
    "label": "flow",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1090,7 +1090,7 @@
    "rationale": "Project partner managing your backlog: park/what's-next"
   },
   {
-   "id": "marketplace_formal_agent_contracts",
+   "id": "marketplace_formal_agent_contracts","_origin":"semantic",
    "label": "formal-agent-contracts",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1101,7 +1101,7 @@
    "rationale": "Formal methods: inter-agent contracts in VDM-SL, verify with Z3"
   },
   {
-   "id": "marketplace_fortytwo_mcp",
+   "id": "marketplace_fortytwo_mcp","_origin":"semantic",
    "label": "fortytwo-mcp",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1112,7 +1112,7 @@
    "rationale": "Collective multi-agent inference for high-stakes questions"
   },
   {
-   "id": "marketplace_gambit",
+   "id": "marketplace_gambit","_origin":"semantic",
    "label": "gambit",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1123,7 +1123,7 @@
    "rationale": "Structured PM workflows across the product lifecycle"
   },
   {
-   "id": "marketplace_gate_and_ship",
+   "id": "marketplace_gate_and_ship","_origin":"semantic",
    "label": "gate-and-ship",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1134,7 +1134,7 @@
    "rationale": "Quality gates then ship; chains prepare-delivery and ship"
   },
   {
-   "id": "marketplace_gitkb",
+   "id": "marketplace_gitkb","_origin":"semantic",
    "label": "gitkb",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1145,7 +1145,7 @@
    "rationale": "Local code intelligence, persistent knowledge graph, task context"
   },
   {
-   "id": "marketplace_goalkeeper",
+   "id": "marketplace_goalkeeper","_origin":"semantic",
    "label": "goalkeeper",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1156,7 +1156,7 @@
    "rationale": "Durable contract-driven goal execution for long-running tasks"
   },
   {
-   "id": "marketplace_gr0m_mem",
+   "id": "marketplace_gr0m_mem","_origin":"semantic",
    "label": "gr0m-mem",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1167,7 +1167,7 @@
    "rationale": "Zero-install persistent memory brain; four MCP tools"
   },
   {
-   "id": "marketplace_graperoot",
+   "id": "marketplace_graperoot","_origin":"semantic",
    "label": "graperoot",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1178,7 +1178,7 @@
    "rationale": "Dual-graph code context: structural call graph + dependency graph"
   },
   {
-   "id": "marketplace_graph_query_mcp",
+   "id": "marketplace_graph_query_mcp","_origin":"semantic",
    "label": "graph-query-mcp",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1189,7 +1189,7 @@
    "rationale": "FastMCP server for surgical queries against a vault knowledge graph"
   },
   {
-   "id": "marketplace_groundwork",
+   "id": "marketplace_groundwork","_origin":"semantic",
    "label": "groundwork",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1200,7 +1200,7 @@
    "rationale": "Structured dev workflow: requirements to architecture to impl"
   },
   {
-   "id": "marketplace_guard",
+   "id": "marketplace_guard","_origin":"semantic",
    "label": "guard",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1211,7 +1211,7 @@
    "rationale": "PreToolUse hooks denying dangerous shell/git/credential commands"
   },
   {
-   "id": "marketplace_guild",
+   "id": "marketplace_guild","_origin":"semantic",
    "label": "guild",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1222,7 +1222,7 @@
    "rationale": "Self-evolving team of specialist agents that plans before execution"
   },
   {
-   "id": "marketplace_handoffkit",
+   "id": "marketplace_handoffkit","_origin":"semantic",
    "label": "handoffkit",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1233,7 +1233,7 @@
    "rationale": "Push AI session handoffs to HandoffKit automatically via MCP"
   },
   {
-   "id": "marketplace_harness",
+   "id": "marketplace_harness","_origin":"semantic",
    "label": "harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1244,7 +1244,7 @@
    "rationale": "Decomposes complex tasks into coordinated teams of agents"
   },
   {
-   "id": "marketplace_harness_architect",
+   "id": "marketplace_harness_architect","_origin":"semantic",
    "label": "harness-architect",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1255,7 +1255,7 @@
    "rationale": "Meta-tool scanning a project and building an end-to-end harness"
   },
   {
-   "id": "marketplace_harness_boot",
+   "id": "marketplace_harness_boot","_origin":"semantic",
    "label": "harness-boot",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1266,7 +1266,7 @@
    "rationale": "Multi-agent dev harness via living specs and specialist agents"
   },
   {
-   "id": "marketplace_harness_designing_plugin",
+   "id": "marketplace_harness_designing_plugin","_origin":"semantic",
    "label": "harness-designing-plugin",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1277,7 +1277,7 @@
    "rationale": "Helps design teams unify scattered AI setup into a harness"
   },
   {
-   "id": "marketplace_harness_engineering",
+   "id": "marketplace_harness_engineering","_origin":"semantic",
    "label": "harness-engineering",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1288,7 +1288,7 @@
    "rationale": "Bootstrap/audit/evolve a reliable 6-layer agent harness"
   },
   {
-   "id": "marketplace_harness_evolver",
+   "id": "marketplace_harness_evolver","_origin":"semantic",
    "label": "harness-evolver",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1299,7 +1299,7 @@
    "rationale": "Autonomous LLM agent optimization via LangSmith and worktrees"
   },
   {
-   "id": "marketplace_harness_init",
+   "id": "marketplace_harness_init","_origin":"semantic",
    "label": "harness-init",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1310,7 +1310,7 @@
    "rationale": "Makes a repo agent-ready with AGENTS.md, boundary tests, CI"
   },
   {
-   "id": "marketplace_harness_kit",
+   "id": "marketplace_harness_kit","_origin":"semantic",
    "label": "harness-kit",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1321,7 +1321,7 @@
    "rationale": "Engineering framework empowering agents with structured controls"
   },
   {
-   "id": "marketplace_harness_sast_and_sca",
+   "id": "marketplace_harness_sast_and_sca","_origin":"semantic",
    "label": "harness-sast-and-sca",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1332,7 +1332,7 @@
    "rationale": "Secure AI Coding: real-time SAST/SCA in AI-assisted development"
   },
   {
-   "id": "marketplace_harnesskit",
+   "id": "marketplace_harnesskit","_origin":"semantic",
    "label": "harnesskit",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1343,7 +1343,7 @@
    "rationale": "Adaptive harness detecting stack, applying experience-level guardrails"
   },
   {
-   "id": "marketplace_heimdall",
+   "id": "marketplace_heimdall","_origin":"semantic",
    "label": "heimdall",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1354,7 +1354,7 @@
    "rationale": "Analyze video files/bug-report screen recordings in Claude Code"
   },
   {
-   "id": "marketplace_hipocampus",
+   "id": "marketplace_hipocampus","_origin":"semantic",
    "label": "hipocampus",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1365,7 +1365,7 @@
    "rationale": "3-tier hot/warm/cold memory with self-compression"
   },
   {
-   "id": "marketplace_hive",
+   "id": "marketplace_hive","_origin":"semantic",
    "label": "hive",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1376,7 +1376,7 @@
    "rationale": "Bio-inspired swarm orchestrator coordinating agents via stigmergy"
   },
   {
-   "id": "marketplace_hivemind",
+   "id": "marketplace_hivemind","_origin":"semantic",
    "label": "hivemind",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1387,7 +1387,7 @@
    "rationale": "Persistent memory, context sync, virtual filesystem, AI wikis"
   },
   {
-   "id": "marketplace_ido4specs",
+   "id": "marketplace_ido4specs","_origin":"semantic",
    "label": "ido4specs",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1398,7 +1398,7 @@
    "rationale": "Bridges a strategic spec to GitHub issues, decomposing tasks"
   },
   {
-   "id": "marketplace_indian_consumer_drafting",
+   "id": "marketplace_indian_consumer_drafting","_origin":"semantic",
    "label": "indian-consumer-drafting",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1409,7 +1409,7 @@
    "rationale": "Legal drafting for India's Consumer Disputes Commissions"
   },
   {
-   "id": "marketplace_infiniteclaud",
+   "id": "marketplace_infiniteclaud","_origin":"semantic",
    "label": "infiniteclaud",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1420,7 +1420,7 @@
    "rationale": "Autonomous automation agent with 20 specialized MCP tools"
   },
   {
-   "id": "marketplace_ix_memory",
+   "id": "marketplace_ix_memory","_origin":"semantic",
    "label": "ix-memory",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1431,7 +1431,7 @@
    "rationale": "Connects Claude Code to Ix, a structured persistent memory backend"
   },
   {
-   "id": "marketplace_just_ship",
+   "id": "marketplace_just_ship","_origin":"semantic",
    "label": "just-ship",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1442,7 +1442,7 @@
    "rationale": "Multi-agent framework: one ticket triggers a full pipeline"
   },
   {
-   "id": "marketplace_karimo_harness_engineering_agent_orchestration",
+   "id": "marketplace_karimo_harness_engineering_agent_orchestration","_origin":"semantic",
    "label": "karimo-harness-engineering-agent-orchestration",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1453,7 +1453,7 @@
    "rationale": "Harness engineering: product-design-driven agent orchestration"
   },
   {
-   "id": "marketplace_kindex",
+   "id": "marketplace_kindex","_origin":"semantic",
    "label": "kindex",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1464,7 +1464,7 @@
    "rationale": "Persistent knowledge graph turning Claude project-scoped"
   },
   {
-   "id": "marketplace_larch",
+   "id": "marketplace_larch","_origin":"semantic",
    "label": "larch",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1475,7 +1475,7 @@
    "rationale": "Multi-agent workflow automation orchestrating the full SDLC"
   },
   {
-   "id": "marketplace_launchpad",
+   "id": "marketplace_launchpad","_origin":"semantic",
    "label": "launchpad",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1486,7 +1486,7 @@
    "rationale": "Comprehensive agentic coding harness; 38 slash commands"
   },
   {
-   "id": "marketplace_lean_kg",
+   "id": "marketplace_lean_kg","_origin":"semantic",
    "label": "lean-kg",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1497,7 +1497,7 @@
    "rationale": "Lightweight local-first knowledge graph for accurate codebase context"
   },
   {
-   "id": "marketplace_learning_planner",
+   "id": "marketplace_learning_planner","_origin":"semantic",
    "label": "learning-planner",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1508,7 +1508,7 @@
    "rationale": "Long-running learning companion: plan, track, review"
   },
   {
-   "id": "marketplace_lightning_tv_expert_plugin",
+   "id": "marketplace_lightning_tv_expert_plugin","_origin":"semantic",
    "label": "lightning-tv-expert-plugin",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1519,7 +1519,7 @@
    "rationale": "Lightning TV framework expertise for Smart TV apps"
   },
   {
-   "id": "marketplace_lightrun",
+   "id": "marketplace_lightrun","_origin":"semantic",
    "label": "lightrun",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1530,7 +1530,7 @@
    "rationale": "Runtime investigation: evidence-first debugging of live apps"
   },
   {
-   "id": "marketplace_llm_secure_patterns",
+   "id": "marketplace_llm_secure_patterns","_origin":"semantic",
    "label": "llm-secure-patterns",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1541,7 +1541,7 @@
    "rationale": "Secure design patterns for LLM apps: ingestion, hardening"
   },
   {
-   "id": "marketplace_looper_loop",
+   "id": "marketplace_looper_loop","_origin":"semantic",
    "label": "looper-loop",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1552,7 +1552,7 @@
    "rationale": "Agentic loop where each step is reviewed by another agent"
   },
   {
-   "id": "marketplace_loreconvo",
+   "id": "marketplace_loreconvo","_origin":"semantic",
    "label": "loreconvo",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1563,7 +1563,7 @@
    "rationale": "Cross-surface persistent memory across Code, Cowork, Chat"
   },
   {
-   "id": "marketplace_magellan",
+   "id": "marketplace_magellan","_origin":"semantic",
    "label": "magellan",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1574,7 +1574,7 @@
    "rationale": "Enterprise knowledge discovery and process repository"
   },
   {
-   "id": "marketplace_magician",
+   "id": "marketplace_magician","_origin":"semantic",
    "label": "magician",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1585,7 +1585,7 @@
    "rationale": "SDLC plugin taking a task from idea to merged PR autonomously"
   },
   {
-   "id": "marketplace_make_documentation",
+   "id": "marketplace_make_documentation","_origin":"semantic",
    "label": "make-documentation",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1596,7 +1596,7 @@
    "rationale": "Generates/updates technical documentation for GitHub projects"
   },
   {
-   "id": "marketplace_marcopolo",
+   "id": "marketplace_marcopolo","_origin":"semantic",
    "label": "marcopolo",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1607,7 +1607,7 @@
    "rationale": "Data computer connecting databases, warehouses, SaaS"
   },
   {
-   "id": "marketplace_mash_multi_agent_software_harness",
+   "id": "marketplace_mash_multi_agent_software_harness","_origin":"semantic",
    "label": "mash-multi-agent-software-harness",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1618,7 +1618,7 @@
    "rationale": "Multi-Agent Software Harness managing the full lifecycle"
   },
   {
-   "id": "marketplace_meeting_bots",
+   "id": "marketplace_meeting_bots","_origin":"semantic",
    "label": "meeting-bots",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1629,7 +1629,7 @@
    "rationale": "Panel of AI personas debating decisions; 3-10 participants"
   },
   {
-   "id": "marketplace_mem0",
+   "id": "marketplace_mem0","_origin":"semantic",
    "label": "mem0",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1640,7 +1640,7 @@
    "rationale": "Connect Mem0 for persistent memory across sessions"
   },
   {
-   "id": "marketplace_membase",
+   "id": "marketplace_membase","_origin":"semantic",
    "label": "membase",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1651,7 +1651,7 @@
    "rationale": "Membase Cloud persistent memory and wiki workflows"
   },
   {
-   "id": "marketplace_memento",
+   "id": "marketplace_memento","_origin":"semantic",
    "label": "memento",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1662,7 +1662,7 @@
    "rationale": "Persistent searchable knowledge surviving every session/device"
   },
   {
-   "id": "marketplace_memex_mcp",
+   "id": "marketplace_memex_mcp","_origin":"semantic",
    "label": "memex-mcp",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1673,7 +1673,7 @@
    "rationale": "Temporal knowledge graph of codebase from commits/source"
   },
   {
-   "id": "marketplace_meta_harness_ygn",
+   "id": "marketplace_meta_harness_ygn","_origin":"semantic",
    "label": "meta-harness-ygn",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1684,7 +1684,7 @@
    "rationale": "Brings scientific rigor to harness engineering"
   },
   {
-   "id": "marketplace_mexus_agent_team",
+   "id": "marketplace_mexus_agent_team","_origin":"semantic",
    "label": "mexus-agent-team",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1695,7 +1695,7 @@
    "rationale": "Markdown-only Agent Team coordinating via Markdown files"
   },
   {
-   "id": "marketplace_mindwright",
+   "id": "marketplace_mindwright","_origin":"semantic",
    "label": "mindwright",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1706,7 +1706,7 @@
    "rationale": "Persistent per-agent memory distilling sessions into facts"
   },
   {
-   "id": "marketplace_mister_anderson",
+   "id": "marketplace_mister_anderson","_origin":"semantic",
    "label": "mister-anderson",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1717,7 +1717,7 @@
    "rationale": "Beads development: task tracking, review gates, orchestration"
   },
   {
-   "id": "marketplace_mmpm_cognitive_os",
+   "id": "marketplace_mmpm_cognitive_os","_origin":"semantic",
    "label": "mmpm-cognitive-os",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1728,7 +1728,7 @@
    "rationale": "Constitutional multi-agent governance; 16 agents across 4 layers"
   },
   {
-   "id": "marketplace_mosaic",
+   "id": "marketplace_mosaic","_origin":"semantic",
    "label": "mosaic",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1739,7 +1739,7 @@
    "rationale": "DCVE planning + Discuss for multi-perspective debate"
   },
   {
-   "id": "marketplace_mumei",
+   "id": "marketplace_mumei","_origin":"semantic",
    "label": "mumei",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1750,7 +1750,7 @@
    "rationale": "Quality Enforcement Layer gating spec phases at OS boundary"
   },
   {
-   "id": "marketplace_munin_memory",
+   "id": "marketplace_munin_memory","_origin":"semantic",
    "label": "munin-memory",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1761,7 +1761,7 @@
    "rationale": "Long-term memory system remembering your work"
   },
   {
-   "id": "marketplace_neko_gundan",
+   "id": "marketplace_neko_gundan","_origin":"semantic",
    "label": "neko-gundan",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1772,7 +1772,7 @@
    "rationale": "Multi-agent orchestration as a hierarchical cat team"
   },
   {
-   "id": "marketplace_neko_harness_doctor",
+   "id": "marketplace_neko_harness_doctor","_origin":"semantic",
    "label": "neko-harness-doctor",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1783,7 +1783,7 @@
    "rationale": "Diagnoses your harness against 25 anti-patterns"
   },
   {
-   "id": "marketplace_nexo_brain",
+   "id": "marketplace_nexo_brain","_origin":"semantic",
    "label": "nexo-brain",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1794,7 +1794,7 @@
    "rationale": "Cognitive co-operator: persistent memory, learning, continuity"
   },
   {
-   "id": "marketplace_next_task",
+   "id": "marketplace_next_task","_origin":"semantic",
    "label": "next-task",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1805,7 +1805,7 @@
    "rationale": "Autonomous workflow orchestrator across 12 coordinated phases"
   },
   {
-   "id": "marketplace_nexus_the_cartographer",
+   "id": "marketplace_nexus_the_cartographer","_origin":"semantic",
    "label": "nexus-the-cartographer",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1816,7 +1816,7 @@
    "rationale": "Cowork metabrain with knowledge graph and 20 MCP tools"
   },
   {
-   "id": "marketplace_notify_sounds",
+   "id": "marketplace_notify_sounds","_origin":"semantic",
    "label": "notify-sounds",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1827,7 +1827,7 @@
    "rationale": "Plays system sounds when a task finishes or needs permission"
   },
   {
-   "id": "marketplace_obsidian_knowledge",
+   "id": "marketplace_obsidian_knowledge","_origin":"semantic",
    "label": "obsidian-knowledge",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1838,7 +1838,7 @@
    "rationale": "Self-evolving plugin managing an Obsidian knowledge vault"
   },
   {
-   "id": "marketplace_oh_my_forge",
+   "id": "marketplace_oh_my_forge","_origin":"semantic",
    "label": "oh-my-forge",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1849,7 +1849,7 @@
    "rationale": "Workflow harness preventing agent mistakes from repeating"
   },
   {
-   "id": "marketplace_orchestrator",
+   "id": "marketplace_orchestrator","_origin":"semantic",
    "label": "orchestrator",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1860,7 +1860,7 @@
    "rationale": "Generates prompts with the right agent and orchestration pattern"
   },
   {
-   "id": "marketplace_orchestrator_workflow_plugin",
+   "id": "marketplace_orchestrator_workflow_plugin","_origin":"semantic",
    "label": "orchestrator-workflow-plugin",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1871,7 +1871,7 @@
    "rationale": "Multi-agent framework splitting builds into phases via three roles"
   },
   {
-   "id": "marketplace_patristic",
+   "id": "marketplace_patristic","_origin":"semantic",
    "label": "patristic",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1882,7 +1882,7 @@
    "rationale": "Search/cite the Russian Orthodox patristic corpus"
   },
   {
-   "id": "marketplace_personal_council",
+   "id": "marketplace_personal_council","_origin":"semantic",
    "label": "personal-council",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1893,7 +1893,7 @@
    "rationale": "5-voice weighted think tank for founders"
   },
   {
-   "id": "marketplace_phone_a_friend",
+   "id": "marketplace_phone_a_friend","_origin":"semantic",
    "label": "phone-a-friend",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1904,7 +1904,7 @@
    "rationale": "CLI relay letting agents collaborate with other AI backends"
   },
   {
-   "id": "marketplace_phone_a_friend_paf",
+   "id": "marketplace_phone_a_friend_paf","_origin":"semantic",
    "label": "phone-a-friend-paf",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1915,7 +1915,7 @@
    "rationale": "Lets Claude Code call other AI backends for second opinions"
   },
   {
-   "id": "marketplace_pownie",
+   "id": "marketplace_pownie","_origin":"semantic",
    "label": "pownie",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1926,7 +1926,7 @@
    "rationale": "Agent harness for offensive security work"
   },
   {
-   "id": "marketplace_pramana",
+   "id": "marketplace_pramana","_origin":"semantic",
    "label": "pramana",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1937,7 +1937,7 @@
    "rationale": "Reference implementation of a semantic layer for AI-assisted SE"
   },
   {
-   "id": "marketplace_prd_to_kanban",
+   "id": "marketplace_prd_to_kanban","_origin":"semantic",
    "label": "prd-to-kanban",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1948,7 +1948,7 @@
    "rationale": "Transfers a PRD to a Kanban doc with dev waves/parallel windows"
   },
   {
-   "id": "marketplace_prepare_delivery",
+   "id": "marketplace_prepare_delivery","_origin":"semantic",
    "label": "prepare-delivery",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1959,7 +1959,7 @@
    "rationale": "Pre-ship quality gates: deslop, simplify, agnix lint"
   },
   {
-   "id": "marketplace_project_pilot",
+   "id": "marketplace_project_pilot","_origin":"semantic",
    "label": "project-pilot",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1970,7 +1970,7 @@
    "rationale": "Persistent memory layer capturing architecture decisions"
   },
   {
-   "id": "marketplace_project_scaffolder_synaptic_edition",
+   "id": "marketplace_project_scaffolder_synaptic_edition","_origin":"semantic",
    "label": "project-scaffolder-synaptic-edition",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1981,7 +1981,7 @@
    "rationale": "Generate a project KB then orchestrate development"
   },
   {
-   "id": "marketplace_pushnotifime_human_in_the_loop",
+   "id": "marketplace_pushnotifime_human_in_the_loop","_origin":"semantic",
    "label": "pushnotifime-human-in-the-loop",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -1992,7 +1992,7 @@
    "rationale": "Human-in-the-loop notifications and approvals for agents"
   },
   {
-   "id": "marketplace_pydantic_ai",
+   "id": "marketplace_pydantic_ai","_origin":"semantic",
    "label": "pydantic-ai",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2003,7 +2003,7 @@
    "rationale": "Accurate Pydantic AI code patterns and gotchas"
   },
   {
-   "id": "marketplace_qlik_agents",
+   "id": "marketplace_qlik_agents","_origin":"semantic",
    "label": "qlik-agents",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2014,7 +2014,7 @@
    "rationale": "Multi-agent development pipeline for Qlik Sense"
   },
   {
-   "id": "marketplace_quick_question",
+   "id": "marketplace_quick_question","_origin":"semantic",
    "label": "quick-question",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2025,7 +2025,7 @@
    "rationale": "Unity Agent Harness auto-compiling C# and running test pipelines"
   },
   {
-   "id": "marketplace_reflect",
+   "id": "marketplace_reflect","_origin":"semantic",
    "label": "reflect",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2036,7 +2036,7 @@
    "rationale": "Session-local metacognition harness for long-running work"
   },
   {
-   "id": "marketplace_review_all",
+   "id": "marketplace_review_all","_origin":"semantic",
    "label": "review-all",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2047,7 +2047,7 @@
    "rationale": "Project-agnostic multi-agent code review with verification"
   },
   {
-   "id": "marketplace_rpm_relentless_product_manager",
+   "id": "marketplace_rpm_relentless_product_manager","_origin":"semantic",
    "label": "rpm-relentless-product-manager",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2058,7 +2058,7 @@
    "rationale": "Persists project state and prevents documentation drift"
   },
   {
-   "id": "marketplace_sabha_os",
+   "id": "marketplace_sabha_os","_origin":"semantic",
    "label": "sabha-os",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2069,7 +2069,7 @@
    "rationale": "Local-first AI council: 9 C-suite roles in the Chanakya tradition"
   },
   {
-   "id": "marketplace_scaffold",
+   "id": "marketplace_scaffold","_origin":"semantic",
    "label": "scaffold",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2080,7 +2080,7 @@
    "rationale": "Framework with persistent memory backed by Obsidian"
   },
   {
-   "id": "marketplace_sciqlab_supply_chain",
+   "id": "marketplace_sciqlab_supply_chain","_origin":"semantic",
    "label": "sciqlab-supply-chain",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2091,7 +2091,7 @@
    "rationale": "Three AI agents for supply chain operations and S&OP"
   },
   {
-   "id": "marketplace_self_improving_agent_pipeline",
+   "id": "marketplace_self_improving_agent_pipeline","_origin":"semantic",
    "label": "self-improving-agent-pipeline",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2102,7 +2102,7 @@
    "rationale": "Pipeline of skills implementing two feedback loops"
   },
   {
-   "id": "marketplace_session_handoff",
+   "id": "marketplace_session_handoff","_origin":"semantic",
    "label": "session-handoff",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2113,7 +2113,7 @@
    "rationale": "Hand off an in-flight task from one AI tool to another"
   },
   {
-   "id": "marketplace_session_orchestrator",
+   "id": "marketplace_session_orchestrator","_origin":"semantic",
    "label": "session-orchestrator",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2124,7 +2124,7 @@
    "rationale": "Session-level orchestration into 5 typed waves"
   },
   {
-   "id": "marketplace_shipwright",
+   "id": "marketplace_shipwright","_origin":"semantic",
    "label": "shipwright",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2135,7 +2135,7 @@
    "rationale": "A la carte toolkit: best practices, memory, agent-team planning"
   },
   {
-   "id": "marketplace_shipwright_brain",
+   "id": "marketplace_shipwright_brain","_origin":"semantic",
    "label": "shipwright-brain",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2146,7 +2146,7 @@
    "rationale": "Persistent memory via markdown files, no database"
   },
   {
-   "id": "marketplace_shipyard",
+   "id": "marketplace_shipyard","_origin":"semantic",
    "label": "shipyard",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2157,7 +2157,7 @@
    "rationale": "Runs Claude Code through a spec-driven agile sprint lifecycle"
   },
   {
-   "id": "marketplace_simple_workflow",
+   "id": "marketplace_simple_workflow","_origin":"semantic",
    "label": "simple-workflow",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2168,7 +2168,7 @@
    "rationale": "Dev lifecycle with ticket management and Generator-Evaluator"
   },
   {
-   "id": "marketplace_sindri",
+   "id": "marketplace_sindri","_origin":"semantic",
    "label": "sindri",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2179,7 +2179,7 @@
    "rationale": "Turns a one-line goal into an autonomous overnight experiment loop"
   },
   {
-   "id": "marketplace_skill_picker",
+   "id": "marketplace_skill_picker","_origin":"semantic",
    "label": "skill-picker",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2190,7 +2190,7 @@
    "rationale": "Compare AI coding skills head-to-head via controlled A/B tests"
   },
   {
-   "id": "marketplace_spec_engine",
+   "id": "marketplace_spec_engine","_origin":"semantic",
    "label": "spec-engine",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2201,7 +2201,7 @@
    "rationale": "Spec-driven engine turning specs into code via wave-based agents"
   },
   {
-   "id": "marketplace_stackpilot",
+   "id": "marketplace_stackpilot","_origin":"semantic",
    "label": "stackpilot",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2212,7 +2212,7 @@
    "rationale": "Sprint orchestration: design-spec-plan-code-QA pipeline"
   },
   {
-   "id": "marketplace_stash",
+   "id": "marketplace_stash","_origin":"semantic",
    "label": "stash",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2223,7 +2223,7 @@
    "rationale": "Persistent cloud memory surviving beyond a single session"
   },
   {
-   "id": "marketplace_strands_sdk",
+   "id": "marketplace_strands_sdk","_origin":"semantic",
    "label": "strands-sdk",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2234,7 +2234,7 @@
    "rationale": "Strands-agents SDK reference: A2A, swarms, agents-as-tools"
   },
   {
-   "id": "marketplace_strategy_consultant",
+   "id": "marketplace_strategy_consultant","_origin":"semantic",
    "label": "strategy-consultant",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2245,7 +2245,7 @@
    "rationale": "Runs a full strategy consulting engagement end-to-end"
   },
   {
-   "id": "marketplace_superfast",
+   "id": "marketplace_superfast","_origin":"semantic",
    "label": "superfast",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2256,7 +2256,7 @@
    "rationale": "Keeps a coding agent building exactly what you want, fast"
   },
   {
-   "id": "marketplace_superpipelines",
+   "id": "marketplace_superpipelines","_origin":"semantic",
    "label": "superpipelines",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2267,7 +2267,7 @@
    "rationale": "Multi-agent pipelines with write/review isolation, crash-safe"
   },
   {
-   "id": "marketplace_superpowers",
+   "id": "marketplace_superpowers","_origin":"semantic",
    "label": "superpowers",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2278,7 +2278,7 @@
    "rationale": "Coding-agent skill layer engaging from the moment you build"
   },
   {
-   "id": "marketplace_sym_mesh_channel",
+   "id": "marketplace_sym_mesh_channel","_origin":"semantic",
    "label": "sym-mesh-channel",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2289,7 +2289,7 @@
    "rationale": "Real-time Claude-to-Claude mesh peer communication"
   },
   {
-   "id": "marketplace_tdd_evolutionary_loop",
+   "id": "marketplace_tdd_evolutionary_loop","_origin":"semantic",
    "label": "tdd-evolutionary-loop",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2300,7 +2300,7 @@
    "rationale": "TDD cycle with two parallel coders and a devil's advocate"
   },
   {
-   "id": "marketplace_techknowmad_ai_skills",
+   "id": "marketplace_techknowmad_ai_skills","_origin":"semantic",
    "label": "techknowmad-ai-skills",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2311,7 +2311,7 @@
    "rationale": "20 enterprise skills for autonomous AI/ML research lab ops"
   },
   {
-   "id": "marketplace_the_courtroom",
+   "id": "marketplace_the_courtroom","_origin":"semantic",
    "label": "the-courtroom",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2322,7 +2322,7 @@
    "rationale": "Cross-model deliberation: Claude proposes, Codex cross-examines"
   },
   {
-   "id": "marketplace_three_pillars",
+   "id": "marketplace_three_pillars","_origin":"semantic",
    "label": "three-pillars",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2333,7 +2333,7 @@
    "rationale": "Design-first pipelines, multi-persona deliberation, continuity"
   },
   {
-   "id": "marketplace_tianluo",
+   "id": "marketplace_tianluo","_origin":"semantic",
    "label": "tianluo",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2344,7 +2344,7 @@
    "rationale": "Methodology for multi-hour to multi-day autonomous tasks"
   },
   {
-   "id": "marketplace_tradememory",
+   "id": "marketplace_tradememory","_origin":"semantic",
    "label": "tradememory",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2355,7 +2355,7 @@
    "rationale": "Persistent memory + strategy evolution for AI traders"
   },
   {
-   "id": "marketplace_train_prep",
+   "id": "marketplace_train_prep","_origin":"semantic",
    "label": "train-prep",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2366,7 +2366,7 @@
    "rationale": "Prepare AI consulting training materials for any industry"
   },
   {
-   "id": "marketplace_trinity",
+   "id": "marketplace_trinity","_origin":"semantic",
    "label": "trinity",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2377,7 +2377,7 @@
    "rationale": "Three-agent harness turning a requirement into a reviewed PR"
   },
   {
-   "id": "marketplace_twining",
+   "id": "marketplace_twining","_origin":"semantic",
    "label": "twining",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2388,7 +2388,7 @@
    "rationale": "Agent coordination: shared blackboard, decision tracking"
   },
   {
-   "id": "marketplace_tycono",
+   "id": "marketplace_tycono","_origin":"semantic",
    "label": "tycono",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2399,7 +2399,7 @@
    "rationale": "AI team orchestration: CTO/Engineer roles instead of one AI"
   },
   {
-   "id": "marketplace_understand_anything",
+   "id": "marketplace_understand_anything","_origin":"semantic",
    "label": "understand-anything",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2410,7 +2410,7 @@
    "rationale": "Multi-agent pipeline building a knowledge graph of every file"
   },
   {
-   "id": "marketplace_using_cmux",
+   "id": "marketplace_using_cmux","_origin":"semantic",
    "label": "using-cmux",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2421,7 +2421,7 @@
    "rationale": "Teaches the agent to operate cmux, an agent-integrated multiplexer"
   },
   {
-   "id": "marketplace_vector_md_context_injector",
+   "id": "marketplace_vector_md_context_injector","_origin":"semantic",
    "label": "vector-md-context-injector",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2432,7 +2432,7 @@
    "rationale": "Hooks auto-injecting sub-tree scoped context files on read"
   },
   {
-   "id": "marketplace_velixar",
+   "id": "marketplace_velixar","_origin":"semantic",
    "label": "velixar",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2443,7 +2443,7 @@
    "rationale": "Cognitive memory system with knowledge graph and contradiction detection"
   },
   {
-   "id": "marketplace_versori_skills",
+   "id": "marketplace_versori_skills","_origin":"semantic",
    "label": "versori-skills",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2454,7 +2454,7 @@
    "rationale": "Create/build/deploy/monitor production-grade data integrations"
   },
   {
-   "id": "marketplace_vibe_flow",
+   "id": "marketplace_vibe_flow","_origin":"semantic",
    "label": "vibe-flow",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2465,7 +2465,7 @@
    "rationale": "Orchestration skills for Vibe Kanban: multi-agent waves"
   },
   {
-   "id": "marketplace_vibe_test",
+   "id": "marketplace_vibe_test","_origin":"semantic",
    "label": "vibe-test",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2476,7 +2476,7 @@
    "rationale": "Test coverage for vibe-coded apps classified by risk"
   },
   {
-   "id": "marketplace_waterfall",
+   "id": "marketplace_waterfall","_origin":"semantic",
    "label": "waterfall",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2487,7 +2487,7 @@
    "rationale": "Multi-agent Specification-Driven Development framework"
   },
   {
-   "id": "marketplace_wave_planner",
+   "id": "marketplace_wave_planner","_origin":"semantic",
    "label": "wave-planner",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2498,7 +2498,7 @@
    "rationale": "Transform issues into execution-ready plans with risk prediction"
   },
   {
-   "id": "marketplace_waves_exovian",
+   "id": "marketplace_waves_exovian","_origin":"semantic",
    "label": "waves-exovian",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2509,7 +2509,7 @@
    "rationale": "Product dev framework turning ideas into software via artifacts"
   },
   {
-   "id": "marketplace_web_ctl",
+   "id": "marketplace_web_ctl","_origin":"semantic",
    "label": "web-ctl",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2520,7 +2520,7 @@
    "rationale": "Browser automation toolkit: navigate, authenticate, interact"
   },
   {
-   "id": "marketplace_wicked_garden",
+   "id": "marketplace_wicked_garden","_origin":"semantic",
    "label": "wicked-garden",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2531,7 +2531,7 @@
    "rationale": "AI-Native SDLC: 14 domains, 80 specialist agents, 152 skills"
   },
   {
-   "id": "marketplace_wiq",
+   "id": "marketplace_wiq","_origin":"semantic",
    "label": "wiq",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2542,7 +2542,7 @@
    "rationale": "Bardeen wiq: workflow automation with multi-agent orchestration"
   },
   {
-   "id": "marketplace_wmux_orchestrator",
+   "id": "marketplace_wmux_orchestrator","_origin":"semantic",
    "label": "wmux-orchestrator",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2553,7 +2553,7 @@
    "rationale": "Decomposes tasks into parallel Claude Code agents"
   },
   {
-   "id": "marketplace_wrightward",
+   "id": "marketplace_wrightward","_origin":"semantic",
    "label": "wrightward",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",
@@ -2564,7 +2564,7 @@
    "rationale": "Multi-agent coordination blocking conflicting writes across sessions"
   },
   {
-   "id": "marketplace_writ",
+   "id": "marketplace_writ","_origin":"semantic",
    "label": "writ",
    "file_type": "concept",
    "source_file": "marketplace-235-relevant.txt",

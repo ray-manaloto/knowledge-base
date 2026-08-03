@@ -1,7 +1,7 @@
 {
  "nodes": [
   {
-   "id": "cc20260730_goal_doc",
+   "id": "cc20260730_goal_doc","_origin":"semantic",
    "label": "Anthropic's `/goal` reference page as of 2026-07-30. Re-read for knowledge-base#76 after its sha256 moved from the 2026-07-27 baseline (56a76edc6bf3 -> c7b6a5a7206d). Exactly one section changed: 'How evaluation works'. Everything the goal-engineering skill is built on is byte-unchanged.",
    "file_type": "concept",
    "source_file": "docs/claude-code/goal.md",
@@ -12,7 +12,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_hooks_doc",
+   "id": "cc20260730_hooks_doc","_origin":"semantic",
    "label": "Anthropic's hooks reference as of 2026-07-30 (sha256 b65c99124dc5 -> ee3adc7c4b17). Watched because `/goal` is a session-scoped prompt-based Stop hook, so a hooks change can alter goal behaviour with goal.md untouched.",
    "file_type": "concept",
    "source_file": "docs/claude-code/hooks.md",
@@ -23,7 +23,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_skills_doc",
+   "id": "cc20260730_skills_doc","_origin":"semantic",
    "label": "Anthropic's Agent Skills reference as of 2026-07-30 (sha256 868916e08681 -> 23d035ad222c). FIRST INGESTION: this page was watched by `currency.toml` `docs_watch` since 2026-07-27 but had never been extracted into the graph — 0 nodes from it in any chunk, against a control of 128 nodes mentioning 'skill'. A watched page absent from the corpus is the gap the docs-mirror manifest exists to close.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -34,7 +34,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_goal_evaluator_default_provider_dependent",
+   "id": "cc20260730_goal_evaluator_default_provider_dependent","_origin":"semantic",
    "label": "CHANGED 2026-07-30. The evaluator model was documented as 'your configured small fast model, which defaults to Haiku'. It now reads 'defaults to Haiku ON THE CLAUDE API; on a third-party provider, check your provider page for the platform's default.' So Haiku is a default of one deployment, not a property of `/goal`.",
    "file_type": "concept",
    "source_file": "docs/claude-code/goal.md",
@@ -45,7 +45,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_goal_haiku_env_override_is_global",
+   "id": "cc20260730_goal_haiku_env_override_is_global","_origin":"semantic",
    "label": "NEW 2026-07-30. `ANTHROPIC_DEFAULT_HAIKU_MODEL` selects a different evaluator model. Its scope is GLOBAL and the page warns about it explicitly: Claude Code reads it everywhere it uses the small fast model, so setting it also resolves the `haiku` alias to that model and runs background functionality such as conversation summarization on it. It is never a `/goal`-only knob.",
    "file_type": "concept",
    "source_file": "docs/claude-code/goal.md",
@@ -56,7 +56,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_goal_yes_no_semantics",
+   "id": "cc20260730_goal_yes_no_semantics","_origin":"semantic",
    "label": "The evaluator answers yes or no with a short reason. NO: Claude keeps working and takes the reason as guidance for the next turn. YES: Claude Code clears the goal and records an achieved entry in the transcript. Restructured into bullets on 2026-07-30; the semantics are unchanged.",
    "file_type": "concept",
    "source_file": "docs/claude-code/goal.md",
@@ -67,7 +67,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_goal_constraints_unchanged",
+   "id": "cc20260730_goal_constraints_unchanged","_origin":"semantic",
    "label": "RE-VERIFIED UNCHANGED on 2026-07-30, which is why the goal-engineering skill needed no structural edit: the evaluator 'does not call tools, so it can only judge what Claude has already surfaced in the conversation' (verbatim); the 4,000-character condition cap; one goal active per session; setting a goal starts a turn immediately with the condition itself as the directive; a turn or time clause is the only bound; `stop`/`off`/`reset`/`none`/`cancel` alias `clear`; resume carries the condition but resets turn count, timer and token baseline.",
    "file_type": "concept",
    "source_file": "docs/claude-code/goal.md",
@@ -78,7 +78,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_goal_evaluator_floor_not_description",
+   "id": "cc20260730_goal_evaluator_floor_not_description","_origin":"semantic",
    "label": "INFERRED consequence for goal authoring: because the evaluator model is provider-dependent and env-overridable, 'a Haiku-class reader given the transcript and nothing else' is a FLOOR to write against, not a description of the model that will actually judge. The risk is the inverse of the obvious one — not that the evaluator is weaker than assumed, but that a smart evaluator settles a vague clause correctly and the clause is then believed to be fine.",
    "file_type": "concept",
    "source_file": "docs/claude-code/goal.md",
@@ -89,7 +89,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_hooks_sessionend_shared_budget",
+   "id": "cc20260730_hooks_sessionend_shared_budget","_origin":"semantic",
    "label": "NEW 2026-07-30, and load-bearing for any repo with a SessionEnd hook: '`SessionEnd` hooks share a 1.5-second budget; if your settings set a longer per-hook `timeout`, Claude Code raises the budget to match, up to 60 seconds.' Two consequences. A SessionEnd hook with NO timeout gets 1.5s, which no transcript scan finishes — and a killed SessionEnd hook is silent, so the audit simply stops existing. And a declared timeout above 60 can never be granted.",
    "file_type": "concept",
    "source_file": "docs/claude-code/hooks.md",
@@ -100,7 +100,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_hooks_permissionrequest_autodeny",
+   "id": "cc20260730_hooks_permissionrequest_autodeny","_origin":"semantic",
    "label": "CHANGED 2026-07-30. `PermissionRequest` was 'Runs when the user is shown a permission dialog'. It now also runs in sessions that CANNOT show one — background subagents in non-interactive mode — and 'if no hook returns a decision, it denies the tool call.' In headless work the default is therefore DENY, and a hook is what can allow.",
    "file_type": "concept",
    "source_file": "docs/claude-code/hooks.md",
@@ -111,7 +111,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_hooks_pretooluse_vs_permissionrequest",
+   "id": "cc20260730_hooks_pretooluse_vs_permissionrequest","_origin":"semantic",
    "label": "The distinction, restated 2026-07-30: PreToolUse hooks run before EVERY tool call, whether or not it needs permission. PermissionRequest hooks run only when Claude Code is about to ask for permission, or when it would otherwise auto-deny a call that cannot prompt. Neither event fires for `EndConversation`.",
    "file_type": "concept",
    "source_file": "docs/claude-code/hooks.md",
@@ -122,7 +122,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "cc20260730_hooks_eight_block_cap_still_present",
+   "id": "cc20260730_hooks_eight_block_cap_still_present","_origin":"semantic",
    "label": "CONTROL-ARMED UNCHANGED 2026-07-30: 'Claude Code overrides the hook and ends the turn after 8 consecutive blocks' is still present — 1 occurrence in both the 2026-07-27 baseline and the current page, against a bogus term at 0, so the probe discriminates. goal.md still never mentions any cap. The recorded unreconciled disagreement between the two pages therefore STANDS; it has not been resolved by either revision.",
    "file_type": "concept",
    "source_file": "docs/claude-code/hooks.md",
@@ -133,7 +133,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_precedence_enterprise_over_project",
+   "id": "ccskills_precedence_enterprise_over_project","_origin":"semantic",
    "label": "Skill name precedence is ENTERPRISE > PERSONAL > PROJECT — the opposite of the usual assumption that the project wins. A skill at any of those levels also overrides a BUNDLED skill of the same name (a project `code-review` replaces the built-in `/code-review`). Plugin skills use a `plugin-name:skill-name` namespace and so cannot conflict. Where a skill and a `.claude/commands/` file share a name, the skill wins.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -144,7 +144,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_nested_not_loaded_at_startup",
+   "id": "ccskills_nested_not_loaded_at_startup","_origin":"semantic",
    "label": "REVERSED on 2026-07-30. The page previously said Claude Code 'discovers skills from nested `.claude/skills/` directories on demand'. It now states they 'aren't loaded at startup' — they load the first time Claude reads or edits a file inside that subdirectory and stay for the session, and 'until then, those skills don't appear in autocomplete and can't be invoked by name.' The failure is invisible: a nested skill is not missing, only un-invocable until an unrelated file read happens to arm it.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -155,7 +155,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_nested_qualified_command_name",
+   "id": "ccskills_nested_qualified_command_name","_origin":"semantic",
    "label": "A nested skill clashing by name stays available under a directory-qualified command, e.g. `apps/web/.claude/skills/deploy/` -> `/apps/web:deploy`, while `/deploy` runs the project-root one. Invoking the unqualified name loads the root skill and appends the list of qualified variants with an instruction to also invoke any whose directory holds the files being worked on. Requires v2.1.203+.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -166,7 +166,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_listing_budget_is_one_percent_of_context",
+   "id": "ccskills_listing_budget_is_one_percent_of_context","_origin":"semantic",
    "label": "THE TRUNCATION THAT IS NOT THE 1,536 CAP. Claude Code loads a listing of skill names and descriptions; the listing ALWAYS contains every skill NAME, but its character budget 'scales at 1% of the model's context window'. On overflow Claude Code 'drops descriptions starting with the skills you invoke least', so a perfectly short description can lose its keywords purely because OTHER skills exist. Raise it with `skillListingBudgetFraction` or `SLASH_COMMAND_TOOL_CHAR_BUDGET`, or set low-priority entries to `name-only`.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -177,7 +177,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_desc_cap_is_combined_and_configurable",
+   "id": "ccskills_desc_cap_is_combined_and_configurable","_origin":"semantic",
    "label": "The per-entry cap is 1,536 characters applied to the COMBINED `description` and `when_to_use` text — not to `description` alone — and it applies 'regardless of budget'. It is configurable via `skillListingMaxDescChars`. Guidance is to put the key use case first, since it is the tail that is lost.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -188,7 +188,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_doctor_and_context_report_listing_cost",
+   "id": "ccskills_doctor_and_context_report_listing_cost","_origin":"semantic",
    "label": "How to observe the listing budget rather than guess at it: `/doctor` estimates the listing's context cost and names its biggest contributors; the Skills row in `/context` reports the size AFTER the budget is applied, so it matches what the model receives. Before v2.1.196 that row counted every description in full and could read several times larger than the configured budget. An overflow also writes a warning to the `--debug` log.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -199,7 +199,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_paths_frontmatter_limits_activation",
+   "id": "ccskills_paths_frontmatter_limits_activation","_origin":"semantic",
    "label": "A skill's `paths` frontmatter takes glob patterns that limit AUTOMATIC activation: with it set, Claude loads the skill on its own only when working with matching files. Same format as path-specific memory rules — so the eager-vs-scoped trade that applies to `.claude/rules/*.md` applies to skills too.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -210,7 +210,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_tool_grants_are_turn_scoped",
+   "id": "ccskills_tool_grants_are_turn_scoped","_origin":"semantic",
    "label": "`allowed-tools` grants run WITHOUT permission only during the turn that invokes the skill, and the grant clears on the next user message. `disallowed-tools` removes tools from the pool while the skill is active, clearing the same way; like deny rules it cannot remove `EndConversation` while any other tool remains.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -221,7 +221,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_skill_dir_substitution_in_allowed_tools",
+   "id": "ccskills_skill_dir_substitution_in_allowed_tools","_origin":"semantic",
    "label": "`${CLAUDE_SKILL_DIR}` and `${CLAUDE_PROJECT_DIR}` are substituted in TWO places — the skill's markdown body and Bash rules inside `allowed-tools` — which is what lets a skill run a bundled script with no permission prompt. The `allowed-tools` substitution needs v2.1.129+; on older versions the rule stays a literal string and never matches, so the command silently prompts anyway. `${CLAUDE_PROJECT_DIR}` needs v2.1.196+.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -232,7 +232,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_malformed_frontmatter_loads_empty_metadata",
+   "id": "ccskills_malformed_frontmatter_loads_empty_metadata","_origin":"semantic",
    "label": "A silent-failure mode worth knowing: if the frontmatter YAML is malformed, Claude Code loads the skill BODY with empty metadata. `/skill-name` still works, so the skill looks fine — but Claude has no `description` to match against and will never invoke it on its own. `--debug` shows the parse error.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -243,7 +243,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_skilloverrides_four_states",
+   "id": "ccskills_skilloverrides_four_states","_origin":"semantic",
    "label": "`skillOverrides` in settings controls visibility without editing a shared repo's SKILL.md. Four states: `on` (name + description, in the `/` menu), `name-only` (name only, in the menu), `user-invocable-only` (hidden from Claude, in the menu), `off` (hidden from both). Absent means `on`. As of v2.1.199 `off` also hides the skill from Remote Control and Agent SDK command lists. Plugin skills are NOT affected — manage those via `/plugin`.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -254,7 +254,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_add_dir_loads_skills_as_an_exception",
+   "id": "ccskills_add_dir_loads_skills_as_an_exception","_origin":"semantic",
    "label": "`--add-dir` / `/add-dir` grant FILE ACCESS rather than configuration discovery, with skills as the single exception: `.claude/skills/` inside an added directory is loaded automatically. The exception is specific to those flags — the `permissions.additionalDirectories` SETTING grants file access only and loads no skills. Commands and output styles are never loaded from added directories.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -265,7 +265,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_live_change_detection_is_text_only",
+   "id": "ccskills_live_change_detection_is_text_only","_origin":"semantic",
    "label": "Adding, editing or removing a skill under `~/.claude/skills/`, the project `.claude/skills/`, or a `.claude/skills/` inside an `--add-dir` directory takes effect within the session, no restart. Two limits: creating a top-level skills directory that did not exist at session start needs a restart so it can be watched, and live detection covers `SKILL.md` TEXT only — for a skill folder that is also a plugin, changes to `hooks/`, `.mcp.json`, `agents/` and `output-styles/` need `/reload-plugins`.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",
@@ -276,7 +276,7 @@
    "contributor": "mrkhachaturov/agent-harness-docs@03853a01"
   },
   {
-   "id": "ccskills_restrict_via_skill_permission_rules",
+   "id": "ccskills_restrict_via_skill_permission_rules","_origin":"semantic",
    "label": "Skill invocation is governable by permission rules: `Skill` in deny rules disables all skills; `Skill(name)` is an exact match and `Skill(name *)` a prefix match with any arguments. `user-invocable: false` controls MENU VISIBILITY ONLY and does not block the Skill tool — `disable-model-invocation: true` is what removes a skill from Claude's context entirely.",
    "file_type": "concept",
    "source_file": "docs/claude-code/skills.md",

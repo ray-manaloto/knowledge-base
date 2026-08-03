@@ -1,7 +1,7 @@
 {
  "nodes": [
   {
-   "id": "ytrgvx_graphify",
+   "id": "ytrgvx_graphify","_origin":"semantic",
    "label": "Graphify",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -12,7 +12,7 @@
    "rationale": "Builds a permanent map of an entire codebase and exports it as Obsidian markdown so an AI assistant never rereads the same files, walking a graph of relationships instead of loading raw files."
   },
   {
-   "id": "ytrgvx_token_tax",
+   "id": "ytrgvx_token_tax","_origin":"semantic",
    "label": "Token tax (AI forgetting cost)",
    "file_type": "rationale",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -23,7 +23,7 @@
    "rationale": "Hidden cost of stateless AI assistants: rereading 200 files from scratch each new chat burns ~44,200 tokens asking the same question 7 different ways across a week."
   },
   {
-   "id": "ytrgvx_context_persistence",
+   "id": "ytrgvx_context_persistence","_origin":"semantic",
    "label": "Persistent codebase memory",
    "file_type": "rationale",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -34,7 +34,7 @@
    "rationale": "Teach the AI the codebase once and it never forgets; Obsidian becomes a searchable, linkable, AI-readable record so the model never re-ingests files it already understood."
   },
   {
-   "id": "ytrgvx_tree_sitter_parse",
+   "id": "ytrgvx_tree_sitter_parse","_origin":"semantic",
    "label": "Tree-sitter one-pass parse",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -45,7 +45,7 @@
    "rationale": "Reads the codebase exactly once, parsing every file with tree-sitter to extract relationships that matter: which functions call which, how services connect, what schemas feed which APIs."
   },
   {
-   "id": "ytrgvx_explicit_graph",
+   "id": "ytrgvx_explicit_graph","_origin":"semantic",
    "label": "Explicit relationship graph",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -56,7 +56,7 @@
    "rationale": "Not just a pile of files but a map, e.g. user service connects to DB pool and sessions, which connects to auth."
   },
   {
-   "id": "ytrgvx_obsidian_export",
+   "id": "ytrgvx_obsidian_export","_origin":"semantic",
    "label": "Obsidian markdown export with wikilinks",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -67,7 +67,7 @@
    "rationale": "Converts the graph into markdown notes (auth.md, sessions.md, db.md) each with wikilinks pointing to the others, forming a navigable second brain."
   },
   {
-   "id": "ytrgvx_graph_walk_hops",
+   "id": "ytrgvx_graph_walk_hops","_origin":"semantic",
    "label": "Graph-walk instead of file load",
    "file_type": "rationale",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -78,7 +78,7 @@
    "rationale": "On a question the assistant walks three hops across the graph (user service -> DB pool -> sessions) rather than loading 50 files, claimed 71x more efficient."
   },
   {
-   "id": "ytrgvx_confidence_labels",
+   "id": "ytrgvx_confidence_labels","_origin":"semantic",
    "label": "Confidence-labeled relationships",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -89,7 +89,7 @@
    "rationale": "Each relationship is tagged Extracted (came straight from code, trust it), Inferred (AI reasoned it, worth a second look), or Ambiguous (flagged for human verification) as a guardrail against hallucinations."
   },
   {
-   "id": "ytrgvx_hallucination_guardrail",
+   "id": "ytrgvx_hallucination_guardrail","_origin":"semantic",
    "label": "Hallucination guardrail via evidence check",
    "file_type": "rationale",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -100,7 +100,7 @@
    "rationale": "Example: AI claims tokens rotate every 15 minutes; the linter asks 'found it in the code?' \u2014 no evidence, so the claim is flagged for removal."
   },
   {
-   "id": "ytrgvx_git_hook_rebuild",
+   "id": "ytrgvx_git_hook_rebuild","_origin":"semantic",
    "label": "Git-commit hook graph rebuild",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -111,7 +111,7 @@
    "rationale": "Because code ships and schemas/APIs evolve, graphify rebuilds the graph on every git commit via a hook to keep the second brain in sync with reality."
   },
   {
-   "id": "ytrgvx_weekly_lint_pass",
+   "id": "ytrgvx_weekly_lint_pass","_origin":"semantic",
    "label": "Weekly lint pass",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -122,7 +122,7 @@
    "rationale": "A critical maintenance step run once a week that checks the wiki for contradictions, dead pages, and fabricated claims; skipping it for weeks lets the second brain fill with stale claims the AI will confidently repeat."
   },
   {
-   "id": "ytrgvx_merge_heterogeneous_sources",
+   "id": "ytrgvx_merge_heterogeneous_sources","_origin":"semantic",
    "label": "Merge heterogeneous sources into one graph",
    "file_type": "concept",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -133,7 +133,7 @@
    "rationale": "SQL schemas, terraform, and architecture PDFs can be merged into one graph; new team members get an interactive map instead of a 200-slide onboarding deck."
   },
   {
-   "id": "ytrgvx_structure_dependency",
+   "id": "ytrgvx_structure_dependency","_origin":"semantic",
    "label": "Depends on clean codebase structure",
    "file_type": "rationale",
    "source_file": "yt-RGVXR0OFNzI.txt",
@@ -144,7 +144,7 @@
    "rationale": "Works best on codebases with clear structure and explicit relationships; circular dependencies and implicit conventions make the graph reflect that chaos \u2014 it is not a substitute for fixing bad architecture."
   },
   {
-   "id": "ytgna_graphify_knowledge_base",
+   "id": "ytgna_graphify_knowledge_base","_origin":"semantic",
    "label": "Graphify knowledge base",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -156,7 +156,7 @@
    "source_location": "lines 1-11"
   },
   {
-   "id": "ytgna_graphify_plugin",
+   "id": "ytgna_graphify_plugin","_origin":"semantic",
    "label": "Graphify Claude Code plugin",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -168,7 +168,7 @@
    "source_location": "lines 4-8"
   },
   {
-   "id": "ytgna_claude_code",
+   "id": "ytgna_claude_code","_origin":"semantic",
    "label": "Claude Code",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -180,7 +180,7 @@
    "source_location": "lines 1-4"
   },
   {
-   "id": "ytgna_node_edge_graph",
+   "id": "ytgna_node_edge_graph","_origin":"semantic",
    "label": "Node and edge graph of concepts",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -192,7 +192,7 @@
    "source_location": "lines 11-24"
   },
   {
-   "id": "ytgna_graphify_out_folder",
+   "id": "ytgna_graphify_out_folder","_origin":"semantic",
    "label": "graphify-out folder",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -204,7 +204,7 @@
    "source_location": "lines 12-14"
   },
   {
-   "id": "ytgna_graph_html_visualization",
+   "id": "ytgna_graph_html_visualization","_origin":"semantic",
    "label": "graph.html visualization",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -216,7 +216,7 @@
    "source_location": "lines 14-16"
   },
   {
-   "id": "ytgna_graphify_obsidian_command",
+   "id": "ytgna_graphify_obsidian_command","_origin":"semantic",
    "label": "graphify obsidian command",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -228,7 +228,7 @@
    "source_location": "lines 12-19"
   },
   {
-   "id": "ytgna_obsidian_vault",
+   "id": "ytgna_obsidian_vault","_origin":"semantic",
    "label": "Obsidian vault (one note per node)",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -240,7 +240,7 @@
    "source_location": "lines 19-35"
   },
   {
-   "id": "ytgna_relationships_without_context_gap",
+   "id": "ytgna_relationships_without_context_gap","_origin":"semantic",
    "label": "Relationships-without-context gap",
    "file_type": "rationale",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -252,7 +252,7 @@
    "source_location": "lines 19-24"
   },
   {
-   "id": "ytgna_context_reintegration",
+   "id": "ytgna_context_reintegration","_origin":"semantic",
    "label": "Reintegrating workspace context into nodes",
    "file_type": "rationale",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -264,7 +264,7 @@
    "source_location": "lines 25-31"
   },
   {
-   "id": "ytgna_loop_goal_directive",
+   "id": "ytgna_loop_goal_directive","_origin":"semantic",
    "label": "Loop / goal don't-stop directive",
    "file_type": "rationale",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -276,7 +276,7 @@
    "source_location": "lines 27-29"
   },
   {
-   "id": "ytgna_claude_code_routed_into_vault",
+   "id": "ytgna_claude_code_routed_into_vault","_origin":"semantic",
    "label": "Claude Code routed into the knowledge graph vault",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -288,7 +288,7 @@
    "source_location": "lines 32-40"
   },
   {
-   "id": "ytgna_bash_node_query",
+   "id": "ytgna_bash_node_query","_origin":"semantic",
    "label": "Bash-command node lookup",
    "file_type": "concept",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -300,7 +300,7 @@
    "source_location": "lines 38-49"
   },
   {
-   "id": "ytgna_token_efficient_retrieval",
+   "id": "ytgna_token_efficient_retrieval","_origin":"semantic",
    "label": "Token-efficient prebuilt-graph retrieval",
    "file_type": "rationale",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -312,7 +312,7 @@
    "source_location": "lines 46-49"
   },
   {
-   "id": "ytgna_graphify_non_destructive",
+   "id": "ytgna_graphify_non_destructive","_origin":"semantic",
    "label": "Non-destructive graph generation",
    "file_type": "rationale",
    "source_file": "yt-GnA9xjYWHBg.txt",
@@ -324,7 +324,7 @@
    "source_location": "lines 8-13"
   },
   {
-   "id": "yt0czt_adr",
+   "id": "yt0czt_adr","_origin":"semantic",
    "label": "ADR (Any Decision Record)",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -336,7 +336,7 @@
    "source_location": "line 1, 14, 23"
   },
   {
-   "id": "yt0czt_prd",
+   "id": "yt0czt_prd","_origin":"semantic",
    "label": "PRD (Product Requirements Document)",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -348,7 +348,7 @@
    "source_location": "line 3-4, 13, 52"
   },
   {
-   "id": "yt0czt_madr",
+   "id": "yt0czt_madr","_origin":"semantic",
    "label": "MADR (Markdown ADR)",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -360,7 +360,7 @@
    "source_location": "line 3, 19-22"
   },
   {
-   "id": "yt0czt_adr_template",
+   "id": "yt0czt_adr_template","_origin":"semantic",
    "label": "ADR structure/template",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -372,7 +372,7 @@
    "source_location": "line 15-18, 22"
   },
   {
-   "id": "yt0czt_decision_context_capture",
+   "id": "yt0czt_decision_context_capture","_origin":"semantic",
    "label": "Capturing decisions and context",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -384,7 +384,7 @@
    "source_location": "line 3, 8-9"
   },
   {
-   "id": "yt0czt_session_restart_amnesia",
+   "id": "yt0czt_session_restart_amnesia","_origin":"semantic",
    "label": "Session-restart decision amnesia",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -396,7 +396,7 @@
    "source_location": "line 10-12"
   },
   {
-   "id": "yt0czt_code_vs_decisions_iceberg",
+   "id": "yt0czt_code_vs_decisions_iceberg","_origin":"semantic",
    "label": "Code-vs-decisions iceberg",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -408,7 +408,7 @@
    "source_location": "line 7-10"
   },
   {
-   "id": "yt0czt_graphify",
+   "id": "yt0czt_graphify","_origin":"semantic",
    "label": "Graphify (queryable knowledge graph)",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -420,7 +420,7 @@
    "source_location": "line 2, 52-53"
   },
   {
-   "id": "yt0czt_queryable_brain",
+   "id": "yt0czt_queryable_brain","_origin":"semantic",
    "label": "Queryable brain",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -432,7 +432,7 @@
    "source_location": "line 14, 52"
   },
   {
-   "id": "yt0czt_rejected_options_requeryable",
+   "id": "yt0czt_rejected_options_requeryable","_origin":"semantic",
    "label": "Permanent requeryable rejected options",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -444,7 +444,7 @@
    "source_location": "line 14, 18"
   },
   {
-   "id": "yt0czt_user_story",
+   "id": "yt0czt_user_story","_origin":"semantic",
    "label": "User story",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -456,7 +456,7 @@
    "source_location": "line 4, 42, 47"
   },
   {
-   "id": "yt0czt_iterative_loop_workflow",
+   "id": "yt0czt_iterative_loop_workflow","_origin":"semantic",
    "label": "Iterative research-plan-execute-review loop",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -468,7 +468,7 @@
    "source_location": "line 46-50"
   },
   {
-   "id": "yt0czt_agile_scrum_analogy",
+   "id": "yt0czt_agile_scrum_analogy","_origin":"semantic",
    "label": "Agile/Scrum change-management analogy",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -480,7 +480,7 @@
    "source_location": "line 5-6"
   },
   {
-   "id": "yt0czt_bmad_speckit",
+   "id": "yt0czt_bmad_speckit","_origin":"semantic",
    "label": "BMAD / SpecKit methods",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -492,7 +492,7 @@
    "source_location": "line 4"
   },
   {
-   "id": "yt0czt_adr_skill",
+   "id": "yt0czt_adr_skill","_origin":"semantic",
    "label": "ADR kit / Claude Code skill",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -504,7 +504,7 @@
    "source_location": "line 20, 25, 55-57"
   },
   {
-   "id": "yt0czt_boilerplate_chipsas",
+   "id": "yt0czt_boilerplate_chipsas","_origin":"semantic",
    "label": "ChipSAS boilerplate stack",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -516,7 +516,7 @@
    "source_location": "line 29-34"
   },
   {
-   "id": "yt0czt_obsidian_vault",
+   "id": "yt0czt_obsidian_vault","_origin":"semantic",
    "label": "Obsidian markdown vault",
    "file_type": "concept",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -528,7 +528,7 @@
    "source_location": "line 2, 26-27"
   },
   {
-   "id": "yt0czt_multi_level_adr",
+   "id": "yt0czt_multi_level_adr","_origin":"semantic",
    "label": "Multi-level ADRs",
    "file_type": "rationale",
    "source_file": "yt-0CZtRw0KrXo.txt",
@@ -540,7 +540,7 @@
    "source_location": "line 26-39"
   },
   {
-   "id": "ytxtbw_fable_5",
+   "id": "ytxtbw_fable_5","_origin":"semantic",
    "label": "Fable 5",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -552,7 +552,7 @@
    "rationale": "Presented as an exceptionally powerful frontier model the speaker spent thousands in credits testing; temporarily available and expected to return to subscriptions per Anthropic."
   },
   {
-   "id": "ytxtbw_opus_48",
+   "id": "ytxtbw_opus_48","_origin":"semantic",
    "label": "Opus 4.8",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -564,7 +564,7 @@
    "rationale": "Cheaper model the speaker wants to elevate toward Fable-5-like behavior by injecting Fable's process; Opus 4.8 on high is often as good as or better than max-effort runs."
   },
   {
-   "id": "ytxtbw_process_is_the_moat",
+   "id": "ytxtbw_process_is_the_moat","_origin":"semantic",
    "label": "The process, not the model, is the moat",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -576,7 +576,7 @@
    "rationale": "A beginner with Fable 5 loses to Karpathy on an older model; the way you instruct and the loops/systems you build around a model matter more than raw intelligence. You can't keep a model's intelligence but you can keep its process."
   },
   {
-   "id": "ytxtbw_extract_the_fable_method",
+   "id": "ytxtbw_extract_the_fable_method","_origin":"semantic",
    "label": "Extract the Fable method",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -588,7 +588,7 @@
    "rationale": "Rather than have Fable plan and do everything, extract how Fable thinks and let cheaper models think and execute like it; analyze a loved deliverable (or the session) to recover what made it good and turn it into a reusable skill."
   },
   {
-   "id": "ytxtbw_model_teacher_not_workhorse",
+   "id": "ytxtbw_model_teacher_not_workhorse","_origin":"semantic",
    "label": "Treat the top model as teacher, not workhorse",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -600,7 +600,7 @@
    "rationale": "Use the powerful model like a retiring senior engineer packaging its knowledge for junior engineers \u2014 improving your setups and skills \u2014 rather than as an employee grinding tasks."
   },
   {
-   "id": "ytxtbw_fable_mode_skill",
+   "id": "ytxtbw_fable_mode_skill","_origin":"semantic",
    "label": "Fable mode skill",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -612,7 +612,7 @@
    "rationale": "An installable skill file that makes any model (Opus 4.8, GPT 5.5, open-source) operate with Fable's judgment, planning, verification and reasoning habits; makes Opus feel elevated."
   },
   {
-   "id": "ytxtbw_five_gates",
+   "id": "ytxtbw_five_gates","_origin":"semantic",
    "label": "Five gates: scope, evidence, attack, verify, report",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -624,7 +624,7 @@
    "rationale": "Fable mode operates on five gates: scoping before work, evidence before reasoning, reasoning adversarially, verifying before declaring done, and calibrating/reporting."
   },
   {
-   "id": "ytxtbw_adversarial_scoping",
+   "id": "ytxtbw_adversarial_scoping","_origin":"semantic",
    "label": "Adversarial scoping (devil's advocate planning)",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -636,7 +636,7 @@
    "rationale": "Beyond listing steps, scoping means playing devil's advocate \u2014 enumerating everything that could go wrong and exploring the unknowns in the plan; Fable excels at this."
   },
   {
-   "id": "ytxtbw_verify_dont_assume",
+   "id": "ytxtbw_verify_dont_assume","_origin":"semantic",
    "label": "Verify existence; recognition is not current knowledge",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -648,7 +648,7 @@
    "rationale": "From the leaked prompt: partial recognition from training is not current knowledge, and a prompt implying a file exists doesn't mean it does \u2014 verify at every step that what was done is accurate."
   },
   {
-   "id": "ytxtbw_leaked_system_prompt",
+   "id": "ytxtbw_leaked_system_prompt","_origin":"semantic",
    "label": "Leaked Claude Fable 5 system prompt",
    "file_type": "document",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -660,7 +660,7 @@
    "rationale": "Leaked system prompt the speaker read (with Fable) to extract habits: verify existence, answer an ambiguous query before asking one clarifying question, acknowledge errors, and effort-scaling guidance."
   },
   {
-   "id": "ytxtbw_dynamic_workflows",
+   "id": "ytxtbw_dynamic_workflows","_origin":"semantic",
    "label": "Dynamic workflows",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -672,7 +672,7 @@
    "rationale": "Claude Code lets you spin up dynamic workflows where a model designs the workflow and its sub-agents; the orchestrator keeps designing more steps as workers report back."
   },
   {
-   "id": "ytxtbw_orchestrator_subagent_delegation",
+   "id": "ytxtbw_orchestrator_subagent_delegation","_origin":"semantic",
    "label": "Orchestrator-to-subagent delegation",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -684,7 +684,7 @@
    "rationale": "An orchestrator model designs and plans while sub-agents (Sonnet/high-q/Opus) execute and report back, letting the orchestrator plan further steps in a loop."
   },
   {
-   "id": "ytxtbw_fable_orchestrating_cheaper_workers",
+   "id": "ytxtbw_fable_orchestrating_cheaper_workers","_origin":"semantic",
    "label": "Fable orchestrating Sonnet workers \u2248 Fable+Fable results",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -696,7 +696,7 @@
    "rationale": "Dynamic workflows with Fable orchestrating Sonnet sub-agents gave about the same results as Fable orchestrating Fable, at far lower cost \u2014 the light-bulb moment: keep the orchestrator's planning, cheapen the execution."
   },
   {
-   "id": "ytxtbw_opus_orchestrator_highq_scouts",
+   "id": "ytxtbw_opus_orchestrator_highq_scouts","_origin":"semantic",
    "label": "Opus orchestrator + high-q scouts (~3x cheaper, same result)",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -708,7 +708,7 @@
    "rationale": "Concrete test: Opus orchestrator (in Fable mode) delegating to high-q scout workers was ~3x cheaper than using Opus/Sonnet workers yet produced the exact same result."
   },
   {
-   "id": "ytxtbw_model_routing",
+   "id": "ytxtbw_model_routing","_origin":"semantic",
    "label": "Model routing",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -720,7 +720,7 @@
    "rationale": "Match each task to the smallest/cheapest model that can hit the required quality \u2014 don't pay for a high-intelligence model when a cheaper one gets the same result; a key skill for coming years."
   },
   {
-   "id": "ytxtbw_reasoning_effort_levels",
+   "id": "ytxtbw_reasoning_effort_levels","_origin":"semantic",
    "label": "Reasoning effort levels (low/high/xhigh/max)",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -732,7 +732,7 @@
    "rationale": "Beyond choosing a model, choose the effort level per task: 1 for signal facts, 3-5 for medium tasks, 5-10 for deep research; Fable 5 on low \u2248 Opus 4.8 on high."
   },
   {
-   "id": "ytxtbw_effort_overthinking",
+   "id": "ytxtbw_effort_overthinking","_origin":"semantic",
    "label": "Higher effort can overthink and produce worse output",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -744,7 +744,7 @@
    "rationale": "xhigh/max effort runs go longer, cost more, and second-guess themselves \u2014 often producing something worse than Opus 4.8 or Fable on plain high."
   },
   {
-   "id": "ytxtbw_score_cost_effort_frontier",
+   "id": "ytxtbw_score_cost_effort_frontier","_origin":"semantic",
    "label": "Score-vs-cost-vs-effort release-blog chart",
    "file_type": "image",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -756,7 +756,7 @@
    "rationale": "Release-blog chart plotting Fable 5, Opus 4.8, and GPT 5.5 by score (y) vs cost (x) across effort levels, showing overlap like Fable-5-low near Opus-4.8-high."
   },
   {
-   "id": "ytxtbw_model_toolkit_table",
+   "id": "ytxtbw_model_toolkit_table","_origin":"semantic",
    "label": "Model toolkit table (cost/intelligence/taste)",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -768,7 +768,7 @@
    "rationale": "Give Claude a table of available models scored on cost, intelligence, and taste (creativity/UX) so it can route/delegate to the right model when spinning up dynamic workflows and agent teams."
   },
   {
-   "id": "ytxtbw_delegate_to_codex",
+   "id": "ytxtbw_delegate_to_codex","_origin":"semantic",
    "label": "Delegate to Codex / open-source models",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -780,7 +780,7 @@
    "rationale": "Routing can hand tasks to external tools like Codex or open-source/local models, not just Anthropic models."
   },
   {
-   "id": "ytxtbw_unit_economics_ai_budget",
+   "id": "ytxtbw_unit_economics_ai_budget","_origin":"semantic",
    "label": "AI unit economics / per-month budget",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -792,7 +792,7 @@
    "rationale": "As companies and individuals face AI budgets, routing to the cheapest sufficient model is what separates people getting far more for far less."
   },
   {
-   "id": "ytxtbw_long_task_plan_execute_verify",
+   "id": "ytxtbw_long_task_plan_execute_verify","_origin":"semantic",
    "label": "Long-task loop: plan, execute, verify",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -804,7 +804,7 @@
    "rationale": "Anthropic published that Fable is strong at long tasks: working toward a goal, planning it, executing, then verifying."
   },
   {
-   "id": "ytxtbw_fable_temporary_own_your_process",
+   "id": "ytxtbw_fable_temporary_own_your_process","_origin":"semantic",
    "label": "You don't own the models \u2014 own your process",
    "file_type": "rationale",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -816,7 +816,7 @@
    "rationale": "Fable will be pulled and returned to subscriptions; models can be taken away, so what you can own is your processes, systems, methodologies, plus hardware and local models."
   },
   {
-   "id": "ytxtbw_claude_code",
+   "id": "ytxtbw_claude_code","_origin":"semantic",
    "label": "Claude Code",
    "file_type": "concept",
    "source_file": "yt-XTBWVVcF3Pk.txt",
@@ -828,7 +828,7 @@
    "rationale": "The harness that lets the speaker spin up dynamic workflows, sub-agents, and skills."
   },
   {
-   "id": "ytmhso_second_brain",
+   "id": "ytmhso_second_brain","_origin":"semantic",
    "label": "Second Brain knowledge system",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -839,7 +839,7 @@
    "rationale": "A trustworthy personal-knowledge system built on ~2000 markdown notes; the goal was not a pretty graph but a system you can trust to make knowledge findable and self-consistent."
   },
   {
-   "id": "ytmhso_four_capabilities",
+   "id": "ytmhso_four_capabilities","_origin":"semantic",
    "label": "Four required capabilities (find, read, stay-clean, overview)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -850,7 +850,7 @@
    "rationale": "Define CAPABILITIES before tools: (1) semantic find in seconds without the exact word, (2) read in-place, (3) stay clean (detect duplicates/contradictions/stale), (4) overview. Each capability later finds a home in the architecture."
   },
   {
-   "id": "ytmhso_six_step_process",
+   "id": "ytmhso_six_step_process","_origin":"semantic",
    "label": "Six-step build process (4 steps before any code)",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -861,7 +861,7 @@
    "rationale": "Question -> capabilities -> brainstorm -> spec -> plan -> build -> test. Four of six steps happen before the first line of code; the biggest AI-project risk is the AI confidently building the wrong thing at full speed, and front-loading decisions prevents it."
   },
   {
-   "id": "ytmhso_superpowers_skill",
+   "id": "ytmhso_superpowers_skill","_origin":"semantic",
    "label": "Superpowers skill package for Claude Code",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -872,7 +872,7 @@
    "rationale": "Skill package supplying steps 2-5; a skill is a work instruction given to Claude once that then applies to every project. It forces the AI into an engineering process: ask questions one at a time, write decisions to a doc, break into small testable tasks, then build, with the human as a checkpoint at each transition."
   },
   {
-   "id": "ytmhso_fresh_subagent_per_task",
+   "id": "ytmhso_fresh_subagent_per_task","_origin":"semantic",
    "label": "Fresh subagent per task with isolated context",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -883,7 +883,7 @@
    "rationale": "In the build step each task gets a fresh Claude subagent (own instance) that receives only that one task plus the context it needs and nothing else; its result is verified before the next task starts."
   },
   {
-   "id": "ytmhso_test_done_criteria",
+   "id": "ytmhso_test_done_criteria","_origin":"semantic",
    "label": "Per-task test + explicit done-criterion",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -894,7 +894,7 @@
    "rationale": "Each of the 14 core tasks carries a test and a concrete completion criterion (e.g. 'search returns THIS file for THIS example question', not merely 'search works'); the human reviews results, not code."
   },
   {
-   "id": "ytmhso_deterministic_before_model",
+   "id": "ytmhso_deterministic_before_model","_origin":"semantic",
    "label": "Deterministic code before the model",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -905,7 +905,7 @@
    "rationale": "AI (purple in the diagram) is used only where genuine understanding is needed; anything a machine can do reliably runs as plain deterministic code because it is faster, cheaper, reproducible and auditable."
   },
   {
-   "id": "ytmhso_markdown_single_truth",
+   "id": "ytmhso_markdown_single_truth","_origin":"semantic",
    "label": "Markdown as the single source of truth",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -916,7 +916,7 @@
    "rationale": "All knowledge lives as plain markdown files; every other part (index, graph, search) is a derived view that can be discarded and rebuilt without losing any knowledge. No database, no lock-in format."
   },
   {
-   "id": "ytmhso_indexer",
+   "id": "ytmhso_indexer","_origin":"semantic",
    "label": "Deterministic indexer (map + index.md catalog)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -927,7 +927,7 @@
    "rationale": "A small no-AI program that walks all folders and records title/size, links and cluster per file, then writes a map file (for the graph) and an index.md catalog (one line per area/important file) that Claude reads first. Every run is identical, takes seconds and costs nothing."
   },
   {
-   "id": "ytmhso_qmd_hybrid_search",
+   "id": "ytmhso_qmd_hybrid_search","_origin":"semantic",
    "label": "QMD local hybrid search (Tobi Lutke)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -938,7 +938,7 @@
    "rationale": "A ready-made 'building block' reference: local hybrid search combining classic keyword search with meaning search, runs fully on-device with three small local models (~<3GB), no cloud. Answers capability #1 (find without exact word)."
   },
   {
-   "id": "ytmhso_semantic_search",
+   "id": "ytmhso_semantic_search","_origin":"semantic",
    "label": "Semantic/meaning (embedding) search",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -949,7 +949,7 @@
    "rationale": "A small model places every note on a 'map of meanings'; the query is embedded onto the same map and nearest neighbours are the hits, so 'subtitles' finds a note that only says 'captions' with no word overlap."
   },
   {
-   "id": "ytmhso_brain_first_ruleset",
+   "id": "ytmhso_brain_first_ruleset","_origin":"semantic",
    "label": "Brain First rule set in CLAUDE.md",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -960,7 +960,7 @@
    "rationale": "The rules Claude reads at every start that govern how it works with the knowledge; its heart is the search ladder, forbidding Claude from wildly searching or reading the whole vault."
   },
   {
-   "id": "ytmhso_search_ladder",
+   "id": "ytmhso_search_ladder","_origin":"semantic",
    "label": "Five-rung search ladder",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -971,7 +971,7 @@
    "rationale": "Rung1 read index.md catalog; rung2 check the wiki for already-condensed knowledge; rung3 QMD search; rung4 open exactly one (best) file; rung5 answer. Descending the ladder keeps token use to a few thousand per question."
   },
   {
-   "id": "ytmhso_context_window_avoidance",
+   "id": "ytmhso_context_window_avoidance","_origin":"semantic",
    "label": "System that needs no large context window",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -982,7 +982,7 @@
    "rationale": "You never load the whole vault into context; the trick is not a bigger context window but a system that needs none \u2014 Claude loads only the catalog plus a few relevant files per question. The context window is the AI's short-term memory and more tokens means fuller, slower, costlier."
   },
   {
-   "id": "ytmhso_karpathy_pattern",
+   "id": "ytmhso_karpathy_pattern","_origin":"semantic",
    "label": "Karpathy pattern: AI maintains its own knowledge wiki",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -993,7 +993,7 @@
    "rationale": "A 'pattern to adapt' reference (a few paragraphs, not code) from Andrej Karpathy: the AI writes and updates markdown pages, keeps a small index read first, and runs check-rules against contradictions and dead links. Answers capability #3 (stay clean)."
   },
   {
-   "id": "ytmhso_self_maintaining_wiki",
+   "id": "ytmhso_self_maintaining_wiki","_origin":"semantic",
    "label": "Self-maintaining wiki (0.9 Wiki folder)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1004,7 +1004,7 @@
    "rationale": "A folder written exclusively by Claude, never by hand; page types include source summaries, topic pages, person/project pages and synthesis pages that condense multiple sources; all cross-linked, same rules regardless of which Claude session works on it."
   },
   {
-   "id": "ytmhso_wiki_schema_file",
+   "id": "ytmhso_wiki_schema_file","_origin":"semantic",
    "label": "Wiki schema file (Claude's wiki work-instruction)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1015,7 +1015,7 @@
    "rationale": "A plain text file living in the wiki folder that Claude reads before every wiki operation, defining page types and rules so behaviour stays identical across sessions."
   },
   {
-   "id": "ytmhso_ingest_operation",
+   "id": "ytmhso_ingest_operation","_origin":"semantic",
    "label": "Ingest operation (add a source into the wiki)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1026,7 +1026,7 @@
    "rationale": "Claude reads a new source, uses the wiki page-directory to find only the pages the topic touches (not the whole wiki), updates/creates those pages and sets links; matching info is worked in, contradicting info is flagged."
   },
   {
-   "id": "ytmhso_conflict_detection",
+   "id": "ytmhso_conflict_detection","_origin":"semantic",
    "label": "Contradiction detection & flagging (52 real conflicts)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1037,7 +1037,7 @@
    "rationale": "During ingest every touched page is checked for whether new info contradicts existing content; conflicts are boxed wherever they appear and nothing is overwritten \u2014 both statements stay with their sources and the human decides. On the real vault it flagged 52 conflict spots (a planted-trap test caught all 3 and left an unrelated 4th untouched)."
   },
   {
-   "id": "ytmhso_three_reference_roles",
+   "id": "ytmhso_three_reference_roles","_origin":"semantic",
    "label": "Three reference roles (building block / pattern / benchmark)",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1048,7 +1048,7 @@
    "rationale": "Every reference gets one explicit role: Baustein (ready-made part to install), Muster (an idea/pattern you re-implement), Messlatte (a benchmark defining how good the result must look). Copy-pasting others' solutions solves others' problems; roles are the most transferable idea in the project."
   },
   {
-   "id": "ytmhso_graphify_gbrain_reference",
+   "id": "ytmhso_graphify_gbrain_reference","_origin":"semantic",
    "label": "Graphify & G-Brain (pattern-only references)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1059,7 +1059,7 @@
    "rationale": "Two projects studied for their pattern (markdown as sole truth, graph only a derived intermediate) with no code taken; knowing what you do NOT need also gives confidence to stick to your own approach \u2014 rejecting is a research result too."
   },
   {
-   "id": "ytmhso_human_decides_ai_delivers",
+   "id": "ytmhso_human_decides_ai_delivers","_origin":"semantic",
    "label": "Human decides, AI delivers",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1070,7 +1070,7 @@
    "rationale": "Across brainstorming, every wiki contradiction and every optics step the AI made not a single decision \u2014 it only made decisions possible. The AI writes the code; you curate references, decide, and sign off each step."
   },
   {
-   "id": "ytmhso_token_benchmark",
+   "id": "ytmhso_token_benchmark","_origin":"semantic",
    "label": "Benchmark: ~50% fewer tokens, ~40% less time",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1081,7 +1081,7 @@
    "rationale": "Five real work questions run with and without the Brain system: the Brain variant used ~50% fewer tokens and ~40% less time at 5/5 correct. Token cost comes from searching (each search step re-reads the whole prior history); without a system Claude searches long and each round gets costlier \u2014 one query cost >0.5M tokens without Brain vs ~a third with it. Brain wins on deeply-buried knowledge spanning multiple files."
   },
   {
-   "id": "ytmhso_visual_reference_spec",
+   "id": "ytmhso_visual_reference_spec","_origin":"semantic",
    "label": "Images as spec (ChatGPT generates target, Claude Code builds)",
    "file_type": "rationale",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1092,7 +1092,7 @@
    "rationale": "The expensive mistake was describing the desired look in words (a guessing game). The fix: have ChatGPT's image engine generate the target-state images, then hand them to Claude Code as a concrete visual reference/spec \u2014 a clear division of labour between two AIs, one step at a time with human sign-off."
   },
   {
-   "id": "ytmhso_graph_web_app",
+   "id": "ytmhso_graph_web_app","_origin":"semantic",
    "label": "Graph web app (read-only viewer window)",
    "file_type": "concept",
    "source_file": "yt-mHSOsy_usAg.txt",
@@ -1103,7 +1103,7 @@
    "rationale": "The fifth building block, deliberately at the edge: it reads the indexer's map file to draw the graph, opens any clicked note beside it (capability #2 read), and hosts the semantic search box. It never writes and never decides \u2014 the optics are swappable; the foundation is mandatory."
   },
   {
-   "id": "yt22iy_graphify",
+   "id": "yt22iy_graphify","_origin":"semantic",
    "label": "graphify",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1115,7 +1115,7 @@
    "rationale": null
   },
   {
-   "id": "yt22iy_ai_second_brain_persistent_graph",
+   "id": "yt22iy_ai_second_brain_persistent_graph","_origin":"semantic",
    "label": "AI second brain as persistent knowledge graph",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1127,7 +1127,7 @@
    "rationale": "Coding assistants have amnesia: every new chat re-reads files from scratch, paying a token tax per query, and stuffing a whole repo into context makes answers worse. Do the expensive reading once, up front, into a graph the assistant can query."
   },
   {
-   "id": "yt22iy_read_once_walk_graph",
+   "id": "yt22iy_read_once_walk_graph","_origin":"semantic",
    "label": "read-once, then walk the graph",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1139,7 +1139,7 @@
    "rationale": "Instead of searching text on every question, do the expensive reading once up front and squeeze the project into an explicit graph of entities and relationships; answering then means walking the graph. Exactly how a senior engineer works: build the mental map once, then follow it."
   },
   {
-   "id": "yt22iy_rag_limitation_for_code",
+   "id": "yt22iy_rag_limitation_for_code","_origin":"semantic",
    "label": "RAG vector search is weak for code",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1151,7 +1151,7 @@
    "rationale": "RAG chunks files into vectors and finds closest matches, but for code the link between a function and its callers is not about similar words \u2014 it lives in the call graph. You pay to load the whole library just to find one paragraph."
   },
   {
-   "id": "yt22iy_three_pass_ingestion",
+   "id": "yt22iy_three_pass_ingestion","_origin":"semantic",
    "label": "three-pass ingestion",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1163,7 +1163,7 @@
    "rationale": "graphify runs three separate passes, each with a different privacy story: source code, recordings, and documents/images."
   },
   {
-   "id": "yt22iy_pass_one_treesitter",
+   "id": "yt22iy_pass_one_treesitter","_origin":"semantic",
    "label": "pass one: Tree-sitter source parsing",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1175,7 +1175,7 @@
    "rationale": "Source code runs through Tree-sitter across 40 languages \u2014 deterministic, no AI model, no network call. Code stays on-machine and every link found is tagged as a hard fact ('extracted')."
   },
   {
-   "id": "yt22iy_pass_two_faster_whisper",
+   "id": "yt22iy_pass_two_faster_whisper","_origin":"semantic",
    "label": "pass two: local transcription with faster-whisper",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1187,7 +1187,7 @@
    "rationale": "Audio/video (e.g. a screen-recorded design meeting) is transcribed locally with faster-whisper \u2014 an hour of talking becomes text on the laptop, nothing uploaded, folded into the graph."
   },
   {
-   "id": "yt22iy_pass_three_api_documents",
+   "id": "yt22iy_pass_three_api_documents","_origin":"semantic",
    "label": "pass three: documents/images sent to AI provider",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1199,7 +1199,7 @@
    "rationale": "PDFs and images can't be read by a grammar, so they are sent to your own AI provider (your own API key, no middleman) to be understood. The only pass that leaves your machine; skip it with code-only mode for full privacy."
   },
   {
-   "id": "yt22iy_code_only_mode",
+   "id": "yt22iy_code_only_mode","_origin":"semantic",
    "label": "code-only (fully private) mode",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1211,7 +1211,7 @@
    "rationale": "Run code-only mode to skip the document/image pass so nothing leaves the machine."
   },
   {
-   "id": "yt22iy_confidence_labels",
+   "id": "yt22iy_confidence_labels","_origin":"semantic",
    "label": "confidence labels: extracted/inferred/ambiguous",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1223,7 +1223,7 @@
    "rationale": "Every connection carries a label so the tool refuses to sound sure about what it isn't: Extracted = right there in the code, trust it; Inferred = model reasoned from context, probably; Ambiguous = model raised a hand, check before building on it."
   },
   {
-   "id": "yt22iy_community_detection",
+   "id": "yt22iy_community_detection","_origin":"semantic",
    "label": "community detection into modules",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1235,7 +1235,7 @@
    "rationale": "Once the graph exists it self-organizes: community detection makes modules fall out of the shape of the code (auth, billing, infrastructure clusters) with bridge files lit up \u2014 you didn't draw the map, the relationships did."
   },
   {
-   "id": "yt22iy_query_walk_short_path",
+   "id": "yt22iy_query_walk_short_path","_origin":"semantic",
    "label": "query-time graph walk returning short paths",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1247,7 +1247,7 @@
    "rationale": "Asking 'how does a user log in?' walks the graph and hands back a short path \u2014 three hops, zero files opened \u2014 so the assistant reads a few node summaries instead of half the repo."
   },
   {
-   "id": "yt22iy_query_modes",
+   "id": "yt22iy_query_modes","_origin":"semantic",
    "label": "explain / path / deep query modes",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1259,7 +1259,7 @@
    "rationale": "graphify explain gives a plain-English tour of an entity; graphify path finds the shortest chain between two things; deep mode hunts the fuzzier inferred links a quick pass would skip."
   },
   {
-   "id": "yt22iy_token_reduction_claim",
+   "id": "yt22iy_token_reduction_claim","_origin":"semantic",
    "label": "~71x fewer tokens per query (unreproduced)",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1271,7 +1271,7 @@
    "rationale": "graphify claims about 71x fewer tokens per query on a mixed codebase \u2014 but it is their own benchmark on their own data, unreproduced externally, so take the exact figure with a grain of salt though the direction is right."
   },
   {
-   "id": "yt22iy_graph_exports",
+   "id": "yt22iy_graph_exports","_origin":"semantic",
    "label": "graph exports: HTML/JSON/markdown/Neo4j/MCP",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1283,7 +1283,7 @@
    "rationale": "The graph isn't trapped in the tool: exports include a clickable viz.js HTML graph, plain JSON, a markdown report of busiest files, a Neo4j database, and an MCP server so any agent can call the codebase graph as a built-in tool."
   },
   {
-   "id": "yt22iy_mcp_server_export",
+   "id": "yt22iy_mcp_server_export","_origin":"semantic",
    "label": "MCP server export",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1295,7 +1295,7 @@
    "rationale": "An MCP server export lets any agent call your codebase graph like a built-in tool."
   },
   {
-   "id": "yt22iy_incremental_sha256_hashing",
+   "id": "yt22iy_incremental_sha256_hashing","_origin":"semantic",
    "label": "incremental SHA-256 hashing + git hook rebuild",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1307,7 +1307,7 @@
    "rationale": "Every file gets a SHA-256 hash so a second run only rereads what changed; add a git hook and the graph rebuilds on every commit, keeping the map matched to the exact branch you're standing on."
   },
   {
-   "id": "yt22iy_obsidian_export",
+   "id": "yt22iy_obsidian_export","_origin":"semantic",
    "label": "Obsidian export (entities as pages, wikilinks)",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1319,7 +1319,7 @@
    "rationale": "Obsidian is plain markdown on your disk \u2014 the natural home for a brain you own. graphify's Obsidian export turns each entity into a page and each relationship into a wikilink, and the graph view shows the codebase as a mind map you can wander."
   },
   {
-   "id": "yt22iy_claudian_plugin",
+   "id": "yt22iy_claudian_plugin","_origin":"semantic",
    "label": "Claudian: Claude Code in the Obsidian sidebar",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1331,7 +1331,7 @@
    "rationale": "Claudian drops Claude Code into the Obsidian sidebar so the vault becomes the agent's working directory \u2014 it can read notes, write new ones, and run commands without leaving the app."
   },
   {
-   "id": "yt22iy_karpathy_three_layer_design",
+   "id": "yt22iy_karpathy_three_layer_design","_origin":"semantic",
    "label": "Karpathy three-layer design (raw/wiki/schema)",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1343,7 +1343,7 @@
    "rationale": "Karpathy's design is three layers: a raw folder of sources the AI leaves untouched; a wiki layer the AI owns and keeps cross-links honest; and a schema file telling the model how the wiki is laid out. Kept alive by three operations: ingest, query, lint."
   },
   {
-   "id": "yt22iy_ingest_query_lint_ops",
+   "id": "yt22iy_ingest_query_lint_ops","_origin":"semantic",
    "label": "ingest / query / lint operations",
    "file_type": "concept",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1355,7 +1355,7 @@
    "rationale": "Ingest pulls in new sources and updates every page they touch; query searches the wiki and answers with citations; lint runs a health check for contradictions, dead pages, and stale claims."
   },
   {
-   "id": "yt22iy_lint_maintenance_pass",
+   "id": "yt22iy_lint_maintenance_pass","_origin":"semantic",
    "label": "lint / weekly maintenance pass",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1367,7 +1367,7 @@
    "rationale": "The biggest crack: Karpathy built a cleanup (lint) pass into the design on purpose and almost every tutorial skips it. Five minutes a week reading what the agent wrote, pruning stale pages and killing contradictions, is the rent \u2014 skip it and the whole thing decays into noise."
   },
   {
-   "id": "yt22iy_memex_vannevar_bush",
+   "id": "yt22iy_memex_vannevar_bush","_origin":"semantic",
    "label": "Memex (Vannevar Bush, 1945) lineage",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1379,7 +1379,7 @@
    "rationale": "Karpathy traces the idea to Vannevar Bush's 1945 Memex \u2014 the dream of linked trails between documents where the links matter as much as the pages. We just lacked a tool patient enough to maintain them; now the model does that upkeep for free."
   },
   {
-   "id": "yt22iy_crack_scale",
+   "id": "yt22iy_crack_scale","_origin":"semantic",
    "label": "crack: scale degrades navigation",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1391,7 +1391,7 @@
    "rationale": "A vault of 50 tidy notes feels like magic; 2,000 notes becomes a search problem again because the model spends its context navigating structure instead of answering. The graph softens this but doesn't erase it."
   },
   {
-   "id": "yt22iy_crack_confident_fiction",
+   "id": "yt22iy_crack_confident_fiction","_origin":"semantic",
    "label": "crack: confident fiction (fabricated notes)",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
@@ -1403,7 +1403,7 @@
    "rationale": "When writing up notes the assistant fills gaps with things you never said, in your own voice. The fix is a blunt instruction: 'do not add anything I didn't write' \u2014 without it, the second brain invents memories."
   },
   {
-   "id": "yt22iy_crack_feedback_loops",
+   "id": "yt22iy_crack_feedback_loops","_origin":"semantic",
    "label": "crack: feedback loops (AI quoting AI)",
    "file_type": "rationale",
    "source_file": "yt-22iy2mDFiF8.txt",
