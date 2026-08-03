@@ -158,6 +158,60 @@ extended every time a source is ingested:
   `kb-label` does. (`--missing-only` is only correct when community numbering is
   stable, which it never is after a merge.)
 
+### Merge N-ARY, never pairwise (#120)
+
+`merge-graphs` takes **N paths in one call** — that is what the bullet above means
+by "2+", and calling it that way is not an optimisation, it is the correctness
+requirement. `prefix_graph_for_global` (`build.py:1449`) prefixes every input
+unconditionally with `<repo_tag>::` and has **no already-prefixed guard**, so
+feeding the accumulator back in once per source re-prefixes everything already
+merged.
+
+Measured 2026-08-03, before and after, on the same repo:
+
+| | pairwise loop | one N-ary call |
+|---|---|---|
+| node-id `::` depth | 1–22, mode 10 | **1–2** |
+| duplicate-prefix waste | 184 MB, **33% of the file** | **0.00%** |
+
+Depth 2 is the floor, not a leak: one prefix from the corpus composition, one from
+the final self-merge that runs after the base snapshot. `kb_setup.graph._merge_sources_into`
+is the only place this is spelled; `tests/test_merge_prefixes_once.py` holds the
+unit, integration and control arms.
+
+### Growing the corpus — the ladder, cheapest rung first
+
+The 512 MiB `_MAX_GRAPH_FILE_BYTES` is a **soft, per-file memory-bomb guard**, not
+an architectural ceiling: `_max_graph_file_bytes()` honours `GRAPHIFY_MAX_GRAPH_BYTES`
+(bytes, or a binary `MB`/`GB` suffix), re-read on every call. This repo sets `1GB`
+in `mise.toml [env]`. Measured cost of a parse: **3.7x the file size in peak RSS**
+(557,996,319 bytes → 2,068,955,136 RSS, 1.6 s).
+
+⚠️ **mise `[env]` does not reach a bare `graphify …` typed at a shell** — `command -v
+graphify` resolves to the raw `mise/installs/…/bin` dir, not a shim. Use
+`mise exec -- graphify explain …` while the aggregate is above the stock default.
+
+Raising the cap is a **bridge, never a strategy** — a cap raised once per ingestion
+is a ratchet. Since #120 removed the superlinear `O(sources x edges x len(prefix))`
+term, growth is **linear in ingested bytes**, which makes *what* we ingest the only
+lever that still matters. In order:
+
+1. **Ingestion intent** — do not pay AST for a repo pinned to track a version.
+   Measured: the 13 toolchain pins are **266 MB, 49%** of all sub-graph bytes
+   (`codex` alone 133 MB) against `graphify`'s 11 MB. See #123, #81, and
+   `docs-mirror-is-the-ingestion-path`: *never pin a tool's own repo `kind = code`
+   to get its docs.*
+2. **`kind = docs`** — skips a guaranteed-empty AST pass over a docs mirror.
+3. **`scope = study`** — fully ingested, routed to `study-graph.json`, out of the
+   ranked corpus.
+4. **Federate (#130) or push to a graph DB** — `push_to_neo4j()` /
+   `push_to_falkordb()` / `--push <uri>` are native. Measured 2026-08-03: the merged
+   aggregate has **0 cross-source edges of 815,481** across 40 namespaces
+   (control-armed — an injected crossing moves the count to 1), because
+   `merge-graphs` namespaces each input before `compose`. So federation costs
+   nothing in recall. It is still last: it is a retrieval rewrite, while rung 1 is a
+   manifest field.
+
 ## Work memory (the self-learning loop) — USE IT
 
 Two verbs turn query outcomes into durable, graph-aware lessons. Record load-bearing

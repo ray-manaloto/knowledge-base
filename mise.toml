@@ -98,6 +98,44 @@ HK_MISE = "1"
 # applies — the corpus inherently contains secret-LIKE strings but is never committed.
 GITLEAKS_CONFIG = "{{config_root}}/.gitleaks.toml"
 
+# graphify refuses to READ a graph.json above this cap (`security.py`
+# `_max_graph_file_bytes`, default 512 MiB), so exceeding it does not degrade the
+# corpus — it makes the whole aggregate graph UNQUERYABLE, `explain`/`path`/
+# `query` included. That happened 2026-08-03 at 532.1 MiB.
+#
+# Set HERE and not in `clean_env()` because mise resolves it for every `mise run
+# kb-*` task AND for `mise exec`, whereas a python-side default would cover only
+# subprocesses kb_setup itself spawns.
+#
+# It does NOT reach a bare `graphify …` typed at a shell — control-armed
+# 2026-08-03, both directions: `mise env` and `mise exec -- sh -c 'echo $VAR'`
+# both show `1GB`, while the same shell and a fresh `zsh -lc` both show it empty.
+# Cause: `command -v graphify` resolves to
+# `~/.local/share/mise/installs/pipx-graphifyy/<ver>/bin/graphify` — the raw
+# INSTALL DIR, not a mise shim — so no mise env is applied. That is the same
+# PATH-ordering defect `kb-currency-check` step 1 was built for (CLAUDE.md
+# records it at 0.9.23; it is now at 0.9.31), and the same reason
+# `graphify_env.graphify_exe()` resolves through `mise which` instead of PATH.
+# So: the read-only introspection `hook_guard` allows direct
+# (`explain`/`path`/`god-nodes`) must be invoked as `mise exec -- graphify …`
+# whenever the aggregate is above 512 MiB. Below it, bare calls work either way —
+# which is the real argument for keeping the aggregate under the stock default
+# rather than living on this override.
+#
+# 1GB, chosen from a measurement rather than a guess: parsing the 557,996,319-byte
+# graph peaked at 2,068,955,136 bytes RSS — 3.7x the file, in 1.6s. So a 1 GiB
+# graph costs ~3.8 GiB to parse (plus networkx on top), which is survivable on a
+# 16 GiB host and not merely on this 96 GiB one. Binary suffix: graphify reads
+# `GB` as 1024^3.
+#
+# THIS IS A BRIDGE, NOT A GROWTH STRATEGY. Measured the same day: 184 MB (33%) of
+# that file was duplicated `repo::` prefix from #120 — the pairwise merge loop
+# re-prefixing its own accumulator once per source. Fixing that returns the
+# aggregate to ~356 MiB, back UNDER the stock default. A cap raised once per
+# ingestion is not a guard, it is a ratchet; the durable answer is #130
+# (federate across per-source graphs instead of merging into one file).
+GRAPHIFY_MAX_GRAPH_BYTES = "1GB"
+
 # ---------------------------------------------------------------------------
 # Lint / test gates (thin wrappers; logic lives in hk.pkl and python/)
 # ---------------------------------------------------------------------------

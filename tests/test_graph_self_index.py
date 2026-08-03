@@ -25,6 +25,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from conftest import apply_merge, merge_recorder
 from kb_setup import graph
 from kb_setup import manifest as mf
 from kb_setup.currency import config, sync
@@ -62,29 +63,31 @@ def _run_build(monkeypatch, tmp_path: Path, run=None) -> list[list[str]]:
     reaches `merge-graphs` is a claim about the built artifact.
     """
     calls: list[list[str]] = []
-    # TWO manifests deliberately: `build()` seeds graph.json from the first
-    # code-bearing source and only `merge-graphs` the REST, so a single-manifest
-    # fixture shells out to nothing and the control arm below would fail at HEAD
-    # for a reason that has nothing to do with what it checks.
+    # TWO manifests deliberately. `_merge_sources_into` COPIES a lone input —
+    # `merge-graphs` requires two paths — so a single-manifest fixture shells out
+    # to nothing and the control arm below would fail at HEAD for a reason that
+    # has nothing to do with what it checks. (Before #120 the same requirement
+    # came from a different mechanism: the first source seeded and only the rest
+    # were merged.)
     _manifest(tmp_path, "aaa-seed")
     _manifest(tmp_path, "zzz-merged")
     (tmp_path / "sources" / "extractions").mkdir(parents=True, exist_ok=True)
 
-    # The seed sub-graph is written for real and `shutil.copy` is NOT stubbed, so
-    # graph.json and the base snapshot are actual files. That is what lets the
-    # base-snapshot tests below assert on CONTENT rather than on "was copy called".
-    seed_sub = tmp_path / "sources" / "aaa-seed" / "graphify-out" / "graph.json"
-    seed_sub.parent.mkdir(parents=True, exist_ok=True)
-    seed_sub.write_text('{"nodes": [], "edges": [], "seed": true}', encoding="utf-8")
+    # Both sub-graphs are written for real, with distinguishable bytes, and the
+    # `_run` stub models `merge-graphs` on disk (`apply_merge`). That is what lets
+    # the base-snapshot tests below assert on CONTENT rather than on "was copy
+    # called" — the role `shutil.copy` of the seed used to play.
+    for name, marker in (("aaa-seed", "seed"), ("zzz-merged", "merged")):
+        sub = tmp_path / "sources" / name / "graphify-out" / "graph.json"
+        sub.parent.mkdir(parents=True, exist_ok=True)
+        sub.write_text(f'{{"nodes": [], "edges": [], "{marker}": true}}', encoding="utf-8")
 
     monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
     monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
-    monkeypatch.setattr(
-        graph, "_run", run or (lambda argv, _root: calls.append([str(a) for a in argv]))
-    )
+    monkeypatch.setattr(graph, "_run", run or merge_recorder(calls))
 
     graph.build(tmp_path)
     return calls
@@ -234,7 +237,10 @@ def test_build_snapshots_a_base_that_excludes_our_own_code(monkeypatch, tmp_path
 
     def _watch_run(argv: list[str], _root: Path) -> None:
         joined = " ".join(str(a) for a in argv)
+        # Recorded BEFORE the merge is applied: the question is whether the base
+        # existed when the call was ISSUED.
         existed_at.append((joined, base.is_file()))
+        apply_merge(argv)
 
     monkeypatch.setattr(graph, "_run", _watch_run)
     _run_build(monkeypatch, tmp_path, run=_watch_run)
