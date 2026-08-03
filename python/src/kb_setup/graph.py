@@ -637,9 +637,33 @@ def build(repo_root: Path) -> None:
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
     gpy = graphify_python(repo_root)
-    chunks = sorted((sources / "extractions").glob("*.json"))
-    print(f"[kb-build] merging {len(chunks)} committed doc extraction(s)")
-    for chunk in chunks:
+    chunk_paths = sorted((sources / "extractions").glob("*.json"))
+
+    # VALIDATE BEFORE MERGING — fail closed. Added 2026-08-03 after a cold review
+    # found the validator was reachable only from `mise run kb-validate-chunks`,
+    # i.e. only when a human remembered. That is the same defect this repo had
+    # just filed as #134: `kb-validate-chunks` had evidently NEVER been run over
+    # the committed set, and 37 dangling edges had been sitting in two chunks
+    # through every build. A rule added to a validator nothing calls protects
+    # nothing — which is exactly what the `_origin` marker would have been.
+    #
+    # Here rather than at assemble time because assembly is not the only door:
+    # a chunk can be hand-edited, or arrive from a branch, and `build()` is the
+    # one path every committed chunk must pass through.
+    from kb_setup import chunks as _chunks
+
+    bad = _chunks.validate_files(chunk_paths)
+    problems = {p: issues for p, issues in bad.items() if issues}
+    if problems:
+        lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
+        raise SystemExit(
+            f"{len(problems)} extraction chunk(s) failed validation — refusing to merge:\n"
+            + "\n".join(lines)
+            + "\nRun `mise run kb-validate-chunks -- sources/extractions/*.json` for the full list."
+        )
+
+    print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
+    for chunk in chunk_paths:
         name = chunk.stem.removesuffix("-docs")
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)

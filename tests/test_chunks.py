@@ -169,3 +169,120 @@ def test_the_marker_must_be_semantic_and_not_merely_present() -> None:
         f"a node marked _origin='ast' passed validation; issues were {issues}. That "
         f"is the exact state 0.9.32 left the 629 dropped nodes in."
     )
+
+
+def _valid_chunk_file(path, nid: str = "a") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(_chunk([_node(nid)], [])), encoding="utf-8")
+
+
+def test_kb_build_refuses_a_chunk_that_fails_validation(monkeypatch, tmp_path) -> None:
+    """The consumer must enforce it — a validator only `kb-validate-chunks` calls is not a gate.
+
+    THE DEFECT THIS EXISTS FOR, found by the cold lane. `chunks.validate` was
+    reachable only from `mise run kb-setup validate-chunks`, i.e. only when a
+    human remembered — and #134 established on the same day that nobody had:
+    37 dangling edges had ridden through every build in two committed chunks.
+    So the `_origin` rule added beside it would have protected nothing.
+
+    Realistic break: an extraction agent omits `_origin`, or emits an edge whose
+    target it never created. Both are things agents demonstrably do here.
+
+    The graphify runner is replaced with a recorder that FAILS if reached: the
+    contract is refusal BEFORE the merge subprocess, not a non-zero exit after
+    it has already written to the graph.
+    """
+    from kb_setup import graph
+
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    (tmp_path / "sources" / "demo").mkdir(parents=True)
+    (tmp_path / "sources" / "demo.manifest").write_text(
+        "url = https://example.invalid/o/demo\nref = main\n"
+        "commit = 03853a019423ffb5c5082e24c39ac20e38a7cfb1\nkind = code\n",
+        encoding="utf-8",
+    )
+    sub = tmp_path / "sources" / "demo" / "graphify-out" / "graph.json"
+    sub.parent.mkdir(parents=True, exist_ok=True)
+    sub.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+
+    bad = _node("a")
+    del bad["_origin"]
+    (tmp_path / "sources" / "extractions" / "bad-docs.json").write_text(
+        json.dumps(_chunk([bad], [])), encoding="utf-8"
+    )
+
+    def _must_not_merge(argv: list, _root: object) -> None:
+        joined = " ".join(str(a) for a in argv)
+        if "_merge_docs" in joined:
+            pytest.fail(f"build() merged an invalid chunk instead of refusing: {joined}")
+
+    monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
+    monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
+    monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
+    monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
+    monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
+    monkeypatch.setattr(graph, "_run", _must_not_merge)
+
+    with pytest.raises(SystemExit) as exc:
+        graph.build(tmp_path)
+    assert "failed validation" in str(exc.value), (
+        f"build() exited for some other reason: {exc.value!r}"
+    )
+
+
+def test_kb_merge_refuses_a_chunk_that_fails_validation(monkeypatch, tmp_path) -> None:
+    """CONTROL ARM's sibling: `kb-merge` is the SHARPER door and had only an is-file check.
+
+    `build()` replays chunks that are already committed and reviewed; `kb-merge`
+    takes a FRESH one straight off an extraction agent — the input least likely
+    to be well-formed, and the one that used to reach the merge subprocess on
+    nothing more than "the path exists".
+    """
+    from kb_setup import graphify_ops
+
+    bad = _node("a")
+    del bad["_origin"]
+    p = tmp_path / "fresh.json"
+    p.write_text(json.dumps(_chunk([bad], [])), encoding="utf-8")
+
+    def _must_not_spawn(*_a: object, **_k: object) -> None:
+        pytest.fail("merge_chunk spawned the merge subprocess for an invalid chunk")
+
+    monkeypatch.setattr(graphify_ops.subprocess, "run", _must_not_spawn)
+    assert graphify_ops.merge_chunk(tmp_path, str(p)) == 2
+
+
+def test_kb_merge_still_accepts_a_valid_chunk(monkeypatch, tmp_path) -> None:
+    """CONTROL ARM: refusing everything would satisfy both tests above for free.
+
+    Without this, `merge_chunk` returning 2 unconditionally — the cheapest wrong
+    fix — passes the sibling test and breaks every real ingestion.
+    """
+    from kb_setup import graphify_ops
+
+    p = tmp_path / "good.json"
+    _valid_chunk_file(p)
+    spawned: list[bool] = []
+
+    class _OK:
+        returncode = 0
+
+    monkeypatch.setattr(graphify_ops, "graphify_python", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(
+        graphify_ops.subprocess, "run", lambda *_a, **_k: (spawned.append(True), _OK())[1]
+    )
+    graphify_ops.merge_chunk(tmp_path, str(p))
+
+    # Asserts REACHABILITY, not the return code, and that is the honest level.
+    # `merge_chunk` also re-derives the prose graph afterwards and returns 1 when
+    # that fails — which it does here, because a tmp_path has no built
+    # `graphify-out/graph.json`. Asserting `rc == 0` would therefore be asserting
+    # that an unrelated post-merge step succeeded, and the only way to make it
+    # pass would be to stub that step too — piling fixture on fixture to test
+    # something this case is not about. What the gate owes is: a valid chunk
+    # REACHES the merge. That is exactly what `spawned` records.
+    assert spawned, (
+        "a VALID chunk was refused before the merge subprocess — the gate is too "
+        "greedy, and `merge_chunk` returning 2 unconditionally would pass the "
+        "sibling refusal test while breaking every real ingestion"
+    )

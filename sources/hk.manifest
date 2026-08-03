@@ -20,7 +20,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/hk
-ref = v1.52.0
-commit = 849757505dfc73cfba8f1f110c67d1dad99dfb2c
+ref = v1.54.0
+commit = 75a084aafb00e5bc457a4e3a1305e7e67b892405
 kind = code
 added = 2026-08-02

@@ -548,6 +548,23 @@ re-derive it."""
 mise_key = "hk"
 binary = "hk"
 github = "jdx/hk"
+# The ingested corpus must describe the release we actually run — the same
+# invariant `[tool.graphify]` states above, and it is NOT optional here just
+# because these manifests are newer.
+#
+# ⚠️ ADDED 2026-08-03 AFTER A COLD REVIEW CAUGHT ITS ABSENCE. `sources/hk.manifest`
+# landed 2026-08-02, but this table was never told about it — and
+# `sync.py`'s manifest check turns an absent `ToolSpec.manifest` into **SKIP with
+# the reason "this repo pins no source manifest for the tool"**. That reason was
+# true when written and became false the day the manifest landed, so the checker
+# reported a clean SKIP over a real drift: this repo bumped hk in `mise.toml`
+# while the manifest still pinned the previous release, and `kb-build` went on
+# extracting the OLD source into the corpus.
+#
+# That is precisely the DRIFT/SKIP/OK collapse this engine refuses everywhere
+# else, arriving through the one door nothing was watching: a SKIP whose stated
+# reason is a fact about the repo that can silently stop being true.
+manifest = "sources/hk.manifest"
 
 [[tool.hk.watch]]
 kind = "local"
@@ -618,6 +635,23 @@ the new binary agrees with the new schemas — which is this item's whole point.
 mise_key = "fnox"
 binary = "fnox"
 github = "jdx/fnox"
+# The ingested corpus must describe the release we actually run — the same
+# invariant `[tool.graphify]` states above, and it is NOT optional here just
+# because these manifests are newer.
+#
+# ⚠️ ADDED 2026-08-03 AFTER A COLD REVIEW CAUGHT ITS ABSENCE. `sources/fnox.manifest`
+# landed 2026-08-02, but this table was never told about it — and
+# `sync.py`'s manifest check turns an absent `ToolSpec.manifest` into **SKIP with
+# the reason "this repo pins no source manifest for the tool"**. That reason was
+# true when written and became false the day the manifest landed, so the checker
+# reported a clean SKIP over a real drift: this repo bumped fnox in `mise.toml`
+# while the manifest still pinned the previous release, and `kb-build` went on
+# extracting the OLD source into the corpus.
+#
+# That is precisely the DRIFT/SKIP/OK collapse this engine refuses everywhere
+# else, arriving through the one door nothing was watching: a SKIP whose stated
+# reason is a fact about the repo that can silently stop being true.
+manifest = "sources/fnox.manifest"
 
 [[tool.fnox.watch]]
 kind = "local"
