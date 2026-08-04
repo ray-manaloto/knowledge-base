@@ -48,18 +48,30 @@ continue with no gaps?* If the answer is no, fix that before step 7.
 
 ## 1. Snapshot the working state
 
-Gather, don't recall:
+Gather, don't recall — **one task, not four commands** (#144):
 
 ```bash
-git status --short
-git branch --show-current
-git log --oneline -8
-gh pr list --head "$(git branch --show-current)" --json number,title,state
+mise run kb-session-state
 ```
 
-Note the branch, the staged/unstaged/untracked split, any open PR and its state
-(`gh pr checks <n>`), and the in-flight task from the previous
-`.agent/plans/session-*.md`.
+It prints the branch, the staged/unstaged/untracked split, the recent commits,
+and the open PR with its check state, already shaped like a handoff bullet. Four
+hand-run commands reformatted by hand is four chances to transcribe something,
+and this repo has already paid for that twice — a `file:line` read off a `sed`
+window by eye (`:1836` for `:1830`, propagated into three files) and a PR number
+read out of a redacted `mise run` log (`pull/[redacted]59`).
+
+**Read the block from an unredacted run.** mise's output redaction masks digits
+mid-number, so a branch called `feat/144-…` prints as `feat/[redacted]44-…`.
+Copy the block from `uv run kb-setup session-state` instead — same command, no
+redaction layer — or paste from a run whose digits you have checked.
+
+**`COULD NOT ASK` is not `none`.** If the PR line says the former, `gh` was
+unreachable, rate-limited or unauthenticated — write that into the handoff as
+unknown, never as "0 open PRs". A claim nobody checked is the exact thing
+`mise run kb-handoff-check` exists to catch in step 6.
+
+Then add the in-flight task from the previous `.agent/plans/session-*.md`.
 
 Also inventory **session-local runtime state**: background tasks and agents
 still running, and any scheduled wakeups or crons created this session. Stop
