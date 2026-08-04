@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from kb_setup import handoff
+from kb_setup import gates, handoff
 
 _MISE = "[tasks.kb-build]\nrun = 'true'\n[tasks.lint]\nrun = 'true'\n"
 
@@ -268,3 +268,227 @@ def test_the_report_names_every_verdict_even_at_zero(tmp_path: Path):
     report = handoff.render(handoff.check(root, "see `docs/a.md`\n"), source="h.md")
     for word in ("OK", "ambiguous", "unverifiable", "broken"):
         assert word in report
+
+
+# ------------------------------------------------------- gate claims ----
+#
+# #147. The one check in `/clear-prep` step 6 that had nothing durable to read:
+# the record #146 writes is what these read it against.
+#
+# The split that decides everything here is FAIL vs UNVERIFIABLE. A claim the
+# record CONTRADICTS is wrong and exits 1; a claim the record cannot speak to —
+# because there is none at that commit, or none for that gate — is unverifiable
+# and exits 0. Collapsing the second into the first would make the checker fail
+# on every fresh clone, since `.agent/` is machine-local and a clone has no
+# records at all. Collapsing it the other way would make a missing record read
+# as a pass, which is the false green the ticket exists to prevent.
+
+_GATE_MISE = "".join(
+    f"[tasks.{t}]\nrun = 'true'\n" for t in ("kb-build", "lint", "test", "kb-gates", "lint-docs")
+)
+
+_A = "a" * 40
+_B = "b" * 40
+
+
+def _gate_repo(tmp_path: Path, rows: list[gates.GateResult] | None = None, sha: str = _A) -> Path:
+    """A fixture repo whose `mise.toml` declares gates, plus one gate record."""
+    (tmp_path / "mise.toml").write_text(_GATE_MISE, encoding="utf-8")
+    if rows is not None:
+        gates.record(tmp_path, rows, sha=sha)
+    return tmp_path
+
+
+def _row(
+    task: str, rc: int | None = 0, sha: str | None = _A, *, dirty: bool | None = False
+) -> gates.GateResult:
+    return gates.GateResult(task, rc, sha, "t", dirty=dirty)
+
+
+def _gate_findings(root: Path, text: str) -> list[handoff.Finding]:
+    return [f for f in handoff.check(root, text) if f.check == "gate"]
+
+
+def test_a_gate_claim_the_record_confirms_passes(tmp_path: Path):
+    """Criterion 2, and the positive control for every failure below."""
+    root = _gate_repo(tmp_path, [_row("lint")])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.OK
+
+
+def test_a_gate_claim_the_record_contradicts_fails(tmp_path: Path):
+    """The claim says green, the record says red. The record wins."""
+    root = _gate_repo(tmp_path, [_row("lint", rc=1)])
+    (f,) = _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n"))
+    assert "rc=1" in f.detail
+
+
+def test_a_gate_recorded_as_not_run_never_passes_a_claim(tmp_path: Path):
+    """`rc: null` is "no result was produced" — it is not a pass (#146)."""
+    root = _gate_repo(tmp_path, [_row("lint", rc=None, sha=None, dirty=None)])
+    (f,) = _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n"))
+    assert "no result" in f.detail
+
+
+def test_a_claim_with_no_record_at_that_commit_is_unverifiable_not_wrong(tmp_path: Path):
+    """Criterion 4. A fresh clone has no records; that is not evidence of a lie."""
+    root = _gate_repo(tmp_path)
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.UNVERIFIABLE
+    assert _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")) == []
+
+
+def test_a_record_at_a_different_commit_does_not_vouch_for_the_claim(tmp_path: Path):
+    """Criterion 3 and 5 — the REJECTING direction, at the file level.
+
+    `lint rc=0` is recorded, truthfully, at another commit. A checker that
+    searched for "a record saying lint passed" would pass this, and that is
+    exactly the stale exit code vouching for code it never saw.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", sha=_B)], sha=_B)
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is not handoff.Verdict.OK
+    assert _B[:12] in f.detail
+
+
+def test_a_row_recorded_against_a_different_commit_fails(tmp_path: Path):
+    """Criterion 3 at its sharpest: the FILE is this commit's, the ROW is not.
+
+    #146 reads HEAD per gate, so an amend mid-run leaves a row bound to another
+    commit inside a record keyed to this one. That row's exit code is about code
+    the claimed commit never contained, and nothing but this check can see it.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", sha=_B)])
+    (f,) = _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n"))
+    assert _B[:12] in f.detail
+
+
+def test_a_claim_naming_no_commit_is_unverifiable(tmp_path: Path):
+    """Most historical handoffs claim `lint rc=0` and name no commit at all."""
+    root = _gate_repo(tmp_path, [_row("lint")])
+    (f,) = _gate_findings(root, "- `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.UNVERIFIABLE
+    assert "no commit" in f.detail
+
+
+def test_a_claim_whose_block_names_two_commits_is_ambiguous(tmp_path: Path):
+    root = _gate_repo(tmp_path, [_row("lint")])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}` and `{_B[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.AMBIGUOUS
+
+
+def test_a_gate_the_record_does_not_cover_is_unverifiable(tmp_path: Path):
+    """`lint-docs` is a real task and is not in `GATE_TASKS`; that is not a defect."""
+    root = _gate_repo(tmp_path, [_row("lint")])
+    findings = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint-docs` rc=0\n")
+    assert [f.verdict for f in findings] == [handoff.Verdict.UNVERIFIABLE]
+
+
+def test_a_claim_recorded_over_a_dirty_tree_is_reported_but_does_not_fail(tmp_path: Path):
+    """The gate ran, and it did not run on that commit. A caveat, not a lie.
+
+    Gating before you commit is the normal rhythm here, so FAIL would be a
+    false-positive machine — and silence would let "green at `<sha>`" stand for
+    a tree that was never `<sha>`.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", dirty=True)])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.AMBIGUOUS
+    assert "uncommitted" in f.detail
+
+
+def test_a_claim_whose_row_could_not_read_head_is_unverifiable(tmp_path: Path):
+    """The gate ran and is bound to no commit, so it can vouch for none."""
+    root = _gate_repo(tmp_path, [_row("lint", sha=None)])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.UNVERIFIABLE
+    assert "bound to no commit" in f.detail
+
+
+def test_an_unreadable_record_is_unverifiable(tmp_path: Path):
+    root = _gate_repo(tmp_path)
+    path = root / gates.GATES_DIR / f"gates-{_A}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not json", encoding="utf-8")
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.UNVERIFIABLE
+    assert "could not read" in f.detail
+
+
+def test_a_runner_claim_passes_when_every_recorded_gate_passed(tmp_path: Path):
+    """`mise run kb-gates` **rc=0** asserts something about the whole record."""
+    root = _gate_repo(tmp_path, [_row("lint"), _row("test")])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=0**\n")
+    assert f.verdict is handoff.Verdict.OK
+
+
+def test_a_runner_claim_fails_when_a_recorded_gate_did_not_pass(tmp_path: Path):
+    root = _gate_repo(tmp_path, [_row("lint"), _row("test", rc=1)])
+    (f,) = _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=0**\n"))
+    assert "test" in f.detail
+
+
+def test_a_runner_claim_fails_when_a_gate_was_never_reached(tmp_path: Path):
+    """A `--stop` record is partial by construction; unreached is not neutral."""
+    root = _gate_repo(tmp_path, [_row("lint"), _row("test", rc=None, sha=None, dirty=None)])
+    assert _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=0**\n"))
+
+
+def test_a_runner_claim_of_failure_is_checked_too(tmp_path: Path):
+    """Control arm: rc=1 claimed over an all-green record is also a mismatch."""
+    root = _gate_repo(tmp_path, [_row("lint"), _row("test")])
+    assert _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=1**\n"))
+
+
+def test_a_runner_claim_of_failure_passes_when_a_gate_failed(tmp_path: Path):
+    root = _gate_repo(tmp_path, [_row("lint"), _row("test", rc=1)])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=1**\n")
+    assert f.verdict is handoff.Verdict.OK
+
+
+def test_a_runner_claim_over_an_empty_record_is_unverifiable(tmp_path: Path):
+    """Zero gates all passed, vacuously. Reading that as green is the false one."""
+    root = _gate_repo(tmp_path, [])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=0**\n")
+    assert f.verdict is handoff.Verdict.UNVERIFIABLE
+
+
+def test_a_token_that_is_not_a_declared_task_is_not_a_gate_claim(tmp_path: Path):
+    """`timeout 60 …` returns rc=127` — real prose, and a claim about nothing."""
+    root = _gate_repo(tmp_path, [_row("lint")])
+    assert _gate_findings(root, "- `timeout 60 x` returns rc=127 on macOS\n") == []
+
+
+def test_a_broken_gate_claim_exits_one(tmp_path: Path, capsys):
+    """The exit code, end to end — the property the whole check is for."""
+    root = _gate_repo(tmp_path, [_row("lint", rc=1)])
+    (root / ".agent" / "plans").mkdir(parents=True, exist_ok=True)
+    (root / ".agent" / "plans" / "session-x.md").write_text(
+        f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n", encoding="utf-8"
+    )
+    assert handoff.main([], root) == 1
+    assert "gate" in capsys.readouterr().out
+
+
+def test_an_unverifiable_gate_claim_exits_zero(tmp_path: Path, capsys):
+    """Control arm for the exit code: reported, and not a failure."""
+    root = _gate_repo(tmp_path)
+    (root / ".agent" / "plans").mkdir(parents=True, exist_ok=True)
+    (root / ".agent" / "plans" / "session-x.md").write_text(
+        f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n", encoding="utf-8"
+    )
+    assert handoff.main([], root) == 0
+    assert "gate" in capsys.readouterr().out
+
+
+def test_an_unreached_gate_is_not_described_as_a_tree_of_unknown_cleanliness(tmp_path: Path):
+    """A row padded as "not run" carries `dirty: null` because nothing was asked.
+
+    Reading that as "could not tell whether the tree was clean" describes a gate
+    that never happened. Reachable on any `--stop` record, which is what the ship
+    path writes every time — so this is the common case, not an edge one.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", rc=1), _row("test", rc=None, sha=None, dirty=None)])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=1**\n")
+    assert f.verdict is handoff.Verdict.OK
+    assert "clean" not in f.detail

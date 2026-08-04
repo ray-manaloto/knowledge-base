@@ -327,6 +327,134 @@ def record(repo_root: Path, results: list[GateResult], *, sha: str) -> Path:
     return path
 
 
+#: The task that RUNS the gates rather than being one. A handoff claiming
+#: `mise run kb-gates` **rc=0** is asserting something about every gate in the
+#: record, not about a gate by this name — see :meth:`Record.summarise`.
+RUNNER_TASK = "kb-gates"
+
+#: Filename shape of a record, used to pick this directory's own artifacts out
+#: of whatever else is beside them. A stray file must not become an ambiguous
+#: match, which would make the checker refuse for a reason the author cannot see.
+_RECORD_GLOB = "gates-*.json"
+_RECORD_PREFIX = "gates-"
+
+
+@dataclass(frozen=True)
+class RecordedGate:
+    """One gate as READ BACK from a record, rather than as produced by a run.
+
+    A separate type from :class:`GateResult` on purpose. That one is what this
+    module observed and every field is trustworthy; this one is parsed from a
+    file on disk that any editor could have touched, so its fields are typed as
+    the JSON permits and validated on the way in. Annotating untrusted JSON with
+    the optimistic type is exactly how callers stop checking it.
+    """
+
+    task: str
+    rc: int | None
+    sha: str | None
+    dirty: bool | None
+
+
+@dataclass(frozen=True)
+class Record:
+    """One run's record, read back from `.agent/kb/gates/gates-<sha>.json`.
+
+    ``sha`` is the file's own key — HEAD when the run STARTED. Each row carries
+    the HEAD its own gate ran against, and the two can differ; a reader checking
+    a claim must use the ROW's, which is why both survive the parse.
+    """
+
+    sha: str
+    path: Path
+    gates: tuple[RecordedGate, ...]
+
+    def row(self, task: str) -> RecordedGate | None:
+        """The recorded row for ``task``, or None when the run did not cover it."""
+        return next((r for r in self.gates if r.task == task), None)
+
+    def summarise(self) -> tuple[int, int]:
+        """``(passed, not-passed)`` over every row — what a runner claim asserts.
+
+        A gate with no result counts as not passed, the same way :meth:`GateRun.
+        all_passed` counts it. A record whose unreached gates were read as
+        neutral would let a `--stop` run that never reached half its list vouch
+        for a claim that everything was green.
+        """
+        passed = sum(1 for r in self.gates if r.rc == 0)
+        return passed, len(self.gates) - passed
+
+
+def _parse(path: Path) -> Record | None:
+    """A record read from ``path``, or None when the bytes are not one.
+
+    Every field is checked rather than trusted. `json.loads` succeeding says the
+    file is JSON, not that it is a gate record — and a `"gates": "lint"` that
+    iterates as characters would produce a record of one-letter task names that
+    matches nothing and reads as "the run did not cover that gate".
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, UnicodeDecodeError, json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    rows = data.get("gates")
+    sha = data.get("sha")
+    if not isinstance(rows, list) or not isinstance(sha, str):
+        return None
+    parsed: list[RecordedGate] = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("task"), str):
+            return None
+        parsed.append(
+            RecordedGate(
+                task=row["task"],
+                rc=row["rc"] if isinstance(row.get("rc"), int) else None,
+                sha=row["sha"] if isinstance(row.get("sha"), str) else None,
+                # `is True` / `is False`, not `bool(...)`: the third state is
+                # "could not ask", and coercing an absent or malformed value to
+                # False would report an unknown tree as a clean one — the
+                # collapse this field was added to prevent.
+                dirty=row["dirty"] if isinstance(row.get("dirty"), bool) else None,
+            )
+        )
+    return Record(sha=sha, path=path, gates=tuple(parsed))
+
+
+def find_record(repo_root: Path, sha: str) -> tuple[Record | None, str]:
+    """The record for ``sha``, or ``(None, why)``. ``sha`` may be abbreviated.
+
+    The `(value, reason)` shape is `review.receipt_state`'s, and the reason is
+    never empty when the value is None — the composer renders it verbatim, so a
+    silent None would become an unexplained verdict.
+
+    A record at ANOTHER commit is never returned, and the reason NAMES the
+    commits that do have one. "Not found" alone, said in a directory visibly
+    full of `gates-*.json`, invites the reader to reach for the nearest one —
+    which is the stale exit code vouching for code it never saw that #147 exists
+    to prevent, arriving via the report instead of via the code.
+    """
+    wanted = review.safe_sha(sha).lower()
+    if not wanted:
+        return None, "the claim names no commit"
+    present = sorted((repo_root / GATES_DIR).glob(_RECORD_GLOB))
+    keys = {p: p.name[len(_RECORD_PREFIX) : -len(".json")].lower() for p in present}
+    matches = [p for p, key in keys.items() if key.startswith(wanted)]
+    if not matches:
+        others = sorted({key[:_SHA_ABBREV] for key in keys.values()})
+        seen = f" — records exist at {', '.join(others)}" if others else ""
+        return None, f"no gate record at {wanted[:_SHA_ABBREV]}{seen}"
+    if len(matches) > 1:
+        return None, (
+            f"{len(matches)} records match {wanted[:_SHA_ABBREV]} — cite more of the commit"
+        )
+    parsed = _parse(matches[0])
+    if parsed is None:
+        return None, f"could not read the gate record at {matches[0].name}"
+    return parsed, ""
+
+
 def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     """The report: one line per gate, the counts, and where the record went."""
     lines = [f"gates at {sha[:_SHA_ABBREV]}"]

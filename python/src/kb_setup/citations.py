@@ -144,6 +144,48 @@ _LINE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
 #: still yields `lint` rather than a citation nothing declares.
 _TASK_RE = re.compile(r"\bmise run ([A-Za-z][A-Za-z0-9_:-]*(?:\.[A-Za-z0-9_:-]+)*)")
 
+#: `<task> rc=<n>` — a gate claim in the four spellings this repo's handoffs
+#: actually use: `` `mise run lint` **rc=0** ``, `` `mise run lint` → **rc=0** ``,
+#: `` `brain-audit` rc=0 ``, and a bare `lint rc=0`. The optional decoration
+#: between the task and its `rc=` is what makes one pattern cover all four; a
+#: pattern per spelling would have gone stale the first time someone wrote a
+#: fifth. `rc=` must be followed by DIGITS — `rc=$?` is prose about exit codes,
+#: not a claim to have one.
+_GATE_CLAIM_RE = re.compile(
+    r"`?(?:mise run )?(?P<task>[A-Za-z][A-Za-z0-9_-]*)`?"
+    r"[ \t]*(?:→[ \t]*)?\*{0,2}rc=(?P<rc>\d+)"
+)
+
+#: The DISTRIBUTIVE form: `Gates on `f3e233a`, all rc=0: <list of tasks>`. One
+#: phrase vouching for four gates, so skipping it would leave the highest-stakes
+#: claim in the corpus unchecked.
+#:
+#: The trailing colon is load-bearing, not punctuation-matching. Without it the
+#: parenthetical in `` `mise run kb-gates` **rc=0** (lint/test/brain-audit/eval
+#: all rc=0), `mise run lint-docs` `` — one real handoff line — swept up every
+#: later `mise run` on the line, manufacturing claims nobody wrote. A colon
+#: introduces a list; a closing paren trails one.
+_ALL_RC_RE = re.compile(r"\ball\b[^\n:]{0,40}?rc=(?P<rc>\d+)\*{0,2}[ \t]*:")
+
+#: Words that introduce :data:`_ALL_RC_RE` and name no task. Without this, the
+#: phrase `all rc=0` reads as a claim about a gate called `all` — a citation the
+#: composer would then report as undeclared, which is a true statement about a
+#: task that was never claimed.
+_DISTRIBUTIVE_WORDS: frozenset[str] = frozenset({"all"})
+
+#: A commit token: a code span that is hex and nothing else. Seven is git's own
+#: abbreviation floor and the length this repo's handoffs write.
+#:
+#: Deliberately unable to match `main`, `origin/main`, or a branch name — and
+#: `Gates on `main`, all rc=0` is a real handoff line. A claim bound to a branch
+#: is bound to nothing checkable, because the branch has moved since; reading it
+#: as a commit would be inventing the binding the whole check exists to demand.
+_COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
+
+#: A line that ENDS the block above it and starts a new one: a list item, a
+#: heading, a table row, or a block quote. Blank lines break a block too.
+_BLOCK_BREAK_RE = re.compile(r"^\s*(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|\||>)")
+
 
 @dataclass(frozen=True)
 class Span:
@@ -183,6 +225,28 @@ class TaskCitation:
     """A `mise run <name>` occurrence."""
 
     name: str
+    line: int
+
+
+@dataclass(frozen=True)
+class GateClaim:
+    """A claim that a named gate exited with a particular code.
+
+    ``shas`` is every commit token named in the claim's own BLOCK — the list
+    item, paragraph or table row it sits in — and it is a tuple rather than a
+    single value because 0, 1 and 2+ are three different answers. Zero is a
+    claim bound to no commit; two is a block whose binding is ambiguous. Both
+    are things the composer must be able to say, and a `str | None` can only
+    say one of them.
+
+    ``task`` is whatever token preceded the `rc=`, NOT a known gate. This module
+    cannot know which tasks this repo declares, and asking it to would move a
+    filesystem question into a text parser (#143). The composer filters.
+    """
+
+    task: str
+    rc: int
+    shas: tuple[str, ...]
     line: int
 
 
@@ -328,6 +392,77 @@ def path_citations(text: str) -> list[PathCitation]:
             )
         )
     return found
+
+
+def _blocks(stripped: str) -> list[tuple[int, int]]:
+    """Character bounds of each block in ``stripped`` — the claim-binding unit.
+
+    A block is one list item, paragraph, table row or block quote. It is the
+    unit because a handoff names commits everywhere — in gotchas, in review
+    tables, in its own header — so binding a gate claim to the nearest PRECEDING
+    sha in the document would let the paragraph above a gate list vouch for it.
+    A claim inherits only what its own block says.
+    """
+    lines = stripped.split("\n")
+    offsets: list[int] = []
+    pos = 0
+    for line in lines:
+        offsets.append(pos)
+        pos += len(line) + 1
+
+    bounds: list[tuple[int, int]] = []
+    start: int | None = None
+    for i, line in enumerate(lines):
+        if (not line.strip() or _BLOCK_BREAK_RE.match(line)) and start is not None:
+            bounds.append((offsets[start], offsets[i]))
+            start = None
+        if line.strip() and start is None:
+            start = i
+    if start is not None:
+        bounds.append((offsets[start], len(stripped)))
+    return bounds
+
+
+def gate_claims(text: str) -> list[GateClaim]:
+    """Every claim that a gate exited with a particular code.
+
+    Two forms, both real and both from this repo's committed handoffs: a DIRECT
+    `` `mise run lint` **rc=0** ``, and a DISTRIBUTIVE `all rc=0: <list>` whose
+    single phrase vouches for every task after it in the block.
+
+    A direct claim WINS over a distributive one for the same task in the same
+    block. That is not tidiness: `` `mise run kb-gates` **rc=0** (lint/test all
+    rc=0), `mise run lint-docs` **rc=0** `` would otherwise yield two claims on
+    `lint-docs` that happen to agree, and agreeing by luck is not verification.
+    """
+    stripped = strip_fences(text)
+    claims: list[GateClaim] = []
+    for start, end in _blocks(stripped):
+        body = stripped[start:end]
+        first_line = stripped.count("\n", 0, start) + 1
+
+        def line_of(offset: int, body: str = body, first_line: int = first_line) -> int:
+            return first_line + body.count("\n", 0, offset)
+
+        shas = tuple(
+            m.group("body") for m in _SPAN_RE.finditer(body) if _COMMIT_RE.match(m.group("body"))
+        )
+        claimed: set[str] = set()
+        for m in _GATE_CLAIM_RE.finditer(body):
+            task = m.group("task")
+            if task in _DISTRIBUTIVE_WORDS:
+                continue
+            claimed.add(task)
+            claims.append(GateClaim(task, int(m.group("rc")), shas, line_of(m.start())))
+        for phrase in _ALL_RC_RE.finditer(body):
+            rc = int(phrase.group("rc"))
+            for cite in _TASK_RE.finditer(body, phrase.end()):
+                name = cite.group(1)
+                if name in claimed:
+                    continue
+                claimed.add(name)
+                claims.append(GateClaim(name, rc, shas, line_of(cite.start())))
+    return claims
 
 
 def task_citations(text: str) -> list[TaskCitation]:

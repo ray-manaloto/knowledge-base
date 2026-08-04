@@ -13,6 +13,9 @@ module — and the exclusion cases outnumber the inclusion ones on purpose.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from kb_setup import citations
 
 # ------------------------------------------------------------ code spans ----
@@ -283,3 +286,148 @@ def test_a_task_name_with_trailing_junk_is_not_the_declared_task():
     """
     (t,) = citations.task_citations("run `mise run kb-build.typo` first\n")
     assert t.name != "kb-build"
+
+
+# ------------------------------------------------------------ gate claims ----
+#
+# Every case below is a phrasing that occurs in this repo's own committed
+# handoffs, not one invented for the test. `test_gate_claims_are_found_in_the
+# _real_handoff_corpus` is the arm that keeps it that way: a parser tuned to
+# fixtures alone is the dead detector this repo has already shipped once.
+
+
+def test_a_direct_gate_claim_is_extracted():
+    (c,) = citations.gate_claims("- `mise run lint` **rc=0**\n")
+    assert (c.task, c.rc, c.line) == ("lint", 0, 1)
+
+
+def test_an_arrow_between_the_task_and_its_rc_is_not_a_barrier():
+    """`` `mise run lint` → **rc=0** `` — the form six handoffs use."""
+    (c,) = citations.gate_claims("- `mise run lint` → **rc=0**\n")
+    assert (c.task, c.rc) == ("lint", 0)
+
+
+def test_a_bare_task_name_before_rc_is_a_claim():
+    """`lint rc=0 · test rc=0` — no backticks at all, and just as much a claim."""
+    claims = citations.gate_claims("- Gates green: lint rc=0 · test rc=1\n")
+    assert [(c.task, c.rc) for c in claims] == [("lint", 0), ("test", 1)]
+
+
+def test_a_backticked_bare_task_name_is_a_claim():
+    """`` `brain-audit` rc=0 `` — the hyphen must survive into the task name."""
+    (c,) = citations.gate_claims("- `brain-audit` rc=0\n")
+    assert c.task == "brain-audit"
+
+
+def test_a_claim_inherits_the_commit_its_block_names():
+    text = "- Gates on `7f97305`: `mise run lint` rc=0\n"
+    (c,) = citations.gate_claims(text)
+    assert c.shas == ("7f97305",)
+
+
+def test_a_claim_does_not_inherit_a_commit_from_another_block():
+    """The false-positive arm for the binding, and the one that decides the design.
+
+    A handoff names shas everywhere — in gotchas, in review tables, in the
+    header. Binding a claim to the nearest PRECEDING sha in the document would
+    make the gotcha paragraph above a gate list vouch for it. The unit is the
+    block, so a claim in a block that names no commit is bound to nothing.
+    """
+    text = "- I typed `db0a770` by hand and it named no commit.\n- `mise run lint` rc=0\n"
+    (c,) = citations.gate_claims(text)
+    assert c.shas == ()
+
+
+def test_a_branch_name_is_not_a_commit():
+    """`Gates on `main`, all rc=0` — real, and `main` binds a claim to nothing."""
+    text = "- Gates on `main`, all rc=0: `mise run lint`\n"
+    (c,) = citations.gate_claims(text)
+    assert c.shas == ()
+
+
+def test_a_distributive_all_rc_covers_the_tasks_listed_after_it():
+    """`Gates on `f3e233a`, all rc=0: <list>` — one phrase vouching for four gates.
+
+    The highest-stakes form in the corpus, so it is read rather than skipped.
+    """
+    text = "- Gates on `f3e233a`, all rc=0: `mise run lint` · `mise run lint-docs`\n"
+    claims = citations.gate_claims(text)
+    assert [(c.task, c.rc, c.shas) for c in claims] == [
+        ("lint", 0, ("f3e233a",)),
+        ("lint-docs", 0, ("f3e233a",)),
+    ]
+
+
+def test_a_distributive_claim_stops_at_the_end_of_its_block():
+    text = "- Gates, all rc=0: `mise run lint`\n\n- Later: `mise run test`\n"
+    assert [c.task for c in citations.gate_claims(text)] == ["lint"]
+
+
+def test_a_task_with_its_own_rc_is_not_claimed_twice():
+    """A direct rc wins; the distributive phrase does not also claim that task.
+
+    Without this, `` `mise run kb-gates` **rc=0** (lint/test all rc=0), `mise run
+    lint-docs` **rc=0** `` — one real line — produced a second, accidental claim
+    on `lint-docs` that happened to agree. Agreeing by luck is not verification.
+    """
+    text = "- all rc=0: `mise run lint` **rc=1**\n"
+    assert [(c.task, c.rc) for c in citations.gate_claims(text)] == [("lint", 1)]
+
+
+def test_a_distributive_phrase_needs_its_colon():
+    """`(lint/test/brain-audit/eval all rc=0),` introduces no list — it trails one.
+
+    Without the colon anchor that parenthetical swept up every `mise run` for the
+    rest of the line, which is how a claim about the runner silently became four
+    claims about gates nobody had written down.
+    """
+    text = "- `mise run kb-gates` **rc=0** (lint/test all rc=0), `mise run lint-docs`\n"
+    assert [c.task for c in citations.gate_claims(text)] == ["kb-gates"]
+
+
+def test_gate_claims_ignore_fenced_examples():
+    text = "```\n`mise run lint` rc=0\n```\n"
+    assert citations.gate_claims(text) == []
+
+
+def test_an_rc_with_no_number_is_not_a_claim():
+    """`lint rc=$?` records HOW an exit code was read, not what it was.
+
+    The task token is directly adjacent to the `rc=`, so only the digit
+    requirement excludes this. The first version of this test used
+    `out=$(pytest); rc=$?`, where the `;` did the excluding — a fixture that
+    could not exhibit the harm, so the arm on the digit run survived while
+    looking armed.
+    """
+    assert citations.gate_claims("- Gates: lint rc=$? read from the file\n") == []
+
+
+def test_the_shell_idiom_around_an_rc_is_not_a_claim_either():
+    """`out=$(pytest | tail -3); rc=$?` — the form `/clear-prep` step 5 teaches."""
+    assert citations.gate_claims("- `out=$(pytest); rc=$?` reads tail's 0\n") == []
+
+
+def test_a_nonzero_rc_is_claimed_as_written():
+    """A handoff recording a red gate is still making a checkable claim."""
+    (c,) = citations.gate_claims("- `mise run test` **rc=1**\n")
+    assert c.rc == 1
+
+
+def test_gate_claims_are_found_in_the_real_handoff_corpus():
+    """The control arm: a parser tuned to fixtures alone finds nothing real.
+
+    `.agent/` is gitignored, so a fresh clone has no handoffs and this skips —
+    but on any machine that HAS them, a parser that stopped matching the corpus
+    fails here rather than passing quietly. (`fixture-shaped-tests-hide-a-dead-
+    detector`.)
+    """
+    plans = sorted(Path(__file__).resolve().parents[1].joinpath(".agent", "plans").glob("*.md"))
+    if not plans:
+        pytest.skip("no handoff corpus on this machine (.agent/ is gitignored)")
+    claimed = {
+        (c.task, c.rc)
+        for p in plans
+        for c in citations.gate_claims(p.read_text(encoding="utf-8", errors="replace"))
+    }
+    assert ("lint", 0) in claimed
+    assert ("test", 0) in claimed
