@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from conftest import handoff_lead as _lead
 from kb_setup import citations, gates, handoff
 
 _MISE = "[tasks.kb-build]\nrun = 'true'\n[tasks.lint]\nrun = 'true'\n"
@@ -700,3 +701,188 @@ def test_an_absent_marker_on_a_genuine_typo_is_still_accepted(tmp_path: Path):
     """Control arm: making the marker falsifiable must not break its real use."""
     root = _repo(tmp_path, {"mise.toml": _MISE})
     assert _fails(handoff.check(root, "the example `mise.tomlx` (absent) above\n")) == []
+
+
+# ------------------------------------------------- the branch a handoff is for ----
+#
+# #149. `kb-ship` refuses a branch whose handoff has broken citations, and SKIPS
+# — explicitly, never silently — when no handoff describes the current branch.
+# The skip is the load-bearing half: measured on 2026-08-03, the newest handoff
+# described the session that STARTED the work rather than the one shipping it,
+# and without the branch match the gate would have blocked a healthy PR.
+
+
+def _plans(root: Path, files: dict[str, tuple[str, int]]) -> Path:
+    """Write `.agent/plans/<name>` for each `{name: (body, mtime)}`.
+
+    mtime is explicit because selection is by mtime, and two files written in
+    the same test run can land in the same clock tick — a tie the sort would
+    break arbitrarily, giving a test that passes on one machine.
+    """
+    plans = root / ".agent" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    for name, (body, mtime) in files.items():
+        path = plans / name
+        path.write_text(body, encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+    return plans
+
+
+def test_the_recorded_branch_is_the_first_one_the_lead_names():
+    assert handoff.recorded_branch(_lead("feat/x")) == "feat/x"
+
+
+def test_the_first_of_two_branches_in_one_lead_wins():
+    """A real handoff row names the branch, then names another in an aside.
+
+    Without a lead that mentions two, "first wins" is unfalsifiable — the last
+    would pass every single-mention case identically.
+    """
+    text = (
+        "# H\n\n| branch | `main` (the round's branch `feat/settled-claims` is merged) |\n\n## D\n"
+    )
+    assert handoff.recorded_branch(text) == "main"
+
+
+def test_a_handoff_that_names_no_branch_records_none():
+    assert handoff.recorded_branch("# Session handoff\n\nall done.\n\n## Detail\n") is None
+
+
+def test_a_branch_named_only_after_the_lead_is_not_recorded():
+    """The bound, asserted rather than assumed — see `citations.document_lead`."""
+    text = "# H\n\nnothing here\n\n## Detail\n\nbranch `feat/late`\n"
+    assert handoff.recorded_branch(text) is None
+
+
+def test_an_older_handoff_for_this_branch_is_masked_by_a_newer_one(tmp_path: Path):
+    """NEWEST-ONLY. Only the newest handoff can speak, matching or not.
+
+    This asserted the opposite for one round — that the scan should reach past a
+    newer handoff for another branch and check this branch's own. Measured over
+    the real 35-handoff corpus, that reading refuses **8 of the 21 branches**
+    they record, every one on a handoff 1-7 days stale whose cited paths have
+    since been deleted by unrelated commits. It relocates the harm #149 exists to
+    remove rather than removing it, and `.agent/plans/` is append-only, so it
+    grows. The criterion was amended on the issue.
+
+    The BROKEN handoff here is the older one for `work`, so a scan would refuse
+    and newest-only skips — the two readings are distinguishable by this fixture,
+    which is the point of building it this way round.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(
+        root,
+        {
+            "session-2026-01-01.md": (_lead("work", "see `docs/gone.md`\n"), 1),
+            "session-2026-01-02.md": (_lead("other", "see `docs/a.md`\n"), 2),
+        },
+    )
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert got.findings == ()
+    assert "session-2026-01-02.md" in got.summary
+    assert "other" in got.summary
+
+
+def test_the_newest_of_several_handoffs_for_one_branch_wins(tmp_path: Path):
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(
+        root,
+        {
+            "session-2026-01-01.md": (_lead("work", "see `docs/gone.md`\n"), 1),
+            "session-2026-01-02.md": (_lead("work", "see `docs/a.md`\n"), 2),
+        },
+    )
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.OK
+    assert got.source == "session-2026-01-02.md"
+
+
+def test_a_matching_handoff_with_a_broken_citation_is_broken(tmp_path: Path):
+    """Criterion 3 — this is what refuses the push."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": (_lead("work", "see `docs/gone.md`\n"), 1)})
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.BROKEN
+    assert [f.claim for f in got.findings if f.verdict is handoff.Verdict.FAIL] == ["docs/gone.md"]
+
+
+def test_a_matching_handoff_whose_findings_are_only_advisory_is_ok(tmp_path: Path):
+    """The strict/advisory split #145 draws, reaching the ship gate unchanged.
+
+    An UNVERIFIABLE gate claim is reported and must not refuse a push: `.agent/`
+    is machine-local, so a record's absence is normal rather than a defect.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": (_lead("work", "`mise run lint` **rc=0**\n"), 1)})
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.OK
+    assert handoff.Verdict.UNVERIFIABLE in {f.verdict for f in got.findings}
+
+
+def test_no_handoff_for_this_branch_is_skipped_and_says_so(tmp_path: Path):
+    """Criteria 2 and 4 — the SKIP is REPORTED, and never reads as a pass."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": (_lead("other", "see `docs/a.md`\n"), 1)})
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert "SKIP" in got.summary
+    assert "work" in got.summary
+    assert got.source == ""
+
+
+def test_a_newest_handoff_recording_no_branch_is_skipped_naming_that(tmp_path: Path):
+    """6 of 35 committed handoffs record no branch — the message must differ.
+
+    "records no branch" and "records `other`" are different reasons to skip, and
+    only the first tells a reader the fix is to write the branch into the lead.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": ("# H\n\nnothing here\n\n## D\n", 1)})
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert "records no branch" in got.summary
+
+
+def test_a_broken_handoff_for_another_branch_does_not_refuse(tmp_path: Path):
+    """Criterion 5 — the regression guard for the measured 2026-08-03 case.
+
+    The only handoff on disk is BROKEN and describes a different branch. It must
+    produce a skip, not a refusal, or the gate blocks a healthy PR.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": (_lead("older", "see `docs/gone.md`\n"), 1)})
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert got.findings == ()
+
+
+def test_no_handoffs_at_all_is_skipped(tmp_path: Path):
+    root = _repo(tmp_path)
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert "SKIP" in got.summary
+
+
+def test_an_unreadable_branch_is_skipped_rather_than_matched(tmp_path: Path):
+    """None means git could not be asked (#144) — it is not a branch to match on."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": (_lead("work", "see `docs/gone.md`\n"), 1)})
+    got = handoff.check_for_branch(root, None)
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert got.findings == ()
+    # The SUMMARY, not just the state. Without the guard this still skips — no
+    # handoff records `None` — but it would say "none of the 1 handoff(s)
+    # records branch `None`", which reads as a checked answer about a branch
+    # nobody is on. The guard exists for the sentence, so the sentence is what
+    # this asserts; asserting only SKIPPED made the guard unfalsifiable.
+    assert "could not be read" in got.summary
+    assert "None" not in got.summary
+
+
+def test_the_ok_summary_names_the_handoff_and_its_counts(tmp_path: Path):
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    _plans(root, {"session-2026-01-01.md": (_lead("work", "see `docs/a.md`\n"), 1)})
+    got = handoff.check_for_branch(root, "work")
+    assert "session-2026-01-01.md" in got.summary
+    assert "work" in got.summary

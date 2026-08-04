@@ -11,6 +11,7 @@ import subprocess
 from collections.abc import Callable
 
 import pytest
+from conftest import handoff_lead
 from kb_setup import pr
 
 
@@ -926,3 +927,110 @@ def test_land_accepts_an_ancestor_receipt_for_a_closing_commit(
     out = capsys.readouterr().out
     assert "covered by the receipt for" in out
     assert "land: refusing" not in out
+
+
+# --------------------------------------------------------------------------
+# ship — the handoff for THIS branch (#149)
+# --------------------------------------------------------------------------
+#
+# The branch match is what makes this gate safe to have at all. Measured on
+# 2026-08-03: the newest handoff on disk described the session that STARTED the
+# work rather than the one shipping it, so checking it unconditionally would
+# have blocked a healthy PR.
+
+
+def _handoff(tmp_path, branch: str, body: str) -> None:
+    """Write one handoff recording ``branch``, in `kb-session-state`'s format.
+
+    `docs/present.md` is written too, and it is not scenery. `kb_setup.resolve`
+    reads a path whose FIRST SEGMENT names no directory here as a citation about
+    ANOTHER repo — UNVERIFIABLE, which is advisory and does not refuse. Without a
+    real `docs/` in the fixture, every `docs/gone.md` below would come back
+    advisory and the refusal tests would assert a refusal that cannot happen: a
+    fixture unable to exhibit the harm it targets, which is how the mutation arm
+    on #144 nearly shipped as a false pass.
+    """
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    (tmp_path / "docs" / "present.md").write_text("x\n", encoding="utf-8")
+    plans = tmp_path / ".agent" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / "session-2026-01-01.md").write_text(handoff_lead(branch, body), encoding="utf-8")
+
+
+def test_ship_refuses_a_broken_handoff_for_this_branch(monkeypatch, tmp_path, capsys):
+    """Criterion 3. Every OTHER reason to refuse is removed first.
+
+    Without the receipt and the green gates this would exit 1 for a reason the
+    test is not about — the failure mode `test_ship_refuses_on_blocking_review_findings`
+    already paid for once.
+    """
+    _write_valid_receipt(tmp_path)
+    _handoff(tmp_path, _BRANCH, "see `docs/gone.md`\n")
+    seen: list[list[str]] = []
+
+    def handler(cmd: list[str]) -> _Proc:
+        seen.append(cmd)
+        return _clean_branch_handler(cmd)
+
+    _stub_run(monkeypatch, handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 1
+    assert not any(c[:2] == ["git", "push"] for c in seen)
+    assert "docs/gone.md" in capsys.readouterr().out
+
+
+def test_ship_accepts_a_clean_handoff_for_this_branch(monkeypatch, tmp_path, capsys):
+    """CONTROL ARM for the refusal above — same path, a handoff that holds."""
+    _write_valid_receipt(tmp_path)
+    _handoff(tmp_path, _BRANCH, "see `mise.toml`\n")
+    (tmp_path / "mise.toml").write_text("[tasks.lint]\nrun = 'true'\n", encoding="utf-8")
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+    assert "session-2026-01-01.md" in capsys.readouterr().out
+
+
+def test_ship_is_not_blocked_by_a_broken_handoff_for_another_branch(monkeypatch, tmp_path, capsys):
+    """Criterion 5 — the regression guard for the measured 2026-08-03 case.
+
+    The only handoff on disk is BROKEN and describes another branch. Shipping
+    must proceed, and must SAY it skipped (criteria 2 and 4): a gate that had
+    nothing to check is not a gate that checked and found nothing.
+    """
+    _write_valid_receipt(tmp_path)
+    _handoff(tmp_path, "some/older-branch", "see `docs/gone.md`\n")
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert "SKIP" in out
+    assert _BRANCH in out
+    # The skipped handoff's own defect must not be reported as this branch's.
+    assert "docs/gone.md" not in out
+
+
+def test_ship_reports_the_handoff_gate_when_there_is_no_handoff_at_all(
+    monkeypatch, tmp_path, capsys
+):
+    """Criterion 2. Silence would be indistinguishable from a pass."""
+    _write_valid_receipt(tmp_path)
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: True)
+    assert pr.ship_main(tmp_path) == 0
+    assert "SKIP" in capsys.readouterr().out
+
+
+def test_the_handoff_gate_runs_before_the_gates(monkeypatch, tmp_path):
+    """A broken handoff is a cheap refusal — it must not cost four gate runs.
+
+    Same reasoning as the receipt check, which is deliberately ahead of the
+    gates. Fixing a handoff writes no commit (`.agent/` is gitignored), so
+    ordering it before the gates costs nothing and invalidates nothing.
+    """
+    _write_valid_receipt(tmp_path)
+    _handoff(tmp_path, _BRANCH, "see `docs/gone.md`\n")
+    ran: list[bool] = []
+    _stub_run(monkeypatch, _clean_branch_handler)
+    monkeypatch.setattr(pr, "run_gates", lambda _root: ran.append(True) or True)
+    assert pr.ship_main(tmp_path) == 1
+    assert ran == []

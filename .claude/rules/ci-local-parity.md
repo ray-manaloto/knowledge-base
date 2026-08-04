@@ -27,8 +27,10 @@ add a workflow step later, add its hk equivalent in the same change.
 
 `kb_setup.gates.GATE_TASKS` is the list `mise run kb-ship` actually enforces
 (`lint`, `test`, `brain-audit`, `eval`). The review receipt is checked BEFORE
-that list and again before the push. A gate that is not in that list, and not an
-hk step reached by `lint`, does not gate anything.
+that list and again before the push; the handoff for the current branch is
+checked in between (#149, and it SKIPS out loud when no handoff records this
+branch). A gate that is not in that list, and not an hk step reached by `lint`,
+does not gate anything.
 
 **One list, two callers, and ONE entry point.** Both `mise run kb-gates` and
 `pr.run_gates` call **`gates.run_and_record`** — not `gates.run` followed by

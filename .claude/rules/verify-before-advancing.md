@@ -44,9 +44,17 @@ claim about them gets checked against. It does not stop at the first failure.
 Scale the matrix to the blast radius — a one-line doc typo needs the docs
 row, not a full `kb-build`.
 
-**`mise run kb-ship` checks the `kb-review` receipt, then runs `lint` + `test` +
-`brain-audit` + `eval`, and refuses to push if any fails.** That is the floor, not the ceiling: it does not know whether
-your change needed a `kb-build` or a chunk validation.
+**`mise run kb-ship` checks the `kb-review` receipt, then this branch's handoff,
+then runs `lint` + `test` + `brain-audit` + `eval`, and refuses to push if any
+fails.** The handoff step (#149) checks the **newest** `.agent/plans/session-*.md`
+and only when its recorded branch is the one you are on, printing an explicit SKIP
+otherwise — the ordinary case, since `/clear-prep` writes the handoff *after* the
+round. A SKIP is never a pass, and a handoff describing another branch never
+blocks you. Newest-only rather than newest-that-matches, because `.agent/plans/`
+is append-only and handoffs cite paths that later commits delete: scanning back
+for a match refuses **8 of the 21 branches** this repo's handoffs record, all on
+stale handoffs. That is the floor, not the ceiling: it does not know whether your
+change needed a `kb-build` or a chunk validation.
 
 ## A green gate is not a green artifact
 

@@ -697,3 +697,100 @@ def test_a_real_typo_still_survives_the_alphanumeric_rule():
     """Control arm for the two above: the rule must not eat the feature."""
     got = {c.text: c.repairs for c in citations.typo_candidates("`mise.tomlx` `graph.jsom`\n")}
     assert got == {"mise.tomlx": ("mise.toml",), "graph.jsom": ("graph.json",)}
+
+
+# ------------------------------------------------------- branch mentions ----
+
+
+@pytest.mark.parametrize(
+    ("line", "want"),
+    [
+        # Each line below is a real lead from this repo's
+        # `.agent/plans/session-*.md`, trimmed only at the TAIL — so the
+        # extractor is pinned to the corpus rather than to what a test author
+        # imagined the format was. Nothing between the word and its span is
+        # touched, which is the part under test.
+        (
+            "/ knowledge-base · branch `fix/cc-doctor-judges-session-path` ·",
+            "fix/cc-doctor-judges-session-path",
+        ),
+        (
+            "knowledge-base · branch **`chore/144-close-the-loop`** (created for you),",
+            "chore/144-close-the-loop",
+        ),
+        (
+            "knowledge-base · on branch **`docs/kb-serve-reference`** @ `3c9a887`, clean,",
+            "docs/kb-serve-reference",
+        ),
+        ("knowledge-base · branch **`main`** @ **`6584fbd`**, clean, **0 open PRs**.", "main"),
+        # The format `mise run kb-session-state` emits (#144) — the one every
+        # handoff written from here on will carry.
+        ("- **branch**: `chore/144-close-the-loop`", "chore/144-close-the-loop"),
+    ],
+)
+def test_a_branch_mention_is_the_span_nearest_the_word(line: str, want: str):
+    assert [m.name for m in citations.branch_mentions(line + "\n")] == [want]
+
+
+def test_every_mention_is_returned_in_document_order():
+    """A real handoff table row names two branches; this module reports both.
+
+    Extracting only the first would move the "which one is THE branch" decision
+    into a text parser — the split `kb_setup.handoff` owns (#143). The composer
+    takes the first; this function has no opinion.
+    """
+    line = "| branch | `main` (the round's branch `feat/settled-claims` is merged) |\n"
+    assert [m.name for m in citations.branch_mentions(line)] == ["main", "feat/settled-claims"]
+
+
+def test_a_line_with_no_span_after_the_word_yields_nothing():
+    """`- **branch**: COULD NOT READ` is a real render output — it names none."""
+    assert citations.branch_mentions("- **branch**: COULD NOT READ — git did not answer\n") == []
+
+
+def test_a_span_on_a_different_line_is_not_the_branch():
+    """The word and its span must share a line, or any later span would qualify."""
+    assert citations.branch_mentions("we are on a branch\nsee `docs/a.md`\n") == []
+
+
+def test_a_capture_that_is_not_ref_shaped_is_dropped():
+    r"""`the branch/sha window; `_git`'s silent rc` — a real handoff table row.
+
+    `\bbranch\b` matches inside `branch/sha`, and the nearest span is `_git`.
+    A leading underscore is not a ref, so the shape guard drops it rather than
+    reporting a branch nobody named.
+    """
+    assert citations.branch_mentions("| x | round 6: the branch/sha window; `_git` rc |\n") == []
+
+
+def test_prose_captured_between_two_spans_is_dropped():
+    """A `branch` inside a code span makes the NEXT capture run over prose."""
+    assert citations.branch_mentions("run `git branch` to see; you are on `main`\n") == []
+
+
+def test_a_mention_inside_a_fenced_block_is_example_text():
+    text = "```\nbranch `feat/example`\n```\n"
+    assert citations.branch_mentions(text) == []
+
+
+def test_a_mention_records_its_line():
+    text = "# Session handoff\n\nknowledge-base · branch **`feat/x`** @ `abc1234`\n"
+    (m,) = citations.branch_mentions(text)
+    assert (m.name, m.line) == ("feat/x", 3)
+
+
+def test_the_lead_stops_at_the_first_subheading():
+    """`lead` is the coordinates paragraph — where a handoff states its branch."""
+    text = "# H\n\nbranch `feat/a`\n\n## Later\n\nbranch `feat/b`\n"
+    assert [m.name for m in citations.branch_mentions(citations.document_lead(text))] == ["feat/a"]
+
+
+def test_lead_preserves_line_numbers():
+    """Same rule as `strip_fences` — the reported line must be the real one.
+
+    A checker that reports the wrong line is the `:1836`-for-`:1830` defect this
+    module exists to catch, reintroduced inside the catcher.
+    """
+    text = "# H\n\nbranch `feat/a`\n\n## Later\n\nx\n"
+    assert citations.document_lead(text).count("\n") >= 2
+    assert citations.branch_mentions(citations.document_lead(text))[0].line == 3

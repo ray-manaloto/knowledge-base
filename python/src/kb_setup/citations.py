@@ -205,6 +205,43 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: heading, a table row, or a block quote. Blank lines break a block too.
 _BLOCK_BREAK_RE = re.compile(r"^\s*(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|\||>)")
 
+#: A `##`-or-deeper heading — where a document's LEAD ends. The `#` title itself
+#: is deliberately not a terminator: the lead is the paragraph BETWEEN the title
+#: and the first section, which is where an authored document states its
+#: coordinates.
+_SUBHEADING_RE = re.compile(r"^ {0,3}#{2,6}[ \t]")
+
+#: The word `branch` followed, ON THE SAME LINE and with no backtick in between,
+#: by the code span naming it. The three constraints are each doing work:
+#:
+#: THE CHARACTER CLASS IS THE WHOLE MECHANISM, and it does two jobs:
+#:
+#: * excluding `\n` keeps the word and its span on ONE line — otherwise every
+#:   later span in the document qualifies, and a `- **branch**: COULD NOT READ`
+#:   line would claim whatever came next;
+#: * excluding `` ` `` makes the span the NEAREST one after the word, so
+#:   `on branch **`docs/x`** @ `3c9a887`` yields the branch and not the sha.
+#:
+#: The `?` is INERT and is kept only as a statement of intent. Measured: a
+#: backtick-free run can terminate at exactly one position — the first backtick
+#: — so greedy and lazy find the same match, and swapping them changes nothing
+#: over all 35 handoffs in `.agent/plans/`. This note exists because the comment
+#: here used to credit the laziness for the nearest-span rule, which would have
+#: told anyone widening the class that they were still protected. They are not:
+#: `[^\n]*` yields `3c9a887` for the line above.
+#:
+#: The word may itself be inside a span (`` `git branch` ``), in which case the
+#: capture runs from that span's CLOSING backtick over prose. Nothing here can
+#: prevent that — spans are not tracked at this level — which is why the shape
+#: guard below is not decoration: prose has spaces, and a branch does not.
+_BRANCH_RE = re.compile(r"\bbranch\b[^`\n]*?`(?P<name>[^`\n]+)`")
+
+#: What a capture must look like to be reported as a branch at all. Narrower
+#: than `git check-ref-format` on purpose, in the same direction as everything
+#: else in this module: a name it wrongly rejects becomes silence, while a name
+#: it wrongly accepts becomes a claim about which branch a document describes.
+_REF_SHAPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+
 #: Positions that differ under a transposition — exactly two, and adjacent.
 _TRANSPOSED_POSITIONS = 2
 
@@ -272,6 +309,20 @@ class TaskCitation:
 
 
 @dataclass(frozen=True)
+class BranchMention:
+    """A git branch this document says something is on.
+
+    NOT a citation — nothing here can be checked against the filesystem, and
+    this module deliberately has no opinion about which mention (if any) is THE
+    branch a document describes. That is a question about what a *handoff* is,
+    so `kb_setup.handoff` answers it (#143, #149).
+    """
+
+    name: str
+    line: int
+
+
+@dataclass(frozen=True)
 class GateClaim:
     """A claim that a named gate exited with a particular code.
 
@@ -329,6 +380,70 @@ def strip_fences(text: str) -> str:
             opener = ""
         out.append("")
     return "\n".join(out)
+
+
+def document_lead(text: str) -> str:
+    """Everything before the first `##`-or-deeper heading.
+
+    The LEAD is where an authored document states its coordinates — this repo's
+    handoffs put the branch, the HEAD sha and the PR state in the paragraph
+    between the `#` title and the first section. Truncating there rather than
+    reading the whole document is a bound, and a bound is a way to turn "absent"
+    into "unreachable" (`probes-need-a-control-arm.md` rule 3) — so both arms
+    were run over the 35 handoffs in `.agent/plans/` on 2026-08-04, and the
+    result is a trade rather than a free win:
+
+    * they AGREE on 31, including all 29 the lead can read;
+    * on the other 4 the lead is silent and the whole-file read answers — three
+      of those answers are WRONG (`kb-land` twice, from prose about the task; a
+      stale branch listed for deletion), and one is right (a `| branch | …` row
+      under `## State at handoff`).
+
+    So the bound costs one correct answer in 35 and suppresses three wrong ones.
+    That is the direction this module is biased in everywhere else: a branch it
+    fails to read becomes a reported SKIP, while a branch it reads WRONG becomes
+    a claim about which document describes the current work.
+
+    Line numbers are preserved for the lines it keeps, since only the tail is
+    dropped. Fences are stripped FIRST so a `##` quoted inside an example block
+    cannot cut the lead short.
+    """
+    kept: list[str] = []
+    for line in strip_fences(text).split("\n"):
+        if _SUBHEADING_RE.match(line):
+            break
+        kept.append(line)
+    return "\n".join(kept)
+
+
+def _is_ref_shaped(name: str) -> bool:
+    """Whether ``name`` could be a git branch name at all.
+
+    `..`, a trailing `/` and a trailing `.lock` are rejected because
+    `git check-ref-format` rejects them; everything else here is stricter than
+    git, which is the safe direction (see :data:`_REF_SHAPE_RE`).
+    """
+    if not _REF_SHAPE_RE.match(name):
+        return False
+    return ".." not in name and not name.endswith(("/", ".lock"))
+
+
+def branch_mentions(text: str) -> list[BranchMention]:
+    """Every branch this document names, in document order.
+
+    ALL of them, not the first: a real handoff row reads
+    ``| branch | `main` (the round's branch `feat/settled-claims` is merged) |``
+    and both are genuinely mentioned. Which one the document is ABOUT is the
+    composer's call.
+    """
+    stripped = strip_fences(text)
+    found: list[BranchMention] = []
+    for m in _BRANCH_RE.finditer(stripped):
+        name = m.group("name")
+        if not _is_ref_shaped(name):
+            continue
+        found.append(BranchMention(name=name, line=stripped.count("\n", 0, m.start()) + 1))
+    return found
 
 
 def code_spans(text: str) -> list[Span]:

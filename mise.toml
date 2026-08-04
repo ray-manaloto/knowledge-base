@@ -491,14 +491,20 @@ description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review
 run = "uv run kb-setup review-receipt"
 
 [tasks.kb-ship]
-description = 'Review receipt + gates (lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
+description = 'Review receipt + this branch handoff + gates (lint/test/brain-audit/eval) → push → open PR: mise run kb-ship [-- --title T]'
 # The sanctioned way to open a PR here. `gh pr create` is NOT guard-denied in
 # this repo — `hook_guard._REDIRECT` covers graphify subcommands only — so this
 # is convention, not enforcement, and a raw `gh pr create` would bypass the
 # review receipt entirely. Said plainly because the comment used to claim the
 # guard stopped it, while `mise-tasks-only.md` correctly said it does not.
 # Gates run BEFORE the push, so a red branch never becomes a PR. This repo has no
-# CI, so the local gates are the only gates. Logic in kb_setup.pr.
+# CI, so the local gates are the only gates. Between the receipt and the gates it
+# runs kb-handoff-check against the NEWEST handoff, and only when that handoff
+# records the branch you are on (#149) — otherwise it reports a SKIP, never
+# silence. The skip is the ordinary case, because /clear-prep writes the handoff
+# after the round. Newest-only rather than newest-that-matches: scanning back for
+# a match refuses 8 of the 21 branches this repo's handoffs record, all on stale
+# handoffs whose paths later commits deleted. Logic in kb_setup.pr.
 run = "uv run kb-setup ship"
 
 [tasks.kb-land]

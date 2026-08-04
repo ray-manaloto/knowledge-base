@@ -11,6 +11,12 @@ What it does keep is the part that carries the safety:
   gates and again immediately before the push. **That is this module's strongest
   behaviour**, because CodeRabbit is advisory here, so the local review is the
   only review;
+* ``ship`` then refuses a branch whose OWN handoff cites something that is not
+  there (:func:`_handoff_holds`, #149) — and explicitly SKIPS, out loud, when the
+  newest handoff under `.agent/plans/` does not record the current branch. Why
+  the match matters, and why it is the NEWEST handoff rather than the newest
+  matching one, is recorded once at `handoff.check_for_branch` with the
+  measurement behind it; this module owns only the ship-time policy;
 * ``ship`` then runs every gate in :data:`gates.GATE_TASKS` (``lint``, ``test``,
   ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red branch never
   becomes a PR — and RECORDS each result under `.agent/kb/gates/`, because the
@@ -341,6 +347,40 @@ def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     return 0
 
 
+def _handoff_holds(repo_root: Path, branch: str) -> bool:
+    """Print the handoff verdict for ``branch``; False only when it is BROKEN.
+
+    Three outcomes and they are all REPORTED, which is the criterion this gate
+    was specified against (#149): a skip that printed nothing would be
+    indistinguishable from a handoff that was checked and held.
+
+    * BROKEN — the handoff describing THIS branch cites something that is not
+      there. Refuse, and print the findings so the fix does not need a second
+      command.
+    * OK — checked and it holds. Advisory findings are named in the summary and
+      do not refuse; `kb_setup.handoff` already draws that line and drawing a
+      second, stricter one here would make `mise run kb-handoff-check` disagree
+      with the gate that consumes it.
+    * SKIPPED — the newest handoff does not describe this branch. NOT a pass, and
+      it is the normal case at ship time, because `/clear-prep` writes the
+      handoff after the round rather than before it.
+
+    The skip is what makes the gate safe rather than lenient, and the evidence
+    for that — including why it is the NEWEST handoff and not the newest one that
+    matches — lives at `handoff.check_for_branch` rather than being paraphrased
+    here. One measured fact, one place to correct it.
+    """
+    from kb_setup import handoff
+
+    result = handoff.check_for_branch(repo_root, branch)
+    print(f"==> handoff: {result.summary}")
+    if result.coverage is not handoff.Coverage.BROKEN:
+        return True
+    print(handoff.render(list(result.findings), source=result.source))
+    print("ship: refusing — the handoff for this branch cites something that is not there")
+    return False
+
+
 def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
     """Return the SHA to push, or None (having said why) if the push must not happen.
 
@@ -366,15 +406,22 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
     return sha
 
 
-def ship_main(repo_root: Path, *, title: str | None = None) -> int:
-    """Gate, push, and open a PR for the current branch; return an exit code."""
-    branch = _ship_preflight(repo_root)
-    if branch is None:
-        return 1
+def _pre_push_checks(repo_root: Path, branch: str) -> bool:
+    """Every refusal that must clear before anything leaves the machine.
 
-    # Checked BEFORE the gates, deliberately: a failing gate is fixed by an
-    # amend, which moves the SHA and invalidates whatever receipt existed. Ask
-    # the cheap question first rather than after four gate runs.
+    One function rather than three inline blocks because they are one policy —
+    nothing is pushed unless the commit was reviewed, this branch's handoff
+    holds, and every gate is green — and because :func:`ship_main`'s job is the
+    SEQUENCE (preflight, checks, push, PR) rather than the individual verdicts.
+
+    THE ORDER IS CHEAPEST-FIRST, and the first two are ahead of the gates
+    deliberately. A failing gate is fixed by an amend, which moves the SHA and
+    invalidates whatever receipt existed — so asking the cheap questions after
+    four gate runs would spend minutes to learn something that was already
+    decided. Neither cheap check has an ordering hazard of its own: `.agent/` is
+    gitignored, so fixing a handoff writes no commit and cannot move the SHA the
+    receipt is for.
+    """
     from kb_setup import review
 
     ok, summary = review.receipt_state(
@@ -383,10 +430,28 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     print(f"==> review: {summary}")
     if not ok:
         print("ship: refusing — not pushing an unreviewed commit")
-        return 1
+        return False
+
+    if not _handoff_holds(repo_root, branch):
+        return False
 
     if not run_gates(repo_root):
         print("ship: gates failed — not pushing")
+        return False
+    return True
+
+
+def ship_main(repo_root: Path, *, title: str | None = None) -> int:
+    """Gate, push, and open a PR for the current branch; return an exit code."""
+    branch = _ship_preflight(repo_root)
+    if branch is None:
+        return 1
+
+    # `branch` is the name `_ship_preflight` already validated — not "", not
+    # "main", not detached. Threading it through rather than re-reading HEAD is
+    # what keeps `_handoff_holds` off `current_branch`, whose rc-only read
+    # reports an UNBORN branch as unreadable (#144, found by the cold lane).
+    if not _pre_push_checks(repo_root, branch):
         return 1
 
     sha = _validated_sha_for_push(repo_root, branch)

@@ -268,6 +268,13 @@ more than a missing one. Before printing the resume prompt:
 - every number it repeats was measured *this* session, or is labelled as
   inherited and unverified (`probes-need-a-control-arm.md` rule 6).
 
+**Say which branch the handoff is for, in its lead.** `mise run kb-ship` re-runs
+this check against the **newest** handoff, and only when that handoff records
+the branch you are on (#149) — so a handoff whose lead names no branch is one
+the next session's ship skips. The lead is the paragraph
+before the first `##`; step 1's `mise run kb-session-state` block already opens
+with a backticked `- **branch**:` bullet, so pasting it satisfies this.
+
 ## 7. Emit the resume prompt — one line
 
 All the context is in auto-memory (loaded automatically) and the handoff. The

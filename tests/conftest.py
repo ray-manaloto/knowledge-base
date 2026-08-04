@@ -69,6 +69,19 @@ def merge_recorder(calls: list[list[str]]) -> Callable[..., None]:
     return run
 
 
+def handoff_lead(branch: str, body: str = "") -> str:
+    """A handoff whose LEAD records ``branch``, in the format #144 emits.
+
+    ONE copy, in conftest, because this literal is a CONTRACT with what
+    `mise run kb-session-state` prints — `- **branch**: `<name>`` — and #149's
+    gate reads it back. `test_handoff.py` and `test_pr.py` each hand-built it,
+    so a change to that format would have left one suite testing the old shape
+    and still green. Exactly why the `git` fixture moved here (see above):
+    duplicated setup that drifts before it is a day old.
+    """
+    return f"# Session handoff\n\n- **branch**: `{branch}`\n\n## Detail\n\n{body}"
+
+
 @pytest.fixture
 def git(tmp_path: Path) -> Callable[..., str]:
     """Return a `git(*args) -> stdout` bound to a fresh repo on a `work` branch.
