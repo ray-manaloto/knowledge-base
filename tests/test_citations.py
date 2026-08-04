@@ -463,3 +463,20 @@ def test_the_sha_accessor_is_empty_unless_exactly_one_commit_is_named():
 def test_the_sha_accessor_returns_the_single_commit():
     (c,) = citations.gate_claims("- Gates on `77661a3`: `mise run lint` rc=0\n")
     assert c.sha == "77661a3"
+
+
+def test_two_distributive_phrases_do_not_bleed_into_each_other():
+    """`all rc=0: <list>; all rc=1: <list>` bound the SECOND list to rc=0.
+
+    The parser reported the opposite of what was authored, and the checker would
+    then confirm it. A manufactured claim is worse than a missed one: a miss
+    leaves the handoff unchecked, this puts a verdict behind words nobody wrote.
+    """
+    text = "- all rc=0: `mise run lint`; all rc=1: `mise run test`\n"
+    assert [(c.task, c.rc) for c in citations.gate_claims(text)] == [("lint", 0), ("test", 1)]
+
+
+def test_a_single_distributive_phrase_still_reaches_the_end_of_its_block():
+    """Control arm: bounding each phrase must not truncate the only one."""
+    text = "- Gates, all rc=0: `mise run lint` ·\n  `mise run test` · `mise run eval`\n"
+    assert [c.task for c in citations.gate_claims(text)] == ["lint", "test", "eval"]

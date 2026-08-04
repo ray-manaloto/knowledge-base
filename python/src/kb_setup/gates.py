@@ -374,9 +374,28 @@ class Record:
     path: Path
     gates: tuple[RecordedGate, ...]
 
+    def rows_for(self, task: str) -> tuple[RecordedGate, ...]:
+        """EVERY recorded row for ``task``. Zero, one, or — legitimately — more.
+
+        Plural, and that is the whole point. `kb-gates -- lint lint` is accepted
+        by the CLI, so a record really can carry two rows for one task with
+        DIFFERENT results; a singular `row()` returned the first and the second
+        was invisible to every lookup, which meant a claim could be confirmed
+        against a result the run later contradicted. The caller has to see both
+        to say so. (Cold lane.)
+        """
+        return tuple(r for r in self.gates if r.task == task)
+
     def row(self, task: str) -> RecordedGate | None:
-        """The recorded row for ``task``, or None when the run did not cover it."""
-        return next((r for r in self.gates if r.task == task), None)
+        """The FIRST recorded row for ``task``, or None. Prefer :meth:`rows_for`.
+
+        Kept because a single row is the overwhelmingly common case and reads
+        better at a call site that has already established there is one. It must
+        never be used to DECIDE anything about a claim — that is what let a
+        duplicate row hide.
+        """
+        rows = self.rows_for(task)
+        return rows[0] if rows else None
 
     def summarise(self) -> tuple[int, int]:
         """``(passed, not-passed)`` over every row — what a runner claim asserts.
@@ -388,6 +407,16 @@ class Record:
         """
         passed = sum(1 for r in self.gates if r.rc == 0)
         return passed, len(self.gates) - passed
+
+
+def _is_exit_code(value: object) -> bool:
+    """Whether ``value`` is an exit code as JSON can carry one.
+
+    `bool` is a subclass of `int`, so a bare `isinstance(v, int)` accepts `true`
+    and `false` — and `True == 1`, so the record then agrees with a claim of
+    `rc=1`. An exit code is a number, not a flag.
+    """
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _parse(path: Path) -> Record | None:
@@ -406,7 +435,7 @@ def _parse(path: Path) -> Record | None:
         return None
     rows = data.get("gates")
     sha = data.get("sha")
-    if not isinstance(rows, list) or not isinstance(sha, str):
+    if not isinstance(rows, list) or not isinstance(sha, str) or not sha:
         return None
     parsed: list[RecordedGate] = []
     for row in rows:
@@ -415,8 +444,20 @@ def _parse(path: Path) -> Record | None:
         parsed.append(
             RecordedGate(
                 task=row["task"],
-                rc=row["rc"] if isinstance(row.get("rc"), int) else None,
-                sha=row["sha"] if isinstance(row.get("sha"), str) else None,
+                # `not isinstance(v, bool)` is load-bearing: in Python `bool` IS
+                # an `int`, so `"rc": true` parsed as a valid exit code and then
+                # compared EQUAL to 1 — a hand-edited or corrupted record could
+                # confirm a `rc=1` claim with a value that is not an exit code at
+                # all. (Cold lane.)
+                rc=row["rc"] if _is_exit_code(row.get("rc")) else None,
+                # `or None`, so an empty string becomes the "unknown" state
+                # rather than a third thing that is neither. `""` is FALSY, so
+                # the drift check skipped it, and it is not `None`, so the
+                # unbound check skipped it too — a row bound to no commit passed
+                # BOTH directions and confirmed a claim about any commit at all.
+                # `iter_run` already normalises the same way at write time; this
+                # is the read side finally agreeing with it. (Cold lane.)
+                sha=(row["sha"] or None) if isinstance(row.get("sha"), str) else None,
                 # `is True` / `is False`, not `bool(...)`: the third state is
                 # "could not ask", and coercing an absent or malformed value to
                 # False would report an unknown tree as a clean one — the

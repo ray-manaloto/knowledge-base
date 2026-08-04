@@ -485,9 +485,18 @@ def gate_claims(text: str) -> list[GateClaim]:
                 continue
             claimed.add(task)
             claims.append(GateClaim(task, int(m.group("rc")), shas, line_of(m.start())))
-        for phrase in _ALL_RC_RE.finditer(body):
+        # Each phrase owns the text up to the NEXT phrase, not to the end of the
+        # block. Scanning to the end let `all rc=0: <list>; all rc=1: <list>`
+        # bind the SECOND list to rc=0 and then suppress the second phrase via
+        # `claimed` — so the parser reported the opposite of what was written,
+        # and the checker would go on to confirm it. A manufactured claim is
+        # worse than a missed one: a miss leaves the handoff unchecked, while
+        # this one puts a verdict behind words nobody wrote. (Cold lane.)
+        phrases = list(_ALL_RC_RE.finditer(body))
+        for i, phrase in enumerate(phrases):
             rc = int(phrase.group("rc"))
-            for cite in _TASK_RE.finditer(body, phrase.end()):
+            stop = phrases[i + 1].start() if i + 1 < len(phrases) else len(body)
+            for cite in _TASK_RE.finditer(body, phrase.end(), stop):
                 name = cite.group(1)
                 if name in claimed:
                     continue

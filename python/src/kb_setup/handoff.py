@@ -268,15 +268,28 @@ def _judge(claim: citations.GateClaim, record: gates.Record) -> Finding:
         if not rows:
             return _gate_finding(claim, Verdict.UNVERIFIABLE, f"the record at {at} covers no gates")
     else:
-        row = record.row(claim.task)
-        if row is None:
+        matched = record.rows_for(claim.task)
+        if not matched:
             covered = ", ".join(r.task for r in record.gates) or "nothing"
             return _gate_finding(
                 claim,
                 Verdict.UNVERIFIABLE,
                 f"the record at {at} covers {covered} — not {claim.task}",
             )
-        rows = [row]
+        if len(matched) > 1:
+            # `kb-gates -- lint lint` is accepted, so one record really can hold
+            # two rows for one task with different results. Picking the first
+            # was silent, and silently picking the one that AGREES with the
+            # claim is the failure this whole module exists to remove — so the
+            # disagreement goes to the reader instead. (Cold lane.)
+            said = ", ".join("rc=" + ("none" if r.rc is None else str(r.rc)) for r in matched)
+            return _gate_finding(
+                claim,
+                Verdict.AMBIGUOUS,
+                f"the record at {at} has {len(matched)} rows for {claim.task} ({said}) — "
+                f"which one is the claim about?",
+            )
+        rows = list(matched)
     return _judge_rows(claim, record, rows, runner=runner)
 
 
@@ -314,7 +327,13 @@ def _judge_rows(
     if mismatch is not None:
         return _gate_finding(claim, Verdict.FAIL, mismatch)
 
-    unbound = [r.task for r in rows if r.rc is not None and r.sha is None]
+    # `not r.sha`, not `r.sha is None`. `_parse` now normalises an empty row sha
+    # to None, but this is the point of USE and it must not depend on that: an
+    # empty string is FALSY, so the drift check above skips it, and it is not
+    # None, so an identity test skipped it too — a row bound to no commit passed
+    # in BOTH directions and confirmed a claim about any commit at all. Fixing
+    # only the parser would leave the hole one constructor away. (Cold lane.)
+    unbound = [r.task for r in rows if r.rc is not None and not r.sha]
     if unbound:
         return _gate_finding(
             claim,
@@ -365,9 +384,22 @@ def _rc_mismatch(
     """
     if runner:
         _, unpassed = record.summarise()
-        if (claim.rc == 0) == (unpassed == 0):
+        # `kb-gates` exits 0 when every gate passed and 1 when one did not, so
+        # the record implies ONE exit code and it is compared, not merely tested
+        # for zeroness. The old form asked `(claim.rc == 0) == (unpassed == 0)`,
+        # which made every non-zero claim equivalent — and 2 is not "a gate
+        # failed", it is `kb-gates` REFUSING to run, which writes no record at
+        # all. So a record confirming `rc=2` was confirming a run that, by the
+        # runner's own contract, never happened. (Cold lane.)
+        expected = 1 if unpassed else 0
+        if claim.rc == expected:
             return None
         names = ", ".join(r.task for r in rows if r.rc != 0)
+        if claim.rc not in {0, 1}:
+            return (
+                f"claims rc={claim.rc}, but {gates.RUNNER_TASK} exits only 0 or 1 once it "
+                f"has run — {claim.rc} is a refused request, and a refusal writes no record"
+            )
         return (
             f"claims rc={claim.rc}, but the record has {unpassed} gate(s) that "
             f"did not pass ({names})"

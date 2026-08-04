@@ -520,3 +520,57 @@ def test_the_absent_marker_hint_is_still_printed_for_a_path_failure(tmp_path: Pa
     (root / "docs" / "a.md").write_text("x\n", encoding="utf-8")
     report = handoff.render(handoff.check(root, "see `docs/gone.md`\n"), source="h.md")
     assert "(absent)" in report
+
+
+# ------------------------------------ cold-lane round 1 (#147) ----
+#
+# Five findings, every one of the same shape: a FALSE claim judged `OK` by the
+# tool built to stop exactly that. None was caught by the 19 mutation arms,
+# because an arm proves the claims you thought of.
+
+
+def test_a_runner_claim_of_a_refused_run_is_not_confirmed_by_a_record(tmp_path: Path):
+    """`kb-gates` exits 2 when it REFUSES, and a refusal writes no record.
+
+    The comparison asked `(claim.rc == 0) == (unpassed == 0)`, making every
+    non-zero claim equivalent — so a record of a completed run with a failed
+    gate confirmed `rc=2`, a run that by the runner's own contract never
+    happened.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", rc=1)])
+    (f,) = _fails(_gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=2**\n"))
+    assert "refused" in f.detail
+
+
+def test_a_runner_claim_of_one_is_still_confirmed_by_a_failed_gate(tmp_path: Path):
+    """Control arm: tightening the comparison must not reject the real rc=1."""
+    root = _gate_repo(tmp_path, [_row("lint", rc=1)])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=1**\n")
+    assert f.verdict is handoff.Verdict.OK
+
+
+def test_a_duplicate_row_is_reported_rather_than_silently_resolved(tmp_path: Path):
+    """`kb-gates -- lint lint` is accepted, so two rows for one task is reachable.
+
+    The lookup returned the FIRST, so the second was invisible — and picking the
+    row that agrees with the claim is precisely the failure this module exists
+    to remove.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", rc=0), _row("lint", rc=1)])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.AMBIGUOUS
+    assert "2 rows" in f.detail
+
+
+def test_a_row_with_an_empty_sha_is_unbound_at_the_point_of_use(tmp_path: Path):
+    """`""` is falsy AND is not None, so it passed the drift and unbound checks.
+
+    Asserted against a directly-constructed row rather than a parsed one on
+    purpose: `_parse` now normalises it away, and a test that went through the
+    parser would prove the parser rather than this check. The hole was one
+    constructor away from returning.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", rc=0, sha="")])
+    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    assert f.verdict is handoff.Verdict.UNVERIFIABLE
+    assert "bound to no commit" in f.detail

@@ -847,3 +847,61 @@ def test_row_returns_none_for_a_gate_the_record_does_not_cover(tmp_path):
     assert found is not None
     assert found.row("lint") is not None
     assert found.row("lint-docs") is None
+
+
+def test_a_boolean_is_not_an_exit_code(tmp_path):
+    """`"rc": true` parsed as a valid exit code, and `True == 1` in Python.
+
+    So a hand-edited or corrupted record confirmed a `rc=1` claim with a value
+    that is not an exit code at all. `bool` IS an `int` here, which is why the
+    check has to say so explicitly.
+    """
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": True, "sha": _SHA}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].rc is None
+
+
+def test_a_real_exit_code_still_parses(tmp_path):
+    """Control arm for the test above — rejecting bools must not reject ints."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 1, "sha": _SHA}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].rc == 1
+
+
+def test_an_empty_row_sha_is_read_back_as_unknown(tmp_path):
+    """Write-side `iter_run` already normalises `"" -> None`; the read side now agrees."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 0, "sha": ""}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].sha is None
+
+
+def test_a_record_with_an_empty_top_level_sha_is_unreadable(tmp_path):
+    """`record()` never writes one, so an empty key is corruption, not a state."""
+    _write_raw(tmp_path, _SHA, json.dumps({"sha": "", "gates": []}))
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is None
+
+
+def test_rows_for_returns_every_matching_row(tmp_path):
+    """The plural lookup is what makes a duplicate row visible to the caller."""
+    _write_record(
+        tmp_path, _SHA, [_ok("lint"), gates.GateResult("lint", 1, _SHA, "t", dirty=False)]
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert [r.rc for r in found.rows_for("lint")] == [0, 1]
