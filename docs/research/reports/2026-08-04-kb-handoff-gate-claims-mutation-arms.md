@@ -112,3 +112,31 @@ file, never by retyping the line.
 ## GitHub repos touched
 
 _None._ Every probe ran against this repository's own working tree.
+
+## Round 2 of the cold review: three more arms, at a later commit
+
+**The 19-arm table above was measured at `1bdc64d`**, before the cold lane's two
+rounds. It is left as measured rather than re-run, and this section states the
+condition instead of letting the table quietly imply it covers later code.
+
+Round 2's finding was that one of round 1's own fix-tests **could not fail** —
+`test_a_row_with_an_empty_sha_is_unbound_at_the_point_of_use` went through
+`gates.record()` → `find_record` → `_parse`, and `_parse` normalises `"" → None`
+at read time, so the point-of-use predicate it claimed to pin never saw an empty
+string. Reverting `not r.sha` to the pre-fix `r.sha is None` left it green. Its
+docstring asserted it was hand-built on purpose; it was not. This is the
+"fix surviving inside its own fix" pattern arriving in the TEST rather than in
+the code, and no amount of code-side mutation could have surfaced it — only
+mutating the fix and re-running its own test does.
+
+Re-armed at `ed4e4e3`, all three by single-site mutation:
+
+| arm | outcome |
+|---|---|
+| point-of-use empty-sha guard (the former tautology) | CAUGHT (rc=1) |
+| a malformed `rc` rejects the whole record | CAUGHT (rc=1) |
+| a same-task contradiction survives the distributive dedup | CAUGHT (rc=1) |
+
+The first row is the one worth keeping: before the fix that same command
+returned **rc=0**, which is what "a test that cannot fail" looks like from the
+outside — indistinguishable from a passing suite.

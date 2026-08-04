@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from kb_setup import gates, handoff
+from kb_setup import citations, gates, handoff
 
 _MISE = "[tasks.kb-build]\nrun = 'true'\n[tasks.lint]\nrun = 'true'\n"
 
@@ -562,15 +562,30 @@ def test_a_duplicate_row_is_reported_rather_than_silently_resolved(tmp_path: Pat
     assert "2 rows" in f.detail
 
 
-def test_a_row_with_an_empty_sha_is_unbound_at_the_point_of_use(tmp_path: Path):
+def test_a_row_with_an_empty_sha_is_unbound_at_the_point_of_use():
     """`""` is falsy AND is not None, so it passed the drift and unbound checks.
 
-    Asserted against a directly-constructed row rather than a parsed one on
-    purpose: `_parse` now normalises it away, and a test that went through the
-    parser would prove the parser rather than this check. The hole was one
-    constructor away from returning.
+    Asserted on `_judge` with a HAND-BUILT row, because everything above it
+    normalises the input away. The first version of this test went through
+    `gates.record()` -> `find_record` -> `_parse`, which turns `"" -> None` at
+    read time — so `_judge_rows` never saw an empty string and the test passed
+    identically with the pre-fix `r.sha is None` predicate restored. It asserted
+    nothing, while its own docstring claimed it was hand-built on purpose.
+
+    Confirmed by mutation before and after: reverting the predicate leaves the
+    old form green and fails this one. (Cold lane round 2 — the fix surviving
+    inside its own fix, in the test rather than in the code.)
     """
-    root = _gate_repo(tmp_path, [_row("lint", rc=0, sha="")])
-    (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n")
+    row = gates.RecordedGate(task="lint", rc=0, sha="", dirty=False)
+    record = gates.Record(sha=_A, path=Path("gates-x.json"), gates=(row,))
+    f = handoff._judge(citations.GateClaim("lint", 0, (_A[:7],), 1), record)
     assert f.verdict is handoff.Verdict.UNVERIFIABLE
     assert "bound to no commit" in f.detail
+
+
+def test_a_row_with_a_real_sha_is_bound_at_the_point_of_use():
+    """Control arm: the point-of-use guard must not call every row unbound."""
+    row = gates.RecordedGate(task="lint", rc=0, sha=_A, dirty=False)
+    record = gates.Record(sha=_A, path=Path("gates-x.json"), gates=(row,))
+    f = handoff._judge(citations.GateClaim("lint", 0, (_A[:7],), 1), record)
+    assert f.verdict is handoff.Verdict.OK

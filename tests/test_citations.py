@@ -480,3 +480,21 @@ def test_a_single_distributive_phrase_still_reaches_the_end_of_its_block():
     """Control arm: bounding each phrase must not truncate the only one."""
     text = "- Gates, all rc=0: `mise run lint` ·\n  `mise run test` · `mise run eval`\n"
     assert [c.task for c in citations.gate_claims(text)] == ["lint", "test", "eval"]
+
+
+def test_two_phrases_claiming_the_same_task_differently_both_survive():
+    """`all rc=0: lint; all rc=1: lint` dropped the second claim silently.
+
+    The shared `claimed` set suppressed it, so a contradiction the author WROTE
+    never reached the checker. Emitting both means one fails against the record,
+    which is how a reader gets told. Pre-existing, in the path this round
+    touched. (Cold lane round 2.)
+    """
+    text = "- all rc=0: `mise run lint`; all rc=1: `mise run lint`\n"
+    assert [(c.task, c.rc) for c in citations.gate_claims(text)] == [("lint", 0), ("lint", 1)]
+
+
+def test_one_phrase_naming_a_task_twice_claims_it_once():
+    """Control arm: dedup on (task, rc) must still collapse a real duplicate."""
+    text = "- all rc=0: `mise run lint` · `mise run lint`\n"
+    assert [(c.task, c.rc) for c in citations.gate_claims(text)] == [("lint", 0)]

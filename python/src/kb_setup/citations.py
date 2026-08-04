@@ -493,14 +493,23 @@ def gate_claims(text: str) -> list[GateClaim]:
         # worse than a missed one: a miss leaves the handoff unchecked, while
         # this one puts a verdict behind words nobody wrote. (Cold lane.)
         phrases = list(_ALL_RC_RE.finditer(body))
+        # Deduped on (task, rc), NOT on task alone. `claimed` holds only the
+        # DIRECT claims, because a direct rc genuinely overrides a distributive
+        # one — but two distributive phrases naming the same task with DIFFERENT
+        # codes are two claims that contradict each other, and suppressing the
+        # second one hid the contradiction from the checker entirely. Emitting
+        # both means one of them FAILS against the record, which is how a reader
+        # gets told. (Cold lane, round 2; pre-existing, in the path this round
+        # already touched.)
+        distributed: set[tuple[str, int]] = set()
         for i, phrase in enumerate(phrases):
             rc = int(phrase.group("rc"))
             stop = phrases[i + 1].start() if i + 1 < len(phrases) else len(body)
             for cite in _TASK_RE.finditer(body, phrase.end(), stop):
                 name = cite.group(1)
-                if name in claimed:
+                if name in claimed or (name, rc) in distributed:
                     continue
-                claimed.add(name)
+                distributed.add((name, rc))
                 claims.append(GateClaim(name, rc, shas, line_of(cite.start())))
     return claims
 

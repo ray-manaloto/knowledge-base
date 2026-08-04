@@ -40,6 +40,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypeIs
 
 from kb_setup import atomic, resolve, review
 
@@ -409,14 +410,55 @@ class Record:
         return passed, len(self.gates) - passed
 
 
-def _is_exit_code(value: object) -> bool:
+def _is_exit_code(value: object) -> TypeIs[int]:
     """Whether ``value`` is an exit code as JSON can carry one.
 
     `bool` is a subclass of `int`, so a bare `isinstance(v, int)` accepts `true`
     and `false` — and `True == 1`, so the record then agrees with a claim of
     `rc=1`. An exit code is a number, not a flag.
+
+    A `TypeIs` rather than a `bool` so the caller's `rc` narrows to `int` on the
+    strength of the check that was performed, instead of being re-asserted with
+    a cast. A type that claims more than the check establishes is how a caller
+    stops checking at all.
     """
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _read_row(row: object) -> RecordedGate | None:
+    """One recorded gate, or None when the row is not one.
+
+    ABSENT and PRESENT-BUT-WRONG-TYPE are different, and the split is the whole
+    point. A missing field is another writer's omission and reads as "unknown";
+    a field that is there and is the wrong TYPE means these bytes are not a gate
+    record, and the honest answer is that the record could not be read.
+
+    Coercing instead is how the collapse this repo keeps relearning gets in:
+    `"rc": true` was normalised to None, which is the SAME value a legitimately
+    unreached gate carries — so a corrupt row became indistinguishable from
+    "this gate did not run" and went on to help confirm a runner claim of
+    failure. "Could not read" is not one of the states a record has. (Cold lane,
+    round 2.)
+    """
+    if not isinstance(row, dict):
+        return None
+    task = row.get("task")
+    if not isinstance(task, str) or not task:
+        return None
+    rc = row.get("rc")
+    if rc is not None and not _is_exit_code(rc):
+        return None
+    sha = row.get("sha")
+    if sha is not None and not isinstance(sha, str):
+        return None
+    dirty = row.get("dirty")
+    if dirty is not None and not isinstance(dirty, bool):
+        return None
+    # `sha or None`: an empty string is FALSY, so the drift check skipped it, and
+    # it is not None, so the unbound check skipped it too — a row bound to no
+    # commit passed both directions. `iter_run` normalises the same way at write
+    # time; this is the read side agreeing with it.
+    return RecordedGate(task=task, rc=rc, sha=sha or None, dirty=dirty)
 
 
 def _parse(path: Path) -> Record | None:
@@ -439,32 +481,10 @@ def _parse(path: Path) -> Record | None:
         return None
     parsed: list[RecordedGate] = []
     for row in rows:
-        if not isinstance(row, dict) or not isinstance(row.get("task"), str):
+        read = _read_row(row)
+        if read is None:
             return None
-        parsed.append(
-            RecordedGate(
-                task=row["task"],
-                # `not isinstance(v, bool)` is load-bearing: in Python `bool` IS
-                # an `int`, so `"rc": true` parsed as a valid exit code and then
-                # compared EQUAL to 1 — a hand-edited or corrupted record could
-                # confirm a `rc=1` claim with a value that is not an exit code at
-                # all. (Cold lane.)
-                rc=row["rc"] if _is_exit_code(row.get("rc")) else None,
-                # `or None`, so an empty string becomes the "unknown" state
-                # rather than a third thing that is neither. `""` is FALSY, so
-                # the drift check skipped it, and it is not `None`, so the
-                # unbound check skipped it too — a row bound to no commit passed
-                # BOTH directions and confirmed a claim about any commit at all.
-                # `iter_run` already normalises the same way at write time; this
-                # is the read side finally agreeing with it. (Cold lane.)
-                sha=(row["sha"] or None) if isinstance(row.get("sha"), str) else None,
-                # `is True` / `is False`, not `bool(...)`: the third state is
-                # "could not ask", and coercing an absent or malformed value to
-                # False would report an unknown tree as a clean one — the
-                # collapse this field was added to prevent.
-                dirty=row["dirty"] if isinstance(row.get("dirty"), bool) else None,
-            )
-        )
+        parsed.append(read)
     return Record(sha=sha, path=path, gates=tuple(parsed))
 
 

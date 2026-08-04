@@ -849,23 +849,6 @@ def test_row_returns_none_for_a_gate_the_record_does_not_cover(tmp_path):
     assert found.row("lint-docs") is None
 
 
-def test_a_boolean_is_not_an_exit_code(tmp_path):
-    """`"rc": true` parsed as a valid exit code, and `True == 1` in Python.
-
-    So a hand-edited or corrupted record confirmed a `rc=1` claim with a value
-    that is not an exit code at all. `bool` IS an `int` here, which is why the
-    check has to say so explicitly.
-    """
-    _write_raw(
-        tmp_path,
-        _SHA,
-        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": True, "sha": _SHA}]}),
-    )
-    found, _ = gates.find_record(tmp_path, _SHA)
-    assert found is not None
-    assert found.gates[0].rc is None
-
-
 def test_a_real_exit_code_still_parses(tmp_path):
     """Control arm for the test above — rejecting bools must not reject ints."""
     _write_raw(
@@ -905,3 +888,52 @@ def test_rows_for_returns_every_matching_row(tmp_path):
     found, _ = gates.find_record(tmp_path, _SHA)
     assert found is not None
     assert [r.rc for r in found.rows_for("lint")] == [0, 1]
+
+
+def test_a_malformed_rc_makes_the_whole_record_unreadable(tmp_path):
+    """`"rc": true` must not be COERCED to the value an unreached gate carries.
+
+    Normalising it to None made a corrupt row indistinguishable from "this gate
+    did not run", so it went on to help confirm a runner claim of failure — the
+    "could not read rendered as a state" collapse, one layer down. A record with
+    a field of the wrong type is not a record.
+    """
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": True, "sha": _SHA}]}),
+    )
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert "could not read" in detail
+
+
+def test_a_null_rc_is_still_a_legitimate_row(tmp_path):
+    """Control arm: an unreached gate really does carry `rc: null` (#146)."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": None, "sha": None}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].rc is None
+
+
+def test_a_row_with_a_wrong_typed_dirty_is_unreadable(tmp_path):
+    """The same rule for every field: present-but-wrong-typed is not a state."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 0, "dirty": "yes"}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is None
+
+
+def test_an_absent_field_is_unknown_rather_than_malformed(tmp_path):
+    """ABSENT and WRONG-TYPED are different: one is an omission, one is corruption."""
+    _write_raw(tmp_path, _SHA, json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 0}]}))
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert (found.gates[0].sha, found.gates[0].dirty) == (None, None)
