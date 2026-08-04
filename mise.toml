@@ -539,6 +539,23 @@ description = 'Score project skills with plugin-eval (static layer, no LLM): mis
 # not comparable. Logic in kb_setup.skill_eval.
 run = "uv run kb-setup skill-score"
 
+[tasks.kb-handoff-check]
+description = "Verify a handoff's static claims — paths, file:line, task names: mise run kb-handoff-check [-- <path>]"
+# Replaces the by-hand half of /clear-prep step 6, which asks the agent that WROTE
+# the handoff to verify it from memory at the end of a long session — and which
+# already failed that way (`:1836` written for `:1830`, propagated into three
+# files). With no argument it checks the newest .agent/plans/session-*.md.
+# STRICT about wrongness (a broken path / a file:line past EOF / a task this repo
+# does not declare exits 1), ADVISORY about ambiguity (a bare filename matching
+# several files is reported and exits 0), and 2 on a malformed request — the same
+# split kb-skill-score draws. Task names are checked against THIS repo's mise.toml
+# and never against `mise tasks ls`, which merges the user's global config and so
+# reports strictly more tasks than this file declares — the exact count is in
+# kb_setup.resolve.declared_tasks and is deliberately NOT repeated here, because
+# both totals move every time this file gains a task. Logic in kb_setup.handoff,
+# over the reusable kb_setup.citations + kb_setup.resolve primitives.
+run = "uv run kb-setup handoff-check"
+
 [tasks.kb-goal-check]
 description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'
 # ADVISORY — always exits 0. A goal document is authored input, not repo source, so a
