@@ -51,8 +51,17 @@ continue with no gaps?* If the answer is no, fix that before step 7.
 Gather, don't recall — **one task, not four commands** (#144):
 
 ```bash
-mise run kb-session-state
+uv run kb-setup session-state
 ```
+
+**Deliberately not `mise run kb-session-state`.** Same code, but mise redacts
+digit runs matching your secrets, so the task mangles **the branch, every commit
+SHA, and every issue/PR number** — the three fields a handoff most needs
+verbatim, and the two that `kb-gates` records and `kb-review` receipts are keyed
+by. `feat/144-…` prints as `feat/[redacted]44-…` and `90e2591cda13` as
+`90e259[redacted]cda[redacted]3`. The `tier1.mise-redaction-legible` eval case
+tracks this and is advisory-by-design; the cause is your user-level mise config,
+which `do-not.md` #11 bars this repo from editing.
 
 It prints the branch, the staged/unstaged/untracked split, the recent commits,
 and the open PR with its check state, already shaped like a handoff bullet. Four
@@ -60,11 +69,6 @@ hand-run commands reformatted by hand is four chances to transcribe something,
 and this repo has already paid for that twice — a `file:line` read off a `sed`
 window by eye (`:1836` for `:1830`, propagated into three files) and a PR number
 read out of a redacted `mise run` log (`pull/[redacted]59`).
-
-**Read the block from an unredacted run.** mise's output redaction masks digits
-mid-number, so a branch called `feat/144-…` prints as `feat/[redacted]44-…`.
-Copy the block from `uv run kb-setup session-state` instead — same command, no
-redaction layer — or paste from a run whose digits you have checked.
 
 **`COULD NOT ASK` is not `none`.** If the PR line says the former, `gh` was
 unreachable, rate-limited or unauthenticated — write that into the handoff as

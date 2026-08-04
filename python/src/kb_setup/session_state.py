@@ -23,16 +23,23 @@ first would put a claim in a handoff that nothing checked — the precise defect
 it. :class:`PrState` therefore has three members, not a bool, matching
 `resolve.State`, `handoff.Verdict` and `currency`'s DRIFT/SKIP/OK next door.
 
-READ THE BLOCK FROM AN UNREDACTED RUN. mise's output redaction masks digit runs
-it matches against the user's secrets, so `mise run kb-session-state` prints this
-branch as `feat/[redacted]44-kb-session-state`. That is the SAME defect this
-module exists to remove (a PR number was once read out of a log as
-`pull/[redacted]59`), arriving through the transport rather than the transcriber
-— so it is called out here, in `mise.toml`, and in `/clear-prep` step 1 rather
-than left for a reader to discover from a wrong number in a handoff. The cause is
-the USER's mise config (`_.fnox-env`), which `do-not.md` #11 forbids this repo
-from editing, so the mitigation is `uv run kb-setup session-state` — same code,
-no redaction layer.
+READ THE BLOCK FROM AN UNREDACTED RUN — AND IT IS NOT ONLY THE BRANCH. mise's
+output redaction masks digit runs matching the user's secrets, so
+`mise run kb-session-state` mangles **the branch, every commit SHA, and every
+issue/PR number**: `feat/144-…` prints as `feat/[redacted]44-…` and
+`90e2591cda13` as `90e259[redacted]cda[redacted]3`. SHAs and PR numbers are the
+worse half — they are what `kb-gates` records and `kb-review` receipts are keyed
+by, so a reader who checks the branch (which the first draft of this paragraph
+told them to do, naming only the branch) would still paste a corrupted SHA.
+
+That is the SAME defect this module exists to remove — a PR number was once read
+out of a log as `pull/[redacted]59` — arriving through the transport rather than
+the transcriber. The repo already tracks it as the advisory-by-design eval case
+`tier1.mise-redaction-legible`, whose own message says every figure `mise run`
+prints is untrustworthy while it holds. The cause is the USER's mise config
+(`_.fnox-env`), which `do-not.md` #11 forbids this repo from editing, so the
+mitigation is `uv run kb-setup session-state` — same code, no redaction layer.
+`/clear-prep` step 1 therefore fences THAT command, not the task.
 
 THE PROBE IS `gh pr list --state open`, NOT `gh pr view <branch>`. `pr.py`
 records what the latter does: it resolves a branch to its PR REGARDLESS of
@@ -61,9 +68,11 @@ _GIT_TIMEOUT = 30
 #: real answer here rather than a failure.
 _GH_TIMEOUT = 120
 
-#: How many commits a snapshot carries. Enough to show what the session did
-#: without turning a handoff bullet into a changelog.
-DEFAULT_COMMITS = 5
+#: How many commits a snapshot carries. EIGHT, matching the `git log --oneline -8`
+#: that `/clear-prep` step 1 ran before this task replaced it. Five read better in
+#: a bullet, but shipping five would have silently narrowed the workflow this
+#: replaces — a reduction nobody asked for and no reviewer would see.
+DEFAULT_COMMITS = 8
 
 #: What `git rev-parse --abbrev-ref HEAD` returns when HEAD is detached — the
 #: literal string, not an error. A paused bisect or a `git checkout <sha>`
@@ -73,12 +82,17 @@ DEFAULT_COMMITS = 5
 #: turn "we are not on a branch" into a confident "no open PR".
 DETACHED = "HEAD"
 
-#: `git status --porcelain` status codes meaning "nothing in this half". Index
+#: `git status --porcelain` status code meaning "nothing in this half". Index
 #: and worktree are read INDEPENDENTLY (X and Y), because `MM` is genuinely both
 #: staged and unstaged and collapsing it loses the distinction a handoff reader
 #: needs: "staged: foo" alone invites them to believe the staged content is the
 #: whole change.
-_UNMODIFIED = " "
+#: A `frozenset`, matching :data:`_PAIRED_CODES` next door, because the test is
+#: set MEMBERSHIP. As a bare string it was substring containment wearing the same
+#: syntax — harmless here (the `_STATUS_PREFIX` guard makes every tested value
+#: length 1, and the standards lane tried to construct a reaching case and could
+#: not) but two spellings of one idea in adjacent constants.
+_UNMODIFIED = frozenset({" "})
 
 #: Codes whose `-z` record is followed by a SECOND NUL-terminated field holding
 #: the original path. Failing to consume it does not merely render renames oddly
@@ -111,15 +125,33 @@ class PullRequest:
     """The PR half of a snapshot.
 
     ``detail`` is never empty when ``state`` is UNVERIFIABLE — :func:`render`
-    prints it verbatim, so a silent unknown would become an unexplained one.
-    ``number``/``title``/``checks`` are populated only for OPEN.
+    prints it verbatim, so a silent unknown would become an unexplained one. It
+    means ONE thing: why there is no answer. ``note`` carries the separate job
+    of annotating an answer we DO have (currently: more than one open PR on the
+    head). They were one field until the standards lane pointed out that a
+    caller filtering on ``detail`` could not tell an explanation from an
+    annotation — and that this docstring already claimed ``detail`` was only the
+    former while the code used it for both.
+
+    ``number``/``title``/``checks``/``checks_green`` are populated only for OPEN.
+
+    ``checks_green`` mirrors `pr.checks_state`'s verdict and is None unless
+    ``state`` is OPEN. It is False BOTH for a binding check that failed and for
+    a checks lookup that could not be read: `pr.checks_state` owns that collapse
+    and it gates `ship`/`land`, so it is not rewritten from here — ``checks``
+    carries the sentence that distinguishes them. Recorded rather than silently
+    discarded, because without it a caller asking "are the checks green?" had to
+    substring-match prose that can also read "could not read checks (rc=1)".
+    (Spec lane, criterion 3.)
     """
 
     state: PrState
     number: int | None = None
     title: str = ""
     checks: str = ""
+    checks_green: bool | None = None
     detail: str = ""
+    note: str = ""
 
 
 @dataclass(frozen=True)
@@ -183,7 +215,11 @@ def _git(args: list[str], repo_root: Path) -> tuple[int, str]:
     """
     try:
         proc = subprocess.run(
-            ["git", "-C", str(repo_root), *args],
+            # `cwd=`, the spelling `pr._run` and `gates.tree_dirty` both use.
+            # `git -C <root>` is equivalent and was two idioms for one job in
+            # adjacent modules. (Standards lane.)
+            ["git", *args],
+            cwd=repo_root,
             capture_output=True,
             text=True,
             errors="replace",
@@ -391,26 +427,33 @@ def _pr_from_rows(rows: list[dict[str, object]]) -> PullRequest:
             detail="gh returned a PR row with no usable number",
         )
     title = rows[0].get("title")
-    _, checks = _checks_state(number)
+    green, checks = _checks_state(number)
     # More than one open PR on a single head is possible and worth saying, since
-    # everything below reports only the first.
+    # everything below reports only the first. It goes in `note`, not `detail`:
+    # `detail` means "why there is no answer", and this is an answer.
     extra = f" ({len(rows)} open PRs on this branch; showing the first)" if len(rows) > 1 else ""
     return PullRequest(
         PrState.OPEN,
         number=number,
         title=title if isinstance(title, str) else "",
         checks=checks,
-        detail=extra,
+        checks_green=green,
+        note=extra,
     )
 
 
-def gather(repo_root: Path, *, limit: int = DEFAULT_COMMITS, pr: bool = True) -> Snapshot:
+def gather(repo_root: Path, *, limit: int = DEFAULT_COMMITS, with_pr: bool = True) -> Snapshot:
     """Read the session's working state. Renders nothing (criterion 2).
 
-    ``pr=False`` skips the network call entirely and reports the PR state as
-    UNVERIFIABLE-because-not-asked. That is not a placeholder: a caller that
+    ``with_pr=False`` skips the network call entirely and reports the PR state
+    as UNVERIFIABLE-because-not-asked. That is not a placeholder: a caller that
     declined to look has exactly as much evidence about the PR as one whose
     lookup failed, and giving it a cheerier value would be inventing one.
+
+    Named ``with_pr`` rather than ``pr``, which was four things in one module —
+    the sibling module imported in :func:`_checks_state`, the :class:`Snapshot`
+    field, :func:`_render_pr`'s :class:`PullRequest` parameter, and this flag.
+    (Standards lane.)
     """
     branch = current_branch(repo_root)
     return Snapshot(
@@ -419,7 +462,7 @@ def gather(repo_root: Path, *, limit: int = DEFAULT_COMMITS, pr: bool = True) ->
         commits=recent_commits(repo_root, limit),
         pr=(
             pull_request(repo_root, branch)
-            if pr
+            if with_pr
             else PullRequest(PrState.UNVERIFIABLE, detail="the PR lookup was not requested")
         ),
     )
@@ -454,7 +497,7 @@ def _render_pr(pr: PullRequest) -> str:
     if pr.state is PrState.OPEN:
         title = f" — {pr.title}" if pr.title else ""
         checks = f" (checks: {pr.checks})" if pr.checks else ""
-        return f"- **open PR**: #{pr.number}{title}{checks}{pr.detail}"
+        return f"- **open PR**: #{pr.number}{title}{checks}{pr.note}"
     return f"- **open PR**: COULD NOT ASK — {pr.detail}"
 
 
@@ -501,5 +544,19 @@ def main(args: list[str], repo_root: Path) -> int:
             file=sys.stderr,
         )
         return 2
-    print(render(gather(repo_root, pr="--no-pr" not in args)))
+    # POSITIONALS ARE REFUSED TOO. This command takes none, so anything here is
+    # a mistake — a mistyped flag that lost its dashes, or a path the caller
+    # thought was accepted. Ignoring them exited 0 on `session-state bogus`
+    # while the comment above claimed unrecognised input is refused rather than
+    # ignored, so the guard enforced half its own stated rule. `kb-gates` may
+    # ignore positionals because it TAKES them (gate names). (Standards lane.)
+    positional = [a for a in args if not a.startswith("-")]
+    if positional:
+        print(
+            f"kb-session-state: takes no positional argument(s), got "
+            f"{', '.join(positional)} (accepted: {', '.join(sorted(_FLAGS))})",
+            file=sys.stderr,
+        )
+        return 2
+    print(render(gather(repo_root, with_pr="--no-pr" not in args)))
     return 0

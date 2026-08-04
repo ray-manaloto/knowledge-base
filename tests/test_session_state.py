@@ -172,6 +172,16 @@ def test_the_branch_and_recent_commits_are_gathered(
     assert len(snap.commits) <= session_state.DEFAULT_COMMITS
 
 
+def test_the_default_commit_count_matches_the_workflow_it_replaces() -> None:
+    """`/clear-prep` step 1 ran `git log --oneline -8`, so the default is 8.
+
+    Pinned as a test rather than left to the constant's comment: shipping 5
+    would silently narrow the workflow this task replaces, and a reduction with
+    no test is one no reviewer would ever see.
+    """
+    assert session_state.DEFAULT_COMMITS == 8
+
+
 def test_commit_limit_is_honoured(
     git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -234,6 +244,55 @@ def test_an_open_pr_is_reported_with_its_number_and_checks(
     assert pr.number == 144
     assert pr.title == "the snapshot"
     assert "green" in pr.checks
+    # The VERDICT is carried as data, not left only in the prose. Without this a
+    # caller asking "are the checks green?" has to substring-match text that can
+    # also read "could not read checks (rc=1)". (Spec lane, criterion 3.)
+    assert pr.checks_green is True
+
+
+def test_a_red_check_is_carried_as_data_not_only_as_prose(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`checks_green` must actually track the verdict, not be hardcoded True."""
+    monkeypatch.setattr(session_state, "_gh", lambda _a, _r: (0, '[{"number": 9, "title": "t"}]'))
+    monkeypatch.setattr(session_state, "_checks_state", lambda _n: (False, "1 check(s) not green"))
+
+    pr = session_state.gather(tmp_path).pr
+
+    assert pr.checks_green is False
+
+
+def test_checks_green_is_none_when_there_is_no_open_pr(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No PR means no checks were asked about — not that they were not green."""
+    _no_pr(monkeypatch)
+
+    assert session_state.gather(tmp_path).pr.checks_green is None
+
+
+def test_a_multi_pr_annotation_does_not_land_in_the_unverifiable_field(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`detail` means "why there is no answer"; a note about an answer is not that.
+
+    One field doing both jobs left a caller filtering on `detail` unable to tell
+    an explanation from an annotation — while the class docstring claimed
+    `detail` was only the former. (Standards lane.)
+    """
+    monkeypatch.setattr(
+        session_state,
+        "_gh",
+        lambda _a, _r: (0, '[{"number": 1, "title": "a"}, {"number": 2, "title": "b"}]'),
+    )
+    monkeypatch.setattr(session_state, "_checks_state", lambda _n: (True, "green"))
+
+    pr = session_state.gather(tmp_path).pr
+
+    assert pr.state is session_state.PrState.OPEN
+    assert pr.detail == ""
+    assert "2 open PRs" in pr.note
+    assert "2 open PRs" in session_state.render(session_state.gather(tmp_path))
 
 
 def test_a_failed_gh_lookup_is_its_own_state_not_no_open_pr(
@@ -350,9 +409,9 @@ def test_gathering_can_skip_the_pr_lookup_entirely(
     monkeypatch.setattr(
         session_state,
         "_gh",
-        lambda _a, _r: pytest.fail("gh must not be called when pr=False"),
+        lambda _a, _r: pytest.fail("gh must not be called when with_pr=False"),
     )
-    snap = session_state.gather(tmp_path, pr=False)
+    snap = session_state.gather(tmp_path, with_pr=False)
 
     assert snap.branch == "work"
     assert snap.pr.state is session_state.PrState.UNVERIFIABLE
@@ -500,6 +559,26 @@ def test_main_refuses_an_unknown_flag(
     _no_pr(monkeypatch)
 
     assert session_state.main(["--nonsense"], tmp_path) == 2
+
+
+def test_main_refuses_a_positional_argument(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """This command takes no positionals, so anything there is a mistake.
+
+    Ignoring them exited 0 on `session-state bogus` while the module's own
+    comment claimed unrecognised input is refused rather than ignored — the
+    guard enforcing half its stated rule. A mistyped flag that lost its dashes
+    is the realistic way in. (Standards lane.)
+    """
+    _no_pr(monkeypatch)
+
+    assert session_state.main(["bogus"], tmp_path) == 2
+    # Control: the accepted flag still works, so the guard discriminates rather
+    # than refusing everything.
+    assert session_state.main(["--no-pr"], tmp_path) == 0
 
 
 def test_main_accepts_the_no_pr_flag(
