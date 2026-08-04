@@ -498,3 +498,171 @@ def test_one_phrase_naming_a_task_twice_claims_it_once():
     """Control arm: dedup on (task, rc) must still collapse a real duplicate."""
     text = "- all rc=0: `mise run lint` · `mise run lint`\n"
     assert [(c.task, c.rc) for c in citations.gate_claims(text)] == [("lint", 0)]
+
+
+# --------------------------------------------------- typo'd extensions ----
+#
+# The extraction half of #154. `citations` cannot know whether `mise.tomlx` is a
+# typo — that is a filesystem question — so it PROPOSES the repairs and
+# `kb_setup.resolve` disposes. Everything here is therefore about which tokens
+# get proposed at all, and the exclusion arms are again the point: the mechanism
+# this ticket originally specified (a bare stem probe) was measured to promote
+# 233 distinct tokens over this repo's 156 authored markdown files, almost all of
+# them `module.attribute` references. Those exclusions are asserted below.
+
+
+def test_a_typod_extension_proposes_the_known_spelling():
+    (cand,) = citations.typo_candidates("see `mise.tomlx` here\n")
+    assert cand.text == "mise.tomlx"
+    assert cand.repairs == ("mise.toml",)
+    assert cand.line == 1
+
+
+def test_a_known_extension_is_never_a_typo_candidate():
+    """Control arm: the tokens `path_citations` already handles never appear here.
+
+    Two extractors reporting one token would produce two findings for one
+    mistake, which is the duplication `path_citations` already excludes
+    `file:line` for.
+
+    `config.yml` IS the fixture, and `mise.toml` alone was not. A known extension
+    is usually far from every other known extension — `toml` and `md` have no
+    neighbour within one edit — so removing the `is_path_like` guard leaves them
+    proposing nothing and the arm reports a false pass. `yml` is one edit from
+    BOTH `xml` and `yaml`, so it is the token that can actually exhibit the
+    double-report. A fixture unable to exhibit the harm is the probe being the
+    no-op, not the code.
+    """
+    assert citations.typo_candidates("see `mise.toml` `docs/a.md` `config.yml`\n") == []
+
+
+def test_the_repair_covers_all_four_single_edit_typos():
+    """Substitution, insertion, deletion and transposition — the classic set.
+
+    Transposition is included because `.tmol` for `.toml` is one of the most
+    common ways a human mistypes an extension, and it was measured to cost
+    **0 additional promotions** over the corpus rather than assumed harmless.
+    """
+    got = {
+        c.text: c.repairs
+        for c in citations.typo_candidates(
+            "`a.tomd` `b.tomll` `c.tom` `d.tmol`\n"  # sub, ins, del, transpose
+        )
+    }
+    assert got["a.tomd"] == ("a.toml",)
+    assert got["b.tomll"] == ("b.toml",)
+    assert got["c.tom"] == ("c.toml",)
+    assert got["d.tmol"] == ("d.toml",)
+
+
+def test_a_module_attribute_reference_is_not_a_typo_candidate():
+    """The measured false-positive class, asserted as an arm.
+
+    `gates.record` names a real module and a real attribute. Under the stem
+    probe this ticket originally proposed it resolved uniquely to
+    `python/src/kb_setup/gates.py` and would have been reported as a typo — 278
+    occurrences of exactly this shape across the corpus. Under extension repair
+    it never reaches the filesystem, because no known extension is one edit from
+    `record`.
+    """
+    text = "`gates.record` `graphify_env.clean_env()` `chunks._out_path` `resolve.build_index()`\n"
+    assert citations.typo_candidates(text) == []
+
+
+def test_a_version_number_is_not_a_typo_candidate():
+    """`0.9.31` and `2026-08-03` occur in every handoff."""
+    assert citations.typo_candidates("`0.9.31` and `2026-08-03` and `1.2.3`\n") == []
+
+
+def test_a_typo_candidate_keeps_its_directory_prefix():
+    """The repair replaces the extension and nothing else."""
+    (cand,) = citations.typo_candidates("`python/src/kb_setup/handoff.pyy`\n")
+    assert cand.repairs == ("python/src/kb_setup/handoff.py",)
+
+
+def test_a_file_line_reference_is_not_a_typo_candidate():
+    """A BOUND, stated rather than left implicit.
+
+    `cli.pyx:287` is the same defect wearing a line number, and it is not
+    reported. Measured over the corpus: **0 occurrences**, against 5 bare tokens
+    that do reach the repair gate — so the recall given up is zero today, and
+    that count is the condition on the claim.
+
+    The arm matters in the other direction too: `cli.py:287` must not be
+    proposed here, or a citation `line_citations` already checks would be
+    reported twice.
+
+    `foo.mp:3` IS the fixture that makes this test able to fail. `cli.py:287` and
+    `cli.pyx:287` cannot: their extensions are far from every known spelling, so
+    removing the guard entirely leaves them proposing nothing and the mutation
+    arm reports a false pass — which is exactly what it did for one round. See
+    :func:`test_the_line_ref_guard_is_load_bearing_not_decorative`.
+    """
+    assert citations.typo_candidates("`cli.py:287` `cli.pyx:287` `foo.mp:3`\n") == []
+
+
+def test_a_typo_candidate_obeys_every_exclusion_a_path_does():
+    """The categorical rejections are shared, not re-derived.
+
+    A glob, an elision, a URL, a flag and a schemeless host are excluded from
+    path citations by construction; a second extractor that forgot any one of
+    them would reintroduce the false positives the first was built to avoid.
+    """
+    text = (
+        "`docs/*.mdx` `review-f19b18d6….mdd` `https://x.com/a.tomll` "
+        "`--out.tomll` `code.claude.com/docs/x.mdd`\n"
+    )
+    assert citations.typo_candidates(text) == []
+
+
+def test_a_typo_candidate_carries_the_absent_marker():
+    """So a deliberately-cited typo can be marked, exactly like a missing path."""
+    (cand,) = citations.typo_candidates("the example `mise.tomlx` (absent) above\n")
+    assert cand.marked_absent
+
+
+def test_a_typod_extension_inside_a_fence_is_not_a_candidate():
+    """Fenced content is EXAMPLE text — the same rule every other extractor obeys."""
+    assert citations.typo_candidates("```\n`mise.tomlx`\n```\n") == []
+
+
+def test_an_extension_far_from_every_known_one_proposes_nothing():
+    """The control for the whole mechanism: two edits away is not a typo here.
+
+    Stated so the bound is visible — `.tomlxx` is a real typo this will not
+    catch, and silence is the documented safe direction.
+    """
+    assert citations.typo_candidates("`mise.tomlxx` `notes.org` `data.parquet`\n") == []
+
+
+def test_the_line_ref_guard_is_load_bearing_not_decorative():
+    """The CONTROL ARM for the guard: prove it has something to guard.
+
+    This test exists because the opposite was asserted, confidently, in a code
+    comment and in a mutation report. The reasoning was: a `file:line` token ends
+    in `:<digits>`, so its extension contains a `:` and ends in digits; every
+    entry in `_KNOWN_EXT` is short and alphanumeric; therefore no such extension
+    is ever one edit from a known one. Every premise is true and the conclusion
+    is false — it never asked whether a known extension ends in a DIGIT.
+
+    **`mp3` does.** `foo.mp:3` has extension `mp:3`; delete the colon and you have
+    `mp3`. So the guard is the only thing stopping that token from proposing
+    `foo.mp3`, and the arm that "survived by construction" survived because its
+    fixtures could not exhibit the harm.
+
+    Asserted against the real `_ext_repairs` rather than against the allowlist's
+    shape, so a future entry that breaks it fails here whatever it looks like.
+    """
+    assert citations._ext_repairs("mp:3") == ("mp3",)
+    assert citations._ext_repairs("py:287") == ()
+
+
+def test_mp3_is_still_the_reason_the_guard_is_needed():
+    """Names the counterexample, so removing `mp3` does not silently retire it.
+
+    If this ever fails with an empty list, the guard above may genuinely have
+    become decoration — and that is a decision to take deliberately, having
+    re-run the reasoning, not something to discover from a green suite.
+    """
+    ending_in_a_digit = sorted(ext for ext in citations._KNOWN_EXT if ext[-1].isdigit())
+    assert ending_in_a_digit == ["mp3"]

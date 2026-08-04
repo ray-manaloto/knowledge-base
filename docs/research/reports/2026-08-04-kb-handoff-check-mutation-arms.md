@@ -14,6 +14,23 @@ measurement. Anyone can re-derive the table below from the script.
 Run 2026-08-04 against `feat/145-kb-handoff-check`:
 **32 of 32 arms discriminated, control included.**
 
+Re-run 2026-08-04 against `feat/154-extension-typo`, with #154's ten arms
+appended: **42 of 42 discriminated**, control included. Baseline green,
+restored green.
+
+That number was **41 of 42 for two rounds**, with arm 41 recorded as an
+expected no-op "by construction". It was not; the reasoning behind that label
+was wrong and the arm was simply pointed at a fixture that could not exhibit
+the harm. See "Arm 41 was reported a declared no-op, and that was WRONG" —
+the most useful section in this document.
+
+PROVENANCE OF THIS TABLE, since a table is a probe too. Rows 0–31 were
+**re-asserted** against the harness's own `MUTATIONS` list rather than retyped —
+all 32 agreed — and rows 32–41 were **generated** from that list paired with the
+run log, matched by label. Neither half was transcribed by hand;
+`probes-need-a-control-arm.md` rule 8 exists because a hand-built table in this
+repo already dropped a row and mislabelled two. (Standards lane.)
+
 The arms grew across two rounds of cold cross-family review. Round 1 added six
 (repo-escape containment, the `sources/` root's own level, a directory citation
 naming a file, an `(absent)` marker over an AMBIGUOUS resolution, a reversed
@@ -78,9 +95,96 @@ class of edit a reviewer is most likely to try. The harness deletes every
 | 29 | file:line: the lower-bound half of the range check removed | `test_a_zero_line_reference_fails` | ✓ |
 | 30 | sources: the committed extractions subtree reclassified vendored | `test_the_committed_extractions_subtree_counts_as_authored` | ✓ |
 | 31 | task lookup: aliases no longer counted as declared | `test_an_alias_counts_as_declared` | ✓ |
+| 32 | typo'd extension: the whole check unwired from the composer | `test_a_mistyped_extension_is_a_broken_citation` | ✓ |
+| 33 | typo'd extension: the repair vocabulary emptied | `test_a_typod_extension_proposes_the_known_spelling` | ✓ |
+| 34 | typo'd extension: the transposition arm dropped | `test_the_repair_covers_all_four_single_edit_typos` | ✓ |
+| 35 | typo'd extension: the all-digit guard removed, so a version proposes repairs | `test_a_version_number_is_not_a_typo_candidate` | ✓ |
+| 36 | typo'd extension: a token path_citations already reports is proposed again | `test_a_known_extension_is_never_a_typo_candidate` | ✓ |
+| 37 | typo'd extension: the vendored tier consulted when repairing | `test_a_repair_never_resolves_against_a_vendored_clone` | ✓ |
+| 38 | typo'd extension: the already-resolves silence guard removed | `test_an_unlisted_extension_that_really_exists_stays_silent` | ✓ |
+| 39 | typo'd extension: uniqueness weakened from exactly-one to at-least-one | `test_two_repairs_that_both_resolve_stay_silent` | ✓ |
+| 40 | typo'd extension: the suggestion interpolates a resolver label again | `test_the_suggestion_names_a_bare_path_not_a_resolver_label` | ✓ |
+| 41 | typo'd extension: the file:line guard removed, so `foo.mp:3` proposes `foo.mp3` | `test_a_file_line_reference_is_not_a_typo_candidate` | ✓ |
 
 Baseline rc=0 before the run; rc=0 after the last restore, so no arm left the
 tree mutated.
+
+## Arm 41 was reported a declared no-op, and that was WRONG
+
+This section previously argued that arm 41 could not fire, and the harness label
+said `EXPECTED NO-OP by construction`. Both were wrong, and the way they were
+wrong is worth more than the arm.
+
+The reasoning ran: for `_LINE_REF_RE` to match, a token ends in `:<digits>`, so
+its extension contains a `:` and ends in digits; every entry in `_KNOWN_EXT` is
+short and alphanumeric; therefore no such extension is ever within one edit of a
+known one. **Every premise is true and the conclusion is false.** It never asked
+whether a known extension ends in a DIGIT.
+
+`mp3` does. `foo.mp:3` has extension `mp:3`; delete the colon and you have `mp3` —
+one edit. Measured:
+
+    _ext_repairs('mp:3')   -> ('mp3',)
+    _ext_repairs('py:287') -> ()
+
+So the guard is the only thing stopping `foo.mp:3` from proposing `foo.mp3`. It
+is load-bearing, not decoration.
+
+**The arm did not survive because the code was undefended. It survived because
+the TEST's fixtures could not exhibit the harm** — `cli.py:287` and
+`cli.pyx:287` are far from every known spelling, so removing the guard leaves
+them proposing nothing either way. This repo already had that lesson written
+down, and this round wrote it into a test docstring an hour before walking into
+it: *a fixture unable to exhibit the harm is the probe being the no-op, not the
+code.*
+
+The fixture is now `foo.mp:3`, the arm is a real catch, and two tests pin the
+counterexample so it cannot quietly retire:
+`test_the_line_ref_guard_is_load_bearing_not_decorative` asserts `_ext_repairs`
+directly, and `test_mp3_is_still_the_reason_the_guard_is_needed` names `mp3` as
+the sole known extension ending in a digit — so removing it becomes a deliberate
+decision rather than something discovered from a still-green suite.
+
+**What generalises: "unreachable by construction" is a claim, and it needs an
+arm like any other.** The cheap one is to construct the reaching case and watch
+it be rejected; if you cannot construct it, that is when you may say unreachable.
+Declaring it from a chain of true premises is how a live guard gets reported dead.
+
+## The corpus measurement #154's criterion 4 asks for
+
+Recorded here rather than only in `9a6eedb`'s commit body, because this is the
+tracked, indexed artifact a later reader opens; the #145 baseline it continues
+("24 findings across 28 handoffs") likewise survives only in ticket prose.
+(Spec lane, F3.)
+
+Both arms over the same `.agent/plans/session-*.md`, same command shape, only the
+`kb_setup` package swapped — "before" produced by disabling the new extractor
+in-process, and independently reproduced by a review lane against a `git
+worktree` at `main`:
+
+| tree | OK | AMBIG | UNVER | FAIL |
+|---|---|---|---|---|
+| `main` = 6584fbd | 746 | 29 | 97 | **24** |
+| `feat/154-extension-typo` | 748 | 29 | 97 | **24** |
+
+**FAIL 24 → 24. No false positive gained.** The +2 lands in OK: both are
+`mise.tomlx` in one handoff that quotes #154's example in prose, and both take
+the `` (absent) `` marker — which that same handoff already used for its sibling
+stem-typo example, so the marker closed an asymmetry rather than papering over a
+finding.
+
+Two conditions on those numbers, because a figure without its condition survives
+review and is still wrong where it is used:
+
+* **33 handoffs, on this machine.** `.agent/` is gitignored and machine-local, so
+  the count is not portable and was 28 when #145 landed. The durable fact is the
+  delta (+2, both deliberate quotations), not the total.
+* **The `is_path_like` refactor is armed, not assumed additive.** It now shares
+  `_categorically_not_a_path` with the new extractor, so "the new check is purely
+  additive" is exactly the kind of claim that needs its own arm. Compared against
+  a verbatim copy of the 6584fbd implementation over every code-span token in the
+  corpus: **2,939 tokens, 0 disagreements** (a review lane re-derived it at a
+  wider bound: 13,278 tokens, 0 disagreements).
 
 ## Each mutation is a realistic break
 
@@ -342,6 +446,79 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "        names.update(_aliases(body))",
         "        pass",
         "test_an_alias_counts_as_declared",
+    ),
+    # ---------------------------------------------------------------- #154 ----
+    (
+        "typo'd extension: the whole check unwired from the composer",
+        "python/src/kb_setup/handoff.py",
+        "    findings.extend(_check_extension_typos(repo_root, text, index))\n",
+        "",
+        "test_a_mistyped_extension_is_a_broken_citation",
+    ),
+    (
+        "typo'd extension: the repair vocabulary emptied",
+        "python/src/kb_setup/citations.py",
+        "    return tuple(sorted(known for known in _KNOWN_EXT "
+        "if _one_edit_apart(lowered, known)))",
+        "    return ()",
+        "test_a_typod_extension_proposes_the_known_spelling",
+    ),
+    (
+        "typo'd extension: the transposition arm dropped",
+        "python/src/kb_setup/citations.py",
+        "        if len(differing) == _TRANSPOSED_POSITIONS and differing[1] == differing[0] + 1:",
+        "        if False:",
+        "test_the_repair_covers_all_four_single_edit_typos",
+    ),
+    (
+        "typo'd extension: the all-digit guard removed, so a version proposes repairs",
+        "python/src/kb_setup/citations.py",
+        "    if lowered.isdigit():",
+        "    if False:",
+        "test_a_version_number_is_not_a_typo_candidate",
+    ),
+    (
+        "typo'd extension: a token path_citations already reports is proposed again",
+        "python/src/kb_setup/citations.py",
+        "    if token is None or is_path_like(token):",
+        "    if token is None:",
+        "test_a_known_extension_is_never_a_typo_candidate",
+    ),
+    (
+        "typo'd extension: the vendored tier consulted when repairing",
+        "python/src/kb_setup/resolve.py",
+        "    authored = idx.authored_only()",
+        "    authored = idx",
+        "test_a_repair_never_resolves_against_a_vendored_clone",
+    ),
+    (
+        "typo'd extension: the already-resolves silence guard removed",
+        "python/src/kb_setup/resolve.py",
+        "    if resolve_path(repo_root, token, authored).state is State.RESOLVED:\n"
+        "        return None",
+        "    if False:\n        return None",
+        "test_an_unlisted_extension_that_really_exists_stays_silent",
+    ),
+    (
+        "typo'd extension: uniqueness weakened from exactly-one to at-least-one",
+        "python/src/kb_setup/resolve.py",
+        "    if len(hits) != 1:",
+        "    if not hits:",
+        "test_two_repairs_that_both_resolve_stay_silent",
+    ),
+    (
+        "typo'd extension: the suggestion interpolates a resolver label again",
+        "python/src/kb_setup/resolve.py",
+        "    named = _rel(repo_root, match) if match is not None else hits[0].detail",
+        "    named = hits[0].detail",
+        "test_the_suggestion_names_a_bare_path_not_a_resolver_label",
+    ),
+    (
+        "typo'd extension: the file:line guard removed, so `foo.mp:3` proposes `foo.mp3`",
+        "python/src/kb_setup/citations.py",
+        "    if _categorically_not_a_path(token) or _LINE_REF_RE.match(token):",
+        "    if _categorically_not_a_path(token):",
+        "test_a_file_line_reference_is_not_a_typo_candidate",
     ),
 ]
 

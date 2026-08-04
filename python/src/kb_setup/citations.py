@@ -205,6 +205,9 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: heading, a table row, or a block quote. Blank lines break a block too.
 _BLOCK_BREAK_RE = re.compile(r"^\s*(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|\||>)")
 
+#: Positions that differ under a transposition — exactly two, and adjacent.
+_TRANSPOSED_POSITIONS = 2
+
 
 @dataclass(frozen=True)
 class Span:
@@ -236,6 +239,27 @@ class LineCitation:
     start: int
     end: int
     line: int
+    marked_absent: bool = False
+
+
+@dataclass(frozen=True)
+class TypoCandidate:
+    """A token that is path-shaped but for an extension nobody recognises.
+
+    NOT a finding, and deliberately not named one. This module cannot know
+    whether `mise.tomlx` is a typo or an unknown-but-valid extension — that is a
+    filesystem question, and answering it here would move it into a text parser
+    (#143). So the candidate carries the repaired spellings it is one edit from
+    and `kb_setup.resolve` decides; a candidate whose repairs name nothing real
+    is dropped without ever becoming a finding.
+
+    ``repairs`` holds whole TOKENS, not bare extensions, so the directory prefix
+    is applied once here rather than at each consumer.
+    """
+
+    text: str
+    line: int
+    repairs: tuple[str, ...]
     marked_absent: bool = False
 
 
@@ -348,6 +372,33 @@ def _looks_like_a_host(token: str) -> bool:
     return "." in first[1:]
 
 
+def _categorically_not_a_path(token: str) -> bool:
+    """The rejections that precede any judgement about the token's EXTENSION.
+
+    Factored out because two extractors now ask them — :func:`is_path_like` and
+    :func:`typo_candidates` — and a second copy that forgot one would reintroduce
+    precisely the false positives the first was built to exclude. The elision
+    character alone was the largest measured class over all 28 handoffs, so the
+    duplicate would not have been a theoretical risk.
+
+    The host test stays INSIDE the multi-segment branch, which is not tidiness:
+    `_looks_like_a_host` splits on `/` and falls back to the whole token, so
+    asking it about a bare `mise.toml` reads `ise.toml` and rejects the single
+    most ordinary citation in the corpus.
+    """
+    if not token or any(c.isspace() for c in token):
+        return True
+    if token.startswith(("-", "~", "/", ".../")):
+        # Flags; and `~`/`/` are outside the repo, so this module cannot
+        # adjudicate them either way — silence is the honest answer, not a miss.
+        return True
+    if "://" in token or token.startswith("git@"):
+        return True
+    if any(c in _NON_PATH_CHARS for c in token):
+        return True
+    return "/" in token and _looks_like_a_host(token)
+
+
 def is_path_like(token: str) -> bool:
     """Whether a token is a repo-relative path claim at all.
 
@@ -357,24 +408,74 @@ def is_path_like(token: str) -> bool:
     token is only ever judged on its extension once it is known to be a bare
     filesystem-looking token.
     """
-    if not token or any(c.isspace() for c in token):
-        return False
-    if token.startswith(("-", "~", "/", ".../")):
-        # Flags; and `~`/`/` are outside the repo, so this module cannot
-        # adjudicate them either way — silence is the honest answer, not a miss.
-        return False
-    if "://" in token or token.startswith("git@"):
-        return False
-    if any(c in _NON_PATH_CHARS for c in token):
+    if _categorically_not_a_path(token):
         return False
     if "/" in token:
-        return not _looks_like_a_host(token) and (token.endswith("/") or _has_known_ext(token))
+        return token.endswith("/") or _has_known_ext(token)
     return _has_known_ext(token)
 
 
 def _single_token(span: Span) -> str | None:
     """The span's content when it is one whole token, else None."""
     return span.text if span.text and not any(c.isspace() for c in span.text) else None
+
+
+def _one_edit_apart(a: str, b: str) -> bool:
+    """True when ``a`` and ``b`` differ by exactly one Damerau-Levenshtein edit.
+
+    Substitution, insertion, deletion and TRANSPOSITION — the classic four. The
+    transposition arm is here because `.tmol` for `.toml` is one of the commonest
+    ways a human mistypes an extension and is TWO substitutions away, so a plain
+    Levenshtein distance would miss it. It was measured over this repo's 156
+    authored markdown files before being included: **0 additional promotions**,
+    so it costs nothing here rather than being assumed harmless.
+    """
+    if a == b:
+        return False
+    if len(a) == len(b):
+        differing = [i for i, (x, y) in enumerate(zip(a, b, strict=True)) if x != y]
+        if len(differing) == 1:
+            return True
+        if len(differing) == _TRANSPOSED_POSITIONS and differing[1] == differing[0] + 1:
+            i = differing[0]
+            return a[i] == b[i + 1] and a[i + 1] == b[i]
+        return False
+    if abs(len(a) - len(b)) != 1:
+        return False
+    longer, shorter = (a, b) if len(a) > len(b) else (b, a)
+    return any(longer[:i] + longer[i + 1 :] == shorter for i in range(len(longer)))
+
+
+def _ext_repairs(ext: str) -> tuple[str, ...]:
+    """Known extensions one edit from ``ext``, or empty when it is not a typo.
+
+    The allowlist is now load-bearing in TWO ways rather than one: it still gates
+    which tokens are reported at all, and it is also the repair vocabulary. That
+    is what keeps this from becoming the stem probe #154 originally specified,
+    which was measured to promote 233 distinct tokens over the corpus —
+    `gates.record`, `pr.ship_main`, `graphify_env.clean_env()` — because a
+    `module.attribute` reference always has a real module for a stem. None of
+    those is within one edit of any extension, so none of them reaches the
+    filesystem at all.
+
+    THE BOUND, stated because the `file:line` one is: an extension more than ONE
+    edit from every known spelling proposes nothing, so `notepad.markdown` and
+    `SKILL.mdown` are not caught even though their stems name real files. The
+    stem probe #154 originally specified would have caught that class — it is the
+    only thing given up by not building it, and it is given up knowingly against
+    that mechanism's measured 278 false positives. Silence is the documented safe
+    direction; `test_an_extension_far_from_every_known_one_proposes_nothing` pins
+    it so it stays deliberate. (Spec lane.)
+    """
+    lowered = ext.lower()
+    if lowered.isdigit():
+        # A version number is not a mistyped file. `1.2.3` splits to an extension
+        # of `3`, which is one substitution from `c` and from `h` — so without
+        # this, every version this repo writes proposes two repairs. The
+        # resolve step would reject them, but a candidate nobody can act on is
+        # noise in the one module whose whole design is under-reporting.
+        return ()
+    return tuple(sorted(known for known in _KNOWN_EXT if _one_edit_apart(lowered, known)))
 
 
 def line_citations(text: str) -> list[LineCitation]:
@@ -423,6 +524,81 @@ def path_citations(text: str) -> list[PathCitation]:
             )
         )
     return found
+
+
+def _typo_candidate(span: Span) -> TypoCandidate | None:
+    """One span read as a mistyped extension, or None to stay silent.
+
+    The FIRST question is the one :func:`is_path_like` answers, because a token it
+    accepts is already a path citation and must not be extracted twice. Only then
+    come the categorical rejections and the extension itself. (An earlier draft of
+    this docstring claimed the order matched `is_path_like`'s — categorical
+    rejections first — which it does not; the behaviour was right and the sentence
+    describing it was wrong, which is the one direction this module's whole
+    subject is about. Standards lane.)
+    """
+    token = _single_token(span)
+    if token is None or is_path_like(token):
+        # Already a path citation. Two extractors reporting one token would
+        # produce two findings for one mistake, which is exactly why
+        # `path_citations` excludes `file:line` references.
+        return None
+    if _categorically_not_a_path(token) or _LINE_REF_RE.match(token):
+        #
+        # THE `_LINE_REF_RE` HALF IS LOAD-BEARING, and the reasoning that first
+        # said otherwise is recorded because it was wrong in an instructive way.
+        # It ran: for the pattern to match, the token ends in `:<digits>`, so the
+        # extension contains a `:` and ends in digits — and since every entry in
+        # `_KNOWN_EXT` is short and alphanumeric, none is ever one edit from such
+        # a thing. Every step is true and the conclusion is false, because it
+        # never asked whether a known extension ends in a DIGIT. **`mp3` does.**
+        # So `foo.mp:3` has extension `mp:3`, and deleting the colon yields
+        # `mp3` — one edit. Without this guard that token proposes `foo.mp3`.
+        #
+        # `test_the_line_ref_guard_is_load_bearing_not_decorative` pins the
+        # counterexample, so the guard can never quietly become decoration.
+        #
+        # The BOUND it states is still a bound: `cli.pyx:287` is this same defect
+        # wearing a line number and is NOT reported. Measured over the corpus,
+        # that form occurs 0 times against 5 bare tokens that do reach the repair
+        # gate — so the recall given up is zero today, and that count is the
+        # condition on the claim.
+        return None
+    last = token.rsplit("/", 1)[-1]
+    if last in _DOTFILES:
+        return None
+    stem, dot, ext = last.rpartition(".")
+    if not dot or not stem:
+        # The same non-empty-stem rule `_has_known_ext` applies: a bare extension
+        # named in prose (`.md`) is not a citation, mistyped or otherwise.
+        return None
+    repairs = _ext_repairs(ext)
+    if not repairs:
+        return None
+    prefix = token[: len(token) - len(ext)]
+    return TypoCandidate(
+        text=token,
+        line=span.line,
+        repairs=tuple(prefix + repair for repair in repairs),
+        marked_absent=span.marked_absent,
+    )
+
+
+def typo_candidates(text: str) -> list[TypoCandidate]:
+    """Every token whose EXTENSION looks mistyped, with what it may have meant.
+
+    The gap #154 was filed for: the allowlist makes `mise.tomlx` indistinguishable
+    from an unknown-but-valid extension, so both were silently dropped and a
+    handoff naming `graph.jsom` passed at exit 0. That is a false NEGATIVE in
+    exactly the class the checker exists for.
+
+    This closes it WITHOUT touching the allowlist's role as the reporting gate:
+    a token still has to earn a finding, and it earns one only by being one edit
+    from a known extension AND naming something real once repaired — the second
+    half being `kb_setup.resolve`'s call, not this module's.
+    """
+    found = [_typo_candidate(span) for span in code_spans(text)]
+    return [c for c in found if c is not None]
 
 
 def _blocks(stripped: str) -> list[tuple[int, int]]:

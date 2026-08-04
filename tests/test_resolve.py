@@ -484,3 +484,115 @@ def test_the_committed_extractions_subtree_counts_as_authored(tmp_path: Path):
     got = resolve.resolve_path(root, "chunk-one.json")
     assert got.state is resolve.State.RESOLVED
     assert "vendored" not in got.detail
+
+
+# ------------------------------------------------- mistyped extensions ----
+#
+# The resolution half of #154. `citations` proposes the repairs; this decides
+# whether any of them names something real. Returning None means STAY SILENT —
+# not "resolved", not "missing" — because the whole mechanism only earns its
+# place by promoting a token the allowlist would otherwise have dropped, and a
+# promotion nobody can act on is the false positive the checker must not emit.
+
+
+def test_a_mistyped_extension_reports_the_one_repair_that_resolves(tmp_path: Path):
+    root = _repo(tmp_path, {"mise.toml": "x\n"})
+    got = resolve.resolve_extension_typo(root, "mise.tomlx", ("mise.toml",))
+    assert got is not None
+    assert got.state is resolve.State.MISSING
+    assert "mise.toml" in got.detail
+
+
+def test_an_unlisted_extension_that_really_exists_stays_silent(tmp_path: Path):
+    """THE control arm for the whole mechanism.
+
+    `notes.org` is an unknown-but-VALID extension, not a typo. It is exactly the
+    case the allowlist was built to stay quiet about, and repairing it to a
+    file that happens to exist beside it would turn a correct citation into a
+    finding — the regression criterion 2 forbids.
+    """
+    root = _repo(tmp_path, {"notes.org": "x\n", "notes.md": "x\n"})
+    assert resolve.resolve_extension_typo(root, "notes.org", ("notes.md",)) is None
+
+
+def test_a_repair_that_names_nothing_stays_silent(tmp_path: Path):
+    """`codegraph.db` repairs to `.md` at one edit, and `codegraph.md` does not exist.
+
+    The resolve step is the gate, not the edit distance. Measured over the
+    corpus this is the row that separates the two: a distance rule alone would
+    have reported it.
+    """
+    root = _repo(tmp_path, {"other.md": "x\n"})
+    assert resolve.resolve_extension_typo(root, "codegraph.db", ("codegraph.md",)) is None
+
+
+def test_two_repairs_that_both_resolve_stay_silent(tmp_path: Path):
+    """`exactly one` is the discipline `_near_hit` already keeps.
+
+    Two plausible referents is not one obvious referent, and naming either would
+    be a guess presented as a finding.
+    """
+    root = _repo(tmp_path, {"notes.md": "x\n", "notes.py": "x\n"})
+    got = resolve.resolve_extension_typo(root, "notes.pk", ("notes.md", "notes.py"))
+    assert got is None
+
+
+def test_a_repair_never_resolves_against_a_vendored_clone(tmp_path: Path):
+    """`runner.os` is a GitHub Actions expression, not a mistyped filename.
+
+    It repaired to `.rs` and suffix-matched `sources/hk/src/step/runner.rs`
+    inside the pinned hk clone — the one false positive the corpus measurement
+    found, and the reason repair resolution is restricted to the AUTHORED tree.
+    The original criterion already said `authored`; this is what enforcing it
+    costs.
+    """
+    root = _repo(tmp_path, {"sources/hk/src/step/runner.rs": "x\n"})
+    assert resolve.resolve_extension_typo(root, "runner.os", ("runner.rs",)) is None
+
+
+def test_a_repair_resolving_in_the_authored_tree_is_the_control(tmp_path: Path):
+    """Paired with the arm above: the same shape, authored, DOES report.
+
+    Without this the vendored arm proves only that the probe can say None.
+    """
+    root = _repo(tmp_path, {"src/step/runner.rs": "x\n"})
+    got = resolve.resolve_extension_typo(root, "runner.os", ("runner.rs",))
+    assert got is not None
+    assert got.state is resolve.State.MISSING
+
+
+def test_a_repair_may_resolve_against_the_derived_root(tmp_path: Path):
+    """`graph.jsom` is the ticket's own motivating example.
+
+    `graph.json` exists nowhere but `graphify-out/`, so a repair that could not
+    see the derived tier would stay silent on the most-cited filename in the
+    corpus — losing the case the ticket was filed about.
+    """
+    root = _repo(tmp_path, {"graphify-out/graph.json": "{}\n"})
+    got = resolve.resolve_extension_typo(root, "graph.jsom", ("graph.json",))
+    assert got is not None
+    assert got.state is resolve.State.MISSING
+    assert "graph.json" in got.detail
+
+
+def test_a_repair_naming_several_files_is_not_a_unique_hit(tmp_path: Path):
+    """An AMBIGUOUS repair is not a referent either — silence, not a finding."""
+    root = _repo(tmp_path, {"a/x/run.py": "1\n", "b/x/run.py": "1\n"})
+    assert resolve.resolve_extension_typo(root, "run.pyy", ("run.py",)) is None
+
+
+def test_the_suggestion_names_a_bare_path_not_a_resolver_label(tmp_path: Path):
+    """The suggestion has to read like something you can paste back.
+
+    `Resolution.detail` is tier-dependent — the derived tier renders
+    `derived output: graphify-out/graph.json` — so interpolating it produced
+    "did you mean derived output: graphify-out/graph.json?". `_near_hit`, the
+    machinery this generalises from, names a bare path. Without this test the fix
+    is unarmed: the older assertion (`"graph.json" in detail`) passes either way.
+    (Spec lane, F2.)
+    """
+    root = _repo(tmp_path, {"graphify-out/graph.json": "{}\n"})
+    got = resolve.resolve_extension_typo(root, "graph.jsom", ("graph.json",))
+    assert got is not None
+    assert "did you mean graphify-out/graph.json?" in got.detail
+    assert "derived output" not in got.detail
