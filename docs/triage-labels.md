@@ -27,10 +27,15 @@ from a typo when a skill fails to apply it.
 
 ## These are not the only labels
 
-`wayfinder:map` / `research` / `prototype` / `grilling` / `task` are a separate
-vocabulary owned by `/mattpocock-skills:wayfinder` and documented in
-`docs/issue-tracker.md`. The two sets are orthogonal: a wayfinder decision ticket
-can also be `needs-info`.
+`wayfinder:map`, `wayfinder:research`, `wayfinder:prototype`,
+`wayfinder:grilling` and `wayfinder:task` are a separate vocabulary owned by
+`/mattpocock-skills:wayfinder` and documented in `docs/issue-tracker.md`. The two
+sets are orthogonal: a wayfinder decision ticket can also be `needs-info`.
+
+**Every one of those five carries the `wayfinder:` prefix** — spelled out here
+rather than factored into a `wayfinder:map / research / …` shorthand, because
+that shorthand reads as four bare labels that do not exist, and a label a skill
+cannot apply fails the same way a typo does.
 
 ## Why this file is not at `docs/agents/triage-labels.md`
 
@@ -47,10 +52,14 @@ three-line file with no frontmatter at both paths:
 | `docs/probe-control.md` | rc=0 — `No issues found` |
 
 The probe discriminates on path alone, so the constraint is real and current, not
-inherited. See `docs/issue-tracker.md` for the same finding applied to the
-tracker doc, including which skills read the `docs/agents/` path literally and
-are therefore unaffected by this file's location only because they never look for
-it.
+inherited. `docs/issue-tracker.md` records the same finding for the tracker doc.
+
+**The relocation has a real cost — it is not free, and two skills pay it.**
+`setup-matt-pocock-skills` *writes* `docs/agents/triage-labels.md` when `triage`
+is installed (`SKILL.md:68,102`), and `code-review` reads
+`docs/agents/issue-tracker.md` twice and will not find ours. Neither is worked
+around: a gate that fails is the harder constraint, so the file stays here and
+those skills are handed the path explicitly when invoked.
 
 ## See also
 

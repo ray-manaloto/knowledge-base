@@ -14,9 +14,11 @@ Four lessons, all measured on 2026-08-03 while running grilling -> to-spec -> to
 over the /clear-prep rework.
 
 1. A SPEC STEP CAN BE UNBUILDABLE, AND GRILLING IS WHERE THAT SURFACES. /clear-prep
-step 6 asked whether "every gate result matches the recorded rc". Nothing records
-one: a gate prints its exit code to a terminal, that goes to a temp file, the file
-dies with the session, and an agent retypes the number into the handoff as prose.
+step 6 asked whether "every gate result matches the recorded rc". Nothing DURABLE
+records one. A gate does not print its own exit code at all -- the shell captures
+$?, and clear-prep's own step 5 tells you to append it to a /tmp log beside the
+output. That log dies with the session, and an agent then retypes the number into
+the handoff as prose. So the recorded rc and the claim about it have one source.
 Across 28 handoffs, 26 carry such a claim and NONE could be checked against
 anything. A check with one input can only ever agree with itself. The general
 form: before specifying a verification step, name the artifact it reads. If that
