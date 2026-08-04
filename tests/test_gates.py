@@ -20,6 +20,7 @@ import subprocess
 from pathlib import Path
 from typing import Never
 
+import pytest
 from kb_setup import gates, pr
 
 _MISE = "mise.toml"
@@ -312,6 +313,75 @@ def test_record_runs_nothing(monkeypatch, tmp_path):
     calls = _never_runs(monkeypatch)
     gates.record(tmp_path, _results(), sha=_SHA)
     assert calls == []
+
+
+def test_an_interrupt_still_records_the_gates_that_finished(monkeypatch, tmp_path):
+    """Ctrl-C partway through must not take the completed gates' evidence with it.
+
+    The likeliest way a real run ends early — it takes minutes — and the one the
+    module exists to survive. `KeyboardInterrupt` is a `BaseException`, so it was
+    caught by nothing and propagated out of the result-building loop before
+    anything was written. (Cold lane, P2.)
+    """
+    calls: list[str] = []
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] != "mise":
+            return subprocess.CompletedProcess(cmd, 0, "")
+        calls.append(cmd[-1])
+        if cmd[-1] == "gamma":
+            raise KeyboardInterrupt
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+    root = _repo(tmp_path)
+    with pytest.raises(KeyboardInterrupt):
+        gates.run_and_record(root, _TASKS, stop_on_failure=False)
+
+    # The interrupt still propagates — this records, it does not swallow.
+    rows = _rows(_written(root)[0])
+    assert rows["alpha"]["rc"] == 0
+    assert rows["beta"]["rc"] == 0
+    # And the gates it never reached are PADDED, not absent: a short list would
+    # read as a complete run over fewer gates.
+    assert set(rows) == set(_TASKS)
+    assert rows["gamma"]["rc"] is None
+    assert rows["delta"]["rc"] is None
+
+
+def test_a_clean_run_records_the_same_way(monkeypatch, tmp_path):
+    """CONTROL ARM — the same call with no interrupt records all four with real rcs."""
+    _stub(monkeypatch, failing="__none__")
+    _pin_sha(monkeypatch)
+    root = _repo(tmp_path)
+    gate_run, _summary = gates.run_and_record(root, _TASKS, stop_on_failure=False)
+    assert gate_run is not None
+    assert [r["rc"] for r in json.loads(_written(root)[0].read_text())["gates"]] == [0, 0, 0, 0]
+
+
+def test_record_never_truncates_a_previous_record_in_place(tmp_path):
+    """The write is temp-then-rename, so a reader never sees a half-written file.
+
+    Asserted by making the RENAME fail: the destination must still hold the old
+    record. A truncating `Path.write_text` would have destroyed it before failing.
+    (Cold lane, P2.)
+    """
+    first = gates.record(tmp_path, _results(), sha=_SHA)
+    before = first.read_text(encoding="utf-8")
+
+    def boom(_self: Path, _target: Path) -> None:
+        msg = "disk full"
+        raise OSError(msg)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "replace", boom)
+        with pytest.raises(OSError, match="disk full"):
+            gates.record(tmp_path, [gates.GateResult("z", 9, _SHA, "t")], sha=_SHA)
+
+    assert first.read_text(encoding="utf-8") == before
+    # And no debris left beside the real artifact.
+    assert not list(first.parent.glob("*.tmp"))
 
 
 def test_record_survives_an_empty_result_list(tmp_path):

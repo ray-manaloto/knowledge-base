@@ -1,4 +1,4 @@
-# kb-gates (#146) — 23 mutation arms, with the three probes that lied
+# kb-gates (#146) — 27 mutation arms, with the probes that lied
 
 **Date:** 2026-08-04 · **Subject:** `python/src/kb_setup/gates.py`,
 `python/src/kb_setup/pr.py`, `tests/test_gates.py`
@@ -15,7 +15,7 @@ The harness lives at `scratchpad/mutate.py` for this session only; the table
 below is the durable record, and the rows under "What the harness found
 about itself" are the reason it is worth committing rather than summarising.
 
-## Results — 23/23 caught
+## Results — 27/27 caught
 
 Control row first: an unmutated `tests/test_gates.py` must be green, or every
 "FAIL" below is indistinguishable from a broken harness.
@@ -46,10 +46,15 @@ Control row first: an unmutated `tests/test_gates.py` must be green, or every
 | 21 | the dirty-tree caveat is never printed | `test_render_says_when_the_tree_was_dirty` | 1 |
 | 22 | unknown cleanliness is silently treated as clean | `test_render_distinguishes_unknown_cleanliness_from_clean` | 1 |
 | 23 | run() stops capturing the tree state | `test_run_records_whether_the_tree_was_dirty` | 1 |
+| 24 | an interrupt discards the gates that already finished | `test_an_interrupt_still_records_the_gates_that_finished` | 1 |
+| 25 | unreached gates are dropped instead of padded as not-run | `test_an_interrupt_still_records_the_gates_that_finished` | 1 |
+| 26 | the record is written in place, truncating the previous one | `test_record_never_truncates_a_previous_record_in_place` | 1 |
+| 27 | a failed atomic write leaves its temp file behind | `test_record_never_truncates_a_previous_record_in_place` | 1 |
 
-Rows 14–17 are the review round's additions; the rest are the pre-review 20 (two
-of which were re-pointed when `run_and_record` absorbed the sequence, and which
-reported `MUTATION DID NOT APPLY` rather than passing — the guard doing its job).
+Rows 12–17 came from the two-axis review and rows 24–27 from the cold lane; the
+rest are the original 20. Several were RE-POINTED as the code moved under them,
+and every one reported `MUTATION DID NOT APPLY` rather than quietly passing —
+the guard doing its job, three separate times.
 
 **This table is GENERATED from the harness's own `ARMS` list**, not transcribed:
 the script imports `mutate.py`, asserts every arm appears as caught in the run
@@ -150,11 +155,53 @@ The general lesson: **mutation arms only cover the claims you thought to
 mutate.** Every arm here passed, and a second reader still found an assertion
 that could not fail. Arms are a floor, not a ceiling.
 
+## What the review round did NOT catch either — the cold lane
+
+A third pass, `kb-review`'s one cold cross-family lane (codex/GPT-5.6 Sol, by
+ref, no design context), over code that was by then green on 23 arms, 45 tests
+and two review axes. It found two more, both P2, and both the same shape: the
+gate LOGIC was correct and the ARTIFACT was not durable — which is the only
+thing this module exists to produce.
+
+**Ctrl-C discarded every completed gate.** `record()` ran once, after `run()`
+returned in full. `KeyboardInterrupt` is a `BaseException`, caught by nothing,
+so an interrupt partway through a four-minute run propagated out of the
+result-building loop and took the finished gates' evidence with it — no record
+at all. The likeliest way a real run ends early, arriving through the door
+nobody watched. `run()` is now a generator (`iter_run`) so the caller holds what
+it already has, and `run_and_record` records in a `finally`, padding the
+unreached gates as `rc: null` rather than leaving a short list that would read
+as a complete run.
+
+**The write truncated the previous record in place.** `Path.write_text`
+truncates first, and `record()` overwrites a prior record for the same commit by
+design — so an interrupt or a full disk mid-write destroyed a good record and
+left unparsable bytes where it had been. This repo already had the fix and the
+language for it: `skill_eval._atomic_write`, temp-then-rename, with a docstring
+explaining exactly this failure. The new writer simply did not use it. It now
+lives in `kb_setup.atomic` with both callers, which is what this repo's
+two-callers-earn-a-module rule is for.
+
+**A lint rule tried to reintroduce the first bug.** `ruff`'s PERF402 wanted
+`results = list(...)` in place of the accumulate-then-`extend`. They look
+interchangeable and are not: `list()` builds its own list and binds it only on
+success, so an interrupt leaves the accumulator empty and the `finally` records
+nothing. The tidier spelling *is* the bug. `extend` retains what was already
+yielded — and because that retention is load-bearing, it is pinned by a test
+rather than assumed from interpreter behaviour.
+
+**Three arms were rejected by the harness before they could lie.** One anchored
+on a line the fix had moved; one "caught" its target only by breaking SYNTAX, so
+pytest exited 4 on a collection error and proved nothing about the test; one
+failed twice more because a comment sits between the anchor lines. The fix for
+the last was to build the anchor by READING the file rather than retyping it —
+the same lesson as the generated table, one level down.
+
 ## Reproduction
 
 ```bash
-uv run python <scratchpad>/mutate.py    # 23/23 arms caught, restored tree green
-uv run pytest tests/test_gates.py -q    # 45 passed
+uv run python <scratchpad>/mutate.py    # 27/27 arms caught, restored tree green
+uv run pytest tests/test_gates.py -q    # 48 passed
 ```
 
 ## GitHub repos touched

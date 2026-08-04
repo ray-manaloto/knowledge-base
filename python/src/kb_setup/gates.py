@@ -36,11 +36,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from kb_setup import resolve, review
+from kb_setup import atomic, resolve, review
 
 #: Where a run's record lands. Listed in `agent-artifact-conventions.md`, which
 #: forbids directories that are not.
@@ -203,27 +204,33 @@ def _invoke(repo_root: Path, task: str) -> int:
         return _RC_COULD_NOT_RUN
 
 
-def run(repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool) -> list[GateResult]:
-    """Run ``tasks`` in order; return one result per REQUESTED gate.
+def iter_run(
+    repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool
+) -> Iterator[GateResult]:
+    """Yield one result per REQUESTED gate, AS EACH FINISHES.
 
-    Writes nothing — :func:`record` does that, and either is usable without the
-    other (criterion 2).
+    A generator rather than a list-returner so a caller can hold the results it
+    already has when the run does not finish. `run_and_record` relies on that: a
+    Ctrl-C partway through — the likeliest interruption, since a real run takes
+    minutes — used to propagate out of a list-building loop and take every
+    completed gate's evidence with it, leaving no record at all. Losing four
+    minutes of gate results to an interrupt is the exact failure this module
+    exists to prevent, arriving through the door nobody watched. (Cold lane, P2.)
 
     ``stop_on_failure`` is off for `kb-gates`, where the point is to learn every
     gate's state in one pass, and on for the ship path, where there is nothing to
     gain by spending minutes on gates whose result cannot change the refusal.
-    Gates past the stop are returned as "not run" rather than dropped.
+    Gates past the stop are yielded as "not run" rather than dropped.
 
     HEAD is read PER GATE, not once for the run. The gates take minutes and
     nothing stops an amend landing in the middle of them; a single sha stamped
     across every row would make the later rows quietly untrue, which is the exact
     failure this module exists to remove. :func:`render` flags the divergence.
     """
-    results: list[GateResult] = []
     stopped = False
     for task in tasks:
         if stopped:
-            results.append(GateResult(task, None, None, None))
+            yield GateResult(task, None, None, None)
             continue
         sha = head_sha(repo_root)
         dirty = tree_dirty(repo_root)
@@ -238,10 +245,19 @@ def run(repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool) -> li
         rc = _invoke(repo_root, task)
         finished_at = datetime.now(UTC).isoformat()
         print(f"{'PASS' if rc == 0 else 'FAIL'}  gate {task} rc={rc}", flush=True)
-        results.append(GateResult(task, rc, sha, finished_at, dirty))
+        yield GateResult(task, rc, sha, finished_at, dirty)
         if rc != 0 and stop_on_failure:
             stopped = True
-    return results
+
+
+def run(repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool) -> list[GateResult]:
+    """Run ``tasks`` in order; return one result per REQUESTED gate.
+
+    Writes nothing — :func:`record` does that, and either is usable without the
+    other (criterion 2). The eager form over :func:`iter_run`, for every caller
+    that has nothing to do with a partial run.
+    """
+    return list(iter_run(repo_root, tasks, stop_on_failure=stop_on_failure))
 
 
 def record(repo_root: Path, results: list[GateResult], *, sha: str) -> Path:
@@ -271,7 +287,13 @@ def record(repo_root: Path, results: list[GateResult], *, sha: str) -> Path:
             for r in results
         ],
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    # Temp-then-rename, never a truncating in-place write. `record` OVERWRITES a
+    # previous record for the same commit by design, so the destination usually
+    # already holds a valid one — and `Path.write_text` truncates first, meaning
+    # an interrupt or a full disk mid-write destroys the good record and leaves
+    # unparsable bytes in its place. For an artifact whose only job is to be read
+    # later that is corruption, not a lost write. (Cold lane, P2.)
+    atomic.write_text(path, json.dumps(payload, indent=2) + "\n")
     return path
 
 
@@ -368,8 +390,28 @@ def run_and_record(
     if not sha:
         return None, "could not read HEAD — a record that cannot name its commit is not one"
 
-    results = run(repo_root, tasks, stop_on_failure=stop_on_failure)
-    path = record(repo_root, results, sha=sha)
+    # Accumulate as each gate finishes and record in a `finally`, so an interrupt
+    # cannot take the completed gates' evidence with it. `BaseException` is the
+    # point — `KeyboardInterrupt` is not an `Exception`, and Ctrl-C during a
+    # multi-minute run is the likeliest way this loop ever ends early. The
+    # unreached gates are PADDED as "not run" rather than left absent, or a
+    # truncated list would read as a complete short run. (Cold lane, P2.)
+    results: list[GateResult] = []
+    try:
+        # `results.extend(<generator>)`, NOT `results = list(<generator>)`. They
+        # look interchangeable and are not: `list()` builds its own list and only
+        # binds it on success, so an interrupt leaves `results` empty and the
+        # `finally` records nothing — the exact bug this block exists to fix,
+        # reintroduced by the tidier spelling. `extend` appends as it consumes, so
+        # what has already been yielded is retained.
+        #
+        # That retention is the load-bearing part, so it is PINNED BY A TEST
+        # (`test_an_interrupt_still_records_the_gates_that_finished`) rather than
+        # assumed from the interpreter's behaviour.
+        results.extend(iter_run(repo_root, tasks, stop_on_failure=stop_on_failure))
+    finally:
+        results.extend(GateResult(t, None, None, None) for t in tasks[len(results) :])
+        path = record(repo_root, results, sha=sha)
     return GateRun(results, sha, path), render(results, sha=sha, path=path)
 
 
