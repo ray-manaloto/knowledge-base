@@ -1,0 +1,666 @@
+"""Tests for `kb_setup.session_state` — the working-state snapshot (#144).
+
+Driven against the real `git` fixture repo in `conftest.py`, per criterion 5:
+no mocking of git internals. The only stubbed thing is `_gh`, because a test
+must not make a network call — and stubbing it is what lets the third PR state
+("could not ask") be armed at all, which is the one behaviour #144's design
+comment says must exist.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from collections.abc import Callable
+from pathlib import Path
+
+import pytest
+from kb_setup import session_state
+
+
+def _no_pr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub `_gh` as a repo with no open PR — rc=0 and a well-formed empty list."""
+    monkeypatch.setattr(session_state, "_gh", lambda _args, _root: (0, "[]"))
+
+
+def _gh_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub `_gh` as unreachable — the state that must not read as "no open PR"."""
+    monkeypatch.setattr(
+        session_state, "_gh", lambda _args, _root: (1, "gh: could not connect to api.github.com")
+    )
+
+
+# --------------------------------------------------------------------------
+# criterion 6 — both arms: a clean tree and a dirty one
+# --------------------------------------------------------------------------
+
+
+def test_a_clean_tree_reports_an_empty_split(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clean tree is an ordinary result: empty tuples, `read` True (criterion 4)."""
+    _no_pr(monkeypatch)
+    snap = session_state.gather(tmp_path)
+
+    assert snap.changes.read is True
+    assert snap.changes.staged == ()
+    assert snap.changes.unstaged == ()
+    assert snap.changes.untracked == ()
+    assert snap.changes.clean is True
+
+
+def test_a_dirty_tree_splits_staged_unstaged_and_untracked(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The three buckets are read from one `git status`, and kept apart."""
+    _no_pr(monkeypatch)
+    # tracked + committed, then modified in the worktree only -> unstaged
+    (tmp_path / "tracked.txt").write_text("one\n", encoding="utf-8")
+    git("add", "--", "tracked.txt")
+    git("commit", "-q", "-m", "add tracked")
+    (tmp_path / "tracked.txt").write_text("two\n", encoding="utf-8")
+    # added to the index -> staged
+    (tmp_path / "staged.txt").write_text("s\n", encoding="utf-8")
+    git("add", "--", "staged.txt")
+    # never added -> untracked
+    (tmp_path / "untracked.txt").write_text("u\n", encoding="utf-8")
+
+    snap = session_state.gather(tmp_path)
+
+    assert snap.changes.read is True
+    assert snap.changes.clean is False
+    assert "staged.txt" in snap.changes.staged
+    assert "tracked.txt" in snap.changes.unstaged
+    assert "untracked.txt" in snap.changes.untracked
+    # The buckets are disjoint here — a path modified only in the worktree must
+    # not also be reported as staged, which is what reading X and Y as one status
+    # character would do.
+    assert "tracked.txt" not in snap.changes.staged
+    assert "staged.txt" not in snap.changes.unstaged
+
+
+def test_a_path_staged_and_then_modified_again_is_in_both_buckets(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`MM` is genuinely both, and collapsing it to one loses a real distinction.
+
+    A handoff that says "staged: foo" when foo also has unstaged edits invites
+    the reader to believe the staged content is the whole change.
+    """
+    _no_pr(monkeypatch)
+    (tmp_path / "both.txt").write_text("a\n", encoding="utf-8")
+    git("add", "--", "both.txt")
+    (tmp_path / "both.txt").write_text("b\n", encoding="utf-8")
+
+    changes = session_state.gather(tmp_path).changes
+
+    assert "both.txt" in changes.staged
+    assert "both.txt" in changes.unstaged
+
+
+def test_a_rename_does_not_shift_the_entries_after_it(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    r"""`-z` gives an R entry a SECOND NUL field; consuming it is not optional.
+
+    THE ASSERTIONS ARE EXACT, and that is the whole point of this test. The
+    fixture really does produce `R  zz-new-name.txt\\0old-name.txt\\0A  zzz-after.txt\\0`
+    (probed directly, not assumed). Tracing the UNFIXED parse over those bytes:
+    the origin field `old-name.txt` is read as a record whose X/Y are `o`/`l`
+    and whose path is `-name.txt`, so it lands in staged AND unstaged — while
+    `zzz-after.txt` still parses correctly afterwards.
+
+    So the obvious arm — "is the later path still in staged?" — PASSES with the
+    bug present. It is a fixture that cannot exhibit the harm, which is this
+    repo's recurring false-pass (rule 3 of `probes-need-a-control-arm.md`). What
+    discriminates is the SPURIOUS entry, so the buckets are asserted whole.
+    """
+    _no_pr(monkeypatch)
+    (tmp_path / "old-name.txt").write_text("x\n", encoding="utf-8")
+    git("add", "--", "old-name.txt")
+    git("commit", "-q", "-m", "add old-name")
+    git("mv", "old-name.txt", "zz-new-name.txt")
+    # Sorts after the rename entries, so a one-field shift is visible around it.
+    (tmp_path / "zzz-after.txt").write_text("a\n", encoding="utf-8")
+    git("add", "--", "zzz-after.txt")
+
+    changes = session_state.gather(tmp_path).changes
+
+    assert changes.staged == ("zz-new-name.txt", "zzz-after.txt")
+    assert changes.unstaged == ()
+    assert changes.untracked == ()
+
+
+def test_a_merge_conflict_is_its_own_bucket_not_staged_and_unstaged(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An UNMERGED path (`UU`) is not describable as staged OR unstaged.
+
+    Without an explicit branch it falls through both generic tests and renders
+    identically to an ordinary `MM` — so a reader mid-conflict sees
+    "staged: f.txt / unstaged: f.txt" and concludes it needs re-staging, when in
+    truth nothing can be committed until the conflict is resolved. This repo
+    ships a `resolving-merge-conflicts` skill, so a session in this state is a
+    case the tool will really meet. (Cold lane, P2.)
+    """
+    _no_pr(monkeypatch)
+    (tmp_path / "f.txt").write_text("base\n", encoding="utf-8")
+    git("add", "--", "f.txt")
+    git("commit", "-q", "-m", "base for conflict")
+    git("checkout", "-q", "-b", "feature")
+    (tmp_path / "f.txt").write_text("theirs\n", encoding="utf-8")
+    git("commit", "-q", "-am", "theirs")
+    git("checkout", "-q", "work")
+    (tmp_path / "f.txt").write_text("ours\n", encoding="utf-8")
+    git("commit", "-q", "-am", "ours")
+    # Conflicting merge; `git merge` exits non-zero on conflict, so it is run
+    # through subprocess directly rather than the check=True `git` fixture.
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "merge", "-q", "feature"],
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+
+    changes = session_state.gather(tmp_path).changes
+
+    # Control: the fixture really did produce a conflict, so this test can fail.
+    assert changes.unmerged == ("f.txt",), f"no conflict in fixture: {changes}"
+    assert changes.conflicted is True
+    assert "f.txt" not in changes.staged
+    assert "f.txt" not in changes.unstaged
+    assert changes.clean is False
+    assert "UNMERGED" in session_state.render(session_state.gather(tmp_path))
+
+
+def test_an_unborn_branch_is_read_not_reported_as_unreadable(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`git rev-parse --abbrev-ref HEAD` exits 128 before the first commit.
+
+    It prints `HEAD` to stdout while failing, so trusting only its rc turns a
+    perfectly knowable branch into this module's "could not be asked" state —
+    the module's own collapse running backwards: a checked answer thrown away.
+    `git symbolic-ref --short HEAD` answers rc=0 here, which is why it is tried
+    first. (Cold lane, P1, probed against real git.)
+    """
+    _no_pr(monkeypatch)
+    fresh = tmp_path / "unborn"
+    fresh.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "newborn", str(fresh)], check=True, timeout=30)
+    (fresh / "staged.txt").write_text("s\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(fresh), "add", "--", "staged.txt"], check=True, timeout=30)
+
+    snap = session_state.gather(fresh)
+
+    assert snap.branch == "newborn"
+    assert snap.detached is False
+    # The rest of the snapshot still reads: the staged file was always visible,
+    # which is what made the false "COULD NOT READ" beside it so misleading.
+    assert snap.changes.staged == ("staged.txt",)
+    assert "COULD NOT READ" not in session_state.render(snap)
+
+
+def test_a_detached_head_does_not_report_a_checked_no_open_pr(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`git rev-parse --abbrev-ref HEAD` returns the literal "HEAD" when detached.
+
+    `gh pr list --head HEAD` is then a well-formed query that matches nothing,
+    so without a guard the snapshot would report a CHECKED "no open PR" for a
+    session that is not on a branch at all.
+    """
+    monkeypatch.setattr(
+        session_state, "_gh", lambda _a, _r: pytest.fail("must not ask gh about a detached HEAD")
+    )
+    git("checkout", "-q", "--detach")
+
+    snap = session_state.gather(tmp_path)
+
+    assert snap.detached is True
+    assert snap.pr.state is session_state.PrState.UNVERIFIABLE
+    assert "detached" in session_state.render(snap)
+
+
+# --------------------------------------------------------------------------
+# branch + commits
+# --------------------------------------------------------------------------
+
+
+def test_the_branch_and_recent_commits_are_gathered(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _no_pr(monkeypatch)
+    (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
+    git("add", "--", "a.txt")
+    git("commit", "-q", "-m", "the newest subject")
+
+    snap = session_state.gather(tmp_path)
+
+    assert snap.branch == "work"
+    assert snap.commits[0].subject == "the newest subject"
+    assert snap.commits[0].sha
+    # Newest first, and bounded by `limit`.
+    assert len(snap.commits) <= session_state.DEFAULT_COMMITS
+
+
+def test_the_default_commit_count_matches_the_workflow_it_replaces() -> None:
+    """`/clear-prep` step 1 ran `git log --oneline -8`, so the default is 8.
+
+    Pinned as a test rather than left to the constant's comment: shipping 5
+    would silently narrow the workflow this task replaces, and a reduction with
+    no test is one no reviewer would ever see.
+    """
+    assert session_state.DEFAULT_COMMITS == 8
+
+
+def test_commit_limit_is_honoured(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _no_pr(monkeypatch)
+    for i in range(4):
+        (tmp_path / f"c{i}.txt").write_text("x\n", encoding="utf-8")
+        git("add", "--", f"c{i}.txt")
+        git("commit", "-q", "-m", f"commit {i}")
+
+    assert len(session_state.gather(tmp_path, limit=2).commits) == 2
+
+
+def test_a_non_repo_reports_an_unread_state_rather_than_a_clean_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Outside a repo, git answers nothing — which is not "nothing changed".
+
+    This is the same collapse the PR state is guarded against, one field over:
+    an empty split rendered as a clean tree would be a claim nobody checked.
+    """
+    _no_pr(monkeypatch)
+    snap = session_state.gather(tmp_path / "not-a-repo")
+
+    assert snap.changes.read is False
+    assert snap.changes.clean is False
+    assert snap.branch is None
+
+
+# --------------------------------------------------------------------------
+# the design decision on #144 — three PR states, not two
+# --------------------------------------------------------------------------
+
+
+def test_no_open_pr_is_an_ordinary_result(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Criterion 4: the caller handles it like any other value, not as a special case."""
+    _no_pr(monkeypatch)
+    snap = session_state.gather(tmp_path)
+
+    assert snap.pr.state is session_state.PrState.NONE
+    assert snap.pr.number is None
+
+
+def test_an_open_pr_is_reported_with_its_number_and_checks(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        session_state,
+        "_gh",
+        lambda _args, _root: (0, '[{"number": 144, "title": "the snapshot"}]'),
+    )
+    monkeypatch.setattr(
+        session_state, "_checks_state", lambda _n, _r: (True, "2 binding check(s) green")
+    )
+
+    pr = session_state.gather(tmp_path).pr
+
+    assert pr.state is session_state.PrState.OPEN
+    assert pr.number == 144
+    assert pr.title == "the snapshot"
+    assert "green" in pr.checks
+    # The VERDICT is carried as data, not left only in the prose. Without this a
+    # caller asking "are the checks green?" has to substring-match text that can
+    # also read "could not read checks (rc=1)". (Spec lane, criterion 3.)
+    assert pr.checks_green is True
+
+
+def test_a_red_check_is_carried_as_data_not_only_as_prose(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`checks_green` must actually track the verdict, not be hardcoded True."""
+    monkeypatch.setattr(session_state, "_gh", lambda _a, _r: (0, '[{"number": 9, "title": "t"}]'))
+    monkeypatch.setattr(
+        session_state, "_checks_state", lambda _n, _r: (False, "1 check(s) not green")
+    )
+
+    pr = session_state.gather(tmp_path).pr
+
+    assert pr.checks_green is False
+
+
+def test_checks_green_is_none_when_there_is_no_open_pr(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No PR means no checks were asked about — not that they were not green."""
+    _no_pr(monkeypatch)
+
+    assert session_state.gather(tmp_path).pr.checks_green is None
+
+
+def test_a_multi_pr_annotation_does_not_land_in_the_unverifiable_field(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`detail` means "why there is no answer"; a note about an answer is not that.
+
+    One field doing both jobs left a caller filtering on `detail` unable to tell
+    an explanation from an annotation — while the class docstring claimed
+    `detail` was only the former. (Standards lane.)
+    """
+    monkeypatch.setattr(
+        session_state,
+        "_gh",
+        lambda _a, _r: (0, '[{"number": 1, "title": "a"}, {"number": 2, "title": "b"}]'),
+    )
+    monkeypatch.setattr(session_state, "_checks_state", lambda _n, _r: (True, "green"))
+
+    pr = session_state.gather(tmp_path).pr
+
+    assert pr.state is session_state.PrState.OPEN
+    assert pr.detail == ""
+    assert "2 open PRs" in pr.note
+    assert "2 open PRs" in session_state.render(session_state.gather(tmp_path))
+
+
+def test_a_failed_gh_lookup_is_its_own_state_not_no_open_pr(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """THE load-bearing case (#144's design comment).
+
+    `gh` unreachable, rate-limited or unauthenticated must not render as "no
+    open PR" — that would put a claim in a handoff that nothing checked.
+    """
+    _gh_down(monkeypatch)
+    pr = session_state.gather(tmp_path).pr
+
+    assert pr.state is session_state.PrState.UNVERIFIABLE
+    assert pr.state is not session_state.PrState.NONE
+    assert pr.detail  # never silent about why
+
+
+def test_unparsable_gh_output_is_unverifiable_not_no_open_pr(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rc=0 is not enough — a body we cannot read means we never got an answer.
+
+    `gh` can exit 0 having printed a warning banner, and `json.loads` failing on
+    that is "could not ask", not "asked and there is none".
+    """
+    monkeypatch.setattr(session_state, "_gh", lambda _args, _root: (0, "Welcome to gh!\nnot json"))
+
+    assert session_state.gather(tmp_path).pr.state is session_state.PrState.UNVERIFIABLE
+
+
+def test_a_well_formed_payload_of_the_wrong_shape_is_unverifiable(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Valid JSON that is not a list of PR objects is not an empty result.
+
+    `json.loads` succeeding says the bytes are JSON, not that they answer the
+    question — the same strictness `pr.checks_state` applies next door.
+    """
+    monkeypatch.setattr(session_state, "_gh", lambda _args, _root: (0, '{"message": "Not Found"}'))
+
+    assert session_state.gather(tmp_path).pr.state is session_state.PrState.UNVERIFIABLE
+
+
+def test_a_boolean_pr_number_is_refused_rather_than_rendered_as_pr_1(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`bool` is a subclass of `int`, so a bare isinstance check accepts `true`.
+
+    `True == 1`, so the unguarded form renders a corrupt row as a confident
+    "PR #1" — a specific, checkable, wrong claim, which is worse in a handoff
+    than admitting the lookup failed. Same trap `gates._is_exit_code` documents.
+    """
+    monkeypatch.setattr(
+        session_state, "_gh", lambda _a, _r: (0, '[{"number": true, "title": "t"}]')
+    )
+
+    assert session_state.gather(tmp_path).pr.state is session_state.PrState.UNVERIFIABLE
+
+
+def test_the_pr_probe_asks_only_for_open_prs_on_this_branch(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pinned, because `gh pr view <branch>` resolves a PR REGARDLESS of state.
+
+    `pr.py` records that exact defect: it returned a MERGED PR with rc=0 and let
+    `ship` report success having opened nothing. A snapshot built on the same
+    call would print a merged PR as the session's open one.
+    """
+    seen: list[list[str]] = []
+
+    def record(args: list[str], _root: Path) -> tuple[int, str]:
+        seen.append(args)
+        return 0, "[]"
+
+    monkeypatch.setattr(session_state, "_gh", record)
+    session_state.gather(tmp_path)
+
+    assert seen, "the PR probe never ran"
+    argv = seen[0]
+    assert argv[:2] == ["pr", "list"]
+    assert "--state" in argv
+    assert argv[argv.index("--state") + 1] == "open"
+    assert "--head" in argv
+    assert argv[argv.index("--head") + 1] == "work"
+    assert "view" not in argv
+
+
+def test_the_pr_probe_is_skipped_when_the_branch_is_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no branch there is nothing to ask ABOUT, and asking anyway lies.
+
+    `gh pr list --head ""` would list the repo's open PRs on any branch, so a
+    snapshot that could not read git would confidently name someone else's PR.
+    """
+    called: list[object] = []
+
+    def record(args: list[str], _root: Path) -> tuple[int, str]:
+        called.append(args)
+        return 0, "[]"
+
+    monkeypatch.setattr(session_state, "_gh", record)
+    pr = session_state.gather(tmp_path / "not-a-repo").pr
+
+    assert called == []
+    assert pr.state is session_state.PrState.UNVERIFIABLE
+
+
+def test_gathering_can_skip_the_pr_lookup_entirely(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#149's branch check needs the git data and should not pay for a network call."""
+    monkeypatch.setattr(
+        session_state,
+        "_gh",
+        lambda _a, _r: pytest.fail("gh must not be called when with_pr=False"),
+    )
+    snap = session_state.gather(tmp_path, with_pr=False)
+
+    assert snap.branch == "work"
+    assert snap.pr.state is session_state.PrState.UNVERIFIABLE
+    assert "not requested" in snap.pr.detail
+
+
+# --------------------------------------------------------------------------
+# criterion 2 + 3 — separate functions, structured data
+# --------------------------------------------------------------------------
+
+
+def test_gather_returns_structured_data_not_a_string(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Criterion 3, pinned: a caller reads fields, it does not parse prose."""
+    _no_pr(monkeypatch)
+    snap = session_state.gather(tmp_path)
+
+    assert isinstance(snap, session_state.Snapshot)
+    assert not isinstance(snap, str)
+
+
+def test_render_is_a_pure_function_of_a_snapshot(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Criterion 2: rendering re-reads nothing, so it can run without git or gh.
+
+    Armed by rendering a snapshot from a DIFFERENT repo root — if `render`
+    reached for live state it would disagree with the data it was handed.
+    """
+    _no_pr(monkeypatch)
+    snap = session_state.gather(tmp_path)
+    monkeypatch.setattr(session_state, "_gh", lambda _a, _r: pytest.fail("render must not call gh"))
+
+    assert "work" in session_state.render(snap)
+
+
+def test_render_prints_the_three_pr_states_differently(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The design comment's second half: the renderer must distinguish them.
+
+    Structured data that says three things and a renderer that prints two of
+    them the same way puts the collapse back in the artifact a human reads.
+    """
+    _no_pr(monkeypatch)
+    none_text = session_state.render(session_state.gather(tmp_path))
+
+    _gh_down(monkeypatch)
+    unver_text = session_state.render(session_state.gather(tmp_path))
+
+    monkeypatch.setattr(session_state, "_gh", lambda _a, _r: (0, '[{"number": 7, "title": "t"}]'))
+    monkeypatch.setattr(session_state, "_checks_state", lambda _n, _r: (True, "green"))
+    open_text = session_state.render(session_state.gather(tmp_path))
+
+    prs = {
+        line
+        for text in (none_text, unver_text, open_text)
+        for line in text.splitlines()
+        if "PR" in line
+    }
+    assert len(prs) == 3, f"two PR states rendered identically: {prs}"
+    assert "none" in none_text
+    assert "#7" in open_text
+    # The unverifiable arm must not be readable as the absent one.
+    assert "none" not in unver_text.split("PR")[1].split("\n")[0]
+
+
+def test_render_marks_an_unread_tree_rather_than_showing_it_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _no_pr(monkeypatch)
+    text = session_state.render(session_state.gather(tmp_path / "not-a-repo"))
+
+    assert "clean" not in text.lower()
+
+
+def test_render_says_clean_for_a_clean_tree(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _no_pr(monkeypatch)
+
+    assert "clean" in session_state.render(session_state.gather(tmp_path)).lower()
+
+
+# --------------------------------------------------------------------------
+# criterion 1 + 5 — the module entry point
+# --------------------------------------------------------------------------
+
+
+def test_main_prints_the_snapshot_and_exits_zero(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Criterion 1 + 5, driven at the entry point against the fixture repo."""
+    _no_pr(monkeypatch)
+
+    assert session_state.main([], tmp_path) == 0
+    assert "work" in capsys.readouterr().out
+
+
+def test_main_exits_zero_on_a_dirty_tree_too(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The second arm at the entry point. A snapshot REPORTS; it never gates.
+
+    An rc that tracked cleanliness would make this task unusable in the place it
+    exists for — you take a snapshot precisely when there is something to say.
+    """
+    _no_pr(monkeypatch)
+    (tmp_path / "dirty.txt").write_text("d\n", encoding="utf-8")
+
+    assert session_state.main([], tmp_path) == 0
+    assert "dirty.txt" in capsys.readouterr().out
+
+
+def test_main_still_exits_zero_when_gh_is_unreachable(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A snapshot with an unknown PR state is still a useful snapshot."""
+    _gh_down(monkeypatch)
+
+    assert session_state.main([], tmp_path) == 0
+    assert "could not" in capsys.readouterr().out.lower()
+
+
+def test_main_refuses_an_unknown_flag(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """2 for a request that could not be honoured — the split `kb-gates` draws.
+
+    Silently ignoring `--no-pr` (say) would make the command take the opposite
+    position from the one the command line states, and still exit 0.
+    """
+    _no_pr(monkeypatch)
+
+    assert session_state.main(["--nonsense"], tmp_path) == 2
+
+
+def test_main_refuses_a_positional_argument(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """This command takes no positionals, so anything there is a mistake.
+
+    Ignoring them exited 0 on `session-state bogus` while the module's own
+    comment claimed unrecognised input is refused rather than ignored — the
+    guard enforcing half its stated rule. A mistyped flag that lost its dashes
+    is the realistic way in. (Standards lane.)
+    """
+    _no_pr(monkeypatch)
+
+    assert session_state.main(["bogus"], tmp_path) == 2
+    # Control: the accepted flag still works, so the guard discriminates rather
+    # than refusing everything.
+    assert session_state.main(["--no-pr"], tmp_path) == 0
+
+
+def test_main_accepts_the_no_pr_flag(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        session_state, "_gh", lambda _a, _r: pytest.fail("--no-pr must not call gh")
+    )
+
+    assert session_state.main(["--no-pr"], tmp_path) == 0

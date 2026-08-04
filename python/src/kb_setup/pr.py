@@ -134,16 +134,28 @@ def run_gates(repo_root: Path) -> bool:
     return gate_run.all_passed
 
 
-def checks_state(pr_number: int) -> tuple[bool, str]:
+def checks_state(pr_number: int, *, cwd: Path | None = None) -> tuple[bool, str]:
     """Return ``(green, summary)`` for a PR's checks.
 
     Green means every BINDING check reached a terminal, non-failing bucket.
     Checks in :data:`_ADVISORY_CHECKS` are reported and never counted, in any
     bucket including "pending". A PR with no checks at all is green — this repo
     has no CI, so "no checks" is normal here and must not deadlock the merge.
+
+    ``cwd`` selects the repository `gh` resolves against, and defaults to None
+    — the process's own directory, which is what every caller in this module
+    relied on implicitly. It is explicit now because `kb_setup.session_state`
+    takes a ``repo_root`` and passes it to every other read; this was the one
+    call that silently ignored it, so a caller pointing the snapshot at another
+    checkout would have got PR checks resolved against whatever directory the
+    process happened to be in. Not reachable from the shipped task, where
+    `cli.py` sets ``repo_root = Path.cwd()`` — a latent inconsistency, fixed
+    additively so `ship`/`land` behaviour is unchanged. (Cold lane, P3.)
     """
     rc, out = _run(
-        ["gh", "pr", "checks", str(pr_number), "--json", "name,bucket"], timeout=_GH_TIMEOUT
+        ["gh", "pr", "checks", str(pr_number), "--json", "name,bucket"],
+        cwd=cwd,
+        timeout=_GH_TIMEOUT,
     )
     # `gh pr checks` exits non-zero both when checks FAIL and (per its docs) when
     # none exist, so rc alone cannot discriminate — the JSON body is what does.

@@ -540,7 +540,7 @@ description = 'Score project skills with plugin-eval (static layer, no LLM): mis
 run = "uv run kb-setup skill-score"
 
 [tasks.kb-handoff-check]
-description = "Verify a handoff's claims — paths, file:line, task names, gate results: mise run kb-handoff-check [-- <path>]"
+description = "Verify a handoff's claims — paths (incl. mistyped extensions), file:line, task names, gate results: mise run kb-handoff-check [-- <path>]"
 # Replaces the by-hand half of /clear-prep step 6, which asks the agent that WROTE
 # the handoff to verify it from memory at the end of a long session — and which
 # already failed that way (`:1836` written for `:1830`, propagated into three
@@ -578,6 +578,34 @@ description = "Run the gates and record each result durably: mise run kb-gates [
 # kb-ship calls the SAME run+record functions with the flag on, so the record and
 # the push decision cannot disagree. Logic in kb_setup.gates.
 run = "uv run kb-setup gates"
+
+[tasks.kb-session-state]
+description = "Print the session's working state as a paste-ready handoff block: mise run kb-session-state [-- --no-pr]"
+# Replaces the by-hand half of /clear-prep step 1, which asks an agent to run four
+# commands (branch, status, log, PR) and reformat them into a handoff every
+# session. Four chances to transcribe something, and this repo has already paid
+# for that class twice: a file:line read off a sed window by eye (:1836 for
+# :1830, propagated into three files), and a PR number read out of a mise run log
+# where redaction had masked digits mid-number (pull/[redacted]59).
+# ALWAYS exits 0 for what it finds — a snapshot reports, it never gates; 2 only
+# for a request that cannot be honoured (an unknown flag).
+# A FAILED gh LOOKUP IS ITS OWN STATE and never renders as "no open PR" (#144):
+# gh unreachable, rate-limited or unauthenticated is not evidence that no PR
+# exists, and a handoff asserting "0 open PRs" on a question nobody managed to ask
+# is exactly what kb-handoff-check exists to catch. `-- --no-pr` skips the network
+# call entirely and reports the PR state as unverifiable-because-not-asked.
+# READ THE BLOCK FROM AN UNREDACTED RUN, and it is NOT only the branch: mise
+# masks digit runs matching the user's secrets, so this task mangles the branch,
+# every commit SHA and every issue/PR number — feat/144-… prints as
+# feat/[redacted]44-… and 90e2591cda13 as 90e259[redacted]cda[redacted]3. The
+# SHAs are the worse half; they key the kb-gates records and kb-review receipts.
+# That is the very defect this task exists to remove, arriving via the transport,
+# and it is the advisory eval case tier1.mise-redaction-legible. Copy from
+# `uv run kb-setup session-state` (same code, no redaction layer); the cause is
+# the user's mise config, which do-not.md #11 forbids this repo from editing.
+# Gathering and rendering are separate functions so a caller can read the state
+# without the markdown. Logic in kb_setup.session_state.
+run = "uv run kb-setup session-state"
 
 [tasks.kb-goal-check]
 description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'
