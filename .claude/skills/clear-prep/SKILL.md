@@ -239,11 +239,16 @@ more than a missing one. Before printing the resume prompt:
   window, which is how a `:1836` that was really `:1830` reached three files;
 - every `mise run <task>` it names is in `mise tasks ls`;
 - every gate result matches `.agent/kb/gates/gates-<sha>.json`, not your
-  recollection. Check the ROWS, not just the top-level `sha`: each row carries
-  its own `sha` (HEAD when that gate ran, which can differ if HEAD moved
-  mid-run) and its own `dirty`. A row with `"dirty": true` describes the tree,
-  not the commit; a row with `"rc": null` did not produce a result and is not a
-  pass; a row with `"sha": null` is bound to no commit at all;
+  recollection. **`mise run kb-handoff-check` now does this one for you** (#147)
+  — it reads each `rc=` claim back against the record and checks the ROWS, not
+  just the top-level `sha`. What it needs from you is the **commit, in the same
+  bullet as the claim** — the shape `- Gates on 77661a3: …` with the sha
+  backticked. A claim that names no commit cannot be looked up and is reported
+  `UNVER`, and a sha in a neighbouring paragraph is deliberately not inherited.
+  A branch name is not a commit. Read the verdicts as: `FAIL` the record
+  contradicts you; `UNVER` nothing can speak to it (no record at that commit, or
+  that gate was not in the run); `AMBIG` it holds with a caveat — usually that
+  the tree was dirty, so the result describes that tree and not the commit;
 - every number it repeats was measured *this* session, or is labelled as
   inherited and unverified (`probes-need-a-control-arm.md` rule 6).
 

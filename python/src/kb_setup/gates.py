@@ -40,6 +40,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypeIs
 
 from kb_setup import atomic, resolve, review
 
@@ -64,7 +65,12 @@ _GIT_TIMEOUT = 30
 _RC_TIMEOUT = 124
 _RC_COULD_NOT_RUN = 127
 
-_SHA_ABBREV = 12
+#: Characters of a commit shown in a report. Public because `kb_setup.handoff`
+#: renders the same commits when it checks a claim against a record: two copies
+#: of one presentation constant, kept in step by comment alone, is the
+#: duplication `review.safe_sha` was made public to avoid one directory over —
+#: identical right up until one of them is changed. (Standards lane.)
+SHA_ABBREV = 12
 
 #: The local gates every PR must pass before it is pushed — moved here from `pr`
 #: (where it was `GATES`) so the ship path and `kb-gates` cannot drift into two
@@ -327,9 +333,197 @@ def record(repo_root: Path, results: list[GateResult], *, sha: str) -> Path:
     return path
 
 
+#: The task that RUNS the gates rather than being one. A handoff claiming
+#: `mise run kb-gates` **rc=0** is asserting something about every gate in the
+#: record, not about a gate by this name — see :meth:`Record.summarise`.
+RUNNER_TASK = "kb-gates"
+
+#: Filename shape of a record, used to pick this directory's own artifacts out
+#: of whatever else is beside them. A stray file must not become an ambiguous
+#: match, which would make the checker refuse for a reason the author cannot see.
+_RECORD_GLOB = "gates-*.json"
+_RECORD_PREFIX = "gates-"
+
+
+@dataclass(frozen=True)
+class RecordedGate:
+    """One gate as READ BACK from a record, rather than as produced by a run.
+
+    A separate type from :class:`GateResult` on purpose. That one is what this
+    module observed and every field is trustworthy; this one is parsed from a
+    file on disk that any editor could have touched, so its fields are typed as
+    the JSON permits and validated on the way in. Annotating untrusted JSON with
+    the optimistic type is exactly how callers stop checking it.
+    """
+
+    task: str
+    rc: int | None
+    sha: str | None
+    dirty: bool | None
+
+
+@dataclass(frozen=True)
+class Record:
+    """One run's record, read back from `.agent/kb/gates/gates-<sha>.json`.
+
+    ``sha`` is the file's own key — HEAD when the run STARTED. Each row carries
+    the HEAD its own gate ran against, and the two can differ; a reader checking
+    a claim must use the ROW's, which is why both survive the parse.
+    """
+
+    sha: str
+    path: Path
+    gates: tuple[RecordedGate, ...]
+
+    def rows_for(self, task: str) -> tuple[RecordedGate, ...]:
+        """EVERY recorded row for ``task``. Zero, one, or — legitimately — more.
+
+        Plural, and that is the whole point. `kb-gates -- lint lint` is accepted
+        by the CLI, so a record really can carry two rows for one task with
+        DIFFERENT results; a singular `row()` returned the first and the second
+        was invisible to every lookup, which meant a claim could be confirmed
+        against a result the run later contradicted. The caller has to see both
+        to say so. (Cold lane.)
+        """
+        return tuple(r for r in self.gates if r.task == task)
+
+    def row(self, task: str) -> RecordedGate | None:
+        """The FIRST recorded row for ``task``, or None. Prefer :meth:`rows_for`.
+
+        Kept because a single row is the overwhelmingly common case and reads
+        better at a call site that has already established there is one. It must
+        never be used to DECIDE anything about a claim — that is what let a
+        duplicate row hide.
+        """
+        rows = self.rows_for(task)
+        return rows[0] if rows else None
+
+    def summarise(self) -> tuple[int, int]:
+        """``(passed, not-passed)`` over every row — what a runner claim asserts.
+
+        A gate with no result counts as not passed, the same way :meth:`GateRun.
+        all_passed` counts it. A record whose unreached gates were read as
+        neutral would let a `--stop` run that never reached half its list vouch
+        for a claim that everything was green.
+        """
+        passed = sum(1 for r in self.gates if r.rc == 0)
+        return passed, len(self.gates) - passed
+
+
+def _is_exit_code(value: object) -> TypeIs[int]:
+    """Whether ``value`` is an exit code as JSON can carry one.
+
+    `bool` is a subclass of `int`, so a bare `isinstance(v, int)` accepts `true`
+    and `false` — and `True == 1`, so the record then agrees with a claim of
+    `rc=1`. An exit code is a number, not a flag.
+
+    A `TypeIs` rather than a `bool` so the caller's `rc` narrows to `int` on the
+    strength of the check that was performed, instead of being re-asserted with
+    a cast. A type that claims more than the check establishes is how a caller
+    stops checking at all.
+    """
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _read_row(row: object) -> RecordedGate | None:
+    """One recorded gate, or None when the row is not one.
+
+    ABSENT and PRESENT-BUT-WRONG-TYPE are different, and the split is the whole
+    point. A missing field is another writer's omission and reads as "unknown";
+    a field that is there and is the wrong TYPE means these bytes are not a gate
+    record, and the honest answer is that the record could not be read.
+
+    Coercing instead is how the collapse this repo keeps relearning gets in:
+    `"rc": true` was normalised to None, which is the SAME value a legitimately
+    unreached gate carries — so a corrupt row became indistinguishable from
+    "this gate did not run" and went on to help confirm a runner claim of
+    failure. "Could not read" is not one of the states a record has. (Cold lane,
+    round 2.)
+    """
+    if not isinstance(row, dict):
+        return None
+    task = row.get("task")
+    if not isinstance(task, str) or not task:
+        return None
+    rc = row.get("rc")
+    if rc is not None and not _is_exit_code(rc):
+        return None
+    sha = row.get("sha")
+    if sha is not None and not isinstance(sha, str):
+        return None
+    dirty = row.get("dirty")
+    if dirty is not None and not isinstance(dirty, bool):
+        return None
+    # `sha or None`: an empty string is FALSY, so the drift check skipped it, and
+    # it is not None, so the unbound check skipped it too — a row bound to no
+    # commit passed both directions. `iter_run` normalises the same way at write
+    # time; this is the read side agreeing with it.
+    return RecordedGate(task=task, rc=rc, sha=sha or None, dirty=dirty)
+
+
+def _parse(path: Path) -> Record | None:
+    """A record read from ``path``, or None when the bytes are not one.
+
+    Every field is checked rather than trusted. `json.loads` succeeding says the
+    file is JSON, not that it is a gate record — and a `"gates": "lint"` that
+    iterates as characters would produce a record of one-letter task names that
+    matches nothing and reads as "the run did not cover that gate".
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, UnicodeDecodeError, json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    rows = data.get("gates")
+    sha = data.get("sha")
+    if not isinstance(rows, list) or not isinstance(sha, str) or not sha:
+        return None
+    parsed: list[RecordedGate] = []
+    for row in rows:
+        read = _read_row(row)
+        if read is None:
+            return None
+        parsed.append(read)
+    return Record(sha=sha, path=path, gates=tuple(parsed))
+
+
+def find_record(repo_root: Path, sha: str) -> tuple[Record | None, str]:
+    """The record for ``sha``, or ``(None, why)``. ``sha`` may be abbreviated.
+
+    The `(value, reason)` shape is `review.receipt_state`'s, and the reason is
+    never empty when the value is None — the composer renders it verbatim, so a
+    silent None would become an unexplained verdict.
+
+    A record at ANOTHER commit is never returned, and the reason NAMES the
+    commits that do have one. "Not found" alone, said in a directory visibly
+    full of `gates-*.json`, invites the reader to reach for the nearest one —
+    which is the stale exit code vouching for code it never saw that #147 exists
+    to prevent, arriving via the report instead of via the code.
+    """
+    wanted = review.safe_sha(sha).lower()
+    if not wanted:
+        return None, "the claim names no commit"
+    present = sorted((repo_root / GATES_DIR).glob(_RECORD_GLOB))
+    keys = {p: p.name[len(_RECORD_PREFIX) : -len(".json")].lower() for p in present}
+    matches = [p for p, key in keys.items() if key.startswith(wanted)]
+    if not matches:
+        others = sorted({key[:SHA_ABBREV] for key in keys.values()})
+        seen = f" — records exist at {', '.join(others)}" if others else ""
+        return None, f"no gate record at {wanted[:SHA_ABBREV]}{seen}"
+    if len(matches) > 1:
+        return None, (
+            f"{len(matches)} records match {wanted[:SHA_ABBREV]} — cite more of the commit"
+        )
+    parsed = _parse(matches[0])
+    if parsed is None:
+        return None, f"could not read the gate record at {matches[0].name}"
+    return parsed, ""
+
+
 def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     """The report: one line per gate, the counts, and where the record went."""
-    lines = [f"gates at {sha[:_SHA_ABBREV]}"]
+    lines = [f"gates at {sha[:SHA_ABBREV]}"]
     for r in results:
         state = "not run" if not r.ran else ("PASS" if r.passed else f"FAIL rc={r.rc}")
         lines.append(f"  {r.task:<12} {state}")
@@ -348,7 +542,7 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     if drifted:
         lines.append(
             f"  ! HEAD moved during the run — some gates ran against "
-            f"{', '.join(s[:_SHA_ABBREV] for s in drifted)}, not {sha[:_SHA_ABBREV]}"
+            f"{', '.join(s[:SHA_ABBREV] for s in drifted)}, not {sha[:SHA_ABBREV]}"
         )
 
     # Said out loud rather than left in the JSON. A run over a dirty tree is the
@@ -359,7 +553,7 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     if unclean:
         lines.append(
             f"  ! uncommitted changes were present — these describe the tree, "
-            f"not {sha[:_SHA_ABBREV]} itself ({', '.join(unclean)})"
+            f"not {sha[:SHA_ABBREV]} itself ({', '.join(unclean)})"
         )
     if unknown:
         lines.append(f"  ! could not tell whether the tree was clean ({', '.join(unknown)})")

@@ -540,7 +540,7 @@ description = 'Score project skills with plugin-eval (static layer, no LLM): mis
 run = "uv run kb-setup skill-score"
 
 [tasks.kb-handoff-check]
-description = "Verify a handoff's static claims — paths, file:line, task names: mise run kb-handoff-check [-- <path>]"
+description = "Verify a handoff's claims — paths, file:line, task names, gate results: mise run kb-handoff-check [-- <path>]"
 # Replaces the by-hand half of /clear-prep step 6, which asks the agent that WROTE
 # the handoff to verify it from memory at the end of a long session — and which
 # already failed that way (`:1836` written for `:1830`, propagated into three
@@ -554,6 +554,14 @@ description = "Verify a handoff's static claims — paths, file:line, task names
 # kb_setup.resolve.declared_tasks and is deliberately NOT repeated here, because
 # both totals move every time this file gains a task. Logic in kb_setup.handoff,
 # over the reusable kb_setup.citations + kb_setup.resolve primitives.
+# GATE CLAIMS are checked too (#147): every `<task> rc=<n>` is read back against
+# `.agent/kb/gates/gates-<sha>.json`, the record kb-gates writes. A claim binds to
+# the commit named in its OWN bullet/paragraph — not the nearest sha above it,
+# which would let a gotchas paragraph vouch for a gate list. The strict/advisory
+# split holds: the record CONTRADICTING a claim exits 1, while "no record at that
+# commit" is UNVERIFIABLE and exits 0, because `.agent/` is machine-local and a
+# fresh clone has no records at all — failing there would break the checker in
+# exactly the situation it exists for.
 run = "uv run kb-setup handoff-check"
 
 [tasks.kb-gates]

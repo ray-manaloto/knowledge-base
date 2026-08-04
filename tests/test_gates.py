@@ -711,3 +711,229 @@ def test_ship_gates_are_the_repo_s_real_declared_tasks():
 def test_the_kb_gates_task_is_declared():
     root = Path(__file__).resolve().parents[1]
     assert gates.undeclared(root, ("kb-gates",)) == ()
+
+
+# ---------------------------------------------------- reading a record back ----
+#
+# The lookup half of #147. Every arm here is about the ONE question the checker
+# asks — "is there a record for THIS commit" — and the answers that are not yes
+# are kept apart, because a lookup that folds "no record" into "wrong record"
+# hands the composer a two-state answer to a three-state question.
+
+
+def _write_record(root: Path, sha: str, rows: list[gates.GateResult]) -> Path:
+    return gates.record(root, rows, sha=sha)
+
+
+def _ok(task: str, sha: str = _SHA) -> gates.GateResult:
+    return gates.GateResult(task, 0, sha, "t", dirty=False)
+
+
+def test_find_record_returns_the_record_written_for_that_sha(tmp_path):
+    _write_record(tmp_path, _SHA, [_ok("lint")])
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.sha == _SHA
+    assert [r.task for r in found.gates] == ["lint"]
+    assert detail == ""
+
+
+def test_find_record_matches_the_abbreviated_sha_a_handoff_writes():
+    """Handoffs cite seven characters; the record is keyed by forty."""
+    assert _SHA.startswith(_SHA[:7])
+
+
+def test_find_record_accepts_an_abbreviated_sha(tmp_path):
+    _write_record(tmp_path, _SHA, [_ok("lint")])
+    found, _ = gates.find_record(tmp_path, _SHA[:7])
+    assert found is not None
+    assert found.sha == _SHA
+
+
+def test_find_record_says_so_when_there_is_no_record_at_all(tmp_path):
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert "no gate record" in detail
+
+
+def test_find_record_does_not_return_a_record_from_another_commit(tmp_path):
+    """The rejecting arm for criterion 3, at the lookup layer.
+
+    A record keyed to another commit must not answer for this one, and the
+    detail must NAME it — a reader who is told only "not found" while a
+    `gates-*.json` sits in the directory will reach for it.
+    """
+    other = "b" * 40
+    _write_record(tmp_path, other, [_ok("lint", other)])
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert other[:12] in detail
+
+
+def test_find_record_refuses_an_ambiguous_abbreviation(tmp_path):
+    """Two records sharing a prefix: answering with either would be a guess."""
+    _write_record(tmp_path, "abc1" + "0" * 36, [_ok("lint")])
+    _write_record(tmp_path, "abc2" + "0" * 36, [_ok("lint")])
+    found, detail = gates.find_record(tmp_path, "abc")
+    assert found is None
+    assert "2 records" in detail
+
+
+def test_find_record_treats_an_unparsable_record_as_unreadable(tmp_path):
+    path = tmp_path / gates.GATES_DIR / f"gates-{_SHA}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not json", encoding="utf-8")
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert "could not read" in detail
+
+
+def _write_raw(root: Path, sha: str, body: str) -> None:
+    path = root / gates.GATES_DIR / f"gates-{sha}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+
+
+def test_find_record_treats_a_record_of_the_wrong_shape_as_unreadable(tmp_path):
+    """Valid JSON is not a valid record — `gates` must be a list of objects."""
+    _write_raw(tmp_path, _SHA, '{"sha": "x", "gates": "lint"}')
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert "could not read" in detail
+
+
+def test_find_record_treats_a_record_with_no_gates_key_as_unreadable(tmp_path):
+    """A truncated record, and the arm the case above could not provide.
+
+    `"gates": "lint"` is caught by the PER-ROW check further down, so removing
+    the shape guard left that test green — a mutation masked by the next guard.
+    With no `gates` key at all there is no row loop to reach: without the guard
+    this iterates None and crashes, which is not one of the three answers.
+    """
+    _write_raw(tmp_path, _SHA, '{"sha": "x"}')
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert "could not read" in detail
+
+
+def test_find_record_treats_a_non_string_sha_as_unreadable(tmp_path):
+    """The other half of the shape guard: `record.sha` is sliced by its readers."""
+    _write_raw(tmp_path, _SHA, '{"sha": 5, "gates": []}')
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is None
+
+
+def test_a_record_round_trips_every_field_the_checker_reads(tmp_path):
+    """`rc`, `sha` and `dirty` all survive the write; None survives as None."""
+    _write_record(tmp_path, _SHA, [gates.GateResult("lint", None, None, None, dirty=None)])
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    (row,) = found.gates
+    assert (row.task, row.rc, row.sha, row.dirty) == ("lint", None, None, None)
+
+
+def test_find_record_ignores_a_file_that_is_not_a_gate_record(tmp_path):
+    """A stray file in the directory must not become an ambiguous match."""
+    (tmp_path / gates.GATES_DIR).mkdir(parents=True, exist_ok=True)
+    (tmp_path / gates.GATES_DIR / "notes.md").write_text("x", encoding="utf-8")
+    _write_record(tmp_path, _SHA, [_ok("lint")])
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+
+
+def test_row_returns_none_for_a_gate_the_record_does_not_cover(tmp_path):
+    _write_record(tmp_path, _SHA, [_ok("lint")])
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.row("lint") is not None
+    assert found.row("lint-docs") is None
+
+
+def test_a_real_exit_code_still_parses(tmp_path):
+    """Control arm for the test above — rejecting bools must not reject ints."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 1, "sha": _SHA}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].rc == 1
+
+
+def test_an_empty_row_sha_is_read_back_as_unknown(tmp_path):
+    """Write-side `iter_run` already normalises `"" -> None`; the read side now agrees."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 0, "sha": ""}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].sha is None
+
+
+def test_a_record_with_an_empty_top_level_sha_is_unreadable(tmp_path):
+    """`record()` never writes one, so an empty key is corruption, not a state."""
+    _write_raw(tmp_path, _SHA, json.dumps({"sha": "", "gates": []}))
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is None
+
+
+def test_rows_for_returns_every_matching_row(tmp_path):
+    """The plural lookup is what makes a duplicate row visible to the caller."""
+    _write_record(
+        tmp_path, _SHA, [_ok("lint"), gates.GateResult("lint", 1, _SHA, "t", dirty=False)]
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert [r.rc for r in found.rows_for("lint")] == [0, 1]
+
+
+def test_a_malformed_rc_makes_the_whole_record_unreadable(tmp_path):
+    """`"rc": true` must not be COERCED to the value an unreached gate carries.
+
+    Normalising it to None made a corrupt row indistinguishable from "this gate
+    did not run", so it went on to help confirm a runner claim of failure — the
+    "could not read rendered as a state" collapse, one layer down. A record with
+    a field of the wrong type is not a record.
+    """
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": True, "sha": _SHA}]}),
+    )
+    found, detail = gates.find_record(tmp_path, _SHA)
+    assert found is None
+    assert "could not read" in detail
+
+
+def test_a_null_rc_is_still_a_legitimate_row(tmp_path):
+    """Control arm: an unreached gate really does carry `rc: null` (#146)."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": None, "sha": None}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert found.gates[0].rc is None
+
+
+def test_a_row_with_a_wrong_typed_dirty_is_unreadable(tmp_path):
+    """The same rule for every field: present-but-wrong-typed is not a state."""
+    _write_raw(
+        tmp_path,
+        _SHA,
+        json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 0, "dirty": "yes"}]}),
+    )
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is None
+
+
+def test_an_absent_field_is_unknown_rather_than_malformed(tmp_path):
+    """ABSENT and WRONG-TYPED are different: one is an omission, one is corruption."""
+    _write_raw(tmp_path, _SHA, json.dumps({"sha": _SHA, "gates": [{"task": "lint", "rc": 0}]}))
+    found, _ = gates.find_record(tmp_path, _SHA)
+    assert found is not None
+    assert (found.gates[0].sha, found.gates[0].dirty) == (None, None)
