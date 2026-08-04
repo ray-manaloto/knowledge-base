@@ -239,8 +239,11 @@ more than a missing one. Before printing the resume prompt:
   window, which is how a `:1836` that was really `:1830` reached three files;
 - every `mise run <task>` it names is in `mise tasks ls`;
 - every gate result matches `.agent/kb/gates/gates-<sha>.json`, not your
-  recollection — and if the record's `sha` is not the commit the handoff claims,
-  the numbers describe a different tree;
+  recollection. Check the ROWS, not just the top-level `sha`: each row carries
+  its own `sha` (HEAD when that gate ran, which can differ if HEAD moved
+  mid-run) and its own `dirty`. A row with `"dirty": true` describes the tree,
+  not the commit; a row with `"rc": null` did not produce a result and is not a
+  pass; a row with `"sha": null` is bound to no commit at all;
 - every number it repeats was measured *this* session, or is labelled as
   inherited and unverified (`probes-need-a-control-arm.md` rule 6).
 

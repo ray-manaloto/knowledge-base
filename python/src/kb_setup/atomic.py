@@ -15,6 +15,7 @@ until one of them is hardened and the other is not.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -25,7 +26,15 @@ def write_text(path: Path, text: str) -> None:
     one and never a partial. The temp file is removed if the write fails, so a
     crashed run leaves no debris beside the real artifact.
     """
-    tmp = path.with_name(path.name + ".tmp")
+    # The pid is not decoration. A temp name derived ONLY from the destination
+    # means two concurrent writers share one inode: one can rename the file out
+    # from under the other (FileNotFoundError on the second `replace`), or both
+    # can interleave bytes into it before either rename. Pre-existing in
+    # `skill_eval`, and inherited unchanged by the extraction — but this module
+    # now has a second caller whose concurrent case is plausible (two `kb-gates`
+    # runs at one commit), so it is fixed here rather than carried forward.
+    # (Cold lane round 2, P2, correctly labelled pre-existing.)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     try:
         tmp.write_text(text, encoding="utf-8")
         tmp.replace(path)

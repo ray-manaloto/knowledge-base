@@ -114,13 +114,34 @@ class GateResult:
 
     @property
     def ran(self) -> bool:
-        """Whether this gate was invoked at all."""
+        """Whether this gate produced a result — i.e. ran to COMPLETION.
+
+        Not "was invoked at all", which is what this said and could not deliver.
+        When a run is interrupted, the gate that was in flight has no result and
+        is padded exactly like one that was never reached, so `rc=None` covers
+        both "never started" and "started and did not finish". Those are genuinely
+        indistinguishable from here — the interrupt can land inside `_invoke` or
+        between gates — so the honest move is to claim the weaker thing rather
+        than have the record assert a stronger one that is sometimes false.
+        (Cold lane round 2, paired impl+test finding.)
+        """
         return self.rc is not None
 
     @property
     def passed(self) -> bool:
-        """Whether this gate ran AND exited 0. A gate that never ran has not passed."""
+        """Whether this gate completed AND exited 0. No result is never a pass."""
         return self.rc == 0
+
+    @property
+    def bound_to_a_commit(self) -> bool:
+        """Whether a COMPLETED gate's result can be tied to a commit.
+
+        A gate that ran while `git rev-parse` was transiently failing has a
+        result and no commit to attach it to. That is not drift and not a
+        failure; it is a row nobody can check later, which for this artifact is
+        the one thing worth saying out loud. (Cold lane round 2.)
+        """
+        return not self.ran or bool(self.sha)
 
 
 def head_sha(repo_root: Path) -> str:
@@ -149,7 +170,11 @@ def tree_dirty(repo_root: Path) -> bool | None:
             check=False,
             timeout=_GIT_TIMEOUT,
         )
-    except OSError, subprocess.SubprocessError:
+    except OSError, subprocess.SubprocessError, UnicodeDecodeError:
+        # UnicodeDecodeError is neither of the other two — `text=True` decodes
+        # inside `subprocess.run`, so a path git emits verbatim that is not UTF-8
+        # raised straight past a handler whose whole job is to return "unknown"
+        # instead of raising. (Cold lane round 2, P3.)
         return None
     if proc.returncode != 0:
         return None
@@ -232,7 +257,12 @@ def iter_run(
         if stopped:
             yield GateResult(task, None, None, None)
             continue
-        sha = head_sha(repo_root)
+        # `or None`, not the raw "". An empty sha is git failing transiently, not
+        # a commit — and `render`'s drift check filters falsy values, so the raw
+        # form produced a PASSING row bound to nothing, silently. None makes it
+        # the same three-state shape as `dirty`, and `bound_to_a_commit` reports
+        # it. (Cold lane round 2, P2.)
+        sha = head_sha(repo_root) or None
         dirty = tree_dirty(repo_root)
         # `flush=True` on both, and it is not cosmetic. Python block-buffers stdout
         # when it is a file rather than a tty, while the gate's own child writes
@@ -333,6 +363,16 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
         )
     if unknown:
         lines.append(f"  ! could not tell whether the tree was clean ({', '.join(unknown)})")
+
+    # A gate that COMPLETED while git was transiently unreadable has a result and
+    # no commit to attach it to. It is not drift (the drift check filters falsy
+    # shas by design), so without this it passed in silence. (Cold lane round 2.)
+    unbound = [r.task for r in results if not r.bound_to_a_commit]
+    if unbound:
+        lines.append(
+            f"  ! could not read HEAD for ({', '.join(unbound)}) — "
+            f"their results are not bound to any commit"
+        )
     lines.append(f"recorded: {path}")
     return "\n".join(lines)
 

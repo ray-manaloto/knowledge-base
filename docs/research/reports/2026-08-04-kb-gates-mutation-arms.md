@@ -1,4 +1,4 @@
-# kb-gates (#146) — 27 mutation arms, with the probes that lied
+# kb-gates (#146) — 30 mutation arms, and the reviews that outran them
 
 **Date:** 2026-08-04 · **Subject:** `python/src/kb_setup/gates.py`,
 `python/src/kb_setup/pr.py`, `tests/test_gates.py`
@@ -15,7 +15,7 @@ The harness lives at `scratchpad/mutate.py` for this session only; the table
 below is the durable record, and the rows under "What the harness found
 about itself" are the reason it is worth committing rather than summarising.
 
-## Results — 27/27 caught
+## Results — 30/30 caught
 
 Control row first: an unmutated `tests/test_gates.py` must be green, or every
 "FAIL" below is indistinguishable from a broken harness.
@@ -50,11 +50,16 @@ Control row first: an unmutated `tests/test_gates.py` must be green, or every
 | 25 | unreached gates are dropped instead of padded as not-run | `test_an_interrupt_still_records_the_gates_that_finished` | 1 |
 | 26 | the record is written in place, truncating the previous one | `test_record_never_truncates_a_previous_record_in_place` | 1 |
 | 27 | a failed atomic write leaves its temp file behind | `test_record_never_truncates_a_previous_record_in_place` | 1 |
+| 28 | an empty per-gate HEAD read is stored as a real sha | `test_a_gate_whose_head_read_failed_is_not_bound_to_a_commit` | 1 |
+| 29 | a completed gate bound to no commit is never reported | `test_a_gate_whose_head_read_failed_is_not_bound_to_a_commit` | 1 |
+| 30 | a decode failure crashes instead of reporting unknown | `test_tree_dirty_is_unknown_when_git_output_cannot_be_decoded` | 1 |
 
-Rows 12–17 came from the two-axis review and rows 24–27 from the cold lane; the
-rest are the original 20. Several were RE-POINTED as the code moved under them,
-and every one reported `MUTATION DID NOT APPLY` rather than quietly passing —
-the guard doing its job, three separate times.
+Arms 1–20 are the original set; the rest were added by three successive review
+passes (two-axis, then two cold rounds). **Nine arms had to be RE-POINTED** as
+the code moved under them, and every one reported `MUTATION DID NOT APPLY`
+rather than quietly passing — the guard doing its job, six separate times. The
+fix that finally stuck was to build each anchor by READING the file instead of
+retyping it, which is the generated-table lesson one level down.
 
 **This table is GENERATED from the harness's own `ARMS` list**, not transcribed:
 the script imports `mutate.py`, asserts every arm appears as caught in the run
@@ -197,11 +202,62 @@ failed twice more because a comment sits between the anchor lines. The fix for
 the last was to build the anchor by READING the file rather than retyping it —
 the same lesson as the generated table, one level down.
 
+## Round 2 of the cold lane — and the SHA I fabricated
+
+The bound is two rounds, so this was the last. Over code green on 27 arms, 48
+tests and three prior passes, it found **eight more** (7 P2, 1 P3) — and caught
+an error of mine before the gate could.
+
+**I fabricated a full SHA.** The report save-path I handed the lane named
+`db0a770a4d4bfbf3aa60bc4b6a56aad5faf1e2fc`, a commit that does not exist: I
+extended the 7-char prefix `db0a770` into a plausible-looking 40 rather than
+reading `git rev-parse HEAD`. The lane checked with `git cat-file -t`, said so
+first, and saved a correctly-named copy alongside. Had it not, the receipt would
+have refused for "the lane left no report" — a gap wearing a typo's clothes.
+This is `a-line-number-is-a-measurement` with 33 more characters: a SHA is read,
+never composed.
+
+The eight, condensed:
+
+- **A transiently-empty per-gate HEAD read became a passing row bound to nothing.**
+  `run_and_record` guards HEAD once before the loop; `iter_run` re-read it per
+  gate with no guard, and `render`'s drift check filters falsy shas *by design* —
+  so a `0` exit code was recorded against `""` and nothing said so. Now `None`
+  (the same three-state shape as `dirty`) with a `bound_to_a_commit` report.
+- **The `finally` padding called the in-flight gate "never invoked".** True for a
+  gate the run never reached, false for the one that was running when the
+  interrupt landed. They are genuinely indistinguishable from there, so the fix
+  was to weaken the *claim* — `ran` now means "produced a result" — rather than
+  assert a stronger one that is sometimes false.
+- **The paired test asserted that same false contract**, which is why the
+  implementation and its test agreed: both were consistent with a wrong claim.
+- **`atomic.write_text`'s temp name was per-destination, not per-process.**
+  Correctly labelled PRE-EXISTING — inherited verbatim from `skill_eval` — but
+  the extraction gave it a second caller whose concurrent case (two `kb-gates`
+  runs at one commit) is plausible, so it is fixed rather than carried forward.
+- **`tree_dirty` did not catch `UnicodeDecodeError`** (P3). `text=True` decodes
+  inside `subprocess.run`, and a `ValueError` is neither `OSError` nor
+  `SubprocessError` — so a non-UTF-8 path raised straight past a handler whose
+  whole contract is to return "unknown" instead of raising.
+- **Three doc defects, all mine.** `agent-artifact-conventions.md` glossed
+  `dirty` with **inverted polarity** ("was the tree clean") on the very field
+  added to stop a false reading; `ci-local-parity.md` named `gates.run` +
+  `gates.record` when both callers use `run_and_record`, inviting a maintainer to
+  open-code the two-call form and lose the interrupt-safe recording; and
+  `clear-prep`'s self-verify checked only the top-level `sha` when the format
+  explicitly lets each row carry its own `sha` and `dirty`.
+
+**The pattern across four passes.** Twenty arms, then a two-axis review, then two
+cold rounds — each found real defects the previous had been green over, and the
+later ones were increasingly about the *artifact* rather than the logic. Arms
+prove the claims you thought of; a different reader finds the claims you did not.
+Three of the last eight were prose that would have actively misled someone.
+
 ## Reproduction
 
 ```bash
-uv run python <scratchpad>/mutate.py    # 27/27 arms caught, restored tree green
-uv run pytest tests/test_gates.py -q    # 48 passed
+uv run python <scratchpad>/mutate.py    # 30/30 arms caught, restored tree green
+uv run pytest tests/test_gates.py -q    # 52 passed
 ```
 
 ## GitHub repos touched

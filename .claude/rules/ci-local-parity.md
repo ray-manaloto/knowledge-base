@@ -30,12 +30,15 @@ add a workflow step later, add its hk equivalent in the same change.
 that list and again before the push. A gate that is not in that list, and not an
 hk step reached by `lint`, does not gate anything.
 
-**One list, two callers.** `mise run kb-gates` runs the same tuple through the
-same `gates.run` + `gates.record` pair, differing only in the stop-on-failure
-flag: off there (learn every gate's state in one pass), on for `ship` (the
-refusal is already decided). `pr.run_gates` delegates rather than keeping its own
-loop, so the recorded results and the push decision are the same numbers read
-once — they cannot disagree (#146). Adding a gate means editing `GATE_TASKS`;
+**One list, two callers, and ONE entry point.** Both `mise run kb-gates` and
+`pr.run_gates` call **`gates.run_and_record`** — not `gates.run` followed by
+`gates.record`. That distinction is load-bearing: `run_and_record` records in a
+`finally`, so an interrupt cannot discard the gates that already finished, and
+open-coding the two-call form silently gives that up. They differ only in the
+stop-on-failure flag: off for `kb-gates` (learn every gate's state in one pass),
+on for `ship` (the refusal is already decided). Delegating rather than keeping a
+second loop is what makes the recorded results and the push decision the same
+numbers read once (#146). Adding a gate means editing `GATE_TASKS`;
 `gates.undeclared` then refuses at run time if the name is not in `mise.toml`.
 
 ## Rule 2: Every tool an hk step invokes must be pinned in `mise.toml`

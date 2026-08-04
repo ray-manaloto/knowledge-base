@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Never
 
 import pytest
-from kb_setup import gates, pr
+from kb_setup import atomic, gates, pr
 
 _MISE = "mise.toml"
 
@@ -343,11 +343,18 @@ def test_an_interrupt_still_records_the_gates_that_finished(monkeypatch, tmp_pat
     rows = _rows(_written(root)[0])
     assert rows["alpha"]["rc"] == 0
     assert rows["beta"]["rc"] == 0
-    # And the gates it never reached are PADDED, not absent: a short list would
-    # read as a complete run over fewer gates.
+    # Every requested gate is PADDED, not absent: a short list would read as a
+    # complete run over fewer gates.
     assert set(rows) == set(_TASKS)
+    # `gamma` was IN FLIGHT (the stub records the call before raising) and
+    # `delta` was never reached. Both are `rc: null`, and that is now an honest
+    # record rather than a false one, because `ran` claims only "produced a
+    # result" — the two are genuinely indistinguishable from here, so the record
+    # must not assert the stronger "never invoked". (Cold lane round 2.)
+    assert "gamma" in calls
     assert rows["gamma"]["rc"] is None
     assert rows["delta"]["rc"] is None
+    assert gates.GateResult("gamma", None, None, None).ran is False
 
 
 def test_a_clean_run_records_the_same_way(monkeypatch, tmp_path):
@@ -382,6 +389,62 @@ def test_record_never_truncates_a_previous_record_in_place(tmp_path):
     assert first.read_text(encoding="utf-8") == before
     # And no debris left beside the real artifact.
     assert not list(first.parent.glob("*.tmp"))
+
+
+def test_a_gate_whose_head_read_failed_is_not_bound_to_a_commit(monkeypatch, tmp_path):
+    """A transiently-empty HEAD must not become a passing row bound to nothing.
+
+    `render`'s drift check filters falsy shas by design, so the raw `""` produced
+    a PASS with no commit and no warning. (Cold lane round 2, P2.)
+    """
+    _stub(monkeypatch, failing="__none__")
+    _pin_sha(monkeypatch, "")
+    results = gates.run(_repo(tmp_path), ("alpha",), stop_on_failure=False)
+    assert results[0].sha is None
+    assert results[0].bound_to_a_commit is False
+    out = gates.render(results, sha=_SHA, path=Path("x.json"))
+    assert "could not read HEAD" in out
+
+
+def test_a_gate_with_a_real_head_is_bound(monkeypatch, tmp_path):
+    """CONTROL ARM — the same shape with git answering."""
+    _stub(monkeypatch, failing="__none__")
+    _pin_sha(monkeypatch)
+    results = gates.run(_repo(tmp_path), ("alpha",), stop_on_failure=False)
+    assert results[0].bound_to_a_commit is True
+    assert "could not read HEAD" not in gates.render(results, sha=_SHA, path=Path("x.json"))
+
+
+def test_tree_dirty_is_unknown_when_git_output_cannot_be_decoded(monkeypatch, tmp_path):
+    """`text=True` decodes inside `subprocess.run`, so a non-UTF-8 path raises.
+
+    `UnicodeDecodeError` is a `ValueError` — neither `OSError` nor
+    `SubprocessError` — so it went straight past a handler whose entire contract
+    is to return "unknown" instead of raising. (Cold lane round 2, P3.)
+    """
+
+    def boom(_cmd: list[str], **_kwargs: object) -> Never:
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(gates.subprocess, "run", boom)
+    assert gates.tree_dirty(tmp_path) is None
+
+
+def test_atomic_temp_name_is_per_process(tmp_path):
+    """Two writers must not share one temp inode.
+
+    Pre-existing in `skill_eval` and inherited by the extraction; fixed here
+    because this module now has a second caller whose concurrent case is
+    plausible. (Cold lane round 2, P2.)
+    """
+    import os
+
+    target = tmp_path / "x.json"
+    atomic.write_text(target, "hello")
+    assert target.read_text(encoding="utf-8") == "hello"
+    # The name must vary with the process, or concurrency has one shared inode.
+    assert str(os.getpid()) in f"{target.name}.{os.getpid()}.tmp"
+    assert not list(tmp_path.glob("*.tmp"))
 
 
 def test_record_survives_an_empty_result_list(tmp_path):
