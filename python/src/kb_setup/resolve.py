@@ -178,12 +178,16 @@ def _inside(repo_root: Path, candidate: Path) -> bool:
     `Path.exists()` follows `..` straight out of the tree, so
     `python/../../dotfiles/README.md` resolved against a sibling checkout and was
     reported RESOLVED — a false GREEN on a citation this checker has no standing
-    to verify, and `line_count` then opened the file. Normalised lexically rather
-    than with `Path.resolve()`, so a symlinked repo root (every `tmp_path` on
-    macOS is one) is not itself read as an escape.
+    to verify, and `line_count` then opened the file.
+
+    BOTH SIDES are resolved, not normalised lexically. A lexical form cannot see
+    a symlink, so an in-repo link pointing at a sibling checkout reached the same
+    false green by another route; resolving the root as well as the target is
+    what keeps a symlinked repo root (every `tmp_path` on macOS is one) from
+    reading as an escape in the process.
     """
-    root = Path(os.path.normpath(repo_root))
-    target = Path(os.path.normpath(candidate))
+    root = repo_root.resolve()
+    target = candidate.resolve()
     return target == root or root in target.parents
 
 

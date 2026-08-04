@@ -436,3 +436,51 @@ def test_a_trailing_slash_on_a_real_directory_still_resolves(tmp_path: Path):
     """Control arm for the test above."""
     root = _repo(tmp_path, {"docs/sub/a.md": "x\n"})
     assert resolve.resolve_path(root, "docs/sub/").state is resolve.State.RESOLVED
+
+
+def test_a_symlink_pointing_outside_the_repo_does_not_resolve(tmp_path: Path):
+    """The other half of containment, and the same false-GREEN class.
+
+    Lexical normalisation cannot see a symlink, so `link/README.md` where
+    `link` -> a sibling checkout resolved as verified — exactly what the `..`
+    fix was for, reached by a different route.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "README.md").write_text("x\n", encoding="utf-8")
+    root = _repo(tmp_path / "repo", {"docs/a.md": "x\n"})
+    (root / "link").symlink_to(outside, target_is_directory=True)
+    assert resolve.resolve_path(root, "link/README.md").state is not resolve.State.RESOLVED
+
+
+def test_a_symlink_staying_inside_the_repo_still_resolves(tmp_path: Path):
+    """Control arm: containment rejects escapes, not symlinks as such."""
+    root = _repo(tmp_path / "repo", {"real/README.md": "x\n"})
+    (root / "link").symlink_to(root / "real", target_is_directory=True)
+    assert resolve.resolve_path(root, "link/README.md").state is resolve.State.RESOLVED
+
+
+def test_a_single_dotdot_escape_is_also_rejected(tmp_path: Path):
+    """Discriminates containment from a bogus "reject two or more `..`" rule.
+
+    The existing escape/control pair differed only in how many `..` segments
+    each had, so a fix that counted them would pass both and check nothing.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "README.md").write_text("x\n", encoding="utf-8")
+    root = _repo(tmp_path / "repo", {"docs/a.md": "x\n"})
+    assert resolve.resolve_path(root, "../outside/README.md").state is not (resolve.State.RESOLVED)
+
+
+def test_the_committed_extractions_subtree_counts_as_authored(tmp_path: Path):
+    """`sources/extractions/` had no fixture at all.
+
+    Only `media` was ever exercised, so dropping `extractions` from the kept set
+    left every test green — a constant half-covered by a suite that looked
+    complete.
+    """
+    root = _repo(tmp_path, {"sources/extractions/chunk-one.json": "{}\n"})
+    got = resolve.resolve_path(root, "chunk-one.json")
+    assert got.state is resolve.State.RESOLVED
+    assert "vendored" not in got.detail

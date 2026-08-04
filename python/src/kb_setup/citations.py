@@ -104,9 +104,14 @@ _DOTFILES: frozenset[str] = frozenset(
     {".dockerignore", ".editorconfig", ".env", ".gitattributes", ".gitignore"}
 )
 
-#: A single-backtick code span. Excludes newlines so an unclosed backtick cannot
-#: swallow the rest of the document into one enormous "citation".
-_SPAN_RE = re.compile(r"`([^`\n]+)`")
+#: A code span: a run of N backticks closed by a run of N. Matching only SINGLE
+#: backticks split a genuine double-backtick escape span containing a literal
+#: backtick (`` ``docs/gone.md`x`` ``) and manufactured a path citation out of the
+#: fragments. The runs are MAXIMAL — a backtick may not sit either side of a
+#: delimiter — or a bare ``` ``` ``` line parses as a span containing a backtick.
+#: Excludes newlines so an unclosed backtick cannot swallow the rest of the
+#: document into one enormous "citation".
+_SPAN_RE = re.compile(r"(?P<ticks>`+)(?!`)(?P<body>[^\n]+?)(?<!`)(?P=ticks)(?!`)")
 
 #: The explicit "cited because it does not exist" marker, immediately after the
 #: closing backtick. Anchored to the span rather than to the line so it can only
@@ -115,18 +120,29 @@ _ABSENT_MARKER_RE = re.compile(r"[ \t]?\(absent\)")
 
 #: A fenced code block delimiter, CAPTURING its run length. Fenced content is
 #: EXAMPLE text — the paths in it need not exist — so it is blanked before
-#: extraction. The length matters: a four-backtick block exists precisely to
+#: extraction. Three CommonMark rules are load-bearing here, and each was found
+#: leaking or swallowing real citations without it: the indent is capped at three
+#: spaces (deeper is an indented code line, not a delimiter), a CLOSING fence may
+#: carry no info string (so ```` ```python ```` mid-block is content), and the run
+#: must be at least as long and of the same character.
+#: The length matters: a four-backtick block exists precisely to
 #: quote a three-backtick one, and toggling on any fence line let the inner pair
 #: close and reopen the outer block, leaking example content out as real
 #: citations (and, with the nesting reversed, swallowing real content).
-_FENCE_RE = re.compile(r"^\s*(?P<fence>`{3,}|~{3,})")
+_FENCE_RE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
 
 #: `path:12` or `path:12-19`.
 _LINE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
 
 #: `mise run <name>`. The name must start with a letter, which is what stops
 #: `mise run <task>` (a placeholder) from being read as a task called `<task>`.
-_TASK_RE = re.compile(r"\bmise run ([A-Za-z][A-Za-z0-9_:-]*)")
+#:
+#: A dotted tail is captured DELIBERATELY: without it the match stopped at the
+#: dot, so `mise run kb-build.typo` was read as the declared task `kb-build` and
+#: reported fine — a typo in a command the next session would run, passing. The
+#: tail requires a following name character, so a sentence-final `mise run lint.`
+#: still yields `lint` rather than a citation nothing declares.
+_TASK_RE = re.compile(r"\bmise run ([A-Za-z][A-Za-z0-9_:-]*(?:\.[A-Za-z0-9_:-]+)*)")
 
 
 @dataclass(frozen=True)
@@ -188,7 +204,7 @@ def strip_fences(text: str) -> str:
         fence = m.group("fence")
         if not opener:
             opener = fence
-        elif fence[0] == opener[0] and len(fence) >= len(opener):
+        elif fence[0] == opener[0] and len(fence) >= len(opener) and not m.group("info").strip():
             # CommonMark: only a run at least as long, of the same character,
             # closes the block. Anything shorter is content.
             opener = ""
@@ -204,7 +220,7 @@ def code_spans(text: str) -> list[Span]:
         marker = _ABSENT_MARKER_RE.match(stripped, m.end())
         spans.append(
             Span(
-                text=m.group(1),
+                text=m.group("body"),
                 line=stripped.count("\n", 0, m.start()) + 1,
                 marked_absent=marker is not None,
             )

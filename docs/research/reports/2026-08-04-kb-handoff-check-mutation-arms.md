@@ -12,12 +12,14 @@ mutation result nobody can re-run is an assertion, not evidence — and because
 measurement. Anyone can re-derive the table below from the script.
 
 Run 2026-08-04 against `feat/145-kb-handoff-check`:
-**23 of 23 arms discriminated, control included.**
+**32 of 32 arms discriminated, control included.**
 
-The last six arms cover checks added after the cold cross-family review found
-them missing — repo-escape containment, the `sources/` root's own level, a
-directory citation naming a file, an `(absent)` marker over an AMBIGUOUS
-resolution, a reversed line range, and fence-length tracking.
+The arms grew across two rounds of cold cross-family review. Round 1 added six
+(repo-escape containment, the `sources/` root's own level, a directory citation
+naming a file, an `(absent)` marker over an AMBIGUOUS resolution, a reversed
+line range, fence-length tracking); round 2 added nine more, closing both the
+symlink half of containment and four CommonMark rules the fence and code-span
+parsing did not implement.
 
 ## Why row 0 is a control
 
@@ -65,8 +67,17 @@ class of edit a reviewer is most likely to try. The harness deletes every
 | 18 | directory citations: the kind check dropped | `test_a_trailing_slash_on_a_plain_file_does_not_resolve` | ✓ |
 | 19 | absent marker: AMBIGUOUS accepted as confirmed absent | `test_an_absent_marker_on_an_ambiguous_citation_fails` | ✓ |
 | 20 | file:line: the reversed-range check removed | `test_a_reversed_line_range_fails` | ✓ |
-| 21 | fences: length no longer required to close a block | `test_a_longer_fence_survives_a_shorter_one_inside_it` | ✓ |
-| 22 | task lookup: aliases no longer counted as declared | `test_an_alias_counts_as_declared` | ✓ |
+| 21 | fences: the length comparison dropped entirely | `test_a_longer_fence_survives_a_shorter_one_inside_it` | ✓ |
+| 22 | containment: resolved back to lexical, so a symlink escapes | `test_a_symlink_pointing_outside_the_repo_does_not_resolve` | ✓ |
+| 23 | fences: a closing fence may carry an info string again | `test_a_fence_line_carrying_an_info_string_does_not_close_a_block` | ✓ |
+| 24 | fences: the same-character guard dropped | `test_a_fence_of_the_other_character_does_not_close_a_block` | ✓ |
+| 25 | fences: length predicate weakened from >= to == | `test_a_longer_closing_fence_still_closes` | ✓ |
+| 26 | fences: the three-space indent cap removed | `test_a_deeply_indented_backtick_run_is_not_a_fence` | ✓ |
+| 27 | spans: maximal-run rule dropped, so ``a`b`` splits in two | `test_a_double_backtick_span_is_read_as_one_span` | ✓ |
+| 28 | tasks: the dotted-tail capture removed | `test_a_task_name_with_trailing_junk_is_not_the_declared_task` | ✓ |
+| 29 | file:line: the lower-bound half of the range check removed | `test_a_zero_line_reference_fails` | ✓ |
+| 30 | sources: the committed extractions subtree reclassified vendored | `test_the_committed_extractions_subtree_counts_as_authored` | ✓ |
+| 31 | task lookup: aliases no longer counted as declared | `test_an_alias_counts_as_declared` | ✓ |
 
 Baseline rc=0 before the run; rc=0 after the last restore, so no arm left the
 tree mutated.
@@ -255,11 +266,75 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "test_a_reversed_line_range_fails",
     ),
     (
-        "fences: length no longer required to close a block",
+        "fences: the length comparison dropped entirely",
         "python/src/kb_setup/citations.py",
-        "        elif fence[0] == opener[0] and len(fence) >= len(opener):",
-        "        elif True:",
+        '        elif fence[0] == opener[0] and len(fence) >= len(opener) and not m.group("info").strip():',
+        '        elif fence[0] == opener[0] and not m.group("info").strip():',
         "test_a_longer_fence_survives_a_shorter_one_inside_it",
+    ),
+    (
+        "containment: resolved back to lexical, so a symlink escapes",
+        "python/src/kb_setup/resolve.py",
+        "    root = repo_root.resolve()\n    target = candidate.resolve()",
+        "    root = Path(os.path.normpath(repo_root))\n"
+        "    target = Path(os.path.normpath(candidate))",
+        "test_a_symlink_pointing_outside_the_repo_does_not_resolve",
+    ),
+    (
+        "fences: a closing fence may carry an info string again",
+        "python/src/kb_setup/citations.py",
+        '        elif fence[0] == opener[0] and len(fence) >= len(opener) and not m.group("info").strip():',
+        "        elif fence[0] == opener[0] and len(fence) >= len(opener):",
+        "test_a_fence_line_carrying_an_info_string_does_not_close_a_block",
+    ),
+    (
+        "fences: the same-character guard dropped",
+        "python/src/kb_setup/citations.py",
+        '        elif fence[0] == opener[0] and len(fence) >= len(opener) and not m.group("info").strip():',
+        '        elif len(fence) >= len(opener) and not m.group("info").strip():',
+        "test_a_fence_of_the_other_character_does_not_close_a_block",
+    ),
+    (
+        "fences: length predicate weakened from >= to ==",
+        "python/src/kb_setup/citations.py",
+        '        elif fence[0] == opener[0] and len(fence) >= len(opener) and not m.group("info").strip():',
+        '        elif fence[0] == opener[0] and len(fence) == len(opener) and not m.group("info").strip():',
+        "test_a_longer_closing_fence_still_closes",
+    ),
+    (
+        "fences: the three-space indent cap removed",
+        "python/src/kb_setup/citations.py",
+        'r"^ {0,3}(?P<fence>`{3,}|~{3,})(?P<info>.*)$"',
+        'r"^\\s*(?P<fence>`{3,}|~{3,})(?P<info>.*)$"',
+        "test_a_deeply_indented_backtick_run_is_not_a_fence",
+    ),
+    (
+        "spans: maximal-run rule dropped, so ``a`b`` splits in two",
+        "python/src/kb_setup/citations.py",
+        'r"(?P<ticks>`+)(?!`)(?P<body>[^\\n]+?)(?<!`)(?P=ticks)(?!`)"',
+        'r"`(?P<ticks>)(?P<body>[^`\\n]+)`"',
+        "test_a_double_backtick_span_is_read_as_one_span",
+    ),
+    (
+        "tasks: the dotted-tail capture removed",
+        "python/src/kb_setup/citations.py",
+        'r"\\bmise run ([A-Za-z][A-Za-z0-9_:-]*(?:\\.[A-Za-z0-9_:-]+)*)"',
+        'r"\\bmise run ([A-Za-z][A-Za-z0-9_:-]*)"',
+        "test_a_task_name_with_trailing_junk_is_not_the_declared_task",
+    ),
+    (
+        "file:line: the lower-bound half of the range check removed",
+        "python/src/kb_setup/handoff.py",
+        "    if cite.start < 1 or cite.end > total:",
+        "    if cite.end > total:",
+        "test_a_zero_line_reference_fails",
+    ),
+    (
+        "sources: the committed extractions subtree reclassified vendored",
+        "python/src/kb_setup/resolve.py",
+        '_SOURCES_KEPT: frozenset[str] = frozenset({"extractions", "media"})',
+        '_SOURCES_KEPT: frozenset[str] = frozenset({"media"})',
+        "test_the_committed_extractions_subtree_counts_as_authored",
     ),
     (
         "task lookup: aliases no longer counted as declared",

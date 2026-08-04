@@ -250,3 +250,21 @@ def test_an_ordinary_line_range_still_passes(tmp_path: Path):
     """Control arm for the test above."""
     root = _repo(tmp_path, {"docs/a.md": "1\n2\n3\n4\n5\n"})
     assert _fails(handoff.check(root, "see `docs/a.md:2-4`\n")) == []
+
+
+def test_a_zero_line_reference_fails(tmp_path: Path):
+    """`path:0` — the other half of the bounds check, previously untested."""
+    root = _repo(tmp_path, {"docs/a.md": "1\n2\n3\n"})
+    assert _fails(handoff.check(root, "see `docs/a.md:0`\n")) != []
+
+
+def test_the_report_names_every_verdict_even_at_zero(tmp_path: Path):
+    """The summary's contract is that no state is indistinguishable from zero.
+
+    Asserting only `"1 OK"` let a renderer that drops zero-valued counts pass
+    while breaking exactly the property the counts exist to provide.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    report = handoff.render(handoff.check(root, "see `docs/a.md`\n"), source="h.md")
+    for word in ("OK", "ambiguous", "unverifiable", "broken"):
+        assert word in report

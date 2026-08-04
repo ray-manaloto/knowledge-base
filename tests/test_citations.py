@@ -218,3 +218,68 @@ def test_a_plain_fence_still_closes_normally():
     """Control arm: the length rule must not stop an ordinary fence closing."""
     text = "a\n```\n`docs/nope.md`\n```\nb `docs/real.md`\n"
     assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_fence_line_carrying_an_info_string_does_not_close_a_block():
+    """CommonMark: a CLOSING fence may not carry an info string.
+
+    Treating ```` ```python ```` as a closer ended the block early and leaked the
+    rest of the example out as real citations.
+    """
+    text = "a\n```\n```python\nsee `docs/nope.md`\n```\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_fence_of_the_other_character_does_not_close_a_block():
+    """`~~~` cannot close a ``` ``` ``` block — the character must match."""
+    text = "a\n```\n~~~\nsee `docs/nope.md`\n~~~\n```\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_shorter_fence_of_the_same_character_does_not_close_a_block():
+    """Pins the `>=` in the close predicate, which `==` would also satisfy."""
+    text = "a\n````\n```\nsee `docs/nope.md`\n````\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_longer_closing_fence_still_closes():
+    """Control arm for the rule above: `>=`, not `==`."""
+    text = "a\n```\n`docs/nope.md`\n`````\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_deeply_indented_backtick_run_is_not_a_fence():
+    """CommonMark caps a fence's indent at 3 spaces.
+
+    Unlimited indent made an indented literal-backtick line a delimiter, so a
+    real citation between two of them was silently swallowed.
+    """
+    text = "a\n    ```\n`docs/real.md`\n    ```\nb\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_three_space_indented_fence_still_fences():
+    """Control arm for the indent cap."""
+    text = "a\n   ```\n`docs/nope.md`\n   ```\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_double_backtick_span_is_read_as_one_span():
+    """`` ``a`b`` `` is ONE span whose body contains a backtick, not two spans.
+
+    Matching only single-backtick pairs split it in two and manufactured a
+    path citation out of the fragments.
+    """
+    spans = citations.code_spans("see ``docs/gone.md`x`` here\n")
+    assert [s.text for s in spans] == ["docs/gone.md`x"]
+    assert citations.path_citations("see ``docs/gone.md`x`` here\n") == []
+
+
+def test_a_task_name_with_trailing_junk_is_not_the_declared_task():
+    """`mise run kb-build.typo` must not be read as `mise run kb-build`.
+
+    Without a trailing boundary the regex stopped at the `.` and reported a
+    declared task, so a typo in a command the next session would run passed.
+    """
+    (t,) = citations.task_citations("run `mise run kb-build.typo` first\n")
+    assert t.name != "kb-build"
