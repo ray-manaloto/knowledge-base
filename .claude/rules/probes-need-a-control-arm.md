@@ -146,6 +146,25 @@ its issue tracker is the thing most likely to be quoted at you.
    produced by a script, re-derive it from the script's own data structure and
    assert the two agree; that check costs one command and is the only thing standing between a
    reader and a confident wrong number.
+9. **"Unreachable by construction" is a CLAIM, and it needs an arm like any
+   other.** To say it, *construct the reaching case and watch it be rejected*.
+   If you can construct it, it is reachable and you have just found your
+   fixture; if you genuinely cannot after trying, the claim is earned.
+
+   Deriving unreachability from a chain of true premises is not evidence. A
+   guard here was documented as dead because: a `file:line` token ends in
+   `:<digits>`, so its extension contains a `:`; every allowlisted extension is
+   short and alphanumeric; therefore none is one edit away. Every premise true,
+   conclusion false — it never asked whether an allowlisted extension ends in a
+   **digit**. `mp3` does, so `foo.mp:3` repaired to `foo.mp3` and the guard was
+   live all along.
+
+   **A PREDICTED survival is the most dangerous arm you can run.** That one was
+   labelled `EXPECTED NO-OP` in the harness, so two runs *confirmed the
+   prediction* instead of testing it — and it had only survived because the
+   test's fixtures could not exhibit the harm (rule 3's bound, wearing a
+   different hat). Treat a survival you predicted as owing MORE evidence than a
+   surprising one, not less.
 
 ## Applies to
 
