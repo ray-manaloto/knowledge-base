@@ -119,19 +119,19 @@ def run_gates(repo_root: Path) -> bool:
     """
     from kb_setup import gates
 
-    missing = gates.undeclared(repo_root, gates.GATE_TASKS)
-    if missing:
-        print(f"ship: refusing — gate(s) not declared in mise.toml: {', '.join(missing)}")
+    # `run_and_record`, not the three calls open-coded. Doing the sequence by hand
+    # here is what let this path skip the unreadable-HEAD refusal `gates.main`
+    # makes, so a ship could write `gates-.json` with `"sha": ""` — a record that
+    # names no commit, which is the artifact #146 exists to abolish. Both review
+    # lanes found that independently; the duplication was the cause, so the
+    # sequence has one owner now and this function keeps only the policy.
+    gate_run, summary = gates.run_and_record(repo_root, gates.GATE_TASKS, stop_on_failure=True)
+    if gate_run is None:
+        print(f"ship: refusing — {summary}")
         return False
 
-    # HEAD is read here for the record's KEY only. Whether HEAD is still the
-    # reviewed commit when the push happens is `_validated_sha_for_push`'s
-    # question, asked after the gates, and this must not look like an answer to it.
-    sha = gates.head_sha(repo_root)
-    results = gates.run(repo_root, gates.GATE_TASKS, stop_on_failure=True)
-    path = gates.record(repo_root, results, sha=sha)
-    print(gates.render(results, sha=sha, path=path))
-    return all(r.passed for r in results)
+    print(summary)
+    return gate_run.all_passed
 
 
 def checks_state(pr_number: int) -> tuple[bool, str]:

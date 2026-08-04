@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 from typing import Never
 
-from kb_setup import gates
+from kb_setup import gates, pr
 
 _MISE = "mise.toml"
 
@@ -399,6 +399,34 @@ def test_main_refuses_an_undeclared_gate_named_on_the_command_line(monkeypatch, 
     capsys.readouterr()
 
 
+def test_main_refuses_an_unknown_flag(monkeypatch, tmp_path, capsys):
+    """A flag the command does not know is a request that cannot be honoured.
+
+    `--stop-on-failure` is the realistic spelling to get wrong: it is what the
+    acceptance criterion calls this flag. It is dropped from the task list by the
+    `startswith("-")` filter AND fails the `--stop` test, so without this guard
+    the run silently took the OPPOSITE position of the only flag this command has
+    and exited 0/1 as though that was what was asked for. (Spec lane.)
+    """
+    calls = _never_runs(monkeypatch)
+    _pin_sha(monkeypatch)
+    monkeypatch.setattr(gates, "GATE_TASKS", _TASKS)
+    assert gates.main(["--stop-on-failure"], _repo(tmp_path)) == 2
+    assert calls == []
+    assert "--stop-on-failure" in capsys.readouterr().err
+
+
+def test_main_accepts_the_flag_it_documents(monkeypatch, tmp_path, capsys):
+    """CONTROL ARM — the correctly spelled flag is not refused, and stops."""
+    _stub(monkeypatch)
+    _pin_sha(monkeypatch)
+    monkeypatch.setattr(gates, "GATE_TASKS", _TASKS)
+    root = _repo(tmp_path)
+    assert gates.main(["--stop"], root) == 1
+    capsys.readouterr()
+    assert _rows(_written(root)[0])["gamma"]["rc"] is None
+
+
 def test_main_refuses_when_head_is_unreadable(monkeypatch, tmp_path, capsys):
     """A record that cannot name its commit is not the artifact #146 asks for."""
     calls = _never_runs(monkeypatch)
@@ -463,10 +491,19 @@ def test_render_distinguishes_unknown_cleanliness_from_clean():
     assert "could not tell" in gates.render(results, sha=_SHA, path=Path("x.json")).lower()
 
 
-def test_render_names_the_unrun_gates():
+def test_render_names_unrun_gates_in_the_summary():
+    """Asserted on the SUMMARY line, not on the output as a whole.
+
+    The first version checked `"gamma" in out`, which `render`'s per-gate row
+    satisfies no matter what the summary says — so dropping the named list from
+    the summary passed all 42 tests. A blind test in the suite whose own report
+    is about blind tests; found by the standards review lane, which mutated the
+    clause and showed the survival, and re-confirmed here before the fix.
+    """
     out = gates.render(_results(), sha=_SHA, path=Path("x.json"))
-    assert "gamma" in out
-    assert "beta" in out
+    summary = next(line for line in out.splitlines() if "passed," in line)
+    assert "not run (gamma)" in summary
+    assert "1 passed, 1 failed" in summary
 
 
 # --------------------------------------------------------------------------
@@ -475,8 +512,6 @@ def test_render_names_the_unrun_gates():
 
 
 def test_ship_gate_runner_delegates_and_records(monkeypatch, tmp_path):
-    from kb_setup import pr
-
     _stub(monkeypatch, failing="__none__")
     _pin_sha(monkeypatch)
     monkeypatch.setattr(gates, "GATE_TASKS", ("alpha",))
@@ -487,8 +522,6 @@ def test_ship_gate_runner_delegates_and_records(monkeypatch, tmp_path):
 
 def test_ship_gate_runner_stops_and_still_records(monkeypatch, tmp_path):
     """CONTROL ARM — a failing gate returns False, and the record survives it."""
-    from kb_setup import pr
-
     _stub(monkeypatch)
     _pin_sha(monkeypatch)
     monkeypatch.setattr(gates, "GATE_TASKS", _TASKS)
@@ -500,9 +533,25 @@ def test_ship_gate_runner_stops_and_still_records(monkeypatch, tmp_path):
     assert rows["gamma"]["rc"] is None
 
 
-def test_ship_gate_runner_refuses_an_undeclared_gate(monkeypatch, tmp_path, capsys):
-    from kb_setup import pr
+def test_ship_gate_runner_refuses_an_unreadable_head(monkeypatch, tmp_path, capsys):
+    """The ship path must make the SAME refusal `kb-gates` makes.
 
+    It did not. `pr.run_gates` open-coded the sequence and skipped the empty-sha
+    guard, so a ship with an unreadable HEAD wrote `gates-.json` carrying
+    `"sha": ""` — a file that reads as a gate record and names no commit. Found
+    independently by both review lanes; the fix gave the sequence one owner.
+    """
+    calls = _never_runs(monkeypatch)
+    _pin_sha(monkeypatch, "")
+    monkeypatch.setattr(gates, "GATE_TASKS", ("alpha",))
+    root = _repo(tmp_path, ("alpha",))
+    assert pr.run_gates(root) is False
+    assert calls == []
+    assert not _written(root)
+    capsys.readouterr()
+
+
+def test_ship_gate_runner_refuses_an_undeclared_gate(monkeypatch, tmp_path, capsys):
     calls = _never_runs(monkeypatch)
     _pin_sha(monkeypatch)
     monkeypatch.setattr(gates, "GATE_TASKS", ("alpha", "nope"))

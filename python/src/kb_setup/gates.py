@@ -315,37 +315,100 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     return "\n".join(lines)
 
 
+@dataclass(frozen=True)
+class GateRun:
+    """One complete run: what happened, at which commit, and where it was written.
+
+    These three travelled together into :func:`record` and :func:`render` and back
+    out to two callers, which is a type asking to be born — and, more to the point,
+    it is where the "``sha`` is never empty" invariant now lives. Enforcing that in
+    only one of the two callers is precisely the defect this type was extracted to
+    remove. (Standards + spec lanes, both independently.)
+    """
+
+    results: list[GateResult]
+    sha: str
+    path: Path
+
+    @property
+    def all_passed(self) -> bool:
+        """Whether every REQUESTED gate ran and exited 0."""
+        return all(r.passed for r in self.results)
+
+
+def run_and_record(
+    repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool
+) -> tuple[GateRun | None, str]:
+    """Validate, run, record — the whole sequence; ``(None, why)`` if it refused.
+
+    The `(value, summary)` shape is `review.receipt_state`'s, deliberately: the
+    caller decides what a refusal COSTS (an exit code, a False) and this decides
+    what is refusable.
+
+    This does NOT collapse :func:`run` and :func:`record` — criterion 2 keeps them
+    separate and each is still usable alone, which two tests pin. What it removes
+    is the second copy of the SEQUENCE around them. `kb-gates` and the ship path
+    had one each, and they had already drifted: `main` refused an unreadable HEAD
+    and `pr.run_gates` did not, so the ship path would write `gates-.json` with
+    `"sha": ""` — a file that reads as a gate record and names no commit, which is
+    the exact artifact #146 exists to abolish. Both review lanes found it
+    independently, and the standards lane named the duplication as its cause.
+    """
+    missing = undeclared(repo_root, tasks)
+    if missing:
+        return None, (
+            f"gate(s) not declared in mise.toml: {', '.join(missing)} "
+            f"({len(resolve.declared_tasks(repo_root))} tasks declared)"
+        )
+
+    # Read BEFORE the gates: it keys the record, and a record that cannot name its
+    # commit is not the checkable artifact #146 asks for. Refusing here also means
+    # the minutes are never spent producing something unciteable.
+    sha = head_sha(repo_root)
+    if not sha:
+        return None, "could not read HEAD — a record that cannot name its commit is not one"
+
+    results = run(repo_root, tasks, stop_on_failure=stop_on_failure)
+    path = record(repo_root, results, sha=sha)
+    return GateRun(results, sha, path), render(results, sha=sha, path=path)
+
+
+#: Every flag `kb-gates` accepts. An unrecognised one is REFUSED rather than
+#: ignored. `--stop-on-failure` is the realistic case — it is what the criterion
+#: this flag implements is CALLED, so it is the spelling a reader guesses — and it
+#: would otherwise be dropped from the task list by the `startswith("-")` filter
+#: AND fail the `--stop` test, so the run would silently take the opposite
+#: position of the one flag this command has and exit 0 or 1 as though that had
+#: been asked for. The module already reserves 2 for a request it cannot honour;
+#: a flag it does not know is one. (Spec lane.)
+_FLAGS = frozenset({"--stop"})
+
+
 def main(args: list[str], repo_root: Path) -> int:
     """`kb-gates [<task>...] [--stop]` — 1 if any gate failed, 2 on a bad request.
 
-    2 is reserved for a request that could not be honoured — a gate this repo
-    does not declare, or a HEAD that cannot be read — the same split
-    `kb-handoff-check` and `kb-skill-score` draw. It matters here because 1 is a
-    claim about the gates, and refusing to run them is not that claim.
+    2 is reserved for a request that could not be honoured — an unknown flag, a
+    gate this repo does not declare, or a HEAD that cannot be read — the same
+    split `kb-handoff-check` and `kb-skill-score` draw. It matters here because 1
+    is a claim about the gates, and refusing to run them is not that claim.
     """
-    tasks = tuple(a for a in args if not a.startswith("-")) or GATE_TASKS
-
-    missing = undeclared(repo_root, tasks)
-    if missing:
+    unknown_flags = [a for a in args if a.startswith("-") and a not in _FLAGS]
+    if unknown_flags:
         print(
-            f"kb-gates: not declared in mise.toml: {', '.join(missing)} "
-            f"({len(resolve.declared_tasks(repo_root))} tasks declared)",
+            f"kb-gates: unknown flag(s) {', '.join(unknown_flags)} "
+            f"(accepted: {', '.join(sorted(_FLAGS))})",
             file=sys.stderr,
         )
         return 2
 
-    # Read BEFORE the gates: it keys the record, and a record that cannot name
-    # its commit is not the checkable artifact #146 asks for. Refusing here also
-    # means the minutes are never spent producing something unciteable.
-    sha = head_sha(repo_root)
-    if not sha:
-        print("kb-gates: could not read HEAD", file=sys.stderr)
+    tasks = tuple(a for a in args if not a.startswith("-")) or GATE_TASKS
+    gate_run, summary = run_and_record(repo_root, tasks, stop_on_failure="--stop" in args)
+    if gate_run is None:
+        print(f"kb-gates: {summary}", file=sys.stderr)
         return 2
 
-    results = run(repo_root, tasks, stop_on_failure="--stop" in args)
-    path = record(repo_root, results, sha=sha)
-    print(render(results, sha=sha, path=path))
+    print(summary)
     # A gate that never ran counts as not passed. Under the default flag none can
     # be unrun, but `--stop` makes it reachable, and a `--stop` run that exited 0
     # having skipped half the list would be the false green in person.
-    return 0 if all(r.passed for r in results) else 1
+    return 0 if gate_run.all_passed else 1
