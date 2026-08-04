@@ -31,6 +31,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD (one exception: a commit whose ENTIRE delta since the receipt is `graphify-out/memory/**` or `docs/goals/README.md`, so the round's own closing tasks can land — `kb_setup.review.EXEMPT_PATHS`, #66) |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
 | `<gate> 2>&1 \| tail -40` | `<gate> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file — a pipe returns `tail`'s exit code, masking a failed gate |
+| running the gates one at a time and retyping the exit codes into a handoff | `mise run kb-gates` — runs them and writes `.agent/kb/gates/gates-<sha>.json`, so the claim has a surviving artifact. The `/tmp` form above is still correct for a ONE-OFF gate; what it cannot do is outlive the session (#146) |
 | `npx <tool>` | the mise-pinned binary directly |
 
 Read-only introspection with **no task equivalent** stays direct and is

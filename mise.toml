@@ -556,6 +556,21 @@ description = "Verify a handoff's static claims — paths, file:line, task names
 # over the reusable kb_setup.citations + kb_setup.resolve primitives.
 run = "uv run kb-setup handoff-check"
 
+[tasks.kb-gates]
+description = "Run the gates and record each result durably: mise run kb-gates [-- <task>... --stop]"
+# The other half of /clear-prep step 5. That step already tells you to redirect a
+# gate to a file and record `rc=$?` — so in-session the check is performable; what
+# nothing does is ENFORCE that it ran, and the /tmp log dies with the session. The
+# failure is an EXPIRED artifact, not an absent one. This writes
+# .agent/kb/gates/gates-<sha>.json, beside the kb-review receipt and with the same
+# durability: survives the session, dies with the clone.
+# Does NOT stop at the first failure — the point is to learn every gate's state in
+# one pass. `-- --stop` opts into the ship path's behaviour. Exits 1 if any gate
+# failed, 2 if a named gate is not declared in mise.toml or HEAD cannot be read.
+# kb-ship calls the SAME run+record functions with the flag on, so the record and
+# the push decision cannot disagree. Logic in kb_setup.gates.
+run = "uv run kb-setup gates"
+
 [tasks.kb-goal-check]
 description = 'Mechanically check a /goal goal+rider pair: mise run kb-goal-check -- <path|pair-prefix|--text "...">'
 # ADVISORY — always exits 0. A goal document is authored input, not repo source, so a

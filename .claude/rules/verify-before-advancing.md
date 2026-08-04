@@ -19,11 +19,14 @@ It is the operational teeth behind `zero-skip-policy.md`.
 
 ## The check matrix — run what applies to the change
 
-**Always (any code/config/docs change):**
+**Always (any code/config/docs change):** `mise run kb-gates` runs all four and
+records each result to `.agent/kb/gates/gates-<sha>.json`, which is what a later
+claim about them gets checked against. It does not stop at the first failure.
 
 - `mise run lint` — hk `check --all`, exit 0. Never raw `hk` (see
   `long-running-command-hangs.md`).
 - `mise run test` — `uv run pytest tests/ -x -q`, all pass.
+- `mise run brain-audit`, `mise run eval` — the other two `kb-ship` enforces.
 
 **Conditional (only when that surface changed):**
 

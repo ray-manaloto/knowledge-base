@@ -23,6 +23,7 @@ repo proper — never in `.agent/`. Do not create ad-hoc directories in either.
 | `.agent/brain-audit.md` | The advisory SessionEnd transcript audit |
 | `.agent/kb/review/receipt-<sha>.json` | One `kb-review` receipt, keyed to the exact commit — what **both `kb-ship` and `kb-land`** gate on (`land` is the backstop for a PR that reached the remote without `ship`). An ancestor's receipt also covers HEAD when everything committed since is in `review.EXEMPT_PATHS` (`graphify-out/memory/**`, `docs/goals/README.md`), which is what lets a round commit its own `kb-remember`/`kb-goal-outcome` output (#66) |
 | `.agent/kb/review/reports/review-<sha>-<lane>.md` | That review's per-lane reports; the receipt refuses to name a lane that left none. `<lane>` is the lane with any `:variant` **stripped** — `cold:codex` leaves `…-cold.md` |
+| `.agent/kb/gates/gates-<sha>.json` | One gate run's result per gate — task, exit code, the commit it ran against, when it finished — written by `mise run kb-gates` and by `kb-ship`. Nothing reads it as a gate: it exists so a handoff's "lint rc=0" has a surviving artifact to be checked against instead of being prose an agent retyped. A gate the run never reached is present with `rc: null`, never omitted (#146) |
 
 `.agent/` is in the real **`.gitignore`**, not a per-clone
 `.git/info/exclude`. That distinction is the reason this rule exists in its
