@@ -11,9 +11,12 @@ What it does keep is the part that carries the safety:
   gates and again immediately before the push. **That is this module's strongest
   behaviour**, because CodeRabbit is advisory here, so the local review is the
   only review;
-* ``ship`` then runs every gate in :data:`GATES` (``lint``, ``test``,
+* ``ship`` then runs every gate in :data:`gates.GATE_TASKS` (``lint``, ``test``,
   ``brain-audit``, ``eval``) BEFORE the branch is pushed, so a red branch never
-  becomes a PR;
+  becomes a PR — and RECORDS each result under `.agent/kb/gates/`, because the
+  numbers it prints used to survive only as long as the terminal did (#146). The
+  list, the runner and the record all live in `kb_setup.gates`; this module keeps
+  the ship-specific policy and nothing else;
 * the push is pinned to the SHA the receipt was validated against
   (``<sha>:refs/heads/<branch>``), so HEAD moving during the gates cannot slip an
   unreviewed commit onto the remote;
@@ -42,7 +45,9 @@ from pathlib import Path
 
 _GIT_TIMEOUT = 120
 _GH_TIMEOUT = 120
-_GATE_TIMEOUT = 1800
+# `_GATE_TIMEOUT` moved to `kb_setup.gates` with the runner it bounded (#146).
+# Left behind here it would be dead config that reads as live — the next person
+# raising a gate timeout would edit the copy nothing consults.
 
 # `gh pr checks --json bucket` buckets that do NOT block a merge. "skipping" is a
 # valid terminal state (a conditional job that correctly did not run); "pending"
@@ -84,15 +89,6 @@ def _run(
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
-def _stream(cmd: list[str], *, cwd: Path | None = None, timeout: int = _GATE_TIMEOUT) -> int:
-    """Run ``cmd`` with output streaming to the terminal; return its exit code."""
-    try:
-        return subprocess.run(cmd, cwd=cwd, check=False, timeout=timeout).returncode
-    except (OSError, subprocess.SubprocessError) as exc:
-        print(f"  {cmd[0]}: {exc}")
-        return 1
-
-
 def current_branch(repo_root: Path) -> str:
     """Return the checked-out branch name, or "" if it cannot be determined."""
     rc, out = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
@@ -105,32 +101,37 @@ def working_tree_clean(repo_root: Path) -> bool:
     return rc == 0 and not out.strip()
 
 
-#: The local gates every PR must pass before it is pushed. `eval` is tiers 1+2 —
-#: reachability probes plus the guard fixture table, offline and fast only, so it
-#: costs nothing here. Its two opt-in halves run on demand: `-- --live` for the
-#: lane doctor (one API call per installed lane) and `-- --slow` for the golden
-#: retrieval set (~3 min, advisory — it reports recall@k, it does not gate).
-#:
-#: NOT EVERY OFFLINE CASE IS BINDING, and this comment used to imply otherwise by
-#: scoping "advisory" to the `--slow` half alone. `tier1.mise-redaction-legible`
-#: is offline, runs on every ship, and is `gated=False`: it reports and never
-#: reddens, because its only remedy is a user-level mise config `do-not.md` #11
-#: forbids editing. So a green `eval` gate here means "nothing GATED failed", not
-#: "every case passed" — read the case table, not the rc. `evals.render` prints
-#: the true failed/unarmed counts precisely so that distinction survives.
-GATES = ("lint", "test", "brain-audit", "eval")
-
-
 def run_gates(repo_root: Path) -> bool:
-    """Run every local gate in :data:`GATES`; True only if all of them pass."""
-    for gate in GATES:
-        print(f"==> gate: {gate}")
-        rc = _stream(["mise", "run", gate], cwd=repo_root)
-        status = "PASS" if rc == 0 else "FAIL"
-        print(f"{status}  gate {gate} rc={rc}")
-        if rc != 0:
-            return False
-    return True
+    """Run every gate in :data:`gates.GATE_TASKS`; True only if all of them pass.
+
+    The list, the runner and the record all live in `kb_setup.gates` now (#146).
+    This function keeps only the ship path's two policy choices:
+
+    * **stop at the first failure** — the refusal is already decided, so the
+      remaining gates would cost minutes to tell us something that cannot change
+      it. `kb-gates` chooses the opposite, which is why the flag exists;
+    * **refuse before running** if the gate list names a task this repo does not
+      declare, rather than letting `mise` fail three gates in.
+
+    It delegates rather than keeping its own loop specifically so that the record
+    and the push decision cannot disagree: they are now the same numbers, read
+    once. A second loop here would be a second answer to "did the gates pass".
+    """
+    from kb_setup import gates
+
+    # `run_and_record`, not the three calls open-coded. Doing the sequence by hand
+    # here is what let this path skip the unreadable-HEAD refusal `gates.main`
+    # makes, so a ship could write `gates-.json` with `"sha": ""` — a record that
+    # names no commit, which is the artifact #146 exists to abolish. Both review
+    # lanes found that independently; the duplication was the cause, so the
+    # sequence has one owner now and this function keeps only the policy.
+    gate_run, summary = gates.run_and_record(repo_root, gates.GATE_TASKS, stop_on_failure=True)
+    if gate_run is None:
+        print(f"ship: refusing — {summary}")
+        return False
+
+    print(summary)
+    return gate_run.all_passed
 
 
 def checks_state(pr_number: int) -> tuple[bool, str]:

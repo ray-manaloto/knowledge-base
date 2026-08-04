@@ -128,9 +128,24 @@ its issue tracker is the thing most likely to be quoted at you.
    mark it explicitly as unverified. And when a number *ranks* things, ask what
    the **noise floor** is: a difference smaller than same-input variance is not
    a difference.
+   **A number can be invalidated by the very commit that writes it.** Ask what
+   would move a figure before you commit it, and if the answer is "this change",
+   state the durable fact instead — the delta, the ratio, the mechanism. One
+   branch shipped two: "45 tasks listed vs 41 declared" in a commit that ADDED a
+   task, and "82 files in `docs/`" in a commit that added a doc. Both were
+   correctly measured, both were wrong on arrival, and neither was noticed
+   until a reviewer re-ran the count. This is the inherited-number failure with
+   a shorter fuse: the author *did* measure, so it reads as verified forever.
 7. **Cross-check a surprise before you report it.** A second route to the same
    fact costs seconds and settles which side is broken. Disagreement is a
    finding, not noise — and the finding is usually your probe.
+8. **A generated table drifts from its generator — verify, don't copy.** An
+   evidence table transcribed by hand (or built by a regex over the generator's
+   source) is a probe with no control arm. One built this way silently dropped a
+   row and attached two labels to the wrong rows. If a document carries a table
+   produced by a script, re-derive it from the script's own data structure and
+   assert the two agree; that check costs one command and is the only thing standing between a
+   reader and a confident wrong number.
 
 ## Applies to
 

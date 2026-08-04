@@ -59,6 +59,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from kb_setup import atomic
+
 #: Where `plugin-eval` can legitimately be found, best-provenance first.
 #:
 #: The marketplace checkout comes first because that is how Ray chose to install
@@ -544,27 +546,9 @@ def write_baseline(
     # an honest, visible mismatch a human sees in `git status` — while the
     # reverse would leave a new baseline that no README documents. Each write is
     # temp-then-rename so neither file is ever observed half-written.
-    _atomic_write(repo_root / _BASELINE_MD, rendered + "\n")
-    _atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    atomic.write_text(repo_root / _BASELINE_MD, rendered + "\n")
+    atomic.write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return path
-
-
-def _atomic_write(path: Path, text: str) -> None:
-    """Write `text` to `path` via a temp file and a rename, never in place.
-
-    `Path.write_text` truncates first, so an interrupted write leaves a
-    truncated committed artifact — for the baseline JSON that is a corrupt file
-    whose next read now (correctly) discards the whole thing, silently losing
-    every recorded score. A rename is atomic on POSIX; the temp file is removed
-    if the write fails so a crashed run leaves no debris beside the real file.
-    """
-    tmp = path.with_name(path.name + ".tmp")
-    try:
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(path)
-    except OSError:
-        tmp.unlink(missing_ok=True)
-        raise
 
 
 def _render(

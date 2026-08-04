@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | md-budget | skill-score [--write] [skill...] | "
-            "handoff-check [path] | "
+            "handoff-check [path] | gates [task...] [--stop] | "
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
@@ -130,6 +130,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import handoff
 
         return handoff.main(rest, repo_root)
+    if cmd == "gates":
+        from kb_setup import gates
+
+        return gates.main(rest, repo_root)
     if cmd == "goal-check":
         from kb_setup import goal
 
@@ -198,7 +202,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
         "brain [query|record|reflect|audit] | md-budget | skill-score [--write] [skill...] | "
-        "handoff-check [path] | cc | cc-doctor | "
+        "handoff-check [path] | gates [task...] [--stop] | cc | cc-doctor | "
         "eval [--live] [--slow] | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,

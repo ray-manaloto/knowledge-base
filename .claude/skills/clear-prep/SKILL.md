@@ -200,20 +200,29 @@ stripped from the lane, because `kb_setup.review` *reads* those filenames.
 ## 5. Validate, then commit
 
 Run the gates that apply to what changed; each must exit 0 before you commit.
-`verify-before-advancing.md` has the full matrix — the common rows:
+`verify-before-advancing.md` has the full matrix.
+
+**Start with `mise run kb-gates`.** It runs the always-rows (`lint`, `test`,
+`brain-audit`, `eval`), does *not* stop at the first failure, and writes each
+result — task, exit code, the commit, the finish time — to
+`.agent/kb/gates/gates-<sha>.json`. It exits 1 if any gate failed. That file is
+what step 6 checks the handoff against; a number you retyped from a terminal has
+nothing behind it once the session ends.
+
+Then the conditional rows, by hand:
 
 ```bash
-mise run lint                       # always
-mise run test                       # always
 mise run lint-docs                  # CLAUDE.md / .claude/** touched
 mise run kb-skill-score             # .claude/skills/** touched (advisory)
 mise run kb-currency-check          # mise.toml pins touched
 mise run kb-build                   # sources/** touched — reproduce from committed inputs
 ```
 
-Capture the real exit code. `<gate> 2>&1 | tail -40` returns *tail's* status and
-will report success for a gate that failed; redirect to a file, record `rc=$?`,
-and read the file.
+Capture the real exit code for those. `<gate> 2>&1 | tail -40` returns *tail's*
+status and will report success for a gate that failed; redirect to a file, record
+`rc=$?`, and read the file. That form is still correct for a one-off — what it
+cannot do is survive the session, which is why the always-rows go through
+`kb-gates` instead.
 
 Stage specific paths rather than `git add .`. If you are on `main`, branch
 **first** — `kb-land` ends by syncing `main`, so it leaves you checked out there
@@ -229,7 +238,12 @@ more than a missing one. Before printing the resume prompt:
 - every `file:line` is real — read the cited line, do not eyeball it off a `sed`
   window, which is how a `:1836` that was really `:1830` reached three files;
 - every `mise run <task>` it names is in `mise tasks ls`;
-- every gate result matches the recorded `rc`, not your recollection;
+- every gate result matches `.agent/kb/gates/gates-<sha>.json`, not your
+  recollection. Check the ROWS, not just the top-level `sha`: each row carries
+  its own `sha` (HEAD when that gate ran, which can differ if HEAD moved
+  mid-run) and its own `dirty`. A row with `"dirty": true` describes the tree,
+  not the commit; a row with `"rc": null` did not produce a result and is not a
+  pass; a row with `"sha": null` is bound to no commit at all;
 - every number it repeats was measured *this* session, or is labelled as
   inherited and unverified (`probes-need-a-control-arm.md` rule 6).
 

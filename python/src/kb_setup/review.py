@@ -317,7 +317,7 @@ def _evidence_gap(repo_root: Path, data: dict[str, Any], sha: str) -> str | None
     if missing:
         return (
             f"claims lane(s) {', '.join(missing)} ran, but no non-empty report is at "
-            f"{REPORT_DIR}/review-{_safe_sha(sha)}-<lane>.md — a lane that left no "
+            f"{REPORT_DIR}/review-{safe_sha(sha)}-<lane>.md — a lane that left no "
             f"report is a claim, not a review"
         )
     if unbound:
@@ -346,11 +346,16 @@ def _binds_sha(body: str, sha: str) -> bool:
     return sha in body or (len(sha) >= _SHA_ABBREV and sha[:_SHA_ABBREV] in body)
 
 
-def _safe_sha(sha: str) -> str:
+def safe_sha(sha: str) -> str:
     """Return ``sha`` reduced to commit characters.
 
     Defence in depth behind the CLI's refusal to take a `--sha`: a value with a
     path separator in it would otherwise steer a write out of the receipt dir.
+
+    Public because `kb_setup.gates` keys its own per-commit artifact the same
+    way, one directory over. A second copy of a path-containment helper is the
+    kind of duplication that stays identical right up until one of them is
+    hardened and the other is not.
     """
     return "".join(c for c in sha if c.isalnum())
 
@@ -372,7 +377,7 @@ def _safe_lane(lane: str) -> str:
 
 def receipt_path(repo_root: Path, sha: str) -> Path:
     """Return the receipt path for ``sha`` (not necessarily existing)."""
-    return repo_root / RECEIPT_DIR / f"receipt-{_safe_sha(sha)}.json"
+    return repo_root / RECEIPT_DIR / f"receipt-{safe_sha(sha)}.json"
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -504,7 +509,7 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     latent for the same reason: nothing passed a variant here.
     """
     lane_file = _safe_lane(_lane_prefix(lane))
-    return repo_root / REPORT_DIR / f"review-{_safe_sha(sha)}-{lane_file}.md"
+    return repo_root / REPORT_DIR / f"review-{safe_sha(sha)}-{lane_file}.md"
 
 
 def _report_gaps(repo_root: Path, data: dict[str, Any], sha: str) -> tuple[list[str], list[str]]:
