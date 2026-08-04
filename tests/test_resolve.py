@@ -596,3 +596,41 @@ def test_the_suggestion_names_a_bare_path_not_a_resolver_label(tmp_path: Path):
     assert got is not None
     assert "did you mean graphify-out/graph.json?" in got.detail
     assert "derived output" not in got.detail
+
+
+def test_a_token_that_is_ambiguous_under_its_own_spelling_stays_silent(tmp_path: Path):
+    """Several real files match, which is the OPPOSITE of absent.
+
+    The narrower `is RESOLVED` test let AMBIGUOUS fall through to the repair gate
+    and emit `no file named Program.cs` — a sentence the index directly
+    contradicts. `State` has four members precisely so "could not tell" is never
+    rendered as a verdict, and this was that collapse pointed at a confident
+    FAIL. (Silent-failure lane, F2.)
+    """
+    root = _repo(tmp_path, {"a/Program.cs": "x\n", "b/Program.cs": "x\n", "a/Program.c": "x\n"})
+    assert resolve.resolve_path(root, "Program.cs").state is resolve.State.AMBIGUOUS
+    assert resolve.resolve_extension_typo(root, "Program.cs", ("Program.c",)) is None
+
+
+def test_a_token_naming_a_real_vendored_file_stays_silent(tmp_path: Path):
+    """`watch.pyi` inside a pinned clone is a file we can actually open.
+
+    The token's own existence test used the authored-only index, so this was
+    reported `no file named watch.pyi` while `resolve_path` resolved it. Reading
+    graphify's and mise's own source is the entire reason the vendored tier
+    exists. `authored_only()` belongs to the REPAIRS, not to this question.
+    (Silent-failure lane, F3.)
+    """
+    root = _repo(tmp_path, {"sources/upstream/pkg/watch.pyi": "x\n", "python/watch.py": "x\n"})
+    assert resolve.resolve_path(root, "watch.pyi").state is resolve.State.RESOLVED
+    assert resolve.resolve_extension_typo(root, "watch.pyi", ("watch.py",)) is None
+
+
+def test_a_repair_still_ignores_the_vendored_tier_control(tmp_path: Path):
+    """Control arm for the two above: the narrowing must SURVIVE on the repairs.
+
+    Widening the token's own test to the full index must not widen the repair
+    search with it, or the `runner.os` false positive comes straight back.
+    """
+    root = _repo(tmp_path, {"sources/hk/src/step/runner.rs": "x\n"})
+    assert resolve.resolve_extension_typo(root, "runner.os", ("runner.rs",)) is None

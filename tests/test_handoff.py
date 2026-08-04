@@ -675,3 +675,28 @@ def test_a_mistyped_extension_is_reported_as_a_path_check(tmp_path: Path):
     root = _repo(tmp_path, {"mise.toml": _MISE})
     (f,) = _fails(handoff.check(root, "see `mise.tomlx`\n"))
     assert f.check in handoff._PATH_CHECKS
+
+
+def test_an_absent_marker_on_a_typo_that_actually_resolves_fails(tmp_path: Path):
+    """The marker must be FALSIFIABLE here, exactly as it is for every other path.
+
+    It was not. Routing a marked candidate through `resolve_extension_typo` gave
+    it two exits — None and MISSING — and `_check_absent_marker` maps MISSING to
+    OK, so the entire input space produced "no finding" or "OK" and no input
+    could make the marker fail. Paste `(absent)` beside a real typo and it was
+    silenced forever.
+
+    Worse than the abstraction: `render` prints "the marker is checked both ways,
+    so it cannot hide a real miss" on these findings by design, so the tool
+    advertised a promise that was false for this one check.
+    (Silent-failure lane, F1.)
+    """
+    root = _repo(tmp_path, {"notes.pyy": "x\n", "notes.py": "y\n"})
+    (f,) = _fails(handoff.check(root, "see `notes.pyy` (absent) here\n"))
+    assert "marked" in f.detail
+
+
+def test_an_absent_marker_on_a_genuine_typo_is_still_accepted(tmp_path: Path):
+    """Control arm: making the marker falsifiable must not break its real use."""
+    root = _repo(tmp_path, {"mise.toml": _MISE})
+    assert _fails(handoff.check(root, "the example `mise.tomlx` (absent) above\n")) == []

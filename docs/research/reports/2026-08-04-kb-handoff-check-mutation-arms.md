@@ -14,8 +14,8 @@ measurement. Anyone can re-derive the table below from the script.
 Run 2026-08-04 against `feat/145-kb-handoff-check`:
 **32 of 32 arms discriminated, control included.**
 
-Re-run 2026-08-04 against `feat/154-extension-typo`, with #154's ten arms
-appended: **42 of 42 discriminated**, control included. Baseline green,
+Re-run 2026-08-04 against `feat/154-extension-typo`, with #154's thirteen arms
+appended: **45 of 45 discriminated**, control included. Baseline green,
 restored green.
 
 That number was **41 of 42 for two rounds**, with arm 41 recorded as an
@@ -104,7 +104,10 @@ class of edit a reviewer is most likely to try. The harness deletes every
 | 38 | typo'd extension: the already-resolves silence guard removed | `test_an_unlisted_extension_that_really_exists_stays_silent` | ✓ |
 | 39 | typo'd extension: uniqueness weakened from exactly-one to at-least-one | `test_two_repairs_that_both_resolve_stay_silent` | ✓ |
 | 40 | typo'd extension: the suggestion interpolates a resolver label again | `test_the_suggestion_names_a_bare_path_not_a_resolver_label` | ✓ |
-| 41 | typo'd extension: the file:line guard removed, so `foo.mp:3` proposes `foo.mp3` | `test_a_file_line_reference_is_not_a_typo_candidate` | ✓ |
+| 41 | typo'd extension: the alphanumeric rule removed, so `pr.py:` proposes `pr.py` | `test_trailing_punctuation_is_not_a_mistyped_extension` | ✓ |
+| 42 | typo'd extension: the (absent) marker made unfalsifiable again | `test_an_absent_marker_on_a_typo_that_actually_resolves_fails` | ✓ |
+| 43 | typo'd extension: AMBIGUOUS under the written spelling falls through again | `test_a_token_that_is_ambiguous_under_its_own_spelling_stays_silent` | ✓ |
+| 44 | typo'd extension: the token's own existence test narrowed to authored again | `test_a_token_naming_a_real_vendored_file_stays_silent` | ✓ |
 
 Baseline rc=0 before the run; rc=0 after the last restore, so no arm left the
 tree mutated.
@@ -494,7 +497,7 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
     (
         "typo'd extension: the already-resolves silence guard removed",
         "python/src/kb_setup/resolve.py",
-        "    if resolve_path(repo_root, token, authored).state is State.RESOLVED:\n"
+        "    if resolve_path(repo_root, token, idx).state is not State.MISSING:\n"
         "        return None",
         "    if False:\n        return None",
         "test_an_unlisted_extension_that_really_exists_stays_silent",
@@ -514,11 +517,32 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "test_the_suggestion_names_a_bare_path_not_a_resolver_label",
     ),
     (
-        "typo'd extension: the file:line guard removed, so `foo.mp:3` proposes `foo.mp3`",
+        "typo'd extension: the alphanumeric rule removed, so `pr.py:` proposes `pr.py`",
         "python/src/kb_setup/citations.py",
-        "    if _categorically_not_a_path(token) or _LINE_REF_RE.match(token):",
-        "    if _categorically_not_a_path(token):",
-        "test_a_file_line_reference_is_not_a_typo_candidate",
+        "    if not lowered.isalnum():",
+        "    if False:",
+        "test_trailing_punctuation_is_not_a_mistyped_extension",
+    ),
+    (
+        "typo'd extension: the (absent) marker made unfalsifiable again",
+        "python/src/kb_setup/handoff.py",
+        "            got = resolve.resolve_path(repo_root, cand.text, index)",
+        '            got = resolve.Resolution(resolve.State.MISSING, "")',
+        "test_an_absent_marker_on_a_typo_that_actually_resolves_fails",
+    ),
+    (
+        "typo'd extension: AMBIGUOUS under the written spelling falls through again",
+        "python/src/kb_setup/resolve.py",
+        "    if resolve_path(repo_root, token, idx).state is not State.MISSING:",
+        "    if resolve_path(repo_root, token, idx).state is State.RESOLVED:",
+        "test_a_token_that_is_ambiguous_under_its_own_spelling_stays_silent",
+    ),
+    (
+        "typo'd extension: the token's own existence test narrowed to authored again",
+        "python/src/kb_setup/resolve.py",
+        "    if resolve_path(repo_root, token, idx).state is not State.MISSING:",
+        "    if resolve_path(repo_root, token, idx.authored_only()).state is not State.MISSING:",
+        "test_a_token_naming_a_real_vendored_file_stays_silent",
     ),
 ]
 

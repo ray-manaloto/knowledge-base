@@ -135,18 +135,30 @@ def _check_extension_typos(repo_root: Path, text: str, index: resolve.Index) -> 
     """
     found: list[Finding] = []
     for cand in citations.typo_candidates(text):
+        if cand.marked_absent:
+            # Adjudicated against the token's OWN resolution, exactly as
+            # `_check_path` does — never against the typo verdict.
+            #
+            # Routing it through `resolve_extension_typo` instead made the marker
+            # UNFALSIFIABLE here, which is the one thing it must never be. That
+            # function has two exits, None and MISSING, and `_check_absent_marker`
+            # maps MISSING to OK — so for a marked candidate the entire input
+            # space produced "no finding" or "OK" and no input could make the
+            # marker fail. The comment that stood here argued the both-directions
+            # rule was intact because "a token that RESOLVES never reaches this
+            # function". True, and it was the defect: the token silently resolving
+            # is precisely the case the marker is supposed to FAIL on.
+            #
+            # It mattered beyond the abstraction. `render` prints "the marker is
+            # checked both ways, so it cannot hide a real miss" on any FAIL whose
+            # check is in `_PATH_CHECKS`, and these are filed under `path` on
+            # purpose — so the tool was printing that promise next to the one
+            # check for which it was false. (Silent-failure lane, F1.)
+            got = resolve.resolve_path(repo_root, cand.text, index)
+            found.append(_check_absent_marker("path", cand.text, cand.line, got))
+            continue
         got = resolve.resolve_extension_typo(repo_root, cand.text, cand.repairs, index)
         if got is None:
-            continue
-        if cand.marked_absent:
-            # Always MISSING by construction here, so this can only ever confirm
-            # the marker. The both-directions rule is not weakened: a token that
-            # RESOLVES never reaches this function, and one that resolves under
-            # its written spelling is a path citation `_check_path` already
-            # fails for. An author marking a real typo absent is asserting they
-            # meant to name something that does not exist — the same claim, and
-            # the same exposure, as marking any other path.
-            found.append(_check_absent_marker("path", cand.text, cand.line, got))
             continue
         found.append(Finding("path", _VERDICT_OF[got.state], cand.text, cand.line, got.detail))
     return found

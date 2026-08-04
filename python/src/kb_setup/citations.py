@@ -468,6 +468,27 @@ def _ext_repairs(ext: str) -> tuple[str, ...]:
     it so it stays deliberate. (Spec lane.)
     """
     lowered = ext.lower()
+    if not lowered.isalnum():
+        # An extension is alphanumeric. Without this, the repair treats trailing
+        # punctuation as part of the extension and "fixes" it by deleting one
+        # character, which measured 3 findings over 386 authored markdown files
+        # and **0 of them were real typos** — `` `pr.py:` `` and `` `evals.py:` ``
+        # in a review report quoting a PATTERN rather than citing a file, and a
+        # path with a comma inside the backticks. Precision 0/3 on that corpus,
+        # in the one module whose whole design is under-reporting.
+        #
+        # It also SUBSUMES the `file:line` guard `_typo_candidate` used to carry
+        # separately, which is why that guard is now gone rather than sitting
+        # beside this one: a `_LINE_REF_RE` match ends in `:<digits>`, so its
+        # extension contains a `:` and is rejected here. Two guards for one
+        # property mask each other's mutations — each mutates to a no-op while
+        # the other still holds — so the property reads as armed when neither
+        # site is. One guard, one arm.
+        #
+        # And an EMPTY extension is rejected with them: `_one_edit_apart("", "c")`
+        # is True, so a sentence-final `` `resolve.` `` proposed `resolve.c` and
+        # `resolve.h`.
+        return ()
     if lowered.isdigit():
         # A version number is not a mistyped file. `1.2.3` splits to an extension
         # of `3`, which is one substitution from `c` and from `h` — so without
@@ -543,26 +564,7 @@ def _typo_candidate(span: Span) -> TypoCandidate | None:
         # produce two findings for one mistake, which is exactly why
         # `path_citations` excludes `file:line` references.
         return None
-    if _categorically_not_a_path(token) or _LINE_REF_RE.match(token):
-        #
-        # THE `_LINE_REF_RE` HALF IS LOAD-BEARING, and the reasoning that first
-        # said otherwise is recorded because it was wrong in an instructive way.
-        # It ran: for the pattern to match, the token ends in `:<digits>`, so the
-        # extension contains a `:` and ends in digits — and since every entry in
-        # `_KNOWN_EXT` is short and alphanumeric, none is ever one edit from such
-        # a thing. Every step is true and the conclusion is false, because it
-        # never asked whether a known extension ends in a DIGIT. **`mp3` does.**
-        # So `foo.mp:3` has extension `mp:3`, and deleting the colon yields
-        # `mp3` — one edit. Without this guard that token proposes `foo.mp3`.
-        #
-        # `test_the_line_ref_guard_is_load_bearing_not_decorative` pins the
-        # counterexample, so the guard can never quietly become decoration.
-        #
-        # The BOUND it states is still a bound: `cli.pyx:287` is this same defect
-        # wearing a line number and is NOT reported. Measured over the corpus,
-        # that form occurs 0 times against 5 bare tokens that do reach the repair
-        # gate — so the recall given up is zero today, and that count is the
-        # condition on the claim.
+    if _categorically_not_a_path(token):
         return None
     last = token.rsplit("/", 1)[-1]
     if last in _DOTFILES:

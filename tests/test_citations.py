@@ -635,34 +635,65 @@ def test_an_extension_far_from_every_known_one_proposes_nothing():
     assert citations.typo_candidates("`mise.tomlxx` `notes.org` `data.parquet`\n") == []
 
 
-def test_the_line_ref_guard_is_load_bearing_not_decorative():
-    """The CONTROL ARM for the guard: prove it has something to guard.
+def test_a_colon_bearing_extension_proposes_nothing():
+    """A `file:line` token earns no repair — now via ONE guard, not two.
 
-    This test exists because the opposite was asserted, confidently, in a code
-    comment and in a mutation report. The reasoning was: a `file:line` token ends
-    in `:<digits>`, so its extension contains a `:` and ends in digits; every
-    entry in `_KNOWN_EXT` is short and alphanumeric; therefore no such extension
-    is ever one edit from a known one. Every premise is true and the conclusion
-    is false — it never asked whether a known extension ends in a DIGIT.
+    History worth keeping, because it is the reason this test exists rather than
+    a second `_LINE_REF_RE` check: that guard was carried separately and declared
+    "unreachable by construction" from three TRUE premises — a `file:line` token
+    ends in `:<digits>`, so its extension contains a `:`; every `_KNOWN_EXT` entry
+    is short and alphanumeric; therefore none is one edit away. The chain never
+    asked whether a known extension ends in a DIGIT. **`mp3` does**, so `mp:3`
+    repaired to `mp3` and the guard was live all along — its mutation arm had
+    survived only because the fixtures (`cli.py:287`) could not exhibit it.
 
-    **`mp3` does.** `foo.mp:3` has extension `mp:3`; delete the colon and you have
-    `mp3`. So the guard is the only thing stopping that token from proposing
-    `foo.mp3`, and the arm that "survived by construction" survived because its
-    fixtures could not exhibit the harm.
-
-    Asserted against the real `_ext_repairs` rather than against the allowlist's
-    shape, so a future entry that breaks it fails here whatever it looks like.
+    The alphanumeric rule now covers the whole class, so the separate guard is
+    gone rather than sitting beside this one. Two guards for one property mask
+    each other's mutations: each mutates to a no-op while the other still holds,
+    so the property reads as armed when neither site is.
     """
-    assert citations._ext_repairs("mp:3") == ("mp3",)
+    assert citations._ext_repairs("mp:3") == ()
     assert citations._ext_repairs("py:287") == ()
+    assert citations._ext_repairs("pyx:287") == ()
 
 
-def test_mp3_is_still_the_reason_the_guard_is_needed():
-    """Names the counterexample, so removing `mp3` does not silently retire it.
+def test_mp3_is_why_the_colon_rule_cannot_be_relaxed():
+    """Names the counterexample, so the old bad reasoning cannot be re-derived.
 
-    If this ever fails with an empty list, the guard above may genuinely have
-    become decoration — and that is a decision to take deliberately, having
-    re-run the reasoning, not something to discover from a green suite.
+    If `mp3` ever leaves the allowlist, someone may reason their way back to
+    "a colon-bearing extension can never earn a repair, so the rule is free" —
+    which was true of every premise and false of the conclusion. This fails first.
     """
-    ending_in_a_digit = sorted(ext for ext in citations._KNOWN_EXT if ext[-1].isdigit())
-    assert ending_in_a_digit == ["mp3"]
+    assert sorted(ext for ext in citations._KNOWN_EXT if ext[-1].isdigit()) == ["mp3"]
+
+
+def test_trailing_punctuation_is_not_a_mistyped_extension():
+    """An extension is alphanumeric.
+
+    Without that, the repair treats trailing punctuation as part of the extension
+    and "fixes" it by deleting one character. Measured over 386 authored markdown
+    files: 3 findings of this shape and **0 real typos** — `` `pr.py:` `` and
+    `` `evals.py:` `` quoted a PATTERN in a review report rather than citing a
+    file, and one path carried a comma inside the backticks. Precision 0/3, in
+    the module whose whole design is under-reporting.
+    (Silent-failure lane, F4.)
+    """
+    text = "`pr.py:` `evals.py:` `.agent/plans/session-2026-07-31.md,`\n"
+    assert citations.typo_candidates(text) == []
+
+
+def test_an_empty_extension_proposes_nothing():
+    """`` `resolve.` `` proposed `resolve.c` and `resolve.h`.
+
+    `_one_edit_apart("", "c")` is True — the deletion arm accepts a length
+    difference of one against the empty string — and only `isdigit` was guarded.
+    (Silent-failure lane, F5.)
+    """
+    assert citations._ext_repairs("") == ()
+    assert citations.typo_candidates("see `resolve.` there\n") == []
+
+
+def test_a_real_typo_still_survives_the_alphanumeric_rule():
+    """Control arm for the two above: the rule must not eat the feature."""
+    got = {c.text: c.repairs for c in citations.typo_candidates("`mise.tomlx` `graph.jsom`\n")}
+    assert got == {"mise.tomlx": ("mise.toml",), "graph.jsom": ("graph.json",)}

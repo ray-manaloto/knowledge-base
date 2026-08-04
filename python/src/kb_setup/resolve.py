@@ -311,9 +311,27 @@ def resolve_extension_typo(
     checkable. (Spec lane, F1 — the #157 defect class inside the #157 fix.)
     """
     idx = index if index is not None else build_index(repo_root)
-    authored = idx.authored_only()
-    if resolve_path(repo_root, token, authored).state is State.RESOLVED:
+    # The token's OWN existence test asks the FULL index and demands MISSING.
+    # Two separate defects lived in the narrower `is RESOLVED` form against
+    # `authored`, and both made this function say `no file named X` about an X
+    # the index can see (Silent-failure lane, F2 and F3):
+    #
+    # * **AMBIGUOUS fell through.** Several real files matching the written
+    #   spelling is the opposite of absent, and `State` has four members exactly
+    #   so "could not tell" is never rendered as a verdict. So does UNVERIFIABLE
+    #   — `graphify/serve.pyx` names another repo, and this has no standing to
+    #   call it missing. Demanding MISSING is the only test that licenses the
+    #   sentence this function goes on to write.
+    # * **The vendored tier was excluded from the wrong question.** `watch.pyi`
+    #   naming a real file inside a pinned clone was reported absent while
+    #   `resolve_path` could open it. Reading graphify's and mise's own source is
+    #   why that tier exists at all.
+    #
+    # `authored_only()` still applies to the REPAIRS below, which is where it was
+    # measured and where `runner.os` needs it. One narrowing, one question.
+    if resolve_path(repo_root, token, idx).state is not State.MISSING:
         return None
+    authored = idx.authored_only()
     # Uniqueness is counted on RESOLVED ALONE, and the name is taken afterwards.
     # Folding `match is not None` into the filter made a match-less RESOLVED —
     # which no tier produces today — able to turn a two-hit case (silent) into a
