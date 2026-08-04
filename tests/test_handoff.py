@@ -492,3 +492,31 @@ def test_an_unreached_gate_is_not_described_as_a_tree_of_unknown_cleanliness(tmp
     (f,) = _gate_findings(root, f"- Gates on `{_A[:7]}`: `mise run kb-gates` **rc=1**\n")
     assert f.verdict is handoff.Verdict.OK
     assert "clean" not in f.detail
+
+
+def test_the_absent_marker_hint_is_not_printed_for_a_gate_failure(tmp_path: Path):
+    """The hint teaches `` `path` (absent) ``, which a gate claim cannot carry.
+
+    The arm fired on ANY failure, so once gate claims could fail, a run whose
+    only defect was `lint rc=0` advised the reader to mark a path absent —
+    unactionable advice attached to a finding it has nothing to do with.
+    """
+    root = _gate_repo(tmp_path, [_row("lint", rc=1)])
+    report = handoff.render(
+        handoff.check(root, f"- Gates on `{_A[:7]}`: `mise run lint` rc=0\n"), source="h.md"
+    )
+    assert "(absent)" not in report
+
+
+def test_the_absent_marker_hint_is_still_printed_for_a_path_failure(tmp_path: Path):
+    """Control arm: scoping the hint must not delete it.
+
+    `docs/a.md` has to EXIST for `docs/gone.md` to be a MISSING rather than an
+    UNVERIFIABLE — without a real `docs/`, the citation reads as a claim about
+    another repo and never reaches the FAIL this arm is about.
+    """
+    root = _gate_repo(tmp_path)
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "a.md").write_text("x\n", encoding="utf-8")
+    report = handoff.render(handoff.check(root, "see `docs/gone.md`\n"), source="h.md")
+    assert "(absent)" in report

@@ -64,7 +64,12 @@ _GIT_TIMEOUT = 30
 _RC_TIMEOUT = 124
 _RC_COULD_NOT_RUN = 127
 
-_SHA_ABBREV = 12
+#: Characters of a commit shown in a report. Public because `kb_setup.handoff`
+#: renders the same commits when it checks a claim against a record: two copies
+#: of one presentation constant, kept in step by comment alone, is the
+#: duplication `review.safe_sha` was made public to avoid one directory over —
+#: identical right up until one of them is changed. (Standards lane.)
+SHA_ABBREV = 12
 
 #: The local gates every PR must pass before it is pushed — moved here from `pr`
 #: (where it was `GATES`) so the ship path and `kb-gates` cannot drift into two
@@ -442,12 +447,12 @@ def find_record(repo_root: Path, sha: str) -> tuple[Record | None, str]:
     keys = {p: p.name[len(_RECORD_PREFIX) : -len(".json")].lower() for p in present}
     matches = [p for p, key in keys.items() if key.startswith(wanted)]
     if not matches:
-        others = sorted({key[:_SHA_ABBREV] for key in keys.values()})
+        others = sorted({key[:SHA_ABBREV] for key in keys.values()})
         seen = f" — records exist at {', '.join(others)}" if others else ""
-        return None, f"no gate record at {wanted[:_SHA_ABBREV]}{seen}"
+        return None, f"no gate record at {wanted[:SHA_ABBREV]}{seen}"
     if len(matches) > 1:
         return None, (
-            f"{len(matches)} records match {wanted[:_SHA_ABBREV]} — cite more of the commit"
+            f"{len(matches)} records match {wanted[:SHA_ABBREV]} — cite more of the commit"
         )
     parsed = _parse(matches[0])
     if parsed is None:
@@ -457,7 +462,7 @@ def find_record(repo_root: Path, sha: str) -> tuple[Record | None, str]:
 
 def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     """The report: one line per gate, the counts, and where the record went."""
-    lines = [f"gates at {sha[:_SHA_ABBREV]}"]
+    lines = [f"gates at {sha[:SHA_ABBREV]}"]
     for r in results:
         state = "not run" if not r.ran else ("PASS" if r.passed else f"FAIL rc={r.rc}")
         lines.append(f"  {r.task:<12} {state}")
@@ -476,7 +481,7 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     if drifted:
         lines.append(
             f"  ! HEAD moved during the run — some gates ran against "
-            f"{', '.join(s[:_SHA_ABBREV] for s in drifted)}, not {sha[:_SHA_ABBREV]}"
+            f"{', '.join(s[:SHA_ABBREV] for s in drifted)}, not {sha[:SHA_ABBREV]}"
         )
 
     # Said out loud rather than left in the JSON. A run over a dirty tree is the
@@ -487,7 +492,7 @@ def render(results: list[GateResult], *, sha: str, path: Path) -> str:
     if unclean:
         lines.append(
             f"  ! uncommitted changes were present — these describe the tree, "
-            f"not {sha[:_SHA_ABBREV]} itself ({', '.join(unclean)})"
+            f"not {sha[:SHA_ABBREV]} itself ({', '.join(unclean)})"
         )
     if unknown:
         lines.append(f"  ! could not tell whether the tree was clean ({', '.join(unknown)})")

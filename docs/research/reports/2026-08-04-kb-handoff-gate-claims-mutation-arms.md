@@ -1,14 +1,20 @@
 # #147 mutation arms — gate-claim verification
 
-**18 arms, 18/18 caught**, control green before and
-restored green after. Harness: `PYTHONDONTWRITEBYTECODE=1`, anchors READ from the
-file with a loud `DID NOT APPLY` on a miss, and pytest `rc=4` reported as
-`SYNTAX ONLY` rather than as a catch.
+**19 arms; 17 caught by single-site mutation.** Control green before
+and restored green after. The 2 that survived are **one property guarded at
+two sites**, and it IS armed — see the last section, which is the point of this
+report rather than a footnote to it.
 
-Both tables below are **generated from the harness's own `ARMS` list** and
-asserted row-for-row against the run log, per
-`probes-need-a-control-arm.md` rule 8 — a transcribed evidence table has already
-dropped a row and mislabelled two in this repo.
+Harness: `PYTHONDONTWRITEBYTECODE=1` (CPython keys a `.pyc` on source size and
+mtime in whole SECONDS, so a harness rewriting one file per second serves the
+previous mutation's bytecode), anchors READ from the file with a loud
+`DID NOT APPLY` on a miss, and pytest `rc=4` reported as `SYNTAX ONLY` rather
+than as a catch.
+
+Both tables are **generated from the harness's own `ARMS` list** and asserted
+row-for-row against the run log, per `probes-need-a-control-arm.md` rule 8 — a
+transcribed evidence table has already dropped a row and mislabelled two in this
+repo.
 
 ## What each arm claims is load-bearing
 
@@ -27,7 +33,8 @@ dropped a row and mislabelled two in this repo.
 | summarise: count an unrun gate as passed | `gates.py` | a `--stop` record cannot vouch for a green runner claim |
 | verdict: skip the per-row commit binding | `handoff.py` | criterion 3 — a row recorded against another commit |
 | verdict: drop the no-result branch and let != speak for it | `handoff.py` | `rc: null` is never a pass |
-| verdict: pass a claim that names no commit | `handoff.py` | an unbound claim is unverifiable, not verified |
+| verdict: pass a claim that names no commit (outer guard only) | `handoff.py` | NO-OP by construction — find_record's empty-sha guard still catches it |
+| lookup: accept an empty sha and match every record | `gates.py` | an unbound claim must not match the first record in the directory |
 | verdict: report a dirty-tree result as clean | `handoff.py` | a result over a dirty tree does not describe the commit |
 | verdict: report an unbound row as verified | `handoff.py` | a row bound to no commit can vouch for none |
 | verdict: check every token, not just declared tasks | `handoff.py` | `returns rc=127` is prose, and reporting it buries real findings |
@@ -51,32 +58,56 @@ dropped a row and mislabelled two in this repo.
 | summarise: count an unrun gate as passed | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_runner_claim_fails_when_a_gate_was_never_re |
 | verdict: skip the per-row commit binding | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_row_recorded_against_a_different_commit_fai |
 | verdict: drop the no-result branch and let != speak for it | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_gate_recorded_as_not_run_never_passes_a_cla |
-| verdict: pass a claim that names no commit | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_claim_naming_no_commit_is_unverifiable |
+| verdict: pass a claim that names no commit (outer guard only) | SURVIVED | no test failed — the claim is unarmed |
+| lookup: accept an empty sha and match every record | SURVIVED | no test failed — the claim is unarmed |
 | verdict: report a dirty-tree result as clean | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_claim_recorded_over_a_dirty_tree_is_reporte |
 | verdict: report an unbound row as verified | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_claim_whose_row_could_not_read_head_is_unve |
 | verdict: check every token, not just declared tasks | CAUGHT | rc=1, 1 failed, first: tests/test_handoff.py::test_a_token_that_is_not_a_declared_task_is_not_a_ |
 | verdict: fold `no record` into `wrong` | CAUGHT | rc=1, 3 failed, first: tests/test_handoff.py::test_a_claim_with_no_record_at_that_commit_is_unve |
 | RESTORED | GREEN | rc=0 |
 
-## Three arms that first reported SURVIVED, and why each was the PROBE
+## The two SURVIVED arms are one property, guarded twice
 
-Recorded because the count alone would have read as 15/18 unarmed code, and all
-three were defects in the arm rather than in the subject
+`GateClaim.sha` returns `""` for a claim naming zero or two commits, and
+`find_record` refuses an empty sha. Bypassing either guard alone leaves the
+other standing, so **neither single-site mutation can discriminate** — which is
+why both are reported here as survivors rather than quietly dropped.
+
+Mutating **both** sites in one run, by hand:
+
+```
+BOTH-GUARDS ARM rc= 1 failures: 1
+    FAILED tests/test_handoff.py::test_a_claim_naming_no_commit_is_unverifiable
+```
+
+So the property is armed. What the harness cannot show is that it takes two
+edits to break it, and a count of "17/19" read without this section would
+report defended code as unarmed.
+
+## Four arms that first reported SURVIVED, and why each was the PROBE
+
+Recorded because the count alone would have read as unarmed code, and all four
+were defects in the arm rather than in the subject
 (`mutation-arms-are-a-floor-not-a-ceiling`).
 
 1. **`rc=$?` digit rule.** The fixture was `` `out=$(pytest); rc=$?` `` — excluded
    by the `;` before `rc=`, never by the digit requirement. A fixture that
    cannot exhibit the harm. Replaced with `lint rc=$?`, where the task token is
-   directly adjacent, and the arm caught.
+   adjacent, and the arm caught.
 2. **JSON shape guard.** The fixture `{"sha": "x", "gates": "lint"}` is caught by
-   the PER-ROW check further down, so removing the shape guard changed nothing —
+   the per-row check further down, so removing the shape guard changed nothing —
    a mutation masked by the next guard. Replaced with a record carrying no
    `gates` key at all, which has no row loop to reach.
 3. **Null-rc branch.** The first mutation was `return None or "no result …"`,
    which is a no-op. The second targeted `if row.rc != claim.rc`, unreachable for
-   `None` because the explicit branch above it returns first. The real arm
-   deletes that branch — the realistic break, since it is the line a
-   "simplification" would remove.
+   `None` because the branch above it returns first. The real arm deletes that
+   branch — the realistic break, since it is the line a "simplification" removes.
+4. **Unbound claim.** The section above. Genuinely two guards, not a bad probe —
+   but indistinguishable from one until the two-site arm was run.
+
+Four stale anchors also reported `DID NOT APPLY` after the review round moved
+the code. That is the harness working: every one was re-pointed by reading the
+file, never by retyping the line.
 
 ## GitHub repos touched
 

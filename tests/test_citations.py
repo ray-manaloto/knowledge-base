@@ -431,3 +431,35 @@ def test_gate_claims_are_found_in_the_real_handoff_corpus():
     }
     assert ("lint", 0) in claimed
     assert ("test", 0) in claimed
+
+
+def test_a_table_cell_claim_is_read():
+    """`` | `mise run lint` | **rc=0** at `78f7190` | `` — verbatim from a handoff.
+
+    Found by a review lane AFTER the pattern's own comment had claimed it
+    covered "the four spellings this repo's handoffs actually use". A silent
+    miss is worse than a reported one here: the claim simply disappears rather
+    than being reported unverifiable.
+    """
+    text = "| `mise run lint` | **rc=0** at `78f7190` (re-run after the edit) |\n"
+    (c,) = citations.gate_claims(text)
+    assert (c.task, c.rc, c.shas) == ("lint", 0, ("78f7190",))
+
+
+def test_a_claim_crosses_at_most_one_cell_boundary():
+    """The task stays the token NEAREST the `rc=`, never the row's first one."""
+    (c,) = citations.gate_claims("| lint | something else | rc=0 |\n")
+    assert c.task == "else"
+
+
+def test_the_sha_accessor_is_empty_unless_exactly_one_commit_is_named():
+    """Zero and two are real answers; `shas[0]` raises on one and guesses on the other."""
+    text = "- `mise run lint` rc=0\n\n- Gates on `77661a3` and `c25974b`: `mise run test` rc=0\n"
+    unbound, ambiguous = citations.gate_claims(text)
+    assert unbound.sha == ""
+    assert ambiguous.sha == ""
+
+
+def test_the_sha_accessor_returns_the_single_commit():
+    (c,) = citations.gate_claims("- Gates on `77661a3`: `mise run lint` rc=0\n")
+    assert c.sha == "77661a3"

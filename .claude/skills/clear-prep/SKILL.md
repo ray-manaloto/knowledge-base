@@ -246,10 +246,9 @@ more than a missing one. Before printing the resume prompt:
   backticked. A claim that names no commit cannot be looked up and is reported
   `UNVER`, and a sha in a neighbouring paragraph is deliberately not inherited.
   A branch name is not a commit. Read the verdicts as: `FAIL` the record
-  contradicts you; `UNVER`
-  nothing can speak to it (no record at that commit, or that gate was not in the
-  run); `AMBIG` it holds with a caveat — usually that the tree was dirty, so the
-  result describes that tree and not the commit;
+  contradicts you; `UNVER` nothing can speak to it (no record at that commit, or
+  that gate was not in the run); `AMBIG` it holds with a caveat — usually that
+  the tree was dirty, so the result describes that tree and not the commit;
 - every number it repeats was measured *this* session, or is labelled as
   inherited and unverified (`probes-need-a-control-arm.md` rule 6).
 

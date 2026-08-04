@@ -144,21 +144,40 @@ _LINE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
 #: still yields `lint` rather than a citation nothing declares.
 _TASK_RE = re.compile(r"\bmise run ([A-Za-z][A-Za-z0-9_:-]*(?:\.[A-Za-z0-9_:-]+)*)")
 
-#: `<task> rc=<n>` — a gate claim in the four spellings this repo's handoffs
+#: `<task> rc=<n>` — a gate claim in the five spellings this repo's handoffs
 #: actually use: `` `mise run lint` **rc=0** ``, `` `mise run lint` → **rc=0** ``,
-#: `` `brain-audit` rc=0 ``, and a bare `lint rc=0`. The optional decoration
-#: between the task and its `rc=` is what makes one pattern cover all four; a
+#: `` `brain-audit` rc=0 ``, a bare `lint rc=0`, and the table-cell
+#: `` | `mise run lint` | **rc=0** at `78f7190` | ``. The optional decoration
+#: between the task and its `rc=` is what makes one pattern cover all five; a
 #: pattern per spelling would have gone stale the first time someone wrote a
-#: fifth. `rc=` must be followed by DIGITS — `rc=$?` is prose about exit codes,
-#: not a claim to have one.
+#: sixth — and the fifth was found in the corpus by a review lane after the
+#: comment here had already claimed "the four spellings this repo's handoffs
+#: actually use". The count in a comment is a measurement, so it can be wrong.
+#:
+#: At most ONE cell boundary is crossed, so the task is still the token NEAREST
+#: the `rc=`. A pattern that skipped arbitrary `|` would attach an exit code to
+#: whichever task appeared earliest in the row.
+#:
+#: `rc=` must be followed by DIGITS — `rc=$?` records HOW an exit code was read
+#: and claims nothing about its value.
 _GATE_CLAIM_RE = re.compile(
     r"`?(?:mise run )?(?P<task>[A-Za-z][A-Za-z0-9_-]*)`?"
-    r"[ \t]*(?:→[ \t]*)?\*{0,2}rc=(?P<rc>\d+)"
+    r"[ \t]*\|?[ \t]*(?:→[ \t]*)?\*{0,2}rc=(?P<rc>\d+)"
 )
 
 #: The DISTRIBUTIVE form: `Gates on `f3e233a`, all rc=0: <list of tasks>`. One
 #: phrase vouching for four gates, so skipping it would leave the highest-stakes
 #: claim in the corpus unchecked.
+#:
+#: The tasks it distributes over are `mise run <name>` occurrences ONLY, which is
+#: a deliberate BOUND and not an oversight: a bare comma-separated list after the
+#: colon cannot be told from prose, and `all rc=0: lint, test, currency check`
+#: would claim a gate called `currency`. The bound is stated because a
+#: bare-name list would be silently skipped rather than reported — measured over
+#: all 30 committed handoffs on 2026-08-04, that form occurs **0 times** against
+#: 4 occurrences of the `mise run` form, so the recall given up is zero *today*.
+#: That count is the condition on the claim, and it moves the moment someone
+#: writes one. (Standards lane.)
 #:
 #: The trailing colon is load-bearing, not punctuation-matching. Without it the
 #: parenthetical in `` `mise run kb-gates` **rc=0** (lint/test/brain-audit/eval
@@ -248,6 +267,18 @@ class GateClaim:
     rc: int
     shas: tuple[str, ...]
     line: int
+
+    @property
+    def sha(self) -> str:
+        """The one commit this claim is bound to. Empty unless there is exactly one.
+
+        A named accessor rather than `shas[0]` at each call site: zero and two
+        are real answers a caller must handle first, and `[0]` reads as though
+        they were not — it raises on the first and silently picks on the second.
+        Returning `""` for both makes the unhandled case fall out as "names no
+        commit" rather than as a wrong binding.
+        """
+        return self.shas[0] if len(self.shas) == 1 else ""
 
 
 def strip_fences(text: str) -> str:

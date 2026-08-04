@@ -31,8 +31,10 @@ from pathlib import Path
 
 from kb_setup import citations, gates, resolve
 
-#: Characters of a commit shown in a report — `kb_setup.gates`' own abbreviation.
-_SHA_ABBREV = 12
+#: The checks a `` `path` (absent) `` marker can be written on. A gate claim
+#: cannot, which is why `render` scopes its hint to these rather than to any
+#: FAIL.
+_PATH_CHECKS: frozenset[str] = frozenset({"path", "file-line"})
 
 
 class Verdict(Enum):
@@ -80,10 +82,15 @@ def check(repo_root: Path, text: str) -> list[Finding]:
     citation is the difference between one pass over the tree and one per claim.
     """
     index = resolve.build_index(repo_root)
+    # Read ONCE and threaded, for the same reason as ``index``: both the task
+    # check and the gate check ask which tasks this repo declares, and letting
+    # each parse `mise.toml` for itself is the drift this function's contract
+    # already rules out for the tree walk. (Standards lane.)
+    declared = resolve.declared_tasks(repo_root)
     findings = [_check_path(repo_root, c, index) for c in citations.path_citations(text)]
     findings.extend(_check_line_ref(repo_root, c, index) for c in citations.line_citations(text))
-    findings.extend(_check_tasks(repo_root, text))
-    findings.extend(_check_gate_claims(repo_root, text))
+    findings.extend(_check_tasks(text, declared))
+    findings.extend(_check_gate_claims(repo_root, text, declared))
     return findings
 
 
@@ -174,8 +181,7 @@ def _check_line_ref(repo_root: Path, cite: citations.LineCitation, index: resolv
     return Finding("file-line", Verdict.OK, claim, cite.line, f"{got.detail} has {total} lines")
 
 
-def _check_tasks(repo_root: Path, text: str) -> list[Finding]:
-    declared = resolve.declared_tasks(repo_root)
+def _check_tasks(text: str, declared: frozenset[str]) -> list[Finding]:
     findings: list[Finding] = []
     for cite in citations.task_citations(text):
         ok = cite.name in declared
@@ -193,7 +199,7 @@ def _check_tasks(repo_root: Path, text: str) -> list[Finding]:
     return findings
 
 
-def _check_gate_claims(repo_root: Path, text: str) -> list[Finding]:
+def _check_gate_claims(repo_root: Path, text: str, declared: frozenset[str]) -> list[Finding]:
     """Every gate claim in ``text``, checked against the record #146 writes.
 
     Only claims naming a task THIS repo declares are checked. The parser cannot
@@ -201,7 +207,6 @@ def _check_gate_claims(repo_root: Path, text: str) -> list[Finding]:
     `rc=` — `` `timeout 60 x` returns rc=127 `` yields a claim about `returns` —
     and reporting those would bury the real findings in prose.
     """
-    declared = resolve.declared_tasks(repo_root)
     return [
         _check_gate_claim(repo_root, c) for c in citations.gate_claims(text) if c.task in declared
     ]
@@ -238,29 +243,30 @@ def _check_gate_claim(repo_root: Path, claim: citations.GateClaim) -> Finding:
             f"its block names {len(claim.shas)} commits ({', '.join(claim.shas)}) — "
             f"which one did the gates run at?",
         )
-    sha = claim.shas[0]
-    record, why = gates.find_record(repo_root, sha)
+    record, why = gates.find_record(repo_root, claim.sha)
     if record is None:
         return _gate_finding(claim, Verdict.UNVERIFIABLE, why)
-    return _judge(claim, record, sha)
+    return _judge(claim, record)
 
 
-def _judge(claim: citations.GateClaim, record: gates.Record, sha: str) -> Finding:
+def _judge(claim: citations.GateClaim, record: gates.Record) -> Finding:
     """Compare a claim to the rows that speak for it.
 
     A claim about the RUNNER (`mise run kb-gates`) is a claim about every row;
     a claim about one gate is a claim about its row. Both then face the same
     commit-binding and cleanliness questions, which is why the rows are chosen
     first and the checks that follow are written once.
+
+    ``runner`` is decided HERE and passed down, rather than each step asking
+    `claim.task == RUNNER_TASK` for itself. Two sites asking the same question
+    of the same value is how the two halves drift apart. (Standards lane.)
     """
-    if claim.task == gates.RUNNER_TASK:
+    runner = claim.task == gates.RUNNER_TASK
+    at = record.sha[: gates.SHA_ABBREV]
+    if runner:
         rows = list(record.gates)
         if not rows:
-            return _gate_finding(
-                claim,
-                Verdict.UNVERIFIABLE,
-                f"the record at {record.sha[:_SHA_ABBREV]} covers no gates",
-            )
+            return _gate_finding(claim, Verdict.UNVERIFIABLE, f"the record at {at} covers no gates")
     else:
         row = record.row(claim.task)
         if row is None:
@@ -268,17 +274,18 @@ def _judge(claim: citations.GateClaim, record: gates.Record, sha: str) -> Findin
             return _gate_finding(
                 claim,
                 Verdict.UNVERIFIABLE,
-                f"the record at {record.sha[:_SHA_ABBREV]} covers {covered} — not {claim.task}",
+                f"the record at {at} covers {covered} — not {claim.task}",
             )
         rows = [row]
-    return _judge_rows(claim, record, rows, sha)
+    return _judge_rows(claim, record, rows, runner=runner)
 
 
 def _judge_rows(
     claim: citations.GateClaim,
     record: gates.Record,
     rows: list[gates.RecordedGate],
-    sha: str,
+    *,
+    runner: bool,
 ) -> Finding:
     """The questions every claim faces once the rows that speak for it are known.
 
@@ -291,9 +298,10 @@ def _judge_rows(
     # commit has an exit code about code this one never contained, so reporting
     # "rc=1, not rc=0" would name the wrong defect and send the reader to fix a
     # gate that is fine.
+    sha = claim.sha
     drifted = [r for r in rows if r.sha and not r.sha.lower().startswith(sha.lower())]
     if drifted:
-        ran_at = ", ".join(sorted({r.sha[:_SHA_ABBREV] for r in drifted if r.sha}))
+        ran_at = ", ".join(sorted({r.sha[: gates.SHA_ABBREV] for r in drifted if r.sha}))
         return _gate_finding(
             claim,
             Verdict.FAIL,
@@ -302,7 +310,7 @@ def _judge_rows(
             f"({', '.join(r.task for r in drifted)})",
         )
 
-    mismatch = _rc_mismatch(claim, rows, record)
+    mismatch = _rc_mismatch(claim, rows, record, runner=runner)
     if mismatch is not None:
         return _gate_finding(claim, Verdict.FAIL, mismatch)
 
@@ -341,7 +349,11 @@ def _judge_rows(
 
 
 def _rc_mismatch(
-    claim: citations.GateClaim, rows: list[gates.RecordedGate], record: gates.Record
+    claim: citations.GateClaim,
+    rows: list[gates.RecordedGate],
+    record: gates.Record,
+    *,
+    runner: bool,
 ) -> str | None:
     """Why the record contradicts ``claim``'s exit code, or None if it agrees.
 
@@ -351,7 +363,7 @@ def _rc_mismatch(
     row that does not exist. A row with no result counts as not passed, which is
     what makes a `--stop` record unable to vouch for a green claim.
     """
-    if claim.task == gates.RUNNER_TASK:
+    if runner:
         _, unpassed = record.summarise()
         if (claim.rc == 0) == (unpassed == 0):
             return None
@@ -364,6 +376,18 @@ def _rc_mismatch(
         )
     (row,) = rows
     if row.rc is None:
+        # FAIL, not UNVERIFIABLE, and the choice is deliberate — no criterion
+        # adjudicated it until a review lane asked, so it is written down here.
+        # A `rc: null` row LOOKS like silence, which would argue for
+        # UNVERIFIABLE. It is not: a record is a COMPLETE account of one run at
+        # one commit (unreached gates are padded, never omitted) and it
+        # OVERWRITES any earlier record for that commit, so it positively
+        # asserts that the gate produced no result there. A claim that it exited
+        # 0 is contradicted, not merely unsupported — and reading it as silence
+        # would let the one artifact that knows better stay quiet at exit 0
+        # about a green claim nothing backs. #146's `all_passed` and
+        # `Record.summarise` both count a null as not-passed; this is the same
+        # rule reaching the reader. (Spec lane, criterion 9.)
         return "no result was recorded for it — it never ran to completion, which is not a pass"
     if row.rc != claim.rc:
         return f"the record says rc={row.rc}"
@@ -385,7 +409,14 @@ def render(findings: list[Finding], *, source: str) -> str:
     ]
     if not lines:
         lines.append(f"no broken citations in {source}")
-    elif counts[Verdict.FAIL]:
+    elif any(f.verdict is Verdict.FAIL and f.check in _PATH_CHECKS for f in findings):
+        # Scoped to the checks the marker can actually be written on. The arm
+        # used to fire on ANY failure, so once gate claims could fail, a run
+        # whose only defect was `lint rc=0` advised the reader to write
+        # `` `path` (absent) `` — advice that cannot be acted on, attached to a
+        # finding it has nothing to do with. Its own comment claims the report
+        # "teaches it at exactly that moment"; that moment had stopped being
+        # this one. (Standards lane.)
         # The marker is useless if nobody discovers it, and the moment someone
         # needs it is the moment they are staring at a path they cited on
         # purpose. So the report teaches it at exactly that moment.
