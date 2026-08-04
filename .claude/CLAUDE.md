@@ -13,7 +13,14 @@ operations" section `/mattpocock-skills:wayfinder`, `to-spec`, `to-tickets`,
 This pointer is load-bearing, not a courtesy: those skills fall back to a
 local-markdown tracker when no tracker doc has been provided, and nothing else
 in the auto-loaded context names the file. It lives here rather than in the root
-`CLAUDE.md` because that file is at 199 of its 200-line budget.
+`CLAUDE.md` because that file is **at** its 200-line budget.
+
+Two companions, same reason for their paths: **`docs/triage-labels.md`** (the five
+canonical triage roles; all five labels now exist) and **`docs/domain.md`** (how
+skills consume this repo's vocabulary — single-context, and `CONTEXT.md`/`docs/adr/`
+are created lazily by `/domain-modeling`, never scaffolded empty). All three sit in
+`docs/` rather than `docs/agents/` because agnix rejects an `**/agents/*.md` without
+YAML frontmatter — re-probed control-armed 2026-08-03, rc=1 there vs rc=0 in `docs/`.
 
 PRs are opened and merged with `mise run kb-ship` / `mise run kb-land`, never
 `gh pr create` / `gh pr merge`. Read-only `gh pr view` / `gh pr checks` stay
