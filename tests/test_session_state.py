@@ -9,6 +9,7 @@ comment says must exist.
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -129,6 +130,76 @@ def test_a_rename_does_not_shift_the_entries_after_it(
     assert changes.untracked == ()
 
 
+def test_a_merge_conflict_is_its_own_bucket_not_staged_and_unstaged(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An UNMERGED path (`UU`) is not describable as staged OR unstaged.
+
+    Without an explicit branch it falls through both generic tests and renders
+    identically to an ordinary `MM` — so a reader mid-conflict sees
+    "staged: f.txt / unstaged: f.txt" and concludes it needs re-staging, when in
+    truth nothing can be committed until the conflict is resolved. This repo
+    ships a `resolving-merge-conflicts` skill, so a session in this state is a
+    case the tool will really meet. (Cold lane, P2.)
+    """
+    _no_pr(monkeypatch)
+    (tmp_path / "f.txt").write_text("base\n", encoding="utf-8")
+    git("add", "--", "f.txt")
+    git("commit", "-q", "-m", "base for conflict")
+    git("checkout", "-q", "-b", "feature")
+    (tmp_path / "f.txt").write_text("theirs\n", encoding="utf-8")
+    git("commit", "-q", "-am", "theirs")
+    git("checkout", "-q", "work")
+    (tmp_path / "f.txt").write_text("ours\n", encoding="utf-8")
+    git("commit", "-q", "-am", "ours")
+    # Conflicting merge; `git merge` exits non-zero on conflict, so it is run
+    # through subprocess directly rather than the check=True `git` fixture.
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "merge", "-q", "feature"],
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+
+    changes = session_state.gather(tmp_path).changes
+
+    # Control: the fixture really did produce a conflict, so this test can fail.
+    assert changes.unmerged == ("f.txt",), f"no conflict in fixture: {changes}"
+    assert changes.conflicted is True
+    assert "f.txt" not in changes.staged
+    assert "f.txt" not in changes.unstaged
+    assert changes.clean is False
+    assert "UNMERGED" in session_state.render(session_state.gather(tmp_path))
+
+
+def test_an_unborn_branch_is_read_not_reported_as_unreadable(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`git rev-parse --abbrev-ref HEAD` exits 128 before the first commit.
+
+    It prints `HEAD` to stdout while failing, so trusting only its rc turns a
+    perfectly knowable branch into this module's "could not be asked" state —
+    the module's own collapse running backwards: a checked answer thrown away.
+    `git symbolic-ref --short HEAD` answers rc=0 here, which is why it is tried
+    first. (Cold lane, P1, probed against real git.)
+    """
+    _no_pr(monkeypatch)
+    fresh = tmp_path / "unborn"
+    fresh.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "newborn", str(fresh)], check=True, timeout=30)
+    (fresh / "staged.txt").write_text("s\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(fresh), "add", "--", "staged.txt"], check=True, timeout=30)
+
+    snap = session_state.gather(fresh)
+
+    assert snap.branch == "newborn"
+    assert snap.detached is False
+    # The rest of the snapshot still reads: the staged file was always visible,
+    # which is what made the false "COULD NOT READ" beside it so misleading.
+    assert snap.changes.staged == ("staged.txt",)
+    assert "COULD NOT READ" not in session_state.render(snap)
+
+
 def test_a_detached_head_does_not_report_a_checked_no_open_pr(
     git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -235,7 +306,7 @@ def test_an_open_pr_is_reported_with_its_number_and_checks(
         lambda _args, _root: (0, '[{"number": 144, "title": "the snapshot"}]'),
     )
     monkeypatch.setattr(
-        session_state, "_checks_state", lambda _n: (True, "2 binding check(s) green")
+        session_state, "_checks_state", lambda _n, _r: (True, "2 binding check(s) green")
     )
 
     pr = session_state.gather(tmp_path).pr
@@ -255,7 +326,9 @@ def test_a_red_check_is_carried_as_data_not_only_as_prose(
 ) -> None:
     """`checks_green` must actually track the verdict, not be hardcoded True."""
     monkeypatch.setattr(session_state, "_gh", lambda _a, _r: (0, '[{"number": 9, "title": "t"}]'))
-    monkeypatch.setattr(session_state, "_checks_state", lambda _n: (False, "1 check(s) not green"))
+    monkeypatch.setattr(
+        session_state, "_checks_state", lambda _n, _r: (False, "1 check(s) not green")
+    )
 
     pr = session_state.gather(tmp_path).pr
 
@@ -285,7 +358,7 @@ def test_a_multi_pr_annotation_does_not_land_in_the_unverifiable_field(
         "_gh",
         lambda _a, _r: (0, '[{"number": 1, "title": "a"}, {"number": 2, "title": "b"}]'),
     )
-    monkeypatch.setattr(session_state, "_checks_state", lambda _n: (True, "green"))
+    monkeypatch.setattr(session_state, "_checks_state", lambda _n, _r: (True, "green"))
 
     pr = session_state.gather(tmp_path).pr
 
@@ -464,7 +537,7 @@ def test_render_prints_the_three_pr_states_differently(
     unver_text = session_state.render(session_state.gather(tmp_path))
 
     monkeypatch.setattr(session_state, "_gh", lambda _a, _r: (0, '[{"number": 7, "title": "t"}]'))
-    monkeypatch.setattr(session_state, "_checks_state", lambda _n: (True, "green"))
+    monkeypatch.setattr(session_state, "_checks_state", lambda _n, _r: (True, "green"))
     open_text = session_state.render(session_state.gather(tmp_path))
 
     prs = {

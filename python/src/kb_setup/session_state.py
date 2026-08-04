@@ -104,6 +104,13 @@ _PAIRED_CODES = frozenset({"R", "C"})
 #: Length of the `XY ` prefix on a porcelain record, before the path starts.
 _STATUS_PREFIX = 3
 
+#: `git-status(1)` spells an UNMERGED path seven ways: `DD AU UD UA DU AA UU`.
+#: Five contain a `U`; `DD` and `AA` do not, which is why the membership test
+#: needs both halves. None of these letters is a "nothing here" code, so without
+#: an explicit branch every one of them reads as staged-and-unstaged.
+_UNMERGED_CODE = "U"
+_UNMERGED_PAIRS = frozenset({"DD", "AA"})
+
 
 class PrState(Enum):
     """The three answers a PR lookup can get.
@@ -177,12 +184,23 @@ class Changes:
     staged: tuple[str, ...] = ()
     unstaged: tuple[str, ...] = ()
     untracked: tuple[str, ...] = ()
+    unmerged: tuple[str, ...] = ()
     read: bool = True
 
     @property
     def clean(self) -> bool:
         """Whether git was asked AND reported nothing. An unread tree is not clean."""
-        return self.read and not (self.staged or self.unstaged or self.untracked)
+        return self.read and not (self.staged or self.unstaged or self.untracked or self.unmerged)
+
+    @property
+    def conflicted(self) -> bool:
+        """Whether any path is UNMERGED — i.e. nothing can be committed yet.
+
+        Its own question, not a shade of "dirty": a conflicted tree blocks a
+        commit outright, which is the single most important thing a handoff can
+        say about where a session stopped.
+        """
+        return bool(self.unmerged)
 
 
 @dataclass(frozen=True)
@@ -258,16 +276,20 @@ def _gh(args: list[str], repo_root: Path) -> tuple[int, str]:
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
-def _checks_state(number: int) -> tuple[bool, str]:
+def _checks_state(number: int, repo_root: Path) -> tuple[bool, str]:
     """A PR's check state, via `pr.checks_state`.
 
     A named seam for the same reason `gates.head_sha` is one: the tests pin this,
     and pinning `pr.checks_state` itself would silently pin it for `ship` and
     `land` too.
+
+    ``repo_root`` is threaded through as ``cwd``. It was omitted, making this the
+    only read in the module that ignored the root it was given and resolved `gh`
+    against the process's directory instead. (Cold lane, P3.)
     """
     from kb_setup import pr
 
-    return pr.checks_state(number)
+    return pr.checks_state(number, cwd=repo_root)
 
 
 def current_branch(repo_root: Path) -> str | None:
@@ -276,7 +298,27 @@ def current_branch(repo_root: Path) -> str | None:
     None and ``"HEAD"`` are different and both matter: the first means git could
     not be asked, the second means it answered and there is no branch. Only the
     first is a failure; both make a PR lookup meaningless.
+
+    `symbolic-ref` FIRST, and `rev-parse` only as the detached fallback. The
+    order is the fix for a false negative the cold lane found by running it:
+    `git rev-parse --abbrev-ref HEAD` exits **128** on an UNBORN branch — a repo
+    with no commits yet, which is `git init` plus `git checkout -b work`, an
+    entirely ordinary state — while still printing `HEAD` to stdout. Trusting
+    only its rc turned a branch that is perfectly knowable into this module's
+    "could not be asked" state, and the render then said `COULD NOT READ` beside
+    a correctly-read staged file list. That is this module's own collapse
+    running backwards: not an unchecked claim, but a checked answer thrown away.
+
+    `git symbolic-ref --short HEAD` answers rc=0 on an unborn branch and fails
+    when HEAD is detached, so the two commands are complementary rather than
+    redundant — the fallback is what still detects :data:`DETACHED`.
     """
+    rc, out = _git(["symbolic-ref", "--short", "HEAD"], repo_root)
+    name = out.strip()
+    if rc == 0 and name:
+        return name
+    # Detached HEAD (symbolic-ref refuses), or not a repository at all.
+    # `rev-parse --abbrev-ref` prints the literal "HEAD" for the former.
     rc, out = _git(["rev-parse", "--abbrev-ref", "HEAD"], repo_root)
     name = out.strip()
     if rc != 0 or not name:
@@ -285,14 +327,17 @@ def current_branch(repo_root: Path) -> str | None:
 
 
 def _parse_status(out: str) -> Changes:
-    """Parse `git status --porcelain -z` into the three buckets.
+    """Parse `git status --porcelain -z` into the four buckets.
 
     Index (X) and worktree (Y) are read as separate answers, so a path can
     appear in two buckets — which is the truth for `MM`, not a bug.
+
+    UNMERGED IS CHECKED BEFORE EITHER, because it is not describable as either.
     """
     staged: list[str] = []
     unstaged: list[str] = []
     untracked: list[str] = []
+    unmerged: list[str] = []
 
     fields = out.split("\0")
     i = 0
@@ -316,12 +361,23 @@ def _parse_status(out: str) -> Changes:
         # files as staged changes.
         if x == "!" and y == "!":
             continue
+        # BEFORE the two generic branches. An unmerged pair has no " " half, so
+        # it would otherwise fall through and be reported as both staged AND
+        # unstaged — rendered identically to an ordinary `MM`. A reader sees
+        # "staged: f.txt / unstaged: f.txt" and concludes it needs re-staging,
+        # when in truth nothing can be committed until the conflict is resolved.
+        # (Cold lane, P2, probed against a real `git merge`.)
+        if _UNMERGED_CODE in (x, y) or x + y in _UNMERGED_PAIRS:
+            unmerged.append(path)
+            continue
         if x not in _UNMODIFIED:
             staged.append(path)
         if y not in _UNMODIFIED:
             unstaged.append(path)
 
-    return Changes(tuple(staged), tuple(unstaged), tuple(untracked), read=True)
+    return Changes(
+        tuple(staged), tuple(unstaged), tuple(untracked), unmerged=tuple(unmerged), read=True
+    )
 
 
 def working_changes(repo_root: Path) -> Changes:
@@ -406,10 +462,10 @@ def pull_request(repo_root: Path, branch: str | None) -> PullRequest:
             PrState.UNVERIFIABLE,
             detail=f"could not read gh's output: {out.strip()[:200]}",
         )
-    return _pr_from_rows(rows)
+    return _pr_from_rows(rows, repo_root)
 
 
-def _pr_from_rows(rows: list[dict[str, object]]) -> PullRequest:
+def _pr_from_rows(rows: list[dict[str, object]], repo_root: Path) -> PullRequest:
     """Turn `gh`'s ANSWERED rows into a state.
 
     Split from :func:`pull_request` so the branch guards and the payload reading
@@ -427,7 +483,7 @@ def _pr_from_rows(rows: list[dict[str, object]]) -> PullRequest:
             detail="gh returned a PR row with no usable number",
         )
     title = rows[0].get("title")
-    green, checks = _checks_state(number)
+    green, checks = _checks_state(number, repo_root)
     # More than one open PR on a single head is possible and worth saying, since
     # everything below reports only the first. It goes in `note`, not `detail`:
     # `detail` means "why there is no answer", and this is an answer.
@@ -475,6 +531,15 @@ def _render_changes(changes: Changes) -> list[str]:
     if changes.clean:
         return ["- **tree**: clean"]
     lines = ["- **tree**:"]
+    # UNMERGED first and shouted. It is not one more category of change — it is
+    # the reason nothing in this tree can be committed, and a handoff that
+    # buries it under two other buckets has told the reader the wrong thing
+    # about where the session actually is.
+    if changes.unmerged:
+        lines.append(
+            f"  - **UNMERGED — conflict, nothing can be committed until resolved** "
+            f"({len(changes.unmerged)}): {', '.join(changes.unmerged)}"
+        )
     for label, paths in (
         ("staged", changes.staged),
         ("unstaged", changes.unstaged),

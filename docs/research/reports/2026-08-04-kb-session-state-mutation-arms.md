@@ -15,11 +15,15 @@ mutation of the production module plus the ONE named test that must fail).
 
 ## Result
 
-**18 arms run, 18 died. Control green unmutated; module restored green after
-each arm.** Two arms were reported `BROKEN — pattern not found` on an
-intermediate run after a rename (`pr` → `with_pr`) and were repointed; the
-harness reporting that rather than silently scoring them as deaths is the
-behaviour that makes the other sixteen worth anything.
+**20 arms run, 20 died. Control green unmutated; module restored green after
+each arm.** Three arms were reported `BROKEN — pattern not found` across
+intermediate runs — two after the `pr` → `with_pr` rename, one after `clean`
+gained the `unmerged` term — and were repointed. The harness reporting that
+rather than silently scoring them as deaths is the behaviour that makes the
+other seventeen worth anything.
+
+A19 and A20 pin the two defects the **cold cross-family lane** (codex) found
+after both Claude lanes had passed — see Finding 4.
 
 | arm | mutation | test that died |
 |---|---|---|
@@ -41,6 +45,8 @@ behaviour that makes the other sixteen worth anything.
 | A16 | multi-PR note written to `detail` | `…multi_pr_annotation_does_not_land_in_the_unverifiable_field` |
 | A17 | positional args ignored | `…main_refuses_a_positional_argument` |
 | A18 | commit count narrowed to 5 | `…default_commit_count_matches_the_workflow_it_replaces` |
+| A19 | `symbolic-ref` probe removed (unborn HEAD) | `…unborn_branch_is_read_not_reported_as_unreadable` |
+| A20 | unmerged paths fall through to staged+unstaged | `…merge_conflict_is_its_own_bucket…` |
 
 A15–A18 exist because the two-axis review found the defects they pin; A13/A14
 exist because an earlier run listed them as gaps with no test rather than
@@ -167,6 +173,48 @@ are shorter than 12 chars (shortest=1)* and states that every figure `mise run`
 prints is untrustworthy while that holds. Cause is the **user-level** mise
 config (`_.fnox-env`); `do-not.md` #11 bars this repo from editing it, so the
 mitigation is the transport, not a code change.
+
+## Finding 4 — the cold cross-family lane found two defects both Claude lanes missed
+
+Round 1 was Standards + Spec, **both Claude**, and between them they found 8 real
+things. The cold lane (`codex-reviewer`, OpenAI — a different family from the
+author) then found **two more that neither had seen**, and it found them by
+running probes against live git rather than by reading:
+
+**P1 — an unborn branch reported as unreadable.** `git rev-parse --abbrev-ref
+HEAD` exits **128** on a repo with no commits yet, while still printing `HEAD`
+to stdout. Trusting only its rc turned a knowable branch into the module's
+"could not be asked" state. The lane ran the actual `gather()` against a live
+unborn repo and showed the render saying `COULD NOT READ` **beside a correctly
+read staged-file list** — git had answered; it had been asked the wrong plumbing
+command. `git symbolic-ref --short HEAD` returns rc=0 there and fails when
+detached, so the two commands are complementary; `symbolic-ref` now goes first.
+
+This is the module's own thesis running backwards. Everything in it is built so
+an unchecked claim never renders as a checked one — and here a *checked answer*
+was being thrown away as unknown. Both failure directions are the same bug.
+
+**P2 — a merge conflict indistinguishable from an ordinary `MM`.**
+`git-status(1)` spells an unmerged path seven ways (`DD AU UD UA DU AA UU`).
+None of those letters is a "nothing here" code, so every one fell through to the
+generic `x not in _UNMODIFIED` / `y not in _UNMODIFIED` branches and was reported
+as **both staged and unstaged** — rendering exactly like a file that was staged
+then modified again. The lane verified it with a real `git merge`, `xxd`-ing the
+porcelain output to `UU f.txt\0`. A reader mid-conflict would conclude the file
+needs re-staging when in truth nothing can be committed at all. `unmerged` is now
+its own bucket, rendered first and shouted, and `clean` counts it.
+
+**What this measures.** The one-lane policy in `.claude/skills/kb-review` trades
+coverage for proportion, and notes that on #67 *method* — a lane that mutates or
+executes to test its claim — predicted blockers better than lane identity did.
+That held here: the instruction to prefer running a probe over reasoning is what
+produced both findings, and both are states no fixture in the suite constructed.
+
+**P3 (latent, partly unverified by the lane's own account):**
+`pr.checks_state` took no directory and ran `gh` in the process's cwd, so it was
+the only read in the module ignoring the `repo_root` it was handed. Not reachable
+from the shipped task, where `cli.py` sets `repo_root = Path.cwd()`. Fixed
+additively — `checks_state(..., *, cwd=None)` — so `ship`/`land` are unchanged.
 
 ## GitHub repos touched
 
