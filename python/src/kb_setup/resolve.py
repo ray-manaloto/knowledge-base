@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 
@@ -147,6 +147,23 @@ class Index:
     dirs: tuple[str, ...]
     vendored: tuple[str, ...] = ()
 
+    def authored_only(self) -> Index:
+        """This index with the vendored tier dropped.
+
+        A method rather than an `Index(files=…, dirs=…)` at the call site, so the
+        narrowing lives on the type that knows its own tiers. (Standards lane.)
+
+        `dataclasses.replace`, NOT `Index(files=…, dirs=…)`. The call-site form
+        this replaced dropped the vendored tier by OMISSION — it relied on the
+        default — so any field the dataclass gained later would be silently
+        dropped with it. The first version of this method moved that form inside
+        the method and kept it, which relocated the defect rather than removing
+        it while the docstring claimed otherwise. `replace` carries every field
+        forward and names the one being changed, which is the difference between
+        a fix and a fix-shaped edit. (Cold lane, round 2.)
+        """
+        return replace(self, vendored=())
+
 
 def build_index(repo_root: Path) -> Index:
     """Walk the repo once, classifying each path as authored or vendored."""
@@ -245,6 +262,101 @@ def resolve_path(repo_root: Path, token: str, index: Index | None = None) -> Res
     if "/" not in token:
         return Resolution(State.MISSING, f"no file named {token} in this repo or its sources")
     return _unresolved_relative(repo_root, token, idx)
+
+
+def resolve_extension_typo(
+    repo_root: Path, token: str, repairs: tuple[str, ...], index: Index | None = None
+) -> Resolution | None:
+    """MISSING naming the one repair that resolves, or None to STAY SILENT.
+
+    The resolution half of #154. `kb_setup.citations` proposes the spellings a
+    token's extension is one edit from; this decides whether any of them names
+    something real. None is not a fourth state — it means the token never becomes
+    a finding at all, which is the allowlist's existing behaviour preserved for
+    everything this cannot positively identify as a typo.
+
+    THREE THINGS MAKE IT SILENT, and each one removed a measured false positive:
+
+    * **The token already resolves.** `notes.org` naming a real `notes.org` is an
+      unknown-but-VALID extension, which is precisely what the allowlist exists
+      to say nothing about. Repairing it would report a correct citation.
+    * **No repair resolves, or several do.** The resolve step is a SECOND gate
+      behind the edit distance, and it is the one doing most of the work:
+      measured over this repo's authored markdown, **34 distinct tokens reach it
+      and are silenced by it** — `Formula/r/ripgrep.rb` repairs to `.rs`,
+      `.tar.gz` to `.tar.go`, `conf.d` to `conf.c`/`conf.h`/`conf.md`, and none
+      of those files exists. `exactly one` is the same discipline
+      :func:`_near_hit` keeps, for the same reason: two plausible referents is a
+      guess, not a finding.
+
+      (This bullet illustrated itself with `codegraph.db` "really is one edit
+      from `.md`" until a cold round measured it: `_one_edit_apart('db', 'md')`
+      is **False** — two substitutions — so that token is silenced by the
+      DISTANCE and was the one example that could not demonstrate the point it
+      was making. The examples above are re-derived from the corpus.)
+    * **The repair only matched something VENDORED.** `runner.os` — a GitHub
+      Actions context expression — repaired to `.rs` and suffix-matched
+      `sources/hk/src/step/runner.rs` inside the pinned hk clone. That was the
+      single false positive in the corpus measurement.
+
+    WHAT IS EXCLUDED IS THE VENDORED TIER — *not* "the authored tree only", which
+    is how #154's amended criterion and this round's commit message both first
+    put it. The difference is load-bearing rather than pedantic: `resolve_path`'s
+    literal-stat tier and its derived-output tier consult no index at all and
+    stay live, which is exactly why `graph.jsom` resolves to
+    `graphify-out/graph.json` and gets caught. An authored-only rule taken
+    literally would leave `graph.jsom` passing — one of the two cases the ticket
+    was filed about. Dropping the tier from the INDEX rather than from the answer
+    also keeps a literal full-length vendored path a reader actually wrote
+    checkable. (Spec lane, F1 — the #157 defect class inside the #157 fix.)
+    """
+    idx = index if index is not None else build_index(repo_root)
+    # The token's OWN existence test asks the FULL index and demands MISSING.
+    # Two separate defects lived in the narrower `is RESOLVED` form against
+    # `authored`, and both made this function say `no file named X` about an X
+    # the index can see (Silent-failure lane, F2 and F3):
+    #
+    # * **AMBIGUOUS fell through.** Several real files matching the written
+    #   spelling is the opposite of absent, and `State` has four members exactly
+    #   so "could not tell" is never rendered as a verdict. So does UNVERIFIABLE
+    #   — `graphify/serve.pyx` names another repo, and this has no standing to
+    #   call it missing. Demanding MISSING is the only test that licenses the
+    #   sentence this function goes on to write.
+    # * **The vendored tier was excluded from the wrong question.** `watch.pyi`
+    #   naming a real file inside a pinned clone was reported absent while
+    #   `resolve_path` could open it. Reading graphify's and mise's own source is
+    #   why that tier exists at all.
+    #
+    # `authored_only()` still applies to the REPAIRS below, which is where it was
+    # measured and where `runner.os` needs it. One narrowing, one question.
+    if resolve_path(repo_root, token, idx).state is not State.MISSING:
+        return None
+    authored = idx.authored_only()
+    # Uniqueness is counted on RESOLVED ALONE, and the name is taken afterwards.
+    # Folding `match is not None` into the filter made a match-less RESOLVED —
+    # which no tier produces today — able to turn a two-hit case (silent) into a
+    # one-hit FINDING, by dropping a row from the count rather than from the
+    # message. Counting and naming are different questions; asking them in one
+    # comprehension is what let the second one answer the first. (Cold lane,
+    # round 2, F-A.)
+    hits = [
+        got
+        for got in (resolve_path(repo_root, repair, authored) for repair in repairs)
+        if got.state is State.RESOLVED
+    ]
+    if len(hits) != 1:
+        return None
+    # The PATH, not the resolution's detail. `detail` is tier-dependent — tier 3
+    # renders `derived output: graphify-out/graph.json` — so interpolating it
+    # produced "did you mean derived output: …?". `_near_hit`, the machinery this
+    # generalises from, names a bare path, and the suggestion has to read like
+    # something you can paste back. (Spec lane, F2.)
+    match = hits[0].match
+    named = _rel(repo_root, match) if match is not None else hits[0].detail
+    return Resolution(
+        State.MISSING,
+        f"no file named {token} — its extension looks mistyped; did you mean {named}?",
+    )
 
 
 def _resolve_literal(repo_root: Path, token: str) -> Resolution | None:

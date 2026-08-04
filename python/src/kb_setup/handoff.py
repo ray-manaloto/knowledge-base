@@ -1,8 +1,18 @@
-"""Verify a handoff's static claims — `mise run kb-handoff-check`.
+"""Verify a handoff's checkable claims — `mise run kb-handoff-check`.
+
+FOUR CHECKS, AND THEY ARE NOT ALL STATIC. Three ask the filesystem: do the cited
+paths exist (including whether a citation's EXTENSION is mistyped, #154), is
+every `file:line` real, is every named task declared in `mise.toml`. The fourth
+does not: a **gate claim** — `` `mise run lint` **rc=0** `` — is checked against
+`.agent/kb/gates/gates-<sha>.json`, the record `mise run kb-gates` writes (#147).
+That record is a machine-local artifact on disk rather than a fact about the
+tree, which is why a claim can come back UNVERIFIABLE here and never can for a
+path. This paragraph said "static claims" and enumerated only the first three
+until #157; `mise.toml` and `.claude/skills/clear-prep/SKILL.md` had already been
+corrected, so the source was the stale one — the worse direction.
 
 WHAT THIS REPLACES. `/clear-prep` step 6 asks the agent to self-verify the
-handoff it has just written, at the end of a long session, from memory: do the
-cited paths exist, is every `file:line` real, is every named task real. That is
+handoff it has just written, at the end of a long session, from memory. That is
 verification performed by the same context that produced the thing being
 verified, and it has already failed in exactly the way that predicts — a line
 number read off a `sed` window by eye, written as `:1836` when the real line was
@@ -75,7 +85,13 @@ class Finding:
 
 
 def check(repo_root: Path, text: str) -> list[Finding]:
-    """Every static claim in ``text``, checked against ``repo_root``.
+    """Every checkable claim in ``text``, checked against ``repo_root``.
+
+    Paths, mistyped extensions, `file:line` references and task names are checked
+    against the FILESYSTEM under ``repo_root``. Gate claims are not: they are
+    checked against the record `mise run kb-gates` wrote under
+    `.agent/kb/gates/`, which is machine-local and may simply be absent — hence
+    UNVERIFIABLE, a verdict no path check can produce (#147, #157).
 
     The authored-tree index is built ONCE here and threaded through every
     resolution: a handoff carries tens of citations, and rebuilding the walk per
@@ -88,6 +104,7 @@ def check(repo_root: Path, text: str) -> list[Finding]:
     # already rules out for the tree walk. (Standards lane.)
     declared = resolve.declared_tasks(repo_root)
     findings = [_check_path(repo_root, c, index) for c in citations.path_citations(text)]
+    findings.extend(_check_extension_typos(repo_root, text, index))
     findings.extend(_check_line_ref(repo_root, c, index) for c in citations.line_citations(text))
     findings.extend(_check_tasks(text, declared))
     findings.extend(_check_gate_claims(repo_root, text, declared))
@@ -99,6 +116,52 @@ def _check_path(repo_root: Path, cite: citations.PathCitation, index: resolve.In
     if cite.marked_absent:
         return _check_absent_marker("path", cite.text, cite.line, got)
     return Finding("path", _VERDICT_OF[got.state], cite.text, cite.line, got.detail)
+
+
+def _check_extension_typos(repo_root: Path, text: str, index: resolve.Index) -> list[Finding]:
+    """Findings for tokens whose EXTENSION looks mistyped — #154.
+
+    Most candidates produce nothing. `resolve_extension_typo` returns None for
+    every token it cannot positively identify as a typo, and None means the
+    token never becomes a finding at all rather than becoming a quiet one: the
+    allowlist's silence is the behaviour being preserved, and an OK finding would
+    inflate the OK count with tokens nothing actually checked.
+
+    Reported under the `path` check name rather than a new one. That is not
+    cosmetic — `_PATH_CHECKS` scopes `render`'s `(absent)` hint, and this is the
+    finding whose reader is most likely to have cited the token on purpose (a
+    handoff quoting a typo as an example), so it is exactly the moment the hint
+    exists for.
+    """
+    found: list[Finding] = []
+    for cand in citations.typo_candidates(text):
+        if cand.marked_absent:
+            # Adjudicated against the token's OWN resolution, exactly as
+            # `_check_path` does — never against the typo verdict.
+            #
+            # Routing it through `resolve_extension_typo` instead made the marker
+            # UNFALSIFIABLE here, which is the one thing it must never be. That
+            # function has two exits, None and MISSING, and `_check_absent_marker`
+            # maps MISSING to OK — so for a marked candidate the entire input
+            # space produced "no finding" or "OK" and no input could make the
+            # marker fail. The comment that stood here argued the both-directions
+            # rule was intact because "a token that RESOLVES never reaches this
+            # function". True, and it was the defect: the token silently resolving
+            # is precisely the case the marker is supposed to FAIL on.
+            #
+            # It mattered beyond the abstraction. `render` prints "the marker is
+            # checked both ways, so it cannot hide a real miss" on any FAIL whose
+            # check is in `_PATH_CHECKS`, and these are filed under `path` on
+            # purpose — so the tool was printing that promise next to the one
+            # check for which it was false. (Silent-failure lane, F1.)
+            got = resolve.resolve_path(repo_root, cand.text, index)
+            found.append(_check_absent_marker("path", cand.text, cand.line, got))
+            continue
+        got = resolve.resolve_extension_typo(repo_root, cand.text, cand.repairs, index)
+        if got is None:
+            continue
+        found.append(Finding("path", _VERDICT_OF[got.state], cand.text, cand.line, got.detail))
+    return found
 
 
 def _check_absent_marker(
@@ -487,7 +550,12 @@ def newest_handoff(repo_root: Path) -> Path | None:
 
 
 def main(args: list[str], repo_root: Path) -> int:
-    """`kb-handoff-check [<path>]` — 1 on a broken citation, 2 on a bad request."""
+    """`kb-handoff-check [<path>]` — 1 on a contradicted claim, 2 on a bad request.
+
+    Exit 1 covers every FAIL, and a gate claim the record CONTRADICTS is one of
+    them — it is not a citation, so "1 on a broken citation" understated it from
+    #147 until #157. AMBIGUOUS and UNVERIFIABLE are reported at exit 0.
+    """
     positional = [a for a in args if not a.startswith("-")]
     if positional:
         target = Path(positional[0])

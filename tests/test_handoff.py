@@ -589,3 +589,114 @@ def test_a_row_with_a_real_sha_is_bound_at_the_point_of_use():
     record = gates.Record(sha=_A, path=Path("gates-x.json"), gates=(row,))
     f = handoff._judge(citations.GateClaim("lint", 0, (_A[:7],), 1), record)
     assert f.verdict is handoff.Verdict.OK
+
+
+# ------------------------------------------- mistyped extensions (#154) ----
+#
+# The gap: `mise.tomlx` exited 0 with `0 OK, 0 ambiguous, 0 unverifiable, 0
+# broken`, while the control arm — a STEM typo, `citation.py` for
+# `citations.py` — was caught and exited 1. A false negative in exactly the class
+# the checker exists for. Every promotion arm below is paired with the silence
+# arm that proves the mechanism can still say nothing.
+
+
+def test_a_mistyped_extension_is_a_broken_citation(tmp_path: Path):
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    (f,) = _fails(handoff.check(root, "see `mise.tomlx` here\n"))
+    assert f.claim == "mise.tomlx"
+    assert f.line == 1
+    assert "mise.toml" in f.detail
+
+
+def test_an_unknown_but_valid_extension_is_still_not_reported(tmp_path: Path):
+    """THE arm criterion 2 asks for, paired with the one above.
+
+    `notes.org` names a real file whose extension is simply not in the
+    allowlist. It was silent before this change and must stay silent after it,
+    or the fix has bought a true positive at the price of the posture that makes
+    the checker trustworthy.
+    """
+    root = _repo(tmp_path, {"notes.org": "x\n", "notes.md": "y\n"})
+    findings = handoff.check(root, "see `notes.org` here\n")
+    assert [f for f in findings if f.claim == "notes.org"] == []
+
+
+def test_a_module_attribute_reference_is_still_not_reported(tmp_path: Path):
+    """The 278-occurrence class the original mechanism would have promoted.
+
+    Under the stem probe #154 first specified, `gates.record` resolved uniquely
+    to `gates.py` and would have been reported. Nothing here may report it.
+    """
+    root = _repo(tmp_path, {"python/src/kb_setup/gates.py": "x\n"})
+    findings = handoff.check(root, "see `gates.record` and `gates.RUNNER_TASK`\n")
+    assert findings == []
+
+
+def test_a_mistyped_extension_naming_nothing_real_is_not_reported(tmp_path: Path):
+    """One edit from a known extension is not enough — the repair must resolve."""
+    root = _repo(tmp_path, {"other.md": "x\n"})
+    assert handoff.check(root, "see `codegraph.db` here\n") == []
+
+
+def test_a_mistyped_extension_marked_absent_is_accepted(tmp_path: Path):
+    """A handoff quoting the typo ON PURPOSE can say so, exactly like a path.
+
+    This is not hypothetical: the handoff that filed #154 quotes `mise.tomlx` in
+    prose as the example, and is the one occurrence the corpus measurement found.
+    """
+    root = _repo(tmp_path, {"mise.toml": _MISE})
+    assert _fails(handoff.check(root, "the example `mise.tomlx` (absent) above\n")) == []
+
+
+def test_a_mistyped_extension_that_resolves_after_repair_still_exits_1(tmp_path: Path):
+    """The reproduction from the ticket, end to end at the exit code."""
+    root = _repo(tmp_path, {"h.md": "see `mise.tomlx`\n"})
+    assert handoff.main([str(root / "h.md")], root) == 1
+
+
+def test_the_ticket_reproduction_exits_0_before_and_after_for_the_control(tmp_path: Path):
+    """The ticket's own control arm: a STEM typo was already caught.
+
+    Kept as a regression guard on the pairing, not on the new code — if this
+    ever stops failing, the comparison the ticket rests on has gone stale.
+    """
+    root = _repo(tmp_path, {"h.md": "see `python/src/kb_setup/citation.py`\n"})
+    (root / "python" / "src" / "kb_setup").mkdir(parents=True)
+    (root / "python" / "src" / "kb_setup" / "citations.py").write_text("x\n", encoding="utf-8")
+    assert handoff.main([str(root / "h.md")], root) == 1
+
+
+def test_a_mistyped_extension_is_reported_as_a_path_check(tmp_path: Path):
+    """So the `(absent)` hint in `render` applies to it — it is a path claim.
+
+    `_PATH_CHECKS` scopes that hint, and a new check name would silently drop
+    the one finding whose reader most needs to know the marker exists.
+    """
+    root = _repo(tmp_path, {"mise.toml": _MISE})
+    (f,) = _fails(handoff.check(root, "see `mise.tomlx`\n"))
+    assert f.check in handoff._PATH_CHECKS
+
+
+def test_an_absent_marker_on_a_typo_that_actually_resolves_fails(tmp_path: Path):
+    """The marker must be FALSIFIABLE here, exactly as it is for every other path.
+
+    It was not. Routing a marked candidate through `resolve_extension_typo` gave
+    it two exits — None and MISSING — and `_check_absent_marker` maps MISSING to
+    OK, so the entire input space produced "no finding" or "OK" and no input
+    could make the marker fail. Paste `(absent)` beside a real typo and it was
+    silenced forever.
+
+    Worse than the abstraction: `render` prints "the marker is checked both ways,
+    so it cannot hide a real miss" on these findings by design, so the tool
+    advertised a promise that was false for this one check.
+    (Silent-failure lane, F1.)
+    """
+    root = _repo(tmp_path, {"notes.pyy": "x\n", "notes.py": "y\n"})
+    (f,) = _fails(handoff.check(root, "see `notes.pyy` (absent) here\n"))
+    assert "marked" in f.detail
+
+
+def test_an_absent_marker_on_a_genuine_typo_is_still_accepted(tmp_path: Path):
+    """Control arm: making the marker falsifiable must not break its real use."""
+    root = _repo(tmp_path, {"mise.toml": _MISE})
+    assert _fails(handoff.check(root, "the example `mise.tomlx` (absent) above\n")) == []
