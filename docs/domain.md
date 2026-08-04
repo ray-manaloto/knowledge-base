@@ -28,10 +28,17 @@ Read it before inventing language:
 | `docs/issue-tracker.md` | tracker conventions and the wayfinding vocabulary |
 | the knowledge graph itself | `mise run kb-query -- "<question>"` — deterministic, source-cited, zero LLM tokens |
 
-**Query the graph before the filesystem.** That is this repo's whole premise and
-`research-doc-sources.md` step 0. Control-arm an empty result before concluding
-the corpus lacks something: a miss is more often a term-spelling mismatch against
-extracted node labels than a real absence.
+**Query the graph before the filesystem.** That is this repo's whole premise, and
+its source is `CLAUDE.md` § graphify, which puts `graphify query` first for
+codebase questions and the wiki ahead of raw source browsing. The
+sibling ordering for the **network** is `research-doc-sources.md` step 0, whose
+own scope is "before any network call" — cite it for a doc fetch, not for reading
+a local file. Two orderings, two sources; using one rule's authority for the
+other's claim is how a correctly-cited fact ends up wrong where it is applied.
+
+Control-arm an empty result before concluding the corpus lacks something: a miss
+is more often a term-spelling mismatch against extracted node labels than a real
+absence.
 
 ## Use the established vocabulary
 

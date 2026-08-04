@@ -2,7 +2,11 @@
 
 The mattpocock engineering skills speak in terms of five canonical triage roles.
 This file maps those roles to the label strings this repo's tracker actually
-uses. Consumed by `/mattpocock-skills:triage`, `to-tickets`, `to-spec` and `qa`.
+uses. Consumed by `/mattpocock-skills:triage`, `to-tickets` and `to-spec` — the
+three that actually apply a label. `qa` is **not** a consumer: it is deprecated
+upstream and mentions neither a label nor a triage role (0 hits for
+`label|triage` in its `SKILL.md`, against 22 in `triage`'s, so the grep
+discriminates).
 
 | Role in the skills | Label here | Meaning |
 | --- | --- | --- |
@@ -54,12 +58,18 @@ three-line file with no frontmatter at both paths:
 The probe discriminates on path alone, so the constraint is real and current, not
 inherited. `docs/issue-tracker.md` records the same finding for the tracker doc.
 
-**The relocation has a real cost — it is not free, and two skills pay it.**
-`setup-matt-pocock-skills` *writes* `docs/agents/triage-labels.md` when `triage`
-is installed (`SKILL.md:68,102`), and `code-review` reads
-`docs/agents/issue-tracker.md` twice and will not find ours. Neither is worked
-around: a gate that fails is the harder constraint, so the file stays here and
-those skills are handed the path explicitly when invoked.
+**The relocation has a real cost — it is not free, and two skills pay it in
+different currencies.** The remedy differs because one is a reader and one is a
+writer, and a single sentence covering both would describe a fix that only works
+for one of them:
+
+| Skill | Reads or writes `docs/agents/` | What that costs, and the remedy |
+| --- | --- | --- |
+| `code-review` | **reads** `docs/agents/issue-tracker.md`, twice | It will not find ours and behaves as though no tracker were configured. Hand it the real path when you invoke it. |
+| `setup-matt-pocock-skills` | **writes** `docs/agents/triage-labels.md` when `triage` is installed (`SKILL.md:68,102`) | Handing it a path fixes nothing — re-running it verbatim recreates the path `lint-docs` rejects. The remedy is to move its output afterwards, which is what this file's own commit did. |
+
+A gate that fails is the harder constraint, so the file stays here and the cost
+above is accepted rather than worked around.
 
 ## See also
 

@@ -13,16 +13,19 @@ outcome: "useful"
 Four lessons, all measured on 2026-08-03 while running grilling -> to-spec -> to-tickets
 over the /clear-prep rework.
 
-1. A SPEC STEP CAN BE UNBUILDABLE, AND GRILLING IS WHERE THAT SURFACES. /clear-prep
-step 6 asked whether "every gate result matches the recorded rc". Nothing DURABLE
-records one. A gate does not print its own exit code at all -- the shell captures
-$?, and clear-prep's own step 5 tells you to append it to a /tmp log beside the
-output. That log dies with the session, and an agent then retypes the number into
-the handoff as prose. So the recorded rc and the claim about it have one source.
-Across 28 handoffs, 26 carry such a claim and NONE could be checked against
-anything. A check with one input can only ever agree with itself. The general
-form: before specifying a verification step, name the artifact it reads. If that
-artifact does not exist, the step is not hard, it is impossible -- and the fix
+1. A VERIFICATION STEP CAN OUTLIVE ITS EVIDENCE, AND GRILLING IS WHERE THAT
+SURFACES. /clear-prep step 6 asks whether "every gate result matches the recorded
+rc". State this precisely, because the first version of this lesson did not and
+a cold lane caught it: step 5 DOES create that artifact -- it tells you to
+redirect the gate to a file and record rc=$? -- so IN-SESSION the check is
+performable, and calling it impossible was an overstatement. Two narrower things
+are true, and they are the whole lesson. Nothing ENFORCES that step 5 ran, and
+the /tmp log does not survive the session -- so by the time anyone audits the
+handoff, the number in it is prose an agent retyped, with no surviving artifact
+to check it against. Across 28 handoffs, 26 carry such a claim and NONE can be
+checked now. A check whose input has expired can only agree with itself. The
+general form: before specifying a verification step, name the artifact it reads
+AND say how long that artifact lives. If it dies before the check is run, the fix
 belongs at the point the evidence is created, not at the point it is checked.
 
 2. THE MODULE STRUCTURE WILL SLICE TICKETS HORIZONTALLY IF YOU LET IT. A design
