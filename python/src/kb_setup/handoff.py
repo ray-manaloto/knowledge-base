@@ -103,8 +103,22 @@ def _check_absent_marker(
     cited precisely because it does not exist, such as the
     `docs/agents/issue-tracker.md` an external skill hardcodes and will not find.)
     """
-    if got.state is not resolve.State.RESOLVED:
+    if got.state is resolve.State.MISSING:
         return Finding(check_name, Verdict.OK, claim, line, "marked `(absent)`, and absent")
+    if got.state is resolve.State.UNVERIFIABLE:
+        # We could not resolve it either way, so we cannot confirm the marker.
+        # Reporting OK here would claim we had checked something we had not.
+        return Finding(
+            check_name,
+            Verdict.UNVERIFIABLE,
+            claim,
+            line,
+            f"marked `(absent)`, and unverifiable either way — {got.detail}",
+        )
+    # RESOLVED or AMBIGUOUS. AMBIGUOUS is the one that used to slip through as
+    # "confirmed absent": several real files match, which is the opposite of
+    # absent, and letting it pass turned the marker into the mute button the
+    # both-directions rule exists to prevent.
     return Finding(
         check_name,
         Verdict.FAIL,
@@ -117,6 +131,18 @@ def _check_absent_marker(
 def _check_line_ref(repo_root: Path, cite: citations.LineCitation, index: resolve.Index) -> Finding:
     got = resolve.resolve_path(repo_root, cite.path, index)
     claim = f"{cite.path}:{cite.start}" + (f"-{cite.end}" if cite.end != cite.start else "")
+    if cite.start > cite.end:
+        # Decidable without opening anything, and it is this tool's own subject:
+        # `:20-10` is a transposed-digit typo. Both ends can sit inside the file,
+        # so bounds checks alone accept the one arrangement that cannot describe
+        # a real range.
+        return Finding(
+            "file-line",
+            Verdict.FAIL,
+            claim,
+            cite.line,
+            f"reversed line range — {cite.start} > {cite.end}",
+        )
     if cite.marked_absent:
         return _check_absent_marker("file-line", claim, cite.line, got)
     if got.state is not resolve.State.RESOLVED or got.match is None:

@@ -201,3 +201,20 @@ def test_a_task_placeholder_is_not_a_task_name():
 
 def test_task_citations_ignore_fenced_examples():
     assert citations.task_citations("```\nmise run not-a-real-task\n```\n") == []
+
+
+def test_a_longer_fence_survives_a_shorter_one_inside_it():
+    """A ```` ```` ```` block quoting a ``` ``` ``` pair is ONE block, not three.
+
+    Toggling on any fence line regardless of length made the inner pair close
+    and reopen the outer block, so example content leaked out as real citations
+    — and, with the nesting the other way, real content was swallowed.
+    """
+    text = "a\n````\n```\nsee `docs/nope.md`\n```\n````\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]
+
+
+def test_a_plain_fence_still_closes_normally():
+    """Control arm: the length rule must not stop an ordinary fence closing."""
+    text = "a\n```\n`docs/nope.md`\n```\nb `docs/real.md`\n"
+    assert [s.text for s in citations.code_spans(text)] == ["docs/real.md"]

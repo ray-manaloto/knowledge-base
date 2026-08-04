@@ -12,7 +12,12 @@ mutation result nobody can re-run is an assertion, not evidence — and because
 measurement. Anyone can re-derive the table below from the script.
 
 Run 2026-08-04 against `feat/145-kb-handoff-check`:
-**17 of 17 arms discriminated, control included.**
+**23 of 23 arms discriminated, control included.**
+
+The last six arms cover checks added after the cold cross-family review found
+them missing — repo-escape containment, the `sources/` root's own level, a
+directory citation naming a file, an `(absent)` marker over an AMBIGUOUS
+resolution, a reversed line range, and fence-length tracking.
 
 ## Why row 0 is a control
 
@@ -39,23 +44,29 @@ class of edit a reviewer is most likely to try. The harness deletes every
 
 | # | Arm — what was broken | Test that had to fail | Result |
 |---|---|---|---|
-| 0 | **CONTROL** — no-op comment edit | *(suite must stay green)* | ✓ green |
+| 0 | **CONTROL** — no-op comment edit | *(suite must stay green)* | ✓ |
 | 1 | path check: direct-exists guard removed | `test_a_cited_path_that_does_not_exist_fails` | ✓ |
-| 2 | `file:line`: the past-EOF comparison dropped | `test_a_line_reference_past_the_end_of_the_file_fails` | ✓ |
+| 2 | file:line check: the past-EOF comparison dropped | `test_a_line_reference_past_the_end_of_the_file_fails` | ✓ |
 | 3 | task check: declaration lookup bypassed | `test_an_undeclared_task_fails` | ✓ |
-| 4 | `(absent)` marker: reverse direction removed | `test_a_path_marked_absent_that_actually_resolves_fails` | ✓ |
-| 5 | fence stripping: the blanking call deleted | `test_code_spans_ignore_fenced_blocks_but_keep_line_numbers` | ✓ |
-| 6 | exclusion by construction: the elision char dropped | `test_an_elided_path_is_not_a_path` | ✓ |
+| 4 | absent marker: reverse direction removed | `test_a_path_marked_absent_that_actually_resolves_fails` | ✓ |
+| 5 | fence stripping: the call that blanks a fenced block deleted | `test_code_spans_ignore_fenced_blocks_but_keep_line_numbers` | ✓ |
+| 6 | exclusion by construction: the elision character dropped | `test_an_elided_path_is_not_a_path` | ✓ |
 | 7 | suffix match: segment boundary weakened to substring | `test_a_suffix_must_align_on_a_segment_boundary` | ✓ |
 | 8 | resolution order: vendored consulted before authored | `test_a_vendored_source_clone_never_shadows_the_authored_tree` | ✓ |
-| 9 | pruning: derived tree no longer pruned by name | `test_a_nested_derived_tree_is_pruned_too` | ✓ |
-| 10 | `line_count`: unreadable reported as zero, not unknown | `test_line_count_of_an_unreadable_file_is_none_not_zero` | ✓ |
+| 9 | pruning: the derived tree no longer pruned by name | `test_a_nested_derived_tree_is_pruned_too` | ✓ |
+| 10 | line_count: unreadable reported as zero instead of unknown | `test_line_count_of_an_unreadable_file_is_none_not_zero` | ✓ |
 | 11 | exit code: a broken citation no longer exits 1 | `test_main_exits_1_on_a_real_miss` | ✓ |
-| 12 | single-segment circularity: the `len==1` escape removed | `test_an_absent_top_level_directory_is_a_real_miss_not_unverifiable` | ✓ |
+| 12 | single-segment circularity: the len==1 escape removed | `test_an_absent_top_level_directory_is_a_real_miss_not_unverifiable` | ✓ |
 | 13 | near-hit rule: the typo escape removed | `test_a_typo_in_the_leading_segment_is_a_real_miss_and_names_the_near_hit` | ✓ |
 | 14 | near-hit floor: two-segment minimum dropped to one | `test_a_single_segment_tail_is_not_enough_to_claim_a_near_hit` | ✓ |
 | 15 | derived probe: directories no longer resolved | `test_a_top_level_derived_directory_resolves_too` | ✓ |
-| 16 | task lookup: aliases no longer counted as declared | `test_an_alias_counts_as_declared` | ✓ |
+| 16 | containment: the repo-escape guard removed | `test_a_citation_that_escapes_the_repo_does_not_resolve` | ✓ |
+| 17 | sources/ root: the authored-level escape removed | `test_a_source_manifest_beside_the_clones_is_authored` | ✓ |
+| 18 | directory citations: the kind check dropped | `test_a_trailing_slash_on_a_plain_file_does_not_resolve` | ✓ |
+| 19 | absent marker: AMBIGUOUS accepted as confirmed absent | `test_an_absent_marker_on_an_ambiguous_citation_fails` | ✓ |
+| 20 | file:line: the reversed-range check removed | `test_a_reversed_line_range_fails` | ✓ |
+| 21 | fences: length no longer required to close a block | `test_a_longer_fence_survives_a_shorter_one_inside_it` | ✓ |
+| 22 | task lookup: aliases no longer counted as declared | `test_an_alias_counts_as_declared` | ✓ |
 
 Baseline rc=0 before the run; rc=0 after the last restore, so no arm left the
 tree mutated.
@@ -72,7 +83,16 @@ work (`near = _near_hit(...)` → `near = None`, `if candidate.exists():` →
 ## The harness
 
 ```python
-"""Mutation harness for #145 — break each check, confirm its test fails."""
+"""Mutation harness for #145 — break each check, confirm its test fails.
+
+Not repo code: run it by hand from a scratch copy. It exists to satisfy
+the acceptance criterion that every check be mutation-tested, and it clears
+cached bytecode because a same-size edit is otherwise served from a stale .pyc
+and the arm reports a false pass (measured in the immediately preceding round).
+
+Row 0 is a CONTROL: a no-op edit that must leave the suite GREEN. Without it, a
+harness whose arms all die for an unrelated reason reads as total success.
+"""
 
 from __future__ import annotations
 
@@ -82,7 +102,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[3]
+REPO = Path(__file__).resolve().parents[3]  # the repo root
 SUITES = ["tests/test_citations.py", "tests/test_resolve.py", "tests/test_handoff.py"]
 
 # (label, file, old-line-fragment, new-line-fragment, test that MUST break)
@@ -97,8 +117,8 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
     (
         "path check: direct-exists guard removed",
         "python/src/kb_setup/resolve.py",
-        "    if candidate.exists():",
-        "    if True:",
+        "    if not (candidate.exists() and _inside(repo_root, candidate)):\n        return None",
+        "    if False:\n        return None",
         "test_a_cited_path_that_does_not_exist_fails",
     ),
     (
@@ -118,8 +138,8 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
     (
         "absent marker: reverse direction removed",
         "python/src/kb_setup/handoff.py",
-        "    if got.state is not resolve.State.RESOLVED:",
-        "    if True:",
+        "    if got.state is resolve.State.MISSING:\n        return Finding(check_name, Verdict.OK",
+        "    if True:\n        return Finding(check_name, Verdict.OK",
         "test_a_path_marked_absent_that_actually_resolves_fails",
     ),
     (
@@ -200,6 +220,48 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "test_a_top_level_derived_directory_resolves_too",
     ),
     (
+        "containment: the repo-escape guard removed",
+        "python/src/kb_setup/resolve.py",
+        "    if not (candidate.exists() and _inside(repo_root, candidate)):",
+        "    if not candidate.exists():",
+        "test_a_citation_that_escapes_the_repo_does_not_resolve",
+    ),
+    (
+        "sources/ root: the authored-level escape removed",
+        "python/src/kb_setup/resolve.py",
+        "    if len(parts) < _SOURCES_CHILD_PARTS:\n        return False\n",
+        "",
+        "test_a_source_manifest_beside_the_clones_is_authored",
+    ),
+    (
+        "directory citations: the kind check dropped",
+        "python/src/kb_setup/resolve.py",
+        '    if not token.endswith("/") or candidate.is_dir():',
+        "    if True:",
+        "test_a_trailing_slash_on_a_plain_file_does_not_resolve",
+    ),
+    (
+        "absent marker: AMBIGUOUS accepted as confirmed absent",
+        "python/src/kb_setup/handoff.py",
+        "    if got.state is resolve.State.MISSING:\n        return Finding(check_name, Verdict.OK",
+        "    if got.state is not resolve.State.RESOLVED:\n        return Finding(check_name, Verdict.OK",
+        "test_an_absent_marker_on_an_ambiguous_citation_fails",
+    ),
+    (
+        "file:line: the reversed-range check removed",
+        "python/src/kb_setup/handoff.py",
+        "    if cite.start > cite.end:",
+        "    if False:",
+        "test_a_reversed_line_range_fails",
+    ),
+    (
+        "fences: length no longer required to close a block",
+        "python/src/kb_setup/citations.py",
+        "        elif fence[0] == opener[0] and len(fence) >= len(opener):",
+        "        elif True:",
+        "test_a_longer_fence_survives_a_shorter_one_inside_it",
+    ),
+    (
         "task lookup: aliases no longer counted as declared",
         "python/src/kb_setup/resolve.py",
         "        names.update(_aliases(body))",
@@ -260,10 +322,11 @@ def main() -> int:
             detail = "suite stayed green" if ok else f"suite BROKE (rc={mrc}) — harness is lying"
         else:
             ok = mrc != 0 and expect_test in mout
+            named = expect_test in mout
             detail = (
                 f"rc={mrc}, named test failed"
                 if ok
-                else f"rc={mrc}, expected test in output: {expect_test in mout}"
+                else f"rc={mrc}, expected test in output: {named}"
             )
         print(f"{'ok' if ok else 'x'} {label}\n    {detail}")
         if not ok:

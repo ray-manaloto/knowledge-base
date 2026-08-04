@@ -113,9 +113,13 @@ _SPAN_RE = re.compile(r"`([^`\n]+)`")
 #: ever exempt the one citation its author pointed at.
 _ABSENT_MARKER_RE = re.compile(r"[ \t]?\(absent\)")
 
-#: A fenced code block delimiter. Fenced content is EXAMPLE text — the paths in
-#: it need not exist — so it is blanked before extraction.
-_FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+#: A fenced code block delimiter, CAPTURING its run length. Fenced content is
+#: EXAMPLE text — the paths in it need not exist — so it is blanked before
+#: extraction. The length matters: a four-backtick block exists precisely to
+#: quote a three-backtick one, and toggling on any fence line let the inner pair
+#: close and reopen the outer block, leaking example content out as real
+#: citations (and, with the nesting reversed, swallowing real content).
+_FENCE_RE = re.compile(r"^\s*(?P<fence>`{3,}|~{3,})")
 
 #: `path:12` or `path:12-19`.
 _LINE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
@@ -175,13 +179,20 @@ def strip_fences(text: str) -> str:
     inside the catcher.
     """
     out: list[str] = []
-    inside = False
+    opener = ""
     for line in text.splitlines():
-        if _FENCE_RE.match(line):
-            inside = not inside
-            out.append("")
+        m = _FENCE_RE.match(line)
+        if m is None:
+            out.append("" if opener else line)
             continue
-        out.append("" if inside else line)
+        fence = m.group("fence")
+        if not opener:
+            opener = fence
+        elif fence[0] == opener[0] and len(fence) >= len(opener):
+            # CommonMark: only a run at least as long, of the same character,
+            # closes the block. Anything shorter is content.
+            opener = ""
+        out.append("")
     return "\n".join(out)
 
 

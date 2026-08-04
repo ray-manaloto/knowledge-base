@@ -212,3 +212,41 @@ def test_the_report_counts_every_verdict_even_when_clean(tmp_path: Path):
     root = _repo(tmp_path, {"docs/a.md": "x\n"})
     report = handoff.render(handoff.check(root, "see `docs/a.md`\n"), source="h.md")
     assert "1 OK" in report
+
+
+def test_an_absent_marker_on_an_ambiguous_citation_fails(tmp_path: Path):
+    """`` `SKILL.md` (absent) `` where seven real files match is not absent.
+
+    The marker's whole defence is that it is checked both ways, and treating
+    every non-RESOLVED state as "confirmed absent" quietly handed AMBIGUOUS —
+    which means the citation matches SEVERAL real files — the same pass as a
+    genuine miss. That is the mute button the both-ways rule exists to prevent.
+    """
+    root = _repo(tmp_path, {"a/S.md": "x\n", "b/S.md": "y\n"})
+    (f,) = _fails(handoff.check(root, "see `S.md` (absent) now\n"))
+    assert "resolves" in f.detail
+
+
+def test_an_absent_marker_on_an_unverifiable_citation_stays_unverifiable(tmp_path: Path):
+    """We cannot confirm the marker either — saying OK would claim we had."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    findings = handoff.check(root, "see `graphify/serve.py` (absent) now\n")
+    assert [f.verdict for f in findings] == [handoff.Verdict.UNVERIFIABLE]
+
+
+def test_a_reversed_line_range_fails(tmp_path: Path):
+    """`file.md:20-10` is a transposed-digit typo — this tool's whole subject.
+
+    Both ends sat inside the file, and the only checks were `start < 1` and
+    `end > total`, so the one arrangement that cannot describe a real range
+    passed as verified.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "1\n2\n3\n4\n5\n"})
+    (f,) = _fails(handoff.check(root, "see `docs/a.md:4-2`\n"))
+    assert "range" in f.detail
+
+
+def test_an_ordinary_line_range_still_passes(tmp_path: Path):
+    """Control arm for the test above."""
+    root = _repo(tmp_path, {"docs/a.md": "1\n2\n3\n4\n5\n"})
+    assert _fails(handoff.check(root, "see `docs/a.md:2-4`\n")) == []

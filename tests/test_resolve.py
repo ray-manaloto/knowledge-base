@@ -308,9 +308,11 @@ def test_declared_tasks_reads_this_repos_own_declarations(tmp_path: Path):
 def test_a_task_absent_from_the_repo_is_rejected_even_if_it_exists_globally(tmp_path: Path):
     """The whole point of parsing the file instead of asking the tool.
 
-    Measured on this machine, `mise tasks ls` reports 45 while this repo
-    declares 41 — the four extras come from the user's global config, so a
-    handoff naming one would pass here and fail on every other machine.
+    Measured on this machine 2026-08-04, `mise tasks ls` reports 4 MORE tasks
+    than this repo declares (46 vs 42) — the extras come from the user's global
+    config, so a handoff naming one would pass here and fail on every other
+    machine. The delta is the durable fact; both totals move whenever this repo
+    adds a task.
     `lint` is a real task in this repo and deliberately absent from the fixture.
     """
     root = _repo(tmp_path, {"mise.toml": "[tasks.alpha]\nrun = 'true'\n"})
@@ -359,3 +361,78 @@ def test_line_count_of_an_unreadable_file_is_none_not_zero(tmp_path: Path):
     failures.
     """
     assert resolve.line_count(tmp_path / "does-not-exist.md") is None
+
+
+# ------------------------------------------------------- containment ----
+
+
+def test_a_citation_that_escapes_the_repo_does_not_resolve(tmp_path: Path):
+    """`python/../../other/README.md` names a file OUTSIDE this repository.
+
+    `Path.exists()` happily follows `..` out of the tree, so such a token was
+    reported RESOLVED — a citation about a sibling checkout read as verified
+    here, and `line_count` then opened a file this checker has no business
+    reading. A false GREEN, which is the one direction a checker must not fail
+    in.
+    """
+    outside = tmp_path / "other"
+    outside.mkdir()
+    (outside / "README.md").write_text("x\n", encoding="utf-8")
+    root = _repo(tmp_path / "repo", {"python/a.md": "x\n"})
+    assert resolve.resolve_path(root, "python/../../other/README.md").state is not (
+        resolve.State.RESOLVED
+    )
+
+
+def test_a_relative_traversal_that_stays_inside_still_resolves(tmp_path: Path):
+    """Control arm: containment must reject escapes, not every `..`."""
+    root = _repo(tmp_path, {"python/a.md": "x\n", "docs/b.md": "y\n"})
+    assert resolve.resolve_path(root, "python/../docs/b.md").state is resolve.State.RESOLVED
+
+
+# -------------------------------------------- the sources/ root itself ----
+
+
+def test_a_committed_sources_subdirectory_is_reachable_as_a_directory(tmp_path: Path):
+    """`media/` names `sources/media/`, which is committed and authored.
+
+    The vendored test read the CONTAINING directory, so at `sources/` itself the
+    second path segment was the empty string — never in the kept set, so the
+    whole level was classified vendored and `sources/media` and
+    `sources/extractions` never entered the authored directory index at all.
+    """
+    root = _repo(tmp_path, {"sources/media/talk.md": "x\n"})
+    assert resolve.resolve_path(root, "media/").state is resolve.State.RESOLVED
+
+
+def test_a_vendored_clone_directory_is_still_not_authored(tmp_path: Path):
+    """Control arm: fixing the `sources/` root must not un-vendor the clones."""
+    root = _repo(tmp_path, {"sources/agnix/docs/x.md": "y\n"})
+    assert resolve.resolve_path(root, "agnix/docs/").state is not resolve.State.RESOLVED
+
+
+def test_a_source_manifest_beside_the_clones_is_authored(tmp_path: Path):
+    """`sources/*.manifest` files are committed; they sit at the same level."""
+    root = _repo(tmp_path, {"sources/agnix.manifest": "url=x\n"})
+    got = resolve.resolve_path(root, "agnix.manifest")
+    assert got.state is resolve.State.RESOLVED
+    assert "vendored" not in got.detail
+
+
+# ------------------------------------------------- directory citations ----
+
+
+def test_a_trailing_slash_on_a_plain_file_does_not_resolve(tmp_path: Path):
+    """`docs/a.md/` claims a DIRECTORY, and `docs/a.md` is a file.
+
+    `Path.exists()` normalises the trailing slash away, so the citation's own
+    claim about what kind of thing it names was never checked.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    assert resolve.resolve_path(root, "docs/a.md/").state is not resolve.State.RESOLVED
+
+
+def test_a_trailing_slash_on_a_real_directory_still_resolves(tmp_path: Path):
+    """Control arm for the test above."""
+    root = _repo(tmp_path, {"docs/sub/a.md": "x\n"})
+    assert resolve.resolve_path(root, "docs/sub/").state is resolve.State.RESOLVED

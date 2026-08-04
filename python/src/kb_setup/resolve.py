@@ -32,9 +32,11 @@ WHAT IS NEVER SEARCHED. The virtualenv, git's object store (including each
 pinned clone's own), lint/test caches, and every graphify output tree — none
 authored, all large, and `README.md` in each would turn ordinary shorthand into
 permanent AMBIGUOUS noise. For scale, `find` over the trees involved,
-2026-08-03: `graphify-out/` 139,257 files, `sources/` 100,434, `.venv/` 3,349,
-against 82 in `docs/` and 51 in `.claude/` — the authored tree is three orders
-of magnitude smaller than what surrounds it.
+2026-08-03, and note these move: `graphify-out/` 139,257 files, `sources/`
+100,434, `.venv/` 3,349, against ~80 in `docs/` and ~50 in `.claude/`. The
+ratio is the durable fact — the authored tree is three orders of magnitude
+smaller than what surrounds it — and the small counts are stated loosely on
+purpose, because a commit that adds one doc invalidates an exact one.
 """
 
 from __future__ import annotations
@@ -84,6 +86,11 @@ _SOURCES_KEPT: frozenset[str] = frozenset({"extractions", "media"})
 
 #: How many matching paths an AMBIGUOUS finding names before it says "… total".
 _SHOWN_MATCHES = 4
+
+#: Parts in a split `sources/<child>/` prefix. Below this the prefix IS
+#: `sources/` itself, whose own contents (the committed `*.manifest` pins) are
+#: authored rather than vendored.
+_SOURCES_CHILD_PARTS = 3
 
 
 class State(Enum):
@@ -155,13 +162,29 @@ def build_index(repo_root: Path) -> Index:
         base = "" if prefix == "." else f"{prefix}/"
         into = vendored if _is_vendored(base) else files
         into.extend(f"{base}{f}" for f in filenames)
-        if not _is_vendored(base):
-            dirs.extend(f"{base}{d}" for d in dirnames)
+        # Classified per CHILD, not per parent: at `sources/` the children split
+        # between authored (`media`, `extractions`) and vendored clones.
+        dirs.extend(f"{base}{d}" for d in dirnames if not _is_vendored(f"{base}{d}/"))
     return Index(
         files=tuple(sorted(files)),
         dirs=tuple(sorted(dirs)),
         vendored=tuple(sorted(vendored)),
     )
+
+
+def _inside(repo_root: Path, candidate: Path) -> bool:
+    """True when ``candidate`` stays within ``repo_root`` after resolving `..`.
+
+    `Path.exists()` follows `..` straight out of the tree, so
+    `python/../../dotfiles/README.md` resolved against a sibling checkout and was
+    reported RESOLVED — a false GREEN on a citation this checker has no standing
+    to verify, and `line_count` then opened the file. Normalised lexically rather
+    than with `Path.resolve()`, so a symlinked repo root (every `tmp_path` on
+    macOS is one) is not itself read as an escape.
+    """
+    root = Path(os.path.normpath(repo_root))
+    target = Path(os.path.normpath(candidate))
+    return target == root or root in target.parents
 
 
 def _is_vendored(base: str) -> bool:
@@ -170,10 +193,19 @@ def _is_vendored(base: str) -> bool:
     `sources/media/` and `sources/extractions/` are committed and authored here,
     so they are deliberately NOT vendored — labelling a transcript we wrote as
     somebody else's file would be wrong in the other direction.
+
+    The `sources/` LEVEL ITSELF is authored too, and reading only the second
+    segment missed that: for `sources/` the segment is the empty string, never in
+    the kept set, so the whole level counted as vendored — which put the
+    committed `*.manifest` pins in the vendored tier and kept `sources/media`
+    and `sources/extractions` out of the authored directory index entirely.
     """
     if not base.startswith("sources/"):
         return False
-    return base.split("/")[1] not in _SOURCES_KEPT
+    parts = base.split("/")
+    if len(parts) < _SOURCES_CHILD_PARTS:
+        return False
+    return parts[1] not in _SOURCES_KEPT
 
 
 def resolve_path(repo_root: Path, token: str, index: Index | None = None) -> Resolution:
@@ -184,9 +216,9 @@ def resolve_path(repo_root: Path, token: str, index: Index | None = None) -> Res
     the derived-output root. What is left is either a real miss or a claim about
     somewhere else — see :meth:`State`.
     """
-    candidate = repo_root / token
-    if candidate.exists():
-        return Resolution(State.RESOLVED, token.rstrip("/"), candidate)
+    literal = _resolve_literal(repo_root, token)
+    if literal is not None:
+        return literal
 
     idx = index if index is not None else build_index(repo_root)
     settled = _from_matches(repo_root, _suffix_matches(token, idx.files, idx.dirs), "")
@@ -209,6 +241,28 @@ def resolve_path(repo_root: Path, token: str, index: Index | None = None) -> Res
     if "/" not in token:
         return Resolution(State.MISSING, f"no file named {token} in this repo or its sources")
     return _unresolved_relative(repo_root, token, idx)
+
+
+def _resolve_literal(repo_root: Path, token: str) -> Resolution | None:
+    """The token read as a literal repo-relative path, or None to keep looking.
+
+    Two things `Path.exists()` alone does not check, both of which produced a
+    false GREEN — the one direction a checker must never fail in:
+
+    * **containment** — `exists()` follows `..` straight out of the tree, so
+      `python/../../dotfiles/README.md` resolved against a sibling checkout;
+    * **kind** — a trailing slash is normalised away, so `docs/a.md/` resolved
+      against the FILE `docs/a.md` while claiming to name a directory.
+    """
+    candidate = repo_root / token
+    if not (candidate.exists() and _inside(repo_root, candidate)):
+        return None
+    if not token.endswith("/") or candidate.is_dir():
+        return Resolution(State.RESOLVED, token.rstrip("/"), candidate)
+    return Resolution(
+        State.MISSING,
+        f"{token} names a directory, but {token.rstrip('/')} is a file",
+    )
 
 
 def _from_matches(repo_root: Path, matches: list[str], label: str) -> Resolution | None:
