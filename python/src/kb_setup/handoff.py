@@ -172,7 +172,7 @@ def _check_elided(repo_root: Path, cite: citations.ElidedCitation, index: resolv
     there. Here both directions are live — a marked citation that MATCHES is a
     FAIL — so the marker cannot be pasted beside a report to silence it.
     """
-    got = resolve.resolve_elided(repo_root, review.strip_lane_variant(cite.text), index)
+    got = resolve.resolve_elided(repo_root, review.canonical_lane_report(cite.text), index)
     if cite.marked_absent:
         return _check_absent_marker("elided", cite.text, cite.line, got)
     return Finding("elided", _VERDICT_OF[got.state], cite.text, cite.line, got.detail)

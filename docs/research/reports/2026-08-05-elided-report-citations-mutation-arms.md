@@ -1,15 +1,16 @@
 # #148 — elided report citations: mutation arms
 
-**17/17 arms died.** Control green at both ends, tree restored
+**18/18 arms died.** Control green at both ends, tree restored
 (`RESTORED rc=0`). Run: 2026-08-05, on `feat/148-agent-report-coverage`.
 
-**Five of those 17 arms exist because REVIEW found defects the mutation sweep
+**Six of those 18 arms exist because REVIEW found defects the mutation sweep
 could not** — see "What the review found" below.
-The first sweep was 12/12 against code that was wrong in ways no arm asked
-about; the second was 15/15 against code carrying a **false green shipped
-inside the fix for the previous one**. That is this report's most useful
-sentence: **a full mutation score is a statement about the tests, never about
-the design** — and a fix is exactly as reviewable as the code it replaces.
+Three sweeps came back clean over code that was not: 12/12 over a docstring
+claiming a scope the code never applied, 15/15 over a **false green shipped
+inside the fix for it**, and 17/17 over **the same false green one narrowing
+later**. That is this report's most useful sentence: **a full mutation score
+is a statement about the tests, never about the design** — and a fix is
+exactly as reviewable as the code it replaces.
 
 Every arm mutates PRODUCTION code with a break that could really happen and
 asserts the suite goes RED. An arm that survives means the tests do not cover
@@ -114,7 +115,8 @@ removed: two guards for one property mask each other's mutations, which
 | `B18 elided first segment` | `resolve.py` | an elided first segment softens a real miss to UNVERIFIABLE, which does not fail | DIED |
 | `B14 variant strip directory scope` | `review.py` | a `review-` file in ANY directory is rewritten — the false-green direction | DIED |
 | `B15 leading-elision normalisation` | `citations.py` | `…/review-abc…-cold.md` is dropped rather than checked | DIED |
-| `B16 elision survives the variant strip` | `review.py` | `_safe_lane` eats the elision, turning a pattern into a literal | DIED |
+| `B16 elision survives the variant strip` | `review.py` | `_safe_lane` eats the elision AND the repair goes hunting repo-wide again | DIED |
+| `B19 repair anchored to REPORT_DIR` | `review.py` | a repaired citation hunts the WHOLE repo and matches an unrelated file | DIED |
 
 ## Finding on the live corpus
 
@@ -181,6 +183,33 @@ directory) for B14. Three guards, three properties, three arms.
 Two further arms reported `SKIPPED — pattern matched 0 times` because the lines
 they targeted had moved under them. The harness naming a non-matching pattern
 instead of scoring it a pass is the only reason that was visible.
+
+## Round 2 of the cold lane — the same class, one narrowing later
+
+Round 2 verified both round-1 fixes sound, then found the SAME mechanism again,
+reproduced end-to-end:
+
+```
+repo contains only: review-checklist-for-spec.md   (unrelated)
+citation:           `review-check…-spec:draft.md`  (exists nowhere)
+handoff.check ->    elided OK   detail='review-checklist-for-spec.md'
+```
+
+The lane-suffix guard had narrowed WHICH citations get repaired. It never asked
+**where the repaired token is then looked up** — and `resolve_elided` matches a
+bare filename against every basename in the repo, so any repair landing on a real
+file anywhere is a false green.
+
+**The name was the hiding place.** `strip_lane_variant` describes an edit to a
+string, so three rounds of readers (me included) checked the edit's entry
+conditions and never followed the string to its use. It is now
+`canonical_lane_report` and returns a `REPORT_DIR`-qualified path, which makes the
+pattern multi-segment: the repaired citation can only ever match inside the one
+directory `report_path` writes to.
+
+Round 3 was not run — the skill bounds review at two rounds, and the fix's
+verification is the local gates plus arm **B19**, which mutates the anchoring
+away and dies.
 
 ## Reproducing it
 

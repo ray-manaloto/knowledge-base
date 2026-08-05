@@ -512,8 +512,13 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     return repo_root / REPORT_DIR / f"review-{safe_sha(sha)}-{lane_file}.md"
 
 
-def strip_lane_variant(token: str) -> str:
-    """Return a cited lane-report filename with any `:variant` removed (#148).
+def canonical_lane_report(token: str) -> str:
+    """Return a cited lane report's CANONICAL path, or ``token`` unchanged (#148).
+
+    Named for what it returns. It was `strip_lane_variant` for two rounds, and
+    the name was the bug's hiding place: "strip" describes an edit to a string,
+    so nobody asked where the edited string would then be looked up. It is
+    answered below, and it is the whole fix.
 
     `review-<sha>-cold:codex.md` → `review-<sha>-cold.md`. The WRITER already
     does this — :func:`report_path` runs the lane through :func:`_lane_prefix`
@@ -564,6 +569,7 @@ def strip_lane_variant(token: str) -> str:
         return token
     repaired = _lane_prefix(stem)
     if not any(repaired.endswith(f"-{lane}") for lane in LANES):
+        # (see the LANES note below)
         # THE GUARD THAT ACTUALLY HOLDS THE PROPERTY, and its absence was a
         # false green shipped inside the fix for the previous one. The directory
         # test above only fires when there IS a directory, so a BARE
@@ -577,7 +583,25 @@ def strip_lane_variant(token: str) -> str:
         # rather than heuristic, and a stem whose variant-stripped tail is not
         # `-<lane>` is left exactly as written. (Cold lane, BLOCKING.)
         return token
-    return f"{head}/{repaired}.{ext}" if head else f"{repaired}.{ext}"
+    # ALWAYS `REPORT_DIR`-QUALIFIED, even when the citation was bare. This is the
+    # line that closes the class, and it took three rounds to reach because the
+    # first two narrowed WHICH tokens got repaired instead of asking where the
+    # repaired token would then be looked up.
+    #
+    # `resolve_elided` matches a bare filename against every basename in the
+    # repo. So any repair that lands on a real file ANYWHERE is a false green,
+    # and tightening the entry conditions only shrinks the set of citations that
+    # can trigger it: round 1 was `review-gu…:draft.md` finding
+    # `review-guide-notes.md`; round 2, after the lane-suffix guard, was
+    # `review-check…-spec:draft.md` finding `review-checklist-for-spec.md`. Same
+    # mechanism, one narrowing apart.
+    #
+    # A repaired token is by construction a claim about a LANE REPORT, and
+    # `report_path` writes those to exactly one directory. Returning the
+    # qualified path makes the pattern multi-segment, so it can only ever match
+    # inside `REPORT_DIR` — the citation's own reachable set, rather than the
+    # whole tree. (Cold lane rounds 1 and 2, both BLOCKING.)
+    return f"{REPORT_DIR}/{repaired}.{ext}"
 
 
 def _report_gaps(repo_root: Path, data: dict[str, Any], sha: str) -> tuple[list[str], list[str]]:

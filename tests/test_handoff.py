@@ -1007,3 +1007,48 @@ def test_an_elided_citation_into_another_repo_is_reported_but_does_not_fail(tmp_
     findings = handoff.check(root, "see `graphify/src/wat…er.py`\n")
     assert _fails(findings) == []
     assert [f.verdict for f in findings] == [handoff.Verdict.UNVERIFIABLE]
+
+
+def test_a_repaired_lane_citation_cannot_match_outside_the_report_directory(tmp_path: Path):
+    """THE CLASS THAT TOOK THREE ROUNDS TO CLOSE — a repaired token going hunting.
+
+    `resolve_elided` matches a bare filename against every basename in the repo,
+    so ANY repair landing on a real file anywhere is a false green. Two rounds
+    narrowed which citations got repaired and neither asked where the repaired
+    token would then be looked up:
+
+    * round 1 — `review-gu…:draft.md` found `review-guide-notes.md`;
+    * round 2, after the lane-suffix guard — `review-check…-spec:draft.md`
+      found `review-checklist-for-spec.md`.
+
+    Both are asserted here rather than only the latest, because the fix is
+    supposed to close the mechanism and not just the newest instance of it.
+    """
+    root = _repo(
+        tmp_path,
+        {
+            "review-guide-notes.md": "unrelated\n",
+            "review-checklist-for-spec.md": "unrelated\n",
+            f"{_REPORTS}/review-abc1234def-cold.md": "a real report\n",
+        },
+    )
+    for token in ("review-gu…:draft.md", "review-check…-spec:draft.md"):
+        fails = _fails(handoff.check(root, f"see `{token}`\n"))
+        assert len(fails) == 1, token
+        assert "nothing matches" in fails[0].detail
+
+    # CONTROL: the real citation still resolves, so the fix did not simply
+    # refuse everything — which would pass every assertion above for free.
+    assert _fails(handoff.check(root, "see `review-abc1234…-cold:codex.md`\n")) == []
+
+
+def test_an_unrelated_file_inside_the_report_directory_is_not_a_match(tmp_path: Path):
+    """The narrower half: even inside REPORT_DIR, the sha must still match.
+
+    Anchoring the repair to the directory is necessary, not sufficient — the
+    cold lane noted a file living in `REPORT_DIR` that merely ends in a lane
+    suffix would also match if the sha portion were ignored.
+    """
+    root = _repo(tmp_path, {f"{_REPORTS}/review-checklist-for-spec.md": "unrelated\n"})
+    (f,) = _fails(handoff.check(root, "see `review-abc1234…-spec:draft.md`\n"))
+    assert "nothing matches" in f.detail
