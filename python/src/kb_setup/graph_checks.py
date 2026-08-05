@@ -90,15 +90,35 @@ def assert_composition(graph_path: Path, *, tag: str) -> None:
 
     bad_depth = sorted(nid for nid in ids if nid.count("::") > _MAX_SEPARATORS)
 
+    # Two DISTINCT failure shapes for a hyperedge member, reported with two
+    # DISTINCT messages (#176 cold review round 2) — mirroring
+    # `chunks._hyperedge_member_issues`'s own split, which exists for the same
+    # reason. A member that is not a string (an object/list where a bare id
+    # belongs) is a SHAPE problem: no `str()` coercion of it was ever going to
+    # resolve, regardless of what the graph currently contains. A string
+    # member that is simply absent from `ids` is the ACTUAL renamed-or-dropped
+    # case this function exists to catch. Collapsing them into one `str(m) not
+    # in ids` test (the pre-#176 shape) never crashes — `str()` raises on
+    # nothing here — but it reports every shape problem with the
+    # renamed-or-dropped message, which is false: nothing was renamed, the
+    # member was never a valid id in the first place. e.g. an object member
+    # `{"id": "a"}` used to print "{'id': 'a'} dangling", sending the reader
+    # hunting for a missing node instead of a malformed extraction.
     carried = hyperedges.capture_from_data(data)
     dangling: list[str] = []
+    malformed: list[str] = []
     members_seen = 0
     for edge in carried:
         members = edge.get("nodes", edge.get("members"))
         if not isinstance(members, list):
             continue
         members_seen += len(members)
-        dangling.extend(str(m) for m in members if str(m) not in ids)
+        for m in members:
+            if isinstance(m, str):
+                if m not in ids:
+                    dangling.append(m)
+            else:
+                malformed.append(repr(m))
 
     # Printed on EVERY call to this function — kb-build or kb-watch — pass or
     # fail. The counts are already computed here and nothing else reports
@@ -109,14 +129,17 @@ def assert_composition(graph_path: Path, *, tag: str) -> None:
     # change, and a measurement you have to hand-roll is one that stops being
     # taken. Silence here would also be ambiguous in the worst direction —
     # "no complaint" reads identically whether there are five healthy
-    # hyperedges or none at all.
+    # hyperedges or none at all. `malformed` is reported separately rather
+    # than folded into "dangling" so the census stays as truthful as the
+    # refusal message below it.
     print(
         f"[{tag}] composition: {len(ids)} node ids (max '::' depth "
         f"{max((nid.count('::') for nid in ids), default=0)}), {len(carried)} "
-        f"hyperedge(s) / {members_seen} member(s), {len(dangling)} dangling"
+        f"hyperedge(s) / {members_seen} member(s), {len(dangling)} dangling, "
+        f"{len(malformed)} malformed"
     )
 
-    if not bad_depth and not dangling:
+    if not bad_depth and not dangling and not malformed:
         return
 
     lines = [f"graph.json fails a build composition invariant ({graph_path}):"]
@@ -126,6 +149,13 @@ def assert_composition(graph_path: Path, *, tag: str) -> None:
             f"separator(s) — an input was merged more than once (the #120 shape, "
             f"which pairwise/sequential merging or feeding graph.json back into "
             f"merge-graphs both reproduce). e.g. {bad_depth[:_MAX_EXAMPLES]}"
+        )
+    if malformed:
+        lines.append(
+            f"  {len(malformed)} hyperedge member reference(s) are not string ids "
+            f"— an object/list where a bare id belongs is a SHAPE problem: it was "
+            f"never a valid node reference to begin with. e.g. "
+            f"{malformed[:_MAX_EXAMPLES]}"
         )
     if dangling:
         lines.append(

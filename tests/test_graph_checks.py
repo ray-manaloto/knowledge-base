@@ -192,6 +192,57 @@ def test_tag_kb_watch_reaches_the_output_and_kb_build_does_not(tmp_path, capsys)
     assert "[kb-build]" not in out, out
 
 
+def test_a_non_string_hyperedge_member_is_reported_as_a_shape_problem(tmp_path):
+    """A member that is not a string id must say SO, not 'renamed or dropped'.
+
+    Before #176 round 2, `dangling.extend(str(m) for m in members if str(m)
+    not in ids)` coerced EVERY member with `str()` before comparing — so an
+    object member like `{"id": "a"}` produced `"{'id': 'a'} dangling"`,
+    asserting a cause (renamed/dropped) that is false: nothing was renamed,
+    the member was never a valid id to begin with. `str()` never raises here,
+    so the old code did not crash — it just told the reader the wrong story,
+    sending them hunting for a missing node when the real problem is the
+    extraction's shape.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", {"id": "a"}]}],
+        ),
+    )
+    with pytest.raises(SystemExit) as exc:
+        graph_checks.assert_composition(path, tag="kb-build")
+    message = str(exc.value)
+    assert "not string ids" in message, message
+    assert "SHAPE problem" in message, message
+    assert "renamed or dropped" not in message, (
+        f"a non-string member was blamed on a rename/drop that never happened: {message}"
+    )
+
+
+def test_a_dangling_string_member_still_gets_the_renamed_or_dropped_message(tmp_path):
+    """CONTROL ARM: a genuinely unresolved STRING member keeps the old message.
+
+    The split above must not turn every dangling member into a 'shape
+    problem' — only a non-string one is. Re-asserted here alongside the
+    shape-problem test above so a regression that merges the two branches
+    back into one is caught from both sides at once.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", "graphify::vanished"]}],
+        ),
+    )
+    with pytest.raises(SystemExit) as exc:
+        graph_checks.assert_composition(path, tag="kb-build")
+    message = str(exc.value)
+    assert "renamed or dropped" in message, message
+    assert "SHAPE problem" not in message, message
+
+
 def test_both_violations_are_reported_together(tmp_path):
     """Neither check may short-circuit the other.
 

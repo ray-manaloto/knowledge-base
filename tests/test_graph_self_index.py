@@ -180,19 +180,60 @@ def test_the_self_subgraph_joins_the_one_corpus_merge_not_a_second_call(monkeypa
 
 
 def test_build_calls_assert_composition_on_the_artifact_it_produced(monkeypatch, tmp_path):
-    """The composition guard must actually run, not merely exist.
+    """The composition guard must actually run, WITH THE RIGHT TAG, not merely exist.
 
     Every other test in this file stubs `graph_checks.assert_composition` away
     as a no-op (it would otherwise `json.load` the fake concatenated content
     `apply_merge` produces) — which means none of them would notice if the
-    call were deleted from `build()` entirely. This is the one that would:
-    it replaces the no-op with a spy and asserts the call actually happened,
-    against the exact path `build()` just finished writing.
+    call were deleted from `build()` entirely, or called with the wrong tag.
+    This is the one that would: it replaces the no-op with a spy and asserts
+    both the path AND the tag `build()` actually passed.
+
+    Realistic break, PROVEN not hypothetical: round 1 gave `assert_composition`
+    a keyword-only `tag` and twin tests proving the FUNCTION cannot hardcode
+    one — but nothing pinned which tag each CALL SITE passes. This test used
+    to record only the path (`lambda p, **_kw: seen.append(p)`), discarding
+    the very kwarg that would catch a swap. A cold-review round 2 reintroduced
+    the original defect for real — changed `graph.py`'s `build()` call from
+    `tag="kb-build"` to `tag="kb-watch"` — and ran the full suite: rc=0,
+    SURVIVED, because every stub (including the old version of this one)
+    swallowed `tag` via `**_kw`. See
+    `test_refresh_self_calls_assert_composition_with_the_kb_watch_tag` for the
+    `kb-watch` call site's own version of this same check.
     """
-    seen: list[Path] = []
-    _run_build(monkeypatch, tmp_path, assert_composition=lambda p, **_kw: seen.append(p))
-    assert seen == [tmp_path / "graphify-out" / "graph.json"], (
-        f"build() did not call assert_composition on the graph it just wrote; saw {seen}"
+    seen: list[tuple[Path, str | None]] = []
+    _run_build(
+        monkeypatch, tmp_path, assert_composition=lambda p, **kw: seen.append((p, kw.get("tag")))
+    )
+    assert seen == [(tmp_path / "graphify-out" / "graph.json", "kb-build")], (
+        f"build() did not call assert_composition with (path, tag='kb-build'); saw {seen}"
+    )
+
+
+def test_refresh_self_calls_assert_composition_with_the_kb_watch_tag(monkeypatch, tmp_path):
+    """The `kb-watch` sibling of the test above — same defect class, other call site.
+
+    `refresh_self` (`graph.py:914`) calls
+    `graph_checks.assert_composition(real_out, tag="kb-watch")`. Every other
+    test touching `refresh_self` in this file goes through `_stub_recompose`,
+    which stubs `assert_composition` away as a `lambda _path, **_kw: None` —
+    so none of them would notice a tag swapped with `build()`'s. This test is
+    the one that would: it stands up its own spy and asserts both the path AND
+    the tag `refresh_self()` actually passed.
+    """
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    seen: list[tuple[Path, str | None]] = []
+    monkeypatch.setattr(graph, "_run", merge_recorder([]))
+    monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
+    monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
+    monkeypatch.setattr(
+        graph.graph_checks, "assert_composition", lambda p, **kw: seen.append((p, kw.get("tag")))
+    )
+
+    graph.refresh_self(repo)
+
+    assert seen == [(repo / "graphify-out" / "graph.json", "kb-watch")], (
+        f"refresh_self() did not call assert_composition with (path, tag='kb-watch'); saw {seen}"
     )
 
 

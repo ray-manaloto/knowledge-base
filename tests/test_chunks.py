@@ -572,6 +572,39 @@ def test_assemble_raises_on_combined_hyperedge_id_collision(tmp_path) -> None:
     assert "(combined)" in msg, f"expected the '(combined)' label in the error; got: {msg}"
 
 
+def test_assemble_refuses_a_non_object_chunk_without_crashing(tmp_path) -> None:
+    """`assemble()`'s own non-dict-chunk crash, three lines past `validate()`'s fix.
+
+    `validate()` correctly reports "top level is X, expected a JSON object" and
+    `assemble()` appended that to `problems` — then called `chunk.get("nodes",
+    [])` on the SAME non-dict value, in the accumulation loop, BEFORE ever
+    reaching `if problems: raise ValueError`. Confirmed on all four top-level
+    non-object JSON shapes: array/string/number/null each raised
+    `AttributeError` (`'list'`/`'str'`/`'int'`/`'NoneType' object has no
+    attribute 'get'`) instead of the documented refusal, so `cli.py`'s
+    `except ValueError` never caught it and `mise run kb-assemble` printed a
+    raw traceback instead of its `[kb-assemble]` rc=1 message. Same defect
+    class as `test_a_valid_json_non_object_refuses_instead_of_raising` below,
+    one function over (#176 cold review round 2).
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    for label, payload in (
+        ("array", "[]"),
+        ("string", '"oops"'),
+        ("number", "42"),
+        ("null", "null"),
+    ):
+        p = tmp_path / f"{label}.json"
+        p.write_text(payload, encoding="utf-8")
+        with pytest.raises(ValueError, match="expected a JSON object") as exc:
+            chunks.assemble(tmp_path, f"bad-{label}", [p])
+        msg = str(exc.value)
+        assert p.name in msg, f"{label}: the refusal did not name the offending file: {msg}"
+        assert "expected a JSON object" in msg, (
+            f"{label}: assemble() did not report the type-mismatch problem: {msg}"
+        )
+
+
 def test_a_valid_json_non_object_refuses_instead_of_raising(tmp_path) -> None:
     """`validate()` promises it never raises; a JSON array made it AttributeError.
 
@@ -664,11 +697,24 @@ def test_hyperedge_reports_bad_id_dangling_member_and_bad_confidence_together() 
 
 
 def test_hyperedge_reports_missing_nodes_list_and_bad_confidence_together() -> None:
-    """CONTROL ARM's sibling — the `continue` this one catches sits elsewhere.
+    """Pins that a missing 'nodes' list does not suppress the confidence check.
 
-    It sits after the 'no nodes list' append instead. Verified live the same
-    way: inserting `continue` there turns this test red; restoring it turns it
-    green again.
+    This docstring used to claim "verified live: inserting `continue` [after
+    the 'no nodes list' append] turns this test red" — true when it was
+    written, false since `_hyperedge_member_issues` was split out of
+    `_hyperedge_issues`'s loop body (#176). The 'no nodes list' case is now a
+    `return` from that separate function, not an `append` inside the caller's
+    loop, so there is no longer a `continue` insertion point that isolates
+    THIS test from its sibling above. Measured (#176 cold review round 2): the
+    nearest constructible mutation — a `continue` right after
+    `issues.extend(_hyperedge_member_issues(...))` in `_hyperedge_issues` — is
+    unconditional and reddens BOTH this test and
+    `test_hyperedge_reports_bad_id_dangling_member_and_bad_confidence_together`
+    together, not this one alone. It is kept anyway because it still pins a
+    real property (a missing 'nodes' list must not short-circuit the
+    confidence check) — it is just not an INDEPENDENT control arm on that
+    property. A deleted "verified live" claim is safer than one re-pointed at
+    a mutation nobody has actually run.
     """
     h = _hyperedge("h", ["a", "b", "c"], confidence="AMBIGUOUS")
     del h["nodes"]

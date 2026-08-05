@@ -389,6 +389,15 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
             problems.append(f"{p.name}: unreadable/invalid JSON: {e}")
             continue
         problems.extend(validate(chunk, label=p.name))
+        if not isinstance(chunk, dict):
+            # `validate()` already recorded the type-mismatch problem above (the
+            # `problems` check below will raise on it) — but `chunk.get(...)`
+            # itself is only valid on a dict, so a top-level JSON array/string/
+            # number/null reached here and crashed with AttributeError instead
+            # of the documented `ValueError` refusal. Same defect class as the
+            # non-dict-chunk fix in `validate()` above, one function over and
+            # three lines past where that fix stopped (#176 cold review round 2).
+            continue
         for n in chunk.get("nodes", []):
             nid = n.get("id") if isinstance(n, dict) else None
             if isinstance(nid, str) and nid:
