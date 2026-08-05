@@ -82,12 +82,30 @@ def assert_composition(graph_path: Path) -> None:
 
     bad_depth = sorted(nid for nid in ids if nid.count("::") > _MAX_SEPARATORS)
 
+    carried = hyperedges.capture_from_data(data)
     dangling: list[str] = []
-    for edge in hyperedges.capture_from_data(data):
+    members_seen = 0
+    for edge in carried:
         members = edge.get("nodes", edge.get("members"))
         if not isinstance(members, list):
             continue
+        members_seen += len(members)
         dangling.extend(str(m) for m in members if str(m) not in ids)
+
+    # Printed on EVERY build, pass or fail. The counts are already computed here
+    # and nothing else reports them: `kb-insights` covers provenance, spans,
+    # cross-origin and size but not hyperedges, so before this line the only way
+    # to answer "how many hyperedges does the aggregate hold, and do their
+    # members resolve?" was an ad-hoc probe. #176 asks for that figure to be
+    # re-measured after every change, and a measurement you have to hand-roll is
+    # one that stops being taken. Silence here would also be ambiguous in the
+    # worst direction — "no complaint" reads identically whether there are five
+    # healthy hyperedges or none at all.
+    print(
+        f"[kb-build] composition: {len(ids)} node ids (max '::' depth "
+        f"{max((nid.count('::') for nid in ids), default=0)}), {len(carried)} "
+        f"hyperedge(s) / {members_seen} member(s), {len(dangling)} dangling"
+    )
 
     if not bad_depth and not dangling:
         return

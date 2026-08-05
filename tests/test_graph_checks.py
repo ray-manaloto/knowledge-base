@@ -68,6 +68,31 @@ def test_a_clean_graph_with_no_hyperedges_passes(tmp_path):
     graph_checks.assert_composition(path)  # must not raise
 
 
+def test_a_passing_build_still_reports_the_hyperedge_census(tmp_path, capsys):
+    """Silence is the wrong success signal, so the counts are printed either way (#176).
+
+    Nothing else in the toolchain reports them — `kb-insights` covers
+    provenance, community spans, cross-origin edges and size, but not
+    hyperedges. Before this line the only way to answer "how many does the
+    aggregate hold, and do their members resolve?" was an ad-hoc probe, and
+    #176 asks for that figure after every change. Asserting on the NUMBERS and
+    not merely that something was printed is the point: a census that prints
+    `0 hyperedge(s)` on a graph holding five is worse than no census.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}, {"id": ".self-graph::bar"}, {"id": "doc_node"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", ".self-graph::bar", "doc_node"]}],
+        ),
+    )
+    graph_checks.assert_composition(path)
+    out = capsys.readouterr().out
+    assert "3 node ids" in out, out
+    assert "1 hyperedge(s) / 3 member(s)" in out, out
+    assert "0 dangling" in out, out
+
+
 def test_a_depth_two_id_fails(tmp_path):
     """The #120 shape: an id carrying TWO `::` separators must be refused.
 
