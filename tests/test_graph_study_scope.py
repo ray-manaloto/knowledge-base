@@ -71,7 +71,7 @@ def _build(monkeypatch, tmp_path: Path) -> list[list[str]]:
     # fixture's raw text rather than producing valid JSON — enough for the
     # substring assertions this file makes, not enough for either of these.
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
-    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path, **_kw: None)
     monkeypatch.setattr(graph, "_run", merge_recorder(calls))
 
     graph.build(tmp_path)

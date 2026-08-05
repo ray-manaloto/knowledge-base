@@ -51,7 +51,7 @@ _MAX_EXAMPLES = 5
 _MAX_SEPARATORS = 1
 
 
-def assert_composition(graph_path: Path) -> None:
+def assert_composition(graph_path: Path, *, tag: str) -> None:
     """Refuse a `graph.json` that violates this build's composition invariants.
 
     Loads the whole file with a plain `json.load` EXACTLY ONCE — accepted
@@ -75,6 +75,14 @@ def assert_composition(graph_path: Path) -> None:
     reconciles graph.json's two possible hyperedge slots — resolves to a node
     id in this same file. Raises `SystemExit` with counts and a few example
     offenders on either violation; returns `None` on success.
+
+    `tag` names the CALLER (`"kb-build"` or `"kb-watch"`, this function's only
+    two call sites) in every printed line — the same discipline
+    `stamps.refresh_after_regen` uses, and for the same reason: a message
+    tagged with the wrong caller sends someone looking at the wrong task.
+    There is deliberately no default; a caller that forgot to pass one would
+    silently mislabel every line it prints, which is worse than a `TypeError`
+    at the call site.
     """
     data = json.loads(graph_path.read_text(encoding="utf-8"))
     nodes = data.get("nodes", [])
@@ -92,17 +100,18 @@ def assert_composition(graph_path: Path) -> None:
         members_seen += len(members)
         dangling.extend(str(m) for m in members if str(m) not in ids)
 
-    # Printed on EVERY build, pass or fail. The counts are already computed here
-    # and nothing else reports them: `kb-insights` covers provenance, spans,
-    # cross-origin and size but not hyperedges, so before this line the only way
-    # to answer "how many hyperedges does the aggregate hold, and do their
-    # members resolve?" was an ad-hoc probe. #176 asks for that figure to be
-    # re-measured after every change, and a measurement you have to hand-roll is
-    # one that stops being taken. Silence here would also be ambiguous in the
-    # worst direction — "no complaint" reads identically whether there are five
-    # healthy hyperedges or none at all.
+    # Printed on EVERY call to this function — kb-build or kb-watch — pass or
+    # fail. The counts are already computed here and nothing else reports
+    # them: `kb-insights` covers provenance, spans, cross-origin and size but
+    # not hyperedges, so before this line the only way to answer "how many
+    # hyperedges does the aggregate hold, and do their members resolve?" was
+    # an ad-hoc probe. #176 asks for that figure to be re-measured after every
+    # change, and a measurement you have to hand-roll is one that stops being
+    # taken. Silence here would also be ambiguous in the worst direction —
+    # "no complaint" reads identically whether there are five healthy
+    # hyperedges or none at all.
     print(
-        f"[kb-build] composition: {len(ids)} node ids (max '::' depth "
+        f"[{tag}] composition: {len(ids)} node ids (max '::' depth "
         f"{max((nid.count('::') for nid in ids), default=0)}), {len(carried)} "
         f"hyperedge(s) / {members_seen} member(s), {len(dangling)} dangling"
     )

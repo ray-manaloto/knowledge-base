@@ -911,7 +911,7 @@ def refresh_self(repo_root: Path) -> None:
     label_rc = graphify_ops.label(repo_root)
     if label_rc != 0:
         raise SystemExit(f"[kb-watch] label pass failed (rc={label_rc}) — aborting")
-    graph_checks.assert_composition(real_out)
+    graph_checks.assert_composition(real_out, tag="kb-watch")
 
     _write_compose_manifest(
         repo_root,
@@ -1174,7 +1174,7 @@ def build(repo_root: Path) -> None:
     # at most one merge prefix, every carried hyperedge still resolves. Checked
     # HERE, on the artifact this build just produced, so a regression is caught
     # on the next build rather than only on the next `mise run test`.
-    graph_checks.assert_composition(out)
+    graph_checks.assert_composition(out, tag="kb-build")
 
     # What `kb-watch` recomposes FROM (#175's follow-up). Recorded here, after
     # composition is proven correct, so a `refresh_self` reading it back is

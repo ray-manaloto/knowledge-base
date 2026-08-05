@@ -32,7 +32,12 @@ def _node(nid: str, **over: object) -> dict:
     return n
 
 
-def _edge(src: str, tgt: str, **over: object) -> dict:
+def _edge(src: object, tgt: object, **over: object) -> dict:
+    # `src`/`tgt` are `object`, not `str` — a real chunk's shape is only ever
+    # promised by the JSON schema graphify's doc-merge expects, never enforced
+    # by Python's type system, and some tests in this module deliberately
+    # construct a malformed endpoint (a dict/list where a string id belongs)
+    # to prove `_edge_issues` reports it rather than raising.
     e = {
         "source": src,
         "target": tgt,
@@ -56,14 +61,21 @@ def _chunk(nodes: list[dict], edges: list[dict], hyperedges: list[dict] | None =
     }
 
 
-def _hyperedge(hid: str, members: list[str], **over: object) -> dict:
+def _hyperedge(hid: str, members: list[object], **over: object) -> dict:
+    # `members` is `list[object]`, not `list[str]` — same reason as `_edge`'s
+    # `src`/`tgt` above: some tests here deliberately construct a member that
+    # is not a string id, to prove `_hyperedge_member_issues` reports it.
     h = {
         "id": hid,
         "label": hid.title(),
         "nodes": members,
         "relation": "participate_in",
         "confidence": "EXTRACTED",
-        "confidence_score": 0.75,
+        # 1 for EXTRACTED, 0.5 for INFERRED, per kb-extract.js's own prompt —
+        # this fixture is the thing that documents the chunk shape, so it must
+        # not encode a value the prompt forbids. A test needing a different
+        # value sets it explicitly via `**over`.
+        "confidence_score": 1,
         "source_file": "src.md",
     }
     h.update(over)
@@ -367,14 +379,16 @@ def test_a_dangling_hyperedge_member_is_caught() -> None:
     unresolved members and then the whole hyperedge, so a green gate permitted a
     committed relationship to vanish at ingestion (#134).
     """
-    c = _chunk([_node("a")], [], [_hyperedge("h", ["a", "ghost"])])
+    c = _chunk([_node("a")], [], [_hyperedge("h", ["a", "ghost", "also_ghost"])])
     assert any("hyperedge" in i for i in chunks.validate(c, label="c"))
 
     # CONTROL ARM: a fully-resolvable hyperedge must still pass, or the fix is
     # "reject all hyperedges" — which would have deleted the two VALID ones in
     # graphify-docs.json alongside the broken one. That over-deletion actually
     # happened during this fix and was caught by re-reading the validator output.
-    ok = _chunk([_node("a"), _node("b")], [], [_hyperedge("h", ["a", "b"])])
+    # Three members, not two — `_MIN_HYPEREDGE_MEMBERS` (#176) refuses a
+    # fully-resolvable hyperedge with fewer than that.
+    ok = _chunk([_node("a"), _node("b"), _node("c")], [], [_hyperedge("h", ["a", "b", "c"])])
     assert chunks.validate(ok, label="c") == []
 
 
@@ -387,10 +401,15 @@ def test_assemble_carries_hyperedges_regression_for_170(tmp_path) -> None:
     deleted again.
     """
     (tmp_path / "sources" / "extractions").mkdir(parents=True)
-    h = _hyperedge("h_pair", ["x_a", "x_b"])
+    # Three members, not two — `_MIN_HYPEREDGE_MEMBERS` (#176) refuses fewer,
+    # and this test needs the hyperedge to validate cleanly so it survives
+    # into the combined output for the assertion below to find.
+    h = _hyperedge("h_pair", ["x_a", "x_b", "x_c"])
     c1 = tmp_path / "c1.json"
     c2 = tmp_path / "c2.json"
-    c1.write_text(json.dumps(_chunk([_node("x_a"), _node("x_b")], [_edge("x_a", "x_b")], [h])))
+    c1.write_text(
+        json.dumps(_chunk([_node("x_a"), _node("x_b"), _node("x_c")], [_edge("x_a", "x_b")], [h]))
+    )
     c2.write_text(json.dumps(_chunk([_node("y_a")], [])))
     out = chunks.assemble(tmp_path, "mytopic", [c1, c2])
     got = json.loads(out.read_text())
@@ -414,8 +433,40 @@ def test_assemble_hyperedges_empty_or_absent_both_assemble_cleanly(tmp_path) -> 
 
 def test_hyperedge_confidence_extracted_and_inferred_accepted() -> None:
     for tier in ("EXTRACTED", "INFERRED"):
-        c = _chunk([_node("a"), _node("b")], [], [_hyperedge("h", ["a", "b"], confidence=tier)])
+        # Three members — `_MIN_HYPEREDGE_MEMBERS` (#176) refuses fewer, and
+        # this test asserts a fully clean `validate()`, so the fixture must
+        # clear every other check too.
+        nodes = [_node("a"), _node("b"), _node("c")]
+        c = _chunk(nodes, [], [_hyperedge("h", ["a", "b", "c"], confidence=tier)])
         assert chunks.validate(c, label="c") == [], f"{tier} was unexpectedly refused"
+
+
+def test_hyperedge_arity_boundary() -> None:
+    """A hyperedge needs at least 3 members (#176) — boundary tested both ways.
+
+    graphify's own extraction spec defines a hyperedge as "3 or more nodes"
+    (`.claude/skills/graphify/references/extraction-spec.md:38`), and
+    `.claude/workflows/kb-extract.js` instructs agents to emit "THREE OR MORE
+    node ids". A hyperedge with fewer members is just an edge, and it has
+    zero-to-two surviving members by construction once any dangling ones drop
+    — the same silent vanishing this validator exists to catch (#134).
+    """
+    nodes = [_node("a"), _node("b"), _node("c")]
+
+    three = _chunk(nodes, [], [_hyperedge("h", ["a", "b", "c"])])
+    assert chunks.validate(three, label="c") == [], "3 members was unexpectedly refused"
+
+    two = _chunk(nodes, [], [_hyperedge("h", ["a", "b"])])
+    issues = chunks.validate(two, label="c")
+    assert any("member(s), needs at least 3" in i for i in issues), (
+        f"2 members was accepted; issues were {issues}"
+    )
+
+    zero = _chunk(nodes, [], [_hyperedge("h", [])])
+    issues = chunks.validate(zero, label="c")
+    assert any("member(s), needs at least 3" in i for i in issues), (
+        f"0 members was accepted; issues were {issues}"
+    )
 
 
 def test_hyperedge_confidence_ambiguous_refused() -> None:
@@ -498,8 +549,15 @@ def test_assemble_raises_on_combined_hyperedge_id_collision(tmp_path) -> None:
     two chunks are unioned into the artifact that actually gets written.
     """
     (tmp_path / "sources" / "extractions").mkdir(parents=True)
-    c1_data = _chunk([_node("a")], [], [_hyperedge("dup", ["a"])])
-    c2_data = _chunk([_node("b")], [], [_hyperedge("dup", ["b"])])
+    # Three members each — `_MIN_HYPEREDGE_MEMBERS` (#176) refuses fewer, and
+    # the assertions immediately below require BOTH fixtures to validate
+    # clean alone.
+    c1_data = _chunk(
+        [_node("a1"), _node("a2"), _node("a3")], [], [_hyperedge("dup", ["a1", "a2", "a3"])]
+    )
+    c2_data = _chunk(
+        [_node("b1"), _node("b2"), _node("b3")], [], [_hyperedge("dup", ["b1", "b2", "b3"])]
+    )
     assert chunks.validate(c1_data, label="c1") == [], "fixture chunk 1 must validate clean alone"
     assert chunks.validate(c2_data, label="c2") == [], "fixture chunk 2 must validate clean alone"
 
@@ -528,3 +586,113 @@ def test_a_valid_json_non_object_refuses_instead_of_raising(tmp_path) -> None:
     assert "expected a JSON object" in issues[0], (
         f"a top-level array did not produce a controlled refusal: {issues}"
     )
+
+
+def test_an_unhashable_edge_endpoint_is_reported_not_raised() -> None:
+    """`validate()` promises it never raises — an unhashable endpoint broke that.
+
+    An unhashable `source`/`target` broke that promise too, the same class of
+    defect `test_a_valid_json_non_object_refuses_instead_of_raising` fixed
+    eight lines above it in this module for the non-dict-chunk case.
+
+    `e["source"] not in ids` against a `set[str]` raises `TypeError` rather
+    than returning False when `source` is a dict or list — an agent emitting
+    `{"source": {"id": "a"}, ...}` used to crash `kb-validate-chunks`,
+    `kb-assemble` (a `TypeError` instead of the documented `ValueError`), and
+    `graphify_ops.merge_chunk` (a traceback instead of `mise run kb-merge`'s
+    `rc=2` refusal) instead of producing an issue.
+    """
+    bad_source = _chunk([_node("a")], [_edge({"id": "a"}, "a")])
+    issues = chunks.validate(bad_source, label="c")
+    assert any("source is not a string id" in i for i in issues), (
+        f"an unhashable edge source raised instead of being reported; issues were {issues}"
+    )
+
+    bad_target = _chunk([_node("a")], [_edge("a", ["a"])])
+    issues = chunks.validate(bad_target, label="c")
+    assert any("target is not a string id" in i for i in issues), (
+        f"an unhashable edge target raised instead of being reported; issues were {issues}"
+    )
+
+    # CONTROL ARM: this must not become "any non-dangling-looking value passes" —
+    # a well-formed string endpoint must still resolve cleanly.
+    clean = _chunk([_node("a"), _node("b")], [_edge("a", "b")])
+    assert chunks.validate(clean, label="c") == []
+
+
+def test_an_unhashable_hyperedge_member_is_reported_not_raised() -> None:
+    """The hyperedge-member analogue of the test above.
+
+    `missing = [m for m in members if m not in ids]` raised `TypeError` for
+    the same reason — a member that is a dict or list is unhashable against
+    the `set[str]` of known ids. Found alongside FIX 1's edge-endpoint case
+    (#176 cold review round 1), same defect class as the `validate()`
+    non-dict-chunk fix eight lines above `_hyperedge_issues` in this module.
+    """
+    c = _chunk(
+        [_node("a"), _node("b"), _node("c")],
+        [],
+        [_hyperedge("h", ["a", "b", {"id": "c"}])],
+    )
+    issues = chunks.validate(c, label="c")
+    assert any("member(s) are not string ids" in i for i in issues), (
+        f"an unhashable hyperedge member raised instead of being reported; issues were {issues}"
+    )
+
+    # CONTROL ARM: three well-formed string members must still resolve cleanly.
+    clean = _chunk([_node("a"), _node("b"), _node("c")], [], [_hyperedge("h", ["a", "b", "c"])])
+    assert chunks.validate(clean, label="c") == []
+
+
+def test_hyperedge_reports_bad_id_dangling_member_and_bad_confidence_together() -> None:
+    """The docstring promises 'every other combination ... reported together'.
+
+    Every OTHER existing hyperedge test exercises one defect at a time, so a
+    `continue` slipped in right after the bad-id `issues.append(...)` in
+    `_hyperedge_issues` would still pass the whole suite — the members and
+    confidence checks below it would simply never run for that hyperedge, and
+    nothing would notice. This test — and its sibling below — are what such a
+    `continue` regression must fail. Verified live: inserting `continue` after
+    the bad-id append turns this test red; restoring it turns it green again.
+    """
+    h = _hyperedge("", ["a", "ghost", "c"], confidence="AMBIGUOUS")
+    c = _chunk([_node("a"), _node("b"), _node("c")], [], [h])
+    issues = chunks.validate(c, label="c")
+    assert any("valid string id" in i for i in issues), issues
+    assert any("dangling member" in i for i in issues), issues
+    assert any("AMBIGUOUS" in i for i in issues), issues
+
+
+def test_hyperedge_reports_missing_nodes_list_and_bad_confidence_together() -> None:
+    """CONTROL ARM's sibling — the `continue` this one catches sits elsewhere.
+
+    It sits after the 'no nodes list' append instead. Verified live the same
+    way: inserting `continue` there turns this test red; restoring it turns it
+    green again.
+    """
+    h = _hyperedge("h", ["a", "b", "c"], confidence="AMBIGUOUS")
+    del h["nodes"]
+    c = _chunk([_node("a"), _node("b"), _node("c")], [], [h])
+    issues = chunks.validate(c, label="c")
+    assert any("no 'nodes' list" in i for i in issues), issues
+    assert any("AMBIGUOUS" in i for i in issues), issues
+
+
+def test_assemble_handles_a_null_hyperedges_key(tmp_path) -> None:
+    """The `or []` guard is the only thing stopping a `TypeError` here.
+
+    `chunk.get("hyperedges") or []` is the only thing stopping
+    `list.extend(None)` raising `TypeError` when a chunk carries an explicit
+    JSON `null` for `hyperedges`. `validate()` treats `"hyperedges": null` as
+    clean (`_hyperedge_issues` returns `[]` when its argument is `None`), so
+    nothing upstream of `assemble()` catches this shape — this is the
+    regression test for that `or []` staying in place.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c = tmp_path / "c.json"
+    payload = _chunk([_node("a")], [])
+    payload["hyperedges"] = None
+    c.write_text(json.dumps(payload))
+    out = chunks.assemble(tmp_path, "nullhyper", [c])
+    got = json.loads(out.read_text())
+    assert got["hyperedges"] == []

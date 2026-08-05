@@ -88,12 +88,13 @@ if (!calendarOk) {
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['key', 'wrote', 'node_count', 'edge_count'],
+  required: ['key', 'wrote', 'node_count', 'edge_count', 'hyperedge_count'],
   properties: {
     key: { type: 'string' },
     wrote: { type: 'boolean' },
     node_count: { type: 'integer' },
     edge_count: { type: 'integer' },
+    hyperedge_count: { type: 'integer' },
     notes: { type: 'string' },
   },
 }
@@ -148,15 +149,26 @@ edge from the source text; a blanket flip breaks the ones that were already righ
 
 HYPEREDGE object (exact keys) — emit these now; the array is no longer suppressed:
   id               : snake_case, MUST start with "${s.key}_" then a short slug. The
-                     prefix is load-bearing: kb-assemble unions every chunk's
-                     hyperedges into one file and REFUSES a duplicate id across
-                     chunks, and an unprefixed name like "three_pass_extraction"
-                     is exactly the kind two sources both reach for.
+                     prefix is what makes a collision between two sources'
+                     hyperedge ids IMPOSSIBLE in the first place — kb-assemble
+                     unions every chunk's hyperedges into one file and REFUSES a
+                     duplicate id across chunks if one happens anyway, but the
+                     prefix is what stops it from happening. An unprefixed name
+                     like "three_pass_extraction" is exactly the kind two
+                     sources both reach for — it is a REAL committed id in
+                     sources/extractions/graphify-docs.json today, with no
+                     prefix, because it predates this rule (all five committed
+                     hyperedge ids do). The rule binds NEW chunks; the
+                     committed five are grandfathered, not a model to copy.
   label            : short human name of the shared concept.
   nodes            : THREE OR MORE node ids, every one of them defined in THIS
                      chunk. A member that does not resolve is rejected by
-                     kb-validate-chunks, and graphify drops the whole hyperedge
-                     once no member survives.
+                     kb-assemble (kb-validate-chunks only catches it too when
+                     checking this chunk alone — its normal multi-file
+                     invocation resolves endpoints against the UNION of every
+                     chunk passed to it, so a member dangling in this chunk but
+                     defined in a sibling chunk would pass there), and graphify
+                     drops the whole hyperedge once no member survives.
   relation         : participate_in | implement | form
   confidence       : "EXTRACTED" | "INFERRED" — never AMBIGUOUS. That tier exists
                      for edges only; graphify's hyperedge schema does not have it
@@ -183,7 +195,7 @@ Rules: only connect nodes that exist in THIS chunk (hyperedge members included);
 
 After building the chunk, WRITE it (Write tool) to:
   ${scratchDir}/${s.key}.json
-Then your FINAL output is ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, notes (any quality caveat, e.g. paywalled/partial/truncated)}.`
+Then your FINAL output is ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, hyperedge_count (how many hyperedges you emitted, 0 if none), notes (any quality caveat, e.g. paywalled/partial/truncated)}.`
 }
 
 function inventoryPrompt(s) {
@@ -204,7 +216,7 @@ already say in full. A hyperedge over "every item in this category" would restat
 Capture as many items as the file lists; do not invent entries.
 
 WRITE the chunk (Write tool) to ${scratchDir}/${s.key}.json.
-FINAL output = ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, notes}.`
+FINAL output = ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, hyperedge_count:0 (this prompt emits none), notes}.`
 }
 
 const KIND_NOTE = {

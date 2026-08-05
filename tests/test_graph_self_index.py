@@ -99,7 +99,7 @@ def _run_build(monkeypatch, tmp_path: Path, run=None, assert_composition=None) -
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
     monkeypatch.setattr(
-        graph.graph_checks, "assert_composition", assert_composition or (lambda _path: None)
+        graph.graph_checks, "assert_composition", assert_composition or (lambda _path, **_kw: None)
     )
     monkeypatch.setattr(graph, "_run", run or merge_recorder(calls))
 
@@ -190,7 +190,7 @@ def test_build_calls_assert_composition_on_the_artifact_it_produced(monkeypatch,
     against the exact path `build()` just finished writing.
     """
     seen: list[Path] = []
-    _run_build(monkeypatch, tmp_path, assert_composition=seen.append)
+    _run_build(monkeypatch, tmp_path, assert_composition=lambda p, **_kw: seen.append(p))
     assert seen == [tmp_path / "graphify-out" / "graph.json"], (
         f"build() did not call assert_composition on the graph it just wrote; saw {seen}"
     )
@@ -298,7 +298,7 @@ def _stub_recompose(monkeypatch, calls: list[list[str]]) -> None:
     monkeypatch.setattr(graph, "_run", merge_recorder(calls))
     monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
-    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path, **_kw: None)
 
 
 def _forbid_subprocesses(monkeypatch) -> None:
@@ -671,7 +671,7 @@ def test_refresh_self_restamps_so_the_graph_stays_verifiable(monkeypatch, tmp_pa
     monkeypatch.setattr(graph, "_run", _fake_run)
     monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
-    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path, **_kw: None)
 
     graph.refresh_self(root)
 

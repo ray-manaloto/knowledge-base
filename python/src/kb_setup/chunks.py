@@ -42,6 +42,22 @@ _CONFIDENCE = ("EXTRACTED", "INFERRED")
 #: that exists today.
 _HYPEREDGE_CONFIDENCE = ("EXTRACTED", "INFERRED")
 
+#: graphify's own extraction spec defines a hyperedge as "3 or more nodes"
+#: (`.claude/skills/graphify/references/extraction-spec.md:38`), and
+#: `.claude/workflows/kb-extract.js` instructs agents to emit "THREE OR MORE
+#: node ids" — so fewer than three members is an agent error under OUR OWN
+#: contract. graphify itself tolerates fewer: `build.py` carries a comment
+#: saying "single-member hyperedges are legal in this codebase, e.g. a
+#: per-file flow". This is deliberately STRICTER than the tool — we control
+#: the prompt, and a 2-member "hyperedge" is just an edge wearing a costume.
+#: A zero/one/two-member hyperedge also has zero-to-two surviving members by
+#: construction once dangling ones are dropped, which is exactly the silent
+#: vanishing this validator exists to prevent (#134).
+#: Measured backward-compatible 2026-08-05: the five committed hyperedges
+#: (`graphify-docs.json` x2, `media-docs.json` x3) carry 3, 4, 5, 6 and 6
+#: members, so this rejects nothing that exists today.
+_MIN_HYPEREDGE_MEMBERS = 3
+
 #: Every node in a host-agent chunk is semantic BY CONSTRUCTION — a chunk is the
 #: output of the LLM extraction wave, and the AST layer never travels this path.
 #: Stating it explicitly is not redundancy; it is what keeps graphify from
@@ -104,7 +120,18 @@ def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
 
 
 def _edge_issues(edges: list, ids: set[str], label: str) -> list[str]:
-    """Per-edge problems: missing fields, dangling endpoints, bad confidence."""
+    """Per-edge problems: missing fields, dangling endpoints, bad confidence.
+
+    An endpoint is checked with `isinstance(..., str)` BEFORE the `in ids`
+    membership test, not after, and never simply coerced with `str()` into the
+    existing dangling message. `x not in ids` against a `set[str]` raises
+    `TypeError` when `x` is unhashable (a dict or list) rather than returning
+    False — an agent emitting `{"source": {"id": "a"}, ...}` used to crash
+    `validate()` out of its own "never raises" contract (see that function's
+    docstring) instead of producing an ISSUE. A `str()` coercion would have
+    avoided the crash while producing `"{'id': 'a'} dangling"`, which sends the
+    reader hunting for a missing node when the real problem is the shape.
+    """
     issues: list[str] = []
     for i, e in enumerate(edges):
         if not isinstance(e, dict):
@@ -114,12 +141,45 @@ def _edge_issues(edges: list, ids: set[str], label: str) -> list[str]:
         if missing:
             issues.append(f"{label}: edge[{i}] missing field(s) {missing}")
             continue
-        if e["source"] not in ids:
-            issues.append(f"{label}: edge[{i}] dangling source {e['source']!r}")
-        if e["target"] not in ids:
-            issues.append(f"{label}: edge[{i}] dangling target {e['target']!r}")
+        src, tgt = e["source"], e["target"]
+        if not isinstance(src, str):
+            issues.append(f"{label}: edge[{i}] source is not a string id: {src!r}")
+        elif src not in ids:
+            issues.append(f"{label}: edge[{i}] dangling source {src!r}")
+        if not isinstance(tgt, str):
+            issues.append(f"{label}: edge[{i}] target is not a string id: {tgt!r}")
+        elif tgt not in ids:
+            issues.append(f"{label}: edge[{i}] dangling target {tgt!r}")
         if e["confidence"] not in _CONFIDENCE:
             issues.append(f"{label}: edge[{i}] confidence {e['confidence']!r} not in {_CONFIDENCE}")
+    return issues
+
+
+def _hyperedge_member_issues(members: object, ids: set[str], i: int, label: str) -> list[str]:
+    """Problems with one hyperedge's `nodes`/`members` list: arity, shape, resolution.
+
+    Split out of `_hyperedge_issues`'s loop body so that function stays under
+    this repo's complexity gate (`C901`/`PLR0912`) — the check content and
+    order are unchanged from when they lived inline. All independent: a
+    non-list, a too-short list, a non-string member, and a dangling member are
+    each reported without any of the others short-circuiting.
+    """
+    if not isinstance(members, list):
+        return [f"{label}: hyperedge[{i}] has no 'nodes' list"]
+    issues: list[str] = []
+    if len(members) < _MIN_HYPEREDGE_MEMBERS:
+        issues.append(
+            f"{label}: hyperedge[{i}] has {len(members)} member(s), needs "
+            f"at least {_MIN_HYPEREDGE_MEMBERS} — fewer than that is just "
+            f"an edge, and graphify drops the hyperedge outright once "
+            f"member resolution leaves it with none"
+        )
+    non_string = [m for m in members if not isinstance(m, str)]
+    if non_string:
+        issues.append(f"{label}: hyperedge[{i}] member(s) are not string ids: {non_string!r}")
+    missing = [m for m in members if isinstance(m, str) and m not in ids]
+    if missing:
+        issues.append(f"{label}: hyperedge[{i}] dangling member(s) {missing}")
     return issues
 
 
@@ -137,8 +197,8 @@ def _hyperedge_issues(hyperedges: object, ids: set[str], label: str) -> list[str
     vanish at ingestion. That is a large part of why the corpus's own description
     of graphify's pipeline is disconnected (#134). Found by the cold lane, round 2.
 
-    Extended 2026-08-05 (#170, #176) with two more checks, each independent of
-    the member-resolution check above — a hyperedge missing its id can still
+    Extended 2026-08-05 (#170, #176) with several more checks, each independent
+    of the member-resolution check above — a hyperedge missing its id can still
     have dangling members, and both are reported:
 
     - `id` must be a non-empty string and unique within `hyperedges`. Without a
@@ -149,6 +209,18 @@ def _hyperedge_issues(hyperedges: object, ids: set[str], label: str) -> list[str
       (EXTRACTED|INFERRED). This function never checked `confidence` at all
       before — AMBIGUOUS is an edge-only tier in graphify's schema, and nothing
       stopped a hyperedge from carrying it.
+    - `nodes` must have at least `_MIN_HYPEREDGE_MEMBERS` entries — see that
+      constant's own docstring for why fewer is an agent error here even
+      though graphify itself tolerates it.
+    - a member that is not a string (an agent emitting `{"id": "a"}` where a
+      bare id belongs) is reported as "not a string id" rather than compared
+      against `ids` with `in`. `m not in ids` against a `set[str]` raises
+      `TypeError`, not False, when `m` is unhashable — that used to escape
+      `validate()`'s own "never raises" contract (see that function's
+      docstring) through all three of its callers: `kb-validate-chunks`,
+      `kb-assemble` (a `TypeError` instead of the documented `ValueError`), and
+      `graphify_ops.merge_chunk` (`mise run kb-merge` printing a traceback
+      instead of its `rc=2` refusal).
 
     A hyperedge that is not a dict skips every further check on it (there is
     nothing to check); every other combination of problems is reported
@@ -172,12 +244,7 @@ def _hyperedge_issues(hyperedges: object, ids: set[str], label: str) -> list[str
         else:
             seen_ids.add(hid)
         members = h.get("nodes", h.get("members"))
-        if not isinstance(members, list):
-            issues.append(f"{label}: hyperedge[{i}] has no 'nodes' list")
-        else:
-            missing = [m for m in members if m not in ids]
-            if missing:
-                issues.append(f"{label}: hyperedge[{i}] dangling member(s) {missing}")
+        issues.extend(_hyperedge_member_issues(members, ids, i, label))
         confidence = h.get("confidence")
         if confidence not in _HYPEREDGE_CONFIDENCE:
             issues.append(
@@ -296,12 +363,18 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
       set(seen), ...)` — the ARTIFACT THAT ACTUALLY GETS WRITTEN. `seen`'s keys
       are exactly the valid node ids across every input chunk, a SUPERSET of
       what each chunk validated its own hyperedges against above (the per-chunk
-      `validate()` call below is passed no `known_ids`), so this pass cannot
-      itself surface a new dangling member — anything still unresolved here was
-      already unresolved per-chunk, and `problems` already holds it. What ONLY
-      the combined pass can catch: a hyperedge id collision BETWEEN two
-      different chunks — the hyperedge-level analogue of the node `seen` map
-      below, which exists for exactly the same reason.
+      `validate()` call below is passed no `known_ids`), so for a chunk whose
+      nodes/edges validated cleanly, this pass cannot surface a NEW dangling
+      member — anything still unresolved here was already unresolved
+      per-chunk, and `problems` already holds it. That guarantee has one
+      exception, and it is not an edge case: `validate()` returns EARLY, before
+      `_hyperedge_issues` ever runs, when a chunk's own `nodes` or `edges` key
+      is not a list — so that chunk's hyperedges are never checked per-chunk at
+      all, and the combined pass here is the FIRST thing to see them. What ONLY
+      the combined pass can catch unconditionally, even for a chunk that
+      validated perfectly: a hyperedge id collision BETWEEN two different
+      chunks — the hyperedge-level analogue of the node `seen` map below, which
+      exists for exactly the same reason.
     """
     nodes: list = []
     edges: list = []
@@ -329,8 +402,13 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     # Re-validate the COMBINED hyperedge list against the union of node ids the
     # written artifact will actually contain. Calling `_hyperedge_issues`
     # directly rather than re-running `validate()` on a synthetic combined dict
-    # is deliberate: `validate()` would re-report every per-chunk node/edge
-    # problem a second time, turning one real defect into two lines of noise.
+    # is deliberate: `validate()` would re-report every per-chunk NODE and EDGE
+    # problem a second time on top of the hyperedge ones. It does NOT avoid
+    # double-reporting a hyperedge problem itself — a hyperedge that was
+    # already invalid per-chunk above is reported AGAIN here, once under its
+    # own chunk's label and once under "(combined)". That duplication is the
+    # accepted cost of also validating the artifact that actually gets written
+    # against its own final node set, not something this call sidesteps.
     problems.extend(_hyperedge_issues(hyperedges, set(seen), f"{name} (combined)"))
 
     if problems:
