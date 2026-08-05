@@ -3,8 +3,14 @@
 Reproducibility model: the graph is rebuildable from two committed things —
 `sources/*.manifest` (external repo pins) and `sources/extractions/*.json` (the
 non-free host-agent doc extractions). The external repos themselves are cloned on
-demand and gitignored. `graphify-out/` (graph.json + manifest.json) is committed
-so consumers query on clone and `update` can diff incrementally.
+demand and gitignored — and so is everything under `graphify-out/` except the
+authored `memory/`: `graph.json` is DERIVED, far past git's limits at aggregate
+scale, and consumers reach it via `kb-serve` (MCP) or a pushed graph DB, never a
+git blob. (This paragraph claimed graph.json + manifest.json were committed
+until 2026-08-05 — stale since the aggregate outgrew git, flagged by a lane
+mid-#175.) `build()` composes everything in ONE N-ary merge and ends in the
+final labelled state; `refresh_self` (kb-watch) recomposes from the recorded
+inputs rather than patching the artifact in place.
 """
 
 from __future__ import annotations

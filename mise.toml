@@ -288,8 +288,11 @@ description = "Re-extract THIS repo's own code (python/ + tests/) into the aggre
 # NOT a watcher, despite the name it inherits from `graphify watch`. That
 # subcommand rebuilds only <path>/graphify-out/graph.json and exposes no
 # post-rebuild hook, so it cannot refresh the aggregate graph `affected` reads.
-# One-shot and incremental (`graphify update`, AST-only, free). Logic in
-# kb_setup.graph.refresh_self.
+# One-shot RECOMPOSITION since #175: re-extracts our code (AST-only, free), then
+# recomposes the aggregate from `.compose-manifest.json`'s recorded inputs plus
+# the `.merged-chunks.json` ledger of between-build kb-merges — refusing, by
+# name, any ledger entry it cannot verify rather than silently dropping it.
+# Logic in kb_setup.graph.refresh_self.
 run = "uv run kb-setup watch"
 
 [tasks.kb-prose]
