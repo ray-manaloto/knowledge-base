@@ -17,11 +17,21 @@ from kb_setup import insights
 _NODE = {"id": "n1", "label": "n1", "_origin": "ast"}
 
 
-def _write_graph(out: Path, *, tiers: list[str], node_confidence: int = 0) -> Path:
+def _write_graph(
+    out: Path,
+    *,
+    tiers: list[str],
+    node_confidence: int = 0,
+    hyperedges: list[dict] | None = None,
+) -> Path:
     """A pretty-printed graph.json shaped like graphify's real output.
 
     `node_confidence` seeds nodes carrying an edge-only `confidence` field —
     which is not hypothetical: 5 real AST nodes in this corpus do exactly that.
+
+    `hyperedges` seeds the top-level array that follows `links`. graphify's own
+    hyperedge schema carries a `confidence`, so an entry there is the realistic
+    way a scan that fails to stop at the end of `links` over-counts.
     """
     nodes = [dict(_NODE, id=f"n{i}") for i in range(2)]
     nodes += [dict(_NODE, id=f"bad{i}", confidence="EXTRACTED") for i in range(node_confidence)]
@@ -39,7 +49,7 @@ def _write_graph(out: Path, *, tiers: list[str], node_confidence: int = 0) -> Pa
                 "graph": {},
                 "nodes": nodes,
                 "links": links,
-                "hyperedges": [],
+                "hyperedges": hyperedges or [],
                 "built_at_commit": "deadbeef",
             },
             indent=2,
@@ -76,6 +86,36 @@ def test_audit_ignores_a_node_carrying_confidence(tmp_path: Path) -> None:
     a = insights.audit_edges(g)
     assert a.total == 5
     assert a.by_tier == {"EXTRACTED": 3, "INFERRED": 2}
+
+
+def test_audit_stops_at_the_end_of_the_links_array(tmp_path: Path) -> None:
+    """Arms the `break` — a hyperedge's own `confidence` must not be counted.
+
+    Found by a cold review, which deleted the `break` and watched the whole
+    suite stay green: the line the module's docstring is loudest about had no
+    FAIL direction armed. Every other fixture wrote `"hyperedges": []`, so
+    nothing followed the links array that could be miscounted — the gate could
+    only pass.
+
+    graphify's hyperedge schema carries a `confidence`, so this is the realistic
+    shape, not a synthetic one. Without the `break` the scan reports 2 here
+    instead of 1.
+    """
+    g = _write_graph(
+        tmp_path / "graphify-out",
+        tiers=["EXTRACTED"],
+        hyperedges=[
+            {
+                "id": "he1",
+                "nodes": ["n0", "n1"],
+                "relation": "participate_in",
+                "confidence": "INFERRED",
+            }
+        ],
+    )
+    a = insights.audit_edges(g)
+    assert a.total == 1
+    assert a.by_tier == {"EXTRACTED": 1}
 
 
 def test_audit_reports_an_unexpected_tier_rather_than_dropping_it(tmp_path: Path) -> None:

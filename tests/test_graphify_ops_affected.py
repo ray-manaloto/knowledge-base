@@ -121,6 +121,27 @@ def test_an_explicit_graph_wins(monkeypatch, tmp_path: Path) -> None:
     assert argv[argv.index("--graph") + 1] == str(other)
 
 
+def test_the_attached_graph_form_is_refused(monkeypatch, tmp_path: Path) -> None:
+    """`--graph=<path>` is rejected, not silently swapped for our pin.
+
+    graphify ignores the attached spelling entirely and falls back to its
+    cwd-relative default (`ATTACHED_GRAPH`'s note records the probe). Accepting
+    it would discard the caller's corpus and substitute ours — benign in outcome
+    but a lie in the docstring, and `query` already refuses it. A cold review
+    found the two near-identical functions disagreeing on this input.
+    """
+    from kb_setup import graphify_ops
+
+    _graph(tmp_path)
+
+    def _must_not_spawn(*_a: object, **_k: object) -> None:
+        pytest.fail("affected() spawned graphify for the unsupported attached form")
+
+    monkeypatch.setattr(graphify_ops, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(graphify_ops.subprocess, "run", _must_not_spawn)
+    assert graphify_ops.affected(tmp_path, ["sym", "--graph=/tmp/other.json"]) == 2
+
+
 def test_flags_reach_graphify_untouched(monkeypatch, tmp_path: Path) -> None:
     """`--depth` / `--relation` are graphify's, and this wrapper must not eat them.
 

@@ -310,11 +310,28 @@ def affected(repo_root: Path, args: Sequence[str]) -> int:
     The graph is pinned explicitly for the same reason `query` pins it: the
     upstream default resolves `graphify-out/graph.json` against the process cwd,
     so it answers from a different corpus depending on where it was run. Callers
-    may still pass their own `--graph`, which wins.
+    may still pass their own `--graph <path>`, which wins.
+
+    The ATTACHED spelling `--graph=<path>` is REFUSED, exactly as `query`
+    refuses it and for the same measured reason (see :data:`ATTACHED_GRAPH`):
+    graphify ignores that form entirely and falls back to its cwd-relative
+    default. Accepting it here would silently discard the caller's choice and
+    substitute our pin — benign today, since our pin is the graph they almost
+    certainly wanted, but it makes the docstring above a lie for one spelling.
+    A near-identical sibling hardened against an input while this one was not is
+    the shape a cold review flagged; the fix is to make them agree.
     """
     if not args:
         print(
             '[kb-affected] usage: mise run kb-affected -- "<symbol>" [--depth N] [--relation R]...',
+            file=sys.stderr,
+        )
+        return 2
+    if attached := [a for a in args if a.startswith(ATTACHED_GRAPH)]:
+        print(
+            f"[kb-affected] graphify does not support the attached form "
+            f"({attached[0]}) — it ignores the argument and answers from the "
+            f"cwd-relative default instead. Use `--graph <path>`.",
             file=sys.stderr,
         )
         return 2
