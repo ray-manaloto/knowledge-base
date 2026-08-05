@@ -294,6 +294,45 @@ def _full_graph(repo_root: Path) -> Path:
     return repo_root / "graphify-out" / "graph.json"
 
 
+def affected(repo_root: Path, args: Sequence[str]) -> int:
+    """`kb-affected` — `graphify affected`, the reverse-dependency question.
+
+    `query` is a forward BFS from the terms you name, so "what calls this" is a
+    question it structurally cannot answer. `affected` walks the edges backwards
+    instead, which is the blast radius of a change: which callers and which
+    tests move if this symbol does.
+
+    Wired here rather than left to a bare `graphify affected` — which the guard
+    does allow — because `graph.refresh_self` exists precisely so this question
+    is answerable about OUR code, and a capability with no verb is one nobody
+    reaches for. `--depth` defaults to 2 upstream; pass it through untouched.
+
+    The graph is pinned explicitly for the same reason `query` pins it: the
+    upstream default resolves `graphify-out/graph.json` against the process cwd,
+    so it answers from a different corpus depending on where it was run. Callers
+    may still pass their own `--graph`, which wins.
+    """
+    if not args:
+        print(
+            '[kb-affected] usage: mise run kb-affected -- "<symbol>" [--depth N] [--relation R]...',
+            file=sys.stderr,
+        )
+        return 2
+    rest = list(args)
+    if GRAPH_FLAG not in rest:
+        graph = _full_graph(repo_root)
+        if not graph.is_file():
+            print(
+                f"[kb-affected] no graph at {graph} — run `mise run kb-build` first",
+                file=sys.stderr,
+            )
+            return 2
+        rest = [*rest, GRAPH_FLAG, str(graph)]
+    return subprocess.run(
+        [graphify_exe(repo_root), "affected", *rest], cwd=repo_root, env=clean_env(), check=False
+    ).returncode
+
+
 @dataclass(frozen=True)
 class _IdfArgs:
     """A parsed `--idf` invocation: the question, the corpus, how many to show."""

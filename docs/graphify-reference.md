@@ -179,6 +179,46 @@ the final self-merge that runs after the base snapshot. `kb_setup.graph._merge_s
 is the only place this is spelled; `tests/test_merge_prefixes_once.py` holds the
 unit, integration and control arms.
 
+### Provenance is in the node ID, NOT in `repo` (#164)
+
+That second prefix pass has a cost nobody had read off the artifact until
+2026-08-05. `prefix_graph_for_global` sets `data["repo"] = repo_tag`
+**unconditionally** while `local_id` uses `setdefault` — so the self-merge
+overwrites every already-merged node's tag. Measured: `repo` has exactly **two**
+values, `knowledge-base` (331,251) and `.self-graph` (3,235), across 46 sources.
+
+**Read `node["id"].split("::")[1]`** for the source — 40+ distinct tags, and it is
+correct for all 328,387 depth-2 nodes. The `setdefault` asymmetry is also the proof
+of exactly two passes: a sampled node's `local_id` lacks the `OpenSymphony::`
+segment its `id` carries.
+
+### Cross-source edges are IMPOSSIBLE via merge — by design
+
+`merge-graphs` is `nx.compose` over inputs each relabelled into a disjoint
+`<tag>::` namespace (`cli.py:2166-2172`). `compose` unifies nodes by id equality
+only, so no node is ever identified across sources and no edge can span two.
+**Measured: 0 cross-source edges of 816,538**, control-armed three ways (the
+sharpest: 100% of edges classified by id prefix, 0 skipped, while the same parser
+finds 108,647 edges crossing a *community* boundary). Upstream #1729 confirms the
+intent — colliding prefixes were the defect, because they "invent cross-runtime
+edges".
+
+The one mechanism that DOES span sources is a **single `extract` over a single
+root**: `resolve_cross_file_raw_calls` (`symbol_resolution.py:307-376`) builds a
+global label→id index over the whole scanned tree and emits `calls`/INFERRED/0.8
+for uniquely-resolving bare names. So connectivity is bought at extraction time,
+never at merge time. See #167.
+
+### 0.9.33's incremental fix can fail open, silently
+
+0.9.33 fixes `update` dropping member-call/`indirect_call` edges into unchanged
+targets (#2437/#2438). The new incremental-resolution context calls
+`check_graph_file_size_cap(existing_graph_path)` and wraps the block in
+`except Exception: _ctx_nodes, _ctx_edges = [], []` — so **on an oversized graph
+the fix reverts to the old lossy behaviour with no warning and no rc change**.
+At 552 MB against this repo's `GRAPHIFY_MAX_GRAPH_BYTES = 1GB` we are fine; the
+protection disappears without announcing itself as the corpus grows.
+
 ### Growing the corpus — the ladder, cheapest rung first
 
 The 512 MiB `_MAX_GRAPH_FILE_BYTES` is a **soft, per-file memory-bomb guard**, not

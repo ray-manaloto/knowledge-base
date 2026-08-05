@@ -329,6 +329,24 @@ description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N]
 # REJECTED rather than ignored. `--top N` sets how many ranked hits print.
 run = "uv run kb-setup query"
 
+[tasks.kb-affected]
+description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
+# The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from
+# the terms you name; "what breaks if I change this" needs the edges walked
+# backwards, which is what `graphify affected` does (reverse traversal over
+# DEFAULT_AFFECTED_RELATIONS). Depth defaults to 2 upstream.
+#
+# It reads the UNSCOPED graph deliberately — this is a code question, so the prose
+# graph would be the wrong corpus. And it pins --graph for the same reason kb-query
+# does: graphify resolves its default against the process cwd, so an unpinned run
+# answers from whichever corpus happens to sit under it.
+#
+# Why a task at all, when the guard already allows a bare `graphify affected`:
+# `graph.refresh_self` exists SO THAT this question is answerable about our own
+# code (graph.py:230-240 says so), and until now there was no verb — a capability
+# built and never wired. `mise-tasks-only.md`: a recurring workflow ships as a task.
+run = "uv run kb-setup affected"
+
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
 # graphify-mcp binds to an ABSOLUTE graph path, so this server only ever serves
