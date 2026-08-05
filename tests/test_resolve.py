@@ -634,3 +634,133 @@ def test_a_repair_still_ignores_the_vendored_tier_control(tmp_path: Path):
     """
     root = _repo(tmp_path, {"sources/hk/src/step/runner.rs": "x\n"})
     assert resolve.resolve_extension_typo(root, "runner.os", ("runner.rs",)) is None
+
+
+# ------------------------------------------------------ elided citations ----
+#
+# `resolve_elided` answers a DIFFERENT question from `resolve_path`: not "does
+# this file exist" but "does anything here match". Every negative below is paired
+# with the positive control that proves the pattern could have matched, because a
+# glob that matches nothing and a glob that cannot match anything look identical
+# in the result.
+
+_REPORTS = ".agent/kb/review/reports"
+
+
+def test_an_elided_citation_matching_one_file_resolves(tmp_path: Path):
+    """The positive control for every MISSING assertion below."""
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    got = resolve.resolve_elided(root, f"{_REPORTS}/review-abc1234…-cold.md")
+    assert got.state is resolve.State.RESOLVED
+
+
+def test_an_elided_bare_filename_resolves_on_its_basename(tmp_path: Path):
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    got = resolve.resolve_elided(root, "review-abc1234…-cold.md")
+    assert got.state is resolve.State.RESOLVED
+
+
+def test_an_elided_citation_matching_nothing_is_missing(tmp_path: Path):
+    """THE #148 CASE: a lane report named for a commit that never ran."""
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    got = resolve.resolve_elided(root, f"{_REPORTS}/review-deadbee…-cold.md")
+    assert got.state is resolve.State.MISSING
+
+
+def test_an_elided_citation_naming_a_lane_that_never_ran_is_missing(tmp_path: Path):
+    """Same commit, wrong lane — the half a sha-only check would wave through."""
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    got = resolve.resolve_elided(root, f"{_REPORTS}/review-abc1234…-silent-failure.md")
+    assert got.state is resolve.State.MISSING
+
+
+def test_an_elision_does_not_cross_a_directory_boundary(tmp_path: Path):
+    """The bound that keeps an elision from becoming `**`.
+
+    Paired with its control below: the same repo, a pattern whose elision stays
+    inside one segment, which DOES resolve. Without that pair a MISSING here
+    would be indistinguishable from a pattern that could never match.
+    """
+    root = _repo(tmp_path, {"docs/alpha/beta.md": "x\n"})
+    assert resolve.resolve_elided(root, "docs/a…beta.md").state is resolve.State.MISSING
+    assert resolve.resolve_elided(root, "docs/alpha/b…a.md").state is resolve.State.RESOLVED
+
+
+def test_several_matches_resolve_rather_than_reporting_ambiguity(tmp_path: Path):
+    """An elision is a WILDCARD the author wrote on purpose, so many hits is it working.
+
+    `resolve_path` reports AMBIGUOUS for a shorthand naming several files because
+    a reader may want to disambiguate it. Here there is nothing to disambiguate —
+    the author asked for a set — so several matches is RESOLVED, and the count
+    goes in the detail so a reader can see how loose the pattern was.
+    """
+    root = _repo(
+        tmp_path,
+        {
+            f"{_REPORTS}/review-aaa-cold.md": "x\n",
+            f"{_REPORTS}/review-bbb-cold.md": "y\n",
+        },
+    )
+    got = resolve.resolve_elided(root, f"{_REPORTS}/review-…-cold.md")
+    assert got.state is resolve.State.RESOLVED
+    assert "2" in got.detail
+
+
+def test_an_elided_citation_into_another_repo_is_unverifiable(tmp_path: Path):
+    """Not MISSING: this checker has no standing to call another repo's path broken."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    got = resolve.resolve_elided(root, "graphify/src/watch…er.py")
+    assert got.state is resolve.State.UNVERIFIABLE
+
+
+def test_an_elided_directory_citation_resolves_against_directories(tmp_path: Path):
+    root = _repo(tmp_path, {".agent/kb/reports/agents/x.md": "x\n"})
+    got = resolve.resolve_elided(root, ".agent/kb/reports/age…/")
+    assert got.state is resolve.State.RESOLVED
+
+
+def test_an_elided_directory_citation_does_not_match_a_file(tmp_path: Path):
+    """The kind check `_resolve_literal` makes, kept here: a trailing `/` means a dir."""
+    root = _repo(tmp_path, {"docs/alpha.md": "x\n"})
+    assert resolve.resolve_elided(root, "docs/al….md/").state is not resolve.State.RESOLVED
+    assert resolve.resolve_elided(root, "docs/al….md").state is resolve.State.RESOLVED
+
+
+def test_an_elided_citation_matches_only_on_a_segment_boundary(tmp_path: Path):
+    """A tail is not a match. `laude/rules/x.md` must not find `.claude/rules/x.md`.
+
+    The discipline `_suffix_matches` keeps for literal tokens, asserted here
+    because the elided matcher builds its own regex and could drop it silently.
+    Paired with the control that the SAME pattern resolves once the boundary is
+    real.
+    """
+    root = _repo(tmp_path, {".claude/rules/alpha.md": "x\n"})
+    assert resolve.resolve_elided(root, "laude/rules/al….md").state is not resolve.State.RESOLVED
+    assert resolve.resolve_elided(root, "rules/al….md").state is resolve.State.RESOLVED
+
+
+def test_an_elided_citation_resolves_inside_a_pinned_clone(tmp_path: Path):
+    """The vendored tier, ordered after the authored one exactly as `resolve_path` orders it.
+
+    Handoffs cite graphify's and mise's own source, which this repo pins and can
+    therefore read. Excluding the tier would report those as broken.
+    """
+    root = _repo(tmp_path, {"sources/graphify/src/watcher.py": "x\n"})
+    got = resolve.resolve_elided(root, "sources/graphify/src/wat…er.py")
+    assert got.state is resolve.State.RESOLVED
+    assert "vendored" in got.detail
+
+
+def test_an_elision_in_the_first_segment_still_reports_a_real_miss(tmp_path: Path):
+    """An elided FIRST segment cannot be stat-ed, so the miss was softened to UNVERIFIABLE.
+
+    `_elided_miss` asked `(repo_root / first).exists()` on a literal that still
+    contained the elision, so the test could never succeed and a genuinely broken
+    citation escaped at exit 0 — UNVERIFIABLE does not fail the run. Paired with
+    its control: a first segment that matches nothing real is still
+    UNVERIFIABLE, so the fix did not simply make everything MISSING.
+    (Cold lane, MAJOR.)
+    """
+    root = _repo(tmp_path, {"docs/real.md": "x\n"})
+    assert resolve.resolve_elided(root, "d…s/nonexistent.md").state is resolve.State.MISSING
+    assert resolve.resolve_elided(root, "z…z/nonexistent.md").state is resolve.State.UNVERIFIABLE

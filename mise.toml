@@ -546,7 +546,7 @@ description = 'Score project skills with plugin-eval (static layer, no LLM): mis
 run = "uv run kb-setup skill-score"
 
 [tasks.kb-handoff-check]
-description = "Verify a handoff's claims — paths (incl. mistyped extensions), file:line, task names, gate results: mise run kb-handoff-check [-- <path>]"
+description = "Verify a handoff's claims — paths (incl. mistyped extensions and elided report names), file:line, task names, gate results: mise run kb-handoff-check [-- <path>]"
 # Replaces the by-hand half of /clear-prep step 6, which asks the agent that WROTE
 # the handoff to verify it from memory at the end of a long session — and which
 # already failed that way (`:1836` written for `:1830`, propagated into three

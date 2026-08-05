@@ -1317,3 +1317,130 @@ def test_the_accepted_reason_help_names_the_new_reason() -> None:
     help_text = review._skip_reason_help()
     assert "by-policy-one-lane" in help_text
     assert "not-applicable-" in help_text
+
+
+# ------------------------------------------------ strip_lane_variant (#148) ----
+
+
+def test_canonical_lane_report_removes_a_variant_from_a_lane_report_name():
+    got = review.canonical_lane_report(".agent/kb/review/reports/review-abc123-cold:codex.md")
+    assert got == ".agent/kb/review/reports/review-abc123-cold.md"
+
+
+def test_canonical_lane_report_keeps_a_hyphenated_lane_intact():
+    """`silent-failure` must survive: the variant separator is `:`, never the last `-`."""
+    got = review.canonical_lane_report("review-abc123-silent-failure:codex.md")
+    assert got == ".agent/kb/review/reports/review-abc123-silent-failure.md"
+
+
+def test_canonical_lane_report_leaves_a_name_with_no_variant_alone():
+    assert review.canonical_lane_report("review-abc123-cold.md") == "review-abc123-cold.md"
+
+
+def test_canonical_lane_report_leaves_a_non_review_filename_alone():
+    assert review.canonical_lane_report("docs/notes:draft.md") == "docs/notes:draft.md"
+
+
+def test_canonical_lane_report_leaves_another_directory_alone():
+    """THE REACHING CASE, which the test above could not reach.
+
+    That one varies the basename PREFIX, so it only ever exercised the
+    `startswith("review-")` guard. The claim the docstring actually made was
+    about the DIRECTORY, and nothing tested it — so `docs/review-2026:q3.md`
+    became `docs/review-2026.md`: a token outside this module's directory
+    silently rewritten into a name that may exist, which is the false-green
+    direction. Found by the standards lane running the function rather than
+    reading it. (H1.)
+    """
+    assert review.canonical_lane_report("docs/review-2026:q3.md") == "docs/review-2026:q3.md"
+    assert (
+        review.canonical_lane_report("python/src/kb_setup/review-notes:draft.md")
+        == "python/src/kb_setup/review-notes:draft.md"
+    )
+
+
+def test_canonical_lane_report_accepts_the_report_directory_and_a_bare_name():
+    """The two forms handoffs really write. Control arm for the test above."""
+    assert (
+        review.canonical_lane_report(".agent/kb/review/reports/review-abc-cold:codex.md")
+        == ".agent/kb/review/reports/review-abc-cold.md"
+    )
+    assert (
+        review.canonical_lane_report("review-abc-cold:codex.md")
+        == ".agent/kb/review/reports/review-abc-cold.md"
+    )
+
+
+def test_canonical_lane_report_preserves_an_elision():
+    """`_safe_lane` is NOT applied here, and this is why.
+
+    It keeps only alphanumerics, `-` and `_`, so composing it as the writer does
+    would turn `review-abc1234…-cold` into `review-abc1234-cold` — destroying the
+    elision and silently converting a pattern into a literal that matches
+    nothing. A review lane proposed matching the writer exactly; running it is
+    what showed the two sides are not symmetric. (J1.)
+    """
+    got = review.canonical_lane_report("review-abc1234…-cold:codex.md")
+    assert got == ".agent/kb/review/reports/review-abc1234…-cold.md"
+
+
+def test_canonical_lane_report_leaves_a_bare_non_review_name_alone():
+    """The `review-` prefix is load-bearing ONLY for a bare filename — pin that.
+
+    With a directory the scope check already refuses anything outside
+    `REPORT_DIR`, so removing the prefix guard changes nothing there. It changes
+    everything for a bare name: `notes:draft.md` has no directory to judge, and
+    without the prefix it would be rewritten to `notes.md` — a token repaired
+    into a name that may exist. Mutation arm B13 survived until this test
+    existed, which is precisely what the arm is for.
+    """
+    assert review.canonical_lane_report("notes:draft.md") == "notes:draft.md"
+
+
+def test_canonical_lane_report_leaves_a_bare_review_name_that_is_not_a_lane_report():
+    """THE BLOCKING FALSE GREEN, shipped inside the fix for the previous one.
+
+    The directory guard only fires when there IS a directory, so a BARE
+    `review-gu…:draft.md` — a form accepted on purpose — had nothing between it
+    and the rewrite. It became `review-gu….md`, globbed onto an unrelated
+    `review-guide-notes.md`, and `handoff.check` reported a citation that exists
+    NOWHERE as OK. Found by the cold lane by running the pipeline, not reading
+    it. The guard that holds the property asks the closed `LANES` set whether
+    the stem names a lane at all.
+    """
+    assert review.canonical_lane_report("review-gu…:draft.md") == "review-gu…:draft.md"
+    assert review.canonical_lane_report("review-2026:q3.md") == "review-2026:q3.md"
+
+
+def test_canonical_lane_report_accepts_every_known_lane():
+    """Control arm for the test above: prove the guard can still say yes.
+
+    Asserted over `LANES` itself rather than a hand-listed set, so a lane added
+    upstream cannot leave this passing while the repair silently stops
+    recognising it.
+    """
+    for lane in review.LANES:
+        got = review.canonical_lane_report(f"review-abc1234…-{lane}:codex.md")
+        assert got == f".agent/kb/review/reports/review-abc1234…-{lane}.md", lane
+
+
+def test_canonical_lane_report_needs_the_review_prefix():
+    """Each of the three guards is separately reachable — this is the prefix's case.
+
+    Adding the lane-suffix guard made the other two look redundant: mutation arms
+    B13 and B14 both survived, because the cases they had been armed on were now
+    caught by the new guard. They are not redundant — they hold different facets
+    of "this is a lane report", and each needed a reaching case constructed to
+    prove it. `foo-cold:x.md` carries a known lane suffix and no `review-`
+    prefix, so only the prefix guard stands between it and a rewrite.
+    """
+    assert review.canonical_lane_report("foo-cold:x.md") == "foo-cold:x.md"
+
+
+def test_canonical_lane_report_needs_the_report_directory():
+    """The directory guard's own reaching case, for the same reason as above.
+
+    `docs/review-abc-cold:x.md` satisfies BOTH the `review-` prefix and the
+    `-cold` lane suffix, so only the directory test refuses it.
+    """
+    assert review.canonical_lane_report("docs/review-abc-cold:x.md") == "docs/review-abc-cold:x.md"

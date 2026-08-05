@@ -42,10 +42,13 @@ purpose, because a commit that adds one doc invalidates an exact one.
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
+
+from kb_setup.citations import ELISION
 
 #: Directory NAMES pruned wherever they appear: caches, the virtualenv, git's
 #: own object store, and every graphify output tree. None is authored and all
@@ -262,6 +265,125 @@ def resolve_path(repo_root: Path, token: str, index: Index | None = None) -> Res
     if "/" not in token:
         return Resolution(State.MISSING, f"no file named {token} in this repo or its sources")
     return _unresolved_relative(repo_root, token, idx)
+
+
+def resolve_elided(repo_root: Path, token: str, index: Index | None = None) -> Resolution:
+    """Resolve a citation whose middle is ABBREVIATED — `review-8a46d08…-cold.md` (#148).
+
+    A DIFFERENT QUESTION from :func:`resolve_path`, which is why it is a different
+    function rather than a flag. That one asks whether one named file exists; this
+    asks whether anything here matches a pattern the author wrote. `Path.exists()`
+    cannot be asked at all, so the literal tier has no analogue and the index is
+    the only evidence.
+
+    THE ELISION STAYS INSIDE ONE SEGMENT. It stands for the tail of a sha, not for
+    a subtree, and letting it cross `/` would turn every abbreviated citation into
+    a `**` that resolves against almost anything — a check that cannot say no.
+    Paired arms pin it: `docs/a…beta.md` misses while `docs/alpha/b…a.md` resolves
+    in the same repo.
+
+    SEVERAL MATCHES IS RESOLVED, NOT AMBIGUOUS. `resolve_path` reports AMBIGUOUS
+    because a shorthand naming four files is probably fine but worth
+    disambiguating; here the author asked for a set on purpose, so there is
+    nothing to disambiguate. The count goes in the detail instead, because a
+    pattern loose enough to match sixty reports has verified very little and the
+    reader is the one who can tell whether that was intended. Deciding *how*
+    specific is specific enough would be a threshold nobody could defend, and the
+    honest alternative is to show the number.
+
+    The vendored tier is consulted after the authored one, exactly as
+    :func:`resolve_path` orders them, so a pinned clone can never shadow a file
+    this repo wrote.
+    """
+    idx = index if index is not None else build_index(repo_root)
+    pattern = _elided_pattern(token)
+    wants_dir = token.endswith("/")
+    pool = idx.dirs if wants_dir else idx.files
+    matches = [p for p in pool if pattern.match(p)]
+    if matches:
+        return _elided_resolution(repo_root, matches, "")
+    # No `wants_dir` guard: `build_index` puts only FILES in the vendored tier
+    # (verified — 0 of 72,296 entries is a directory), so a guard here would be
+    # a second guard for a property the index already holds. This commit argues
+    # exactly that in `elided_citations`; applying the doctrine in one file and
+    # not the other is the inconsistency. (Standards lane, J4.)
+    vendored = [p for p in idx.vendored if pattern.match(p)]
+    if vendored:
+        return _elided_resolution(repo_root, vendored, "vendored: ")
+    return _elided_miss(repo_root, token)
+
+
+def _elided_pattern(token: str) -> re.Pattern[str]:
+    """``token`` as a regex over indexed paths, matching on segment boundaries.
+
+    The same suffix discipline as :func:`_suffix_matches`, for the same reason: a
+    multi-segment citation names any path ENDING in it (`currency/run.py` finds
+    `python/src/kb_setup/currency/run.py`), while a bare filename names a
+    basename. Anchoring at a `/` rather than anywhere is what stops
+    `laude/rules/x.md` resolving against `.claude/rules/x.md` — a checker that
+    accepts any tail has stopped being able to say no.
+    """
+    needle = token.rstrip("/")
+    body = "[^/]*".join(re.escape(part) for part in needle.split(ELISION))
+    # ONE form covers both shapes. `(?:.*/)?` is the segment-boundary anchor: it
+    # consumes whole leading directories or nothing, so a multi-segment token
+    # matches any path ending in it and a bare filename matches a basename —
+    # without a separate branch that could drift from `_suffix_matches`.
+    return re.compile(f"^(?:.*/)?{body}$")
+
+
+def _elided_resolution(repo_root: Path, matches: list[str], label: str) -> Resolution:
+    """RESOLVED for any number of matches, naming the one or counting the many."""
+    if len(matches) == 1:
+        return Resolution(State.RESOLVED, f"{label}{matches[0]}", repo_root / matches[0])
+    # No `sorted()` here: every tier of `Index` is already `tuple(sorted(...))`
+    # and a comprehension preserves order, so re-sorting was a no-op dressed as a
+    # guarantee. The overflow suffix matches `_from_matches` verbatim — one
+    # reader sees both, and two spellings of "there are more" is the drift a
+    # third caller would harden into a fork. (Standards lane, J2.)
+    shown = ", ".join(matches[:_SHOWN_MATCHES])
+    more = "" if len(matches) <= _SHOWN_MATCHES else f", … ({len(matches)} total)"
+    return Resolution(State.RESOLVED, f"{label}{len(matches)} files match: {shown}{more}")
+
+
+def _elided_miss(repo_root: Path, token: str) -> Resolution:
+    """Decide whether an unmatched elided citation is WRONG or about another repo.
+
+    The first-segment test :func:`_unresolved_relative` makes, minus its near-hit
+    tier — a near hit suffix-matches a literal tail, and an elided tail has no
+    literal form to match with. Dropping it costs the "did you mean" suggestion
+    and nothing else; inventing a fuzzy version of it here would be guessing in
+    the one module whose contract is to under-report.
+    """
+    segments = token.strip("/").split("/")
+    first = segments[0]
+    if len(segments) == 1 or _first_segment_exists(repo_root, first):
+        return Resolution(State.MISSING, f"nothing matches (repo-relative): {token}")
+    return Resolution(
+        State.UNVERIFIABLE,
+        f"matches nothing here, and `{first}/` is not a top-level entry — may name another repo",
+    )
+
+
+def _first_segment_exists(repo_root: Path, first: str) -> bool:
+    """Whether ``first`` names a top-level entry — matching it as a PATTERN if elided.
+
+    `_unresolved_relative` can ask `(repo_root / first).exists()` because its
+    token is literal. Here the first segment may itself be abbreviated, and a
+    literal stat of `d…s` can never succeed — so the test always failed and every
+    such citation was downgraded from MISSING to UNVERIFIABLE, which does not
+    fail the run. A genuinely broken `` `d…s/nonexistent.md` `` came back
+    "may name another repo" instead of FAIL.
+
+    That is the softer direction rather than a fabricated match, but it is still
+    a real citation escaping at exit 0, and the fix is to ask the question the
+    elision was written for: does any top-level entry match this pattern?
+    (Cold lane, MAJOR.)
+    """
+    if ELISION not in first:
+        return (repo_root / first).exists()
+    pattern = re.compile("^" + "[^/]*".join(re.escape(p) for p in first.split(ELISION)) + "$")
+    return any(pattern.match(child.name) for child in repo_root.iterdir())
 
 
 def resolve_extension_typo(

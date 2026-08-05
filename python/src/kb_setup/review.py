@@ -512,6 +512,98 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     return repo_root / REPORT_DIR / f"review-{safe_sha(sha)}-{lane_file}.md"
 
 
+def canonical_lane_report(token: str) -> str:
+    """Return a cited lane report's CANONICAL path, or ``token`` unchanged (#148).
+
+    Named for what it returns. It was `strip_lane_variant` for two rounds, and
+    the name was the bug's hiding place: "strip" describes an edit to a string,
+    so nobody asked where the edited string would then be looked up. It is
+    answered below, and it is the whole fix.
+
+    `review-<sha>-cold:codex.md` → `review-<sha>-cold.md`. The WRITER already
+    does this — :func:`report_path` runs the lane through :func:`_lane_prefix`
+    before building the name — so a file carrying a variant can never exist. A
+    handoff that cites the lane AS RECORDED is therefore naming a spelling that
+    is unmatchable by construction, and a checker taking it literally would
+    report a lane whose report is on disk as one that never ran. That is the
+    false-accusation direction #145 calls fatal to a checker's credibility, and
+    it is what criterion 3 of #148 is about.
+
+    It repairs the SPELLING and vouches for nothing: the repaired name still has
+    to match a real report.
+
+    THE DIRECTORY IS CHECKED, and this docstring used to say so while the code
+    did not. It tested `stem.startswith("review-")` on the BASENAME alone, so
+    `docs/review-2026:q3.md` became `docs/review-2026.md` — a token outside this
+    module's directory, silently rewritten into a name that may well exist. That
+    is the FALSE-GREEN direction inside the one package whose contract is to
+    under-report, and it was defended by a sentence claiming the opposite. The
+    standards lane found it by running the function rather than reading it.
+
+    A citation with NO directory is still accepted, because that is a real form —
+    handoffs write `` `review-abc…-cold.md` `` bare beside the full path, and
+    `resolve` matches a bare filename on its basename. What is excluded is a
+    token that names a DIFFERENT directory, which is the case that could not be
+    about a lane report.
+
+    ONLY `_lane_prefix` IS REPRODUCED, NOT `_safe_lane`, and that asymmetry is
+    deliberate rather than the half-copy it looks like. `report_path` composes
+    `_safe_lane(_lane_prefix(lane))`, and a review lane proposed matching it here.
+    Running it: `_safe_lane("review-abc1234…-cold")` returns
+    `"review-abc1234-cold"` — it keeps only alphanumerics, `-` and `_`, so it
+    DESTROYS the elision and silently turns a pattern into a literal that matches
+    nothing. The two sides are not symmetric because the inputs are not: the
+    writer sanitises a lane name on its way to becoming a filename, while this
+    reads a citation an author wrote, whose whole point is the character
+    `_safe_lane` removes.
+
+    Lives here rather than in `kb_setup.resolve` because the `:variant`
+    convention is this module's — it owns `_lane_prefix`, `report_path` and the
+    directory they write into.
+    """
+    head, _, name = token.rpartition("/")
+    stem, dot, ext = name.rpartition(".")
+    if not dot or not stem.startswith("review-") or _SKIP_SEPARATOR not in stem:
+        return token
+    if head and head.strip("/") != str(REPORT_DIR):
+        return token
+    repaired = _lane_prefix(stem)
+    if not any(repaired.endswith(f"-{lane}") for lane in LANES):
+        # (see the LANES note below)
+        # THE GUARD THAT ACTUALLY HOLDS THE PROPERTY, and its absence was a
+        # false green shipped inside the fix for the previous one. The directory
+        # test above only fires when there IS a directory, so a BARE
+        # `review-gu…:draft.md` — accepted on purpose, since handoffs write the
+        # bare form — had nothing between it and the rewrite. It became
+        # `review-gu….md`, which globbed onto an unrelated `review-guide-notes.md`
+        # and the checker reported a citation that exists NOWHERE as OK.
+        #
+        # The earlier guards are proxies for "this names a lane report"; this one
+        # asks it. :data:`LANES` is a closed set, so the question is decidable
+        # rather than heuristic, and a stem whose variant-stripped tail is not
+        # `-<lane>` is left exactly as written. (Cold lane, BLOCKING.)
+        return token
+    # ALWAYS `REPORT_DIR`-QUALIFIED, even when the citation was bare. This is the
+    # line that closes the class, and it took three rounds to reach because the
+    # first two narrowed WHICH tokens got repaired instead of asking where the
+    # repaired token would then be looked up.
+    #
+    # `resolve_elided` matches a bare filename against every basename in the
+    # repo. So any repair that lands on a real file ANYWHERE is a false green,
+    # and tightening the entry conditions only shrinks the set of citations that
+    # can trigger it: round 1 was `review-gu…:draft.md` finding
+    # `review-guide-notes.md`; round 2, after the lane-suffix guard, was
+    # `review-check…-spec:draft.md` finding `review-checklist-for-spec.md`. Same
+    # mechanism, one narrowing apart.
+    #
+    # A repaired token is by construction a claim about a LANE REPORT, and
+    # `report_path` writes those to exactly one directory. Returning the
+    # qualified path makes the pattern multi-segment, so it can only ever match
+    # inside `REPORT_DIR` — the citation's own reachable set, rather than the
+    # whole tree. (Cold lane rounds 1 and 2, both BLOCKING.)
+    return f"{REPORT_DIR}/{repaired}.{ext}"
+
+
 def _report_gaps(repo_root: Path, data: dict[str, Any], sha: str) -> tuple[list[str], list[str]]:
     """Return ``(lanes with no usable report, lanes whose report names another commit)``.
 

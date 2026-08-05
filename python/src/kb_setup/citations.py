@@ -94,6 +94,15 @@ _KNOWN_EXT: frozenset[str] = frozenset(
 #: (`review-f19b18d6…-cold.md`). That last one was the single largest
 #: false-positive class measured over all 28 committed handoffs — an elided path
 #: names no file by construction, so reporting it as missing says nothing.
+#:
+#: THE ELISION IS STILL EXCLUDED HERE, AND IS NOW CHECKED ELSEWHERE (#148). The
+#: sentence above stays true of *this* question — `Path.exists()` can say nothing
+#: about an abbreviated name — but it was read for two rounds as "the elision is
+#: uncheckable", which is a different claim and a false one. It is checkable by a
+#: different question, "does anything here match", and
+#: :func:`elided_citations` asks it. Keeping the exclusion is what lets that
+#: extractor reuse :func:`is_path_like` for everything except the elision instead
+#: of growing a second, laxer definition of a path.
 _NON_PATH_CHARS: frozenset[str] = frozenset("*?[]{}<>|\\$!\"'`^…")
 
 #: Bare dotfiles that ARE filenames despite having an empty stem. Needed because
@@ -205,6 +214,21 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: heading, a table row, or a block quote. Blank lines break a block too.
 _BLOCK_BREAK_RE = re.compile(r"^\s*(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|\||>)")
 
+#: The character an author writes for the part of a path they are abbreviating —
+#: almost always the tail of a sha inside an otherwise concrete report filename
+#: (`review-8a46d08…-cold.md`). It is in :data:`_NON_PATH_CHARS`, so a token
+#: carrying it is excluded from :func:`path_citations` BY CONSTRUCTION and was,
+#: until #148, checked by nothing at all.
+#:
+#: That exclusion is right for `path_citations` — an elided token names no single
+#: file, so `Path.exists()` can say nothing about it — and it is what made the
+#: hole total rather than partial. Control-armed on 2026-08-05: a *concrete*
+#: citation of a report that never existed comes back FAIL, while the same
+#: citation with its sha elided produces **no citation at all**. So an author
+#: could name a lane report for a commit that never ran and the checker would
+#: stay silent, which is the exact sentence #148 was filed on.
+ELISION = "…"
+
 #: A `##`-or-deeper heading — where a document's LEAD ends. The `#` title itself
 #: is deliberately not a terminator: the lead is the paragraph BETWEEN the title
 #: and the first section, which is where an authored document states its
@@ -297,6 +321,25 @@ class TypoCandidate:
     text: str
     line: int
     repairs: tuple[str, ...]
+    marked_absent: bool = False
+
+
+@dataclass(frozen=True)
+class ElidedCitation:
+    """A path citation whose middle is ABBREVIATED — `review-8a46d08…-cold.md`.
+
+    Its own type rather than a `PathCitation` with a flag, because it is resolved
+    by a different question: a path citation asks "does this file exist", and this
+    asks "does anything here match". Folding them would put a branch inside
+    `resolve_path` on a property only one caller has.
+
+    ``text`` is the token AS WRITTEN, elision included. The pattern is built in
+    `kb_setup.resolve`, which is the module allowed to know what matching means
+    (#143) — this one only decides that a token is making the claim.
+    """
+
+    text: str
+    line: int
     marked_absent: bool = False
 
 
@@ -659,6 +702,90 @@ def path_citations(text: str) -> list[PathCitation]:
                 marked_absent=span.marked_absent,
             )
         )
+    return found
+
+
+def elided_citations(text: str) -> list[ElidedCitation]:
+    """Every path citation whose middle is elided — the #148 extractor.
+
+    A token qualifies when it carries :data:`ELISION` **and** would be an
+    ordinary path citation with the elision removed. Reusing
+    :func:`is_path_like` for that second half is what keeps this from becoming a
+    second, laxer definition of "path" — every exclusion the module already makes
+    applies here, and the elision is simply not held against the token.
+
+    THE EXCLUSIONS DO MOST OF THE WORK, and each was measured over all 37
+    handoffs in `.agent/plans/` on 2026-08-05 rather than assumed:
+
+    * **A brace set is DISPLAY, not a claim.** `review-{a…,b…}-{spec,cold}.md`
+      compresses a list; expanding it into one existence claim per member reports
+      failures against handoffs that were accurate. The real case is
+      `session-2026-07-28-c.md`, whose brace form expands to 12 files while 9
+      exist — and whose author wrote "(9 files)" in the same cell and "cold only"
+      in a table above it. Ray adjudicated it display on 2026-08-05. `{` and `}`
+      are already in :data:`_NON_PATH_CHARS`, so the de-elided token is rejected
+      and no extra rule is needed.
+    * **A `<placeholder>` names no file by construction**, so it can claim none —
+      `review-<sha>-cold.md` is a template teaching the reader a shape. Also
+      already excluded, by the same data.
+    * **A `*` glob is OUT OF SCOPE, and that is a bound worth stating.** It is
+      given up because `*` is written as a QUOTED PATTERN as often as a citation
+      — `**/agents/*.md` appears in prose describing what agnix reads — while the
+      elision is *only* ever a citation across the same files. **This bullet said
+      "4 occur in the corpus and all 4 resolve today" and that number was wrong**:
+      re-derived over the 37 files, single-token spans containing `*` number
+      **98**, of which **59** are path-like once the `*` is removed. The 4 was a
+      count of `*` tokens naming a REPORT DIRECTORY, and the sentence dropped that
+      bound on its way into the docstring — the failure `md-size-budgets.md`
+      records as its own worked example, committed here by the same hand that
+      cites it. (Standards lane, H2.)
+
+    A LEADING ELISION IS NORMALISED, not rejected. `…/review-5c38615…-cold.md` —
+    4 occurrences — de-elides to a leading `/`, which `_categorically_not_a_path`
+    reads as an absolute path outside the repo and drops. That threw away a
+    citation with a concrete sha, a concrete lane and a concrete extension, which
+    is the exact target class. Since the matcher already anchors on a segment
+    boundary, an elided leading directory says nothing a bare filename does not,
+    so it is stripped rather than specially matched. (Spec lane, F1.)
+
+    WHAT IS STILL NOT EXTRACTED, stated because the list above once read as
+    exhaustive and is not (Spec lane, F3): the **extensionless** form
+    `` `review-bd30397…` `` — 3 occurrences — is skipped, because
+    `_has_known_ext` is the gate that keeps `kb_setup.hook_guard` and `0.9.31`
+    out and admitting a bare stem would need a `review-`-specific rule in a
+    module that deliberately knows nothing about review lanes. That is recall
+    given up knowingly, in the documented safe direction.
+    """
+    found: list[ElidedCitation] = []
+    for span in code_spans(text):
+        token = _single_token(span)
+        if token is None or ELISION not in token:
+            continue
+        token = token.removeprefix(f"{ELISION}/")
+        if not is_path_like(token.replace(ELISION, "")):
+            continue
+        # NO `_LINE_REF_RE` GUARD HERE, and its absence is deliberate. The first
+        # draft carried one, mirroring `path_citations`, and a mutation arm
+        # flipping it to `if False:` SURVIVED. It was not a coverage gap: the
+        # check above already enforces the property. For `_LINE_REF_RE` to match,
+        # a token must end in `:<digits>`; `_has_known_ext` reads everything after
+        # the last dot of the last segment as the extension, so those digits land
+        # INSIDE the extension and no allowlist entry contains a colon.
+        #
+        # That claim is earned rather than derived — `probes-need-a-control-arm.md`
+        # rule 9, whose own worked example is a guard declared dead by a chain of
+        # true premises that never asked whether an allowlisted extension ENDS IN
+        # A DIGIT (`mp3` does, so `foo.mp:3` repaired to `foo.mp3` and the guard
+        # was live). So the reaching case was constructed: 8 shapes across all 36
+        # known extensions, including that one, produced **0** tokens that are both
+        # an elided citation and a line reference, with both controls green.
+        #
+        # A second guard for a property one guard already holds is worse than
+        # none: each mutates to a no-op while the other still passes, so the
+        # property reads as armed when neither site is. `_ext_repairs` records
+        # being bitten by exactly this and removed its duplicate for the same
+        # reason — one guard, one arm.
+        found.append(ElidedCitation(text=token, line=span.line, marked_absent=span.marked_absent))
     return found
 
 

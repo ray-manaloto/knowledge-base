@@ -206,6 +206,18 @@ session; each findings-bearing one maps to a file, or to an explicit N/A in the
 handoff. Anything missing gets written now, verbatim from context, before
 `/clear` destroys the only copy.
 
+**Cite each report by NAME, and `mise run kb-handoff-check` will audit the
+coverage for you** (#148). Abbreviating the sha is fine and is what these
+documents already do — `review-8a46d08…-cold.md` is checked as a pattern, so a
+lane named for a commit nothing was ever written for now fails rather than
+passing silently. Two things it cannot see, both stated so the silence is not
+read as a pass: a name written in PROSE rather than as a filename (measured at
+1-in-42 precision over 37 handoffs, so it is deliberately not extracted), and an
+agent that ran and was never mentioned at all — out of reach for anything in
+python, and out of scope per the ticket. Cite a report you know is missing as
+`` `name` (absent) ``; the marker is checked both ways, so it cannot hide a real
+one.
+
 If a report is now load-bearing — something tracked cites it —
 **promote a copy to `docs/research/reports/`**. `.agent/` is gitignored and dies
 to any `git clean -xdf`, and a citation only one machine can open is not a
