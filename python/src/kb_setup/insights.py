@@ -233,19 +233,57 @@ def _build_composition(
 
 
 def _skip_to(fh: Iterator[str], prefix: str) -> None:
-    """Advance `fh` past (and including) the first line starting with `prefix`.
+    """Advance `fh` past (and including) the first ROOT-LEVEL line starting with `prefix`.
 
-    No-ops to EOF if the marker never appears, matching this module's existing
-    tolerance: the original `audit_edges` behaved identically when `"links": ["
-    was absent — an empty scan, not a crash.
+    Depth-tracks from the file's own opening `{` (depth 0 -> 1), so a match is
+    only accepted at `depth == 1` — directly inside the root object, where
+    `"directed"`/`"graph"`/`"nodes"`/`"links"`/`"hyperedges"`/`"built_at_commit"`
+    all live. Without this, a same-named key nested inside `graph` is
+    indistinguishable from the real one: `graph.hyperedges` precedes the
+    top-level `nodes` array in every graphify export (`node_link_data` writes
+    `graph` before `nodes`), and once a hyperedge carries a non-empty member
+    list, that list is ALSO keyed `"nodes"` — measured on the real corpus at
+    line 9 (`graph.hyperedges[0].nodes`, depth 3) vs. the real top-level
+    `"nodes": [` at line 82 (depth 1). A naive first-match `_skip_to` locked
+    onto line 9, positioned `fh` mid-hyperedge, and every downstream map
+    stayed empty — this shape was structurally absent from the empty-
+    hyperedges graph this function was first written and tested against, so
+    the collision was never exercised until hyperedges carried real content.
+
+    Same brace-only depth rules as `_iter_objects` — see that docstring for
+    why a string VALUE containing a literal brace never perturbs the count.
+
+    No-ops to EOF if the marker never appears at root level, matching this
+    module's existing tolerance: an empty scan, not a crash.
     """
+    depth = 0
     for line in fh:
-        if line.strip().startswith(prefix):
+        stripped = line.strip()
+        if depth == 1 and stripped.startswith(prefix):
             return
+        if stripped == "{":
+            depth += 1
+            continue
+        if stripped in ("}", "},"):
+            depth -= 1
+            continue
+        if stripped.endswith("{"):
+            depth += 1
 
 
 def _iter_objects(fh: Iterator[str], stop: str | tuple[str, ...]) -> Iterator[dict[str, str]]:
     """Yield each array element's scalar fields; stop (consuming) at a `stop` line.
+
+    The `stop` match is gated to `depth == 0` — "not currently inside an
+    element" — for the SAME reason field capture is gated to `depth == 1`
+    (below): an unconditional match would treat a same-named key nested
+    inside an element's own `metadata` (or any future nested field) as the
+    array's closing sibling key, stopping mid-element. Not merely
+    hypothetical for the SIBLING case either — `graph.hyperedges` carries a
+    top-level-looking `"hyperedges"` key of its own (nested, at depth 2) that
+    precedes the REAL sibling `"hyperedges"` key `_scan`'s links phase stops
+    at; `depth == 0` is what keeps the two apart once this generator is
+    correctly positioned by a depth-aware `_skip_to`.
 
     DEPTH-TRACKS rather than matching fields unconditionally, because graphify
     nests a `metadata` dict inside SOME node and link objects — measured on the
@@ -277,7 +315,7 @@ def _iter_objects(fh: Iterator[str], stop: str | tuple[str, ...]) -> Iterator[di
     cur: dict[str, str] = {}
     for line in fh:
         stripped = line.strip()
-        if stripped.startswith(stop):
+        if depth == 0 and stripped.startswith(stop):
             return
         if stripped == "{":
             depth += 1
@@ -308,11 +346,19 @@ def _scan(graph_path: Path) -> tuple[Audit, Composition]:
     `"links": [`) to build id -> repo/origin maps and a community -> tag-set
     map — bounded, node-id-keyed maps for ~340k nodes, never holding an edge.
 
-    Nodes fully precede links in every graphify export (the real corpus:
-    `"nodes": [` opens at line 5, `"links": [` at line 4,498,701 — the entire
-    node array first), so `node_origin` is complete before the first link is
-    read. That ordering is why cross-origin edges — a fact depending on BOTH
-    arrays — stays answerable in one pass.
+    The top-level `nodes` array fully precedes the top-level `links` array in
+    every graphify export, so `node_origin` is complete before the first link
+    is read — that ordering is why cross-origin edges, a fact depending on
+    BOTH arrays, stays answerable in one pass. Locating each array's REAL
+    opening line is not a plain first-match, though: `graph.hyperedges`
+    precedes `nodes` (`node_link_data` writes `graph` before `nodes`), and a
+    hyperedge's own member list is keyed `"nodes"` too — measured on the real
+    corpus, a populated `graph.hyperedges` puts a decoy `"nodes": [` as early
+    as line 9, well before the real one (line 82 there). `_skip_to` and
+    `_iter_objects`'s `stop` matching are both depth-gated for exactly this
+    reason (see their own docstrings); this line-number example is stale the
+    moment the corpus changes shape, which is the point — the FIX does not
+    depend on a specific line number holding.
 
     Tier counting stays scoped to exactly the `links` array's own element
     fields, never a whole-file match: see the module docstring for the

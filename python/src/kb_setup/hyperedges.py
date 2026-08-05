@@ -170,11 +170,24 @@ def _write_atomic(graph_path: Path, data: dict[str, object]) -> None:
     rather than a shared helper because it lives on a dict already fully in
     memory (the caller just parsed it) where `prose.derive` streams a
     freshly-built one — the two have no common signature to factor through.
-    `indent=2` and the implicit default `ensure_ascii=True` match both
-    `prose.derive`'s own output and graphify's `export.to_json`
-    (`write_json_atomic`, `ensure_ascii=True` by default): a mismatch here
-    would re-encode every string in a several-hundred-MB file over a default
-    nobody asked to change.
+    `indent=1`, NOT graphify's own `indent=2` (`export.to_json` /
+    `write_json_atomic`), is a deliberate divergence, not a drifted default.
+    This artifact is DERIVED and every consumer parses JSON regardless of
+    indent width — this repo's own `kb_setup.insights._iter_objects` line-
+    scans it, but even that keys on stripped content, never column position —
+    so matching upstream byte-for-byte buys nothing. What it costs: this
+    function is the LAST writer in the `kb-build`/`kb-watch` pipeline
+    (`reattach` runs after `graphify_ops.label`'s own `to_json`), so ITS
+    indent is what the artifact's final byte count reflects, and one fewer
+    indent level per nested line is real bytes at this scale — measured today
+    at 538,616,284 bytes with `indent=2`, against graphify's own DEFAULT
+    536,870,912-byte read cap (`security.py`'s `_MAX_GRAPH_FILE_BYTES`; this
+    repo's mise env raises the effective cap to 1 GiB, but the default is
+    what an env-less invocation enforces). `chunks.py`'s `assemble()` already
+    writes `indent=1` for the identical reason, so this is not a new
+    precedent in this codebase, only a second writer adopting it.
+    `ensure_ascii=True` stays the implicit default, matching graphify's own
+    `export.to_json`: only the indent width is the intentional divergence.
     """
     fd, tmp_name = tempfile.mkstemp(
         dir=graph_path.parent, prefix=graph_path.name + ".", suffix=".tmp"
@@ -182,7 +195,7 @@ def _write_atomic(graph_path: Path, data: dict[str, object]) -> None:
     tmp = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
+            json.dump(data, fh, indent=1)
         tmp.chmod(_GRAPH_MODE)
         tmp.replace(graph_path)
     except BaseException:

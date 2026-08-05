@@ -18,7 +18,12 @@ _NODE = {"id": "n1", "label": "n1", "_origin": "ast"}
 
 
 def _write_full_graph(
-    out: Path, *, nodes: list[dict], links: list[dict], hyperedges: list[dict] | None = None
+    out: Path,
+    *,
+    nodes: list[dict],
+    links: list[dict],
+    hyperedges: list[dict] | None = None,
+    graph: dict | None = None,
 ) -> Path:
     """A pretty-printed graph.json with EXPLICIT nodes/links.
 
@@ -27,6 +32,12 @@ def _write_full_graph(
     the composition tests build fully-explicit fixtures (specific
     `repo`/`community`/`_origin`/`source`/`target` values) and call this
     directly.
+
+    `graph` overrides the top-level `"graph"` dict (default `{}`, matching
+    every existing fixture). The one caller that needs it is the
+    hyperedge-collision regression: graphify's real export nests hyperedges
+    at `graph.hyperedges`, which precedes the top-level `nodes` array — a
+    shape no other fixture here reproduces.
     """
     out.mkdir(parents=True, exist_ok=True)
     p = out / "graph.json"
@@ -35,7 +46,7 @@ def _write_full_graph(
             {
                 "directed": False,
                 "multigraph": False,
-                "graph": {},
+                "graph": {} if graph is None else graph,
                 "nodes": nodes,
                 "links": links,
                 "hyperedges": hyperedges or [],
@@ -376,6 +387,61 @@ def test_iter_objects_ignores_a_field_nested_inside_metadata() -> None:
     ]
     result = list(insights._iter_objects(iter(lines), '"links": ['))
     assert result == [{"id": "outer", "repo": "the-real-one"}]
+
+
+def test_scan_survives_a_populated_graph_hyperedges_before_top_level_nodes(
+    tmp_path: Path,
+) -> None:
+    """Regression for the real post-#175 artifact shape.
+
+    `graph.hyperedges` (populated — `hyperedges.reattach`'s carry, not `[]`)
+    precedes the top-level `nodes` array (`node_link_data` writes `graph`
+    before `nodes`), and a hyperedge's own member list is ALSO keyed
+    `"nodes"`. Before `_skip_to`/`_iter_objects` were made depth-aware, this
+    decoy `"nodes": [` inside the FIRST hyperedge was matched instead of the
+    real top-level one, positioning `fh` mid-hyperedge: every node map stayed
+    empty (spans 0 of 0, cross-origin 0) while the audit alone still worked
+    (a fresh generator over `links`, unaffected by the corrupted node scan).
+    This fixture must go RED against the pre-fix code — confirmed before this
+    test was added — and green after.
+    """
+    graph_meta = {
+        "hyperedges": [
+            {
+                "id": "he1",
+                "label": "decoy member list",
+                "nodes": ["m1", "m2", "m3"],
+                "relation": "participate_in",
+                "confidence": "INFERRED",
+            }
+        ]
+    }
+    nodes = [
+        {"id": "a1", "_origin": "ast", "repo": "graphify", "community": 5},
+        {"id": "a2", "_origin": "ast", "repo": "cognee", "community": 5},
+        {
+            "id": "s1",
+            "_origin": "semantic",
+            "community": 6,
+        },  # untagged, own community — not a 3rd span tag
+    ]
+    links = [{"source": "a1", "target": "s1", "confidence": "EXTRACTED"}]  # the one crossing edge
+
+    g = _write_full_graph(
+        tmp_path / "graphify-out",
+        nodes=nodes,
+        links=links,
+        hyperedges=graph_meta["hyperedges"],
+        graph=graph_meta,
+    )
+
+    audit, comp = insights._scan(g)
+    assert audit.total == 1
+    assert comp.total_communities == 2
+    assert len(comp.spanning) == 1
+    assert comp.spanning[0].community == 5
+    assert comp.spanning[0].tags == ("cognee", "graphify")
+    assert comp.cross_origin_edges == 1
 
 
 def test_size_vs_cap_reports_the_real_file_size_and_stays_under(tmp_path: Path) -> None:
