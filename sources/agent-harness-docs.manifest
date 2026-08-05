@@ -1,5 +1,5 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
 url = https://github.com/mrkhachaturov/agent-harness-docs
 ref = main
-commit = 03853a019423ffb5c5082e24c39ac20e38a7cfb1
+commit = cc1c16037806433e2fcd6c460efc7b1047fa045d
 kind = docs
