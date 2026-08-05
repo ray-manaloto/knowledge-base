@@ -39,7 +39,7 @@ typos = "1.48.0"
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.32", extras = ["all"] }
+"pipx:graphifyy" = { version = "0.9.33", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
@@ -328,6 +328,40 @@ description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N]
 # never shells out to graphify, so graphify's own flags (--budget, --depth) are
 # REJECTED rather than ignored. `--top N` sets how many ranked hits print.
 run = "uv run kb-setup query"
+
+[tasks.kb-affected]
+description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
+# The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from
+# the terms you name; "what breaks if I change this" needs the edges walked
+# backwards, which is what `graphify affected` does (reverse traversal over
+# DEFAULT_AFFECTED_RELATIONS). Depth defaults to 2 upstream.
+#
+# It reads the UNSCOPED graph deliberately — this is a code question, so the prose
+# graph would be the wrong corpus. And it pins --graph for the same reason kb-query
+# does: graphify resolves its default against the process cwd, so an unpinned run
+# answers from whichever corpus happens to sit under it.
+#
+# Why a task at all, when the guard already allows a bare `graphify affected`:
+# `graph.refresh_self` exists SO THAT this question is answerable about our own
+# code (graph.py:230-240 says so), and until now there was no verb — a capability
+# built and never wired. `mise-tasks-only.md`: a recurring workflow ships as a task.
+run = "uv run kb-setup affected"
+
+[tasks.kb-insights]
+description = 'Print what the graph already computed: surprises, questions, god nodes, provenance audit'
+# graphify computes surprises/questions/gods/cohesion on every cluster-only/label run
+# and writes them to graphify-out/.graphify_analysis.json — a file nothing in this repo
+# has ever read. The MCP server exposes three of them, but its resource handlers render
+# ONE FIELD EACH (serve.py:1826-1862), discarding the score/why on a surprise and the
+# type/why on a question. The sidecar keeps the full dicts, so reading it beats paying a
+# subprocess to throw the useful part away.
+#
+# Two measured constraints, both in kb_setup.insights' docstring: the sidecar can be
+# arbitrarily stale with nothing to say so (#138 — measured 3 days behind, describing a
+# corpus 2.4x smaller), so this reports figures AND their staleness; and the provenance
+# audit is computed by STREAMING graph.json scoped to the `links` array, because a
+# whole-file count of `"confidence":` over-counts — five AST nodes carry the field.
+run = "uv run kb-setup insights"
 
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"

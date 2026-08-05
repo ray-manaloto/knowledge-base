@@ -1,0 +1,7 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Rootly's graphify integration — how a NON-CODE domain (incidents/alerts/teams) becomes graphify nodes+edges: ingest.py, rootly_flow.py, models_rootly.py, rootly_export.py. Linked from graphify.com/blog. CAUTION: this is a FORK, not a consumer — its pyproject declares name='graphifyy' version 0.3.6 and it vendors graphify's own modules (build/cluster/extract/analyze/...). Last pushed 2026-04-21, so those vendored copies are ~0.3.6-era against our 0.9.33. scope=study keeps that stale duplicate OUT of the corpus, where it would otherwise answer 'how does graphify work' from April code in a disjoint namespace nothing can flag.
+url = https://github.com/Rootly-AI-Labs/rootly-graphify-importer
+ref = main
+commit = 07eed6a54aa9da26dc2a39cbb0171a909213887c
+kind = code
+scope = study
