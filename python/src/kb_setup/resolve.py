@@ -357,12 +357,33 @@ def _elided_miss(repo_root: Path, token: str) -> Resolution:
     """
     segments = token.strip("/").split("/")
     first = segments[0]
-    if len(segments) == 1 or (repo_root / first).exists():
+    if len(segments) == 1 or _first_segment_exists(repo_root, first):
         return Resolution(State.MISSING, f"nothing matches (repo-relative): {token}")
     return Resolution(
         State.UNVERIFIABLE,
         f"matches nothing here, and `{first}/` is not a top-level entry — may name another repo",
     )
+
+
+def _first_segment_exists(repo_root: Path, first: str) -> bool:
+    """Whether ``first`` names a top-level entry — matching it as a PATTERN if elided.
+
+    `_unresolved_relative` can ask `(repo_root / first).exists()` because its
+    token is literal. Here the first segment may itself be abbreviated, and a
+    literal stat of `d…s` can never succeed — so the test always failed and every
+    such citation was downgraded from MISSING to UNVERIFIABLE, which does not
+    fail the run. A genuinely broken `` `d…s/nonexistent.md` `` came back
+    "may name another repo" instead of FAIL.
+
+    That is the softer direction rather than a fabricated match, but it is still
+    a real citation escaping at exit 0, and the fix is to ask the question the
+    elision was written for: does any top-level entry match this pattern?
+    (Cold lane, MAJOR.)
+    """
+    if ELISION not in first:
+        return (repo_root / first).exists()
+    pattern = re.compile("^" + "[^/]*".join(re.escape(p) for p in first.split(ELISION)) + "$")
+    return any(pattern.match(child.name) for child in repo_root.iterdir())
 
 
 def resolve_extension_typo(

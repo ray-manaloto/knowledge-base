@@ -749,3 +749,18 @@ def test_an_elided_citation_resolves_inside_a_pinned_clone(tmp_path: Path):
     got = resolve.resolve_elided(root, "sources/graphify/src/wat…er.py")
     assert got.state is resolve.State.RESOLVED
     assert "vendored" in got.detail
+
+
+def test_an_elision_in_the_first_segment_still_reports_a_real_miss(tmp_path: Path):
+    """An elided FIRST segment cannot be stat-ed, so the miss was softened to UNVERIFIABLE.
+
+    `_elided_miss` asked `(repo_root / first).exists()` on a literal that still
+    contained the elision, so the test could never succeed and a genuinely broken
+    citation escaped at exit 0 — UNVERIFIABLE does not fail the run. Paired with
+    its control: a first segment that matches nothing real is still
+    UNVERIFIABLE, so the fix did not simply make everything MISSING.
+    (Cold lane, MAJOR.)
+    """
+    root = _repo(tmp_path, {"docs/real.md": "x\n"})
+    assert resolve.resolve_elided(root, "d…s/nonexistent.md").state is resolve.State.MISSING
+    assert resolve.resolve_elided(root, "z…z/nonexistent.md").state is resolve.State.UNVERIFIABLE

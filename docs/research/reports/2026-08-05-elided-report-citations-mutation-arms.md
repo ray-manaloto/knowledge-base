@@ -1,13 +1,15 @@
 # #148 — elided report citations: mutation arms
 
-**15/15 arms died.** Control green at both ends, tree restored
+**17/17 arms died.** Control green at both ends, tree restored
 (`RESTORED rc=0`). Run: 2026-08-05, on `feat/148-agent-report-coverage`.
 
-**Three of those 15 arms exist because a two-axis review found three defects
-in the first version of this change** — see "What the review found" below.
+**Five of those 17 arms exist because REVIEW found defects the mutation sweep
+could not** — see "What the review found" below.
 The first sweep was 12/12 against code that was wrong in ways no arm asked
-about, which is this report's most useful sentence: **a full mutation score
-is a statement about the tests, never about the design.**
+about; the second was 15/15 against code carrying a **false green shipped
+inside the fix for the previous one**. That is this report's most useful
+sentence: **a full mutation score is a statement about the tests, never about
+the design** — and a fix is exactly as reviewable as the code it replaces.
 
 Every arm mutates PRODUCTION code with a break that could really happen and
 asserts the suite goes RED. An arm that survives means the tests do not cover
@@ -108,6 +110,11 @@ removed: two guards for one property mask each other's mutations, which
 | `B11 variant strip wiring` | `handoff.py` | a lane recorded as `cold:codex` looks like a lane that never ran | DIED |
 | `B12 absent marker both ways` | `handoff.py` | `(absent)` on an elided citation is ignored rather than adjudicated | DIED |
 | `B13 variant strip scope` | `review.py` | any filename with a colon is silently rewritten before being checked | DIED |
+| `B17 lane-suffix guard` | `review.py` | THE COLD-LANE BLOCKING DEFECT — a bare `review-x:y.md` is mangled into a false green | DIED |
+| `B18 elided first segment` | `resolve.py` | an elided first segment softens a real miss to UNVERIFIABLE, which does not fail | DIED |
+| `B14 variant strip directory scope` | `review.py` | a `review-` file in ANY directory is rewritten — the false-green direction | DIED |
+| `B15 leading-elision normalisation` | `citations.py` | `…/review-abc…-cold.md` is dropped rather than checked | DIED |
+| `B16 elision survives the variant strip` | `review.py` | `_safe_lane` eats the elision, turning a pattern into a literal | DIED |
 
 ## Finding on the live corpus
 
@@ -148,6 +155,32 @@ only for a BARE filename, which nothing tested), and **B7** reported
 `SKIPPED — pattern matched 0 times` because the line it targeted had changed.
 The harness naming a non-matching pattern rather than scoring it a pass is what
 made both visible.
+
+## Round 2 of review — the fix WAS the defect
+
+A cold cross-family lane (OpenAI family; Claude authored the diff) reviewed
+`2adf52057aaf` with a **mutating** brief, and found two more — both reproduced
+end-to-end through `handoff.check` rather than reasoned about.
+
+| # | severity | defect |
+|---|---|---|
+| **C1** | **BLOCKING** | `strip_lane_variant`'s directory guard — added to fix H1 — only fires when there IS a directory. A **bare** `review-gu…:draft.md` (a form the same function accepts on purpose) was rewritten to `review-gu….md`, globbed onto an unrelated `review-guide-notes.md`, and a citation existing NOWHERE was reported **OK**. The H1 fix closed one path to the false green and left the other open. |
+| **C2** | MAJOR | `_elided_miss` stat-ed a first path segment that could itself contain an elision, so the test could never succeed and a real miss was softened from FAIL to **UNVERIFIABLE** — which does not fail the run. |
+
+C1's fix is the guard that asks the actual question: does the variant-stripped
+stem end in `-<lane>` for a lane in the closed `LANES` set? The two earlier
+guards are proxies for "this names a lane report"; this one asks it.
+
+**Adding it made both earlier guards' arms survive** (B13, B14) — not because
+they were redundant, but because the cases they were armed on were now caught by
+the new guard. Each needed a fresh reaching case constructed to prove it still
+holds a distinct facet: `foo-cold:x.md` (lane suffix, no `review-` prefix) for
+B13, and `docs/review-abc-cold:x.md` (prefix **and** lane suffix, wrong
+directory) for B14. Three guards, three properties, three arms.
+
+Two further arms reported `SKIPPED — pattern matched 0 times` because the lines
+they targeted had moved under them. The harness naming a non-matching pattern
+instead of scoring it a pass is the only reason that was visible.
 
 ## Reproducing it
 

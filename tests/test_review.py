@@ -1392,3 +1392,52 @@ def test_strip_lane_variant_leaves_a_bare_non_review_name_alone():
     existed, which is precisely what the arm is for.
     """
     assert review.strip_lane_variant("notes:draft.md") == "notes:draft.md"
+
+
+def test_strip_lane_variant_leaves_a_bare_review_name_that_is_not_a_lane_report():
+    """THE BLOCKING FALSE GREEN, shipped inside the fix for the previous one.
+
+    The directory guard only fires when there IS a directory, so a BARE
+    `review-gu…:draft.md` — a form accepted on purpose — had nothing between it
+    and the rewrite. It became `review-gu….md`, globbed onto an unrelated
+    `review-guide-notes.md`, and `handoff.check` reported a citation that exists
+    NOWHERE as OK. Found by the cold lane by running the pipeline, not reading
+    it. The guard that holds the property asks the closed `LANES` set whether
+    the stem names a lane at all.
+    """
+    assert review.strip_lane_variant("review-gu…:draft.md") == "review-gu…:draft.md"
+    assert review.strip_lane_variant("review-2026:q3.md") == "review-2026:q3.md"
+
+
+def test_strip_lane_variant_accepts_every_known_lane():
+    """Control arm for the test above: prove the guard can still say yes.
+
+    Asserted over `LANES` itself rather than a hand-listed set, so a lane added
+    upstream cannot leave this passing while the repair silently stops
+    recognising it.
+    """
+    for lane in review.LANES:
+        got = review.strip_lane_variant(f"review-abc1234…-{lane}:codex.md")
+        assert got == f"review-abc1234…-{lane}.md", lane
+
+
+def test_strip_lane_variant_needs_the_review_prefix():
+    """Each of the three guards is separately reachable — this is the prefix's case.
+
+    Adding the lane-suffix guard made the other two look redundant: mutation arms
+    B13 and B14 both survived, because the cases they had been armed on were now
+    caught by the new guard. They are not redundant — they hold different facets
+    of "this is a lane report", and each needed a reaching case constructed to
+    prove it. `foo-cold:x.md` carries a known lane suffix and no `review-`
+    prefix, so only the prefix guard stands between it and a rewrite.
+    """
+    assert review.strip_lane_variant("foo-cold:x.md") == "foo-cold:x.md"
+
+
+def test_strip_lane_variant_needs_the_report_directory():
+    """The directory guard's own reaching case, for the same reason as above.
+
+    `docs/review-abc-cold:x.md` satisfies BOTH the `review-` prefix and the
+    `-cold` lane suffix, so only the directory test refuses it.
+    """
+    assert review.strip_lane_variant("docs/review-abc-cold:x.md") == "docs/review-abc-cold:x.md"

@@ -562,7 +562,22 @@ def strip_lane_variant(token: str) -> str:
         return token
     if head and head.strip("/") != str(REPORT_DIR):
         return token
-    return f"{head}/{_lane_prefix(stem)}.{ext}" if head else f"{_lane_prefix(stem)}.{ext}"
+    repaired = _lane_prefix(stem)
+    if not any(repaired.endswith(f"-{lane}") for lane in LANES):
+        # THE GUARD THAT ACTUALLY HOLDS THE PROPERTY, and its absence was a
+        # false green shipped inside the fix for the previous one. The directory
+        # test above only fires when there IS a directory, so a BARE
+        # `review-gu…:draft.md` — accepted on purpose, since handoffs write the
+        # bare form — had nothing between it and the rewrite. It became
+        # `review-gu….md`, which globbed onto an unrelated `review-guide-notes.md`
+        # and the checker reported a citation that exists NOWHERE as OK.
+        #
+        # The earlier guards are proxies for "this names a lane report"; this one
+        # asks it. :data:`LANES` is a closed set, so the question is decidable
+        # rather than heuristic, and a stem whose variant-stripped tail is not
+        # `-<lane>` is left exactly as written. (Cold lane, BLOCKING.)
+        return token
+    return f"{head}/{repaired}.{ext}" if head else f"{repaired}.{ext}"
 
 
 def _report_gaps(repo_root: Path, data: dict[str, Any], sha: str) -> tuple[list[str], list[str]]:
