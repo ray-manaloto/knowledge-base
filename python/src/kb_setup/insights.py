@@ -28,6 +28,18 @@ Two measured constraints shape this module:
    against 819,167 links, because five AST nodes from `codegraph` carry a stray
    edge-only `confidence` field. The audit therefore counts only inside the
    `"links": [` array.
+
+Composition — three more facts computed in the SAME streaming pass (#175,
+#167), because a second full read of a ~570 MB file is not a cost this module
+pays twice for one report: how many communities span more than one source
+repo (a sign the corpus is cross-pollinating rather than sitting in disjoint
+per-source islands), how many EDGES cross the ast/semantic boundary (#167's
+pre-stated gate is >=20; the real corpus measures 0, so this number decides a
+live question and must be exact, not sampled — see `_crosses_origin`), and
+graph.json's byte size against graphify's DEFAULT 512 MiB read cap
+(`security.py`'s `_MAX_GRAPH_FILE_BYTES`) — this repo's mise env raises the
+EFFECTIVE cap to 1 GiB, but the default is what any invocation outside that
+env enforces.
 """
 
 from __future__ import annotations
@@ -35,6 +47,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 #: Node/link/analysis artifacts, all under `graphify-out/`.
 _GRAPH = "graph.json"
@@ -73,38 +89,313 @@ class Audit:
         return (self.by_tier.get(tier, 0) / self.total * 100) if self.total else 0.0
 
 
-def audit_edges(graph_path: Path) -> Audit:
-    """Count edge confidence tiers by streaming, scoped to the `links` array.
+@dataclass(frozen=True)
+class CommunitySpan:
+    """One community whose member nodes are tagged with more than one source."""
 
-    Streams rather than `json.loads` because the graph is ~557 MB and parsing it
-    costs ~3.7x that in peak RSS — a routine task should not need 2 GB to print
-    four numbers.
+    community: int
+    tags: tuple[str, ...]
 
-    Scoping to `links` is not fastidiousness. A whole-file count of
-    `"confidence":` returns five more than there are links, because five AST
-    nodes carry the field; the tiers would then be reported over a population
-    that is not the edge set.
+
+@dataclass(frozen=True)
+class Composition:
+    """Cross-source structure `assert_composition` never checks (#175, #167).
+
+    `spanning` holds every community whose members carry more than one source
+    tag — evidence the corpus is cross-pollinating rather than sitting in
+    disjoint per-source islands. `cross_origin_edges` is issue #167's gate
+    instrument: the number of edges whose two endpoints differ in `_origin`
+    (ast vs semantic). Both are computed EXACTLY, not sampled — a gate value
+    that is wrong in either direction is worse than one that is merely absent.
     """
-    counts: dict[str, int] = {}
-    total = 0
-    in_links = False
+
+    spanning: tuple[CommunitySpan, ...]
+    total_communities: int
+    cross_origin_edges: int
+    total_edges: int
+
+
+#: A node's source bucket when it carries no `repo` attribute at all. Not a
+#: gap to paper over: post-#175 semantic doc nodes may legitimately carry
+#: none, and folding them into an existing tagged bucket (or dropping them)
+#: would hide exactly the cross-source mixing this probe exists to surface.
+_UNTAGGED = "(untagged)"
+
+#: How many spanning communities `_print_composition` names by example. The
+#: `Composition` object itself carries every one — this bounds the PRINTED
+#: report, matching `_print_sidecar`'s own `[:top]` slicing-at-print-time
+#: rather than the data layer.
+_MAX_SPAN_EXAMPLES = 5
+
+
+def _field_name(stripped: str) -> str | None:
+    """The JSON key of a `"key": value,` line, or None if it opens with no quote.
+
+    Every real field line in graphify's pretty-printed export opens with a
+    quoted key; the None case is a defensive fallback for output this module
+    reads back rather than controls, not a shape ever observed in practice —
+    it exists so an unexpected line is skipped, never a crash.
+    """
+    if not stripped.startswith('"'):
+        return None
+    return stripped.split('"', 2)[1]
+
+
+def _value(stripped: str) -> str:
+    """A `"key": value,` line's RHS, comma and surrounding quotes stripped.
+
+    Works uniformly whether `value` is a quoted string or a bare int/bool/null
+    token — `.strip('"')` is a no-op on an already-unquoted one. Was inlined in
+    `audit_edges` for its one caller (the tier field); every field this module
+    now reads shares this single copy instead.
+    """
+    return stripped.split(":", 1)[1].strip().rstrip(",").strip('"')
+
+
+def _parse_community(raw: str | None) -> int | None:
+    """A captured `community` field's raw text -> an int, or None if unassigned.
+
+    Three cases collapse to the same None, matching `_merge_docs.py`'s own
+    community reconstruction (`_communities_from_graph`): the field was
+    absent, it was JSON `null` (a node added since the last full label pass),
+    or it was present but not integer text. None always means "cannot
+    attribute to a span" — never "attribute to community 0".
+    """
+    if raw is None or raw == "null":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _record_node(
+    fields: dict[str, str], *, node_origin: dict[str, str], community_tags: dict[int, set[str]]
+) -> None:
+    """Fold one finished node's captured fields into the running maps.
+
+    A node with no `id` cannot be indexed and is skipped — never observed on a
+    real graph, but this reads untrusted output, not input we control.
+    """
+    nid = fields.get("id")
+    if nid is None:
+        return
+    origin = fields.get("_origin")
+    if origin is not None:
+        node_origin[nid] = origin
+    tag = fields.get("repo", _UNTAGGED)
+    cid = _parse_community(fields.get("community"))
+    if cid is not None:
+        community_tags.setdefault(cid, set()).add(tag)
+
+
+def _crosses_origin(link: dict[str, str], node_origin: dict[str, str]) -> bool:
+    """True iff this link's two endpoints resolve to DIFFERENT `_origin` values.
+
+    An endpoint that does not resolve — a missing `source`/`target`, or an id
+    absent from `node_origin` (a dangling reference `assert_composition` only
+    checks for hyperedge members, never for a plain link) — counts as unknown,
+    never as a crossing: this feeds an exact gate value (#167) and must
+    undercount rather than guess.
+    """
+    src, tgt = link.get("source"), link.get("target")
+    if src is None or tgt is None:
+        return False
+    o1, o2 = node_origin.get(src), node_origin.get(tgt)
+    return o1 is not None and o2 is not None and o1 != o2
+
+
+def _build_composition(
+    community_tags: dict[int, set[str]], *, cross_origin_edges: int, total_edges: int
+) -> Composition:
+    """Fold the per-community tag sets gathered while scanning into a report.
+
+    Sorted by community id — arbitrary but deterministic, so two runs over an
+    unchanged graph print identical output (a `set`'s iteration order is not
+    guaranteed to repeat across processes).
+    """
+    spanning = tuple(
+        sorted(
+            (
+                CommunitySpan(community=cid, tags=tuple(sorted(tags)))
+                for cid, tags in community_tags.items()
+                if len(tags) > 1
+            ),
+            key=lambda span: span.community,
+        )
+    )
+    return Composition(
+        spanning=spanning,
+        total_communities=len(community_tags),
+        cross_origin_edges=cross_origin_edges,
+        total_edges=total_edges,
+    )
+
+
+def _skip_to(fh: Iterator[str], prefix: str) -> None:
+    """Advance `fh` past (and including) the first line starting with `prefix`.
+
+    No-ops to EOF if the marker never appears, matching this module's existing
+    tolerance: the original `audit_edges` behaved identically when `"links": ["
+    was absent — an empty scan, not a crash.
+    """
+    for line in fh:
+        if line.strip().startswith(prefix):
+            return
+
+
+def _iter_objects(fh: Iterator[str], stop: str | tuple[str, ...]) -> Iterator[dict[str, str]]:
+    """Yield each array element's scalar fields; stop (consuming) at a `stop` line.
+
+    DEPTH-TRACKS rather than matching fields unconditionally, because graphify
+    nests a `metadata` dict inside SOME node and link objects — measured on the
+    real corpus at 4,272 nodes (`"language"`/`"kind"` for code) and more links.
+    A naive unconditional `"key":` match would risk a metadata-nested field
+    masquerading as the element's own; depth-gating makes that structurally
+    impossible rather than merely unobserved. Empirically control-armed: a
+    probe over the full 14M-line file confirms the nested branch genuinely
+    fires (`max_depth_seen == 2`) while zero of `id`/`repo`/`community`/
+    `_origin`/`source`/`target`/`confidence` were ever found nested — but
+    capture stays gated on `depth == 1` regardless, so a future nested
+    collision cannot corrupt this even though today's corpus does not
+    exercise it (`probes-need-a-control-arm.md`).
+
+    Relies on one property of `json.dump(..., indent=N)` pretty-printing: a
+    string VALUE containing a literal `{`/`}` never perturbs this count,
+    because such a value always shares its line with its key and closing
+    quote — a brace only ever stands as a line's SOLE content (`{`, `}`, `},`)
+    or as a line's trailing character (`"metadata": {`) at a true structural
+    boundary, never buried inside a string.
+
+    `fh` must be a single-pass ITERATOR (a real file handle, or `iter(list)`)
+    that the caller keeps consuming afterward: this generator stops exactly at
+    the `stop` line (without yielding it as an element), leaving `fh`
+    positioned for whatever comes next — how one `_scan` pass covers nodes
+    then links without a second read.
+    """
+    depth = 0
+    cur: dict[str, str] = {}
+    for line in fh:
+        stripped = line.strip()
+        if stripped.startswith(stop):
+            return
+        if stripped == "{":
+            depth += 1
+            if depth == 1:
+                cur = {}
+            continue
+        if stripped in ("}", "},"):
+            depth -= 1
+            if depth == 0:
+                yield cur
+            continue
+        if stripped.endswith("{"):
+            depth += 1
+            continue
+        if depth != 1:
+            continue
+        key = _field_name(stripped)
+        if key is not None:
+            cur[key] = _value(stripped)
+
+
+def _scan(graph_path: Path) -> tuple[Audit, Composition]:
+    """One streaming pass over graph.json: edge-tier audit + cross-source composition.
+
+    Streams rather than `json.loads` for the reason this module always has: a
+    ~570 MB graph costs ~3.7x that in peak RSS to parse whole (measured). This
+    pass now ALSO walks `nodes` (the original `audit_edges` skipped straight to
+    `"links": [`) to build id -> repo/origin maps and a community -> tag-set
+    map — bounded, node-id-keyed maps for ~340k nodes, never holding an edge.
+
+    Nodes fully precede links in every graphify export (the real corpus:
+    `"nodes": [` opens at line 5, `"links": [` at line 4,498,701 — the entire
+    node array first), so `node_origin` is complete before the first link is
+    read. That ordering is why cross-origin edges — a fact depending on BOTH
+    arrays — stays answerable in one pass.
+
+    Tier counting stays scoped to exactly the `links` array's own element
+    fields, never a whole-file match: see the module docstring for the
+    819,172-vs-819,167 measured over-count a naive scan produces. Depth-gating
+    (`_iter_objects`) additionally excludes a `metadata`-nested `confidence`,
+    which the ORIGINAL unconditional per-line match could not have.
+    """
+    node_origin: dict[str, str] = {}
+    community_tags: dict[int, set[str]] = {}
+    tier_counts: dict[str, int] = {}
+    tier_total = 0
+    cross_origin = 0
+
     with graph_path.open(encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if not in_links:
-                # The key is emitted by json.dump at a known indent; matching the
-                # stripped prefix keeps this independent of that indent.
-                if stripped.startswith('"links": ['):
-                    in_links = True
-                continue
-            if stripped.startswith(('"hyperedges"', '"built_at_commit"')):
-                break  # past the array; every sibling top-level key ends it
-            if stripped.startswith('"confidence":'):
-                # `  "confidence": "EXTRACTED",` -> EXTRACTED
-                tier = stripped.split(":", 1)[1].strip().rstrip(",").strip('"')
-                counts[tier] = counts.get(tier, 0) + 1
-                total += 1
-    return Audit(total=total, by_tier=counts)
+        _skip_to(fh, '"nodes": [')
+        for node in _iter_objects(fh, '"links": ['):
+            _record_node(node, node_origin=node_origin, community_tags=community_tags)
+        # Same break condition this module has always used for the tier audit:
+        # either sibling key ends the links array, hyperedges present or not.
+        for link in _iter_objects(fh, ('"hyperedges"', '"built_at_commit"')):
+            tier = link.get("confidence")
+            if tier is not None:
+                tier_counts[tier] = tier_counts.get(tier, 0) + 1
+                tier_total += 1
+            if _crosses_origin(link, node_origin):
+                cross_origin += 1
+
+    audit = Audit(total=tier_total, by_tier=tier_counts)
+    comp = _build_composition(
+        community_tags, cross_origin_edges=cross_origin, total_edges=tier_total
+    )
+    return audit, comp
+
+
+def audit_edges(graph_path: Path) -> Audit:
+    """Edge confidence tiers — see `_scan`.
+
+    Its own entry point so a caller that wants ONLY this still pays one read,
+    same cost as before this round; `report()` calls `_scan` directly so
+    wanting the audit AND the composition costs one read, not two.
+    """
+    return _scan(graph_path)[0]
+
+
+def composition(graph_path: Path) -> Composition:
+    """Cross-source community spans + ast/semantic edge crossings — see `_scan`."""
+    return _scan(graph_path)[1]
+
+
+#: graphify's DEFAULT graph.json read cap — `security.py`'s module-level
+#: `_MAX_GRAPH_FILE_BYTES` (verified against the pinned 0.9.33 install, NOT
+#: imported: this module has no other reason to depend on graphify's package,
+#: and a hardcoded constant cannot be silently moved by an unrelated upgrade
+#: the way an import could). 512 MiB = 512 * 1024 * 1024. This repo's OWN mise
+#: env raises the EFFECTIVE cap to 1 GiB (`GRAPHIFY_MAX_GRAPH_BYTES` in
+#: `mise.toml`'s `[env]`) — reported against the DEFAULT anyway, in
+#: `_print_size`, because the default is what any invocation outside that env
+#: (a bare `graphify …` on another host, a CI runner with no mise env applied)
+#: actually enforces.
+_MAX_GRAPH_FILE_BYTES = 512 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class SizeCheck:
+    """graph.json's on-disk size against graphify's default read cap."""
+
+    size_bytes: int
+    cap_bytes: int
+
+    @property
+    def over_cap(self) -> bool:
+        """True once `size_bytes` exceeds `cap_bytes`."""
+        return self.size_bytes > self.cap_bytes
+
+    @property
+    def ratio(self) -> float:
+        """`size_bytes / cap_bytes`, or 0.0 for a zero cap (never reached in practice)."""
+        return self.size_bytes / self.cap_bytes if self.cap_bytes else 0.0
+
+
+def size_vs_cap(graph_path: Path) -> SizeCheck:
+    """graph.json's size against graphify's default cap — a stat, not a read."""
+    return SizeCheck(size_bytes=graph_path.stat().st_size, cap_bytes=_MAX_GRAPH_FILE_BYTES)
 
 
 #: How far the sidecar may lag `graph.json` and still count as the same run.
@@ -163,9 +454,8 @@ def _parse_top(argv: list[str]) -> int | None:
     return int(argv[i + 1])
 
 
-def _print_audit(graph: Path) -> None:
-    """The live section — computed from graph.json, so never stale."""
-    a = audit_edges(graph)
+def _print_audit(a: Audit) -> None:
+    """The live section — computed from graph.json (via `_scan`), so never stale."""
     print(f"\n## Provenance audit — {a.total:,} edges (computed live from {_GRAPH})")
     for tier in ("EXTRACTED", "INFERRED", "AMBIGUOUS"):
         print(f"  {tier:<12}{a.by_tier.get(tier, 0):>12,}  {a.pct(tier):5.1f}%")
@@ -179,6 +469,39 @@ def _print_audit(graph: Path) -> None:
             "and drives one whole `suggest_questions` generator from it, so that "
             "generator is dead code here (#168)."
         )
+
+
+def _print_composition(comp: Composition) -> None:
+    """Multi-source community spans + ast/semantic edge crossings (#175, #167)."""
+    print(
+        f"\n## Multi-source community spans — {len(comp.spanning):,} of "
+        f"{comp.total_communities:,} communities span more than one source"
+    )
+    for span in comp.spanning[:_MAX_SPAN_EXAMPLES]:
+        print(f"  community {span.community}: {{{', '.join(span.tags)}}}")
+    if len(comp.spanning) > _MAX_SPAN_EXAMPLES:
+        print(f"  … +{len(comp.spanning) - _MAX_SPAN_EXAMPLES:,} more")
+
+    print(
+        f"\n## Cross-origin edges — {comp.cross_origin_edges:,} of "
+        f"{comp.total_edges:,} edges cross ast/semantic"
+    )
+
+
+def _print_size(check: SizeCheck) -> None:
+    """graph.json's size against graphify's DEFAULT cap — see `_MAX_GRAPH_FILE_BYTES`."""
+    verdict = "OVER" if check.over_cap else "under"
+    mib = check.size_bytes / (1024 * 1024)
+    cap_mib = check.cap_bytes / (1024 * 1024)
+    print(
+        f"\n## Size vs cap — {check.size_bytes:,} bytes ({mib:,.1f} MiB), "
+        f"{verdict} graphify's default {cap_mib:,.0f} MiB cap ({check.ratio:.2f}x)"
+    )
+    print(
+        "  note: this repo's mise env raises the EFFECTIVE cap to 1 GiB "
+        "(GRAPHIFY_MAX_GRAPH_BYTES in mise.toml) — the DEFAULT is reported here "
+        "because it is what an env-less graphify invocation enforces."
+    )
 
 
 def _print_sidecar(sidecar: Path, *, top: int, stale: str) -> None:
@@ -209,12 +532,14 @@ def _print_sidecar(sidecar: Path, *, top: int, stale: str) -> None:
 
 
 def report(repo_root: Path, args: list[str] | None = None) -> int:
-    """Print surprises, questions, god nodes and the provenance audit.
+    """Print surprises, questions, god nodes, the provenance audit, and composition.
 
-    `--top N` bounds each ranked list. The audit is always computed live from
-    `graph.json`, so it is never stale even when the sidecar is — which is why
-    it prints BEFORE the sidecar sections and prints even when there is no
-    sidecar at all.
+    `--top N` bounds each ranked list. The audit and composition sections are
+    always computed live from `graph.json` in ONE streaming pass (`_scan`), so
+    they are never stale even when the sidecar is — which is why they print
+    BEFORE the sidecar sections and print even when there is no sidecar at
+    all. A missing `graph.json` is refused before any of this runs (below), so
+    none of these three sections ever print against a graph that is not there.
     """
     top = _parse_top(list(args or []))
     if top is None:
@@ -229,7 +554,10 @@ def report(repo_root: Path, args: list[str] | None = None) -> int:
 
     fresh, note = _freshness(repo_root)
     print(f"[kb-insights] {note}")
-    _print_audit(graph)
+    audit, comp = _scan(graph)
+    _print_audit(audit)
+    _print_composition(comp)
+    _print_size(size_vs_cap(graph))
 
     sidecar = out / _SIDECAR
     if not sidecar.is_file():
