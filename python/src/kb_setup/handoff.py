@@ -25,6 +25,15 @@ want to disambiguate it, but it is not a defect and treating it as one is how a
 checker teaches people to ignore it. A malformed request (a target that is not
 there) exits 2, the same split `kb_setup.skill_eval` draws.
 
+TWO CONSUMERS, ONE POLICY. `mise run kb-handoff-check` checks whatever handoff
+you point it at; `mise run kb-ship` checks the NEWEST one, and only when that
+handoff records the current branch, refusing the push if it is broken
+(:func:`check_for_branch`, #149).
+The strict/advisory split is written once, here, so the gate cannot disagree
+with the command you would run to reproduce it. What the ship path adds is a
+third outcome the CLI has no use for — SKIPPED, when nothing on disk describes
+this branch — and skipping is what makes the gate safe rather than lenient.
+
 THE COMPOSER OWNS NO PARSING. Every regex lives in `kb_setup.citations` and
 every filesystem question in `kb_setup.resolve`; this module decides what a
 verdict MEANS for a handoff. Keeping it that way is what lets the next checker —
@@ -533,20 +542,167 @@ def render(findings: list[Finding], *, source: str) -> str:
     return "\n".join(lines)
 
 
-def newest_handoff(repo_root: Path) -> Path | None:
-    """The most recently modified `.agent/plans/session-*.md`, or None.
+def handoffs(repo_root: Path) -> list[Path]:
+    """Every `.agent/plans/session-*.md`, NEWEST FIRST.
 
-    Chosen by mtime rather than by filename. The names sort
+    Ordered by mtime rather than by filename. The names sort
     `session-2026-08-03-d.md` BEFORE `session-2026-08-03.md` (`-` < `.` in
     ASCII), so a lexicographic pick hands back the older of the two — and
     `.agent/` is gitignored and machine-local, so mtime here is authoring time
     rather than checkout time.
     """
-    plans = sorted(
+    return sorted(
         (repo_root / ".agent" / "plans").glob("session-*.md"),
         key=lambda p: p.stat().st_mtime,
+        reverse=True,
     )
-    return plans[-1] if plans else None
+
+
+def newest_handoff(repo_root: Path) -> Path | None:
+    """The most recently modified `.agent/plans/session-*.md`, or None."""
+    found = handoffs(repo_root)
+    return found[0] if found else None
+
+
+def recorded_branch(text: str) -> str | None:
+    """The branch this handoff says it is about, or None if it names none.
+
+    The FIRST branch its lead mentions. First rather than "the only one" because
+    a real handoff row reads ``| branch | `main` (the round's branch
+    `feat/settled-claims` is merged) |`` — the coordinates come first and the
+    commentary follows, which is how these documents are written.
+
+    None is a real answer and the common one for older handoffs: 6 of the 35 in
+    `.agent/plans/` on 2026-08-04 record no branch in their lead at all. It maps
+    to a reported SKIP, never to a match — see :func:`check_for_branch`.
+    Handoffs written from here on carry it by construction, because
+    `mise run kb-session-state` emits `- **branch**: `<name>`` (#144).
+    """
+    mentions = citations.branch_mentions(citations.document_lead(text))
+    return mentions[0].name if mentions else None
+
+
+class Coverage(Enum):
+    """Whether a handoff SPOKE for the current branch, and what it said.
+
+    Three states rather than a bool, for the reason every other tri-state in
+    this package exists: SKIPPED is not OK. A gate that had nothing to check and
+    a gate that checked and found nothing are different sentences, and rendering
+    the first as the second is the false green `kb-handoff-check` was built to
+    remove — arriving in the gate that consumes it.
+    """
+
+    OK = "OK"
+    BROKEN = "BROKEN"
+    SKIPPED = "SKIP"
+
+
+@dataclass(frozen=True)
+class BranchHandoff:
+    """What the handoff for one branch had to say.
+
+    ``summary`` is always non-empty and always safe to print on its own — it is
+    what `kb-ship` shows, and criterion 2 requires the skip case to be REPORTED
+    rather than silent. ``source`` is the matched file's name, empty when
+    nothing matched; ``findings`` is empty for the same reason, so a caller
+    cannot accidentally report another branch's defects as this one's.
+    """
+
+    coverage: Coverage
+    summary: str
+    source: str = ""
+    findings: tuple[Finding, ...] = ()
+
+
+def _handoff_summary(name: str, branch: str, findings: list[Finding]) -> str:
+    counts = {v: sum(1 for f in findings if f.verdict is v) for v in Verdict}
+    advisory = counts[Verdict.AMBIGUOUS] + counts[Verdict.UNVERIFIABLE]
+    tail = f" ({advisory} advisory — `mise run kb-handoff-check` for detail)" if advisory else ""
+    return (
+        f"`{name}` records branch `{branch}` — {counts[Verdict.FAIL]} broken, "
+        f"{counts[Verdict.OK]} OK{tail}"
+    )
+
+
+def check_for_branch(repo_root: Path, branch: str | None) -> BranchHandoff:
+    """Check the NEWEST handoff, and only if it records ``branch``.
+
+    THE BRANCH MATCH IS THE POINT, not a nicety (#149). Measured on 2026-08-03:
+    the newest handoff on disk pinned a commit six behind and asserted "no review
+    receipt", because it described the session that STARTED the work rather than
+    the one shipping it. Checking it would have blocked a healthy PR.
+
+    NEWEST-ONLY, NOT "THE NEWEST THAT MATCHES". #149's acceptance criterion is
+    worded the second way, and it was built that way first — scan every handoff
+    newest-first and check the first one recording this branch. That reading is
+    wrong, and measurably so. `.agent/plans/` is append-only and its handoffs
+    cite paths, so an old handoff rots as unrelated commits delete what it named:
+    over this repo's 35 handoffs, **8 of the 21 branches they record** come back
+    BROKEN under the scan, every one of them on a handoff 1-7 days stale. Under
+    newest-only all 8 SKIP. The scan does not remove the harm this ticket names —
+    a healthy ship refused over another session's staleness — it relocates it one
+    file back, and it grows monotonically. The criterion was amended on #149 to
+    match; see the comment there for the measurement.
+
+    What newest-only gives up is real and small: a session that switches branches
+    and comes back finds its own handoff masked by whatever was written since,
+    and skips. A skip is the safe direction, and this one is also self-correcting
+    — the next `/clear-prep` writes a newer handoff for the branch you are on.
+
+    So the two failure directions are not symmetric, and this function is biased
+    accordingly. A handoff wrongly MATCHED refuses a push over another session's
+    defects. A handoff wrongly SKIPPED loses one advisory check and says so out
+    loud. Everything unreadable therefore skips: no branch, no handoff, a handoff
+    naming no branch, a file that cannot be read.
+
+    Only FAIL refuses. AMBIGUOUS and UNVERIFIABLE are reported in the summary and
+    left advisory, which is `kb_setup.handoff`'s own split (`main` exits 0 for
+    both) rather than a second, stricter policy invented at the gate.
+    """
+    if not branch:
+        # None means git could not be asked (#144) — not "no branch". Either way
+        # there is nothing to match a handoff against.
+        return BranchHandoff(
+            Coverage.SKIPPED,
+            "SKIP — the current branch could not be read, so no handoff can be matched to it",
+        )
+
+    newest = newest_handoff(repo_root)
+    if newest is None:
+        return BranchHandoff(
+            Coverage.SKIPPED,
+            f"SKIP — no handoff under .agent/plans/ to check branch `{branch}` against",
+        )
+    try:
+        text = newest.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        # Reported, not silent, and not a refusal: a handoff we cannot open tells
+        # us nothing about the branch, which is the skip case.
+        return BranchHandoff(
+            Coverage.SKIPPED,
+            f"SKIP — the newest handoff {newest.name} could not be read: {exc}",
+        )
+
+    recorded = recorded_branch(text)
+    if recorded != branch:
+        # NAME what it recorded. "No handoff matched" alone cannot be told from
+        # "the check is broken", and this is the branch of the gate a reader
+        # meets most often — `/clear-prep` writes the handoff AFTER the round,
+        # so at ship time the newest one usually describes the previous session.
+        return BranchHandoff(
+            Coverage.SKIPPED,
+            f"SKIP — the newest handoff {newest.name} records "
+            f"{'`' + recorded + '`' if recorded else 'no branch'}, not `{branch}`",
+        )
+
+    findings = check(repo_root, text)
+    broken = any(f.verdict is Verdict.FAIL for f in findings)
+    return BranchHandoff(
+        Coverage.BROKEN if broken else Coverage.OK,
+        _handoff_summary(newest.name, branch, findings),
+        source=newest.name,
+        findings=tuple(findings),
+    )
 
 
 def main(args: list[str], repo_root: Path) -> int:
