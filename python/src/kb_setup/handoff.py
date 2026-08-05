@@ -1,15 +1,18 @@
 """Verify a handoff's checkable claims — `mise run kb-handoff-check`.
 
-FOUR CHECKS, AND THEY ARE NOT ALL STATIC. Three ask the filesystem: do the cited
-paths exist (including whether a citation's EXTENSION is mistyped, #154), is
-every `file:line` real, is every named task declared in `mise.toml`. The fourth
-does not: a **gate claim** — `` `mise run lint` **rc=0** `` — is checked against
-`.agent/kb/gates/gates-<sha>.json`, the record `mise run kb-gates` writes (#147).
-That record is a machine-local artifact on disk rather than a fact about the
-tree, which is why a claim can come back UNVERIFIABLE here and never can for a
-path. This paragraph said "static claims" and enumerated only the first three
+FIVE CHECKS, AND THEY ARE NOT ALL STATIC. Four ask the filesystem: do the cited
+paths exist (including whether a citation's EXTENSION is mistyped, #154), does
+anything match a citation whose middle is ELIDED (`review-8a46d08…-cold.md`,
+#148), is every `file:line` real, is every named task declared in `mise.toml`.
+The fifth does not: a **gate claim** — `` `mise run lint` **rc=0** `` — is checked
+against `.agent/kb/gates/gates-<sha>.json`, the record `mise run kb-gates` writes
+(#147). That record is a machine-local artifact on disk rather than a fact about
+the tree, which is why a claim can come back UNVERIFIABLE here and never can for
+a path. This paragraph said "static claims" and enumerated only the first three
 until #157; `mise.toml` and `.claude/skills/clear-prep/SKILL.md` had already been
-corrected, so the source was the stale one — the worse direction.
+corrected, so the source was the stale one — the worse direction. The count has
+now gone stale twice, which is why it is spelled out rather than left as "the
+checks below".
 
 WHAT THIS REPLACES. `/clear-prep` step 6 asks the agent to self-verify the
 handoff it has just written, at the end of a long session, from memory. That is
@@ -48,12 +51,12 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from kb_setup import citations, gates, resolve
+from kb_setup import citations, gates, resolve, review
 
 #: The checks a `` `path` (absent) `` marker can be written on. A gate claim
 #: cannot, which is why `render` scopes its hint to these rather than to any
 #: FAIL.
-_PATH_CHECKS: frozenset[str] = frozenset({"path", "file-line"})
+_PATH_CHECKS: frozenset[str] = frozenset({"path", "file-line", "elided"})
 
 
 class Verdict(Enum):
@@ -113,6 +116,7 @@ def check(repo_root: Path, text: str) -> list[Finding]:
     # already rules out for the tree walk. (Standards lane.)
     declared = resolve.declared_tasks(repo_root)
     findings = [_check_path(repo_root, c, index) for c in citations.path_citations(text)]
+    findings.extend(_check_elided(repo_root, c, index) for c in citations.elided_citations(text))
     findings.extend(_check_extension_typos(repo_root, text, index))
     findings.extend(_check_line_ref(repo_root, c, index) for c in citations.line_citations(text))
     findings.extend(_check_tasks(text, declared))
@@ -125,6 +129,53 @@ def _check_path(repo_root: Path, cite: citations.PathCitation, index: resolve.In
     if cite.marked_absent:
         return _check_absent_marker("path", cite.text, cite.line, got)
     return Finding("path", _VERDICT_OF[got.state], cite.text, cite.line, got.detail)
+
+
+def _check_elided(repo_root: Path, cite: citations.ElidedCitation, index: resolve.Index) -> Finding:
+    """Adjudicate a citation whose middle is abbreviated — `review-8a46d08…-cold.md`.
+
+    THE CHECK #148 IS ABOUT. A handoff names the reports its round produced, and
+    it names many of them this way. Control-armed on 2026-08-05, the hole was
+    total rather than partial — a concrete citation of a report that never existed
+    came back FAIL, while the same citation with its sha elided produced no
+    citation at all. So "the cold lane ran at a commit nothing was ever written
+    for" was a sentence a handoff could make and pass.
+
+    THE COUNT, WITH ITS CONDITION, because the first version of this paragraph
+    carried one without. It claimed "21 report citations carry an elision", which
+    was a PRE-IMPLEMENTATION count of report-directory tokens *including* the
+    brace forms the extractor then excluded — a number invalidated by the very
+    commit that wrote it, which `probes-need-a-control-arm.md` rule 6 warns reads
+    as verified forever. Re-derived, the extractor returned **18**; normalising a
+    leading elision then admitted 3 more, so it returns **21** over the 37 files
+    in `.agent/plans/` today.
+
+    That the wrong number and the right one coincide is a coincidence of two
+    different quantities, and it is written down rather than tidied away: a
+    reader seeing only the final figure would conclude the original claim had
+    been right, when it counted a different set and was wrong about the set it
+    named. `.agent/` is gitignored, so none of it is re-derivable on another
+    clone; the durable facts are the mechanism and the control arm above.
+    (Standards lane J3, spec lane F1.)
+
+    WHY THE VARIANT IS STRIPPED FIRST. `kb_setup.review.report_path` removes a
+    lane's `:variant` when it WRITES the report, so a handoff citing the lane as
+    the receipt records it (`cold:codex`) names a file that cannot exist. Checking
+    the written spelling literally would report a lane whose report is on disk as
+    one that never ran. The repair is a spelling repair only — the repaired name
+    still has to match something real, which
+    `test_a_stripped_variant_does_not_excuse_a_lane_with_no_report` pins.
+
+    The `(absent)` marker is adjudicated against the citation's OWN resolution,
+    for the reason spelled out in :func:`_check_extension_typos`: routing a marked
+    citation through a different question is what made the marker unfalsifiable
+    there. Here both directions are live — a marked citation that MATCHES is a
+    FAIL — so the marker cannot be pasted beside a report to silence it.
+    """
+    got = resolve.resolve_elided(repo_root, review.strip_lane_variant(cite.text), index)
+    if cite.marked_absent:
+        return _check_absent_marker("elided", cite.text, cite.line, got)
+    return Finding("elided", _VERDICT_OF[got.state], cite.text, cite.line, got.detail)
 
 
 def _check_extension_typos(repo_root: Path, text: str, index: resolve.Index) -> list[Finding]:

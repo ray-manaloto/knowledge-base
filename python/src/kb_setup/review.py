@@ -512,6 +512,59 @@ def report_path(repo_root: Path, sha: str, lane: str) -> Path:
     return repo_root / REPORT_DIR / f"review-{safe_sha(sha)}-{lane_file}.md"
 
 
+def strip_lane_variant(token: str) -> str:
+    """Return a cited lane-report filename with any `:variant` removed (#148).
+
+    `review-<sha>-cold:codex.md` → `review-<sha>-cold.md`. The WRITER already
+    does this — :func:`report_path` runs the lane through :func:`_lane_prefix`
+    before building the name — so a file carrying a variant can never exist. A
+    handoff that cites the lane AS RECORDED is therefore naming a spelling that
+    is unmatchable by construction, and a checker taking it literally would
+    report a lane whose report is on disk as one that never ran. That is the
+    false-accusation direction #145 calls fatal to a checker's credibility, and
+    it is what criterion 3 of #148 is about.
+
+    It repairs the SPELLING and vouches for nothing: the repaired name still has
+    to match a real report.
+
+    THE DIRECTORY IS CHECKED, and this docstring used to say so while the code
+    did not. It tested `stem.startswith("review-")` on the BASENAME alone, so
+    `docs/review-2026:q3.md` became `docs/review-2026.md` — a token outside this
+    module's directory, silently rewritten into a name that may well exist. That
+    is the FALSE-GREEN direction inside the one package whose contract is to
+    under-report, and it was defended by a sentence claiming the opposite. The
+    standards lane found it by running the function rather than reading it.
+
+    A citation with NO directory is still accepted, because that is a real form —
+    handoffs write `` `review-abc…-cold.md` `` bare beside the full path, and
+    `resolve` matches a bare filename on its basename. What is excluded is a
+    token that names a DIFFERENT directory, which is the case that could not be
+    about a lane report.
+
+    ONLY `_lane_prefix` IS REPRODUCED, NOT `_safe_lane`, and that asymmetry is
+    deliberate rather than the half-copy it looks like. `report_path` composes
+    `_safe_lane(_lane_prefix(lane))`, and a review lane proposed matching it here.
+    Running it: `_safe_lane("review-abc1234…-cold")` returns
+    `"review-abc1234-cold"` — it keeps only alphanumerics, `-` and `_`, so it
+    DESTROYS the elision and silently turns a pattern into a literal that matches
+    nothing. The two sides are not symmetric because the inputs are not: the
+    writer sanitises a lane name on its way to becoming a filename, while this
+    reads a citation an author wrote, whose whole point is the character
+    `_safe_lane` removes.
+
+    Lives here rather than in `kb_setup.resolve` because the `:variant`
+    convention is this module's — it owns `_lane_prefix`, `report_path` and the
+    directory they write into.
+    """
+    head, _, name = token.rpartition("/")
+    stem, dot, ext = name.rpartition(".")
+    if not dot or not stem.startswith("review-") or _SKIP_SEPARATOR not in stem:
+        return token
+    if head and head.strip("/") != str(REPORT_DIR):
+        return token
+    return f"{head}/{_lane_prefix(stem)}.{ext}" if head else f"{_lane_prefix(stem)}.{ext}"
+
+
 def _report_gaps(repo_root: Path, data: dict[str, Any], sha: str) -> tuple[list[str], list[str]]:
     """Return ``(lanes with no usable report, lanes whose report names another commit)``.
 

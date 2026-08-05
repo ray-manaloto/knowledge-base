@@ -906,3 +906,104 @@ def test_the_ok_summary_names_the_handoff_and_its_counts(tmp_path: Path):
     got = handoff.check_for_branch(root, "work")
     assert "session-2026-01-01.md" in got.summary
     assert "work" in got.summary
+
+
+# --------------------------------------------------- elided report claims ----
+#
+# #148. `_check_elided` is the only check whose citations `path_citations`
+# refuses by construction, so every test here would have passed vacuously before
+# the extractor existed — the control arm for that is
+# `test_an_elided_citation_is_checked_at_all` below, which asserts a finding is
+# produced rather than merely that none failed.
+
+_REPORTS = ".agent/kb/review/reports"
+_AGENTS = ".agent/kb/reports/agents"
+
+
+def test_an_elided_citation_is_checked_at_all(tmp_path: Path):
+    """Control arm: prove the check RUNS before trusting any pass below.
+
+    Asserts a finding exists for the token, not just that nothing failed. A
+    check that extracts nothing produces no failures either, and the two are
+    indistinguishable from `_fails(...) == []` alone.
+    """
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    findings = handoff.check(root, f"see `{_REPORTS}/review-abc1234…-cold.md`\n")
+    assert [f.check for f in findings] == ["elided"]
+
+
+def test_an_elided_report_citation_that_resolves_does_not_fail(tmp_path: Path):
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    assert _fails(handoff.check(root, f"see `{_REPORTS}/review-abc1234…-cold.md`\n")) == []
+
+
+def test_an_elided_report_citation_with_no_report_fails(tmp_path: Path):
+    """THE TICKET: a report that was never written must not pass as one that was."""
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    (f,) = _fails(handoff.check(root, f"see `{_REPORTS}/review-deadbee…-cold.md`\n"))
+    assert f.check == "elided"
+    assert "nothing matches" in f.detail
+
+
+def test_an_elided_citation_naming_a_lane_that_never_ran_fails(tmp_path: Path):
+    """The sha is real and the LANE is not — a sha-only check would wave this through."""
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    assert len(_fails(handoff.check(root, f"see `{_REPORTS}/review-abc1234…-spec.md`\n"))) == 1
+
+
+def test_a_lane_variant_is_stripped_when_matching_a_lane_report(tmp_path: Path):
+    """Criterion 3: a lane RECORDED with a variant must not look like one that never ran.
+
+    `kb_setup.review.report_path` strips the `:variant` when it WRITES the file,
+    so a handoff citing the lane as recorded (`cold:codex`) names a filename that
+    can never exist. Without the strip this is a confident false accusation
+    against a lane whose report is on disk — the direction #145 calls fatal.
+    """
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    assert _fails(handoff.check(root, f"see `{_REPORTS}/review-abc1234…-cold:codex.md`\n")) == []
+
+
+def test_a_stripped_variant_does_not_excuse_a_lane_with_no_report(tmp_path: Path):
+    """The other arm of the strip: it repairs the SPELLING, it does not vouch.
+
+    Without this, `strip_lane_variant` could be implemented as "drop everything
+    after the last `-`" and every lane would resolve to every report.
+    """
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    text = f"see `{_REPORTS}/review-abc1234…-spec:codex.md`\n"
+    assert len(_fails(handoff.check(root, text))) == 1
+
+
+def test_a_report_on_disk_that_nothing_mentions_is_not_a_finding(tmp_path: Path):
+    """Criterion 4, second half. The check reads the handoff; it never audits the dir."""
+    root = _repo(
+        tmp_path,
+        {
+            f"{_REPORTS}/review-abc1234def-cold.md": "x\n",
+            f"{_REPORTS}/review-abc1234def-spec.md": "y\n",
+            f"{_AGENTS}/nobody-mentions-me.md": "z\n",
+        },
+    )
+    findings = handoff.check(root, f"see `{_REPORTS}/review-abc1234…-cold.md`\n")
+    assert _fails(findings) == []
+    assert len(findings) == 1
+
+
+def test_an_elided_citation_marked_absent_and_absent_is_ok(tmp_path: Path):
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    findings = handoff.check(root, f"see `{_REPORTS}/review-deadbee…-cold.md` (absent)\n")
+    assert _fails(findings) == []
+
+
+def test_an_elided_citation_marked_absent_that_resolves_fails(tmp_path: Path):
+    """Both arms: the marker cannot be a mute button here either."""
+    root = _repo(tmp_path, {f"{_REPORTS}/review-abc1234def-cold.md": "x\n"})
+    (f,) = _fails(handoff.check(root, f"see `{_REPORTS}/review-abc1234…-cold.md` (absent)\n"))
+    assert "resolves" in f.detail
+
+
+def test_an_elided_citation_into_another_repo_is_reported_but_does_not_fail(tmp_path: Path):
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    findings = handoff.check(root, "see `graphify/src/wat…er.py`\n")
+    assert _fails(findings) == []
+    assert [f.verdict for f in findings] == [handoff.Verdict.UNVERIFIABLE]

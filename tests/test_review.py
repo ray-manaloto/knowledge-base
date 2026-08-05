@@ -1317,3 +1317,78 @@ def test_the_accepted_reason_help_names_the_new_reason() -> None:
     help_text = review._skip_reason_help()
     assert "by-policy-one-lane" in help_text
     assert "not-applicable-" in help_text
+
+
+# ------------------------------------------------ strip_lane_variant (#148) ----
+
+
+def test_strip_lane_variant_removes_a_variant_from_a_lane_report_name():
+    got = review.strip_lane_variant(".agent/kb/review/reports/review-abc123-cold:codex.md")
+    assert got == ".agent/kb/review/reports/review-abc123-cold.md"
+
+
+def test_strip_lane_variant_keeps_a_hyphenated_lane_intact():
+    """`silent-failure` must survive: the variant separator is `:`, never the last `-`."""
+    got = review.strip_lane_variant("review-abc123-silent-failure:codex.md")
+    assert got == "review-abc123-silent-failure.md"
+
+
+def test_strip_lane_variant_leaves_a_name_with_no_variant_alone():
+    assert review.strip_lane_variant("review-abc123-cold.md") == "review-abc123-cold.md"
+
+
+def test_strip_lane_variant_leaves_a_non_review_filename_alone():
+    assert review.strip_lane_variant("docs/notes:draft.md") == "docs/notes:draft.md"
+
+
+def test_strip_lane_variant_leaves_another_directory_alone():
+    """THE REACHING CASE, which the test above could not reach.
+
+    That one varies the basename PREFIX, so it only ever exercised the
+    `startswith("review-")` guard. The claim the docstring actually made was
+    about the DIRECTORY, and nothing tested it — so `docs/review-2026:q3.md`
+    became `docs/review-2026.md`: a token outside this module's directory
+    silently rewritten into a name that may exist, which is the false-green
+    direction. Found by the standards lane running the function rather than
+    reading it. (H1.)
+    """
+    assert review.strip_lane_variant("docs/review-2026:q3.md") == "docs/review-2026:q3.md"
+    assert (
+        review.strip_lane_variant("python/src/kb_setup/review-notes:draft.md")
+        == "python/src/kb_setup/review-notes:draft.md"
+    )
+
+
+def test_strip_lane_variant_accepts_the_report_directory_and_a_bare_name():
+    """The two forms handoffs really write. Control arm for the test above."""
+    assert (
+        review.strip_lane_variant(".agent/kb/review/reports/review-abc-cold:codex.md")
+        == ".agent/kb/review/reports/review-abc-cold.md"
+    )
+    assert review.strip_lane_variant("review-abc-cold:codex.md") == "review-abc-cold.md"
+
+
+def test_strip_lane_variant_preserves_an_elision():
+    """`_safe_lane` is NOT applied here, and this is why.
+
+    It keeps only alphanumerics, `-` and `_`, so composing it as the writer does
+    would turn `review-abc1234…-cold` into `review-abc1234-cold` — destroying the
+    elision and silently converting a pattern into a literal that matches
+    nothing. A review lane proposed matching the writer exactly; running it is
+    what showed the two sides are not symmetric. (J1.)
+    """
+    got = review.strip_lane_variant("review-abc1234…-cold:codex.md")
+    assert got == "review-abc1234…-cold.md"
+
+
+def test_strip_lane_variant_leaves_a_bare_non_review_name_alone():
+    """The `review-` prefix is load-bearing ONLY for a bare filename — pin that.
+
+    With a directory the scope check already refuses anything outside
+    `REPORT_DIR`, so removing the prefix guard changes nothing there. It changes
+    everything for a bare name: `notes:draft.md` has no directory to judge, and
+    without the prefix it would be rewritten to `notes.md` — a token repaired
+    into a name that may exist. Mutation arm B13 survived until this test
+    existed, which is precisely what the arm is for.
+    """
+    assert review.strip_lane_variant("notes:draft.md") == "notes:draft.md"

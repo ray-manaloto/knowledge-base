@@ -815,3 +815,119 @@ def test_lead_preserves_line_numbers():
     text = "# H\n\nbranch `feat/a`\n\n## Later\n\nx\n"
     assert citations.document_lead(text).count("\n") >= 2
     assert citations.branch_mentions(citations.document_lead(text))[0].line == 3
+
+
+# ------------------------------------------------------- elided citations ----
+#
+# The #148 extractor. Every test here is paired with an exclusion, for the reason
+# stated at the top of this file: the elision is a notation authors reach for in
+# prose as often as in a citation, and the measured cost of getting that backwards
+# is a checker nobody trusts.
+
+
+def test_an_elided_citation_is_extracted():
+    """The dominant real form: a lane report whose sha is abbreviated."""
+    text = "see `.agent/kb/review/reports/review-8a46d08…-cold.md`\n"
+    (c,) = citations.elided_citations(text)
+    assert c.text == ".agent/kb/review/reports/review-8a46d08…-cold.md"
+    assert c.line == 1
+
+
+def test_a_bare_filename_may_be_elided():
+    (c,) = citations.elided_citations("see `review-8a46d08…-cold.md`\n")
+    assert c.text == "review-8a46d08…-cold.md"
+
+
+def test_a_token_with_no_elision_is_not_an_elided_citation():
+    """Positive control's opposite: the ordinary path citation is untouched."""
+    assert citations.elided_citations("see `docs/a.md`\n") == []
+
+
+def test_an_elided_token_is_not_also_a_path_citation():
+    """One token, one finding — the rule `path_citations` already keeps for `file:line`."""
+    text = "see `review-8a46d08…-cold.md`\n"
+    assert citations.path_citations(text) == []
+    assert len(citations.elided_citations(text)) == 1
+
+
+def test_a_placeholder_template_is_not_an_elided_citation():
+    """`<sha>` names no file BY CONSTRUCTION, so it can claim nothing."""
+    assert citations.elided_citations("write `review-<sha>-cold.md`\n") == []
+    assert citations.elided_citations("write `review-<full-40-char-sha>-cold.md`\n") == []
+
+
+def test_a_brace_form_is_not_an_elided_citation():
+    """Ray, 2026-08-05: a brace set COMPRESSES a list, it does not claim each member.
+
+    Measured on `session-2026-07-28-c.md`, whose
+    `review-{fdd73c4…,e611b89…,2e43f8b…}-{standards,spec,cold,silent-failure}.md`
+    expands to 12 files while only 9 exist — and whose author wrote "(9 files)"
+    in the same table cell and "cold only" in a table above it. Expanding it
+    would report three failures against a handoff that was accurate throughout.
+    """
+    text = "see `review-{fdd73c4…,e611b89…}-{standards,cold}.md`\n"
+    assert citations.elided_citations(text) == []
+
+
+def test_a_glob_is_not_an_elided_citation():
+    """The stated BOUND: `*` is out of scope, so `res-*.md` is silently skipped.
+
+    Re-derived over the 37 files in `.agent/plans/` on 2026-08-05: **98**
+    single-token spans contain a `*`, of which **59** are path-like once the `*`
+    is removed. An earlier version of this docstring said "4 `*` citations" — that
+    was the count of `*` tokens naming a REPORT DIRECTORY, carried here without
+    its bound, which is the one error `md-size-budgets.md` exists to record.
+
+    The recall is given up because `*` is written as a QUOTED PATTERN as often as
+    a citation — `**/agents/*.md` appears in prose describing what agnix reads —
+    and the elision never is.
+    """
+    assert citations.elided_citations("see `.agent/kb/reports/agents/res-*.md`\n") == []
+
+
+def test_a_bare_elision_is_not_a_citation():
+    assert citations.elided_citations("and so on `…`\n") == []
+
+
+def test_an_elided_citation_carries_the_absent_marker():
+    text = "see `review-deadbee…-cold.md` (absent)\n"
+    (c,) = citations.elided_citations(text)
+    assert c.marked_absent is True
+
+
+def test_an_elided_citation_inside_a_fence_is_ignored():
+    text = "```\nreview-8a46d08…-cold.md\n```\n"
+    assert citations.elided_citations(text) == []
+
+
+def test_an_elided_token_with_no_known_extension_is_not_a_citation():
+    """The allowlist still gates: `2e43f8b…` alone is an abbreviated sha, not a file."""
+    assert citations.elided_citations("at `2e43f8b…`\n") == []
+
+
+def test_an_elided_directory_citation_is_extracted():
+    (c,) = citations.elided_citations("see `docs/research/kb/reports/agents/…`\n")
+    assert c.text == "docs/research/kb/reports/agents/…"
+
+
+def test_a_leading_elision_directory_is_normalised():
+    """`…/review-5c38615…-cold.md` — 4 in the corpus, and all were dropped.
+
+    The elided leading directory de-elides to a leading `/`, which
+    `_categorically_not_a_path` reads as a path outside the repo. That threw away
+    a citation with a concrete sha, lane and extension — the exact target class.
+    Found by the spec lane (F1).
+    """
+    (c,) = citations.elided_citations("see `…/review-5c38615…-cold.md`\n")
+    assert c.text == "review-5c38615…-cold.md"
+
+
+def test_an_extensionless_elided_token_is_still_not_a_citation():
+    """The stated BOUND, pinned so it stays deliberate rather than drifting.
+
+    `review-bd30397…` (3 in the corpus) is skipped: `_has_known_ext` is the gate
+    keeping `kb_setup.hook_guard` and `0.9.31` out, and admitting a bare stem
+    would need a `review-`-specific rule in a module that knows nothing about
+    review lanes. Recall given up knowingly. (Spec lane, F2/F3.)
+    """
+    assert citations.elided_citations("see `review-bd30397…`\n") == []
