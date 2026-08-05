@@ -279,17 +279,24 @@ def _stub_recompose(monkeypatch, calls: list[list[str]]) -> None:
     rather than replaced with nothing, because the merge/replay argv IS the
     behaviour under test; `label`/`assert_composition` run against REAL
     graph.json content that `apply_merge`'s byte-concatenation stand-in does
-    not produce. `_clear_stamp` accepts `**_` because `refresh_self` now calls
-    it with `tag="kb-watch"` (#175 cold review, finding 9). `_restamp_self` is
-    deliberately NOT stubbed here: none of these fixtures write a
-    `currency.toml`, so `_currency_spec` resolves to `None` and it is already
-    a no-op — restamping is exercised on purpose by
-    `test_refresh_self_restamps_so_the_graph_stays_verifiable` and its
-    siblings below, which DO set one up (`_stamped_repo`).
+    not produce.
+
+    `_clear_stamp` is deliberately NOT stubbed (#175 cold review round 2,
+    NEW-1). It used to be — purely so a plain lambda would accept the `tag=`
+    keyword `refresh_self` passes it — but stubbing it out ALSO hid a real
+    defect: it let a test believe a stamp survived a recomposition that, in
+    production, deletes it first. The REAL `_clear_stamp` already accepts
+    `tag=` and is a safe no-op for every fixture in this file that has no
+    `currency.toml` at all (`_currency_spec` resolves to `None` immediately) —
+    the only fixtures where it does anything are the ones built on
+    `_stamped_repo` below, which are exactly the ones that need to exercise it
+    for real. `_restamp_self` is likewise never stubbed here — the same
+    no-op-without-a-spec reasoning applies, and restamping is exercised on
+    purpose by `test_refresh_self_restamps_so_the_graph_stays_verifiable` and
+    its siblings below.
     """
     monkeypatch.setattr(graph, "_run", merge_recorder(calls))
     monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
-    monkeypatch.setattr(graph, "_clear_stamp", lambda _root, **_: None)
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
     monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
 
@@ -607,19 +614,48 @@ def test_refresh_self_restamps_so_the_graph_stays_verifiable(monkeypatch, tmp_pa
     Asserting that some `_restamp_self` function was called would pass just as
     happily on a restamp that wrote the wrong bytes.
 
+    `_clear_stamp` runs FOR REAL here (unlike most fixtures in this file,
+    which have no `currency.toml` at all and so make it a no-op regardless) —
+    that is deliberate and is the whole point of the test. Before #175's round
+    -2 fix (NEW-1), stubbing it out was hiding a real defect: the OLD
+    `_restamp_self` called `sync.restamp_artifacts`, whose contract is
+    "refresh an EXISTING stamp" and which returns `None` once the file is
+    gone — and `_recompose_into_temp` unlinks it immediately before the swap.
+    With the stub in place the file was never actually deleted here, so
+    `restamp_artifacts` always found it and "restamped" successfully in the
+    test while every real `kb-watch` silently ended up unstamped. Un-stubbing
+    it is the realistic mutation that exposes that gap.
+
+    FAIL-ARM CHECKED (manually, not committed): re-stubbing `_clear_stamp`
+    here still leaves this test GREEN (the stub just means the file is never
+    deleted, so of course it survives — the assertion is on real end state,
+    not on whether the stub ran); separately, reverting the tail to call the
+    OLD `_restamp_self(repo_root)` (`sync.restamp_artifacts` against the
+    now-really-cleared file) turns it RED with no stamp on disk at all.
+    Confirmed, then restored — see `test_a_refresh_that_fails_after_the_clear
+    _leaves_no_stamp` for the sibling fail-closed control arm this fix must
+    not break.
+
     Realistic break: revert `refresh_self`'s tail back to
-    `_stamp_build(repo_root, inputs)` — this fix's own regression (#175 cold
-    review, finding 1). `artifact_fingerprints` is `size:mtime_ns`, so ANY
-    rewrite of graph.json moves it; without a restamp that carries the
+    `_stamp_build(repo_root, inputs)` — the ORIGINAL regression (#175 cold
+    review round 1, finding 1). `artifact_fingerprints` is `size:mtime_ns`, so
+    ANY rewrite of graph.json moves it; without a restamp that carries the
     fingerprint forward, the very next session reports the graph as not
     verifiably built by the pin.
     """
     root = _stamped_repo(tmp_path)
     spec = config.load(root)[0]
-    sync.write_stamp(root, spec, version="0.9.32", source_ref="", inputs=None)
-    assert sync.stamped_fingerprints(sync.read_stamp(root, spec)) == sync.artifact_fingerprints(
-        root, spec
-    ), "fixture is wrong: the stamp must agree with the artifact BEFORE the refresh"
+    sync.write_stamp(
+        root,
+        spec,
+        version="0.9.32",
+        source_ref="deadbeefcafe",
+        inputs={"sources/aaa.manifest": "sha256:before"},
+    )
+    before = sync.read_stamp(root, spec)
+    assert sync.stamped_fingerprints(before) == sync.artifact_fingerprints(root, spec), (
+        "fixture is wrong: the stamp must agree with the artifact BEFORE the refresh"
+    )
 
     def _fake_run(argv: list[str], _root: Path) -> None:
         # The merge really does rewrite the scratch file `--out` names — write
@@ -634,17 +670,59 @@ def test_refresh_self_restamps_so_the_graph_stays_verifiable(monkeypatch, tmp_pa
 
     monkeypatch.setattr(graph, "_run", _fake_run)
     monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
-    monkeypatch.setattr(graph, "_clear_stamp", lambda _root, **_: None)
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
     monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
 
     graph.refresh_self(root)
 
-    assert sync.stamped_fingerprints(sync.read_stamp(root, spec)) == sync.artifact_fingerprints(
-        root, spec
-    ), (
+    stamp_file = sync.stamp_path(root, spec)
+    assert stamp_file is not None, "fixture is wrong: no stamp path configured"
+    assert stamp_file.exists(), (
+        "refresh_self left the repo with NO stamp at all — _clear_stamp deletes "
+        "it and nothing wrote it back"
+    )
+    after = sync.read_stamp(root, spec)
+    assert after.get("version") == "0.9.32", f"version was not carried forward: {after}"
+    assert after.get("source_ref") == "deadbeefcafe", f"source_ref was not carried forward: {after}"
+    assert sync.stamped_input_fingerprints(after) == {"sources/aaa.manifest": "sha256:before"}, (
+        f"the input fingerprint map was not carried forward verbatim: {after}"
+    )
+    assert sync.stamped_fingerprints(after) == sync.artifact_fingerprints(root, spec), (
         "refresh_self rewrote graph.json without restamping — kb-currency-check "
         "would report the graph as built by an unknown version every session after."
+    )
+    assert sync.stamped_fingerprints(after) != sync.stamped_fingerprints(before), (
+        "the artifact fingerprints did not move even though graph.json's bytes changed"
+    )
+
+
+def test_a_refresh_that_fails_after_the_clear_leaves_no_stamp(monkeypatch, tmp_path):
+    """Fail-closed must survive the NEW-1 fix: an abort after the clear still ends unstamped.
+
+    Before the fix, EVERY `kb-watch` ended unstamped regardless of outcome
+    (NEW-1) — so this exact assertion held, but for the wrong reason. Now that
+    a SUCCESSFUL refresh restamps, this is the control arm proving an
+    UNSUCCESSFUL one still does not: `_clear_stamp` has already unlinked the
+    file by the time the label pass runs, and `_restamp_self` only ever
+    writes at the very end of `refresh_self`, after every other step has
+    succeeded.
+    """
+    root = _stamped_repo(tmp_path)
+    spec = config.load(root)[0]
+    sync.write_stamp(root, spec, version="0.9.32", source_ref="", inputs=None)
+    stamp_file = sync.stamp_path(root, spec)
+    assert stamp_file is not None, "fixture is wrong: no stamp path configured"
+    assert stamp_file.exists(), "fixture is wrong: no stamp to clear"
+
+    _stub_recompose(monkeypatch, [])
+    monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 1)  # force the post-clear abort
+
+    with pytest.raises(SystemExit, match="label pass failed"):
+        graph.refresh_self(root)
+
+    assert not stamp_file.exists(), (
+        "a refresh that failed AFTER the clear left a stamp behind — fail-closed "
+        "must mean no stamp until full success, not a stale one"
     )
 
 
@@ -843,4 +921,178 @@ def test_a_promoted_ledger_chunks_root_survives_into_the_next_refresh(monkeypatc
     assert root_args == [default_root], (
         f"the promoted chunk replayed with a re-derived root instead of its "
         f"recorded one; got {root_args}, expected [{default_root!r}]"
+    )
+
+
+# --- ledger collapse: last-row-wins (#175 cold review round 2, NEW-2/NEW-3) --
+
+
+def test_ledger_collapses_to_the_last_row_per_path_verifying_only_that_one(monkeypatch, tmp_path):
+    """A superseded row's STALE sha must not block `kb-watch` — only the LAST row's does.
+
+    The ordinary re-ingestion flow: `kb-assemble` overwrites a chunk in place,
+    `kb-merge` merges it again, appending a SECOND ledger row for the SAME
+    path. Before this fix `_verified_ledger_chunks` sha-checked EVERY row, so
+    the superseded first row's now-stale sha refused every `kb-watch` until a
+    full `kb-build` — for a flow that involves no misuse at all (NEW-3).
+    """
+    chunk = tmp_path / "sources" / "extractions" / "bar-docs.json"
+    chunk.parent.mkdir(parents=True, exist_ok=True)
+    chunk.write_text('{"nodes": [], "edges": [], "v": 1}', encoding="utf-8")
+    stale_sha = graph._sha256_file(chunk)
+    chunk.write_text('{"nodes": [], "edges": [], "v": 2}', encoding="utf-8")
+    current_sha = graph._sha256_file(chunk)
+    assert stale_sha != current_sha, "fixture is wrong: the two writes must differ"
+
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    graph._write_merged_chunks(
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=str(chunk.relative_to(repo)), sha256=stale_sha, root=str(chunk.parent)
+            ),
+            graph.MergedChunkEntry(
+                chunk=str(chunk.relative_to(repo)), sha256=current_sha, root=str(chunk.parent)
+            ),
+        ],
+    )
+
+    calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, calls)
+
+    graph.refresh_self(repo)  # must NOT raise
+
+    merge_argvs = [c for c in calls if str(graph._MERGE_SCRIPT) in c]
+    chunk_args = [c[2] for c in merge_argvs]
+    assert chunk_args.count(str(chunk)) == 1, (
+        f"the superseded + current rows for the same path replayed more than "
+        f"once; argv were {merge_argvs}"
+    )
+
+
+def test_ledger_refuses_when_the_last_row_for_a_path_is_stale(monkeypatch, tmp_path):
+    """The fail-closed refusal must still fire — on the SURVIVING row, not a superseded one.
+
+    Control arm for the test above: collapsing to the last row must not
+    become a way to silently ignore a genuinely changed chunk. Two rows name
+    the same path; the FIRST happens to still verify (irrelevant — it is
+    superseded), the LAST does not.
+    """
+    _forbid_subprocesses(monkeypatch)
+    chunk = tmp_path / "sources" / "extractions" / "baz-docs.json"
+    chunk.parent.mkdir(parents=True, exist_ok=True)
+    chunk.write_text('{"nodes": [], "edges": [], "v": 1}', encoding="utf-8")
+    first_sha = graph._sha256_file(chunk)
+
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    graph._write_merged_chunks(
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=str(chunk.relative_to(repo)), sha256=first_sha, root=str(chunk.parent)
+            ),
+            graph.MergedChunkEntry(
+                chunk=str(chunk.relative_to(repo)), sha256="0" * 64, root=str(chunk.parent)
+            ),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        graph.refresh_self(repo)
+    message = str(exc.value)
+    assert "baz-docs.json" in message, (
+        f"the refusal must name the changed chunk; it said {message!r}"
+    )
+
+
+def test_n_identical_ledger_rows_for_one_chunk_replay_exactly_once(monkeypatch, tmp_path):
+    """Re-running `kb-merge` on unchanged content must not multiply the replay.
+
+    The within-ledger sibling of `test_promoting_an_already_present_ledger_
+    chunk_does_not_duplicate` (which covers ledger-vs-MANIFEST): here the
+    chunk is NOT yet in `manifest.chunks` at all, and it is the ledger ITSELF
+    that names it three times (NEW-2). Without the collapse this promotes and
+    replays three times, and — because the resulting `manifest.chunks` tuple
+    then carries three copies — every SUBSEQUENT `kb-watch` keeps replaying
+    three times, permanently.
+    """
+    chunk = tmp_path / "ledger-chunk.json"
+    chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    sha = graph._sha256_file(chunk)
+
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    graph._write_merged_chunks(
+        repo,
+        [
+            graph.MergedChunkEntry(chunk=str(chunk), sha256=sha, root=str(tmp_path))
+            for _ in range(3)
+        ],
+    )
+
+    calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, calls)
+
+    graph.refresh_self(repo)
+
+    manifest = graph._read_compose_manifest(repo)
+    assert manifest is not None
+    promoted_name = str(chunk.relative_to(repo))
+    assert manifest.chunks.count(promoted_name) == 1, (
+        f"three identical ledger rows promoted more than once; chunks were {manifest.chunks}"
+    )
+    merge_argvs = [c for c in calls if str(graph._MERGE_SCRIPT) in c]
+    chunk_args = [c[2] for c in merge_argvs]
+    assert chunk_args.count(str(chunk)) == 1, (
+        f"three identical ledger rows replayed more than once; argv were {merge_argvs}"
+    )
+
+    # Must not PERSIST as a duplicate: a SECOND refresh (empty ledger, the
+    # chunk now legitimately living in manifest.chunks) must replay it exactly
+    # ONCE — not the "chunks=2, replays=2" the review measured this bug
+    # compounding into on every subsequent `kb-watch`.
+    second_calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, second_calls)
+    graph.refresh_self(repo)
+    second_merge_argvs = [c for c in second_calls if str(graph._MERGE_SCRIPT) in c]
+    assert [c[2] for c in second_merge_argvs].count(str(chunk)) == 1, (
+        f"the chunk replayed more than once on a second refresh with an empty "
+        f"ledger — the duplicate persisted; argv were {second_merge_argvs}"
+    )
+
+
+# --- append/verify canonicalization (#175 cold review round 2, finding 8 ----
+# --- secondary) --------------------------------------------------------------
+
+
+def test_append_merged_chunk_canonicalizes_so_a_different_cwd_still_verifies(monkeypatch, tmp_path):
+    """`append_merged_chunk` must store a path verification can reconstruct from ANY cwd.
+
+    Before this fix, `append_merged_chunk` stored `chunk` EXACTLY as given —
+    interpreted relative to whatever the process cwd happened to be at append
+    time — while `_verified_ledger_chunks` always resolves the recorded
+    string relative to `repo_root` (`graph._resolve`). The two agreed only
+    because mise runs tasks from the config root; this reproduces a caller
+    whose cwd is genuinely somewhere else (round-1 finding 8's secondary
+    item).
+    """
+    repo = (tmp_path / "repo").resolve()
+    extractions = repo / "sources" / "extractions"
+    extractions.mkdir(parents=True)
+    chunk_file = extractions / "elsewhere-docs.json"
+    chunk_file.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+
+    other_cwd = tmp_path / "somewhere-else"
+    other_cwd.mkdir()
+    relative_chunk = str(chunk_file.relative_to(other_cwd, walk_up=True))
+    monkeypatch.chdir(other_cwd)
+
+    graph.append_merged_chunk(repo, relative_chunk, str(extractions))
+
+    ledger = graph._read_merged_chunks(repo)
+    assert ledger is not None
+    assert len(ledger) == 1
+
+    verified = graph._verified_ledger_chunks(repo)
+    assert verified == [(chunk_file.resolve(), str(extractions))], (
+        f"the ledger entry did not verify from a different cwd; got {verified}"
     )

@@ -193,6 +193,13 @@ def test_a_successful_merge_appends_to_the_recomposition_ledger(
     to a later recomposition — silently dropping its content the moment
     `kb-watch` next runs, which is the exact failure the ledger exists to rule
     out.
+
+    The recorded `chunk` is asserted CANONICALIZED — repo-root-relative here,
+    since the fixture chunk sits under `repo` — not the raw absolute string
+    `merge_chunk` was called with. `append_merged_chunk` resolves and
+    relativizes before storing (#175 cold review round 2, the round-1
+    finding 8 secondary item), so a later `_verified_ledger_chunks` agrees
+    regardless of the cwd at append time or at verify time.
     """
     from kb_setup import graph
 
@@ -204,7 +211,7 @@ def test_a_successful_merge_appends_to_the_recomposition_ledger(
 
     entries = graph._read_merged_chunks(repo)
     assert entries is not None
-    assert [e.chunk for e in entries] == [chunk]
+    assert [e.chunk for e in entries] == ["chunk.json"]
     assert entries[0].sha256 == graph._sha256_file(Path(chunk))
 
 
