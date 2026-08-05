@@ -12,6 +12,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from kb_setup import hyperedges
 from kb_setup.graphify_env import clean_env, ensure_runtime_deps, graphify_exe
 
 # svg does a full matplotlib spring_layout: O(n^2)-ish (useless hairball at scale)
@@ -37,6 +38,17 @@ _ARTIFACTS: list[tuple[str, list[str], str]] = [
     ("obsidian", ["export", "obsidian"], "obsidian/ (one note per node)"),
     ("svg", ["export", "svg"], "graph.svg (slow at scale; needs scipy)"),
 ]
+
+#: Entries whose graphify subcommand REWRITES graph.json wholesale, rather than
+#: only reading it. Only "report" (`cluster-only`) does — it shares the exact
+#: CLI branch `kb-label` runs (`cli.py`, `cmd in ("cluster-only", "label")`),
+#: which loads graph.json via `build_from_json` and rewrites it via `to_json`
+#: at the end, and loses hyperedges the same way (see `hyperedges.py`'s module
+#: docstring for the verified mechanism). Every other entry is a pure export —
+#: it reads graph.json and writes a DIFFERENT file — so gating the hyperedge
+#: capture/reattach on this set is what keeps a `wiki`/`graphml`/`svg`/... run
+#: from paying a several-hundred-MB read it has no defect to guard against.
+_REWRITES_GRAPH = frozenset({"report"})
 
 
 def _node_count(graph: Path) -> int:
@@ -75,11 +87,16 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
     failures: list[str] = []
     for name, args, desc in selected:
         print(f"  → {name}: {desc}")
+        rewrites = name in _REWRITES_GRAPH
+        # Only the rewriting entry pays this read — see _REWRITES_GRAPH.
+        carried = hyperedges.capture(graph) if rewrites else []
         # clean_env: no non-Claude backend key reaches graphify (Gemini-free).
         rc = subprocess.run([exe, *args], cwd=repo_root, env=clean_env(), check=False).returncode
         if rc != 0:
             print(f"    FAILED ({name}, rc={rc})")
             failures.append(name)
+        elif rewrites:
+            hyperedges.reattach(graph, carried)
 
     if failures:
         print(f"[kb-artifacts] {len(failures)} failed: {', '.join(failures)}")

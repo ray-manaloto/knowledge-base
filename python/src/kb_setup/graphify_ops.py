@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import prose
+from kb_setup import hyperedges, prose
 from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
@@ -151,6 +151,14 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     documented ingestion order is merge -> label, so without this the merge's own
     re-derivation is undone by the very next step and `--prose` is stale again
     with nothing having failed. (Cold lane, round 1.)
+
+    A successful label also CARRIES HYPEREDGES across the run (#171 local
+    mitigation, #175): `graphify label`'s own graph.json round-trip loses them
+    (measured 5->0 on this repo's aggregate — see `hyperedges.py`'s module
+    docstring for the verified mechanism). The pre-run list is captured before
+    `_run` below launches anything and reattached in `_labelled`, before prose
+    re-derivation — `graph-prose.json`'s hyperedge-retention report
+    (`prose.ProseStats`) must see the restored list, not the emptied one.
     """
     # Gate on the binary we are ABOUT TO RUN, not on PATH. The old
     # `shutil.which("graphify")` check sat directly in front of a
@@ -167,6 +175,12 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         )
         return 2
 
+    # Captured BEFORE anything runs: a missing graph.json (no `kb-build` yet)
+    # returns [] here, and the graphify call below fails on its own account
+    # (its own "no graph found" refusal) — this capture changes nothing about
+    # that path, it just also has nothing to carry.
+    carried = hyperedges.capture(_full_graph(repo_root))
+
     base = [exe, "label", "."]
     if missing_only:
         base.append("--missing-only")
@@ -178,31 +192,39 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     if not claude_cli:
         # No --backend + GEMINI/GOOGLE stripped -> auto-detect finds nothing ->
         # deterministic hub labeler. The clean default.
-        return _labelled(repo_root, _run(base, "deterministic no-LLM hub labels (Gemini-free)"))
+        return _labelled(
+            repo_root, _run(base, "deterministic no-LLM hub labels (Gemini-free)"), carried
+        )
 
     rc = _run(
         [*base, "--backend=claude-cli", "--max-concurrency=1"],
         "claude-cli backend (opt-in; broken #2076 — expect fallback)",
     )
     if rc == 0:
-        return _labelled(repo_root, rc)
+        return _labelled(repo_root, rc, carried)
     print(
         "[kb-label] claude-cli backend failed (#2076) — deterministic no-LLM fallback.",
         file=sys.stderr,
     )
-    return _labelled(repo_root, _run(base, "deterministic fallback"))
+    return _labelled(repo_root, _run(base, "deterministic fallback"), carried)
 
 
-def _labelled(repo_root: Path, rc: int) -> int:
-    """Re-derive the prose graph after a labelling run that succeeded.
+def _labelled(repo_root: Path, rc: int, carried: list[hyperedges.Hyperedge]) -> int:
+    """Restore carried hyperedges, then re-derive the prose graph — both gated on `rc`.
 
     Gated on `rc` for the same reason `merge_chunk` gates: a labelling run that
-    failed may have left `graph.json` in any state, and deriving from it would
-    replace a valid prose graph off the back of a failure. The failing rc is the
-    caller's job, and returning it unchanged says so.
+    failed may have left `graph.json` in any state, and either reattaching over
+    it or deriving from it would assert a fact ("the run succeeded") that is
+    false. The failing rc is the caller's job, and returning it unchanged says
+    so — `carried` is discarded along with it.
+
+    Reattach happens BEFORE `_derive_prose`: that call reads graph.json fresh
+    and reports what survived (`prose.ProseStats.hyperedges_out`), so the
+    restored list has to already be on disk when it runs, not after.
     """
     if rc != 0:
         return rc
+    hyperedges.reattach(_full_graph(repo_root), carried)
     return _derive_prose(repo_root, tag="kb-label", did="communities were relabelled")
 
 

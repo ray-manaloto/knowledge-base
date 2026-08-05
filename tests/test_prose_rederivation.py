@@ -210,6 +210,66 @@ def test_a_failed_label_leaves_the_prose_graph_alone(
     assert _prose_ids(repo) == ["yesterday"]
 
 
+# --- hyperedge carry (#171 local mitigation, #175) --------------------------
+
+_HYPEREDGE = {"id": "he1", "nodes": ["just_merged", "yesterday"]}
+
+_PRE_LABEL_WITH_HYPEREDGE: dict[str, object] = {
+    "graph": {"hyperedges": [_HYPEREDGE]},
+    "nodes": [{"id": "yesterday", "label": "yesterday", "file_type": "concept"}],
+    "links": [],
+    "hyperedges": [_HYPEREDGE],
+}
+
+
+def test_label_restores_hyperedges_the_round_trip_would_have_dropped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bug this carry exists for, reproduced end to end through `label()`.
+
+    `_MERGED` (the stub's `writes=`) carries no hyperedges in either slot —
+    exactly what `build_from_json` + `to_json` leave on THIS repo's aggregate
+    graph (measured 5->0; see `hyperedges.py`'s module docstring for the
+    verified mechanism). Without the carry, `label()` would durably write that
+    loss back to disk; with it, the pre-run list survives the round trip.
+    """
+    repo = _repo(tmp_path)
+    (repo / "graphify-out" / "graph.json").write_text(
+        json.dumps(_PRE_LABEL_WITH_HYPEREDGE), encoding="utf-8"
+    )
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+
+    assert graphify_ops.label(repo) == 0
+
+    on_disk = json.loads((repo / "graphify-out" / "graph.json").read_text(encoding="utf-8"))
+    assert on_disk["hyperedges"] == [_HYPEREDGE]
+    assert on_disk["graph"]["hyperedges"] == [_HYPEREDGE]
+
+
+def test_a_failed_label_does_not_restore_hyperedges(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: rc != 0 leaves whatever the failed run wrote untouched.
+
+    Same reasoning as `test_a_failed_label_leaves_the_prose_graph_alone`: a
+    failed run's graph.json is in an unknown state, and reattaching the
+    captured pre-run list over it would assert a fact ("the run succeeded")
+    that is false. Asserted as full-dict equality against `_MERGED` — the
+    stub's exact output — so this fails if reattach touched ANY part of the
+    file, not just the two hyperedge slots.
+    """
+    repo = _repo(tmp_path)
+    (repo / "graphify-out" / "graph.json").write_text(
+        json.dumps(_PRE_LABEL_WITH_HYPEREDGE), encoding="utf-8"
+    )
+    _stub_graphify(monkeypatch, tmp_path, rc=1, writes=_MERGED)
+
+    assert graphify_ops.label(repo) == 1
+
+    on_disk = json.loads((repo / "graphify-out" / "graph.json").read_text(encoding="utf-8"))
+    assert on_disk == _MERGED
+
+
 def test_an_interrupted_write_leaves_no_partial_prose_graph(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
