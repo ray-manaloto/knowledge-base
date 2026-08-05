@@ -85,6 +85,16 @@ Design facts worth not rediscovering:
   consent.
 - **Step 5 can never live in a hook** — a hook is a shell command; only the
   model can call `AskUserQuestion`.
+- **A fingerprint answers "did it move", never "is it still true".** A derived
+  view (`wiki/`, `graph.graphml`) that is stale precisely *because* nothing
+  regenerated it never moves, so `size:mtime_ns` reads OK for it forever — 11h
+  behind, every row green (#182). `kb_setup.currency.views` answers the other
+  question from a `views` map in the same stamp: the graph fingerprint each view
+  was last observed to be generated FROM. **Not a clock** — an ordering rule
+  ("older than the graph ⇒ stale") was built, run, and refuted by its own first
+  output, because `graphify label` writes `GRAPH_REPORT.md` 18.7 s *before* the
+  graph it describes. And a directory's mtime does not move on an in-place
+  rewrite, so that map is keyed on a deep fingerprint, walked at stamp time only.
 
 This rule's remaining, un-automatable job is the **native-first judgment**: is a
 piece of custom code now superseded by a tool feature? The engine tracks

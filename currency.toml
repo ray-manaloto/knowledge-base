@@ -55,11 +55,23 @@ skill_install = ["mise", "exec", "--", "graphify", "install", "--project"]
 artifact = "graphify-out/graph.json"
 # The GENERATED outputs `kb-artifacts` derives from the graph. Ray's step 1 said
 # "in sync with the graph AND generated outputs", so the stamp fingerprints
-# these too (a stat, so it is cheap) and step 1 flags a stale wiki/graphml/svg/
-# report the same way it flags a stale graph. `kb-artifacts` re-stamps them.
-# Directories (wiki/) are fingerprinted by their own mtime/size — a regeneration
-# that adds or removes a page changes the directory stat, which is the signal we
-# want without walking thousands of files in a per-session hook.
+# these too (a stat, so it is cheap) and step 1 flags one that MOVED — was
+# rewritten, or went missing — the same way it flags a stale graph.
+# `kb-artifacts` re-stamps them.
+#
+# It cannot flag one that is stale precisely BECAUSE nothing regenerated it: such
+# a view never moves, so `size:mtime_ns` reads OK for it forever (#182, measured —
+# graphml and wiki sat ~11h behind the graph with every row green). That question
+# is answered separately by `kb_setup.currency.views`, off the `views` map this
+# same stamp now carries, and it reports under its own `[views]` header.
+#
+# Directories (wiki/) are fingerprinted HERE by their own mtime/size — cheap
+# enough for a per-session hook, and it catches a regeneration that adds or
+# removes a page. It does NOT catch one that rewrites the same page names in
+# place: a directory's mtime only moves when an entry is added or removed
+# (measured). `views` therefore uses `sync.deep_artifact_fingerprint` instead,
+# which walks the tree — 35.6-63.3 ms over this wiki — and is paid only at STAMP
+# time, never on the hook path.
 #
 # svg is DELIBERATELY absent, though the handoff suggested it. `kb-artifacts`
 # skips svg above 5,000 nodes (unreadable hairball + a mathtext `$` crash), and

@@ -471,6 +471,132 @@ def test_label_restamps_after_reattach_not_before(
     assert calls == ["reattach", "refresh"], f"restamp must run after reattach; got {calls}"
 
 
+# --- currency stamp refresh, the THIRD writer (#181) -------------------------
+#
+# `merge_chunk` runs `_merge_docs.py` against graph.json, so it is a wholesale
+# rewrite exactly like `label` and `artifacts.generate`'s `report` entry — and it
+# was the one #179 left out. Without a restamp, a merge-ONLY run (the kb-curator
+# skill's own quick path, with no following `kb-label`) leaves
+# `kb-currency-check` reporting build-stamp drift until something else rewrites
+# and restamps the graph.
+#
+# Measured on a real merge rather than inferred, per the ticket: of the four
+# declared artifacts only `graph.json` moves — the three derived views are
+# byte-identical before and after — so the full restamp masks nothing at the
+# fingerprint level. What a merge really invalidates is the views' CONTENT, and
+# that is `currency.views`'s job, not a narrowed variant of this call.
+
+
+def test_a_successful_merge_refreshes_the_currency_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The #181 defect: a merge-only run must not leave the stamp behind.
+
+    A real fingerprint comparison rather than a spy, matching the `label` pair
+    above: the assertion is that the recorded fingerprint now EQUALS what is on
+    disk and no longer equals what it was, which a spy on the call cannot show.
+    """
+    repo = _repo(tmp_path)
+    _with_currency_stamp(repo)
+    spec = config.load(repo)[0]
+    before = sync.read_stamp(repo, spec)
+
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+
+    assert graphify_ops.merge_chunk(repo, _chunk(tmp_path)) == 0
+
+    after = sync.read_stamp(repo, spec)
+    live_fp = sync.artifact_fingerprint(repo / "graphify-out" / "graph.json")
+    assert sync.stamped_fingerprints(after)["graphify-out/graph.json"] == live_fp
+    assert (
+        sync.stamped_fingerprints(before)["graphify-out/graph.json"]
+        != sync.stamped_fingerprints(after)["graphify-out/graph.json"]
+    )
+    # Carried forward, not re-derived: a merge has no standing to restate which
+    # graphify version built the graph. Same rule as the `label` restamp.
+    assert after["version"] == before["version"] == "0.9.32"
+
+
+def test_a_failed_merge_does_not_refresh_the_currency_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: a failed merge restamps nothing.
+
+    graph.json may be half-written after a failed merge, and stamping it would
+    assert "this is the artifact the pin built" over bytes nobody vouched for —
+    the same `rc != 0` gate that already protects the prose re-derivation and
+    the ledger append.
+    """
+    repo = _repo(tmp_path)
+    _with_currency_stamp(repo)
+    spec = config.load(repo)[0]
+    before = sync.read_stamp(repo, spec)
+
+    _stub_graphify(monkeypatch, tmp_path, rc=1, writes=_MERGED)
+
+    assert graphify_ops.merge_chunk(repo, _chunk(tmp_path)) == 1
+
+    assert sync.read_stamp(repo, spec) == before
+
+
+def test_a_merge_whose_ledger_write_fails_does_not_refresh_the_currency_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: the restamp sits BELOW the ledger gate, not above it.
+
+    This is the arm that pins WHERE in `merge_chunk` the call goes. Placing the
+    restamp before `append_merged_chunk` would satisfy the success test just as
+    happily, and would then re-stamp on a run that reports rc=1 — claiming the
+    artifact is fully accounted for by an operation that just told its caller it
+    was not.
+    """
+    from kb_setup import graph
+
+    repo = _repo(tmp_path)
+    _with_currency_stamp(repo)
+    spec = config.load(repo)[0]
+    before = sync.read_stamp(repo, spec)
+
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+
+    def boom(_repo_root: Path, _chunk: str, _root: str) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(graph, "append_merged_chunk", boom)
+
+    assert graphify_ops.merge_chunk(repo, _chunk(tmp_path)) == 1
+
+    assert sync.read_stamp(repo, spec) == before
+
+
+def test_merge_and_label_restamps_carry_their_own_tag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM on the tag: `[kb-merge]`, never the copied `[kb-label]`.
+
+    The tag is the only thing telling someone which of their commands touched the
+    stamp, and this call was written by copying the `label` one — the single most
+    likely defect in it is a tag that came along for the ride. Both directions are
+    asserted from one test so neither can be hardcoded and still pass.
+    """
+    tags: list[str] = []
+    real_refresh = stamps.refresh_after_regen
+
+    def spy(repo_root: Path, *, tag: str) -> None:
+        tags.append(tag)
+        real_refresh(repo_root, tag=tag)
+
+    monkeypatch.setattr(stamps, "refresh_after_regen", spy)
+
+    repo = _repo(tmp_path)
+    _with_currency_stamp(repo)
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+    assert graphify_ops.merge_chunk(repo, _chunk(tmp_path)) == 0
+    assert graphify_ops.label(repo) == 0
+
+    assert tags == ["kb-merge", "kb-label"]
+
+
 def test_an_interrupted_write_leaves_no_partial_prose_graph(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

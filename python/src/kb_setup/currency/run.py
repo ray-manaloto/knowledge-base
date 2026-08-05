@@ -21,7 +21,17 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 
-from kb_setup.currency import baseline, config, docs, issues, report, staleness, sync, upstream
+from kb_setup.currency import (
+    baseline,
+    config,
+    docs,
+    issues,
+    report,
+    staleness,
+    sync,
+    upstream,
+    views,
+)
 from kb_setup.currency.decide import decide
 
 
@@ -108,6 +118,14 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
     # Same posture as everything else on this path — silent when clean, never a
     # rebuild, and the return below is unconditionally 0.
     staleness.report(staleness.check_inputs(repo_root, spec) for spec in _specs(repo_root, only))
+    # And the derived-views verdict (#182), under its own header again and last:
+    # of the three, it is the cheapest to act on (`kb-artifacts`, no network, no
+    # re-extraction), so it is the one a reader should meet after the two that can
+    # invalidate it. Cheap enough for the SessionStart path because it reads the
+    # stamp and stats ONE file: the expensive part (`deep_artifact_fingerprint`'s
+    # walk over `wiki/`, 35.6-63.3 ms) is paid at stamp time, after an operation
+    # that already took minutes.
+    views.report(views.check_views(repo_root, spec) for spec in _specs(repo_root, only))
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
         for tool, finding in stale:
@@ -293,6 +311,17 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
     else:
         for line in lines:
             print(line)
+        # The full run reports the derived-views verdict too (#182), not only the
+        # SessionStart path — a view left behind by a `kb-label` is exactly the
+        # kind of thing someone running the full loop is looking for, and having
+        # it appear in the cheap mode but not the thorough one would read as the
+        # thorough mode clearing it.
+        #
+        # Non-JSON only: `payloads` is a per-tool RunRecord shape, and appending
+        # prose to a document a caller is about to `json.loads` would break the
+        # machine mode to serve the human one. `daily()` and any `--json` consumer
+        # keep a parseable stdout; `check()` above carries the verdict for them.
+        views.report(views.check_views(repo_root, spec) for spec in specs)
     return 0
 
 

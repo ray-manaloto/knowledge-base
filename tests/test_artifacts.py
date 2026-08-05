@@ -173,12 +173,18 @@ def test_a_non_rewriting_entry_never_touches_hyperedges(tmp_path: Path, monkeypa
 
 
 def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkeypatch) -> None:
-    """A successful `generate()` run must call the shared restamp exactly once."""
-    _graph_with_hyperedge(tmp_path)
-    calls: list[tuple[Path, str]] = []
+    """A successful `generate()` run must call the shared restamp exactly once.
 
-    def fake_refresh(repo_root: Path, *, tag: str) -> None:
-        calls.append((repo_root, tag))
+    `regenerated_views` is False here BECAUSE this is an `only=` run (#182): a
+    partial run regenerated a subset and has no standing to certify the views it
+    did not touch. The full-run arm below is what proves the flag is not simply
+    hardcoded.
+    """
+    _graph_with_hyperedge(tmp_path)
+    calls: list[tuple[Path, str, bool]] = []
+
+    def fake_refresh(repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
+        calls.append((repo_root, tag, regenerated_views))
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
     monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
@@ -189,7 +195,39 @@ def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkey
 
     assert artifacts.generate(tmp_path, only=["graphml"]) == 0
 
-    assert calls == [(tmp_path, "kb-artifacts")]
+    assert calls == [(tmp_path, "kb-artifacts", False)]
+
+
+def test_a_full_generate_run_certifies_the_views_but_a_partial_one_does_not(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """CONTROL ARM on `regenerated_views` (#182): both directions, one test.
+
+    This is the only claim in the engine a caller makes about its own work rather
+    than observing it, so the arm that matters is that the claim is CONDITIONAL.
+    A hardcoded `True` would certify views a `kb-artifacts only=[graphml]` run
+    never touched; a hardcoded `False` would leave a full run — the remedy this
+    check prints — unable to clear the message it printed, which is the defect
+    that put the flag here in the first place.
+    """
+    _graph_with_hyperedge(tmp_path)
+    calls: list[bool] = []
+
+    def fake_refresh(_repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
+        assert tag == "kb-artifacts"
+        calls.append(regenerated_views)
+
+    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
+    monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(
+        artifacts.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(list(cmd), 0)
+    )
+    monkeypatch.setattr(artifacts.stamps, "refresh_after_regen", fake_refresh)
+
+    assert artifacts.generate(tmp_path) == 0
+    assert artifacts.generate(tmp_path, only=["graphml"]) == 0
+
+    assert calls == [True, False]
 
 
 def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypatch) -> None:
@@ -202,7 +240,8 @@ def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypa
     _graph_with_hyperedge(tmp_path)
     calls: list[tuple[Path, str]] = []
 
-    def fake_refresh(repo_root: Path, *, tag: str) -> None:
+    def fake_refresh(repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
+        assert not regenerated_views
         calls.append((repo_root, tag))
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])

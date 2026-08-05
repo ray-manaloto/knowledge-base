@@ -110,7 +110,18 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
         print(f"[kb-artifacts] {len(failures)} failed: {', '.join(failures)}")
         return 1
     print("[kb-artifacts] all artifacts generated")
-    stamps.refresh_after_regen(repo_root, tag="kb-artifacts")
+    # `regenerated_views` ONLY on a full run (#182). This is the one caller that
+    # can truthfully say "every declared derived view now describes the graph on
+    # disk": it has just run every generator against it and returned 1 above if
+    # any failed. A partial `only=` run regenerated a subset and must not make the
+    # claim for the rest — `sync.view_records` catches the subset by itself, from
+    # each view's own fingerprint.
+    #
+    # Gated on `only` rather than on `selected` on purpose: `selected` also loses
+    # svg to the node-count skip above, and svg is deliberately NOT a declared
+    # artifact (`currency.toml`), so treating that skip as a partial run would
+    # withhold the claim on every large graph — which is every real run here.
+    stamps.refresh_after_regen(repo_root, tag="kb-artifacts", regenerated_views=not only)
     return 0
 
 
