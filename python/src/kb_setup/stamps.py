@@ -27,7 +27,33 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def refresh_after_regen(repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
+def snapshot_views(repo_root: Path) -> dict[str, dict[str, str]] | None:
+    """`{tool: {view: identity}}` as they are RIGHT NOW, for `refresh_after_regen`.
+
+    Take one BEFORE doing work that might regenerate a derived view, and hand it
+    back afterwards. That bracket is what lets the stamp record which graph a view
+    was generated from without any caller enumerating what it regenerated (#182).
+
+    Returns None — meaning "no snapshot" rather than "nothing was there" — when
+    the config cannot be read, so a broken `currency.toml` degrades to unknown
+    provenance instead of certifying views against a bracket that was never taken.
+    An empty dict is a real snapshot and is treated as one.
+    """
+    try:
+        from kb_setup.currency import config, sync
+
+        return {
+            spec.name: sync.view_identities(repo_root, spec)
+            for spec in config.load(repo_root)
+            if spec.stamp
+        }
+    except OSError, ValueError, TypeError, ImportError:
+        return None
+
+
+def refresh_after_regen(
+    repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+) -> None:
     """Refresh the currency stamp's fingerprints for a just-regenerated artifact.
 
     Without this, step 1 would report every generated output as "changed since
@@ -54,12 +80,15 @@ def refresh_after_regen(repo_root: Path, *, tag: str, regenerated_views: bool = 
     `[kb-artifacts]` after a `kb-label` run would send them looking at the
     wrong task.
 
-    `regenerated_views` is the caller asserting "I just regenerated every declared
-    derived view from the graph now on disk" (#182). Only a FULL
-    `artifacts.generate` run may pass it; it is the sole caller that has actually
-    done that and checked the rc of every generator. Everyone else leaves it
-    False, which is what lets `sync.view_records` report their views as describing
-    an earlier graph — the whole point of the check.
+    `views_before` is a `snapshot_views` result taken before the caller started
+    working (#182). A view is certified against the current graph only when its
+    identity changed inside that bracket — so a caller that regenerated views
+    passes one, and a caller that only rewrote the graph passes nothing and its
+    views are correctly reported as describing an earlier graph.
+
+    Passing None is the safe default and means "I cannot say what I regenerated".
+    It is NOT the same as passing an empty snapshot, which is a real observation
+    that no view existed at the start.
     """
     try:
         from kb_setup.currency import config, sync
@@ -67,7 +96,8 @@ def refresh_after_regen(repo_root: Path, *, tag: str, regenerated_views: bool = 
         for spec in config.load(repo_root):
             if not spec.stamp:
                 continue
-            path = sync.restamp_artifacts(repo_root, spec, regenerated_views=regenerated_views)
+            before = None if views_before is None else views_before.get(spec.name, {})
+            path = sync.restamp_artifacts(repo_root, spec, views_before=before)
             if path is not None:
                 print(f"[{tag}] re-stamped {path.name} for {spec.name}")
     except (OSError, ValueError, TypeError, ImportError) as e:

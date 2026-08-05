@@ -234,6 +234,13 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     # (its own "no graph found" refusal) — this capture changes nothing about
     # that path, it just also has nothing to carry.
     carried = hyperedges.capture(_full_graph(repo_root))
+    # Same "before anything runs" reason, for the other artifact this operation
+    # can move: `graphify label` regenerates GRAPH_REPORT.md as well as the graph
+    # (it prints "GRAPH_REPORT.md and graph.json updated"). Bracketing the run is
+    # what lets the stamp certify the report against the graph this label just
+    # wrote, while leaving graphml/wiki — which label does NOT touch — correctly
+    # reported as describing an earlier one (#182).
+    views_before = stamps.snapshot_views(repo_root)
 
     base = [exe, "label", "."]
     if missing_only:
@@ -247,7 +254,10 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         # No --backend + GEMINI/GOOGLE stripped -> auto-detect finds nothing ->
         # deterministic hub labeler. The clean default.
         return _labelled(
-            repo_root, _run(base, "deterministic no-LLM hub labels (Gemini-free)"), carried
+            repo_root,
+            _run(base, "deterministic no-LLM hub labels (Gemini-free)"),
+            carried,
+            views_before,
         )
 
     rc = _run(
@@ -255,15 +265,20 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         "claude-cli backend (opt-in; broken #2076 — expect fallback)",
     )
     if rc == 0:
-        return _labelled(repo_root, rc, carried)
+        return _labelled(repo_root, rc, carried, views_before)
     print(
         "[kb-label] claude-cli backend failed (#2076) — deterministic no-LLM fallback.",
         file=sys.stderr,
     )
-    return _labelled(repo_root, _run(base, "deterministic fallback"), carried)
+    return _labelled(repo_root, _run(base, "deterministic fallback"), carried, views_before)
 
 
-def _labelled(repo_root: Path, rc: int, carried: list[hyperedges.Hyperedge]) -> int:
+def _labelled(
+    repo_root: Path,
+    rc: int,
+    carried: list[hyperedges.Hyperedge],
+    views_before: dict[str, dict[str, str]] | None = None,
+) -> int:
     """Restore carried hyperedges, refresh the currency stamp, then re-derive the prose graph.
 
     All three are gated on `rc`, for the same reason `merge_chunk` gates: a labelling run that
@@ -309,7 +324,7 @@ def _labelled(repo_root: Path, rc: int, carried: list[hyperedges.Hyperedge]) -> 
     if rc != 0:
         return rc
     hyperedges.reattach(_full_graph(repo_root), carried)
-    stamps.refresh_after_regen(repo_root, tag="kb-label")
+    stamps.refresh_after_regen(repo_root, tag="kb-label", views_before=views_before)
     return _derive_prose(repo_root, tag="kb-label", did="communities were relabelled")
 
 

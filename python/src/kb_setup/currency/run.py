@@ -217,7 +217,18 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     report_root = repo_root / report.REPORT_DIR
     previous = issues.load_previous(report_root, spec.name)
     moved = issues.changes(observations, previous)
-    verdict = decide(sync=status, upstream=up, moved=moved, observations=observations)
+    # The derived-views verdict reaches gate 6 (#182). Without this it was
+    # reported under its own header and nowhere else, so `apply()`'s
+    # auto-authorization — which is built from THIS verdict — could clear a
+    # 6/6 bump over views describing an earlier graph.
+    view_status = views.check_views(repo_root, spec)
+    verdict = decide(
+        sync=status,
+        upstream=up,
+        moved=moved,
+        observations=observations,
+        stale_views=view_status.stale,
+    )
     return report.RunRecord(
         tool=spec.name,
         sync=status,
@@ -243,12 +254,19 @@ def _where_written(repo_root: Path, detail: Path | None, *, write: bool) -> str:
 def _payload(
     repo_root: Path, tool: str, record: report.RunRecord, detail: Path | None
 ) -> dict[str, object]:
-    """One tool's `--json` object — the shape the tool-currency skill reads."""
+    """One tool's `--json` object — the shape the tool-currency skill reads.
+
+    `views` is present because the human path prints the derived-views verdict and
+    the machine path did not, so a `--json` consumer — including `daily()` — saw a
+    record with no trace of it (#182). A signal that exists in one rendering and
+    not the other is worse than absent: it reads as verified in both.
+    """
     return {
         "tool": tool,
         "verdict": asdict(record.verdict),
         "sync": asdict(record.sync),
         "upstream": asdict(record.upstream),
+        "views": asdict(record.views),
         "observations": [asdict(o) for o in record.observations],
         "moved": [asdict(o) for o in record.moved],
         "detail_page": str(detail.relative_to(repo_root)) if detail else None,

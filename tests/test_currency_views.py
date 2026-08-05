@@ -25,6 +25,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import stamps
 from kb_setup.currency import config, staleness, sync, views
 
 if TYPE_CHECKING:
@@ -77,11 +78,45 @@ def _touch(path: Path, when: int) -> None:
 
 
 def _stamp(repo_root: Path) -> Path:
+    """A bare stamp, with NO operation bracketed around it.
+
+    This is `kb-build`: it writes the stamp having regenerated no view, so every
+    view comes out with unknown provenance. Deliberately not a helper that
+    certifies — a test that reached for certification by accident would be
+    asserting against a state no real caller produces.
+    """
     return sync.write_stamp(repo_root, _spec(repo_root), version="0.9.33")
+
+
+def _regenerate(repo_root: Path, tag: str = "kb-artifacts", **files: str) -> None:
+    """Model a real view-producing run: snapshot, write, restamp inside the bracket.
+
+    The bracket is the whole mechanism (`sync.view_records`), so the tests have to
+    take one exactly as `artifacts.generate` and `graphify_ops.label` do. Writing
+    the files WITHOUT it is a different scenario — an unobserved change — and
+    `test_an_unobserved_regeneration_is_never_certified` is the test for that.
+
+    `files` is keyed by the view's basename, so a caller reads as the run it is
+    standing in for: `_regenerate(repo, GRAPH_REPORT="…")` is a `kb-label`.
+    """
+    out = repo_root / "graphify-out"
+    before = stamps.snapshot_views(repo_root)
+    for name, text in files.items():
+        path = out / "wiki" / "index.md" if name == "wiki" else out / _VIEW_FILES[name]
+        path.write_text(text, encoding="utf-8")
+    stamps.refresh_after_regen(repo_root, tag=tag, views_before=before)
+
+
+#: basename -> the path under `graphify-out/` that `_regenerate` writes.
+_VIEW_FILES = {"GRAPH_REPORT": "GRAPH_REPORT.md", "graphml": "graph.graphml"}
 
 
 def _check(repo_root: Path) -> views.ViewStatus:
     return views.check_views(repo_root, _spec(repo_root))
+
+
+def _stale_paths(status: views.ViewStatus) -> list[str]:
+    return [line.split()[0] for line in status.stale]
 
 
 # --- the states, and who owns the silence of each ----------------------------
@@ -98,13 +133,11 @@ def test_a_freshly_stamped_repo_reports_ok_and_prints_nothing(
     """
     repo = _repo(tmp_path)
     _stamp(repo)
-    (repo / "graphify-out" / "GRAPH_REPORT.md").write_text("# report v1\n", encoding="utf-8")
-    (repo / "graphify-out" / "graph.graphml").write_text("<graphml v1/>\n", encoding="utf-8")
-    (repo / "graphify-out" / "wiki" / "index.md").write_text("# wiki v1\n", encoding="utf-8")
-    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# report v1\n", graphml="<graphml v1/>\n", wiki="# wiki v1\n")
 
     status = _check(repo)
     assert status.state == views.OK
+    capsys.readouterr()  # discard the restamp's own line; this asserts on report()
     views.report([status])
     assert capsys.readouterr().out == ""
 
@@ -249,10 +282,7 @@ def test_a_graph_rewritten_without_regenerating_the_views_makes_them_stale(
     """
     repo = _repo(tmp_path)
     _stamp(repo)
-    for name in ("GRAPH_REPORT.md", "graph.graphml"):
-        (repo / "graphify-out" / name).write_text(f"# {name} v1\n", encoding="utf-8")
-    (repo / "graphify-out" / "wiki" / "index.md").write_text("# wiki v1\n", encoding="utf-8")
-    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# report v1\n", graphml="<graphml v1/>\n", wiki="# wiki v1\n")
 
     # ...and now ONLY the graph moves, exactly as a merge-only run leaves it.
     (repo / "graphify-out" / "graph.json").write_text(
@@ -292,21 +322,20 @@ def test_a_view_written_before_the_graph_by_the_same_run_is_not_stale(
     # A `kb-artifacts` run first, so all three views have KNOWN provenance —
     # otherwise they are merely unobserved, and the arm would pass without ever
     # distinguishing a fresh view from a stale one.
-    for name in ("GRAPH_REPORT.md", "graph.graphml"):
-        (out / name).write_text(f"# {name} v0\n", encoding="utf-8")
-    (out / "wiki" / "index.md").write_text("# wiki v0\n", encoding="utf-8")
-    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# report v0\n", graphml="<graphml v0/>\n", wiki="# wiki v0\n")
 
-    # The label run: report first, graph second, then the restamp.
+    # The label run: report first, graph second, then the restamp — all inside
+    # one bracket, which is what a real `graphify_ops.label` takes.
+    before = stamps.snapshot_views(repo)
     (out / "GRAPH_REPORT.md").write_text("# report v1 (this label)\n", encoding="utf-8")
     _touch(out / "GRAPH_REPORT.md", _T0)
     (out / "graph.json").write_text(json.dumps({"nodes": [{"id": "labelled"}]}), encoding="utf-8")
     _touch(out / "graph.json", _T0 + _ONE_MINUTE)
-    _stamp(repo)
+    stamps.refresh_after_regen(repo, tag="kb-label", views_before=before)
 
     status = _check(repo)
     assert status.state == views.STALE
-    stale_paths = [line.split()[0] for line in status.stale]
+    stale_paths = _stale_paths(status)
     assert "graphify-out/GRAPH_REPORT.md" not in stale_paths, (
         "the report was regenerated BY this run and is older only in wall-clock terms"
     )
@@ -351,11 +380,10 @@ def test_the_remedy_clears_the_message_on_a_first_ever_views_map(tmp_path: Path)
     costs minutes.
     """
     repo = _repo(tmp_path)
-    spec = _spec(repo)
-    sync.write_stamp(repo, spec, version="0.9.33")
+    _stamp(repo)
     assert _check(repo).state == views.NOT_VERIFIABLE  # the state this test is about
 
-    sync.restamp_artifacts(repo, spec, regenerated_views=True)
+    _regenerate(repo, GRAPH_REPORT="# r\n", graphml="<g/>\n", wiki="# w\n")
 
     assert _check(repo).state == views.OK
 
@@ -377,6 +405,41 @@ def test_a_restamp_that_did_not_regenerate_the_views_certifies_nothing(tmp_path:
     assert _check(repo).state == views.NOT_VERIFIABLE
 
 
+def test_an_unobserved_regeneration_is_never_certified(tmp_path: Path) -> None:
+    """THE COLD-LANE FINDING (round 1, P2): a false pass, reproduced then closed.
+
+    `refresh_after_regen` is best-effort and swallows its own failures, so a
+    `kb-artifacts` run can regenerate every view and leave the stamp describing
+    the OLD ones. The first implementation then certified any view whose identity
+    merely differed from the stamp — so the next `kb-merge`, which rewrites
+    graph.json and restamps, certified all three against a graph they PREDATE.
+    `check_views` returned OK.
+
+    The bracket is what closes it: a view is certified only when it changed
+    between the caller's own snapshot and now. A change that happened outside any
+    bracket is `""` — unknown, loud, and never a pass.
+    """
+    repo = _repo(tmp_path)
+    out = repo / "graphify-out"
+    spec = _spec(repo)
+    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# r\n", graphml="<g/>\n", wiki="# w\n")
+    assert _check(repo).state == views.OK
+
+    # kb-artifacts regenerates the views; its best-effort restamp fails silently.
+    for name, text in (("GRAPH_REPORT.md", "# r2\n"), ("graph.graphml", "<g2/>\n")):
+        (out / name).write_text(text, encoding="utf-8")
+    (out / "wiki" / "index.md").write_text("# w2\n", encoding="utf-8")
+
+    # kb-merge: rewrites the graph, regenerates no view, brackets nothing.
+    (out / "graph.json").write_text(json.dumps({"nodes": [{"id": "merged"}]}), encoding="utf-8")
+    sync.restamp_artifacts(repo, spec)
+
+    status = _check(repo)
+    assert status.state == views.NOT_VERIFIABLE, "views certified against a graph they predate"
+    assert len(status.blind) == 3
+
+
 def test_certification_survives_a_later_graph_move(tmp_path: Path) -> None:
     """The certified state must still GO stale — certifying is not exempting.
 
@@ -386,9 +449,8 @@ def test_certification_survives_a_later_graph_move(tmp_path: Path) -> None:
     moves underneath it.
     """
     repo = _repo(tmp_path)
-    spec = _spec(repo)
-    sync.write_stamp(repo, spec, version="0.9.33")
-    sync.restamp_artifacts(repo, spec, regenerated_views=True)
+    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# r\n", graphml="<g/>\n", wiki="# w\n")
     assert _check(repo).state == views.OK
 
     (repo / "graphify-out" / "graph.json").write_text(
@@ -413,13 +475,13 @@ def test_stale_outranks_unknown_provenance_and_the_blind_list_rides_along(
     repo = _repo(tmp_path)
     out = repo / "graphify-out"
     _stamp(repo)
-    (out / "graph.graphml").write_text("<graphml v1/>\n", encoding="utf-8")
-    _stamp(repo)  # graphml now has provenance; the other two never moved
+    # graphml now has provenance; the other two were never observed being generated
+    _regenerate(repo, graphml="<graphml v1/>\n")
     (out / "graph.json").write_text(json.dumps({"nodes": [{"id": "moved"}]}), encoding="utf-8")
 
     status = _check(repo)
     assert status.state == views.STALE
-    assert [line.split()[0] for line in status.stale] == ["graphify-out/graph.graphml"]
+    assert _stale_paths(status) == ["graphify-out/graph.graphml"]
     assert len(status.blind) == 2
 
     views.report([status])
@@ -476,16 +538,14 @@ def test_a_wiki_regenerated_in_place_stops_being_reported_stale(tmp_path: Path) 
     repo = _repo(tmp_path)
     out = repo / "graphify-out"
     _stamp(repo)
-    (out / "wiki" / "index.md").write_text("# wiki v1\n", encoding="utf-8")
-    _stamp(repo)
+    _regenerate(repo, wiki="# wiki v1\n")
     (out / "graph.json").write_text(json.dumps({"nodes": [{"id": "moved"}]}), encoding="utf-8")
-    assert "graphify-out/wiki" in [line.split()[0] for line in _check(repo).stale]
+    assert "graphify-out/wiki" in _stale_paths(_check(repo))
 
     # `kb-artifacts`: rewrite the SAME page name, then restamp.
-    (out / "wiki" / "index.md").write_text("# wiki v2, regenerated in place\n", encoding="utf-8")
-    _stamp(repo)
+    _regenerate(repo, wiki="# wiki v2, regenerated in place\n")
 
-    assert "graphify-out/wiki" not in [line.split()[0] for line in _check(repo).stale]
+    assert "graphify-out/wiki" not in _stale_paths(_check(repo))
 
 
 def test_a_deleted_view_drops_its_record_rather_than_carrying_it(tmp_path: Path) -> None:
@@ -497,8 +557,8 @@ def test_a_deleted_view_drops_its_record_rather_than_carrying_it(tmp_path: Path)
     """
     repo = _repo(tmp_path)
     out = repo / "graphify-out"
-    (out / "graph.graphml").write_text("<graphml v1/>\n", encoding="utf-8")
     _stamp(repo)
+    _regenerate(repo, graphml="<graphml v1/>\n")
     (out / "graph.graphml").unlink()
     _stamp(repo)
 

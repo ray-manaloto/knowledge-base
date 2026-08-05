@@ -314,8 +314,19 @@ def _gate_local(observations: tuple[Observation, ...]) -> Ambiguity | None:
     )
 
 
-def _gate_sync(sync: SyncStatus) -> Ambiguity | None:
+def _gate_sync(sync: SyncStatus, stale_views: tuple[str, ...] = ()) -> Ambiguity | None:
     """Gate 6. Blocks on drift, and equally on a check that never got to run.
+
+    `stale_views` is the derived-views verdict (#182), and it belongs to THIS gate
+    rather than a seventh one. The gate is named "step 1 currently green" and a
+    stale view is a step-1 finding — it was simply reported under its own header,
+    so this function, reading only `sync.drifted`/`sync.blind`, could not see it.
+    A cold review caught that: a genuinely stale `wiki/` could not block an
+    otherwise-6/6 AUTO-APPLY, on a gate whose name says it would.
+
+    It is deliberately not fatal-by-itself-forever: like every other ambiguity
+    here it raises a question the human answers. What it must not do is stay
+    silent, because silence on this path is consent.
 
     This used to name the checks that had to pass (`("resolution", "build-stamp")`)
     and let everything else SKIP. Two things were wrong with that. It omitted
@@ -352,6 +363,21 @@ def _gate_sync(sync: SyncStatus) -> Ambiguity | None:
             ),
             recommendation="Run where the tool is installed, so the bump is made on evidence.",
         )
+    if stale_views:
+        return Ambiguity(
+            gate=GATES[5],
+            question="Derived views describe an earlier graph. Bump anyway?",
+            detail=(
+                "Generated outputs out of date with the graph they came from: "
+                + "; ".join(stale_views)
+            ),
+            recommendation=(
+                "Run `mise run kb-artifacts` first — NOT `kb-build`, which does not "
+                "regenerate them. A bump made over stale views leaves it unclear "
+                "afterwards whether a difference came from the new version or the "
+                "old outputs."
+            ),
+        )
     return None
 
 
@@ -361,6 +387,7 @@ def decide(
     upstream: UpstreamStatus,
     moved: tuple[Observation, ...],
     observations: tuple[Observation, ...] = (),
+    stale_views: tuple[str, ...] = (),
 ) -> Verdict:
     """Apply the six gates and return what should happen next.
 
@@ -371,7 +398,13 @@ def decide(
     latest = upstream.latest
 
     always = [
-        g for g in (_gate_extras(sync), _gate_issues(moved, observations), _gate_sync(sync)) if g
+        g
+        for g in (
+            _gate_extras(sync),
+            _gate_issues(moved, observations),
+            _gate_sync(sync, stale_views),
+        )
+        if g
     ]
 
     # A presence-only tool (ffmpeg: source="none") has no version to chase, so an

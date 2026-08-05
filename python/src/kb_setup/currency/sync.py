@@ -427,15 +427,16 @@ def write_stamp(
 
 
 def restamp_artifacts(
-    repo_root: Path, spec: ToolSpec, *, regenerated_views: bool = False
+    repo_root: Path, spec: ToolSpec, *, views_before: Mapping[str, str] | None = None
 ) -> Path | None:
     """Refresh only the fingerprints after `kb-artifacts` regenerated outputs.
 
-    `regenerated_views` is False by default and must stay that way: every caller
-    other than a full `artifacts.generate` run is restamping AFTER touching the
-    graph and NOT the views, which is precisely the state this check exists to
-    report. See `view_records` for why the one exception is a fact rather than a
-    guess.
+    `views_before` is the caller's `view_identities` snapshot from before it
+    started working; a view may only be certified against the current graph when
+    its identity changed inside that bracket. Omitting it is the safe default and
+    means "I cannot say what I regenerated", which records unknown provenance
+    rather than a guess. See `view_records` for the false pass that made the
+    snapshot necessary.
 
     The derived outputs (wiki/svg/…) are generated FROM graph.json AFTER the
     build, so at build time they either don't exist or are stale. `kb-artifacts`
@@ -461,22 +462,25 @@ def restamp_artifacts(
         # there were none", which the staleness check reads as a clean pass.
         inputs=stamped_input_fingerprints(existing),
     )
-    if regenerated_views and written is not None:
-        _certify_views(repo_root, spec, written)
+    if views_before is not None and written is not None:
+        _certify_views(repo_root, spec, written, views_before)
     return written
 
 
-def _certify_views(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> None:
-    """Rewrite the just-written stamp's `views`, certifying every present view.
+def _certify_views(
+    repo_root: Path, spec: ToolSpec, stamp_file: Path, views_before: Mapping[str, str]
+) -> None:
+    """Re-derive the just-written stamp's `views` against the caller's snapshot.
 
     A SECOND write of a ~1 KB file rather than a sixth parameter on `write_stamp`,
     which 25 call sites reach and whose signature is already at its argument
     budget. The ordering that costs nothing to get right: the intermediate state
-    is the UNCERTIFIED map, so a process killed between the two writes leaves
+    is the UNBRACKETED map, so a process killed between the two writes leaves
     views reading *provenance unknown* — conservative, never a false pass.
 
-    `view_records(..., regenerated=True)` rather than a local loop, so the one
-    place that decides what a view record contains stays one place.
+    `view_records` rather than a local loop, so the one place that decides what a
+    view record contains stays one place — including which of the three outcomes
+    a given view earns.
     """
     try:
         payload = json.loads(stamp_file.read_text(encoding="utf-8"))
@@ -484,7 +488,9 @@ def _certify_views(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> None:
         return
     if not isinstance(payload, dict):
         return
-    payload["views"] = view_records(repo_root, spec, stamped_views(payload), regenerated=True)
+    payload["views"] = view_records(
+        repo_root, spec, stamped_views(payload), observed_before=views_before
+    )
     stamp_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
@@ -571,12 +577,27 @@ def deep_artifact_fingerprint(artifact: Path) -> str:
     return f"{entries}:{newest}"
 
 
+def view_identities(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
+    """`{relpath: deep fingerprint}` for every declared derived view that exists NOW.
+
+    A caller takes one of these BEFORE it starts work and hands it back to
+    `view_records` afterwards, which is what turns "these bytes differ from the
+    last stamp" into "these bytes changed DURING this operation". Those are not
+    the same claim, and `view_records` documents what it cost to learn that.
+    """
+    return {
+        rel: fp
+        for rel in spec.artifacts
+        if rel != spec.artifact and (fp := deep_artifact_fingerprint(repo_root / rel))
+    }
+
+
 def view_records(
     repo_root: Path,
     spec: ToolSpec,
     previous: Mapping[str, Mapping[str, str]] | None,
     *,
-    regenerated: bool = False,
+    observed_before: Mapping[str, str] | None = None,
 ) -> dict[str, dict[str, str]]:
     """Which graph each declared derived view was last observed to be generated FROM.
 
@@ -593,34 +614,41 @@ def view_records(
     * `graph` — the primary artifact's fingerprint at the moment the view was last
       observed to change. This is what the check compares against.
 
-    Inferring the regeneration from the view's own bytes rather than taking the
-    caller's word is what makes this correct for every writer at once, including
-    ones that do not know they are view producers: `graphify label` regenerates
-    `GRAPH_REPORT.md` and not `graphml`/`wiki`, a `kb-artifacts only=[graphml]`
-    regenerates exactly one, and `kb-merge` regenerates none — all three fall out
-    of the same diff with nothing enumerated anywhere.
+    `observed_before` is the caller's snapshot of those identities from BEFORE it
+    started, and it is what makes the `graph` field earnable. A view may only be
+    certified against the current graph when its identity changed *between that
+    snapshot and now* — i.e. this operation is the one that regenerated it.
 
-    A view first seen here records `graph: ""` — **never** the current fingerprint.
-    "This file exists" is not evidence about which graph produced it, and guessing
-    would hand a brand-new stamp a clean pass over views of unknown provenance.
-    The check reads `""` as *not verifiable*.
+    **The version without the snapshot was unsound, and a cold review caught it.**
+    It certified any view whose identity merely differed from the last STAMP, on
+    the reasoning that a changed view must have just been regenerated. That
+    inference has a hole with a real trigger, because `refresh_after_regen` is
+    best-effort and swallows its own failures:
 
-    `regenerated` is the ONE caller that may overrule that, and it exists because
-    the honest version of the rule above shipped for an hour and was wrong in
-    practice: on the first stamp to carry this map there is no previous map to
-    diff against, so a full `mise run kb-artifacts` — the very remedy the check
-    prints — regenerated all three views and left every one of them reading
-    *provenance unknown*. **A remedy that does not clear the message it prints is
-    exactly the signal-rot this check was built to fix**, and it would have taken
-    two multi-minute runs to bootstrap.
+        kb-artifacts regenerates the views, its restamp fails silently
+        -> the stamp still describes the OLD views
+        kb-merge rewrites graph.json and restamps
+        -> the views differ from the stamp, so all three were certified
+           against a graph they PREDATE.  Reproduced end to end; `check_views`
+           returned OK.
 
-    So `artifacts.generate` passes `regenerated=True` on a FULL run. That is not a
-    guess dressed up as a fact: it has just run every generator against the graph
-    now on disk and returned non-zero if any failed, so it is the one caller that
-    KNOWS. A partial `only=` run must not pass it — it regenerated a subset, and
-    the identity diff already catches exactly that subset.
+    A snapshot closes it because it brackets one operation rather than an
+    unbounded gap. It also subsumes the boolean flag it replaces — a full
+    `kb-artifacts`, a partial `kb-artifacts only=[graphml]`, a `kb-label` (which
+    regenerates `GRAPH_REPORT.md` and nothing else) and a `kb-merge` (which
+    regenerates none) all fall out of the same comparison, with nothing
+    enumerated anywhere and no caller asserting more than it did.
+
+    Three outcomes per view, and only the first is a certification:
+
+    * changed within the bracket -> the current graph fingerprint;
+    * unchanged since the stamp  -> carry the recorded fingerprint forward;
+    * anything else — first sighting, or changed outside any bracket — `""`,
+      which the check reads as *not verifiable*. "This file exists" is not
+      evidence about which graph produced it.
     """
     known = dict(previous or {})
+    before = observed_before or {}
     primary_fp = artifact_fingerprint(repo_root / spec.artifact) if spec.artifact else ""
     records: dict[str, dict[str, str]] = {}
     for rel in spec.artifacts:
@@ -636,13 +664,19 @@ def view_records(
             # regenerated one and silently pass.
             continue
         was = known.get(rel)
-        unchanged = was is not None and str(was.get("identity", "")) == identity
-        if regenerated:
+        if observed_before is not None and before.get(rel, "") != identity:
+            # Changed while this caller was working. `observed_before is not None`
+            # rather than a truthiness test on `before`: an EMPTY snapshot is a
+            # real answer — no view existed when the caller started — and a view
+            # that exists now therefore changed within the bracket. Collapsing
+            # empty-to-absent would silently withhold certification from the
+            # first `kb-artifacts` run in a fresh clone, which is the bootstrap
+            # case this whole field exists to make one run long.
             graph_fp = primary_fp
-        elif unchanged:
-            graph_fp = str(was.get("graph", "")) if was else ""
+        elif was is not None and str(was.get("identity", "")) == identity:
+            graph_fp = str(was.get("graph", ""))
         else:
-            graph_fp = primary_fp if was is not None else ""
+            graph_fp = ""
         records[rel] = {"identity": identity, "graph": graph_fp}
     return records
 

@@ -175,16 +175,15 @@ def test_a_non_rewriting_entry_never_touches_hyperedges(tmp_path: Path, monkeypa
 def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkeypatch) -> None:
     """A successful `generate()` run must call the shared restamp exactly once.
 
-    `regenerated_views` is False here BECAUSE this is an `only=` run (#182): a
-    partial run regenerated a subset and has no standing to certify the views it
-    did not touch. The full-run arm below is what proves the flag is not simply
-    hardcoded.
+    The snapshot it hands over is asserted separately, below.
     """
     _graph_with_hyperedge(tmp_path)
-    calls: list[tuple[Path, str, bool]] = []
+    calls: list[tuple[Path, str]] = []
 
-    def fake_refresh(repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
-        calls.append((repo_root, tag, regenerated_views))
+    def fake_refresh(
+        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
+        calls.append((repo_root, tag))
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
     monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
@@ -195,39 +194,52 @@ def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkey
 
     assert artifacts.generate(tmp_path, only=["graphml"]) == 0
 
-    assert calls == [(tmp_path, "kb-artifacts", False)]
+    assert calls == [(tmp_path, "kb-artifacts")]
 
 
-def test_a_full_generate_run_certifies_the_views_but_a_partial_one_does_not(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """CONTROL ARM on `regenerated_views` (#182): both directions, one test.
+def test_the_views_snapshot_is_taken_before_the_generators_run(tmp_path: Path, monkeypatch) -> None:
+    """The bracket, pinned by ORDER (#182) — this replaced a boolean that was unsound.
 
-    This is the only claim in the engine a caller makes about its own work rather
-    than observing it, so the arm that matters is that the claim is CONDITIONAL.
-    A hardcoded `True` would certify views a `kb-artifacts only=[graphml]` run
-    never touched; a hardcoded `False` would leave a full run — the remedy this
-    check prints — unable to clear the message it printed, which is the defect
-    that put the flag here in the first place.
+    `generate` used to assert "I regenerated everything" with a flag. A cold review
+    showed that certifies views whose bytes changed at some earlier, unobserved
+    moment (`sync.view_records` carries the reproduction). The snapshot fixes it
+    ONLY if it is taken before the generators run — taken after, it would compare
+    the new bytes against themselves and certify nothing, and taken from the last
+    stamp it would be the unsound version again.
+
+    Asserted by call order rather than by outcome, because reading the stamp after
+    `generate` returns reflects the final state either way. `views_before is not
+    None` is the second half: passing None is the documented "I cannot say what I
+    regenerated", which would silently stop certifying anything at all.
     """
     _graph_with_hyperedge(tmp_path)
-    calls: list[bool] = []
+    order: list[str] = []
+    handed: list[object] = []
 
-    def fake_refresh(_repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
-        assert tag == "kb-artifacts"
-        calls.append(regenerated_views)
+    def fake_snapshot(_repo_root: Path) -> dict[str, dict[str, str]]:
+        order.append("snapshot")
+        return {"graphify": {}}
+
+    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+        order.append("generate")
+        return subprocess.CompletedProcess(list(cmd), 0)
+
+    def fake_refresh(
+        _repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
+        order.append("refresh")
+        handed.append(views_before)
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
     monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
-    monkeypatch.setattr(
-        artifacts.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(list(cmd), 0)
-    )
+    monkeypatch.setattr(artifacts.subprocess, "run", fake_run)
+    monkeypatch.setattr(artifacts.stamps, "snapshot_views", fake_snapshot)
     monkeypatch.setattr(artifacts.stamps, "refresh_after_regen", fake_refresh)
 
-    assert artifacts.generate(tmp_path) == 0
     assert artifacts.generate(tmp_path, only=["graphml"]) == 0
 
-    assert calls == [True, False]
+    assert order == ["snapshot", "generate", "refresh"], f"bracket is wrong: {order}"
+    assert handed == [{"graphify": {}}]
 
 
 def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypatch) -> None:

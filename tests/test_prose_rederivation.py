@@ -460,9 +460,11 @@ def test_label_restamps_after_reattach_not_before(
         calls.append("reattach")
         real_reattach(graph_path, edges)
 
-    def spy_refresh(repo_root: Path, *, tag: str) -> None:
+    def spy_refresh(
+        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
         calls.append("refresh")
-        real_refresh(repo_root, tag=tag)
+        real_refresh(repo_root, tag=tag, views_before=views_before)
 
     monkeypatch.setattr(hyperedges, "reattach", spy_reattach)
     monkeypatch.setattr(stamps, "refresh_after_regen", spy_refresh)
@@ -582,9 +584,11 @@ def test_merge_and_label_restamps_carry_their_own_tag(
     tags: list[str] = []
     real_refresh = stamps.refresh_after_regen
 
-    def spy(repo_root: Path, *, tag: str) -> None:
+    def spy(
+        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
         tags.append(tag)
-        real_refresh(repo_root, tag=tag)
+        real_refresh(repo_root, tag=tag, views_before=views_before)
 
     monkeypatch.setattr(stamps, "refresh_after_regen", spy)
 
