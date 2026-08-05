@@ -1,4 +1,4 @@
-# kb-ship's branch-matched handoff gate (#149) — 15 mutation arms
+# kb-ship's branch-matched handoff gate (#149) — 17 mutation arms
 
 Evidence for the gate `mise run kb-ship` now runs between the review receipt and
 the four gates: it checks the **newest** `.agent/plans/session-*.md`, and only
@@ -18,7 +18,7 @@ the arms, before running any of them, found **two tests that could not fail**.
 
 ## Result
 
-**15 of 15 arms died.** Control green before and after; tree restored. Every arm
+**17 of 17 arms died.** Control green before and after; tree restored. Every arm
 mutates production code, runs `tests/test_citations.py tests/test_handoff.py
 tests/test_pr.py`, and asserts rc≠0. The harness is embedded in full at the
 bottom of this file — it is written to a session scratchpad, which does not
@@ -47,10 +47,13 @@ a row that was wrong on first reading.
 | A13 | the refusal | `pr._handoff_holds` | a broken handoff is reported and shipped anyway |
 | A14 | the report | `pr._handoff_holds` | the SKIP is silent, which is indistinguishable from a pass |
 | A15 | cheapest-first order | `pr._pre_push_checks` | a broken handoff costs four gate runs before it refuses |
+| A16 | ref-shape second half | `citations._is_ref_shaped` | `a..b`, `trailing/` and `x.lock` are reported as branches |
+| A17 | unreadable-handoff guard | `handoff.check_for_branch` | kb-ship dies with a traceback instead of reporting a SKIP |
 <!-- /ARMS-TABLE -->
 
 A7 is the arm this ticket exists for. A12 and A14 are the two "delete the wiring
-line" breaks `probes-need-a-control-arm.md` rule 2 asks for by name.
+line" breaks `probes-need-a-control-arm.md` rule 2 asks for by name. **A16 and
+A17 exist because the first 15 did not catch them** — see Finding 7.
 
 ## Finding 1 — the gate was built to the wrong rule, and it is measurable
 
@@ -171,6 +174,39 @@ which document describes the current work.
 them. Handoffs written from here on carry it by construction:
 `mise run kb-session-state` (#144) emits a backticked `- **branch**:` bullet, and
 `/clear-prep` step 6 now says so.
+
+## Finding 7 — a 15-arm sweep still left two guards unarmed
+
+The cold cross-family lane (OpenAI) was given a MUTATING brief rather than a
+reading one, because this repo has measured that method predicts a blocker better
+than lane identity. It mutated production lines itself and found **two guards
+with zero coverage** that the 15 arms above had passed over. Neither was a live
+defect — both guards are present and correct — but both were untested, which is
+the same thing one edit later.
+
+1. **`_is_ref_shaped`'s second line (A16).** A3 mutated the WHOLE body to
+   `return True` and died — on the regex half. Deleting only
+   `".." not in name and not name.endswith(("/", ".lock"))` left all 96 citation
+   tests passing, because nothing exercised `a..b`, `trailing/` or `x.lock`;
+   `_REF_SHAPE_RE` matches all three happily. **One function, two guards, one
+   tested** — the shape #147's report names, where a coarse arm scores defended
+   code as armed.
+2. **The `OSError` arm on reading the newest handoff (A17).** Deleting the whole
+   try/except left every test passing. The lane did not reason about
+   reachability, it **constructed** the reaching case: a *directory* named
+   `session-2026-01-01.md` under `.agent/plans/`, which an interrupted checkout
+   or a stray `mkdir` produces. Without the guard that raises `IsADirectoryError`
+   up through `_handoff_holds` into `ship_main`, so `mise run kb-ship` dies with
+   a traceback instead of reporting a SKIP — a gate that crashes is not a gate
+   that refuses.
+
+Three tests were added and the two arms above now die. The lesson is about arm
+GRANULARITY: an arm that replaces a whole function body tests only whichever
+guard the fixtures already reach, and reports the rest as armed. Mutate one line.
+
+The lane also independently control-armed Finding 2's no-op claim, reaching the
+same result without being told the answer — which is what makes that claim
+verified rather than merely asserted twice.
 
 ## Finding 6 — the harness is the FOURTH, and #160 is still the fix
 
@@ -371,6 +407,27 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
         '    if not run_gates(repo_root):\n        print("ship: gates failed — not pushing")\n'
         "        return False\n\n    if not _handoff_holds(repo_root, branch):\n        return False",
         "a broken handoff costs four gate runs before it refuses",
+    ),
+    (
+        # A3 mutated the WHOLE body of `_is_ref_shaped` to `return True` and
+        # died — on the regex half. A cold lane deleted only the SECOND line and
+        # every test still passed. One function, two guards, one tested: the
+        # coarse arm scored defended code as armed. (#147's report names this.)
+        "A16 ref-shape second half",
+        CITATIONS,
+        '    return ".." not in name and not name.endswith(("/", ".lock"))',
+        "    return True",
+        "`a..b`, `trailing/` and `x.lock` are reported as branches",
+    ),
+    (
+        # The one guard the whole 15-arm sweep could not kill, found by the cold
+        # lane by CONSTRUCTING the reaching case (a directory where the newest
+        # handoff should be) rather than reasoning about it.
+        "A17 unreadable-handoff guard",
+        HANDOFF,
+        "    try:\n        text = newest.read_text(encoding=\"utf-8\", errors=\"replace\")",
+        "    if True:\n        text = newest.read_text(encoding=\"utf-8\", errors=\"replace\")",
+        "kb-ship dies with a traceback instead of reporting a SKIP",
     ),
 ]
 

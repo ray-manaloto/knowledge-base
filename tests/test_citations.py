@@ -763,6 +763,27 @@ def test_a_capture_that_is_not_ref_shaped_is_dropped():
     assert citations.branch_mentions("| x | round 6: the branch/sha window; `_git` rc |\n") == []
 
 
+@pytest.mark.parametrize("bad", ["a..b", "trailing/", "x.lock"])
+def test_a_capture_git_itself_rejects_is_dropped(bad: str):
+    """The half of `_is_ref_shaped` the character class does NOT cover.
+
+    `_REF_SHAPE_RE` matches all three of these — they are alphanumerics,
+    dots, slashes and hyphens — so the `".." not in name` / trailing-`/` /
+    trailing-`.lock` line is what rejects them, and nothing exercised it.
+    A cold lane deleted that line and all 96 tests here still passed, which is
+    the "one function, two guards, one tested" shape #147's report names: an
+    arm that mutates the whole body dies on the tested half and says nothing
+    about the other.
+    """
+    assert citations.branch_mentions(f"on branch `{bad}` here\n") == []
+
+
+def test_the_ref_shape_guard_still_accepts_the_names_this_repo_uses():
+    """CONTROL ARM — the rejections above must not eat a real branch."""
+    for good in ("main", "feat/149-x", "chore/mise-currency-2026.7.16"):
+        assert [m.name for m in citations.branch_mentions(f"branch `{good}`\n")] == [good]
+
+
 def test_prose_captured_between_two_spans_is_dropped():
     """A `branch` inside a code span makes the NEXT capture run over prose."""
     assert citations.branch_mentions("run `git branch` to see; you are on `main`\n") == []

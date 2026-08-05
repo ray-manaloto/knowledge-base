@@ -857,6 +857,26 @@ def test_a_broken_handoff_for_another_branch_does_not_refuse(tmp_path: Path):
     assert got.findings == ()
 
 
+def test_a_newest_handoff_that_cannot_be_read_is_skipped_not_raised(tmp_path: Path):
+    """The `OSError` arm — reachable, and it was the one guard no arm could kill.
+
+    A cold lane deleted the whole try/except and every test still passed. The
+    reaching case it constructed is a DIRECTORY where the newest handoff should
+    be, which an interrupted checkout or a stray `mkdir` produces. Without the
+    guard this raises `IsADirectoryError` up through `_handoff_holds` and
+    `ship_main`, so `mise run kb-ship` dies with a traceback instead of
+    reporting a clean SKIP — a gate that crashes is not a gate that refuses.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+    plans = root / ".agent" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "session-2026-01-01.md").mkdir()
+    got = handoff.check_for_branch(root, "work")
+    assert got.coverage is handoff.Coverage.SKIPPED
+    assert "could not be read" in got.summary
+    assert got.findings == ()
+
+
 def test_no_handoffs_at_all_is_skipped(tmp_path: Path):
     root = _repo(tmp_path)
     got = handoff.check_for_branch(root, "work")
