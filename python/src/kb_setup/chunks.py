@@ -21,7 +21,26 @@ from pathlib import Path
 # consumes. Kept in sync with the committed chunks under sources/extractions/.
 _NODE_REQUIRED = ("id", "label", "file_type", "source_file", "source_url", "captured_at")
 _EDGE_REQUIRED = ("source", "target", "relation", "confidence", "confidence_score", "weight")
+#: Edges only. Hyperedges have a NARROWER tier set — see `_HYPEREDGE_CONFIDENCE`
+#: below — so widening this tuple (issue #177 will add AMBIGUOUS for edges) must
+#: not be done by editing the hyperedge constant to match.
 _CONFIDENCE = ("EXTRACTED", "INFERRED")
+
+#: Hyperedges are EXTRACTED|INFERRED ONLY, never AMBIGUOUS — a narrower set than
+#: `_CONFIDENCE` above, and DELIBERATELY a separate literal tuple rather than an
+#: alias/slice/subset of it. graphify's own extraction schema spells the two
+#: tiers differently in the same schema line
+#: (`.claude/skills/graphify/references/extraction-spec.md:64`): the edge
+#: object reads `"confidence":"EXTRACTED|INFERRED|AMBIGUOUS"` while the
+#: hyperedge object two fields later reads `"confidence":"EXTRACTED|INFERRED"`.
+#: Issue #177 will widen `_CONFIDENCE` to admit AMBIGUOUS for edges; if this
+#: constant were derived from that one instead of standing on its own, the
+#: widening would silently start permitting an AMBIGUOUS hyperedge that
+#: graphify's schema forbids. Measured against the live corpus 2026-08-05: all
+#: 5 committed hyperedges (`graphify-docs.json` x2, `media-docs.json` x3) carry
+#: `confidence` and all 5 are EXTRACTED or INFERRED, so this rejects nothing
+#: that exists today.
+_HYPEREDGE_CONFIDENCE = ("EXTRACTED", "INFERRED")
 
 #: Every node in a host-agent chunk is semantic BY CONSTRUCTION — a chunk is the
 #: output of the LLM extraction wave, and the AST layer never travels this path.
@@ -117,23 +136,55 @@ def _hyperedge_issues(hyperedges: object, ids: set[str], label: str) -> list[str
     none survive, so a green gate was permitting a committed relationship to
     vanish at ingestion. That is a large part of why the corpus's own description
     of graphify's pipeline is disconnected (#134). Found by the cold lane, round 2.
+
+    Extended 2026-08-05 (#170, #176) with two more checks, each independent of
+    the member-resolution check above — a hyperedge missing its id can still
+    have dangling members, and both are reported:
+
+    - `id` must be a non-empty string and unique within `hyperedges`. Without a
+      usable id, a duplicate is unnameable and `assemble()`'s combined re-check
+      (the only place a CROSS-chunk id collision can be caught) has nothing to
+      key on.
+    - `confidence` must be present and in `_HYPEREDGE_CONFIDENCE`
+      (EXTRACTED|INFERRED). This function never checked `confidence` at all
+      before — AMBIGUOUS is an edge-only tier in graphify's schema, and nothing
+      stopped a hyperedge from carrying it.
+
+    A hyperedge that is not a dict skips every further check on it (there is
+    nothing to check); every other combination of problems is reported
+    together rather than stopping at the first one found.
     """
     if hyperedges is None:
         return []
     if not isinstance(hyperedges, list):
         return [f"{label}: 'hyperedges' is not a list"]
     issues: list[str] = []
+    seen_ids: set[str] = set()
     for i, h in enumerate(hyperedges):
         if not isinstance(h, dict):
             issues.append(f"{label}: hyperedge[{i}] is not an object")
             continue
+        hid = h.get("id")
+        if not isinstance(hid, str) or not hid:
+            issues.append(f"{label}: hyperedge[{i}] has no valid string id")
+        elif hid in seen_ids:
+            issues.append(f"{label}: duplicate hyperedge id {hid!r}")
+        else:
+            seen_ids.add(hid)
         members = h.get("nodes", h.get("members"))
         if not isinstance(members, list):
             issues.append(f"{label}: hyperedge[{i}] has no 'nodes' list")
-            continue
-        missing = [m for m in members if m not in ids]
-        if missing:
-            issues.append(f"{label}: hyperedge[{i}] dangling member(s) {missing}")
+        else:
+            missing = [m for m in members if m not in ids]
+            if missing:
+                issues.append(f"{label}: hyperedge[{i}] dangling member(s) {missing}")
+        confidence = h.get("confidence")
+        if confidence not in _HYPEREDGE_CONFIDENCE:
+            issues.append(
+                f"{label}: hyperedge[{i}] confidence {confidence!r} not in "
+                f"{_HYPEREDGE_CONFIDENCE} — AMBIGUOUS is an edge tier, never a "
+                f"hyperedge one"
+            )
     return issues
 
 
@@ -227,13 +278,34 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
 
     Each input chunk is validated on its own; then ids are checked for collisions
     ACROSS the set (extraction prefixes ids per source, so a collision is a bug);
-    nodes/edges are concatenated (no cross-source dedup — the aggregate graph spans
-    many sources, so `_merge_docs.py` merges with dedup=False by design). Writes
-    `sources/extractions/<name>-docs.json` and returns its path. Raises ValueError
-    on any validation/collision problem — fail loud, never write a broken chunk.
+    nodes/edges/hyperedges are concatenated (no cross-source dedup — the aggregate
+    graph spans many sources, so `_merge_docs.py` merges with dedup=False by
+    design). Writes `sources/extractions/<name>-docs.json` and returns its path.
+    Raises ValueError on any validation/collision problem — fail loud, never
+    write a broken chunk.
+
+    Hyperedges are checked TWICE, at two different levels, and each catches
+    something the other cannot (#170, #176):
+
+    - Per-chunk, inside `validate(chunk, ...)` above — an agent error INSIDE one
+      chunk: a dangling member, a bad confidence tier, a malformed id. This was
+      the only check that existed before 2026-08-05, and it ran on data that was
+      then thrown away (`chunks.py:266` used to hardcode `"hyperedges": []` in
+      the output, deleting every hyperedge an extraction agent had emitted).
+    - Combined, after the loop below, against `_hyperedge_issues(hyperedges,
+      set(seen), ...)` — the ARTIFACT THAT ACTUALLY GETS WRITTEN. `seen`'s keys
+      are exactly the valid node ids across every input chunk, a SUPERSET of
+      what each chunk validated its own hyperedges against above (the per-chunk
+      `validate()` call below is passed no `known_ids`), so this pass cannot
+      itself surface a new dangling member — anything still unresolved here was
+      already unresolved per-chunk, and `problems` already holds it. What ONLY
+      the combined pass can catch: a hyperedge id collision BETWEEN two
+      different chunks — the hyperedge-level analogue of the node `seen` map
+      below, which exists for exactly the same reason.
     """
     nodes: list = []
     edges: list = []
+    hyperedges: list = []
     seen: dict[str, str] = {}
     problems: list[str] = []
 
@@ -252,6 +324,14 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
                 seen[nid] = p.name
             nodes.append(n)
         edges.extend(chunk.get("edges", []))
+        hyperedges.extend(chunk.get("hyperedges") or [])
+
+    # Re-validate the COMBINED hyperedge list against the union of node ids the
+    # written artifact will actually contain. Calling `_hyperedge_issues`
+    # directly rather than re-running `validate()` on a synthetic combined dict
+    # is deliberate: `validate()` would re-report every per-chunk node/edge
+    # problem a second time, turning one real defect into two lines of noise.
+    problems.extend(_hyperedge_issues(hyperedges, set(seen), f"{name} (combined)"))
 
     if problems:
         raise ValueError(
@@ -263,7 +343,7 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     combined = {
         "nodes": nodes,
         "edges": edges,
-        "hyperedges": [],
+        "hyperedges": hyperedges,
         "input_tokens": 0,
         "output_tokens": 0,
     }

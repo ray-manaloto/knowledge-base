@@ -46,8 +46,28 @@ def _edge(src: str, tgt: str, **over: object) -> dict:
     return e
 
 
-def _chunk(nodes: list[dict], edges: list[dict]) -> dict:
-    return {"nodes": nodes, "edges": edges, "hyperedges": [], "input_tokens": 0, "output_tokens": 0}
+def _chunk(nodes: list[dict], edges: list[dict], hyperedges: list[dict] | None = None) -> dict:
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "hyperedges": hyperedges if hyperedges is not None else [],
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
+
+
+def _hyperedge(hid: str, members: list[str], **over: object) -> dict:
+    h = {
+        "id": hid,
+        "label": hid.title(),
+        "nodes": members,
+        "relation": "participate_in",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.75,
+        "source_file": "src.md",
+    }
+    h.update(over)
+    return h
 
 
 def test_validate_clean_chunk_has_no_issues() -> None:
@@ -347,17 +367,151 @@ def test_a_dangling_hyperedge_member_is_caught() -> None:
     unresolved members and then the whole hyperedge, so a green gate permitted a
     committed relationship to vanish at ingestion (#134).
     """
-    c = _chunk([_node("a")], [])
-    c["hyperedges"] = [{"label": "h", "nodes": ["a", "ghost"]}]
+    c = _chunk([_node("a")], [], [_hyperedge("h", ["a", "ghost"])])
     assert any("hyperedge" in i for i in chunks.validate(c, label="c"))
 
     # CONTROL ARM: a fully-resolvable hyperedge must still pass, or the fix is
     # "reject all hyperedges" — which would have deleted the two VALID ones in
     # graphify-docs.json alongside the broken one. That over-deletion actually
     # happened during this fix and was caught by re-reading the validator output.
-    ok = _chunk([_node("a"), _node("b")], [])
-    ok["hyperedges"] = [{"label": "h", "nodes": ["a", "b"]}]
+    ok = _chunk([_node("a"), _node("b")], [], [_hyperedge("h", ["a", "b"])])
     assert chunks.validate(ok, label="c") == []
+
+
+def test_assemble_carries_hyperedges_regression_for_170(tmp_path) -> None:
+    """THE REGRESSION TEST for #170: hyperedges used to be silently discarded.
+
+    `assemble()` used to hardcode `"hyperedges": []` in the combined chunk
+    regardless of what any input chunk carried, deleting every hyperedge an
+    extraction agent had emitted. This must go red if the carry is ever
+    deleted again.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    h = _hyperedge("h_pair", ["x_a", "x_b"])
+    c1 = tmp_path / "c1.json"
+    c2 = tmp_path / "c2.json"
+    c1.write_text(json.dumps(_chunk([_node("x_a"), _node("x_b")], [_edge("x_a", "x_b")], [h])))
+    c2.write_text(json.dumps(_chunk([_node("y_a")], [])))
+    out = chunks.assemble(tmp_path, "mytopic", [c1, c2])
+    got = json.loads(out.read_text())
+    assert got["hyperedges"] == [h], (
+        f"assemble() discarded the input hyperedge; got {got['hyperedges']!r}"
+    )
+
+
+def test_assemble_hyperedges_empty_or_absent_both_assemble_cleanly(tmp_path) -> None:
+    """All 18 committed chunks look like one of these two shapes today."""
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c1 = tmp_path / "c1.json"
+    c2 = tmp_path / "c2.json"
+    c1.write_text(json.dumps(_chunk([_node("a")], [], [])))  # explicit "hyperedges": []
+    absent = {"nodes": [_node("b")], "edges": [], "input_tokens": 0, "output_tokens": 0}
+    c2.write_text(json.dumps(absent))  # "hyperedges" key absent entirely
+    out = chunks.assemble(tmp_path, "cleantopic", [c1, c2])
+    got = json.loads(out.read_text())
+    assert got["hyperedges"] == []
+
+
+def test_hyperedge_confidence_extracted_and_inferred_accepted() -> None:
+    for tier in ("EXTRACTED", "INFERRED"):
+        c = _chunk([_node("a"), _node("b")], [], [_hyperedge("h", ["a", "b"], confidence=tier)])
+        assert chunks.validate(c, label="c") == [], f"{tier} was unexpectedly refused"
+
+
+def test_hyperedge_confidence_ambiguous_refused() -> None:
+    """AMBIGUOUS is an EDGE tier in graphify's own extraction schema.
+
+    Never a hyperedge one — the schema line for hyperedges reads
+    `"confidence":"EXTRACTED|INFERRED"` with no third option.
+    """
+    c = _chunk([_node("a"), _node("b")], [], [_hyperedge("h", ["a", "b"], confidence="AMBIGUOUS")])
+    issues = chunks.validate(c, label="c")
+    assert any("AMBIGUOUS" in i and "edge tier" in i for i in issues), (
+        f"an AMBIGUOUS hyperedge was accepted, or refused without explaining why "
+        f"it's wrong; issues were {issues}"
+    )
+
+
+def test_hyperedge_confidence_absent_refused() -> None:
+    h = _hyperedge("h", ["a", "b"])
+    del h["confidence"]
+    c = _chunk([_node("a"), _node("b")], [], [h])
+    issues = chunks.validate(c, label="c")
+    assert any("confidence" in i for i in issues), (
+        f"a hyperedge with no confidence field at all was accepted; issues were {issues}"
+    )
+
+
+def test_hyperedge_confidence_tuple_is_independent_of_edge_confidence() -> None:
+    """CONTROL ARM: `_HYPEREDGE_CONFIDENCE` must be standalone, not derived.
+
+    Not an alias/slice/subset of `_CONFIDENCE`. Issue #177 will widen
+    `_CONFIDENCE` (edges) to admit AMBIGUOUS; if `_HYPEREDGE_CONFIDENCE` were
+    derived from it instead of standing alone, that widening would silently
+    start permitting an AMBIGUOUS hyperedge the moment it landed — this test
+    is what makes the separation survive that edit.
+    """
+    assert "AMBIGUOUS" not in chunks._HYPEREDGE_CONFIDENCE
+    assert chunks._HYPEREDGE_CONFIDENCE == ("EXTRACTED", "INFERRED")
+
+
+def test_hyperedge_missing_empty_or_non_string_id_refused() -> None:
+    for bad_id, make in (
+        (None, lambda h: h.pop("id")),
+        ("", lambda h: h.update(id="")),
+        (42, lambda h: h.update(id=42)),
+    ):
+        h = _hyperedge("placeholder", ["a", "b"])
+        make(h)
+        c = _chunk([_node("a"), _node("b")], [], [h])
+        issues = chunks.validate(c, label="c")
+        assert any("valid string id" in i for i in issues), (
+            f"bad hyperedge id {bad_id!r} was accepted; issues were {issues}"
+        )
+
+
+def test_validate_flags_duplicate_hyperedge_id_within_one_chunk() -> None:
+    c = _chunk(
+        [_node("a"), _node("b")],
+        [],
+        [_hyperedge("dup", ["a"]), _hyperedge("dup", ["b"])],
+    )
+    issues = chunks.validate(c, label="c")
+    assert any("duplicate hyperedge id" in i and "dup" in i for i in issues), (
+        f"two hyperedges sharing an id within one chunk were not flagged; issues were {issues}"
+    )
+
+
+def test_assemble_still_refuses_a_dangling_hyperedge_member_per_chunk(tmp_path) -> None:
+    """Existing behaviour, must not regress now that hyperedges are carried through."""
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c = tmp_path / "c.json"
+    c.write_text(json.dumps(_chunk([_node("a")], [], [_hyperedge("h", ["a", "ghost"])])))
+    with pytest.raises(ValueError, match="dangling"):
+        chunks.assemble(tmp_path, "baddangle", [c])
+
+
+def test_assemble_raises_on_combined_hyperedge_id_collision(tmp_path) -> None:
+    """ONLY the combined pass can catch this.
+
+    Each chunk validates clean alone, and the collision exists only once the
+    two chunks are unioned into the artifact that actually gets written.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c1_data = _chunk([_node("a")], [], [_hyperedge("dup", ["a"])])
+    c2_data = _chunk([_node("b")], [], [_hyperedge("dup", ["b"])])
+    assert chunks.validate(c1_data, label="c1") == [], "fixture chunk 1 must validate clean alone"
+    assert chunks.validate(c2_data, label="c2") == [], "fixture chunk 2 must validate clean alone"
+
+    c1 = tmp_path / "c1.json"
+    c2 = tmp_path / "c2.json"
+    c1.write_text(json.dumps(c1_data))
+    c2.write_text(json.dumps(c2_data))
+    with pytest.raises(ValueError, match="dup") as exc:
+        chunks.assemble(tmp_path, "clashhyper", [c1, c2])
+    msg = str(exc.value)
+    assert "dup" in msg, f"expected the colliding id in the error; got: {msg}"
+    assert "(combined)" in msg, f"expected the '(combined)' label in the error; got: {msg}"
 
 
 def test_a_valid_json_non_object_refuses_instead_of_raising(tmp_path) -> None:
