@@ -25,22 +25,6 @@ def test_svg_in_default_registry_but_gated_by_limit() -> None:
     assert artifacts._SVG_NODE_LIMIT == 5000
 
 
-def test_restamp_survives_a_malformed_currency_config(tmp_path) -> None:
-    """A broken currency.toml must not turn a successful kb-artifacts into a failure.
-
-    `config.load()` raises TypeError (not ValueError) when `[tool]` is not a
-    table; `_restamp` is best-effort and must swallow it with a warning.
-    """
-    (tmp_path / "currency.toml").write_text('tool = "not a table"\n', encoding="utf-8")
-    # Must not raise — the guarantee _restamp documents.
-    artifacts._restamp(tmp_path)
-
-
-def test_restamp_is_a_noop_without_a_config(tmp_path) -> None:
-    """Control arm: a repo with no currency.toml re-stamps nothing, cleanly."""
-    artifacts._restamp(tmp_path)
-
-
 # --- hyperedge carry (#171 local mitigation, #175) --------------------------
 
 _HYPEREDGE = {"id": "he1", "nodes": ["a"]}
@@ -172,3 +156,62 @@ def test_a_non_rewriting_entry_never_touches_hyperedges(tmp_path: Path, monkeypa
 
     assert calls == []
     assert graph.read_bytes() == before
+
+
+# --- currency stamp refresh really gets called (#179 respec, mutation survivor) --
+#
+# `test_graphify_exe_call_sites.py`'s `test_artifacts_run_the_resolved_binary`
+# patches `stamps.refresh_after_regen` to a no-op, but that test's SUBJECT is
+# which binary `generate` runs, not whether the restamp happens — patching a
+# function that exists either way proves nothing about whether it was called.
+# Before the #179 refactor this was incidentally covered: the old
+# `monkeypatch.setattr(artifacts, "_restamp", ...)` would raise `AttributeError`
+# the moment `_restamp` stopped existing, so deleting the restamp call silently
+# broke that test for an unrelated reason. `stamps.refresh_after_regen` exists
+# independent of whether `generate` calls it, so that accidental tripwire is
+# gone — this test is the direct replacement.
+
+
+def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkeypatch) -> None:
+    """A successful `generate()` run must call the shared restamp exactly once."""
+    _graph_with_hyperedge(tmp_path)
+    calls: list[tuple[Path, str]] = []
+
+    def fake_refresh(repo_root: Path, *, tag: str) -> None:
+        calls.append((repo_root, tag))
+
+    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
+    monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(
+        artifacts.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(list(cmd), 0)
+    )
+    monkeypatch.setattr(artifacts.stamps, "refresh_after_regen", fake_refresh)
+
+    assert artifacts.generate(tmp_path, only=["graphml"]) == 0
+
+    assert calls == [(tmp_path, "kb-artifacts")]
+
+
+def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypatch) -> None:
+    """CONTROL ARM: a failed `generate()` run must not restamp anything.
+
+    Same reasoning as the `label()` failure gate: an artifact that failed to
+    regenerate may be in any state, and stamping it would assert "this is
+    current" about output that is not.
+    """
+    _graph_with_hyperedge(tmp_path)
+    calls: list[tuple[Path, str]] = []
+
+    def fake_refresh(repo_root: Path, *, tag: str) -> None:
+        calls.append((repo_root, tag))
+
+    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
+    monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(
+        artifacts.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(list(cmd), 1)
+    )
+    monkeypatch.setattr(artifacts.stamps, "refresh_after_regen", fake_refresh)
+
+    assert artifacts.generate(tmp_path, only=["graphml"]) == 1
+
+    assert calls == []

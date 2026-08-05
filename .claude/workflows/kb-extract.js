@@ -88,12 +88,13 @@ if (!calendarOk) {
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['key', 'wrote', 'node_count', 'edge_count'],
+  required: ['key', 'wrote', 'node_count', 'edge_count', 'hyperedge_count'],
   properties: {
     key: { type: 'string' },
     wrote: { type: 'boolean' },
     node_count: { type: 'integer' },
     edge_count: { type: 'integer' },
+    hyperedge_count: { type: 'integer' },
     notes: { type: 'string' },
   },
 }
@@ -109,7 +110,7 @@ function commonPrompt(s) {
 (use the Read tool; read ALL of it — it may be long).${s.note ? `\nContext: ${s.note}` : ''}
 
 Produce a graphify DOC-EXTRACTION CHUNK: a JSON object
-  { "nodes": [...], "edges": [...], "hyperedges": [], "input_tokens": 0, "output_tokens": 0 }
+  { "nodes": [...], "edges": [...], "hyperedges": [...], "input_tokens": 0, "output_tokens": 0 }
 
 NODE object (exact keys):
   id          : globally-unique slug, MUST start with "${s.key}_" then a short concept slug (snake_case). Never reuse an id.
@@ -146,6 +147,42 @@ that makes the sentence true. The rules that decide it:
 Do NOT flip a whole relation type at the end as a batch. Direction is decided per
 edge from the source text; a blanket flip breaks the ones that were already right.
 
+HYPEREDGE object (exact keys) — emit these now; the array is no longer suppressed:
+  id               : snake_case, MUST start with "${s.key}_" then a short slug. The
+                     prefix is what makes a collision between two sources'
+                     hyperedge ids IMPOSSIBLE in the first place — kb-assemble
+                     unions every chunk's hyperedges into one file and REFUSES a
+                     duplicate id across chunks if one happens anyway, but the
+                     prefix is what stops it from happening. An unprefixed name
+                     like "three_pass_extraction" is exactly the kind two
+                     sources both reach for — it is a REAL committed id in
+                     sources/extractions/graphify-docs.json today, with no
+                     prefix, because it predates this rule (all five committed
+                     hyperedge ids do). The rule binds NEW chunks; the
+                     committed five are grandfathered, not a model to copy.
+  label            : short human name of the shared concept.
+  nodes            : THREE OR MORE node ids, every one of them defined in THIS
+                     chunk. A member that does not resolve is rejected by
+                     kb-assemble (kb-validate-chunks only catches it too when
+                     checking this chunk alone — its normal multi-file
+                     invocation resolves endpoints against the UNION of every
+                     chunk passed to it, so a member dangling in this chunk but
+                     defined in a sibling chunk would pass there), and graphify
+                     drops the whole hyperedge once no member survives.
+  relation         : participate_in | implement | form
+  confidence       : "EXTRACTED" | "INFERRED" — never AMBIGUOUS. That tier exists
+                     for edges only; graphify's hyperedge schema does not have it
+                     and kb-validate-chunks refuses one that carries it.
+  confidence_score : 1 for EXTRACTED, 0.5 for INFERRED (same as edges).
+  source_file      : "${file}"
+
+WHEN to emit one: only when 3+ nodes genuinely co-participate in ONE concept,
+flow, or pattern that the pairwise edges do not already capture — a pipeline
+whose stages are each a node, a threat model and the mitigations that together
+address it, a decision and the constraints that jointly force it. If the group
+is fully described by the edges you already wrote, the hyperedge adds nothing:
+leave it out. MAXIMUM 3 per chunk, and \`[]\` is a perfectly good answer.
+
 WHY \`_origin: "semantic"\` IS MANDATORY: graphify 0.9.32+ decides a node's tier from
 \`_origin\` when present, and otherwise GUESSES from shape — a \`source_location\` that
 looks like \`L<line>\` is read as AST. Extraction agents have emitted \`source_location\`
@@ -154,11 +191,11 @@ silently deleted **629 nodes** from the prose graph in one build, with no error.
 literal marker makes the guess unreachable. \`mise run kb-validate-chunks\` REJECTS a
 chunk whose nodes lack it.
 
-Rules: only connect nodes that exist in THIS chunk; prefer faithful EXTRACTED edges; mark reasoned links INFERRED honestly; never invent facts not in the source.
+Rules: only connect nodes that exist in THIS chunk (hyperedge members included); prefer faithful EXTRACTED edges; mark reasoned links INFERRED honestly; never invent facts not in the source.
 
 After building the chunk, WRITE it (Write tool) to:
   ${scratchDir}/${s.key}.json
-Then your FINAL output is ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, notes (any quality caveat, e.g. paywalled/partial/truncated)}.`
+Then your FINAL output is ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, hyperedge_count (how many hyperedges you emitted, 0 if none), notes (any quality caveat, e.g. paywalled/partial/truncated)}.`
 }
 
 function inventoryPrompt(s) {
@@ -168,6 +205,9 @@ function inventoryPrompt(s) {
 It is a curated inventory (one entry per item, e.g. marketplace plugins).${s.note ? `\nContext: ${s.note}` : ''}
 
 Produce a graphify chunk { "nodes":[...], "edges":[...], "hyperedges":[], "input_tokens":0, "output_tokens":0 }.
+Leave "hyperedges" EMPTY here even though the general extraction prompt now populates it:
+an inventory is item -> category and nothing else, which the pairwise part_of edges below
+already say in full. A hyperedge over "every item in this category" would restate them.
 - One NODE per item: id "${s.key}_" + item-slug (snake_case, globally unique); label = item name; **_origin "semantic"** (exactly this literal, on every node, mandatory); file_type "concept"; source_file "${file}"; source_url "${s.url}"; captured_at "${capturedAt}"; author null; contributor null; rationale = the item's one-line purpose/category.
 - ALSO create category NODES (id "${s.key}_cat_<slug>") for the main categories present.
 - EDGES: each item -> its category node, relation "part_of", confidence "EXTRACTED", confidence_score 1, source_file "${file}", weight 1.
@@ -176,7 +216,7 @@ Produce a graphify chunk { "nodes":[...], "edges":[...], "hyperedges":[], "input
 Capture as many items as the file lists; do not invent entries.
 
 WRITE the chunk (Write tool) to ${scratchDir}/${s.key}.json.
-FINAL output = ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, notes}.`
+FINAL output = ONLY the StructuredOutput {key:"${s.key}", wrote:true, node_count, edge_count, hyperedge_count:0 (this prompt emits none), notes}.`
 }
 
 const KIND_NOTE = {

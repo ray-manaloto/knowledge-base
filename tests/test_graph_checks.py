@@ -54,7 +54,7 @@ def test_a_clean_graph_passes(tmp_path):
             hyperedges=[{"id": "he1", "nodes": ["graphify::foo", ".self-graph::bar"]}],
         ),
     )
-    graph_checks.assert_composition(path)  # must not raise
+    graph_checks.assert_composition(path, tag="kb-build")  # must not raise
 
 
 def test_a_clean_graph_with_no_hyperedges_passes(tmp_path):
@@ -65,7 +65,32 @@ def test_a_clean_graph_with_no_hyperedges_passes(tmp_path):
     the exception here, not the rule.
     """
     path = _write(tmp_path / "graph.json", _graph(nodes=[{"id": "graphify::foo"}]))
-    graph_checks.assert_composition(path)  # must not raise
+    graph_checks.assert_composition(path, tag="kb-build")  # must not raise
+
+
+def test_a_passing_build_still_reports_the_hyperedge_census(tmp_path, capsys):
+    """Silence is the wrong success signal, so the counts are printed either way (#176).
+
+    Nothing else in the toolchain reports them — `kb-insights` covers
+    provenance, community spans, cross-origin edges and size, but not
+    hyperedges. Before this line the only way to answer "how many does the
+    aggregate hold, and do their members resolve?" was an ad-hoc probe, and
+    #176 asks for that figure after every change. Asserting on the NUMBERS and
+    not merely that something was printed is the point: a census that prints
+    `0 hyperedge(s)` on a graph holding five is worse than no census.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}, {"id": ".self-graph::bar"}, {"id": "doc_node"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", ".self-graph::bar", "doc_node"]}],
+        ),
+    )
+    graph_checks.assert_composition(path, tag="kb-build")
+    out = capsys.readouterr().out
+    assert "3 node ids" in out, out
+    assert "1 hyperedge(s) / 3 member(s)" in out, out
+    assert "0 dangling" in out, out
 
 
 def test_a_depth_two_id_fails(tmp_path):
@@ -80,7 +105,7 @@ def test_a_depth_two_id_fails(tmp_path):
         _graph(nodes=[{"id": "graphify::foo"}, {"id": "outer::graphify::foo"}]),
     )
     with pytest.raises(SystemExit) as exc:
-        graph_checks.assert_composition(path)
+        graph_checks.assert_composition(path, tag="kb-build")
     assert "outer::graphify::foo" in str(exc.value), (
         f"the refusal must name the offending id; it said {exc.value!r}"
     )
@@ -94,7 +119,7 @@ def test_a_single_separator_id_is_not_a_violation(tmp_path):
     healthy build, and the test above could not distinguish the two.
     """
     path = _write(tmp_path / "graph.json", _graph(nodes=[{"id": "graphify::foo"}]))
-    graph_checks.assert_composition(path)  # must not raise
+    graph_checks.assert_composition(path, tag="kb-build")  # must not raise
 
 
 def test_a_dangling_hyperedge_member_fails(tmp_path):
@@ -112,10 +137,110 @@ def test_a_dangling_hyperedge_member_fails(tmp_path):
         ),
     )
     with pytest.raises(SystemExit) as exc:
-        graph_checks.assert_composition(path)
+        graph_checks.assert_composition(path, tag="kb-build")
     assert "graphify::vanished" in str(exc.value), (
         f"the refusal must name the offending member; it said {exc.value!r}"
     )
+
+
+def test_census_reports_a_nonzero_dangling_count(tmp_path, capsys):
+    """A census that hardcodes '0 dangling' would survive the existing test.
+
+    `test_a_passing_build_still_reports_the_hyperedge_census` above asserts
+    `"0 dangling" in out` on a graph whose members all resolve — the ONE field
+    that check never varies. Mutating `f"{len(dangling)} dangling"` to a
+    hardcoded `"0 dangling"` literal survives it, which is exactly the
+    "a census that prints 0 hyperedge(s) on a graph holding five is worse than
+    no census" failure that same test's docstring names. This proves the
+    printed count reflects a GENUINELY dangling member, on a graph where the
+    census print (before the `SystemExit`) and the refusal both fire.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", "graphify::vanished"]}],
+        ),
+    )
+    with pytest.raises(SystemExit):
+        graph_checks.assert_composition(path, tag="kb-build")
+    out = capsys.readouterr().out
+    assert "1 dangling" in out, out
+    assert "0 dangling" not in out, out
+
+
+def test_tag_kb_build_reaches_the_output_and_kb_watch_does_not(tmp_path, capsys):
+    """`tag` must actually reach the printed line, and name the RIGHT caller.
+
+    Written as a twin with the test below so neither can be satisfied by a
+    hardcoded string: a hardcoded "[kb-build]" would pass this test and fail
+    its sibling, and vice versa.
+    """
+    path = _write(tmp_path / "graph.json", _graph(nodes=[{"id": "graphify::foo"}]))
+    graph_checks.assert_composition(path, tag="kb-build")
+    out = capsys.readouterr().out
+    assert "[kb-build]" in out, out
+    assert "[kb-watch]" not in out, out
+
+
+def test_tag_kb_watch_reaches_the_output_and_kb_build_does_not(tmp_path, capsys):
+    """CONTROL ARM / twin of the test above — see its docstring."""
+    path = _write(tmp_path / "graph.json", _graph(nodes=[{"id": "graphify::foo"}]))
+    graph_checks.assert_composition(path, tag="kb-watch")
+    out = capsys.readouterr().out
+    assert "[kb-watch]" in out, out
+    assert "[kb-build]" not in out, out
+
+
+def test_a_non_string_hyperedge_member_is_reported_as_a_shape_problem(tmp_path):
+    """A member that is not a string id must say SO, not 'renamed or dropped'.
+
+    Before #176 round 2, `dangling.extend(str(m) for m in members if str(m)
+    not in ids)` coerced EVERY member with `str()` before comparing — so an
+    object member like `{"id": "a"}` produced `"{'id': 'a'} dangling"`,
+    asserting a cause (renamed/dropped) that is false: nothing was renamed,
+    the member was never a valid id to begin with. `str()` never raises here,
+    so the old code did not crash — it just told the reader the wrong story,
+    sending them hunting for a missing node when the real problem is the
+    extraction's shape.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", {"id": "a"}]}],
+        ),
+    )
+    with pytest.raises(SystemExit) as exc:
+        graph_checks.assert_composition(path, tag="kb-build")
+    message = str(exc.value)
+    assert "not string ids" in message, message
+    assert "SHAPE problem" in message, message
+    assert "renamed or dropped" not in message, (
+        f"a non-string member was blamed on a rename/drop that never happened: {message}"
+    )
+
+
+def test_a_dangling_string_member_still_gets_the_renamed_or_dropped_message(tmp_path):
+    """CONTROL ARM: a genuinely unresolved STRING member keeps the old message.
+
+    The split above must not turn every dangling member into a 'shape
+    problem' — only a non-string one is. Re-asserted here alongside the
+    shape-problem test above so a regression that merges the two branches
+    back into one is caught from both sides at once.
+    """
+    path = _write(
+        tmp_path / "graph.json",
+        _graph(
+            nodes=[{"id": "graphify::foo"}],
+            hyperedges=[{"id": "he1", "nodes": ["graphify::foo", "graphify::vanished"]}],
+        ),
+    )
+    with pytest.raises(SystemExit) as exc:
+        graph_checks.assert_composition(path, tag="kb-build")
+    message = str(exc.value)
+    assert "renamed or dropped" in message, message
+    assert "SHAPE problem" not in message, message
 
 
 def test_both_violations_are_reported_together(tmp_path):
@@ -133,7 +258,7 @@ def test_both_violations_are_reported_together(tmp_path):
         ),
     )
     with pytest.raises(SystemExit) as exc:
-        graph_checks.assert_composition(path)
+        graph_checks.assert_composition(path, tag="kb-build")
     message = str(exc.value)
     assert "outer::graphify::foo" in message
     assert "graphify::vanished" in message
