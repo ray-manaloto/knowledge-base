@@ -61,7 +61,10 @@ def main(argv: list[str] | None = None) -> int:
         # `graph.refresh_self`. One-shot by design: `graphify watch` refreshes
         # only a scoped sub-graph and offers no post-rebuild hook, so it cannot
         # keep the aggregate (the graph `affected` actually reads) current.
-        return graph.refresh_self(repo_root)
+        # Same contract as `build` just above: success is a `None` return, a
+        # refusal is a `SystemExit` the dispatcher's own caller renders.
+        graph.refresh_self(repo_root)
+        return 0
     if cmd == "prose":
         from kb_setup import prose
 

@@ -3,22 +3,30 @@
 Reproducibility model: the graph is rebuildable from two committed things —
 `sources/*.manifest` (external repo pins) and `sources/extractions/*.json` (the
 non-free host-agent doc extractions). The external repos themselves are cloned on
-demand and gitignored. `graphify-out/` (graph.json + manifest.json) is committed
-so consumers query on clone and `update` can diff incrementally.
+demand and gitignored — and so is everything under `graphify-out/` except the
+authored `memory/`: `graph.json` is DERIVED, far past git's limits at aggregate
+scale, and consumers reach it via `kb-serve` (MCP) or a pushed graph DB, never a
+git blob. (This paragraph claimed graph.json + manifest.json were committed
+until 2026-08-05 — stale since the aggregate outgrew git, flagged by a lane
+mid-#175.) `build()` composes everything in ONE N-ary merge and ends in the
+final labelled state; `refresh_self` (kb-watch) recomposes from the recorded
+inputs rather than patching the artifact in place.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
-from dataclasses import replace
+import tempfile
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import atomic, graph_checks, graphify_ops
 from kb_setup import manifest as mf
-from kb_setup import prose
 from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
@@ -29,6 +37,12 @@ _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 # The tool whose artifacts `kb-build` produces. Named explicitly so a
 # multi-tool currency.toml cannot silently stamp the wrong tool.
 _STAMPED_TOOL = "graphify"
+
+#: Permission bits restored on the swapped-in graph.json — see
+#: `_recompose_into_temp`'s docstring. Same value and same reason as
+#: `hyperedges._GRAPH_MODE`; a separate constant because these are separate
+#: modules and the integer is not worth a shared import.
+_GRAPH_MODE = 0o644
 
 
 def _run(cmd: list[str], cwd: Path) -> None:
@@ -158,14 +172,6 @@ _SELF_ROOT = "."
 #: root-only extraction. `--out` redirects it. Gitignored, derived, disposable.
 _SELF_OUT = ".self-graph"
 
-#: The aggregate as it stands BEFORE our own code is merged in — everything the
-#: pinned manifests and committed doc chunks contribute, and nothing of ours.
-#: `kb-watch` restarts from this rather than appending to graph.json, which is the
-#: only thing that makes repeated refreshes idempotent (see `refresh_self`).
-#: Public because the tests import it: a restated literal keeps passing after a
-#: rename, asserting on a filename nothing writes.
-BASE_GRAPH_NAME = ".base-graph.json"
-
 #: Where `scope = study` sources land — repos we are analysing rather than
 #: learning from. They are still fully ingested — no exclusions — just not ranked
 #: beside the corpus.
@@ -186,20 +192,6 @@ BASE_GRAPH_NAME = ".base-graph.json"
 #: and a reader reaching for it to justify the next partition would be reasoning
 #: from a defect. See `_merge_sources_into`.
 STUDY_GRAPH_NAME = "study-graph.json"
-
-#: sha256 of the `graph.json` that the base snapshot is known to compose with.
-#: `refresh_self` refuses unless the current `graph.json` still matches it.
-#:
-#: THIS EXISTS BECAUSE THE SNAPSHOT ALONE IS NOT SAFE, found by a cold review.
-#: `.base-graph.json` is written only by `build()`, but it is NOT the only writer
-#: of `graph.json` — `kb-merge` folds in a doc-extraction chunk and `kb-label`
-#: rewrites the graph outright, both documented as legitimate no-LLM steps
-#: BETWEEN builds. So `kb-build` → `kb-merge` → `kb-watch` restored a base that
-#: predates the merge, silently discarding it, and then restamped the result as
-#: verified — `kb-currency-check` reported clean. Silent data loss wearing a
-#: green light, which is the one failure mode the whole currency engine exists to
-#: prevent.
-BASE_GUARD_NAME = ".base-graph.sha256"
 
 
 def _self_subgraph(repo_root: Path) -> Path:
@@ -253,236 +245,687 @@ def _extract_self(repo_root: Path) -> list[Path]:
     return [_self_subgraph(repo_root)]
 
 
-def refresh_self(repo_root: Path) -> int:
-    """Re-extract this repo's own code into the AGGREGATE graph, then restamp.
+#: Filename of the DERIVED record `build()` writes describing what it actually
+#: composed — never hand-authored, never committed (`graphify-out/` is
+#: gitignored beyond `memory/`). `refresh_self` reads it back so a
+#: recomposition uses the SAME corpus leaves and self location the last full
+#: build did, rather than re-deriving them from `sources/*.manifest` (which may
+#: have grown or shrunk since — `refresh_self` deliberately never reads a
+#: manifest at all; that is the point, not an oversight).
+_COMPOSE_MANIFEST_NAME = ".compose-manifest.json"
 
-    The freshness half of self-indexing (`kb-watch`). `build()` indexes our code
-    once; this keeps it current between builds, incrementally and without an LLM.
+#: Filename of the ledger every successful `kb-merge` appends to between
+#: builds (`append_merged_chunk`). `build()` resets it to `[]` at the moment it
+#: writes the compose manifest — a fresh build subsumes every merge recorded
+#: since the previous one.
+_MERGED_CHUNKS_NAME = ".merged-chunks.json"
 
-    WHY THIS IS NOT A WATCHER, recorded because the obvious reading of the task
-    name is wrong. `graphify watch <path>` was the intended mechanism and cannot
-    do this job: measured on the PINNED 0.9.31 — which is what `graphify_exe`
-    resolves, and NOT what a bare `graphify` reaches (a 0.9.32 also exists on
-    this host; reading the wrong one is how the first draft of this comment cited
-    the wrong version) — its entire CLI surface is one
-    positional path (`_watch(watch_path)` — no `--out`, no merge target, no
-    post-rebuild hook, control-armed against `merge-graphs`, which DOES parse
-    `--out`), and it rebuilds only `<path>/graphify-out/graph.json`. But `affected`
-    reads the AGGREGATE, and `currency.toml` fingerprints the aggregate, so a watch
-    on `python/` refreshes neither. Pointing it at the repo root instead would try
-    to overwrite the merged 130k-node graph with a root-only extraction; graphify's
-    `_check_shrink` refuses that, so it fails loudly rather than destroying the
-    corpus, but it is not a design. Ray chose the one-shot refresh over a
-    homegrown poll loop (2026-08-01) — this stays native, and `use-tool-builtins`
-    is satisfied because the loop we would have written has no tool feature behind
-    it.
 
-    Order matters. Our code is re-extracted into its sub-graph FIRST and merged
-    after, because merging a sub-graph we have not refreshed would restamp a
-    graph that gained nothing — a green stamp over stale content, which is the
-    one failure this whole currency mechanism exists to prevent.
+def _compose_manifest_path(repo_root: Path) -> Path:
+    """Where `build()` records what it composed."""
+    return repo_root / "graphify-out" / _COMPOSE_MANIFEST_NAME
 
-    This said "Each tree is re-extracted into its own sub-graph" until 2026-08-02
-    and described a per-tree loop the same commit had already replaced with one
-    root (#101). Caught by the cold lane — see the "ONE extraction run, over ONE
-    root" block in this function's body, which warns about the same class of
-    drift and lost a round to it too.
+
+def _merged_chunks_path(repo_root: Path) -> Path:
+    """Where every between-build `kb-merge` is recorded for later replay."""
+    return repo_root / "graphify-out" / _MERGED_CHUNKS_NAME
+
+
+@dataclass(frozen=True)
+class ComposeManifest:
+    """What ONE `build()` actually composed, read back by `refresh_self`.
+
+    Every path is repo-root-relative (:func:`_resolve` turns it back into a
+    real `Path`), except a `chunks` entry for a chunk merged from outside the
+    repo tree, which is its own absolute string — see
+    :func:`_relativize_or_str`, which is what produces one. `self_graph` is
+    recorded for provenance — it IS what "this build actually composed" means,
+    literally — even though `refresh_self` never reads it back to find the
+    self sub-graph: that location is a fixed constant (:func:`_self_subgraph`),
+    not something a recomposition needs to recover from a record.
+
+    `chunk_roots` is the root OVERRIDE map for `chunks` entries whose replay
+    root cannot be safely re-derived from the naming convention
+    `_replay_targets` otherwise falls back to — see `_write_compose_manifest`.
     """
-    out = repo_root / "graphify-out" / "graph.json"
-    base = out.parent / BASE_GRAPH_NAME
-    if not base.is_file():
-        raise SystemExit(f"no graphify-out/{BASE_GRAPH_NAME} — run `mise run kb-build` first")
 
-    # FAIL CLOSED if anything else has written graph.json since the snapshot was
-    # composed. `kb-merge` and `kb-label` both legitimately do, and restoring the
-    # base over their output would discard it in silence — then restamp the
-    # result as verified. Refusing costs a rebuild; not refusing costs the merge
-    # AND the ability to notice it went missing.
-    _assert_base_guard(repo_root, "since the snapshot was written")
+    corpus: tuple[str, ...]
+    self_graph: str
+    chunks: tuple[str, ...]
+    chunk_roots: dict[str, str]
 
-    # STAGED, then swapped in one `os.replace`. Writing straight into `out` meant
-    # the copy above wiped every self node FIRST and the extract/merge loop then
-    # rebuilt them on disk, so any failure part-way — a graphify crash, a Ctrl-C —
-    # left graph.json strictly WORSE than before the refresh started, with no
-    # rollback and `affected` back to "No unique node match". A refresh that can
-    # damage the artifact it refreshes is not a refresh. (Cold lane, 04312f3.)
-    staging = out.with_name(out.name + ".refresh")
-    shutil.copy(base, staging)
 
-    # ONE extraction run, over ONE root, always `extract --force`, never `update`.
-    #
-    # Two separate constraints landed on this line, and both are load-bearing:
-    #
-    # * NEVER `update`. The first draft branched — `update` when a sub-graph
-    #   existed, `extract` otherwise — on the reasoning that "the two paths
-    #   differ in cost, not in result". Measured, that was false: the same file
-    #   came out as `source_file='src/kb_setup/graph.py'` down one path and
-    #   `'python/src/kb_setup/graph.py'` down the other, so the aggregate ended
-    #   up disagreeing with itself about where our own code lives. A cheaper path
-    #   that yields different data is not the same path, and a comment asserting
-    #   otherwise is how it survived review.
-    # * ONE root, not one per tree (#101). Per-tree runs put `python/` and
-    #   `tests/` in namespaces `merge-graphs` cannot bridge, so `affected` could
-    #   never answer "which tests cover this symbol" about our own code.
-    _run(_self_extract_argv(repo_root), repo_root)
-    _run(
-        [
-            graphify_exe(repo_root),
-            "merge-graphs",
-            str(staging),
-            str(_self_subgraph(repo_root)),
-            "--out",
-            str(staging),
-        ],
-        repo_root,
+def _write_compose_manifest(
+    repo_root: Path, manifest: ComposeManifest, *, tag: str = "kb-build"
+) -> None:
+    """Record what `build()` (or a successful `refresh_self`) just composed.
+
+    Takes the whole `ComposeManifest` rather than its four fields as separate
+    keywords — `build()` constructs one fresh each time, `refresh_self` builds
+    one via `dataclasses.replace` on the manifest it just read back, and
+    either way the shape written here is exactly the shape `ComposeManifest`
+    already declares, so restating its fields as a parallel parameter list
+    was pure duplication (and had grown past ruff's arg-count budget).
+
+    `manifest.chunk_roots` maps a SUBSET of `manifest.chunks` to the root it
+    must replay under. Only entries whose root is not safely re-derivable
+    from the `<name>-docs.json` -> `sources/<name>` naming convention need
+    one — every chunk `build()` itself discovers via the
+    `sources/extractions/*.json` glob follows that convention by
+    construction, so `build()` always passes `{}`. A chunk promoted here from
+    the between-build merge ledger may not: it was merged with whatever root
+    `kb-merge` actually used, recorded on the ledger entry itself
+    (:class:`MergedChunkEntry`), which can differ from the convention's guess
+    (#175 cold review, finding 4b). See :func:`_replay_targets` for how the
+    two are reconciled.
+
+    `tag` names the CALLER in every printed line — `build()`'s default is
+    right for a full build, and `refresh_self` passes `"kb-watch"` so a
+    `kb-watch` run's own bookkeeping does not print as if `kb-build` had run
+    (#175 cold review, finding 9).
+
+    Best-effort, like the build stamp it sits beside: a failure here must not
+    fail a build that just produced a correct `graph.json`. The one thing that
+    goes wrong if this write fails is that `kb-watch` later refuses and says
+    so (:func:`_load_compose_manifest_or_refuse`) — the safe direction to fail
+    in, not a build dying over its own bookkeeping.
+    """
+    try:
+        path = _compose_manifest_path(repo_root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "corpus": list(manifest.corpus),
+            "self": manifest.self_graph,
+            "chunks": list(manifest.chunks),
+            "chunk_roots": manifest.chunk_roots,
+        }
+        atomic.write_text(path, json.dumps(payload, indent=2) + "\n")
+    except OSError as e:
+        print(
+            f"[{tag}] WARNING: could not record the compose manifest: {e}\n"
+            f"[{tag}] `mise run kb-watch` will refuse until the next successful "
+            f"`mise run kb-build`."
+        )
+
+
+def _valid_compose_fields(
+    data: dict[str, object],
+) -> tuple[list[str], str, list[str], dict[str, str]] | None:
+    """Extract + validate every compose-manifest field, or None if any is malformed.
+
+    Split out of `_read_compose_manifest` purely to keep THAT function's own
+    return-statement count under ruff's complexity budget — adding the
+    `chunk_roots` check (#175 cold review, finding 4) pushed it over. The
+    validation itself is unchanged: every field is checked rather than
+    trusted, this is untrusted JSON any editor could have touched, the same
+    discipline `kb_setup.gates._parse` applies to its own on-disk record. An
+    over-promising type here is how a caller stops checking it. `chunk_roots`
+    is validated as strictly as every other field: a manifest written before
+    #175's cold-review fixes has no such key at all, and that reads as
+    "unreadable", not "no overrides" — the same unknown-is-not-permission
+    rule the rest of this module follows, and it costs nothing since the file
+    is derived and `mise run kb-build` regenerates it.
+    """
+    corpus, self_graph, chunks, chunk_roots = (
+        data.get("corpus"),
+        data.get("self"),
+        data.get("chunks"),
+        data.get("chunk_roots"),
+    )
+    if not isinstance(corpus, list) or not all(isinstance(c, str) and c for c in corpus):
+        return None
+    if not isinstance(self_graph, str) or not self_graph:
+        return None
+    if not isinstance(chunks, list) or not all(isinstance(c, str) and c for c in chunks):
+        return None
+    if not isinstance(chunk_roots, dict) or not all(
+        isinstance(k, str) and k and isinstance(v, str) and v for k, v in chunk_roots.items()
+    ):
+        return None
+    # Rebuilt explicitly rather than returned as narrowed: `isinstance(x, list)`
+    # proves "x is A list", never "a list of str" — `ty` cannot follow the
+    # `all(isinstance(...))` checks above into an element-type narrowing, so
+    # the checked-but-untyped `corpus`/`chunks`/`chunk_roots` would not satisfy
+    # this function's own declared return type. Same idiom as
+    # `sync.stamped_input_fingerprints`'s `{str(k): str(v) ...}`.
+    return (
+        [str(c) for c in corpus],
+        str(self_graph),
+        [str(c) for c in chunks],
+        {str(k): str(v) for k, v in chunk_roots.items()},
     )
 
-    # RE-CHECK IMMEDIATELY BEFORE THE SWAP. The check at the top of this function
-    # is a time-of-check, and the swap below is the time-of-use — separated by a
-    # multi-minute extract+merge loop. A `kb-merge` landing inside that window was
-    # invisible to the first check, got clobbered by the swap, and then had the
-    # guard REARMED over it, certifying the corrupted graph as verified. Exactly
-    # the bug the guard was added to prevent, surviving inside the fix for it.
-    # (Cold lane round 2, 0f22927 — reproduced live against the shipped function.)
-    _assert_base_guard(repo_root, "during the refresh")
 
-    # The swap. Atomic on POSIX, so graph.json is either wholly the old corpus or
-    # wholly the new one — never a half-merged intermediate.
-    staging.replace(out)
+def _read_compose_manifest(repo_root: Path) -> ComposeManifest | None:
+    """The compose manifest, or `None` if it is absent, unreadable, or not one.
 
-    # graph.json changed, so the prose graph derived FROM it is now stale. Every
-    # writer of graph.json re-derives it (`kb-build`/`kb-merge`/`kb-label`); a
-    # writer that skips this leaves `kb-query --prose` describing an older corpus.
-    prose.derive_for(repo_root)
-
-    # Re-arm the guard for the NEXT refresh, against the graph we just wrote.
-    # Skipping this would make the very next `kb-watch` refuse against its own
-    # output — a gate that fires on the honest path teaches people to remove it.
-    _write_base_guard(repo_root)
-    _restamp_self(repo_root)
-    print("[kb-watch] refreshed python/ + tests/ into graphify-out/graph.json")
-    return 0
-
-
-def _digest(path: Path) -> str:
-    """sha256 of a file, or "" if it cannot be read.
-
-    Content, not `size:mtime_ns`. The stamp uses mtime for OUTPUTS because
-    digesting a 382 MB graph on every check is 142x slower (#89) — but this runs
-    once per `kb-watch`, not once per session, and it must survive a rewrite that
-    happens to land on the same size. "Cheap enough there" and "correct enough
-    here" are different questions.
+    See :func:`_valid_compose_fields` for the field-level validation rules.
     """
     try:
-        h = hashlib.sha256()
-        with path.open("rb") as fh:
-            for chunk in iter(lambda: fh.read(1 << 20), b""):
-                h.update(chunk)
-        return h.hexdigest()
-    except OSError:
-        return ""
-
-
-def _write_base_guard(repo_root: Path) -> None:
-    """Record the digest of the graph.json the base snapshot composes with."""
-    out = repo_root / "graphify-out" / "graph.json"
-    digest = _digest(out)
-    if not digest:
-        return
-    try:
-        (out.parent / BASE_GUARD_NAME).write_text(digest, encoding="utf-8")
-    except OSError as e:
-        # Loud, not silent: an unwritten guard makes the NEXT refresh proceed
-        # unchecked, so the operator must know the protection is off.
-        print(
-            f"[kb-watch] WARNING: could not write {BASE_GUARD_NAME}: {e} — "
-            f"the next refresh will not be able to detect a competing writer."
-        )
-
-
-def _read_base_guard(repo_root: Path) -> str | None:
-    """The recorded digest; None when the guard file does not exist.
-
-    ABSENT and UNREADABLE are different answers and must not collapse, which is
-    the distinction the first version got wrong: a bare `except OSError: return
-    ""` made a 0-byte guard (an interrupted write — realistic, this repo has a
-    whole rule about killing wedged processes) and a guard that is a directory
-    both read as "no guard", silently disabling a check whose own comment says
-    FAIL CLOSED. Reproduced by the cold lane: 0-byte guard -> silent revert,
-    exit 0, no error at all.
-
-    So: None means the file is not there — a graph built before this guard
-    existed, which proceeds, because refusing those would break every existing
-    clone to catch a case that cannot have happened there. Anything else that
-    goes wrong RAISES, and the caller refuses. Unknown is not permission.
-    """
-    path = repo_root / "graphify-out" / BASE_GUARD_NAME
-    if not path.exists():
+        data = json.loads(_compose_manifest_path(repo_root).read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
         return None
-    digest = path.read_text(encoding="utf-8").strip()
-    if not digest:
-        raise SystemExit(
-            f"graphify-out/{BASE_GUARD_NAME} exists but is EMPTY — most likely an "
-            f"interrupted write. Refusing rather than treating it as absent, because "
-            f"an unverifiable guard cannot certify that nothing else wrote graph.json.\n"
-            f"  Run `mise run kb-build` to rebuild the snapshot and the guard together."
-        )
-    return digest
+    if not isinstance(data, dict):
+        return None
+    fields = _valid_compose_fields(data)
+    if fields is None:
+        return None
+    corpus, self_graph, chunks, chunk_roots = fields
+    return ComposeManifest(
+        corpus=tuple(corpus),
+        self_graph=self_graph,
+        chunks=tuple(chunks),
+        chunk_roots=dict(chunk_roots),
+    )
 
 
-def _assert_base_guard(repo_root: Path, when: str) -> None:
-    """Refuse unless graph.json still matches the digest the snapshot composes with.
+@dataclass(frozen=True)
+class MergedChunkEntry:
+    """One between-build `kb-merge`, as recorded in the recomposition ledger.
 
-    Called TWICE — once before the copy and once immediately before the atomic
-    swap. Both are needed: the pair brackets the extract+merge loop, which is
-    where a concurrent `kb-merge` would otherwise slip in unseen.
+    `root` is the source root `kb-merge` actually used for path
+    relativization (`graphify_ops.merge_chunk`'s `src_root` — a caller's
+    `--root`, or its own default of the chunk's parent directory). Recorded so
+    a later `kb-watch` replays this chunk under the SAME root it was really
+    merged with, rather than re-deriving one from the `<name>-docs.json` ->
+    `sources/<name>` naming convention that a chunk merged with a custom (or
+    even the ordinary default) root need not follow (#175 cold review,
+    finding 4b).
     """
-    expected = _read_base_guard(repo_root)
-    if expected is None:
-        return
-    out = repo_root / "graphify-out" / "graph.json"
-    actual = _digest(out) if out.is_file() else ""
-    if actual and expected != actual:
-        raise SystemExit(
-            f"graphify-out/graph.json changed {when} "
-            f"(expected sha256 {expected[:12]}, found {actual[:12]}).\n"
-            f"  `kb-merge` and `kb-label` both write graph.json and neither refreshes "
-            f"the snapshot, so continuing would silently discard their work.\n"
-            f"  Run `mise run kb-build` to rebuild the snapshot and the graph together."
-        )
+
+    chunk: str
+    sha256: str
+    root: str
 
 
-def _restamp_self(repo_root: Path) -> None:
-    """Refresh the stamp's artifact fingerprints after a self-refresh.
+def _write_merged_chunks(repo_root: Path, entries: list[MergedChunkEntry]) -> None:
+    path = _merged_chunks_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = [{"chunk": e.chunk, "sha256": e.sha256, "root": e.root} for e in entries]
+    atomic.write_text(path, json.dumps(payload, indent=2) + "\n")
 
-    `restamp_artifacts` and not `write_stamp`: the graph changed but the BUILDER
-    did not, so version and source_ref are carried forward rather than re-observed.
-    Re-observing would be worse than redundant — it would let a graphify upgrade
-    mid-session silently relabel a graph the previous version actually built.
 
-    Without this the refresh is actively harmful: `artifact_fingerprints` is
-    `size:mtime_ns`, so any rewrite of graph.json moves it, and every later
-    `kb-currency-check` reports the graph as not verifiably built by the pin —
-    a permanent red that means nothing, which is how a real signal gets ignored.
-    Best-effort, like every other stamp path here: a refresh must not fail over
-    its own bookkeeping.
+def _reset_merged_chunks(repo_root: Path, *, tag: str = "kb-build") -> None:
+    """Empty the ledger. Best-effort, for the same reason the compose manifest is.
+
+    `tag` names the caller — see `_clear_stamp`'s docstring for why (#175 cold
+    review, finding 9).
     """
     try:
-        from kb_setup.currency import sync
+        _write_merged_chunks(repo_root, [])
+    except OSError as e:
+        print(f"[{tag}] WARNING: could not reset the merge ledger: {e}")
 
-        spec = _currency_spec(repo_root)
-        if spec is None:
-            return
-        path = sync.restamp_artifacts(repo_root, spec)
-        if path is None:
-            print(
-                "[kb-watch] WARNING: no build stamp to refresh — run `mise run kb-build`; "
-                "currency step 1 will report this graph as never stamped."
+
+def _read_merged_chunks(repo_root: Path) -> list[MergedChunkEntry] | None:
+    """The ledger's entries — `[]` if absent, `None` if present but unreadable.
+
+    The distinction is the whole point of the ledger existing. An ABSENT file
+    means no `kb-merge` has landed since the last build — the ordinary case,
+    indistinguishable from "nothing to replay". A PRESENT-but-corrupt one means
+    a recomposition cannot tell whether it would be dropping an entry it can no
+    longer read, and must refuse rather than guess "empty" — the same
+    unknown-is-not-permission rule the compose manifest follows. A ledger
+    entry missing `root` (written before #175's cold-review fixes) is
+    unreadable by the same rule: guessing a root would silently reintroduce
+    the exact divergence recording it exists to prevent, and the file is
+    derived — `mise run kb-build` regenerates it from nothing.
+    """
+    path = _merged_chunks_path(repo_root)
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return None
+    if not isinstance(data, list):
+        return None
+    entries: list[MergedChunkEntry] = []
+    for row in data:
+        if not isinstance(row, dict):
+            return None
+        chunk, sha, root = row.get("chunk"), row.get("sha256"), row.get("root")
+        if (
+            not isinstance(chunk, str)
+            or not chunk
+            or not isinstance(sha, str)
+            or not sha
+            or not isinstance(root, str)
+            or not root
+        ):
+            return None
+        entries.append(MergedChunkEntry(chunk=chunk, sha256=sha, root=root))
+    return entries
+
+
+def _sha256_file(path: Path) -> str:
+    """Hex sha256 of `path`'s bytes, read in blocks rather than loaded whole."""
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def append_merged_chunk(repo_root: Path, chunk: str, root: str) -> None:
+    """Record one successful between-build `kb-merge` in the recomposition ledger.
+
+    Called by `graphify_ops.merge_chunk` on its fully-successful path only —
+    after the merge subprocess AND the prose re-derivation both succeeded — so
+    every ledger entry corresponds to content that is really on `graph.json`
+    right now. `root` is `merge_chunk`'s own `src_root` — the root the merge
+    ACTUALLY ran under — recorded so a later replay uses it verbatim instead
+    of re-deriving one (#175 cold review, finding 4b).
+
+    `chunk` is stored CANONICALIZED — resolved, then made repo-root-relative
+    when it sits under `repo_root`, else its own absolute string
+    (:func:`_relativize_or_str`, the SAME helper `refresh_self`'s
+    ledger-promotion loop already uses) — never the raw string the caller
+    passed. Before this, the raw string was stored VERBATIM and read two
+    different ways by two different readers: this function digested it
+    relative to the process's CURRENT WORKING DIRECTORY (`Path(chunk)`, opened
+    as given), while `_verified_ledger_chunks` later resolved the recorded
+    string relative to `repo_root` (:func:`_resolve`). The two agreed only
+    because mise always runs tasks from the config root — a caller invoked
+    from anywhere else recorded a ledger entry that could never verify again
+    (#175 cold review round 2, the round-1 finding 8 secondary item).
+    Resolving once, HERE, and storing the canonical form makes every later
+    reader agree regardless of the cwd at append time or at verify time.
+
+    Raises rather than swallowing a write failure: a caller that reported
+    success while silently failing to extend the ledger would leave a future
+    `kb-watch` unable to tell this merge ever happened — the exact silent
+    discard the ledger exists to prevent, just arriving through its own
+    recording step instead of through recomposition. `merge_chunk` turns a
+    raise here into its own `rc=1`, the same shape `_derive_prose` already uses
+    when a real change could not be fully accounted for.
+
+    Also raises if the EXISTING ledger cannot be read: appending blindly to an
+    unreadable file would either duplicate or silently drop whatever is
+    already there, and neither is an improvement on refusing.
+    """
+    existing = _read_merged_chunks(repo_root)
+    if existing is None:
+        raise ValueError(
+            f"{_merged_chunks_path(repo_root)} exists but is not a readable merge "
+            f"ledger — refusing to append blindly"
+        )
+    resolved = Path(chunk).resolve()
+    digest = _sha256_file(resolved)
+    stored = _relativize_or_str(resolved, repo_root)
+    _write_merged_chunks(
+        repo_root, [*existing, MergedChunkEntry(chunk=stored, sha256=digest, root=root)]
+    )
+
+
+def _resolve(repo_root: Path, rel_or_abs: str) -> Path:
+    """A compose-manifest/ledger path string -> a real `Path`.
+
+    Every string either record carries is either ABSOLUTE or relative to
+    `repo_root` — never to the process cwd, matching how the rest of this
+    module addresses `sources/` (always `repo_root / ...`, never a bare
+    relative literal). `mise run kb-watch` therefore recomposes the same way
+    regardless of where it happens to be invoked from.
+    """
+    p = Path(rel_or_abs)
+    return p if p.is_absolute() else repo_root / p
+
+
+def _relativize_or_str(path: Path, repo_root: Path) -> str:
+    """`path` relative to `repo_root` when possible, else its own absolute string.
+
+    `Path.relative_to` raises `ValueError` for a path outside `repo_root` — and
+    an out-of-tree ledger chunk is a real, supported case: `_resolve` already
+    special-cases an absolute string, and `cli.py` passes a `kb-merge` caller's
+    argv through verbatim, so `mise run kb-merge -- /elsewhere/chunk.json`
+    genuinely reaches the ledger. Letting that raise here would crash
+    `refresh_self` AFTER `graph.json` has already been swapped in — the
+    recomposition would land with no stamp written and the ledger not reset
+    (#175 cold review, finding 8). Falling back to the absolute string keeps
+    the round-trip lossless either way: `_resolve` reads an absolute string
+    back unchanged, exactly as it does a repo-relative one.
+
+    Two call sites must agree on this canonical form, and both go through this
+    one helper rather than reimplementing it: `refresh_self`'s ledger-promotion
+    loop (naming a chunk already promoted into `manifest.chunks`) and
+    `append_merged_chunk` (naming what a `kb-merge` just recorded) — see the
+    latter's docstring for the append/verify cwd mismatch that unifying on
+    this helper closes (#175 cold review round 2).
+    """
+    try:
+        return str(path.relative_to(repo_root))
+    except ValueError:
+        return str(path)
+
+
+def _load_compose_manifest_or_refuse(repo_root: Path) -> ComposeManifest:
+    """The last build's recorded composition, or a refusal naming the fix.
+
+    A missing file, a malformed one, and one from before this mechanism
+    existed are all treated identically: unknown is not permission, and there
+    is nothing safe to recompose FROM until a `kb-build` has written one.
+    """
+    manifest = _read_compose_manifest(repo_root)
+    if manifest is None:
+        raise SystemExit(
+            f"no usable {_compose_manifest_path(repo_root)} — `kb-watch` recomposes "
+            f"from what the last full build actually composed, and there is no "
+            f"readable record of one. Run `mise run kb-build` first."
+        )
+    return manifest
+
+
+def _verified_ledger_chunks(repo_root: Path) -> list[tuple[Path, str]]:
+    """Ledger entries COLLAPSED to one per resolved path, then VERIFIED `(path, root)` pairs.
+
+    Collapsed FIRST, by resolved path, keeping the LAST row for each — append
+    order is merge order, so the last row for a path is what `graph.json`
+    actually reflects right now. The ordinary re-ingestion flow supersedes a
+    row this way with no misuse at all: `kb-assemble` overwrites a chunk under
+    `sources/extractions/` in place, then `kb-merge` merges it again, and the
+    ledger simply gets a second row for the same path. Verifying EVERY row
+    instead of only the surviving one produced two defects (#175 cold review
+    round 2, NEW-2 and NEW-3):
+
+    * an EARLIER row's sha256 — computed against content the file no longer
+      holds — refused `kb-watch` forever, for a flow that did nothing wrong
+      (NEW-3); and
+    * a chunk merged N times with UNCHANGED content (every row's sha256 still
+      matches) was verified, promoted, and replayed N times — and because the
+      promoted duplicates land in the persisted `manifest.chunks` tuple, the
+      waste PERSISTED on every subsequent `kb-watch` until the next full
+      `kb-build` (NEW-2).
+
+    `dict.pop` then re-insert (not a plain `d[k] = v` overwrite) so the
+    surviving row also takes the POSITION of its LATEST occurrence — a plain
+    reassignment updates the value but leaves an existing key at its ORIGINAL
+    position, which would replay a since-superseded path too early relative to
+    whatever else was appended between its two occurrences.
+
+    Refuses the moment the SURVIVING entry for a path cannot be trusted —
+    missing file, unreadable file, or a sha256 that no longer matches what was
+    recorded at merge time — because recomposing over that would silently drop
+    that merge's content, which is the one property this mechanism exists to
+    keep from the base-guard machinery it replaces. `root` is the entry's OWN
+    recorded root (:attr:`MergedChunkEntry.root`), returned alongside the path
+    so a caller never has to re-derive one — see :func:`_replay_targets`.
+    """
+    ledger = _read_merged_chunks(repo_root)
+    if ledger is None:
+        raise SystemExit(
+            f"{_merged_chunks_path(repo_root)} exists but could not be read as a "
+            f"merge ledger — recomposing now could silently drop a between-build "
+            f"`kb-merge`. Run `mise run kb-build` to reset it."
+        )
+    by_path: dict[Path, MergedChunkEntry] = {}
+    for entry in ledger:
+        key = _resolve(repo_root, entry.chunk)
+        by_path.pop(key, None)
+        by_path[key] = entry
+
+    verified: list[tuple[Path, str]] = []
+    for path, entry in by_path.items():
+        if not path.is_file():
+            raise SystemExit(
+                f"the recomposition ledger names {entry.chunk!r} but that file is "
+                f"missing — recomposing now would silently drop that merge's "
+                f"content. Restore the file, or run `mise run kb-build` to reset "
+                f"the ledger."
             )
-            return
-        print(f"[kb-watch] restamped {path.name}")
-    except (OSError, ValueError, ImportError) as e:
-        print(f"[kb-watch] WARNING: could not restamp: {e}")
+        try:
+            actual = _sha256_file(path)
+        except OSError as e:
+            raise SystemExit(
+                f"the recomposition ledger names {entry.chunk!r} but it could not "
+                f"be read ({e}) — recomposing now would silently drop that merge's "
+                f"content."
+            ) from e
+        if actual != entry.sha256:
+            raise SystemExit(
+                f"{entry.chunk!r} has changed since it was merged (sha256 was "
+                f"{entry.sha256}, is now {actual}) — recomposing now would replay "
+                f"different content than what was actually merged. Run "
+                f"`mise run kb-build` to reset the ledger."
+            )
+        verified.append((path, entry.root))
+    return verified
+
+
+def _validate_replay_chunks(paths: list[Path]) -> None:
+    """Refuse if any chunk about to be replayed fails schema/integrity validation.
+
+    The same gate `build()` applies to the same chunks, for the same reason —
+    a chunk that merged cleanly once is not guaranteed to still be well-formed
+    if it, or a chunk sharing its cross-chunk id space, was hand-edited since.
+    """
+    from kb_setup import chunks as _chunks
+
+    problems = {p: i for p, i in _chunks.validate_files(paths).items() if i}
+    if not problems:
+        return
+    lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
+    raise SystemExit(
+        f"{len(problems)} extraction chunk(s) failed validation — refusing to "
+        f"recompose:\n" + "\n".join(lines)
+    )
+
+
+def _require_present(paths: list[Path], *, what: str) -> None:
+    """Refuse, NAMING every path, if any recorded input is no longer on disk."""
+    missing = [str(p) for p in paths if not p.is_file()]
+    if missing:
+        raise SystemExit(
+            f"{len(missing)} recorded {what}(s) no longer on disk — cannot "
+            f"recompose:\n  " + "\n  ".join(missing) + "\nRun `mise run kb-build`."
+        )
+
+
+def _replay_targets(
+    repo_root: Path,
+    sources: Path,
+    manifest_chunk_names: list[str],
+    chunk_roots: dict[str, str],
+    ledger_chunks: list[tuple[Path, str]],
+) -> list[tuple[Path, str]]:
+    """`(chunk, root)` pairs for `_MERGE_SCRIPT`, manifest order then ledger order.
+
+    A manifest chunk's root is `chunk_roots[name]` when the compose manifest
+    recorded an override for it — every chunk ever promoted from the ledger
+    carries one (:func:`append_merged_chunk`'s `root`, threaded through
+    `refresh_self`'s promotion) — and otherwise falls back to the convention
+    `build()` itself used to merge it the first time: `sources/<name>`, `name`
+    derived from the chunk's stem. That fallback is safe ONLY for a chunk
+    `build()` discovered via its own `sources/extractions/*.json` glob, which
+    is exactly the set that has no override.
+
+    A ledger chunk not yet promoted carries its OWN verified `(path, root)`
+    pair straight from `_verified_ledger_chunks` — the root `kb-merge`
+    actually used, never a guess. Before #175's cold-review fixes this derived
+    a ledger chunk's root from `c.resolve().parent` on every call, which
+    happened to match `merge_chunk`'s own DEFAULT but silently discarded a
+    caller's custom `--root` — and, the sharper bug, was recomputed fresh on
+    every recomposition rather than recorded once, so a chunk promoted into
+    `manifest.chunks` replayed under a DIFFERENT derived root on the very next
+    `kb-watch` (finding 4b). Recording the root at merge time and carrying it
+    through the promotion is what makes it stable across every later replay.
+    """
+    manifest_targets = [
+        (
+            _resolve(repo_root, name),
+            chunk_roots.get(name, str((sources / Path(name).stem.removesuffix("-docs")).resolve())),
+        )
+        for name in manifest_chunk_names
+    ]
+    return manifest_targets + list(ledger_chunks)
+
+
+def _recompose_into_temp(
+    repo_root: Path, real_out: Path, inputs: list[Path], replay: list[tuple[Path, str]]
+) -> None:
+    """Merge `inputs`, replay `replay`, into a scratch file — then swap it in atomically.
+
+    The scratch file lives in the SAME directory as `real_out` (never the
+    system temp dir), so the final `Path.replace` is guaranteed to be an
+    atomic rename rather than risking a cross-filesystem copy — the same
+    reason `atomic.write_text`, `prose.derive` and `hyperedges._write_atomic`
+    all reserve their temp name beside the file they replace.
+
+    Every step above the swap runs against the SCRATCH file, never `real_out`
+    — so the real `graphify-out/graph.json` stays exactly what the last
+    successful build (or recomposition) left it, valid and correctly stamped,
+    for the entire — potentially multi-minute — duration of this call. The
+    stamp is cleared only immediately before the swap (see the comment at that
+    line); any failure before the swap leaves `real_out` untouched, and the
+    `except` below removes the scratch file and re-raises — the same "clear
+    first, only re-stamp on full success" rule `build()`'s own `_clear_stamp`
+    follows, applied at the one moment it actually matters for this shape.
+
+    `tmp_out` is chmod'd to :data:`_GRAPH_MODE` BEFORE the swap:
+    `tempfile.mkstemp` always creates its file `0600`, and `Path.replace` is a
+    rename — the surviving inode's permission bits are the TEMP file's, not
+    the file it replaces. Left unfixed, one recomposition would silently
+    tighten `graph.json` from world-readable to owner-only, and graphify's own
+    `_atomic_replace` PRESERVES whatever mode is already there, so nothing
+    downstream would ever repair it (#175 cold review, finding 5 — the exact
+    hazard `hyperedges._write_atomic` already guards against for its own
+    writes; see `hyperedges._GRAPH_MODE`).
+    """
+    gpy = graphify_python(repo_root)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(real_out.parent), prefix=real_out.name + ".", suffix=".recompose.tmp"
+    )
+    os.close(fd)
+    tmp_out = Path(tmp_name)
+    try:
+        print(f"[kb-watch] composing graph.json from {len(inputs)} recorded input(s)")
+        _merge_sources_into(repo_root, tmp_out, inputs)
+        print(f"[kb-watch] replaying {len(replay)} doc extraction(s)")
+        for chunk, root in replay:
+            _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(tmp_out)], repo_root)
+        # Only NOW — immediately before the swap — does the REAL artifact's
+        # identity actually change. Clearing the stamp any earlier would mark a
+        # still-good graph unstamped for no reason (everything above wrote only
+        # to `tmp_out`); any later and a crash between clearing and replacing
+        # could leave the swap landing under a stamp that no longer describes
+        # what it is about to become.
+        _clear_stamp(repo_root, tag="kb-watch")
+        tmp_out.chmod(_GRAPH_MODE)
+        tmp_out.replace(real_out)
+    except BaseException:
+        tmp_out.unlink(missing_ok=True)
+        raise
+
+
+def refresh_self(repo_root: Path) -> None:
+    """Recompose `graph.json` from what the last build recorded — `kb-watch`.
+
+    THIS REPLACES the base-snapshot/guard machinery that used to restart
+    `graph.json` from a pre-self-merge snapshot, which #175's single-N-ary
+    -merge restructure removed the separable step that machinery depended on
+    (see git history for the two rounds of cold-review fixes — a
+    competing-writer race, then a re-check-before-swap race — that machinery
+    had needed to be safe). The property that machinery existed to guarantee
+    survives here in a different shape: instead of a snapshot, `build()`
+    records exactly what it composed (`.compose-manifest.json`) and every
+    between-build `kb-merge` appends its chunk's path and sha256 to a ledger
+    (`.merged-chunks.json`, via :func:`append_merged_chunk`); this function
+    refuses — rather than silently dropping — the moment a ledger entry cannot
+    be verified against what is actually on disk, and recomposes entirely in a
+    scratch file (:func:`_recompose_into_temp`) so the real artifact is never
+    at risk while that verification and the recompose itself are running.
+
+    This does NOT fingerprint `sources/*.manifest` / `sources/extractions/*.json`
+    the way `build()` does. That was tried and was a REGRESSION, not a
+    simplification (#175 cold review, finding 1): this function recomposes
+    ONLY from the recorded compose manifest and the verified ledger,
+    deliberately never re-reading a manifest at all (see the paragraph above).
+    Stamping a live glob over those files anyway would record, as "what this
+    graph was built from", inputs it structurally did not consult — so a
+    manifest or chunk added since the last `kb-build` would be fingerprinted
+    WITHOUT being in the graph, and `kb-currency-check` would report the
+    corpus in sync while it excludes exactly that content. What a
+    recomposition CAN honestly claim is that the artifact's own fingerprints
+    still describe what is on disk now, with the input map it inherits from
+    the last real build carried forward VERBATIM — recorded by
+    :func:`_restamp_self` from a snapshot :func:`_held_stamp` takes BEFORE
+    `_recompose_into_temp` clears the stamp, since by the time this function's
+    own tail runs there is no stamp left on disk to read back (#175 cold
+    review round 2, NEW-1 — see `_held_stamp`'s docstring for the defect this
+    fixes).
+    """
+    manifest = _load_compose_manifest_or_refuse(repo_root)
+    sources = repo_root / "sources"
+    manifest_chunks = [_resolve(repo_root, c) for c in manifest.chunks]
+    ledger_verified = _verified_ledger_chunks(repo_root)
+    ledger_chunks = [path for path, _root in ledger_verified]
+
+    _validate_replay_chunks(manifest_chunks + ledger_chunks)
+
+    corpus_leaves = [_resolve(repo_root, c) for c in manifest.corpus]
+    _require_present(corpus_leaves, what="corpus leaf")
+    _require_present(manifest_chunks + ledger_chunks, what="chunk")
+
+    # Fold this run's ledger into the chunk bookkeeping BEFORE anything
+    # replays — DE-DUPLICATED (#175 cold review, finding 4a): a chunk whose
+    # resolved path is already in `manifest.chunks` (an earlier `kb-watch`
+    # already promoted it, or it was already part of `build()`'s own glob
+    # before ALSO being merged by hand — the documented flow commits a chunk
+    # under `sources/extractions/` AND merges it, so both can name the same
+    # file in the SAME run) is replayed exactly ONCE, via the manifest branch
+    # below, never a second time via the ledger branch. `chunk_roots` is
+    # refreshed for EVERY verified ledger entry regardless of the dedup
+    # outcome, so an already-present chunk still replays with the root THIS
+    # run actually used — the most recently correct one — not a stale or
+    # re-derived guess.
+    #
+    # `ledger_verified` cannot itself name the same resolved path twice —
+    # `_verified_ledger_chunks` already collapsed the ledger to one row per
+    # path before returning (#175 cold review round 2, NEW-2) — so this
+    # `existing_chunks` check only ever has the ledger-vs-MANIFEST case left
+    # to catch; a within-this-run ledger-vs-ledger duplicate can no longer
+    # reach this loop at all.
+    existing_chunks = set(manifest.chunks)
+    new_chunk_roots = dict(manifest.chunk_roots)
+    promoted: list[str] = []
+    new_ledger_entries: list[tuple[Path, str]] = []
+    for path, root in ledger_verified:
+        name = _relativize_or_str(path, repo_root)
+        new_chunk_roots[name] = root
+        if name in existing_chunks:
+            continue
+        promoted.append(name)
+        new_ledger_entries.append((path, root))
+
+    self_subgraphs = _extract_self(repo_root)
+    replay = _replay_targets(
+        repo_root, sources, list(manifest.chunks), new_chunk_roots, new_ledger_entries
+    )
+    real_out = repo_root / "graphify-out" / "graph.json"
+    # MUST run before `_recompose_into_temp` — that call is what clears the
+    # stamp (`_clear_stamp`, immediately before the swap), and this is the
+    # only remaining chance to read what it is about to delete. See
+    # `_held_stamp`'s own docstring (#175 cold review round 2, NEW-1).
+    held_stamp = _held_stamp(repo_root)
+    _recompose_into_temp(repo_root, real_out, [*corpus_leaves, *self_subgraphs], replay)
+
+    label_rc = graphify_ops.label(repo_root)
+    if label_rc != 0:
+        raise SystemExit(f"[kb-watch] label pass failed (rc={label_rc}) — aborting")
+    graph_checks.assert_composition(real_out)
+
+    _write_compose_manifest(
+        repo_root,
+        replace(
+            manifest,
+            self_graph=str(_self_subgraph(repo_root).relative_to(repo_root)),
+            chunks=(*manifest.chunks, *promoted),
+            chunk_roots=new_chunk_roots,
+        ),
+        tag="kb-watch",
+    )
+    _reset_merged_chunks(repo_root, tag="kb-watch")
+    _restamp_self(repo_root, held_stamp)
+    print("[kb-watch] done — graphify-out/graph.json recomposed from recorded inputs")
 
 
 def _merge_sources_into(repo_root: Path, out: Path, inputs: list[Path]) -> None:
@@ -553,6 +996,47 @@ def _build_study_graph(repo_root: Path, sources: Path, out_dir: Path, study: lis
     _merge_sources_into(
         repo_root, study_out, [sources / n / "graphify-out" / "graph.json" for n in study]
     )
+
+
+def _cluster_study_graph(repo_root: Path, study_out: Path) -> None:
+    """Deterministically re-cluster `study_out` THROUGH the graphify binary.
+
+    A no-op when there is nothing to cluster (no study sources this build, or a
+    study source that produced no graph) — matching `_build_study_graph`'s own
+    early return rather than raising over an absent optional artifact.
+
+    VERIFIED MECHANISM (installed graphify 0.9.33 `cli.py`, the
+    `cmd in ("cluster-only", "label")` branch — never run graphify by hand here;
+    read the installed source instead). `--graph <path>` controls only where the
+    run LOADS from (`graph_json = graph_override if ... else watch_path /
+    _GRAPHIFY_OUT / "graph.json"`, cli.py:1640). The WRITE target is computed
+    separately and does NOT follow it: `out = graph_json.parent` only when that
+    parent directory is literally named `graphify-out` (cli.py:1711-1716), and
+    either way the final write is `to_json(G, communities, str(out /
+    "graph.json"), ...)` (cli.py:1862) — the LITERAL string `"graph.json"`,
+    never `graph_json.name`. So `--graph graphify-out/study-graph.json` would
+    LOAD the study graph but WRITE its clustered result to
+    `graphify-out/graph.json` — the aggregate — because that path's parent
+    directory happens to also be named `graphify-out`. No flag changes this.
+
+    The only safe invocation is therefore to give the run its OWN isolated
+    `<tmp>/graphify-out/graph.json` to read and write: with no `--graph`
+    override, `graph_json` resolves to exactly that path by default, so both
+    the load and the write stay inside the throwaway directory and the real
+    aggregate is never touched. `--no-label` keeps this deterministic —
+    placeholder `"Community {cid}"` names, no hub-labeler, no LLM call
+    (cli.py:1797-1799) — and `--no-viz` skips the `graph.html` render, which
+    this graph is never served from.
+    """
+    if not study_out.is_file():
+        return
+    with tempfile.TemporaryDirectory(prefix="kb-study-cluster-") as tmp:
+        work = Path(tmp)
+        staged = work / "graphify-out" / "graph.json"
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(study_out, staged)
+        _run([graphify_exe(repo_root), "cluster-only", ".", "--no-label", "--no-viz"], work)
+        shutil.copy(staged, study_out)
 
 
 def build(repo_root: Path) -> None:
@@ -644,20 +1128,29 @@ def build(repo_root: Path) -> None:
     if not corpus:
         raise SystemExit("no CORPUS source produced code nodes (only scope=study ones did)")
 
-    # Compose graph.json from every code-bearing CORPUS source in ONE merge (#120).
-    # Not a seed-plus-loop: that fed the accumulator back in per source and
-    # re-prefixed it each time — see `_merge_sources_into`. It also mistagged the
-    # seed, which sat at `graphify-out/graph.json` when `distinct_repo_tags` read
-    # `parent.parent`, so the first source's nodes were labelled with the REPO name
-    # instead of their own. Every source now carries its own tag, exactly once.
-    print(f"[kb-build] composing graph.json from {len(corpus)} corpus source(s)")
+    # Compose graph.json from every code-bearing CORPUS source AND our own code
+    # in ONE merge. Self joins this call rather than a second one as of #175 —
+    # see `_merge_sources_into` for why pairwise/sequential merging duplicates
+    # prefixes (#120), and `refresh_self` for why that removes its old
+    # incremental-restart path. Every source (and self) now carries its own
+    # tag, exactly once.
+    self_subgraphs = _extract_self(repo_root)
+    print(f"[kb-build] composing graph.json from {len(corpus)} corpus source(s) + our own code")
     _merge_sources_into(
-        repo_root, out, [sources / n / "graphify-out" / "graph.json" for n in corpus]
+        repo_root,
+        out,
+        [sources / n / "graphify-out" / "graph.json" for n in corpus] + self_subgraphs,
     )
 
     _build_study_graph(repo_root, sources, out.parent, study)
+    _cluster_study_graph(repo_root, out.parent / STUDY_GRAPH_NAME)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
+    # MERGE-ONLY (#169): `_merge_docs.py` no longer clusters, scores, or reports
+    # per chunk — 17 of 18 such passes were discarded and never read. It loads
+    # graph.json, merges the chunk, reconstructs communities from what the graph
+    # already carries, and writes. The real clustering/labelling happens ONCE,
+    # below, after every chunk has landed — not once per chunk.
     gpy = graphify_python(repo_root)
     # Already validated at the TOP of build(), before anything wrote graph.json.
     print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
@@ -666,33 +1159,48 @@ def build(repo_root: Path) -> None:
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
 
-    # THE BASE SNAPSHOT — taken here, after every external contribution and before
-    # a single node of ours. Order is the entire correctness argument: a snapshot
-    # taken one step later would be a perfectly valid file that reintroduces the
-    # duplication it exists to prevent, and nothing downstream would notice.
-    base = out.parent / BASE_GRAPH_NAME
-    shutil.copy(out, base)
-    print(f"[kb-build] snapshotted {BASE_GRAPH_NAME} — the corpus without our own code")
+    # ONE final label pass — deterministic (no LLM; see `graphify_ops.label`'s own
+    # docstring) — re-clusters the fully-composed graph, carries hyperedges across
+    # graphify's own label/cluster-only round-trip (#171 — measured 5->0 without
+    # this), and re-derives the prose graph as its own last step. `build()` no
+    # longer calls `prose.derive_for` itself: this IS that call now, made by the
+    # function that already has to load graph.json for the label pass, rather
+    # than a second, separate load of the same file.
+    label_rc = graphify_ops.label(repo_root)
+    if label_rc != 0:
+        raise SystemExit(f"[kb-build] final label pass failed (rc={label_rc}) — aborting")
 
-    # Our own library and test tree, merged LAST. They are also the only part
-    # `kb-watch` re-merges, so keeping them at the end is what lets that task
-    # reproduce this exact state from the snapshot above rather than append to it.
-    for sub in _extract_self(repo_root):
-        _run(
-            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
-            repo_root,
-        )
+    # The composition invariants #120 and #171/#175 depend on: every id carries
+    # at most one merge prefix, every carried hyperedge still resolves. Checked
+    # HERE, on the artifact this build just produced, so a regression is caught
+    # on the next build rather than only on the next `mise run test`.
+    graph_checks.assert_composition(out)
 
-    # The prose-only derived graph, from the graph we just built. Here and not in
-    # a separate task-you-must-remember: it is a pure function of graph.json, so
-    # any build that does not refresh it leaves a scoped corpus describing an
-    # older one — and a retrieval figure measured against a stale corpus is the
-    # inherited-number trap with extra steps. `kb-prose` re-derives it alone.
-    prose.derive_for(repo_root)
+    # What `kb-watch` recomposes FROM (#175's follow-up). Recorded here, after
+    # composition is proven correct, so a `refresh_self` reading it back is
+    # reading a description of an artifact `assert_composition` just vouched
+    # for — never of a build that failed partway through. Resetting the ledger
+    # in the same breath is the other half: this build already reflects every
+    # `kb-merge` that landed since the last one (they are baked into `out`
+    # above), so replaying them again on the next recomposition would be
+    # redundant at best and wrong if any of them has since been hand-edited.
+    _write_compose_manifest(
+        repo_root,
+        ComposeManifest(
+            corpus=tuple(
+                str((sources / n / "graphify-out" / "graph.json").relative_to(repo_root))
+                for n in corpus
+            ),
+            self_graph=str(_self_subgraph(repo_root).relative_to(repo_root)),
+            chunks=tuple(str(p.relative_to(repo_root)) for p in chunk_paths),
+            # Every chunk here came from `build()`'s own `sources/extractions/*.json`
+            # glob, so its root is always the naming-convention default
+            # `_replay_targets` falls back to — no override needed.
+            chunk_roots={},
+        ),
+    )
+    _reset_merged_chunks(repo_root)
 
-    # Arm the base guard against the graph we just produced, so a later
-    # `kb-watch` can tell whether anything else has written it since.
-    _write_base_guard(repo_root)
     _stamp_build(repo_root, inputs)
     print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 
@@ -709,8 +1217,14 @@ def _currency_spec(repo_root: Path) -> ToolSpec | None:
     return next((s for s in config.load(repo_root) if s.name == _STAMPED_TOOL and s.stamp), None)
 
 
-def _clear_stamp(repo_root: Path) -> None:
-    """Remove the build stamp so an aborted build cannot leave a stale one."""
+def _clear_stamp(repo_root: Path, *, tag: str = "kb-build") -> None:
+    """Remove the build stamp so an aborted build cannot leave a stale one.
+
+    `tag` names the caller in the printed lines — `refresh_self` (via
+    `_recompose_into_temp`) passes `"kb-watch"` so a `kb-watch` run's own
+    bookkeeping is not misreported as `kb-build`'s (#175 cold review,
+    finding 9).
+    """
     try:
         from kb_setup.currency import sync
 
@@ -720,9 +1234,9 @@ def _clear_stamp(repo_root: Path) -> None:
         path = sync.stamp_path(repo_root, spec)
         if path is not None and path.exists():
             path.unlink()
-            print(f"[kb-build] cleared {path.name} — it is rewritten only on success")
+            print(f"[{tag}] cleared {path.name} — it is rewritten only on success")
     except (OSError, ValueError, ImportError) as e:
-        print(f"[kb-build] WARNING: could not clear the currency stamp: {e}")
+        print(f"[{tag}] WARNING: could not clear the currency stamp: {e}")
 
 
 def _input_fingerprints(repo_root: Path) -> dict[str, str] | None:
@@ -795,6 +1309,126 @@ def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
             )
     except (OSError, ValueError, ImportError) as e:
         print(f"[kb-build] WARNING: could not write the currency stamp: {e}")
+
+
+@dataclass(frozen=True)
+class _HeldStamp:
+    """A build stamp's carry-forward fields, snapshotted before `_clear_stamp` runs.
+
+    `_recompose_into_temp` unlinks the stamp file (`_clear_stamp`) immediately
+    before swapping in the recomposed graph.json — the same "clear first,
+    write only on success" rule `build()` follows, applied at the one moment
+    it matters for this shape (see that function's own docstring). But unlike
+    `build()`, `refresh_self` never runs a builder to re-observe `version`
+    from and never re-reads a manifest to derive `source_ref` from — the only
+    thing it can honestly do is carry the LAST real build's values forward
+    VERBATIM, and that means reading them off disk BEFORE the clear destroys
+    them, not after.
+
+    Before this existed, `refresh_self` tried to restamp AFTER the clear by
+    calling `sync.restamp_artifacts` — whose contract is "refresh an EXISTING
+    stamp" (`if path is None or not path.exists(): return None`), exactly
+    right for its OTHER caller `kb-artifacts`, which never deletes the stamp
+    first. Here it always found the file already gone and always returned
+    `None`, so every `kb-watch` silently left the repo permanently unstamped
+    (#175 cold review round 2, NEW-1). `_held_stamp` is the fix: read these
+    fields while the file still exists, hold them across the clear, and write
+    them straight back via `sync.write_stamp` — never through
+    `restamp_artifacts`, which by then would find nothing.
+    """
+
+    version: str
+    source_ref: str
+    inputs: dict[str, str] | None
+
+
+def _held_stamp(repo_root: Path) -> _HeldStamp | None:
+    """Snapshot the stamp's carry-forward fields — MUST run BEFORE the clear.
+
+    `refresh_self` calls this before `_recompose_into_temp`, which is what
+    clears the stamp. There is no later point at which these fields could
+    still be read off disk — see :class:`_HeldStamp`'s docstring for the
+    defect this exists to avoid repeating.
+
+    Mirrors `sync.restamp_artifacts`'s own "no existing stamp -> nothing to
+    carry forward" rule (`None` here means the same thing `restamp_artifacts`
+    returning `None` means there), just evaluated on the PRE-clear file
+    instead of a post-clear one that can no longer exist.
+
+    Best-effort, like every other stamp path in this module: a read failure
+    must not abort a recomposition that is otherwise fine. `refresh_self`
+    just ends unstamped and says so — the same outcome as running `kb-watch`
+    before any `kb-build` has ever stamped anything.
+    """
+    try:
+        from kb_setup.currency import sync
+
+        spec = _currency_spec(repo_root)
+        if spec is None:
+            return None
+        path = sync.stamp_path(repo_root, spec)
+        if path is None or not path.exists():
+            return None
+        existing = sync.read_stamp(repo_root, spec)
+        return _HeldStamp(
+            version=str(existing.get("version", "")),
+            source_ref=str(existing.get("source_ref", "")),
+            inputs=sync.stamped_input_fingerprints(existing),
+        )
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-watch] WARNING: could not read the existing currency stamp: {e}")
+        return None
+
+
+def _restamp_self(repo_root: Path, held: _HeldStamp | None) -> None:
+    """Write `held` back as the stamp — the fields `_held_stamp` read before the clear.
+
+    NOT `sync.restamp_artifacts`: that reads the CURRENT on-disk stamp, and by
+    the time `refresh_self` reaches its own tail, `_recompose_into_temp` has
+    already unlinked it (`_clear_stamp`, immediately before the swap). `held`
+    is what survives that — a snapshot taken earlier, before the file was
+    destroyed (#175 cold review round 2, NEW-1; see `_held_stamp`).
+
+    `version` and `source_ref` are written back exactly as held, never
+    re-observed: the graph changed but the BUILDER did not, and re-observing
+    would let a graphify upgrade mid-session silently relabel a graph the
+    previous version actually built. The recorded INPUT fingerprint map is
+    carried forward the same way and for the same reason: `refresh_self`
+    deliberately never re-reads `sources/*.manifest` /
+    `sources/extractions/*.json` (see its own docstring), so it has no more
+    standing to restate what the graph was built from than `kb-artifacts`
+    does. `sync.write_stamp` recomputes `artifact_fingerprints` itself, fresh
+    — that part MUST be live, since the whole point of a restamp is that the
+    artifact's bytes just moved.
+
+    `held is None` means there was nothing to carry forward — either no
+    `kb-build` has ever stamped this repo, or `_held_stamp`'s own read failed.
+    Without ANY restamp, a refresh is actively harmful: `artifact_fingerprints`
+    is `size:mtime_ns`, so any rewrite of graph.json moves it, and every later
+    `kb-currency-check` reports the graph as not verifiably built by the pin —
+    a permanent red that means nothing, which is how a real signal gets
+    ignored. So this still prints the warning a from-scratch `kb-watch` has
+    always printed, rather than staying silent. Best-effort like every other
+    stamp path here: a refresh must not fail over its own bookkeeping.
+    """
+    try:
+        from kb_setup.currency import sync
+
+        spec = _currency_spec(repo_root)
+        if spec is None:
+            return
+        if held is None:
+            print(
+                "[kb-watch] WARNING: no build stamp to refresh — run `mise run kb-build`; "
+                "currency step 1 will report this graph as never stamped."
+            )
+            return
+        path = sync.write_stamp(
+            repo_root, spec, version=held.version, source_ref=held.source_ref, inputs=held.inputs
+        )
+        print(f"[kb-watch] restamped {path.name}")
+    except (OSError, ValueError, ImportError) as e:
+        print(f"[kb-watch] WARNING: could not restamp: {e}")
 
 
 def update_all(repo_root: Path) -> int:

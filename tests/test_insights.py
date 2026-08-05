@@ -17,6 +17,48 @@ from kb_setup import insights
 _NODE = {"id": "n1", "label": "n1", "_origin": "ast"}
 
 
+def _write_full_graph(
+    out: Path,
+    *,
+    nodes: list[dict],
+    links: list[dict],
+    hyperedges: list[dict] | None = None,
+    graph: dict | None = None,
+) -> Path:
+    """A pretty-printed graph.json with EXPLICIT nodes/links.
+
+    Shaped like graphify's real output. The shared low-level writer:
+    `_write_graph` below builds tier-driven nodes/links and delegates here;
+    the composition tests build fully-explicit fixtures (specific
+    `repo`/`community`/`_origin`/`source`/`target` values) and call this
+    directly.
+
+    `graph` overrides the top-level `"graph"` dict (default `{}`, matching
+    every existing fixture). The one caller that needs it is the
+    hyperedge-collision regression: graphify's real export nests hyperedges
+    at `graph.hyperedges`, which precedes the top-level `nodes` array — a
+    shape no other fixture here reproduces.
+    """
+    out.mkdir(parents=True, exist_ok=True)
+    p = out / "graph.json"
+    p.write_text(
+        json.dumps(
+            {
+                "directed": False,
+                "multigraph": False,
+                "graph": {} if graph is None else graph,
+                "nodes": nodes,
+                "links": links,
+                "hyperedges": hyperedges or [],
+                "built_at_commit": "deadbeef",
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return p
+
+
 def _write_graph(
     out: Path,
     *,
@@ -39,24 +81,7 @@ def _write_graph(
         {"source": "n0", "target": "n1", "relation": "calls", "confidence": t, "weight": 1}
         for t in tiers
     ]
-    out.mkdir(parents=True, exist_ok=True)
-    p = out / "graph.json"
-    p.write_text(
-        json.dumps(
-            {
-                "directed": False,
-                "multigraph": False,
-                "graph": {},
-                "nodes": nodes,
-                "links": links,
-                "hyperedges": hyperedges or [],
-                "built_at_commit": "deadbeef",
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    return p
+    return _write_full_graph(out, nodes=nodes, links=links, hyperedges=hyperedges)
 
 
 def test_audit_counts_each_tier(tmp_path: Path) -> None:
@@ -248,3 +273,271 @@ def test_the_cli_dispatches_insights(monkeypatch, tmp_path: Path) -> None:
 
     assert cli.main(["insights", "--top", "3"]) == 0
     assert called == [["--top", "3"]]
+
+
+# --- composition (#175, #167): multi-source community spans, cross-origin
+# --- edges, and graph.json size vs graphify's default read cap.
+
+
+def test_composition_finds_a_community_spanning_two_sources(tmp_path: Path) -> None:
+    """Two nodes sharing a community but tagged with different repos -> one span."""
+    nodes = [
+        {"id": "a1", "_origin": "ast", "repo": "graphify", "community": 5},
+        {"id": "a2", "_origin": "ast", "repo": "cognee", "community": 5},
+    ]
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=nodes, links=[])
+    comp = insights.composition(g)
+    assert len(comp.spanning) == 1
+    assert comp.spanning[0].community == 5
+    assert comp.spanning[0].tags == ("cognee", "graphify")
+
+
+def test_composition_reports_zero_spans_on_a_clean_graph(tmp_path: Path) -> None:
+    """Every community single-sourced -> no spans, not a crash on the clean case."""
+    nodes = [
+        {"id": "a1", "_origin": "ast", "repo": "graphify", "community": 5},
+        {"id": "a2", "_origin": "ast", "repo": "graphify", "community": 5},
+        {"id": "b1", "_origin": "ast", "repo": "cognee", "community": 9},
+    ]
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=nodes, links=[])
+    comp = insights.composition(g)
+    assert comp.spanning == ()
+    assert comp.total_communities == 2
+
+
+def test_composition_treats_untagged_as_its_own_source(tmp_path: Path) -> None:
+    """A node with no `repo` key at all must not crash the probe.
+
+    Legitimate for #175 semantic doc nodes — and the "(untagged)" bucket
+    counts as a SOURCE in its own right: two untagged nodes plus one tagged
+    node sharing a community is a two-source span, not a silently-ignored
+    one-source community.
+    """
+    nodes = [
+        {"id": "s1", "_origin": "semantic", "community": 3},
+        {"id": "s2", "_origin": "semantic", "community": 3},
+        {"id": "a1", "_origin": "ast", "repo": "graphify", "community": 3},
+    ]
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=nodes, links=[])
+    comp = insights.composition(g)
+    assert len(comp.spanning) == 1
+    assert comp.spanning[0].tags == ("(untagged)", "graphify")
+
+
+#: Shared by the cross-origin control-arm pair below — the SAME base fixture,
+#: with only the edge set differing between the two tests, so "identical
+#: except for one injected crossing edge" is enforced by construction rather
+#: than by eye (`probes-need-a-control-arm.md`).
+_CROSS_ORIGIN_NODES = [
+    {"id": "a1", "_origin": "ast", "community": 1},
+    {"id": "a2", "_origin": "ast", "community": 1},
+    {"id": "s1", "_origin": "semantic", "community": 2},
+]
+
+
+def test_cross_origin_is_zero_with_no_crossing_edge(tmp_path: Path) -> None:
+    """CONTROL ARM, negative half.
+
+    Both `ast` and `semantic` nodes are present in the graph, but the one link
+    stays within a single origin — proves a nonzero count would come from an
+    actual crossing, not from mere co-presence of both origins somewhere in
+    the graph.
+    """
+    links = [{"source": "a1", "target": "a2", "confidence": "EXTRACTED"}]
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=_CROSS_ORIGIN_NODES, links=links)
+    comp = insights.composition(g)
+    assert comp.cross_origin_edges == 0
+
+
+def test_cross_origin_counts_the_injected_crossing_edge(tmp_path: Path) -> None:
+    """CONTROL ARM, positive half — THE injection arm #167's gate rests on.
+
+    Identical fixture to the test above, plus exactly one edge whose
+    endpoints differ in `_origin`: the count must move 0 -> 1, proving the
+    detector can actually FIRE rather than always answering zero.
+    """
+    links = [
+        {"source": "a1", "target": "a2", "confidence": "EXTRACTED"},
+        {"source": "a1", "target": "s1", "confidence": "INFERRED"},  # the injected crossing
+    ]
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=_CROSS_ORIGIN_NODES, links=links)
+    comp = insights.composition(g)
+    assert comp.cross_origin_edges == 1
+
+
+def test_iter_objects_ignores_a_field_nested_inside_metadata() -> None:
+    """Locks in the empirical finding `_iter_objects`'s docstring cites.
+
+    A key name that ALSO happens to appear nested inside a `metadata` object
+    (real on this corpus: 4,272 nodes carry one) must not masquerade as the
+    element's own top-level field. Without depth-gating this would capture
+    `repo="should-not-be-captured"` instead of the element's real `repo`.
+    """
+    lines = [
+        "    {\n",
+        '      "id": "outer",\n',
+        '      "metadata": {\n',
+        '        "repo": "should-not-be-captured",\n',
+        '        "language": "bash"\n',
+        "      },\n",
+        '      "repo": "the-real-one"\n',
+        "    },\n",
+        "  ],\n",
+        '  "links": [\n',
+    ]
+    result = list(insights._iter_objects(iter(lines), '"links": ['))
+    assert result == [{"id": "outer", "repo": "the-real-one"}]
+
+
+def test_iter_objects_survives_a_multiline_list_of_strings_field() -> None:
+    """A bare string array element (`"foo",` — no `": "`) must not crash the scan.
+
+    `_field_name` accepts any line starting with a quote, so a list-of-strings
+    field's own array elements (e.g. `"aliases": ["foo", "bar"]`, written
+    multi-line by `json.dump(..., indent=N)`) look exactly like a KEY to it —
+    but carry no `": "` at all, and `_value`'s `split(":", 1)[1]` had nothing
+    to index: `IndexError`. This scan does not attempt to represent an
+    array-valued field correctly (it has no array parser, only brace-depth
+    tracking) — what it must not do is crash, and it must still capture this
+    element's ordinary SCALAR fields either side of the list. Reproduced
+    directly against `_iter_objects`, not `_scan`, because no committed corpus
+    input currently has a list-valued node/link field (#175 cold review,
+    finding 6 — "latent, not live").
+    """
+    lines = [
+        "    {\n",
+        '      "id": "n1",\n',
+        '      "aliases": [\n',
+        '        "foo",\n',
+        '        "bar"\n',
+        "      ],\n",
+        '      "repo": "r"\n',
+        "    },\n",
+        "  ],\n",
+        '  "links": [\n',
+    ]
+    result = list(insights._iter_objects(iter(lines), '"links": ['))
+    assert len(result) == 1
+    assert result[0]["id"] == "n1"
+    assert result[0]["repo"] == "r"
+
+
+def test_composition_total_edges_counts_a_link_with_no_confidence_field(tmp_path: Path) -> None:
+    """The denominator must be ALL links, not just ones carrying `confidence`.
+
+    `cross_origin_edges` is counted over every link regardless of whether it
+    has a tier (`_crosses_origin` never gates on `confidence`), so a
+    denominator counted only over TIERED links could print
+    `cross_origin_edges > total_edges` — not merely misleading, actually
+    unrepresentable — the moment one link lacks the field. This link crosses
+    origin AND carries no `confidence` at all, so `total_edges` must still
+    count it (#175 cold review, finding 7).
+    """
+    nodes = [
+        {"id": "a1", "_origin": "ast", "community": 1},
+        {"id": "s1", "_origin": "semantic", "community": 2},
+    ]
+    links = [{"source": "a1", "target": "s1"}]  # no "confidence" at all
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=nodes, links=links)
+    comp = insights.composition(g)
+    assert comp.cross_origin_edges == 1
+    assert comp.total_edges == 1
+
+
+def test_scan_survives_a_populated_graph_hyperedges_before_top_level_nodes(
+    tmp_path: Path,
+) -> None:
+    """Regression for the real post-#175 artifact shape.
+
+    `graph.hyperedges` (populated — `hyperedges.reattach`'s carry, not `[]`)
+    precedes the top-level `nodes` array (`node_link_data` writes `graph`
+    before `nodes`), and a hyperedge's own member list is ALSO keyed
+    `"nodes"`. Before `_skip_to`/`_iter_objects` were made depth-aware, this
+    decoy `"nodes": [` inside the FIRST hyperedge was matched instead of the
+    real top-level one, positioning `fh` mid-hyperedge: every node map stayed
+    empty (spans 0 of 0, cross-origin 0) while the audit alone still worked
+    (a fresh generator over `links`, unaffected by the corrupted node scan).
+    This fixture must go RED against the pre-fix code — confirmed before this
+    test was added — and green after.
+    """
+    graph_meta = {
+        "hyperedges": [
+            {
+                "id": "he1",
+                "label": "decoy member list",
+                "nodes": ["m1", "m2", "m3"],
+                "relation": "participate_in",
+                "confidence": "INFERRED",
+            }
+        ]
+    }
+    nodes = [
+        {"id": "a1", "_origin": "ast", "repo": "graphify", "community": 5},
+        {"id": "a2", "_origin": "ast", "repo": "cognee", "community": 5},
+        {
+            "id": "s1",
+            "_origin": "semantic",
+            "community": 6,
+        },  # untagged, own community — not a 3rd span tag
+    ]
+    links = [{"source": "a1", "target": "s1", "confidence": "EXTRACTED"}]  # the one crossing edge
+
+    g = _write_full_graph(
+        tmp_path / "graphify-out",
+        nodes=nodes,
+        links=links,
+        hyperedges=graph_meta["hyperedges"],
+        graph=graph_meta,
+    )
+
+    audit, comp = insights._scan(g)
+    assert audit.total == 1
+    assert comp.total_communities == 2
+    assert len(comp.spanning) == 1
+    assert comp.spanning[0].community == 5
+    assert comp.spanning[0].tags == ("cognee", "graphify")
+    assert comp.cross_origin_edges == 1
+
+
+def test_size_vs_cap_reports_the_real_file_size_and_stays_under(tmp_path: Path) -> None:
+    g = _write_graph(tmp_path / "graphify-out", tiers=["EXTRACTED"])
+    check = insights.size_vs_cap(g)
+    assert check.size_bytes == g.stat().st_size
+    assert check.cap_bytes == insights._MAX_GRAPH_FILE_BYTES
+    assert check.over_cap is False
+
+
+def test_size_check_over_cap_true_above_the_constant() -> None:
+    """Unit-tests the comparison directly.
+
+    Writing a real 512 MiB fixture to prove the OVER branch is not worth the
+    disk/time cost this round.
+    """
+    check = insights.SizeCheck(
+        size_bytes=insights._MAX_GRAPH_FILE_BYTES + 1, cap_bytes=insights._MAX_GRAPH_FILE_BYTES
+    )
+    assert check.over_cap is True
+    assert check.ratio > 1.0
+
+
+def test_report_prints_the_composition_sections(capsys, tmp_path: Path) -> None:
+    """Proves `report()` actually WIRES the three new sections in.
+
+    The sibling lesson to
+    `test_report_prints_all_four_sections_when_the_sidecar_exists`: a section
+    that is only ever a function nobody calls is invisible to every other
+    test in this file.
+    """
+    nodes = [
+        {"id": "a1", "_origin": "ast", "repo": "graphify", "community": 5},
+        {"id": "a2", "_origin": "ast", "repo": "cognee", "community": 5},
+    ]
+    links = [{"source": "a1", "target": "a2", "confidence": "EXTRACTED"}]
+    _write_full_graph(tmp_path / "graphify-out", nodes=nodes, links=links)
+
+    assert insights.report(tmp_path, []) == 0
+    printed = capsys.readouterr().out
+    assert "Multi-source community spans" in printed
+    assert "community 5" in printed
+    assert "Cross-origin edges" in printed
+    assert "Size vs cap" in printed

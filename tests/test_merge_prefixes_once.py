@@ -61,12 +61,16 @@ def _manifest(tmp_path: Path, name: str) -> None:
 
 
 def test_build_composes_every_corpus_source_in_one_merge(monkeypatch, tmp_path):
-    """One `merge-graphs` call for the whole corpus — never one per source.
+    """One `merge-graphs` call for the whole corpus AND our own code.
+
+    Never one per source, and never a second call for self (#175).
 
     Realistic break: restoring the seed-plus-loop. That is not a hypothetical
     mutation, it is the code this replaced, and it is the shape someone reaches
     for again when adding a per-source step (a filter, a progress line, a retry)
-    — the loop looks like the natural place to put it.
+    — the loop looks like the natural place to put it. Reintroducing a SEPARATE
+    self-merge call is the same defect one call later (#175's own restructure) —
+    both feed an already-merged `out` back into `merge-graphs` as an input.
 
     Asserting on the COUNT and not merely on "the sources appear somewhere" is
     the whole point: a pairwise loop mentions every source too, and passes any
@@ -81,28 +85,33 @@ def test_build_composes_every_corpus_source_in_one_merge(monkeypatch, tmp_path):
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
-    monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
+    monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
     monkeypatch.setattr(graph, "_run", merge_recorder(calls))
 
     graph.build(tmp_path)
 
     out = str(tmp_path / "graphify-out" / "graph.json")
     self_sub = str(graph._self_subgraph(tmp_path))
-    # The self merge legitimately re-feeds graph.json — it runs after the base
-    # snapshot, which is what makes `kb-watch` idempotent — so it is excluded by
-    # name rather than by counting every merge that mentions `out`.
-    corpus_merges = [c for c in calls if "merge-graphs" in c and c[-1] == out and self_sub not in c]
+    # Since #175 the self sub-graph is an ORDINARY input to this same call, not
+    # excluded from it — there is no second merge left to exclude by name.
+    corpus_merges = [c for c in calls if "merge-graphs" in c and c[-1] == out]
 
     assert len(corpus_merges) == 1, (
-        f"expected ONE merge composing all 3 corpus sources; got {len(corpus_merges)}. "
-        f"A per-source loop re-prefixes the accumulator every iteration — 33% of the "
-        f"2026-08-03 graph.json was duplicated `repo::` prefix. argv were {corpus_merges}"
+        f"expected ONE merge composing all 3 corpus sources plus self; got "
+        f"{len(corpus_merges)}. A per-source loop (or a second self-merge call) "
+        f"re-prefixes the accumulator every iteration — 33% of the 2026-08-03 "
+        f"graph.json was duplicated `repo::` prefix. argv were {corpus_merges}"
     )
     argv = corpus_merges[0]
     for name in ("aaa", "mmm", "zzz"):
         assert any(f"/{name}/graphify-out/graph.json" in a for a in argv), (
             f"corpus source {name!r} is not among the merge inputs; argv was {argv}"
         )
+    assert self_sub in argv, (
+        f"the self sub-graph must join this ONE merge as an ordinary input "
+        f"(#175), not a second call; argv was {argv}"
+    )
     assert out not in argv[: argv.index("--out")], (
         f"graph.json was fed back in as an INPUT to its own composition — that is "
         f"the accumulator re-prefix defect itself; argv was {argv}"
