@@ -347,6 +347,22 @@ description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbo
 # built and never wired. `mise-tasks-only.md`: a recurring workflow ships as a task.
 run = "uv run kb-setup affected"
 
+[tasks.kb-insights]
+description = 'Print what the graph already computed: surprises, questions, god nodes, provenance audit'
+# graphify computes surprises/questions/gods/cohesion on every cluster-only/label run
+# and writes them to graphify-out/.graphify_analysis.json — a file nothing in this repo
+# has ever read. The MCP server exposes three of them, but its resource handlers render
+# ONE FIELD EACH (serve.py:1826-1862), discarding the score/why on a surprise and the
+# type/why on a question. The sidecar keeps the full dicts, so reading it beats paying a
+# subprocess to throw the useful part away.
+#
+# Two measured constraints, both in kb_setup.insights' docstring: the sidecar can be
+# arbitrarily stale with nothing to say so (#138 — measured 3 days behind, describing a
+# corpus 2.4x smaller), so this reports figures AND their staleness; and the provenance
+# audit is computed by STREAMING graph.json scoped to the `links` array, because a
+# whole-file count of `"confidence":` over-counts — five AST nodes carry the field.
+run = "uv run kb-setup insights"
+
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
 # graphify-mcp binds to an ABSOLUTE graph path, so this server only ever serves

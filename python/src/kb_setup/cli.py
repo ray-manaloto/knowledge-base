@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args:
         print(
             "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
-            "affected <symbol> [--depth N] | serve | "
+            "affected <symbol> [--depth N] | insights [--top N] | serve | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | md-budget | skill-score [--write] [skill...] | "
@@ -75,6 +75,10 @@ def main(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.affected(repo_root, rest)
+    if cmd == "insights":
+        from kb_setup import insights
+
+        return insights.report(repo_root, rest)
     if cmd == "serve":
         from kb_setup import mcp_serve
 
