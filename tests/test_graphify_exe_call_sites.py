@@ -23,7 +23,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import artifacts, graph, graphify_ops
+from kb_setup import artifacts, graph, graphify_ops, stamps
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -173,7 +173,7 @@ def test_artifacts_run_the_resolved_binary(tmp_path: Path, monkeypatch: pytest.M
 
     monkeypatch.setattr(artifacts, "graphify_exe", lambda _root: exe)
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _root: [])
-    monkeypatch.setattr(artifacts, "_restamp", lambda _root: None)
+    monkeypatch.setattr(stamps, "refresh_after_regen", lambda _root, **_kwargs: None)
     monkeypatch.setattr(artifacts.subprocess, "run", rec)
 
     artifacts.generate(tmp_path, only=["wiki", "graphml"])

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import hyperedges, prose
+from kb_setup import hyperedges, prose, stamps
 from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
@@ -238,21 +238,52 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
 
 
 def _labelled(repo_root: Path, rc: int, carried: list[hyperedges.Hyperedge]) -> int:
-    """Restore carried hyperedges, then re-derive the prose graph — both gated on `rc`.
+    """Restore carried hyperedges, refresh the currency stamp, then re-derive the prose graph.
 
-    Gated on `rc` for the same reason `merge_chunk` gates: a labelling run that
+    All three are gated on `rc`, for the same reason `merge_chunk` gates: a labelling run that
     failed may have left `graph.json` in any state, and either reattaching over
-    it or deriving from it would assert a fact ("the run succeeded") that is
-    false. The failing rc is the caller's job, and returning it unchanged says
-    so — `carried` is discarded along with it.
+    it, restamping it, or deriving from it would assert a fact ("the run
+    succeeded") that is false. The failing rc is the caller's job, and
+    returning it unchanged says so — `carried` is discarded along with it.
 
-    Reattach happens BEFORE `_derive_prose`: that call reads graph.json fresh
-    and reports what survived (`prose.ProseStats.hyperedges_out`), so the
-    restored list has to already be on disk when it runs, not after.
+    Reattach happens BEFORE the restamp and BEFORE `_derive_prose`, and in that
+    order, for two separate reasons:
+
+    - The currency stamp's fingerprint must cover graph.json's FINAL bytes, and
+      `reattach` is the last writer of that file — this mirrors
+      `artifacts.generate`, which orders capture -> subprocess -> reattach ->
+      restamp for the same reason (#179).
+    - `_derive_prose` reads graph.json fresh and reports what survived
+      (`prose.ProseStats.hyperedges_out`), so the restored list has to already
+      be on disk when it runs, not after.
+
+    The restamp runs before `_derive_prose`, not after, because
+    `graphify-out/graph-prose.json` is NOT in the stamped set —
+    `currency.toml`'s `[tool.graphify]` declares `artifact =
+    "graphify-out/graph.json"` and `artifacts = ["graphify-out/GRAPH_REPORT.md",
+    "graphify-out/graph.graphml", "graphify-out/wiki"]`, neither of which is the
+    prose graph. So a prose derivation that fails afterwards cannot invalidate a
+    fingerprint that was never about it, and gating the restamp on the prose
+    step's rc would only buy a permanent, meaningless currency red on a graph
+    that was legitimately relabelled.
+
+    One more thing worth saying plainly, so the next reader does not mistake it
+    for a bug: `stamps.refresh_after_regen` re-fingerprints the WHOLE declared
+    artifact set via `sync.restamp_artifacts`, so this restamp also touches
+    `GRAPH_REPORT.md` / `graph.graphml` / `wiki` — none of which `label`
+    regenerated. That is correct and deliberate; the stamp answers "has
+    anything moved since we last looked", not "is every output mutually
+    consistent", which is the same semantics `stamps.refresh_after_regen`
+    already documents for a partial `kb-artifacts only=` run. It also carries
+    the recorded INPUT fingerprints forward verbatim rather than re-observing
+    `sources/`: `label` never reads `sources/`, so it has no standing to
+    restate what the graph was built from — re-observing them would be drift
+    laundering, which was a P1 in the last round's review.
     """
     if rc != 0:
         return rc
     hyperedges.reattach(_full_graph(repo_root), carried)
+    stamps.refresh_after_regen(repo_root, tag="kb-label")
     return _derive_prose(repo_root, tag="kb-label", did="communities were relabelled")
 
 

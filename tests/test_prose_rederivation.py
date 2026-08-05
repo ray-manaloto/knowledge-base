@@ -28,10 +28,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from kb_setup import graphify_ops, prose
+from kb_setup import graphify_ops, hyperedges, prose, stamps
+from kb_setup.currency import config, sync
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 #: What the stub writes as the merged graph: one AST node the derivation must
 #: drop, and one prose node it must keep. Naming the merged node lets a test
@@ -348,6 +349,126 @@ def test_a_failed_label_does_not_restore_hyperedges(
 
     on_disk = json.loads((repo / "graphify-out" / "graph.json").read_text(encoding="utf-8"))
     assert on_disk == _MERGED
+
+
+# --- currency stamp refresh (#179) -------------------------------------------
+#
+# `label()` rewrites graph.json wholesale (see the module docstring for the
+# installed-0.9.30 citation), which is a REGENERATION exactly like
+# `artifacts.generate`'s `report` entry — so it needs the same
+# `kb_setup.stamps.refresh_after_regen` call, or every manual `mise run
+# kb-label`, including the documented merge -> label curator flow, leaves
+# `mise run kb-currency-check` reporting build-stamp drift until the next full
+# `kb-build` (the fingerprint is `size:mtime_ns`, so ANY rewrite moves it).
+
+
+def _with_currency_stamp(repo_root: Path) -> None:
+    """Add a currency.toml + an existing stamp to a repo `_repo` already built.
+
+    `_repo` already wrote the declared artifact (the pre-merge `graph.json`),
+    which a stamp must fingerprint something that exists.
+    """
+    (repo_root / "currency.toml").write_text(
+        "[tool.graphify]\n"
+        'mise_key = "pipx:graphifyy"\n'
+        'binary = "graphify"\n'
+        'artifact = "graphify-out/graph.json"\n'
+        'stamp = "graphify-out/.currency-stamp.json"\n',
+        encoding="utf-8",
+    )
+    spec = config.load(repo_root)[0]
+    sync.write_stamp(repo_root, spec, version="0.9.32")
+
+
+def test_a_successful_label_refreshes_the_currency_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A successful `label()` must re-fingerprint graph.json, not leave it stale.
+
+    Without this, `label()`'s rewrite moves the file's `size:mtime_ns` and step
+    1 reports drift for a graph that was legitimately relabelled — the #179
+    defect. Asserted as a real fingerprint comparison, not a spy, per the
+    ticket's preference for a real assertion where the cost is affordable.
+    """
+    repo = _repo(tmp_path)
+    _with_currency_stamp(repo)
+    spec = config.load(repo)[0]
+    before = sync.read_stamp(repo, spec)
+
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+
+    assert graphify_ops.label(repo) == 0
+
+    after = sync.read_stamp(repo, spec)
+    live_fp = sync.artifact_fingerprint(repo / "graphify-out" / "graph.json")
+    before_fps = sync.stamped_fingerprints(before)
+    after_fps = sync.stamped_fingerprints(after)
+    assert after_fps["graphify-out/graph.json"] == live_fp
+    assert before_fps["graphify-out/graph.json"] != after_fps["graphify-out/graph.json"]
+    # version/source_ref are carried forward, not re-derived by a restamp —
+    # `label()` never reads `sources/` and has no standing to restate them.
+    assert after["version"] == before["version"] == "0.9.32"
+
+
+def test_a_failed_label_does_not_refresh_the_currency_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: a failed label run must restamp nothing.
+
+    graph.json may be in any state after a failed run, and stamping it would
+    assert "this is the artifact the pin built" — a claim the same `rc != 0`
+    gate that protects the hyperedge carry and the prose re-derivation
+    (`_labelled`'s early `return rc`) also protects here.
+    """
+    repo = _repo(tmp_path)
+    _with_currency_stamp(repo)
+    spec = config.load(repo)[0]
+    before = sync.read_stamp(repo, spec)
+
+    _stub_graphify(monkeypatch, tmp_path, rc=1, writes=_MERGED)
+
+    assert graphify_ops.label(repo) == 1
+
+    after = sync.read_stamp(repo, spec)
+    assert after == before
+
+
+def test_label_restamps_after_reattach_not_before(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ordering requirement from #179: `reattach()` must run before the restamp.
+
+    The stamp's fingerprint has to cover graph.json's FINAL bytes, and
+    `reattach` is the last writer of that file — mirroring `artifacts.generate`,
+    which orders capture -> subprocess -> reattach -> restamp for the same
+    reason. Proven by call order, not by outcome: reading the fingerprint after
+    `label()` returns reflects the final disk state regardless of which ran
+    first, so an outcome-only assertion would pass even with the order flipped.
+    """
+    repo = _repo(tmp_path)
+    (repo / "graphify-out" / "graph.json").write_text(
+        json.dumps(_PRE_LABEL_WITH_HYPEREDGE), encoding="utf-8"
+    )
+    _with_currency_stamp(repo)
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+
+    calls: list[str] = []
+    real_reattach = hyperedges.reattach
+    real_refresh = stamps.refresh_after_regen
+
+    def spy_reattach(graph_path: Path, edges: Sequence[Mapping[str, object]]) -> None:
+        calls.append("reattach")
+        real_reattach(graph_path, edges)
+
+    def spy_refresh(repo_root: Path, *, tag: str) -> None:
+        calls.append("refresh")
+        real_refresh(repo_root, tag=tag)
+
+    monkeypatch.setattr(hyperedges, "reattach", spy_reattach)
+    monkeypatch.setattr(stamps, "refresh_after_regen", spy_refresh)
+
+    assert graphify_ops.label(repo) == 0
+    assert calls == ["reattach", "refresh"], f"restamp must run after reattach; got {calls}"
 
 
 def test_an_interrupted_write_leaves_no_partial_prose_graph(
