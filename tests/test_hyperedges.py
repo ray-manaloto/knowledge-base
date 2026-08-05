@@ -98,6 +98,27 @@ def test_capture_neither_slot_present_returns_empty(tmp_path: Path) -> None:
     assert hyperedges.capture(p) == []
 
 
+# --- capture_from_data() ------------------------------------------------------
+#
+# The pure half `graph_checks.assert_composition` reuses so it does not pay a
+# second full read+parse of a several-hundred-MB file for the hyperedge list
+# alone (#175 cold review, finding 2). Same reconciliation rules as `capture`
+# — these are the same two fixtures, just fed in already-parsed.
+
+
+def test_capture_from_data_matches_capture_on_the_same_content(tmp_path: Path) -> None:
+    """The pure dict-level function must agree with the file-reading wrapper."""
+    p = _write(tmp_path, _BOTH_AGREEING)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert hyperedges.capture_from_data(data) == hyperedges.capture(p) == [_HE1]
+
+
+def test_capture_from_data_raises_on_disagreement_same_as_capture() -> None:
+    """The refusal-on-disagreement behaviour must survive the split."""
+    with pytest.raises(ValueError, match="disagrees with itself"):
+        hyperedges.capture_from_data(_BOTH_DISAGREEING)
+
+
 # --- reattach() --------------------------------------------------------------
 
 

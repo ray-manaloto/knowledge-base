@@ -112,6 +112,12 @@ class Composition:
     spanning: tuple[CommunitySpan, ...]
     total_communities: int
     cross_origin_edges: int
+    #: EVERY link scanned, not only links carrying a `confidence` field.
+    #: `cross_origin_edges` is counted over all links (`_crosses_origin` never
+    #: gates on `confidence`), so a denominator counted only over TIERED links
+    #: could print `cross_origin_edges > total_edges` — not merely misleading,
+    #: unrepresentable — the moment one link lacks the field (#175 cold
+    #: review, finding 7).
     total_edges: int
 
 
@@ -129,14 +135,22 @@ _MAX_SPAN_EXAMPLES = 5
 
 
 def _field_name(stripped: str) -> str | None:
-    """The JSON key of a `"key": value,` line, or None if it opens with no quote.
+    """The JSON key of a `"key": value,` line, or None if this is not one.
 
     Every real field line in graphify's pretty-printed export opens with a
-    quoted key; the None case is a defensive fallback for output this module
-    reads back rather than controls, not a shape ever observed in practice —
-    it exists so an unexpected line is skipped, never a crash.
+    quoted key AND carries `": "` between that key and its value — the
+    default `key_separator` `json.dump(..., indent=N)` always emits — so both
+    are required. The `": "` half matters for a shape this module's callers
+    do not control: a bare array-element line inside a list-of-strings field
+    (`"foo",`, no colon at all) also opens with a quote, so without this
+    check it would be treated as a KEY here and then crash `_value`'s
+    `split(":", 1)[1]`, which has nothing to index (#175 cold review,
+    finding 6). The None case is a defensive fallback for output this module
+    reads back rather than controls — it exists so an unexpected line is
+    skipped, never a crash, and this makes that promise true for the shape it
+    did not originally anticipate.
     """
-    if not stripped.startswith('"'):
+    if not stripped.startswith('"') or ": " not in stripped:
         return None
     return stripped.split('"', 2)[1]
 
@@ -332,6 +346,11 @@ def _iter_objects(fh: Iterator[str], stop: str | tuple[str, ...]) -> Iterator[di
             continue
         if depth != 1:
             continue
+        # `_field_name` returns None for a bare array-element line (a
+        # list-of-strings field's own `"foo",`, no `": "` at all) — see its
+        # docstring — so a colonless line is skipped here exactly like any
+        # other line `_field_name` does not recognise, with no separate gate
+        # needed in this loop.
         key = _field_name(stripped)
         if key is not None:
             cur[key] = _value(stripped)
@@ -370,6 +389,7 @@ def _scan(graph_path: Path) -> tuple[Audit, Composition]:
     community_tags: dict[int, set[str]] = {}
     tier_counts: dict[str, int] = {}
     tier_total = 0
+    link_total = 0
     cross_origin = 0
 
     with graph_path.open(encoding="utf-8") as fh:
@@ -379,6 +399,7 @@ def _scan(graph_path: Path) -> tuple[Audit, Composition]:
         # Same break condition this module has always used for the tier audit:
         # either sibling key ends the links array, hyperedges present or not.
         for link in _iter_objects(fh, ('"hyperedges"', '"built_at_commit"')):
+            link_total += 1
             tier = link.get("confidence")
             if tier is not None:
                 tier_counts[tier] = tier_counts.get(tier, 0) + 1
@@ -388,7 +409,7 @@ def _scan(graph_path: Path) -> tuple[Audit, Composition]:
 
     audit = Audit(total=tier_total, by_tier=tier_counts)
     comp = _build_composition(
-        community_tags, cross_origin_edges=cross_origin, total_edges=tier_total
+        community_tags, cross_origin_edges=cross_origin, total_edges=link_total
     )
     return audit, comp
 

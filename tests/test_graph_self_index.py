@@ -36,6 +36,7 @@ import pytest
 from conftest import merge_recorder
 from kb_setup import graph
 from kb_setup import manifest as mf
+from kb_setup.currency import config, sync
 
 
 def _manifest(tmp_path: Path, name: str = "demo") -> mf.Manifest:
@@ -225,7 +226,8 @@ def test_build_resets_the_merge_ledger(monkeypatch, tmp_path):
     stale = tmp_path / "stale-chunk.json"
     stale.write_text("{}", encoding="utf-8")
     graph._write_merged_chunks(
-        tmp_path, [graph.MergedChunkEntry(chunk=str(stale), sha256="deadbeef")]
+        tmp_path,
+        [graph.MergedChunkEntry(chunk=str(stale), sha256="deadbeef", root=str(tmp_path))],
     )
 
     _run_build(monkeypatch, tmp_path)
@@ -235,7 +237,13 @@ def test_build_resets_the_merge_ledger(monkeypatch, tmp_path):
     )
 
 
-def _compose_repo(tmp_path: Path, *, corpus: list[str], chunks: list[str] | None = None) -> Path:
+def _compose_repo(
+    tmp_path: Path,
+    *,
+    corpus: list[str],
+    chunks: list[str] | None = None,
+    chunk_roots: dict[str, str] | None = None,
+) -> Path:
     """A repo root with a REAL compose manifest and real corpus-leaf files.
 
     Mirrors what `build()` itself would have written: one sub-graph file per
@@ -253,7 +261,13 @@ def _compose_repo(tmp_path: Path, *, corpus: list[str], chunks: list[str] | None
         corpus_rel.append(str(sub.relative_to(tmp_path)))
     self_rel = str(graph._self_subgraph(tmp_path).relative_to(tmp_path))
     graph._write_compose_manifest(
-        tmp_path, corpus=corpus_rel, self_graph=self_rel, chunks=chunks or []
+        tmp_path,
+        graph.ComposeManifest(
+            corpus=tuple(corpus_rel),
+            self_graph=self_rel,
+            chunks=tuple(chunks or []),
+            chunk_roots=chunk_roots or {},
+        ),
     )
     return tmp_path
 
@@ -265,12 +279,17 @@ def _stub_recompose(monkeypatch, calls: list[list[str]]) -> None:
     rather than replaced with nothing, because the merge/replay argv IS the
     behaviour under test; `label`/`assert_composition` run against REAL
     graph.json content that `apply_merge`'s byte-concatenation stand-in does
-    not produce.
+    not produce. `_clear_stamp` accepts `**_` because `refresh_self` now calls
+    it with `tag="kb-watch"` (#175 cold review, finding 9). `_restamp_self` is
+    deliberately NOT stubbed here: none of these fixtures write a
+    `currency.toml`, so `_currency_spec` resolves to `None` and it is already
+    a no-op — restamping is exercised on purpose by
+    `test_refresh_self_restamps_so_the_graph_stays_verifiable` and its
+    siblings below, which DO set one up (`_stamped_repo`).
     """
     monkeypatch.setattr(graph, "_run", merge_recorder(calls))
     monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
-    monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
-    monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
+    monkeypatch.setattr(graph, "_clear_stamp", lambda _root, **_: None)
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
     monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
 
@@ -338,7 +357,12 @@ def test_refresh_self_refuses_when_a_ledger_chunk_is_gone(monkeypatch, tmp_path)
     repo = _compose_repo(tmp_path, corpus=["aaa"])
     missing = repo / "sources" / "extractions" / "gone-docs.json"
     graph._write_merged_chunks(
-        repo, [graph.MergedChunkEntry(chunk=str(missing.relative_to(repo)), sha256="abc123")]
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=str(missing.relative_to(repo)), sha256="abc123", root=str(missing.parent)
+            )
+        ],
     )
 
     with pytest.raises(SystemExit) as exc:
@@ -372,7 +396,12 @@ def test_refresh_self_refuses_when_a_ledger_chunk_has_changed(monkeypatch, tmp_p
     chunk.write_text('{"nodes": [], "edges": [], "edited": true}', encoding="utf-8")
 
     graph._write_merged_chunks(
-        repo, [graph.MergedChunkEntry(chunk=str(chunk.relative_to(repo)), sha256=stale_sha)]
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=str(chunk.relative_to(repo)), sha256=stale_sha, root=str(chunk.parent)
+            )
+        ],
     )
 
     with pytest.raises(SystemExit) as exc:
@@ -389,7 +418,10 @@ def test_refresh_self_replays_a_valid_ledger_chunk_after_the_manifests(monkeypat
     Asserted on the recorded argv, the same shape `test_the_self_subgraph_
     joins_the_one_corpus_merge_not_a_second_call` already uses for the corpus
     merge — the behaviour under test is which paths reach the subprocess and
-    in what order, not the subprocess itself.
+    in what order, not the subprocess itself. Also asserts the ROOT each
+    replays with: the manifest chunk gets the naming-convention default
+    (`sources/known`, from its `-docs` stem), the ledger chunk gets its OWN
+    recorded root — never the same derivation (#175 cold review, finding 4b).
     """
     manifest_chunk_dir = tmp_path / "sources" / "extractions"
     manifest_chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -404,7 +436,13 @@ def test_refresh_self_replays_a_valid_ledger_chunk_after_the_manifests(monkeypat
     ledger_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
     graph._write_merged_chunks(
         repo,
-        [graph.MergedChunkEntry(chunk=str(ledger_chunk), sha256=graph._sha256_file(ledger_chunk))],
+        [
+            graph.MergedChunkEntry(
+                chunk=str(ledger_chunk),
+                sha256=graph._sha256_file(ledger_chunk),
+                root=str(tmp_path),
+            )
+        ],
     )
 
     calls: list[list[str]] = []
@@ -413,10 +451,16 @@ def test_refresh_self_replays_a_valid_ledger_chunk_after_the_manifests(monkeypat
     graph.refresh_self(repo)
 
     merge_argvs = [c for c in calls if str(graph._MERGE_SCRIPT) in c]
-    # argv shape is [gpy, _MERGE_SCRIPT, chunk, root, out] — index 2 is the chunk.
+    # argv shape is [gpy, _MERGE_SCRIPT, chunk, root, out] — index 2 is the
+    # chunk, index 3 is the root.
     chunk_args = [c[2] for c in merge_argvs]
     assert chunk_args == [str(manifest_chunk), str(ledger_chunk)], (
         f"expected the manifest's chunk replayed before the ledger's; got {chunk_args}"
+    )
+    root_args = [c[3] for c in merge_argvs]
+    assert root_args == [str((tmp_path / "sources" / "known").resolve()), str(tmp_path)], (
+        f"expected the manifest chunk's naming-convention root then the ledger "
+        f"chunk's own recorded root; got {root_args}"
     )
 
 
@@ -434,7 +478,13 @@ def test_a_successful_refresh_resets_the_ledger_too(monkeypatch, tmp_path):
     ledger_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
     graph._write_merged_chunks(
         repo,
-        [graph.MergedChunkEntry(chunk=str(ledger_chunk), sha256=graph._sha256_file(ledger_chunk))],
+        [
+            graph.MergedChunkEntry(
+                chunk=str(ledger_chunk),
+                sha256=graph._sha256_file(ledger_chunk),
+                root=str(tmp_path),
+            )
+        ],
     )
 
     calls: list[list[str]] = []
@@ -447,9 +497,14 @@ def test_a_successful_refresh_resets_the_ledger_too(monkeypatch, tmp_path):
     )
     manifest = graph._read_compose_manifest(repo)
     assert manifest is not None
-    assert str(ledger_chunk.relative_to(repo)) in manifest.chunks, (
+    promoted = str(ledger_chunk.relative_to(repo))
+    assert promoted in manifest.chunks, (
         f"the replayed ledger chunk must join the rewritten compose manifest; "
         f"chunks were {manifest.chunks}"
+    )
+    assert manifest.chunk_roots.get(promoted) == str(tmp_path), (
+        f"the promoted chunk's recorded root did not survive into the "
+        f"rewritten manifest; chunk_roots were {manifest.chunk_roots}"
     )
 
 
@@ -483,3 +538,309 @@ def test_a_recompose_failure_leaves_the_real_graph_untouched(monkeypatch, tmp_pa
     )
     leftover = list((repo / "graphify-out").glob("graph.json.*.recompose.tmp"))
     assert leftover == [], f"a failed recomposition left its scratch file behind: {leftover}"
+
+
+def test_recompose_swaps_in_a_world_readable_graph_json(monkeypatch, tmp_path):
+    """The swapped-in graph.json must not silently inherit mkstemp's 0600.
+
+    `tempfile.mkstemp` always creates its scratch file `0600`, and
+    `Path.replace` is a rename — the surviving inode's permission bits are the
+    TEMP file's, not `real_out`'s. Left unfixed, every `kb-watch` would
+    silently tighten `graph.json` from world-readable to owner-only, and
+    graphify's own `_atomic_replace` PRESERVES whatever mode is already
+    there, so nothing downstream would ever repair it (#175 cold review,
+    finding 5).
+    """
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    real_out = repo / "graphify-out" / "graph.json"
+    real_out.write_text('{"nodes": []}', encoding="utf-8")
+    real_out.chmod(0o644)
+
+    _stub_recompose(monkeypatch, [])
+
+    graph.refresh_self(repo)
+
+    mode = real_out.stat().st_mode & 0o777
+    assert mode == 0o644, f"graph.json's mode after refresh_self was {oct(mode)}, expected 0o644"
+
+
+# --- restamp semantics (#175 cold review, finding 1) -------------------------
+
+
+def _stamped_repo(tmp_path: Path) -> Path:
+    """A repo with a currency pin and a compose manifest `refresh_self` can use.
+
+    Combines what the deleted (pre-#175) `_stamped_repo` set up — the mise +
+    `currency.toml` pin and an existing `graphify-out/graph.json` to
+    fingerprint — with what `_compose_repo` sets up: the recorded composition
+    `refresh_self` now reads back instead of a base snapshot.
+    """
+    (tmp_path / "mise.toml").write_text(
+        '[tools]\n"pipx:graphifyy" = { version = "0.9.32", extras = ["all"] }\n', encoding="utf-8"
+    )
+    (tmp_path / "currency.toml").write_text(
+        "[tool.graphify]\n"
+        'mise_key = "pipx:graphifyy"\n'
+        'binary = "graphify"\n'
+        'artifact = "graphify-out/graph.json"\n'
+        'stamp = "graphify-out/.currency-stamp.json"\n'
+        # Matches the REAL currency.toml's `inputs` declaration — needed so a
+        # regression that reintroduces `_input_fingerprints(repo_root)` in
+        # `refresh_self` actually globs `sources/*.manifest` here too, rather
+        # than the empty tuple a bare `[tool.graphify]` with no `inputs =`
+        # line would produce (which returns `{}` regardless of what manifests
+        # exist, masking finding 1's defect shape).
+        'inputs = ["sources/*.manifest"]\n',
+        encoding="utf-8",
+    )
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    (repo / "graphify-out" / "graph.json").write_text('{"nodes": []}', encoding="utf-8")
+    return repo
+
+
+def test_refresh_self_restamps_so_the_graph_stays_verifiable(monkeypatch, tmp_path):
+    """`kb-watch` must restamp, or currency step 1 goes permanently red.
+
+    This asserts on the ARTIFACT, not on a recorded call to a helper being
+    invoked — `stamped == observed` is a claim about the stamp file agreeing
+    with graph.json, which is exactly what `kb-currency-check` compares.
+    Asserting that some `_restamp_self` function was called would pass just as
+    happily on a restamp that wrote the wrong bytes.
+
+    Realistic break: revert `refresh_self`'s tail back to
+    `_stamp_build(repo_root, inputs)` — this fix's own regression (#175 cold
+    review, finding 1). `artifact_fingerprints` is `size:mtime_ns`, so ANY
+    rewrite of graph.json moves it; without a restamp that carries the
+    fingerprint forward, the very next session reports the graph as not
+    verifiably built by the pin.
+    """
+    root = _stamped_repo(tmp_path)
+    spec = config.load(root)[0]
+    sync.write_stamp(root, spec, version="0.9.32", source_ref="", inputs=None)
+    assert sync.stamped_fingerprints(sync.read_stamp(root, spec)) == sync.artifact_fingerprints(
+        root, spec
+    ), "fixture is wrong: the stamp must agree with the artifact BEFORE the refresh"
+
+    def _fake_run(argv: list[str], _root: Path) -> None:
+        # The merge really does rewrite the scratch file `--out` names — write
+        # DIFFERENT bytes there so the fingerprint genuinely moves once the
+        # swap lands. A stub that left it untouched would make the assertion
+        # below pass whether or not restamping actually happened.
+        a = [str(x) for x in argv]
+        if "merge-graphs" in a and "--out" in a:
+            Path(a[a.index("--out") + 1]).write_text(
+                '{"nodes": [], "rebuilt": true}', encoding="utf-8"
+            )
+
+    monkeypatch.setattr(graph, "_run", _fake_run)
+    monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
+    monkeypatch.setattr(graph, "_clear_stamp", lambda _root, **_: None)
+    monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
+
+    graph.refresh_self(root)
+
+    assert sync.stamped_fingerprints(sync.read_stamp(root, spec)) == sync.artifact_fingerprints(
+        root, spec
+    ), (
+        "refresh_self rewrote graph.json without restamping — kb-currency-check "
+        "would report the graph as built by an unknown version every session after."
+    )
+
+
+def test_refresh_self_does_not_fingerprint_a_manifest_it_never_read(monkeypatch, tmp_path):
+    """THE regression itself (#175 cold review, finding 1).
+
+    `refresh_self` recomposes ONLY from the recorded compose manifest and the
+    verified ledger — it deliberately never re-reads `sources/*.manifest` (see
+    `refresh_self`'s own docstring). A manifest dropped in AFTER the last
+    `kb-build` is therefore excluded from the graph a `kb-watch` produces, and
+    the stamp must say so: recording a LIVE fingerprint over it anyway would
+    make `kb-currency-check` report the corpus in sync with content the graph
+    structurally does not contain.
+    """
+    root = _stamped_repo(tmp_path)
+    spec = config.load(root)[0]
+    old_manifest = root / "sources" / "old.manifest"
+    old_manifest.parent.mkdir(parents=True, exist_ok=True)
+    old_manifest.write_text("url = https://example.invalid/o/old\n", encoding="utf-8")
+    # A stamp recording ONE input `kb-build` actually saw, matching a real
+    # `_input_fingerprints` map's shape — not the `None` "never asked" case.
+    sync.write_stamp(
+        root,
+        spec,
+        version="0.9.32",
+        source_ref="",
+        inputs={"sources/old.manifest": sync.input_fingerprint(old_manifest)},
+    )
+
+    _stub_recompose(monkeypatch, [])
+
+    # Dropped in AFTER the stamp — exactly the repro `refresh_self`'s
+    # docstring names: a manifest `kb-build` never saw and `kb-watch` never
+    # reads.
+    (root / "sources" / "newthing.manifest").write_text(
+        "url = https://example.invalid/o/newthing\n", encoding="utf-8"
+    )
+
+    graph.refresh_self(root)
+
+    recorded = sync.stamped_input_fingerprints(sync.read_stamp(root, spec))
+    assert recorded is not None
+    assert "sources/newthing.manifest" not in recorded, (
+        f"refresh_self fingerprinted a manifest it structurally never read: {recorded}"
+    )
+    assert "sources/old.manifest" in recorded, (
+        f"the pre-existing input fingerprint must survive verbatim, not just "
+        f"exclude the new one: {recorded}"
+    )
+
+
+# --- ledger promotion: dedup + root fidelity (#175 cold review, finding 4) --
+
+
+def test_promoting_an_already_present_ledger_chunk_does_not_duplicate(monkeypatch, tmp_path):
+    """A chunk already in `manifest.chunks` must not be appended a second time.
+
+    The scenario the cold review found: a chunk lands in `manifest.chunks` (an
+    earlier `kb-watch` already promoted it, or `build()`'s own glob already
+    carried it) and is ALSO still named by a ledger entry (e.g. a `kb-merge`
+    re-run against unchanged content). Without de-duplication the rewritten
+    manifest would carry it TWICE, and every later recomposition would replay
+    it twice — pure waste that compounds on every subsequent `kb-watch`.
+    """
+    ledger_chunk = tmp_path / "ledger-chunk.json"
+    ledger_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    already_promoted = str(ledger_chunk.relative_to(tmp_path))
+
+    repo = _compose_repo(
+        tmp_path,
+        corpus=["aaa"],
+        chunks=[already_promoted],
+        chunk_roots={already_promoted: str(tmp_path)},
+    )
+    graph._write_merged_chunks(
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=already_promoted,
+                sha256=graph._sha256_file(ledger_chunk),
+                root=str(tmp_path),
+            )
+        ],
+    )
+
+    calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, calls)
+
+    graph.refresh_self(repo)
+
+    manifest = graph._read_compose_manifest(repo)
+    assert manifest is not None
+    assert manifest.chunks.count(already_promoted) == 1, (
+        f"a chunk already in manifest.chunks was promoted again; chunks were {manifest.chunks}"
+    )
+    # And it must still only be REPLAYED once per recomposition — the waste
+    # the dedup exists to stop, not merely a manifest-bookkeeping detail.
+    merge_argvs = [c for c in calls if str(graph._MERGE_SCRIPT) in c]
+    chunk_args = [c[2] for c in merge_argvs]
+    assert chunk_args.count(str(ledger_chunk)) == 1, (
+        f"the chunk was replayed more than once in a single recomposition; argv were {merge_argvs}"
+    )
+
+
+def test_a_ledger_chunk_replays_with_its_recorded_root_not_its_parent_directory(
+    monkeypatch, tmp_path
+):
+    """A ledger chunk replays with the root `kb-merge` ACTUALLY used, not a guess.
+
+    Before #175's cold-review fixes, a ledger chunk's replay root was always
+    `c.resolve().parent` — the chunk file's own directory — which silently
+    discarded a `kb-merge --root <custom>` invocation. This chunk's recorded
+    root is deliberately DIFFERENT from its parent directory, so a replay
+    using the old guess would send a different root than the one actually
+    merged with.
+    """
+    custom_root = tmp_path / "a-totally-different-root"
+    custom_root.mkdir()
+    ledger_chunk = tmp_path / "somewhere-else" / "chunk.json"
+    ledger_chunk.parent.mkdir(parents=True, exist_ok=True)
+    ledger_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    graph._write_merged_chunks(
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=str(ledger_chunk),
+                sha256=graph._sha256_file(ledger_chunk),
+                root=str(custom_root),
+            )
+        ],
+    )
+
+    calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, calls)
+
+    graph.refresh_self(repo)
+
+    merge_argvs = [c for c in calls if str(graph._MERGE_SCRIPT) in c]
+    root_args = [c[3] for c in merge_argvs]
+    assert root_args == [str(custom_root)], (
+        f"the ledger chunk replayed with the wrong root; argv were {merge_argvs}"
+    )
+
+
+def test_a_promoted_ledger_chunks_root_survives_into_the_next_refresh(monkeypatch, tmp_path):
+    """THE regression the cold review found (finding 4b), across TWO refreshes.
+
+    A chunk under `sources/extractions/foo-docs.json`, merged with `kb-merge`'s
+    own DEFAULT root (the chunk's parent directory, `sources/extractions` —
+    NOT the naming-convention guess `sources/foo` the manifest-chunk fallback
+    derives from its `-docs` stem), is promoted into `manifest.chunks` by the
+    FIRST refresh. The SECOND refresh must still replay it with the ORIGINAL
+    `sources/extractions` root: before this fix, `_replay_targets` re-derived
+    a manifest chunk's root fresh on every call via the naming convention,
+    with no way to tell this chunk apart from one `build()` itself discovered.
+    """
+    extractions = tmp_path / "sources" / "extractions"
+    extractions.mkdir(parents=True, exist_ok=True)
+    chunk = extractions / "foo-docs.json"
+    chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    default_root = str(extractions)  # kb-merge's own default: the chunk's parent dir
+
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    graph._write_merged_chunks(
+        repo,
+        [
+            graph.MergedChunkEntry(
+                chunk=str(chunk), sha256=graph._sha256_file(chunk), root=default_root
+            )
+        ],
+    )
+
+    _stub_recompose(monkeypatch, [])
+    graph.refresh_self(repo)
+
+    manifest = graph._read_compose_manifest(repo)
+    assert manifest is not None
+    promoted_name = str(chunk.relative_to(repo))
+    assert promoted_name in manifest.chunks
+    assert manifest.chunk_roots.get(promoted_name) == default_root, (
+        f"the promoted chunk's root was not recorded correctly: {manifest.chunk_roots}"
+    )
+
+    # SECOND refresh: the ledger is empty (the first refresh reset it), so
+    # this chunk now replays purely from `manifest.chunks` — exactly the path
+    # the naming-convention fallback (`sources/foo`, wrong) would otherwise
+    # silently take over.
+    second_calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, second_calls)
+    graph.refresh_self(repo)
+
+    merge_argvs = [c for c in second_calls if str(graph._MERGE_SCRIPT) in c]
+    root_args = [c[3] for c in merge_argvs]
+    assert root_args == [default_root], (
+        f"the promoted chunk replayed with a re-derived root instead of its "
+        f"recorded one; got {root_args}, expected [{default_root!r}]"
+    )

@@ -244,7 +244,7 @@ def test_a_merge_whose_ledger_write_fails_does_not_report_success(
     _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
     chunk = _chunk(tmp_path)
 
-    def boom(_repo_root: Path, _chunk: str) -> None:
+    def boom(_repo_root: Path, _chunk: str, _root: str) -> None:
         raise OSError("no space left on device")
 
     monkeypatch.setattr(graph, "append_merged_chunk", boom)

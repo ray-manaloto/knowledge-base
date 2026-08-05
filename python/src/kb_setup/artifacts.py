@@ -12,7 +12,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from kb_setup import hyperedges
+from kb_setup import hyperedges, prose
 from kb_setup.graphify_env import clean_env, ensure_runtime_deps, graphify_exe
 
 # svg does a full matplotlib spring_layout: O(n^2)-ish (useless hairball at scale)
@@ -97,12 +97,41 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
             failures.append(name)
         elif rewrites:
             hyperedges.reattach(graph, carried)
+            # graph.json just changed underneath us — every OTHER writer of it
+            # in this codebase re-derives the prose graph as part of the same
+            # operation (`graphify_ops.merge_chunk`, `graphify_ops.label`, and
+            # `graph.build` via `label`); `report` was the one exception, so
+            # `kb-query --prose` went on describing whatever corpus existed
+            # before this run (#175 cold review, finding 3).
+            if _derive_prose(repo_root, name) != 0:
+                failures.append(name)
 
     if failures:
         print(f"[kb-artifacts] {len(failures)} failed: {', '.join(failures)}")
         return 1
     print("[kb-artifacts] all artifacts generated")
     _restamp(repo_root)
+    return 0
+
+
+def _derive_prose(repo_root: Path, name: str) -> int:
+    """Re-derive the prose graph after `name` rewrote graph.json; 1 on failure.
+
+    Mirrors `graphify_ops._derive_prose`'s semantics as its own small copy
+    rather than a shared import: that function is private to `graphify_ops`'s
+    own two callers (`merge_chunk`, `label`), and this one is small enough
+    that duplicating it costs less than coupling two modules with different
+    jobs over one helper — the same trade-off `hyperedges._write_atomic`'s own
+    docstring makes for its sibling in `prose.derive`.
+    """
+    try:
+        prose.derive_for(repo_root)
+    except (OSError, ValueError, SystemExit) as exc:
+        print(
+            f"    FAILED ({name}: rewrote graph.json but the prose graph could not "
+            f"be re-derived: {exc})"
+        )
+        return 1
     return 0
 
 

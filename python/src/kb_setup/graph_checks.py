@@ -54,18 +54,27 @@ _MAX_SEPARATORS = 1
 def assert_composition(graph_path: Path) -> None:
     """Refuse a `graph.json` that violates this build's composition invariants.
 
-    Loads the whole file with a plain `json.load` — accepted here, not
-    elsewhere in this codebase's stream-conscious writers, because the label
-    pass immediately before this call (`graphify_ops.label`) already loads the
-    same file whole in the same build; a second full parse is not a new cost
-    class it introduces.
+    Loads the whole file with a plain `json.load` EXACTLY ONCE — accepted
+    here, not elsewhere in this codebase's stream-conscious writers, because
+    this function is the only reader either count needs, and it needs both
+    from the SAME parsed dict. This docstring used to justify a single parse
+    by claiming `graphify_ops.label`'s subprocess "already loads the same file
+    whole in the same build" — true, but not a shared cost: that load happens
+    inside a separate `graphify` PROCESS that has already exited by the time
+    this function runs, so it bought this process nothing. The actual
+    mechanism used to call `hyperedges.capture(graph_path)` for the hyperedge
+    list on top of this function's own `json.loads` of the same bytes — TWO
+    live parses of a several-hundred-MB file at once, roughly double the
+    ~3.7x-of-file-size peak RSS `kb_setup.insights` measures for one (#175
+    cold review, finding 2). `hyperedges.capture_from_data` reads the
+    hyperedge list off THIS function's own already-parsed `data` instead.
 
     Enforces two things: (a) every node id contains at most
     :data:`_MAX_SEPARATORS` `::` separators, and (b) every hyperedge member —
-    read via :func:`kb_setup.hyperedges.capture`, which already reconciles
-    graph.json's two possible hyperedge slots — resolves to a node id in this
-    same file. Raises `SystemExit` with counts and a few example offenders on
-    either violation; returns `None` on success.
+    read via :func:`kb_setup.hyperedges.capture_from_data`, which already
+    reconciles graph.json's two possible hyperedge slots — resolves to a node
+    id in this same file. Raises `SystemExit` with counts and a few example
+    offenders on either violation; returns `None` on success.
     """
     data = json.loads(graph_path.read_text(encoding="utf-8"))
     nodes = data.get("nodes", [])
@@ -74,7 +83,7 @@ def assert_composition(graph_path: Path) -> None:
     bad_depth = sorted(nid for nid in ids if nid.count("::") > _MAX_SEPARATORS)
 
     dangling: list[str] = []
-    for edge in hyperedges.capture(graph_path):
+    for edge in hyperedges.capture_from_data(data):
         members = edge.get("nodes", edge.get("members"))
         if not isinstance(members, list):
             continue

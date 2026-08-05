@@ -99,7 +99,7 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     from kb_setup import graph
 
     try:
-        graph.append_merged_chunk(repo_root, chunk)
+        graph.append_merged_chunk(repo_root, chunk, src_root)
     except (OSError, ValueError) as exc:
         # NOT swallowed: the chunk really did merge and the prose graph really
         # did re-derive, but reporting rc=0 here would claim the operation is

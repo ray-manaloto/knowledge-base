@@ -50,6 +50,22 @@ type Hyperedge = dict[str, object]
 _GRAPH_MODE = 0o644
 
 
+def capture_from_data(data: dict[str, object]) -> list[Hyperedge]:
+    """The hyperedge list within an ALREADY-PARSED graph.json dict.
+
+    The pure half of :func:`capture`, split out so a caller that has already
+    parsed the file does not pay a SECOND full read+parse of a several-hundred
+    -MB file just to ask this one question. `graph_checks.assert_composition`
+    is exactly that caller: it needs the top-level node id set from its own
+    parse, and used to also call `capture(graph_path)` — a second `json.loads`
+    of the same bytes, with both copies live in memory at once — to get the
+    hyperedge list it needs from the SAME file (#175 cold review, finding 2).
+    `capture` itself is unchanged for every caller that has not already
+    parsed the file.
+    """
+    return _coalesce(_top(data), _nested(data))
+
+
 def capture(graph_path: Path) -> list[Hyperedge]:
     """The hyperedge list currently on `graph_path`, read from wherever it lives.
 
@@ -71,7 +87,7 @@ def capture(graph_path: Path) -> list[Hyperedge]:
     if not graph_path.is_file():
         return []
     data = json.loads(graph_path.read_text(encoding="utf-8"))
-    return _coalesce(_top(data), _nested(data))
+    return capture_from_data(data)
 
 
 def reattach(graph_path: Path, hyperedges: Sequence[Mapping[str, object]]) -> None:

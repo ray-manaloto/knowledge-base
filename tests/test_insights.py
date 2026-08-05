@@ -389,6 +389,61 @@ def test_iter_objects_ignores_a_field_nested_inside_metadata() -> None:
     assert result == [{"id": "outer", "repo": "the-real-one"}]
 
 
+def test_iter_objects_survives_a_multiline_list_of_strings_field() -> None:
+    """A bare string array element (`"foo",` — no `": "`) must not crash the scan.
+
+    `_field_name` accepts any line starting with a quote, so a list-of-strings
+    field's own array elements (e.g. `"aliases": ["foo", "bar"]`, written
+    multi-line by `json.dump(..., indent=N)`) look exactly like a KEY to it —
+    but carry no `": "` at all, and `_value`'s `split(":", 1)[1]` had nothing
+    to index: `IndexError`. This scan does not attempt to represent an
+    array-valued field correctly (it has no array parser, only brace-depth
+    tracking) — what it must not do is crash, and it must still capture this
+    element's ordinary SCALAR fields either side of the list. Reproduced
+    directly against `_iter_objects`, not `_scan`, because no committed corpus
+    input currently has a list-valued node/link field (#175 cold review,
+    finding 6 — "latent, not live").
+    """
+    lines = [
+        "    {\n",
+        '      "id": "n1",\n',
+        '      "aliases": [\n',
+        '        "foo",\n',
+        '        "bar"\n',
+        "      ],\n",
+        '      "repo": "r"\n',
+        "    },\n",
+        "  ],\n",
+        '  "links": [\n',
+    ]
+    result = list(insights._iter_objects(iter(lines), '"links": ['))
+    assert len(result) == 1
+    assert result[0]["id"] == "n1"
+    assert result[0]["repo"] == "r"
+
+
+def test_composition_total_edges_counts_a_link_with_no_confidence_field(tmp_path: Path) -> None:
+    """The denominator must be ALL links, not just ones carrying `confidence`.
+
+    `cross_origin_edges` is counted over every link regardless of whether it
+    has a tier (`_crosses_origin` never gates on `confidence`), so a
+    denominator counted only over TIERED links could print
+    `cross_origin_edges > total_edges` — not merely misleading, actually
+    unrepresentable — the moment one link lacks the field. This link crosses
+    origin AND carries no `confidence` at all, so `total_edges` must still
+    count it (#175 cold review, finding 7).
+    """
+    nodes = [
+        {"id": "a1", "_origin": "ast", "community": 1},
+        {"id": "s1", "_origin": "semantic", "community": 2},
+    ]
+    links = [{"source": "a1", "target": "s1"}]  # no "confidence" at all
+    g = _write_full_graph(tmp_path / "graphify-out", nodes=nodes, links=links)
+    comp = insights.composition(g)
+    assert comp.cross_origin_edges == 1
+    assert comp.total_edges == 1
+
+
 def test_scan_survives_a_populated_graph_hyperedges_before_top_level_nodes(
     tmp_path: Path,
 ) -> None:
