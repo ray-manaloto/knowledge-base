@@ -618,3 +618,123 @@ def test_the_primary_artifact_is_never_a_view_of_itself(tmp_path: Path) -> None:
     recorded = sync.stamped_views(sync.read_stamp(tmp_path, spec))
     assert recorded is not None
     assert "graphify-out/graph.json" not in recorded
+
+
+# --- the wiring, which is where round 2 found BOTH its findings --------------
+#
+# `views.py` was unit-tested in isolation and both defects lived one layer out:
+# the verdict reached `decide()` as a bare tuple that is empty for NOT_VERIFIABLE,
+# and it never reached `RunRecord` at all. The cold lane's own note on why it
+# stayed hidden is the reason these tests exist — `tests/test_currency_run.py`
+# stubs `_run_one` outright, so nothing exercised the path end to end.
+
+
+def test_gate_six_blocks_an_auto_apply_on_views_it_could_not_verify(tmp_path: Path) -> None:
+    """ROUND 2's P1. `NOT_VERIFIABLE` must raise an ambiguity, not pass silently.
+
+    `_gate_sync`'s own docstring says "silence on this path is consent", and the
+    first fix implemented that for STALE only — whose `stale` tuple is empty for
+    every not-verifiable verdict, so a check that verified NOTHING arrived looking
+    exactly like a clean one and a 6/6 bump auto-applied over it.
+    """
+    from kb_setup.currency.decide import _gate_sync
+
+    repo = _repo(tmp_path)
+    _stamp(repo)  # no bracket -> provenance unknown for all three
+    status = _check(repo)
+    assert status.state == views.NOT_VERIFIABLE, "fixture must produce the state under test"
+    assert not status.stale, "and it must produce it with an EMPTY stale tuple — the whole gap"
+
+    gated = _gate_sync(sync.SyncStatus("graphify", "1", "1", ()), status)
+
+    assert gated is not None
+    assert "could not be verified" in gated.question
+    assert "kb-artifacts" in gated.recommendation
+
+
+def test_gate_six_is_silent_when_the_views_are_verified(tmp_path: Path) -> None:
+    """CONTROL ARM: the gate must be able to produce the other answer.
+
+    Without this, a `_gate_sync` hardcoded to always raise would satisfy both the
+    stale test and the not-verifiable test above and block every bump forever.
+    """
+    from kb_setup.currency.decide import _gate_sync
+
+    repo = _repo(tmp_path)
+    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# r\n", graphml="<g/>\n", wiki="# w\n")
+    status = _check(repo)
+    assert status.state == views.OK
+
+    assert _gate_sync(sync.SyncStatus("graphify", "1", "1", ()), status) is None
+
+
+def test_gate_six_blocks_on_stale_views_too(tmp_path: Path) -> None:
+    """The other loud state, so neither branch can be dropped without a test dying."""
+    from kb_setup.currency.decide import _gate_sync
+
+    repo = _repo(tmp_path)
+    _stamp(repo)
+    _regenerate(repo, GRAPH_REPORT="# r\n", graphml="<g/>\n", wiki="# w\n")
+    (repo / "graphify-out" / "graph.json").write_text(
+        json.dumps({"nodes": [{"id": "moved"}]}), encoding="utf-8"
+    )
+    status = _check(repo)
+    assert status.state == views.STALE
+
+    gated = _gate_sync(sync.SyncStatus("graphify", "1", "1", ()), status)
+
+    assert gated is not None
+    assert "earlier graph" in gated.question
+
+
+def test_the_run_record_carries_the_real_views_status_not_the_default(tmp_path: Path) -> None:
+    """ROUND 2's second P2: computed, used, and then dropped on the floor.
+
+    `RunRecord.views` defaults to SKIP, and `_run_one` built the record without
+    passing the status it had just computed — so `--json` serialized `skip`
+    forever, breaking the machine surface `_payload`'s docstring says it added.
+    A default that is SAFE is not a default that is CORRECT, and only an
+    end-to-end assertion can tell those apart.
+    """
+    from kb_setup.currency import report as report_mod
+    from kb_setup.currency.decide import Verdict
+    from kb_setup.currency.upstream import UpstreamStatus
+
+    def _record(view_status: views.ViewStatus | None = None) -> report_mod.RunRecord:
+        """A minimal RunRecord. Real objects rather than None — the fields are typed.
+
+        An explicit optional rather than an untyped `**kwargs` splat, so the
+        default-vs-supplied distinction this test exists to draw is visible in the
+        signature instead of hidden in a splat ty cannot check.
+        """
+        verdict = Verdict("graphify", "1", "1", auto_apply=False, gates_passed=(), ambiguities=())
+        status = sync.SyncStatus("graphify", "1", "1", ())
+        if view_status is None:
+            return report_mod.RunRecord(
+                tool="graphify",
+                sync=status,
+                upstream=UpstreamStatus(),
+                observations=(),
+                moved=(),
+                verdict=verdict,
+            )
+        return report_mod.RunRecord(
+            tool="graphify",
+            sync=status,
+            upstream=UpstreamStatus(),
+            observations=(),
+            moved=(),
+            verdict=verdict,
+            views=view_status,
+        )
+
+    repo = _repo(tmp_path)
+    _stamp(repo)
+    real = _check(repo)
+    assert real.state == views.NOT_VERIFIABLE
+
+    assert _record(real).views.state == views.NOT_VERIFIABLE
+    assert _record().views.state == views.SKIP, (
+        "the default must stay SKIP — not checked is not a pass"
+    )

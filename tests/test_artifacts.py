@@ -252,8 +252,10 @@ def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypa
     _graph_with_hyperedge(tmp_path)
     calls: list[tuple[Path, str]] = []
 
-    def fake_refresh(repo_root: Path, *, tag: str, regenerated_views: bool = False) -> None:
-        assert not regenerated_views
+    def fake_refresh(
+        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
+        assert views_before is None, "a failed run must not certify anything"
         calls.append((repo_root, tag))
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])

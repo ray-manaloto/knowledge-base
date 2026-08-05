@@ -639,6 +639,18 @@ def view_records(
     regenerates none) all fall out of the same comparison, with nothing
     enumerated anywhere and no caller asserting more than it did.
 
+    **What the bracket does NOT close, stated rather than left to be rediscovered.**
+    It bounds one PROCESS, not the file. `primary_fp` is read when `view_records`
+    runs, so if another `kb-*` operation rewrites `graph.json` after a view was
+    regenerated inside this bracket but before this line, the view is certified
+    against a graph it was never generated from. Nothing in `kb_setup` locks —
+    `grep -rnE "FileLock|flock|fcntl" python/src/kb_setup/` returns nothing — and
+    this repo's workflow is single-agent and serialized through `kb-*` tasks
+    (`mise-tasks-only.md`), which is a convention rather than an enforcement.
+    Reported by the cold lane, round 2, correctly rated narrow. Tracked rather
+    than fixed here: a lock is a different change with its own failure modes, and
+    inventing one inside a review round is how a narrow gap becomes a wide one.
+
     Three outcomes per view, and only the first is a certification:
 
     * changed within the bracket -> the current graph fingerprint;

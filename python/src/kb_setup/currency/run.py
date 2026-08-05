@@ -227,7 +227,11 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
         upstream=up,
         moved=moved,
         observations=observations,
-        stale_views=view_status.stale,
+        # The WHOLE status, not just its stale lines. Passing `view_status.stale`
+        # was round 2's P1: that tuple is empty for every NOT_VERIFIABLE verdict,
+        # so a views check that could not verify anything reached gate 6 looking
+        # exactly like a clean one.
+        views=view_status,
     )
     return report.RunRecord(
         tool=spec.name,
@@ -236,6 +240,10 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
         observations=observations,
         moved=moved,
         verdict=verdict,
+        # Round 2's second P2: this was computed, used for the verdict, and then
+        # dropped — so `_payload` serialized the SKIP default forever, breaking the
+        # machine surface its own docstring says it exists to provide.
+        views=view_status,
     )
 
 

@@ -20,11 +20,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from kb_setup.currency import views as views_mod
 from kb_setup.currency.upstream import UpstreamStatus, Version, same_release
 
 if TYPE_CHECKING:
     from kb_setup.currency.issues import Observation
     from kb_setup.currency.sync import SyncStatus
+    from kb_setup.currency.views import ViewStatus
 
 GATES = (
     "patch-level bump",
@@ -314,19 +316,28 @@ def _gate_local(observations: tuple[Observation, ...]) -> Ambiguity | None:
     )
 
 
-def _gate_sync(sync: SyncStatus, stale_views: tuple[str, ...] = ()) -> Ambiguity | None:
+def _gate_sync(sync: SyncStatus, views: ViewStatus | None = None) -> Ambiguity | None:
     """Gate 6. Blocks on drift, and equally on a check that never got to run.
 
-    `stale_views` is the derived-views verdict (#182), and it belongs to THIS gate
-    rather than a seventh one. The gate is named "step 1 currently green" and a
-    stale view is a step-1 finding — it was simply reported under its own header,
-    so this function, reading only `sync.drifted`/`sync.blind`, could not see it.
-    A cold review caught that: a genuinely stale `wiki/` could not block an
-    otherwise-6/6 AUTO-APPLY, on a gate whose name says it would.
+    `views` is the derived-views verdict (#182), and it belongs to THIS gate rather
+    than a seventh one. The gate is named "step 1 currently green" and a stale view
+    is a step-1 finding — it was simply reported under its own header, so this
+    function, reading only `sync.drifted`/`sync.blind`, could not see it. A cold
+    review caught that: a genuinely stale `wiki/` could not block an otherwise-6/6
+    AUTO-APPLY, on a gate whose name says it would.
 
-    It is deliberately not fatal-by-itself-forever: like every other ambiguity
-    here it raises a question the human answers. What it must not do is stay
-    silent, because silence on this path is consent.
+    It is deliberately not fatal-by-itself-forever: like every other ambiguity here
+    it raises a question the human answers. What it must not do is stay silent,
+    because silence on this path is consent.
+
+    **BOTH loud states, and the first fix shipped only one.** It took a `tuple` of
+    stale lines, which is empty for every `NOT_VERIFIABLE` verdict — so a views
+    check that could not verify anything was invisible to the gate, on the very
+    change whose purpose was closing that class of gap. The cold lane rated the
+    second round P1 and quoted the paragraph above back: silence is consent, and
+    *not verifiable* is silence. It takes the whole `ViewStatus` now, so a state
+    this gate has not been taught about cannot arrive looking like a pass — the
+    same reason `sync` splits SKIP from BLIND two paragraphs up.
 
     This used to name the checks that had to pass (`("resolution", "build-stamp")`)
     and let everything else SKIP. Two things were wrong with that. It omitted
@@ -363,19 +374,34 @@ def _gate_sync(sync: SyncStatus, stale_views: tuple[str, ...] = ()) -> Ambiguity
             ),
             recommendation="Run where the tool is installed, so the bump is made on evidence.",
         )
-    if stale_views:
+    if views is not None and views.stale:
         return Ambiguity(
             gate=GATES[5],
             question="Derived views describe an earlier graph. Bump anyway?",
             detail=(
                 "Generated outputs out of date with the graph they came from: "
-                + "; ".join(stale_views)
+                + "; ".join(views.stale)
             ),
             recommendation=(
                 "Run `mise run kb-artifacts` first — NOT `kb-build`, which does not "
                 "regenerate them. A bump made over stale views leaves it unclear "
                 "afterwards whether a difference came from the new version or the "
                 "old outputs."
+            ),
+        )
+    if views is not None and views.state == views_mod.NOT_VERIFIABLE:
+        return Ambiguity(
+            gate=GATES[5],
+            question="The derived views could not be verified at all. Bump anyway?",
+            detail=(
+                f"{views.detail or 'no reason recorded'}"
+                + ("; " + "; ".join(views.blind) if views.blind else "")
+                + ". Nothing disagreed, but this check never ran."
+            ),
+            recommendation=(
+                "Run `mise run kb-artifacts` so the stamp records what each view was "
+                "generated from, then re-run. Bumping now would rest on a check that "
+                "produced no answer."
             ),
         )
     return None
@@ -387,7 +413,7 @@ def decide(
     upstream: UpstreamStatus,
     moved: tuple[Observation, ...],
     observations: tuple[Observation, ...] = (),
-    stale_views: tuple[str, ...] = (),
+    views: ViewStatus | None = None,
 ) -> Verdict:
     """Apply the six gates and return what should happen next.
 
@@ -402,7 +428,7 @@ def decide(
         for g in (
             _gate_extras(sync),
             _gate_issues(moved, observations),
-            _gate_sync(sync, stale_views),
+            _gate_sync(sync, views),
         )
         if g
     ]
