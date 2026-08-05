@@ -9,16 +9,16 @@ so consumers query on clone and `update` can diff incrementally.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 import subprocess
+import tempfile
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
+from kb_setup import graph_checks, graphify_ops
 from kb_setup import manifest as mf
-from kb_setup import prose
 from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
@@ -158,14 +158,6 @@ _SELF_ROOT = "."
 #: root-only extraction. `--out` redirects it. Gitignored, derived, disposable.
 _SELF_OUT = ".self-graph"
 
-#: The aggregate as it stands BEFORE our own code is merged in — everything the
-#: pinned manifests and committed doc chunks contribute, and nothing of ours.
-#: `kb-watch` restarts from this rather than appending to graph.json, which is the
-#: only thing that makes repeated refreshes idempotent (see `refresh_self`).
-#: Public because the tests import it: a restated literal keeps passing after a
-#: rename, asserting on a filename nothing writes.
-BASE_GRAPH_NAME = ".base-graph.json"
-
 #: Where `scope = study` sources land — repos we are analysing rather than
 #: learning from. They are still fully ingested — no exclusions — just not ranked
 #: beside the corpus.
@@ -186,20 +178,6 @@ BASE_GRAPH_NAME = ".base-graph.json"
 #: and a reader reaching for it to justify the next partition would be reasoning
 #: from a defect. See `_merge_sources_into`.
 STUDY_GRAPH_NAME = "study-graph.json"
-
-#: sha256 of the `graph.json` that the base snapshot is known to compose with.
-#: `refresh_self` refuses unless the current `graph.json` still matches it.
-#:
-#: THIS EXISTS BECAUSE THE SNAPSHOT ALONE IS NOT SAFE, found by a cold review.
-#: `.base-graph.json` is written only by `build()`, but it is NOT the only writer
-#: of `graph.json` — `kb-merge` folds in a doc-extraction chunk and `kb-label`
-#: rewrites the graph outright, both documented as legitimate no-LLM steps
-#: BETWEEN builds. So `kb-build` → `kb-merge` → `kb-watch` restored a base that
-#: predates the merge, silently discarding it, and then restamped the result as
-#: verified — `kb-currency-check` reported clean. Silent data loss wearing a
-#: green light, which is the one failure mode the whole currency engine exists to
-#: prevent.
-BASE_GUARD_NAME = ".base-graph.sha256"
 
 
 def _self_subgraph(repo_root: Path) -> Path:
@@ -253,236 +231,39 @@ def _extract_self(repo_root: Path) -> list[Path]:
     return [_self_subgraph(repo_root)]
 
 
-def refresh_self(repo_root: Path) -> int:
-    """Re-extract this repo's own code into the AGGREGATE graph, then restamp.
+def refresh_self(_repo_root: Path) -> NoReturn:
+    """Refuse — `kb-watch` has no recomposition story under the single-merge build.
 
-    The freshness half of self-indexing (`kb-watch`). `build()` indexes our code
-    once; this keeps it current between builds, incrementally and without an LLM.
+    THIS IS A STUB, and the reason is worth recording precisely rather than
+    leaving a bare refusal. The incremental refresh this replaces restarted
+    `graph.json` from `.base-graph.json` — a snapshot of the corpus taken
+    BEFORE our own code was merged in — then re-extracted and re-merged just
+    the self sub-graph back in. That mechanism existed only because `build()`
+    used to compose the corpus and merge our code in as a SEPARATE, later step,
+    which meant "everything except our code" was a real, snapshottable state.
 
-    WHY THIS IS NOT A WATCHER, recorded because the obvious reading of the task
-    name is wrong. `graphify watch <path>` was the intended mechanism and cannot
-    do this job: measured on the PINNED 0.9.31 — which is what `graphify_exe`
-    resolves, and NOT what a bare `graphify` reaches (a 0.9.32 also exists on
-    this host; reading the wrong one is how the first draft of this comment cited
-    the wrong version) — its entire CLI surface is one
-    positional path (`_watch(watch_path)` — no `--out`, no merge target, no
-    post-rebuild hook, control-armed against `merge-graphs`, which DOES parse
-    `--out`), and it rebuilds only `<path>/graphify-out/graph.json`. But `affected`
-    reads the AGGREGATE, and `currency.toml` fingerprints the aggregate, so a watch
-    on `python/` refreshes neither. Pointing it at the repo root instead would try
-    to overwrite the merged 130k-node graph with a root-only extraction; graphify's
-    `_check_shrink` refuses that, so it fails loudly rather than destroying the
-    corpus, but it is not a design. Ray chose the one-shot refresh over a
-    homegrown poll loop (2026-08-01) — this stays native, and `use-tool-builtins`
-    is satisfied because the loop we would have written has no tool feature behind
-    it.
+    #175 removed that separable step: the self sub-graph is now one ordinary
+    input to the SAME single N-ary `merge-graphs` call the corpus sources go
+    through (see `build()` and `_merge_sources_into`), so there is no longer a
+    "before our code" state to snapshot or restart from. Reintroducing a
+    snapshot now would mean composing corpus-only and corpus+self as two
+    separate merges again — exactly the shape #175 removed, and exactly the
+    shape that re-prefixes an already-merged graph's ids (#120) the moment a
+    refresh actually needs to run.
 
-    Order matters. Our code is re-extracted into its sub-graph FIRST and merged
-    after, because merging a sub-graph we have not refreshed would restamp a
-    graph that gained nothing — a green stamp over stale content, which is the
-    one failure this whole currency mechanism exists to prevent.
-
-    This said "Each tree is re-extracted into its own sub-graph" until 2026-08-02
-    and described a per-tree loop the same commit had already replaced with one
-    root (#101). Caught by the cold lane — see the "ONE extraction run, over ONE
-    root" block in this function's body, which warns about the same class of
-    drift and lost a round to it too.
+    A real incremental refresh under the one-merge shape needs its own design
+    — recomposing from the pinned corpus sub-graphs plus a freshly re-extracted
+    self sub-graph, without ever feeding `graph.json` itself back into a merge
+    — and that design is the next task on this branch, not a resurrection of
+    the base-guard machinery this replaces. That machinery had already needed
+    two rounds of cold-review fixes (a competing-writer race, then a
+    re-check-before-swap race) to be safe for a shape that no longer exists.
+    Refusing loudly here is cheaper than migrating it forward unexamined.
     """
-    out = repo_root / "graphify-out" / "graph.json"
-    base = out.parent / BASE_GRAPH_NAME
-    if not base.is_file():
-        raise SystemExit(f"no graphify-out/{BASE_GRAPH_NAME} — run `mise run kb-build` first")
-
-    # FAIL CLOSED if anything else has written graph.json since the snapshot was
-    # composed. `kb-merge` and `kb-label` both legitimately do, and restoring the
-    # base over their output would discard it in silence — then restamp the
-    # result as verified. Refusing costs a rebuild; not refusing costs the merge
-    # AND the ability to notice it went missing.
-    _assert_base_guard(repo_root, "since the snapshot was written")
-
-    # STAGED, then swapped in one `os.replace`. Writing straight into `out` meant
-    # the copy above wiped every self node FIRST and the extract/merge loop then
-    # rebuilt them on disk, so any failure part-way — a graphify crash, a Ctrl-C —
-    # left graph.json strictly WORSE than before the refresh started, with no
-    # rollback and `affected` back to "No unique node match". A refresh that can
-    # damage the artifact it refreshes is not a refresh. (Cold lane, 04312f3.)
-    staging = out.with_name(out.name + ".refresh")
-    shutil.copy(base, staging)
-
-    # ONE extraction run, over ONE root, always `extract --force`, never `update`.
-    #
-    # Two separate constraints landed on this line, and both are load-bearing:
-    #
-    # * NEVER `update`. The first draft branched — `update` when a sub-graph
-    #   existed, `extract` otherwise — on the reasoning that "the two paths
-    #   differ in cost, not in result". Measured, that was false: the same file
-    #   came out as `source_file='src/kb_setup/graph.py'` down one path and
-    #   `'python/src/kb_setup/graph.py'` down the other, so the aggregate ended
-    #   up disagreeing with itself about where our own code lives. A cheaper path
-    #   that yields different data is not the same path, and a comment asserting
-    #   otherwise is how it survived review.
-    # * ONE root, not one per tree (#101). Per-tree runs put `python/` and
-    #   `tests/` in namespaces `merge-graphs` cannot bridge, so `affected` could
-    #   never answer "which tests cover this symbol" about our own code.
-    _run(_self_extract_argv(repo_root), repo_root)
-    _run(
-        [
-            graphify_exe(repo_root),
-            "merge-graphs",
-            str(staging),
-            str(_self_subgraph(repo_root)),
-            "--out",
-            str(staging),
-        ],
-        repo_root,
+    raise SystemExit(
+        "kb-watch recomposition not yet implemented after the single-merge "
+        "restructure — run `mise run kb-build`"
     )
-
-    # RE-CHECK IMMEDIATELY BEFORE THE SWAP. The check at the top of this function
-    # is a time-of-check, and the swap below is the time-of-use — separated by a
-    # multi-minute extract+merge loop. A `kb-merge` landing inside that window was
-    # invisible to the first check, got clobbered by the swap, and then had the
-    # guard REARMED over it, certifying the corrupted graph as verified. Exactly
-    # the bug the guard was added to prevent, surviving inside the fix for it.
-    # (Cold lane round 2, 0f22927 — reproduced live against the shipped function.)
-    _assert_base_guard(repo_root, "during the refresh")
-
-    # The swap. Atomic on POSIX, so graph.json is either wholly the old corpus or
-    # wholly the new one — never a half-merged intermediate.
-    staging.replace(out)
-
-    # graph.json changed, so the prose graph derived FROM it is now stale. Every
-    # writer of graph.json re-derives it (`kb-build`/`kb-merge`/`kb-label`); a
-    # writer that skips this leaves `kb-query --prose` describing an older corpus.
-    prose.derive_for(repo_root)
-
-    # Re-arm the guard for the NEXT refresh, against the graph we just wrote.
-    # Skipping this would make the very next `kb-watch` refuse against its own
-    # output — a gate that fires on the honest path teaches people to remove it.
-    _write_base_guard(repo_root)
-    _restamp_self(repo_root)
-    print("[kb-watch] refreshed python/ + tests/ into graphify-out/graph.json")
-    return 0
-
-
-def _digest(path: Path) -> str:
-    """sha256 of a file, or "" if it cannot be read.
-
-    Content, not `size:mtime_ns`. The stamp uses mtime for OUTPUTS because
-    digesting a 382 MB graph on every check is 142x slower (#89) — but this runs
-    once per `kb-watch`, not once per session, and it must survive a rewrite that
-    happens to land on the same size. "Cheap enough there" and "correct enough
-    here" are different questions.
-    """
-    try:
-        h = hashlib.sha256()
-        with path.open("rb") as fh:
-            for chunk in iter(lambda: fh.read(1 << 20), b""):
-                h.update(chunk)
-        return h.hexdigest()
-    except OSError:
-        return ""
-
-
-def _write_base_guard(repo_root: Path) -> None:
-    """Record the digest of the graph.json the base snapshot composes with."""
-    out = repo_root / "graphify-out" / "graph.json"
-    digest = _digest(out)
-    if not digest:
-        return
-    try:
-        (out.parent / BASE_GUARD_NAME).write_text(digest, encoding="utf-8")
-    except OSError as e:
-        # Loud, not silent: an unwritten guard makes the NEXT refresh proceed
-        # unchecked, so the operator must know the protection is off.
-        print(
-            f"[kb-watch] WARNING: could not write {BASE_GUARD_NAME}: {e} — "
-            f"the next refresh will not be able to detect a competing writer."
-        )
-
-
-def _read_base_guard(repo_root: Path) -> str | None:
-    """The recorded digest; None when the guard file does not exist.
-
-    ABSENT and UNREADABLE are different answers and must not collapse, which is
-    the distinction the first version got wrong: a bare `except OSError: return
-    ""` made a 0-byte guard (an interrupted write — realistic, this repo has a
-    whole rule about killing wedged processes) and a guard that is a directory
-    both read as "no guard", silently disabling a check whose own comment says
-    FAIL CLOSED. Reproduced by the cold lane: 0-byte guard -> silent revert,
-    exit 0, no error at all.
-
-    So: None means the file is not there — a graph built before this guard
-    existed, which proceeds, because refusing those would break every existing
-    clone to catch a case that cannot have happened there. Anything else that
-    goes wrong RAISES, and the caller refuses. Unknown is not permission.
-    """
-    path = repo_root / "graphify-out" / BASE_GUARD_NAME
-    if not path.exists():
-        return None
-    digest = path.read_text(encoding="utf-8").strip()
-    if not digest:
-        raise SystemExit(
-            f"graphify-out/{BASE_GUARD_NAME} exists but is EMPTY — most likely an "
-            f"interrupted write. Refusing rather than treating it as absent, because "
-            f"an unverifiable guard cannot certify that nothing else wrote graph.json.\n"
-            f"  Run `mise run kb-build` to rebuild the snapshot and the guard together."
-        )
-    return digest
-
-
-def _assert_base_guard(repo_root: Path, when: str) -> None:
-    """Refuse unless graph.json still matches the digest the snapshot composes with.
-
-    Called TWICE — once before the copy and once immediately before the atomic
-    swap. Both are needed: the pair brackets the extract+merge loop, which is
-    where a concurrent `kb-merge` would otherwise slip in unseen.
-    """
-    expected = _read_base_guard(repo_root)
-    if expected is None:
-        return
-    out = repo_root / "graphify-out" / "graph.json"
-    actual = _digest(out) if out.is_file() else ""
-    if actual and expected != actual:
-        raise SystemExit(
-            f"graphify-out/graph.json changed {when} "
-            f"(expected sha256 {expected[:12]}, found {actual[:12]}).\n"
-            f"  `kb-merge` and `kb-label` both write graph.json and neither refreshes "
-            f"the snapshot, so continuing would silently discard their work.\n"
-            f"  Run `mise run kb-build` to rebuild the snapshot and the graph together."
-        )
-
-
-def _restamp_self(repo_root: Path) -> None:
-    """Refresh the stamp's artifact fingerprints after a self-refresh.
-
-    `restamp_artifacts` and not `write_stamp`: the graph changed but the BUILDER
-    did not, so version and source_ref are carried forward rather than re-observed.
-    Re-observing would be worse than redundant — it would let a graphify upgrade
-    mid-session silently relabel a graph the previous version actually built.
-
-    Without this the refresh is actively harmful: `artifact_fingerprints` is
-    `size:mtime_ns`, so any rewrite of graph.json moves it, and every later
-    `kb-currency-check` reports the graph as not verifiably built by the pin —
-    a permanent red that means nothing, which is how a real signal gets ignored.
-    Best-effort, like every other stamp path here: a refresh must not fail over
-    its own bookkeeping.
-    """
-    try:
-        from kb_setup.currency import sync
-
-        spec = _currency_spec(repo_root)
-        if spec is None:
-            return
-        path = sync.restamp_artifacts(repo_root, spec)
-        if path is None:
-            print(
-                "[kb-watch] WARNING: no build stamp to refresh — run `mise run kb-build`; "
-                "currency step 1 will report this graph as never stamped."
-            )
-            return
-        print(f"[kb-watch] restamped {path.name}")
-    except (OSError, ValueError, ImportError) as e:
-        print(f"[kb-watch] WARNING: could not restamp: {e}")
 
 
 def _merge_sources_into(repo_root: Path, out: Path, inputs: list[Path]) -> None:
@@ -553,6 +334,47 @@ def _build_study_graph(repo_root: Path, sources: Path, out_dir: Path, study: lis
     _merge_sources_into(
         repo_root, study_out, [sources / n / "graphify-out" / "graph.json" for n in study]
     )
+
+
+def _cluster_study_graph(repo_root: Path, study_out: Path) -> None:
+    """Deterministically re-cluster `study_out` THROUGH the graphify binary.
+
+    A no-op when there is nothing to cluster (no study sources this build, or a
+    study source that produced no graph) — matching `_build_study_graph`'s own
+    early return rather than raising over an absent optional artifact.
+
+    VERIFIED MECHANISM (installed graphify 0.9.33 `cli.py`, the
+    `cmd in ("cluster-only", "label")` branch — never run graphify by hand here;
+    read the installed source instead). `--graph <path>` controls only where the
+    run LOADS from (`graph_json = graph_override if ... else watch_path /
+    _GRAPHIFY_OUT / "graph.json"`, cli.py:1640). The WRITE target is computed
+    separately and does NOT follow it: `out = graph_json.parent` only when that
+    parent directory is literally named `graphify-out` (cli.py:1711-1716), and
+    either way the final write is `to_json(G, communities, str(out /
+    "graph.json"), ...)` (cli.py:1862) — the LITERAL string `"graph.json"`,
+    never `graph_json.name`. So `--graph graphify-out/study-graph.json` would
+    LOAD the study graph but WRITE its clustered result to
+    `graphify-out/graph.json` — the aggregate — because that path's parent
+    directory happens to also be named `graphify-out`. No flag changes this.
+
+    The only safe invocation is therefore to give the run its OWN isolated
+    `<tmp>/graphify-out/graph.json` to read and write: with no `--graph`
+    override, `graph_json` resolves to exactly that path by default, so both
+    the load and the write stay inside the throwaway directory and the real
+    aggregate is never touched. `--no-label` keeps this deterministic —
+    placeholder `"Community {cid}"` names, no hub-labeler, no LLM call
+    (cli.py:1797-1799) — and `--no-viz` skips the `graph.html` render, which
+    this graph is never served from.
+    """
+    if not study_out.is_file():
+        return
+    with tempfile.TemporaryDirectory(prefix="kb-study-cluster-") as tmp:
+        work = Path(tmp)
+        staged = work / "graphify-out" / "graph.json"
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(study_out, staged)
+        _run([graphify_exe(repo_root), "cluster-only", ".", "--no-label", "--no-viz"], work)
+        shutil.copy(staged, study_out)
 
 
 def build(repo_root: Path) -> None:
@@ -644,20 +466,29 @@ def build(repo_root: Path) -> None:
     if not corpus:
         raise SystemExit("no CORPUS source produced code nodes (only scope=study ones did)")
 
-    # Compose graph.json from every code-bearing CORPUS source in ONE merge (#120).
-    # Not a seed-plus-loop: that fed the accumulator back in per source and
-    # re-prefixed it each time — see `_merge_sources_into`. It also mistagged the
-    # seed, which sat at `graphify-out/graph.json` when `distinct_repo_tags` read
-    # `parent.parent`, so the first source's nodes were labelled with the REPO name
-    # instead of their own. Every source now carries its own tag, exactly once.
-    print(f"[kb-build] composing graph.json from {len(corpus)} corpus source(s)")
+    # Compose graph.json from every code-bearing CORPUS source AND our own code
+    # in ONE merge. Self joins this call rather than a second one as of #175 —
+    # see `_merge_sources_into` for why pairwise/sequential merging duplicates
+    # prefixes (#120), and `refresh_self` for why that removes its old
+    # incremental-restart path. Every source (and self) now carries its own
+    # tag, exactly once.
+    self_subgraphs = _extract_self(repo_root)
+    print(f"[kb-build] composing graph.json from {len(corpus)} corpus source(s) + our own code")
     _merge_sources_into(
-        repo_root, out, [sources / n / "graphify-out" / "graph.json" for n in corpus]
+        repo_root,
+        out,
+        [sources / n / "graphify-out" / "graph.json" for n in corpus] + self_subgraphs,
     )
 
     _build_study_graph(repo_root, sources, out.parent, study)
+    _cluster_study_graph(repo_root, out.parent / STUDY_GRAPH_NAME)
 
     # Doc layer: replay the committed host-agent extractions (free — no subagents).
+    # MERGE-ONLY (#169): `_merge_docs.py` no longer clusters, scores, or reports
+    # per chunk — 17 of 18 such passes were discarded and never read. It loads
+    # graph.json, merges the chunk, reconstructs communities from what the graph
+    # already carries, and writes. The real clustering/labelling happens ONCE,
+    # below, after every chunk has landed — not once per chunk.
     gpy = graphify_python(repo_root)
     # Already validated at the TOP of build(), before anything wrote graph.json.
     print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
@@ -666,33 +497,23 @@ def build(repo_root: Path) -> None:
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
 
-    # THE BASE SNAPSHOT — taken here, after every external contribution and before
-    # a single node of ours. Order is the entire correctness argument: a snapshot
-    # taken one step later would be a perfectly valid file that reintroduces the
-    # duplication it exists to prevent, and nothing downstream would notice.
-    base = out.parent / BASE_GRAPH_NAME
-    shutil.copy(out, base)
-    print(f"[kb-build] snapshotted {BASE_GRAPH_NAME} — the corpus without our own code")
+    # ONE final label pass — deterministic (no LLM; see `graphify_ops.label`'s own
+    # docstring) — re-clusters the fully-composed graph, carries hyperedges across
+    # graphify's own label/cluster-only round-trip (#171 — measured 5->0 without
+    # this), and re-derives the prose graph as its own last step. `build()` no
+    # longer calls `prose.derive_for` itself: this IS that call now, made by the
+    # function that already has to load graph.json for the label pass, rather
+    # than a second, separate load of the same file.
+    label_rc = graphify_ops.label(repo_root)
+    if label_rc != 0:
+        raise SystemExit(f"[kb-build] final label pass failed (rc={label_rc}) — aborting")
 
-    # Our own library and test tree, merged LAST. They are also the only part
-    # `kb-watch` re-merges, so keeping them at the end is what lets that task
-    # reproduce this exact state from the snapshot above rather than append to it.
-    for sub in _extract_self(repo_root):
-        _run(
-            [graphify_exe(repo_root), "merge-graphs", str(out), str(sub), "--out", str(out)],
-            repo_root,
-        )
+    # The composition invariants #120 and #171/#175 depend on: every id carries
+    # at most one merge prefix, every carried hyperedge still resolves. Checked
+    # HERE, on the artifact this build just produced, so a regression is caught
+    # on the next build rather than only on the next `mise run test`.
+    graph_checks.assert_composition(out)
 
-    # The prose-only derived graph, from the graph we just built. Here and not in
-    # a separate task-you-must-remember: it is a pure function of graph.json, so
-    # any build that does not refresh it leaves a scoped corpus describing an
-    # older one — and a retrieval figure measured against a stale corpus is the
-    # inherited-number trap with extra steps. `kb-prose` re-derives it alone.
-    prose.derive_for(repo_root)
-
-    # Arm the base guard against the graph we just produced, so a later
-    # `kb-watch` can tell whether anything else has written it since.
-    _write_base_guard(repo_root)
     _stamp_build(repo_root, inputs)
     print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 

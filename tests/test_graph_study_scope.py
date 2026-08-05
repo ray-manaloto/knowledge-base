@@ -65,7 +65,13 @@ def _build(monkeypatch, tmp_path: Path) -> list[list[str]]:
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
-    monkeypatch.setattr(graph.prose, "derive_for", lambda _root: None)
+    # `graphify_ops.label` and `graph_checks.assert_composition` both run
+    # against REAL graph.json content (a subprocess; a `json.load`), and
+    # `merge_recorder`'s stand-in for `merge-graphs` concatenates each
+    # fixture's raw text rather than producing valid JSON — enough for the
+    # substring assertions this file makes, not enough for either of these.
+    monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
     monkeypatch.setattr(graph, "_run", merge_recorder(calls))
 
     graph.build(tmp_path)
