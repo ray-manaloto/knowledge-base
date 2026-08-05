@@ -87,7 +87,35 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
         # either would replace a valid prose graph with one nobody asked for.
         # The caller's job here is the failed merge, and this rc says so.
         return rc
-    return _derive_prose(repo_root, tag="kb-merge", did="the chunk merged")
+    prose_rc = _derive_prose(repo_root, tag="kb-merge", did="the chunk merged")
+    if prose_rc != 0:
+        return prose_rc
+
+    # Deferred import: `graph` imports THIS module at its own top level
+    # (`from kb_setup import graph_checks, graphify_ops`), so a top-level
+    # `from kb_setup import graph` here would be circular. By the time this
+    # function actually RUNS both modules are already fully loaded, so this is
+    # a plain sys.modules cache hit — it only has to be deferred, not avoided.
+    from kb_setup import graph
+
+    try:
+        graph.append_merged_chunk(repo_root, chunk)
+    except (OSError, ValueError) as exc:
+        # NOT swallowed: the chunk really did merge and the prose graph really
+        # did re-derive, but reporting rc=0 here would claim the operation is
+        # fully durable when the one record `kb-watch` reads to recompose from
+        # just failed to extend — the same silent-discard this whole ledger
+        # exists to prevent, arriving through its own write path instead of
+        # through recomposition. Same shape as `_derive_prose`'s own gate.
+        print(
+            f"[kb-merge] the chunk merged and the prose graph was re-derived, but "
+            f"recording it in the recomposition ledger failed: {exc}\n"
+            f"[kb-merge] a future `mise run kb-watch` will not replay this chunk "
+            f"unless it is re-merged.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:

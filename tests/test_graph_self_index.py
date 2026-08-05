@@ -19,12 +19,13 @@ announces nothing, which is why the fix needs a test rather than a one-off check
 `kb_setup` is not ordinary application code: dotfiles consumes it as a pinned
 `uv` git dependency, so a change here has a blast radius that leaves the repo.
 
-Also covers `refresh_self` (#175): the single-N-ary-merge restructure removed
-the base-snapshot/guard machinery `kb-watch` used to restart from, so there is
-no longer a separable "corpus without our own code" state to snapshot. The
-function is now a loud, immediate refusal rather than a resurrection of that
-machinery for a build shape it no longer matches — see `refresh_self`'s own
-docstring in `graph.py`.
+Also covers `refresh_self` / `kb-watch` (#175): the single-N-ary-merge
+restructure removed the base-snapshot/guard machinery `kb-watch` used to
+restart from, and this file's compose-manifest + merge-ledger tests cover what
+replaced it — recomposing from what `build()` actually recorded it composed,
+refusing rather than guessing whenever a between-build `kb-merge` cannot be
+verified against what is currently on disk. See `refresh_self`'s own docstring
+in `graph.py` for the property this preserves and how.
 """
 
 from __future__ import annotations
@@ -194,40 +195,291 @@ def test_build_calls_assert_composition_on_the_artifact_it_produced(monkeypatch,
     )
 
 
-def test_refresh_self_refuses_loudly(tmp_path):
-    """`kb-watch` has no recomposition story under the single-merge build (#175).
+def test_build_writes_a_compose_manifest(monkeypatch, tmp_path):
+    """`build()` must record what it composed, or `kb-watch` can never recompose.
 
-    The base-snapshot/guard machinery this replaces existed only to make an
-    incremental restart safe for a build with a SEPARABLE self-merge step; the
-    single N-ary merge has no such step to restart from. Refusing is the
-    honest answer until a real design lands, not a resurrection of machinery
-    built for a shape `build()` no longer has.
+    Realistic break: deleting the `_write_compose_manifest` call from the end
+    of `build()` — the same shape `test_the_self_subgraph_joins_the_one_corpus
+    _merge_not_a_second_call` already guards for the merge itself, one step
+    later in the function.
     """
+    _run_build(monkeypatch, tmp_path)
+
+    manifest = graph._read_compose_manifest(tmp_path)
+    assert manifest is not None, "build() did not leave a readable compose manifest"
+    joined = " ".join(manifest.corpus)
+    assert "aaa-seed" in joined, f"corpus source missing from compose manifest: {manifest.corpus}"
+    assert "zzz-merged" in joined, f"corpus source missing from compose manifest: {manifest.corpus}"
+    assert manifest.self_graph == str(graph._self_subgraph(tmp_path).relative_to(tmp_path)), (
+        f"the compose manifest recorded the wrong self sub-graph path: {manifest.self_graph!r}"
+    )
+
+
+def test_build_resets_the_merge_ledger(monkeypatch, tmp_path):
+    """A fresh build subsumes every between-build merge — the ledger goes back to [].
+
+    Without this, a chunk merged BEFORE this build would be replayed a SECOND
+    time by a later `kb-watch`, on top of a corpus that already reflects it.
+    """
+    (tmp_path / "graphify-out").mkdir(parents=True, exist_ok=True)
+    stale = tmp_path / "stale-chunk.json"
+    stale.write_text("{}", encoding="utf-8")
+    graph._write_merged_chunks(
+        tmp_path, [graph.MergedChunkEntry(chunk=str(stale), sha256="deadbeef")]
+    )
+
+    _run_build(monkeypatch, tmp_path)
+
+    assert graph._read_merged_chunks(tmp_path) == [], (
+        "build() left stale ledger entries behind — a fresh build must subsume them"
+    )
+
+
+def _compose_repo(tmp_path: Path, *, corpus: list[str], chunks: list[str] | None = None) -> Path:
+    """A repo root with a REAL compose manifest and real corpus-leaf files.
+
+    Mirrors what `build()` itself would have written: one sub-graph file per
+    named corpus source, and a compose manifest naming them (plus the fixed
+    self-subgraph location) — everything `refresh_self` reads before it does
+    any real work. Returns `tmp_path` itself, named for readability at call
+    sites below.
+    """
+    (tmp_path / "graphify-out").mkdir(parents=True, exist_ok=True)
+    corpus_rel: list[str] = []
+    for name in corpus:
+        sub = tmp_path / "sources" / name / "graphify-out" / "graph.json"
+        sub.parent.mkdir(parents=True, exist_ok=True)
+        sub.write_text(f'{{"nodes": [], "edges": [], "from": "{name}"}}', encoding="utf-8")
+        corpus_rel.append(str(sub.relative_to(tmp_path)))
+    self_rel = str(graph._self_subgraph(tmp_path).relative_to(tmp_path))
+    graph._write_compose_manifest(
+        tmp_path, corpus=corpus_rel, self_graph=self_rel, chunks=chunks or []
+    )
+    return tmp_path
+
+
+def _stub_recompose(monkeypatch, calls: list[list[str]]) -> None:
+    """Stub every subprocess/IO surface `refresh_self` crosses, recording argv.
+
+    Mirrors `_run_build`'s own stubbing (same reasons): `_run` is RECORDED
+    rather than replaced with nothing, because the merge/replay argv IS the
+    behaviour under test; `label`/`assert_composition` run against REAL
+    graph.json content that `apply_merge`'s byte-concatenation stand-in does
+    not produce.
+    """
+    monkeypatch.setattr(graph, "_run", merge_recorder(calls))
+    monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
+    monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
+    monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
+    monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
+    monkeypatch.setattr(graph.graph_checks, "assert_composition", lambda _path: None)
+
+
+def _forbid_subprocesses(monkeypatch) -> None:
+    """Make `refresh_self` fail FAST and CLEAN if it ever reaches a subprocess.
+
+    Every refusal below is supposed to fire before `_extract_self` or
+    `_merge_sources_into` ever runs. Without this, a regression that drops the
+    refusal does not fail the test cleanly — it falls through to `_run`'s real
+    `subprocess.run`, which shells out to the actually-installed `graphify`
+    binary. That is slow, environment-dependent, and (measured directly: the
+    FAIL-arm check for the sha256 comparison below hit exactly this) turns a
+    clear "SystemExit was not raised" into a confusing `CalledProcessError`
+    from a real extraction — still red, but for a much noisier reason than the
+    regression itself.
+    """
+
+    def boom(argv: list[str], _root: Path) -> None:
+        raise AssertionError(f"refresh_self must refuse before shelling out; got {argv}")
+
+    monkeypatch.setattr(graph, "_run", boom)
+
+
+def test_refresh_self_refuses_without_a_compose_manifest(monkeypatch, tmp_path):
+    """No record of a prior build -> refuse, naming the fix.
+
+    Unknown is not permission: a repo that has never been built (or whose
+    record could not be read) has nothing safe for `kb-watch` to recompose FROM.
+    """
+    _forbid_subprocesses(monkeypatch)
+
     with pytest.raises(SystemExit) as exc:
         graph.refresh_self(tmp_path)
-    assert "not yet implemented" in str(exc.value), (
-        f"the refusal must say WHY it refuses; it said {exc.value!r}"
-    )
     assert "kb-build" in str(exc.value), (
         f"the refusal must point at the real recovery path; it said {exc.value!r}"
     )
 
 
-def test_refresh_self_refuses_without_touching_anything(tmp_path):
-    """CONTROL ARM: a refusal that already did partial work first is not a refusal.
+def test_refresh_self_refuses_when_a_corpus_leaf_is_gone(monkeypatch, tmp_path):
+    """A recorded corpus leaf that vanished since the last build must refuse, NAMED.
 
-    Without this, a `refresh_self` that clones, extracts, or merges before
-    raising would satisfy the test above while still doing everything the stub
-    exists NOT to do — network calls and a multi-minute extract+merge loop, for
-    a function whose whole contract is now "refuse immediately".
+    Realistic break: silently dropping a missing source from the recompose
+    input list instead of refusing — that would recompose a SMALLER corpus
+    than the last build produced, without anyone asking for that.
     """
-    out = tmp_path / "graphify-out" / "graph.json"
-    out.parent.mkdir(parents=True)
-    out.write_text('{"nodes": [], "UNTOUCHED": true}', encoding="utf-8")
+    _forbid_subprocesses(monkeypatch)
+    repo = _compose_repo(tmp_path, corpus=["aaa", "bbb"])
+    (repo / "sources" / "bbb" / "graphify-out" / "graph.json").unlink()
 
-    with pytest.raises(SystemExit):
-        graph.refresh_self(tmp_path)
+    with pytest.raises(SystemExit) as exc:
+        graph.refresh_self(repo)
+    message = str(exc.value)
+    assert "bbb" in message, f"the refusal must name the missing leaf; it said {message!r}"
 
-    assert out.read_text(encoding="utf-8") == '{"nodes": [], "UNTOUCHED": true}', (
-        "refresh_self did work before refusing — a stub must refuse FIRST"
+
+def test_refresh_self_refuses_when_a_ledger_chunk_is_gone(monkeypatch, tmp_path):
+    """A ledger entry whose file vanished must refuse, NAMING the entry.
+
+    This is the exact silent-discard the ledger exists to prevent: recomposing
+    without this chunk would produce a graph.json that quietly no longer
+    reflects a merge everyone believed had landed.
+    """
+    _forbid_subprocesses(monkeypatch)
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    missing = repo / "sources" / "extractions" / "gone-docs.json"
+    graph._write_merged_chunks(
+        repo, [graph.MergedChunkEntry(chunk=str(missing.relative_to(repo)), sha256="abc123")]
     )
+
+    with pytest.raises(SystemExit) as exc:
+        graph.refresh_self(repo)
+    message = str(exc.value)
+    assert "gone-docs.json" in message, (
+        f"the refusal must name the missing chunk; it said {message!r}"
+    )
+
+
+def test_refresh_self_refuses_when_a_ledger_chunk_has_changed(monkeypatch, tmp_path):
+    """A ledger entry whose sha256 no longer matches must refuse, NAMING the entry.
+
+    Recomposing over silently-changed content would replay bytes different
+    from whatever was actually verified and merged at `kb-merge` time.
+
+    FAIL-ARM CHECKED (manually, not committed): disabling the `actual !=
+    entry.sha256` comparison in `_verified_ledger_chunks` turns this test red
+    — confirmed, then restored. Before `_forbid_subprocesses` existed, the
+    mutated run fell through to a REAL `graphify extract` subprocess instead
+    of failing cleanly on "SystemExit not raised"; that observation is what
+    `_forbid_subprocesses` exists to fix, here and on every sibling refusal
+    test above.
+    """
+    _forbid_subprocesses(monkeypatch)
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    chunk = repo / "sources" / "extractions" / "changed-docs.json"
+    chunk.parent.mkdir(parents=True, exist_ok=True)
+    chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    stale_sha = graph._sha256_file(chunk)
+    chunk.write_text('{"nodes": [], "edges": [], "edited": true}', encoding="utf-8")
+
+    graph._write_merged_chunks(
+        repo, [graph.MergedChunkEntry(chunk=str(chunk.relative_to(repo)), sha256=stale_sha)]
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        graph.refresh_self(repo)
+    message = str(exc.value)
+    assert "changed-docs.json" in message, (
+        f"the refusal must name the changed chunk; it said {message!r}"
+    )
+
+
+def test_refresh_self_replays_a_valid_ledger_chunk_after_the_manifests(monkeypatch, tmp_path):
+    """A verified ledger entry reaches `_MERGE_SCRIPT`, AFTER the manifest's own chunks.
+
+    Asserted on the recorded argv, the same shape `test_the_self_subgraph_
+    joins_the_one_corpus_merge_not_a_second_call` already uses for the corpus
+    merge — the behaviour under test is which paths reach the subprocess and
+    in what order, not the subprocess itself.
+    """
+    manifest_chunk_dir = tmp_path / "sources" / "extractions"
+    manifest_chunk_dir.mkdir(parents=True, exist_ok=True)
+    manifest_chunk = manifest_chunk_dir / "known-docs.json"
+    manifest_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+
+    repo = _compose_repo(
+        tmp_path, corpus=["aaa"], chunks=[str(manifest_chunk.relative_to(tmp_path))]
+    )
+
+    ledger_chunk = tmp_path / "ledger-chunk.json"
+    ledger_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    graph._write_merged_chunks(
+        repo,
+        [graph.MergedChunkEntry(chunk=str(ledger_chunk), sha256=graph._sha256_file(ledger_chunk))],
+    )
+
+    calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, calls)
+
+    graph.refresh_self(repo)
+
+    merge_argvs = [c for c in calls if str(graph._MERGE_SCRIPT) in c]
+    # argv shape is [gpy, _MERGE_SCRIPT, chunk, root, out] — index 2 is the chunk.
+    chunk_args = [c[2] for c in merge_argvs]
+    assert chunk_args == [str(manifest_chunk), str(ledger_chunk)], (
+        f"expected the manifest's chunk replayed before the ledger's; got {chunk_args}"
+    )
+
+
+def test_a_successful_refresh_resets_the_ledger_too(monkeypatch, tmp_path):
+    """The ledger entries a refresh just replayed must not be replayed again next time.
+
+    CONTROL for `test_build_resets_the_merge_ledger`'s sibling: `kb-watch`
+    subsumes the same way a fresh `kb-build` does, or a second consecutive
+    `kb-watch` would replay an already-replayed chunk on top of itself. The
+    replayed chunk must also join the REWRITTEN compose manifest's `chunks`,
+    since it is now part of what the graph durably reflects.
+    """
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    ledger_chunk = tmp_path / "ledger-chunk.json"
+    ledger_chunk.write_text('{"nodes": [], "edges": []}', encoding="utf-8")
+    graph._write_merged_chunks(
+        repo,
+        [graph.MergedChunkEntry(chunk=str(ledger_chunk), sha256=graph._sha256_file(ledger_chunk))],
+    )
+
+    calls: list[list[str]] = []
+    _stub_recompose(monkeypatch, calls)
+
+    graph.refresh_self(repo)
+
+    assert graph._read_merged_chunks(repo) == [], (
+        "a successful refresh must reset the ledger — it subsumed every entry"
+    )
+    manifest = graph._read_compose_manifest(repo)
+    assert manifest is not None
+    assert str(ledger_chunk.relative_to(repo)) in manifest.chunks, (
+        f"the replayed ledger chunk must join the rewritten compose manifest; "
+        f"chunks were {manifest.chunks}"
+    )
+
+
+def test_a_recompose_failure_leaves_the_real_graph_untouched(monkeypatch, tmp_path):
+    """Everything above the swap runs against the scratch file, never the real one.
+
+    Realistic break: writing `_merge_sources_into`'s output straight to the
+    real `graphify-out/graph.json` instead of a temp path — the shape this
+    design specifically avoids, and this is the test that would catch it
+    coming back.
+    """
+    repo = _compose_repo(tmp_path, corpus=["aaa"])
+    real_out = repo / "graphify-out" / "graph.json"
+    real_out.write_text('{"nodes": [], "UNTOUCHED": true}', encoding="utf-8")
+
+    def boom(argv: list[str], _root: Path) -> None:
+        if "merge-graphs" in argv:
+            raise RuntimeError("simulated failure mid-recompose")
+        # Self-extraction (and anything else that is not the corpus merge)
+        # succeeds as a no-op, so the failure below is proven to land INSIDE
+        # the scratch-file recompose, not before it is even reached.
+
+    monkeypatch.setattr(graph, "_run", boom)
+    monkeypatch.setattr(graph, "graphify_python", lambda _root: "python3")
+
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        graph.refresh_self(repo)
+
+    assert real_out.read_text(encoding="utf-8") == '{"nodes": [], "UNTOUCHED": true}', (
+        "a failure during recomposition touched the real graph.json"
+    )
+    leftover = list((repo / "graphify-out").glob("graph.json.*.recompose.tmp"))
+    assert leftover == [], f"a failed recomposition left its scratch file behind: {leftover}"

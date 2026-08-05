@@ -180,6 +180,79 @@ def test_a_missing_chunk_is_refused_before_anything_runs(
     assert _prose_ids(repo) == ["yesterday"]
 
 
+# --- recomposition ledger (#175) --------------------------------------------
+
+
+def test_a_successful_merge_appends_to_the_recomposition_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The OTHER thing a fully-successful merge must do: extend the ledger.
+
+    `kb-watch` can only replay what this records. A merge that succeeds and
+    re-derives the prose graph but never reaches the ledger would be invisible
+    to a later recomposition — silently dropping its content the moment
+    `kb-watch` next runs, which is the exact failure the ledger exists to rule
+    out.
+    """
+    from kb_setup import graph
+
+    repo = _repo(tmp_path)
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+    chunk = _chunk(tmp_path)
+
+    assert graphify_ops.merge_chunk(repo, chunk) == 0
+
+    entries = graph._read_merged_chunks(repo)
+    assert entries is not None
+    assert [e.chunk for e in entries] == [chunk]
+    assert entries[0].sha256 == graph._sha256_file(Path(chunk))
+
+
+def test_a_failed_merge_does_not_touch_the_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: the ledger append is gated on rc, same as the prose re-derive.
+
+    Without this gate, a failed merge that happened to leave a chunk file
+    sitting on disk would still record a ledger entry for content that was
+    never actually merged into graph.json.
+    """
+    from kb_setup import graph
+
+    repo = _repo(tmp_path)
+    _stub_graphify(monkeypatch, tmp_path, rc=1, writes=_MERGED)
+    chunk = _chunk(tmp_path)
+
+    assert graphify_ops.merge_chunk(repo, chunk) == 1
+
+    assert graph._read_merged_chunks(repo) == []
+
+
+def test_a_merge_whose_ledger_write_fails_does_not_report_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The chunk merged and the prose graph re-derived, but the ledger did not extend.
+
+    `rc=0` here would tell a caller that everything about this merge is
+    durably recorded, when the one artifact `kb-watch` reads to recompose from
+    just failed to extend — the same class of lie `_derive_prose`'s own gate
+    exists to prevent, one step further down the same function.
+    """
+    from kb_setup import graph
+
+    repo = _repo(tmp_path)
+    _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
+    chunk = _chunk(tmp_path)
+
+    def boom(_repo_root: Path, _chunk: str) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(graph, "append_merged_chunk", boom)
+
+    assert graphify_ops.merge_chunk(repo, chunk) == 1
+    assert "recomposition ledger" in capsys.readouterr().err
+
+
 def test_a_successful_label_re_derives_the_prose_graph(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

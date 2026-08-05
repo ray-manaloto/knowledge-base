@@ -28,23 +28,28 @@ graphify-out/graph.json
 # unscoped one looked like on the day of the commit.
 graphify-out/graph-prose.json
 graphify-out/manifest.json
-# The aggregate WITHOUT our own code — `kb-build` writes it, `kb-watch` restarts
-# from it so repeated refreshes are idempotent. Derived and roughly graph.json-
-# sized (~345MB), so it is ignored for both of the reasons graph.json is. NOT
-# covered by the `.graphify_*` rule below: that glob is graphify's own state,
-# whereas this file is ours.
-graphify-out/.base-graph.json
 # `scope = study` sources — repos we ANALYSE rather than learn from. Derived
 # (87 MiB, rebuilt by `kb-build` from the same pinned manifests as everything
 # else) and kept out of the aggregate because merging it in took graph.json past
 # graphify's 512 MiB cap.
 graphify-out/study-graph.json
-# The base guard (sha256 of the graph.json the snapshot composes with) and
-# kb-watch's staging file. Both are per-clone machine state like the snapshot
-# itself; the staging file only exists mid-refresh and its presence afterwards
-# means a refresh died before the atomic swap.
+# RETIRED by #175's single-N-ary-merge restructure: nothing in this repo
+# writes these three anymore (the separable self-merge step the old
+# base-snapshot/guard machinery restarted from is gone; their names now
+# survive only in `docs/research/reports/**`, which is never rewritten — see
+# `research-repo-enumeration.md`). Kept ignored rather than removed: a clone
+# built before #175 landed may still carry these on disk, and an ignore
+# pattern for a file nothing writes is a no-op, while dropping the pattern
+# turns a real leftover file into something `git add -A` could pick up.
+graphify-out/.base-graph.json
 graphify-out/.base-graph.sha256
 graphify-out/graph.json.refresh
+# THEIR REPLACEMENT (#175's follow-up): what `build()` (or a successful
+# `kb-watch`) actually composed, and the ledger of between-build `kb-merge`s a
+# recomposition replays. Both per-clone machine state, like the currency stamp
+# below.
+graphify-out/.compose-manifest.json
+graphify-out/.merged-chunks.json
 graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/
