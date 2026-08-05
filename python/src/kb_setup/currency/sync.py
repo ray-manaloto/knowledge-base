@@ -397,6 +397,18 @@ def write_stamp(
     if path is None:
         raise ValueError(f"{spec.name}: no `stamp` path configured in currency.toml")
     artifact = repo_root / spec.artifact if spec.artifact else None
+    # BEFORE the new fingerprints are taken, because `view_records` decides
+    # "was this view just regenerated?" by diffing against what the PREVIOUS
+    # stamp recorded. Reading it after would compare the map to itself.
+    #
+    # Unlike `inputs`, this is computed here rather than supplied by the caller,
+    # and the asymmetry is the point. `inputs` answers "what was the graph built
+    # FROM", which only a real build has standing to state — so a default that
+    # read the live tree would launder drift. This answers "did these bytes move
+    # since we last looked", which is a pure observation of what is on disk: any
+    # writer may make it, and every writer must, or the one that forgot leaves a
+    # view permanently claiming the graph it no longer describes.
+    previous_views = stamped_views(read_stamp(repo_root, spec))
     payload = {
         "stamp_version": _STAMP_VERSION,
         "tool": spec.name,
@@ -405,6 +417,7 @@ def write_stamp(
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "artifact_commit": _artifact_commit(artifact),
         "artifact_fingerprints": artifact_fingerprints(repo_root, spec),
+        "views": view_records(repo_root, spec, previous_views),
     }
     if inputs is not None:
         payload["input_fingerprints"] = {str(k): str(v) for k, v in inputs.items()}
@@ -413,8 +426,17 @@ def write_stamp(
     return path
 
 
-def restamp_artifacts(repo_root: Path, spec: ToolSpec) -> Path | None:
+def restamp_artifacts(
+    repo_root: Path, spec: ToolSpec, *, views_before: Mapping[str, str] | None = None
+) -> Path | None:
     """Refresh only the fingerprints after `kb-artifacts` regenerated outputs.
+
+    `views_before` is the caller's `view_identities` snapshot from before it
+    started working; a view may only be certified against the current graph when
+    its identity changed inside that bracket. Omitting it is the safe default and
+    means "I cannot say what I regenerated", which records unknown provenance
+    rather than a guess. See `view_records` for the false pass that made the
+    snapshot necessary.
 
     The derived outputs (wiki/svg/…) are generated FROM graph.json AFTER the
     build, so at build time they either don't exist or are stale. `kb-artifacts`
@@ -427,7 +449,7 @@ def restamp_artifacts(repo_root: Path, spec: ToolSpec) -> Path | None:
     if path is None or not path.exists():
         return None
     existing = read_stamp(repo_root, spec)
-    return write_stamp(
+    written = write_stamp(
         repo_root,
         spec,
         version=str(existing.get("version", "")),
@@ -440,6 +462,36 @@ def restamp_artifacts(repo_root: Path, spec: ToolSpec) -> Path | None:
         # there were none", which the staleness check reads as a clean pass.
         inputs=stamped_input_fingerprints(existing),
     )
+    if views_before is not None and written is not None:
+        _certify_views(repo_root, spec, written, views_before)
+    return written
+
+
+def _certify_views(
+    repo_root: Path, spec: ToolSpec, stamp_file: Path, views_before: Mapping[str, str]
+) -> None:
+    """Re-derive the just-written stamp's `views` against the caller's snapshot.
+
+    A SECOND write of a ~1 KB file rather than a sixth parameter on `write_stamp`,
+    which 25 call sites reach and whose signature is already at its argument
+    budget. The ordering that costs nothing to get right: the intermediate state
+    is the UNBRACKETED map, so a process killed between the two writes leaves
+    views reading *provenance unknown* — conservative, never a false pass.
+
+    `view_records` rather than a local loop, so the one place that decides what a
+    view record contains stays one place — including which of the three outcomes
+    a given view earns.
+    """
+    try:
+        payload = json.loads(stamp_file.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return
+    if not isinstance(payload, dict):
+        return
+    payload["views"] = view_records(
+        repo_root, spec, stamped_views(payload), observed_before=views_before
+    )
+    stamp_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def _artifact_commit(artifact: Path | None) -> str:
@@ -490,6 +542,193 @@ def artifact_fingerprint(artifact: Path | None) -> str:
     except OSError:
         return ""
     return f"{st.st_size}:{st.st_mtime_ns}"
+
+
+def deep_artifact_fingerprint(artifact: Path) -> str:
+    """A CONTENT-sensitive identity for one declared output, or "" when unreadable.
+
+    `artifact_fingerprint` is the right answer on the check path and the wrong one
+    here, for DIRECTORIES specifically. It stats the directory, and a directory's
+    mtime moves only when an ENTRY IS ADDED OR REMOVED — measured: rewriting a
+    file in place does not move it, adding one does. So a `wiki/` regeneration
+    that rewrote the same 9,465 page names would be invisible to it, and this
+    function's caller would conclude the view had NOT been regenerated when it
+    just had. The live tree shows the same gap from the other side: `wiki/`'s
+    newest FILE is 79 microseconds newer than the directory itself.
+
+    Hence `<entries>:<newest_mtime_ns>` for a directory, which moves for both an
+    in-place rewrite and an added/removed page. It costs a full walk — 35.6-63.3 ms
+    over the live `wiki/` — which is why it is deliberately NOT used by
+    `artifact_fingerprint`'s callers on the ~10 ms SessionStart path. This one runs
+    at STAMP time, immediately after an operation that took minutes.
+    """
+    if not artifact.exists():
+        return ""
+    if not artifact.is_dir():
+        return artifact_fingerprint(artifact)
+    entries = 0
+    try:
+        newest = artifact.stat().st_mtime_ns
+        for entry in artifact.rglob("*"):
+            entries += 1
+            newest = max(newest, entry.stat().st_mtime_ns)
+    except OSError:
+        return ""
+    return f"{entries}:{newest}"
+
+
+def view_identities(repo_root: Path, spec: ToolSpec) -> dict[str, str]:
+    """`{relpath: deep fingerprint}` for every declared derived view that exists NOW.
+
+    A caller takes one of these BEFORE it starts work and hands it back to
+    `view_records` afterwards, which is what turns "these bytes differ from the
+    last stamp" into "these bytes changed DURING this operation". Those are not
+    the same claim, and `view_records` documents what it cost to learn that.
+    """
+    return {
+        rel: fp
+        for rel in spec.artifacts
+        if rel != spec.artifact and (fp := deep_artifact_fingerprint(repo_root / rel))
+    }
+
+
+def view_records(
+    repo_root: Path,
+    spec: ToolSpec,
+    previous: Mapping[str, Mapping[str, str]] | None,
+    *,
+    observed_before: Mapping[str, str] | None = None,
+) -> dict[str, dict[str, str]]:
+    """Which graph each declared derived view was last observed to be generated FROM.
+
+    The fact `size:mtime_ns` alone can never carry (#182). A view that is stale
+    *because nothing regenerated it* never moves, so the fingerprint map reads OK
+    for it forever — measured on the live corpus, where `graph.graphml` and
+    `wiki/` reported `recorded == live` while describing a graph 11 hours old.
+
+    Two fields per view, and both are needed:
+
+    * `identity` — the view's own `deep_artifact_fingerprint` when last observed.
+      Its ONLY job is to answer "did this view change since the last stamp?", which
+      is how a regeneration is detected without any caller having to declare one.
+    * `graph` — the primary artifact's fingerprint at the moment the view was last
+      observed to change. This is what the check compares against.
+
+    `observed_before` is the caller's snapshot of those identities from BEFORE it
+    started, and it is what makes the `graph` field earnable. A view may only be
+    certified against the current graph when its identity changed *between that
+    snapshot and now* — i.e. this operation is the one that regenerated it.
+
+    **The version without the snapshot was unsound, and a cold review caught it.**
+    It certified any view whose identity merely differed from the last STAMP, on
+    the reasoning that a changed view must have just been regenerated. That
+    inference has a hole with a real trigger, because `refresh_after_regen` is
+    best-effort and swallows its own failures:
+
+        kb-artifacts regenerates the views, its restamp fails silently
+        -> the stamp still describes the OLD views
+        kb-merge rewrites graph.json and restamps
+        -> the views differ from the stamp, so all three were certified
+           against a graph they PREDATE.  Reproduced end to end; `check_views`
+           returned OK.
+
+    A snapshot closes it because it brackets one operation rather than an
+    unbounded gap. It also subsumes the boolean flag it replaces — a full
+    `kb-artifacts`, a partial `kb-artifacts only=[graphml]`, a `kb-label` (which
+    regenerates `GRAPH_REPORT.md` and nothing else) and a `kb-merge` (which
+    regenerates none) all fall out of the same comparison, with nothing
+    enumerated anywhere and no caller asserting more than it did.
+
+    **What the bracket does NOT close, stated rather than left to be rediscovered.**
+    It bounds one PROCESS, not the file. `primary_fp` is read when `view_records`
+    runs, so if another `kb-*` operation rewrites `graph.json` after a view was
+    regenerated inside this bracket but before this line, the view is certified
+    against a graph it was never generated from. Nothing in `kb_setup` locks —
+    `grep -rnE "FileLock|flock|fcntl" python/src/kb_setup/` returns nothing — and
+    this repo's workflow is single-agent and serialized through `kb-*` tasks
+    (`mise-tasks-only.md`), which is a convention rather than an enforcement.
+    Reported by the cold lane, round 2, correctly rated narrow. Tracked rather
+    than fixed here: a lock is a different change with its own failure modes, and
+    inventing one inside a review round is how a narrow gap becomes a wide one.
+
+    Three outcomes per view, and only the first is a certification:
+
+    * changed within the bracket -> the current graph fingerprint;
+    * unchanged since the stamp  -> carry the recorded fingerprint forward;
+    * anything else — first sighting, or changed outside any bracket — `""`,
+      which the check reads as *not verifiable*. "This file exists" is not
+      evidence about which graph produced it.
+    """
+    known = dict(previous or {})
+    before = observed_before or {}
+    primary_fp = artifact_fingerprint(repo_root / spec.artifact) if spec.artifact else ""
+    records: dict[str, dict[str, str]] = {}
+    for rel in spec.artifacts:
+        if rel == spec.artifact:
+            # A config may legally list the graph in both `artifact` and
+            # `artifacts` (`all_artifacts` de-duplicates it). "The graph was
+            # generated from the graph" is not a view record.
+            continue
+        identity = deep_artifact_fingerprint(repo_root / rel)
+        if not identity:
+            # Absent or unreadable. Dropped rather than carried: a stale record
+            # for a file that is gone would later be compared against a
+            # regenerated one and silently pass.
+            continue
+        was = known.get(rel)
+        if observed_before is not None and before.get(rel, "") != identity:
+            # Changed while this caller was working. `observed_before is not None`
+            # rather than a truthiness test on `before`: an EMPTY snapshot is a
+            # real answer — no view existed when the caller started — and a view
+            # that exists now therefore changed within the bracket. Collapsing
+            # empty-to-absent would silently withhold certification from the
+            # first `kb-artifacts` run in a fresh clone, which is the bootstrap
+            # case this whole field exists to make one run long.
+            graph_fp = primary_fp
+        elif was is not None and str(was.get("identity", "")) == identity:
+            graph_fp = str(was.get("graph", ""))
+        else:
+            graph_fp = ""
+        records[rel] = {"identity": identity, "graph": graph_fp}
+    return records
+
+
+def stamped_views(stamp: Mapping[str, object]) -> dict[str, dict[str, str]] | None:
+    """The recorded view-provenance map, or None when this stamp does not carry one.
+
+    None and `{}` are different answers, exactly as in
+    `stamped_input_fingerprints`: None means "this stamp carries no usable view
+    provenance" — the key is absent, or present and corrupt — while `{}` means
+    "asked, and this tool declares no derived views".
+
+    **What collapsing them costs is the MESSAGE, not the verdict**, and that
+    correction is owed to a mutation arm. An earlier draft of this docstring
+    claimed collapsing them "would render every pre-#182 stamp a clean pass"; the
+    arm that mutates this `return None` to `return {}` SURVIVED, and tracing it
+    showed why the claim was false — with `{}` every view falls through to
+    *provenance unknown* and `check_views` returns NOT_VERIFIABLE anyway, while
+    `write_stamp` does `dict(previous or {})` and cannot tell them apart at all.
+    So the distinction earns its place by telling a reader to run `kb-artifacts`
+    rather than leaving them to infer it from three per-view lines — which is
+    what `views.check_views` now says, and what its test now asserts, so the
+    mutant dies on the difference that actually exists rather than on one that
+    was only ever written down.
+
+    Deliberately NOT gated on `_STAMP_VERSION`. A v3 stamp genuinely does prove
+    what it claims — that every declared output matches what was fingerprinted —
+    and bumping the version would report it as DRIFT whose remedy is a full
+    `kb-build`, tens of minutes, to acquire a field a `kb-artifacts` run fills in.
+    """
+    if "views" not in stamp:
+        return None
+    raw = stamp.get("views")
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, dict[str, str]] = {}
+    for key, value in raw.items():
+        if isinstance(value, dict):
+            out[str(key)] = {str(k): str(v) for k, v in value.items()}
+    return out
 
 
 def read_stamp(repo_root: Path, spec: ToolSpec) -> dict[str, object]:

@@ -109,11 +109,23 @@ Run `gh issue view <number> --comments`.
 
 Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
 
+**A wayfinder ticket is a DECISION ticket** — a question whose resolution is a decision — **not a
+slice of a build to execute.** Upstream named the term in v1.2.0 precisely because people kept
+reading one as an ordinary implementation ticket, and that confusion is live here: map **#109**
+carries both kinds. The deep round's phase tickets (#175–#178) are *implementation* tickets that
+merely cite the map; they are not on the frontier and the frontier query below does not order them.
+Reach for the frontier when choosing which **decision** to resolve next — not to pick the next
+build.
+
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog
   body. `gh issue create --label wayfinder:map`.
 - **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues
   endpoint). Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed,
   assign to the driving dev.
+- **Research tickets are burned down DURING charting, in parallel** (v1.2.0). They are no longer
+  parked for a separately-launched session: after creating the tickets, the charting session fires
+  a `/research` subagent per research ticket, capturing findings on a throwaway `research/<name>`
+  branch with a context pointer on the ticket. They are the one exception to one-ticket-per-session.
 - **Blocking**: GitHub's **native issue dependencies**. Add an edge with
   `gh api --method POST repos/ray-manaloto/knowledge-base/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`,
   where `<blocker-db-id>` is the blocker's numeric **database id**

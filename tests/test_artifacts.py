@@ -173,11 +173,16 @@ def test_a_non_rewriting_entry_never_touches_hyperedges(tmp_path: Path, monkeypa
 
 
 def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkeypatch) -> None:
-    """A successful `generate()` run must call the shared restamp exactly once."""
+    """A successful `generate()` run must call the shared restamp exactly once.
+
+    The snapshot it hands over is asserted separately, below.
+    """
     _graph_with_hyperedge(tmp_path)
     calls: list[tuple[Path, str]] = []
 
-    def fake_refresh(repo_root: Path, *, tag: str) -> None:
+    def fake_refresh(
+        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
         calls.append((repo_root, tag))
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
@@ -192,6 +197,51 @@ def test_generate_refreshes_the_currency_stamp_on_success(tmp_path: Path, monkey
     assert calls == [(tmp_path, "kb-artifacts")]
 
 
+def test_the_views_snapshot_is_taken_before_the_generators_run(tmp_path: Path, monkeypatch) -> None:
+    """The bracket, pinned by ORDER (#182) — this replaced a boolean that was unsound.
+
+    `generate` used to assert "I regenerated everything" with a flag. A cold review
+    showed that certifies views whose bytes changed at some earlier, unobserved
+    moment (`sync.view_records` carries the reproduction). The snapshot fixes it
+    ONLY if it is taken before the generators run — taken after, it would compare
+    the new bytes against themselves and certify nothing, and taken from the last
+    stamp it would be the unsound version again.
+
+    Asserted by call order rather than by outcome, because reading the stamp after
+    `generate` returns reflects the final state either way. `views_before is not
+    None` is the second half: passing None is the documented "I cannot say what I
+    regenerated", which would silently stop certifying anything at all.
+    """
+    _graph_with_hyperedge(tmp_path)
+    order: list[str] = []
+    handed: list[object] = []
+
+    def fake_snapshot(_repo_root: Path) -> dict[str, dict[str, str]]:
+        order.append("snapshot")
+        return {"graphify": {}}
+
+    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+        order.append("generate")
+        return subprocess.CompletedProcess(list(cmd), 0)
+
+    def fake_refresh(
+        _repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
+        order.append("refresh")
+        handed.append(views_before)
+
+    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
+    monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(artifacts.subprocess, "run", fake_run)
+    monkeypatch.setattr(artifacts.stamps, "snapshot_views", fake_snapshot)
+    monkeypatch.setattr(artifacts.stamps, "refresh_after_regen", fake_refresh)
+
+    assert artifacts.generate(tmp_path, only=["graphml"]) == 0
+
+    assert order == ["snapshot", "generate", "refresh"], f"bracket is wrong: {order}"
+    assert handed == [{"graphify": {}}]
+
+
 def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypatch) -> None:
     """CONTROL ARM: a failed `generate()` run must not restamp anything.
 
@@ -202,7 +252,10 @@ def test_generate_does_not_refresh_the_stamp_on_failure(tmp_path: Path, monkeypa
     _graph_with_hyperedge(tmp_path)
     calls: list[tuple[Path, str]] = []
 
-    def fake_refresh(repo_root: Path, *, tag: str) -> None:
+    def fake_refresh(
+        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
+    ) -> None:
+        assert views_before is None, "a failed run must not certify anything"
         calls.append((repo_root, tag))
 
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])

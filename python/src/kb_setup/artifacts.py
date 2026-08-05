@@ -83,6 +83,14 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
             )
 
     print(f"[kb-artifacts] generating {len(selected)} artifact(s)")
+    # BEFORE the generators run (#182). Bracketing this loop is what lets the
+    # stamp certify exactly the views this run regenerated — a full run, a
+    # partial `only=` run and a run whose generators all no-op each come out
+    # right, with nothing enumerated here. It replaces a boolean that asserted
+    # "I regenerated everything", which was true for a full run and unsound in
+    # general: it certified views whose bytes had changed at some earlier,
+    # unobserved moment. See `sync.view_records`.
+    views_before = stamps.snapshot_views(repo_root)
     exe = graphify_exe(repo_root)
     failures: list[str] = []
     for name, args, desc in selected:
@@ -110,7 +118,10 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
         print(f"[kb-artifacts] {len(failures)} failed: {', '.join(failures)}")
         return 1
     print("[kb-artifacts] all artifacts generated")
-    stamps.refresh_after_regen(repo_root, tag="kb-artifacts")
+    # Reached only when every selected generator returned 0 (the `failures` branch
+    # returns 1 above), so every view that moved inside this bracket moved because
+    # a generator that SUCCEEDED wrote it.
+    stamps.refresh_after_regen(repo_root, tag="kb-artifacts", views_before=views_before)
     return 0
 
 

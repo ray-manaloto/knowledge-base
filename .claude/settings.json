@@ -70,7 +70,8 @@
     "claude-md-management@claude-plugins-official": true,
     "mise@brentmitchell25": true,
     "plugin-eval@claude-code-workflows": true,
-    "skillopt-sleep@skillopt-sleep": true
+    "skillopt-sleep@skillopt-sleep": true,
+    "codex@openai-codex": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {

@@ -15,10 +15,16 @@ into graph edges, making the process itself queryable alongside everything else.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+# RUNTIME, not TYPE_CHECKING: `RunRecord.views`'s default_factory CONSTRUCTS a
+# ViewStatus, so deferring this import would NameError the moment a record is
+# built without one — which is every fixture and every pre-#182 call site.
+from kb_setup.currency import views as views_mod
+from kb_setup.currency.views import ViewStatus
 
 if TYPE_CHECKING:
     from kb_setup.currency.decide import Verdict
@@ -55,6 +61,11 @@ class RunRecord:
     observations: tuple[Observation, ...]
     moved: tuple[Observation, ...]
     verdict: Verdict
+    #: The derived-views verdict (#182). Defaulted so the 25-odd fixtures that
+    #: build a RunRecord keep working, and defaulted to SKIP rather than OK
+    #: because a record nobody supplied one for was not checked — the same
+    #: not-verifiable-is-not-a-pass rule the rest of this engine runs on.
+    views: ViewStatus = field(default_factory=lambda: ViewStatus("", views_mod.SKIP))
     answers: tuple[tuple[str, str], ...] = ()
 
     @property

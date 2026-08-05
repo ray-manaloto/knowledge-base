@@ -72,8 +72,32 @@ fnox = "1.32.0"
 # symlink the antigravity plugin drives). The Claude architect stays in the
 # chair; these are the executor lanes only. auth is per-user (codex login /
 # Google account) — mise manages the binaries, not the credentials.
-codex = "0.146.0"
-antigravity-cli = "1.1.5"
+#
+# ⚠️ `mise ls-remote codex` is the WRONG instrument for "does this version
+# exist". It lists the aqua registry, which lags GitHub by a day or more:
+# 0.146.1 was Latest upstream for ~4h and absent from all 277 rows, while
+# rows for NEWER 0.147.0-alphas were present. The registry entry is
+# `aqua:openai/codex npm:@openai/codex`, and the npm fallback had it — so
+# `mise install codex@<v>` resolved fine. Verify a codex bump by attempting
+# the install, never by grepping `ls-remote` (probes-need-a-control-arm.md).
+#
+# ⚠️ THIS PIN DOES NOT DECIDE WHICH `agy` RUNS. A hand-installed 143 MB
+# binary sits at `~/.local/bin/agy` (dated 2026-07-14, reports **1.1.2**), and
+# `~/.local/bin` is PATH position 2 against mise's shims at 159 — so a fresh
+# login shell reaches 1.1.2, three releases behind even the old pin. Control
+# arm: no `~/.local/bin/codex` exists, which is why codex resolves to its shim
+# correctly; the shadow is agy-specific, not a general PATH fault. The sibling
+# `antigravity` binary has no shadow and does resolve to this pin. Removing
+# that file is Ray's call — `do-not.md` #11 bars this repo from touching
+# anything under `~`. Until it goes, verify with `agy --version` in a FRESH
+# shell; this pin governs `antigravity`, not `agy`.
+#
+# ⚠️ `agy` also SELF-UPDATES IN PLACE: before this bump the binary inside the
+# `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
+# what runs, so `mise which` never answers "which version" for this tool —
+# ask the binary. Same class as the `fnox`/`latest` note above.
+codex = "0.146.1"
+antigravity-cli = "1.1.10"
 
 [settings]
 experimental = true

@@ -21,7 +21,17 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 
-from kb_setup.currency import baseline, config, docs, issues, report, staleness, sync, upstream
+from kb_setup.currency import (
+    baseline,
+    config,
+    docs,
+    issues,
+    report,
+    staleness,
+    sync,
+    upstream,
+    views,
+)
 from kb_setup.currency.decide import decide
 
 
@@ -108,6 +118,14 @@ def check(repo_root: Path, *, only: str = "", quiet: bool = True) -> int:
     # Same posture as everything else on this path — silent when clean, never a
     # rebuild, and the return below is unconditionally 0.
     staleness.report(staleness.check_inputs(repo_root, spec) for spec in _specs(repo_root, only))
+    # And the derived-views verdict (#182), under its own header again and last:
+    # of the three, it is the cheapest to act on (`kb-artifacts`, no network, no
+    # re-extraction), so it is the one a reader should meet after the two that can
+    # invalidate it. Cheap enough for the SessionStart path because it reads the
+    # stamp and stats ONE file: the expensive part (`deep_artifact_fingerprint`'s
+    # walk over `wiki/`, 35.6-63.3 ms) is paid at stamp time, after an operation
+    # that already took minutes.
+    views.report(views.check_views(repo_root, spec) for spec in _specs(repo_root, only))
     if stale:
         print("[currency] tracked docs pages not verified recently (this is not drift):")
         for tool, finding in stale:
@@ -199,7 +217,22 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     report_root = repo_root / report.REPORT_DIR
     previous = issues.load_previous(report_root, spec.name)
     moved = issues.changes(observations, previous)
-    verdict = decide(sync=status, upstream=up, moved=moved, observations=observations)
+    # The derived-views verdict reaches gate 6 (#182). Without this it was
+    # reported under its own header and nowhere else, so `apply()`'s
+    # auto-authorization — which is built from THIS verdict — could clear a
+    # 6/6 bump over views describing an earlier graph.
+    view_status = views.check_views(repo_root, spec)
+    verdict = decide(
+        sync=status,
+        upstream=up,
+        moved=moved,
+        observations=observations,
+        # The WHOLE status, not just its stale lines. Passing `view_status.stale`
+        # was round 2's P1: that tuple is empty for every NOT_VERIFIABLE verdict,
+        # so a views check that could not verify anything reached gate 6 looking
+        # exactly like a clean one.
+        views=view_status,
+    )
     return report.RunRecord(
         tool=spec.name,
         sync=status,
@@ -207,6 +240,10 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
         observations=observations,
         moved=moved,
         verdict=verdict,
+        # Round 2's second P2: this was computed, used for the verdict, and then
+        # dropped — so `_payload` serialized the SKIP default forever, breaking the
+        # machine surface its own docstring says it exists to provide.
+        views=view_status,
     )
 
 
@@ -225,12 +262,19 @@ def _where_written(repo_root: Path, detail: Path | None, *, write: bool) -> str:
 def _payload(
     repo_root: Path, tool: str, record: report.RunRecord, detail: Path | None
 ) -> dict[str, object]:
-    """One tool's `--json` object — the shape the tool-currency skill reads."""
+    """One tool's `--json` object — the shape the tool-currency skill reads.
+
+    `views` is present because the human path prints the derived-views verdict and
+    the machine path did not, so a `--json` consumer — including `daily()` — saw a
+    record with no trace of it (#182). A signal that exists in one rendering and
+    not the other is worse than absent: it reads as verified in both.
+    """
     return {
         "tool": tool,
         "verdict": asdict(record.verdict),
         "sync": asdict(record.sync),
         "upstream": asdict(record.upstream),
+        "views": asdict(record.views),
         "observations": [asdict(o) for o in record.observations],
         "moved": [asdict(o) for o in record.moved],
         "detail_page": str(detail.relative_to(repo_root)) if detail else None,
@@ -293,6 +337,17 @@ def run(repo_root: Path, *, only: str = "", as_json: bool = False, write: bool =
     else:
         for line in lines:
             print(line)
+        # The full run reports the derived-views verdict too (#182), not only the
+        # SessionStart path — a view left behind by a `kb-label` is exactly the
+        # kind of thing someone running the full loop is looking for, and having
+        # it appear in the cheap mode but not the thorough one would read as the
+        # thorough mode clearing it.
+        #
+        # Non-JSON only: `payloads` is a per-tool RunRecord shape, and appending
+        # prose to a document a caller is about to `json.loads` would break the
+        # machine mode to serve the human one. `daily()` and any `--json` consumer
+        # keep a parseable stdout; `check()` above carries the verdict for them.
+        views.report(views.check_views(repo_root, spec) for spec in specs)
     return 0
 
 
