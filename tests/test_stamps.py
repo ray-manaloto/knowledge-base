@@ -28,6 +28,40 @@ def test_refresh_survives_a_malformed_currency_config(tmp_path: Path, capsys) ->
     assert "could not refresh the currency stamp" in capsys.readouterr().out
 
 
+# --- the WARNING line's tag and cause survive too ----------------------------
+#
+# A mutant that hardcodes `print("[kb-artifacts] WARNING: could not refresh
+# the currency stamp")` — dropping both `{tag}` and `{e}` — still satisfies the
+# fixed-phrase substring check above, on EITHER caller. This is the failure
+# path, hit while someone is already debugging, so it is the one place the
+# message matters most: the tag says which command to blame
+# (`_labelled`'s docstring: "`[kb-artifacts]` after a `kb-label` run would
+# send them looking at the wrong task"), and `{e}` says WHY. Twin tests, one
+# per tag, so neither can be hardcoded and still pass both.
+
+
+def test_warning_path_carries_the_tag_and_the_cause_for_kb_label(tmp_path: Path, capsys) -> None:
+    (tmp_path / "currency.toml").write_text('tool = "not a table"\n', encoding="utf-8")
+    stamps.refresh_after_regen(tmp_path, tag="kb-label")
+    out = capsys.readouterr().out
+    assert "[kb-label]" in out
+    assert "[kb-artifacts]" not in out
+    # config.load()'s own TypeError text — proves `{e}` reached the message.
+    assert "expected a [tool.<name>] table" in out
+
+
+def test_warning_path_carries_the_tag_and_the_cause_for_kb_artifacts(
+    tmp_path: Path, capsys
+) -> None:
+    """CONTROL ARM: same shape, the other tag — proves neither is hardcoded."""
+    (tmp_path / "currency.toml").write_text('tool = "not a table"\n', encoding="utf-8")
+    stamps.refresh_after_regen(tmp_path, tag="kb-artifacts")
+    out = capsys.readouterr().out
+    assert "[kb-artifacts]" in out
+    assert "[kb-label]" not in out
+    assert "expected a [tool.<name>] table" in out
+
+
 def test_refresh_is_a_noop_without_a_config(tmp_path: Path) -> None:
     """Control arm: a repo with no currency.toml re-stamps nothing, cleanly."""
     stamps.refresh_after_regen(tmp_path, tag="kb-label")
