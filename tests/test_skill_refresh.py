@@ -41,10 +41,12 @@ def _wire(
     monkeypatch.setattr(graphify_env, "assert_pinned_graphify", lambda _r=None: None)
     monkeypatch.setattr(config, "load", lambda _r: specs)
     monkeypatch.setattr(skill, "refresh", lambda _r, _s: result)
+    # `skill_refresh.run`, NOT `skill_refresh.subprocess.run` — the latter IS
+    # `sys.modules["subprocess"]`, so patching it replaced `subprocess.run`
+    # process-wide for the duration, beside a sibling suite that runs real `git`
+    # (cold lane on 5204e57, F12).
     monkeypatch.setattr(
-        skill_refresh.subprocess,
-        "run",
-        lambda *_a, **_k: subprocess.CompletedProcess(["mise"], fmt_rc),
+        skill_refresh, "run", lambda *_a, **_k: subprocess.CompletedProcess(["mise"], fmt_rc)
     )
 
 
@@ -84,8 +86,15 @@ def test_the_gate_is_absent_from_the_shared_module() -> None:
     chose not to put it there" is invisible to a later reader, who sees only
     that one path has a gate and the other does not, and reasonably adds it.
     """
-    src = Path(skill.__file__).read_text(encoding="utf-8")
-    assert "assert_pinned_graphify" not in src
+    shared = Path(skill.__file__).read_text(encoding="utf-8")
+    entry = Path(skill_refresh.__file__).read_text(encoding="utf-8")
+
+    # CONTROL ARM for the negative below. A bare `not in` passes if the module
+    # were emptied, renamed, or the token spelled differently — a token spelling
+    # is a bound like any other (`probes-need-a-control-arm.md`). Finding it in
+    # the entry point with the SAME probe proves the probe discriminates.
+    assert "assert_pinned_graphify" in entry
+    assert "assert_pinned_graphify" not in shared
 
 
 def test_a_missing_tool_table_is_a_malformed_request(tmp_path, monkeypatch) -> None:
@@ -127,3 +136,38 @@ def test_a_lost_addendum_fails_an_otherwise_successful_refresh(tmp_path, monkeyp
         skill.SkillResult(ran=True, lost_addenda=("references/query.md (anchor moved)",)),
     )
     assert skill_refresh.refresh(tmp_path) == 1
+
+
+def test_unrepaired_installer_damage_also_fails(tmp_path, monkeypatch) -> None:
+    """Install fine, damage still in the tree, and it must NOT exit 0.
+
+    `SkillResult.unrepaired` is documented as "the only honest thing to do is
+    name the files", and this returned 0 anyway — so the name was printed and
+    the exit code contradicted it, one line before telling the operator to go
+    commit (cold lane on 5204e57, F4).
+    """
+    _wire(
+        monkeypatch,
+        skill.SkillResult(ran=True, unrepaired=(".claude/settings.json",), note="COULD NOT REVERT"),
+    )
+    assert skill_refresh.refresh(tmp_path) == 1
+
+
+def test_the_reverted_delta_is_printed_not_just_named(tmp_path, monkeypatch, capsys) -> None:
+    """The BYTES, not just the filename.
+
+    Reverting an installer change with only its path recorded is the second way
+    to go stale: a future graphify that legitimately adds a hook would have it
+    discarded with nothing left to read (cold lane on 5204e57, F8).
+    """
+    _wire(
+        monkeypatch,
+        skill.SkillResult(
+            ran=True, repaired=(".claude/settings.json",), repair_delta="-old\n+new\n"
+        ),
+    )
+    skill_refresh.refresh(tmp_path)
+
+    out = capsys.readouterr().out
+    assert "+new" in out
+    assert "-old" in out

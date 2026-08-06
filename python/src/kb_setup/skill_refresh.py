@@ -28,10 +28,18 @@ What lives here rather than there, and why:
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
+from subprocess import run
 
 from kb_setup import graphify_env
+
+# `from subprocess import run` rather than `import subprocess`, so a test
+# monkeypatching this module's `run` patches THIS module and not
+# `sys.modules["subprocess"]` process-wide. `skill_refresh.subprocess` was the
+# stdlib module itself, so the old form replaced `subprocess.run` for every
+# other module for the duration — harmless while nothing else in the same test
+# needed a real subprocess, and a loaded gun beside `test_currency_skill.py`,
+# which runs real `git`. (Cold lane on 5204e57, F12.)
 
 #: The tool whose skill this task refreshes. `currency.skill` is generic over
 #: `ToolSpec`; this task is not, because the version gate above is graphify's.
@@ -55,19 +63,30 @@ def refresh(repo_root: Path | None = None) -> int:
 
     result = skill.refresh(root, spec)
     print(f"[skill-refresh] {result.note}")
+    # The bytes, not just the filenames. Reverting an installer change with only
+    # its path recorded is how a future graphify that legitimately adds a hook
+    # gets it discarded without trace (cold lane on 5204e57, F8).
+    if result.repair_delta:
+        print("[skill-refresh] the installer wanted this, and it was reverted:")
+        print(result.repair_delta, end="")
     if not result.ran:
         return 1
 
     # After the addenda, so their bytes are formatted too.
     print("[skill-refresh] mise run fmt")
-    fmt = subprocess.run(["mise", "run", "fmt"], cwd=root, check=False)
+    fmt = run(["mise", "run", "fmt"], cwd=root, check=False)
     if fmt.returncode != 0:
         print(f"[skill-refresh] fmt FAILED rc={fmt.returncode} — skill files may not lint")
         return fmt.returncode
 
     print("[skill-refresh] review `git diff .claude/` before committing")
-    # A lost addendum is the one condition that fails an otherwise-successful
-    # refresh: the install worked, so a 0 would send the operator to commit a
-    # diff that silently dropped a local fix — which is what happened the first
-    # time this ran.
-    return 1 if result.lost_addenda else 0
+    # TWO conditions fail an otherwise-successful refresh, and the line above is
+    # why both must: it tells the operator to go commit.
+    #
+    # - `lost_addenda` — the install worked and a local fix is silently gone,
+    #   which is what happened the first time this ran.
+    # - `unrepaired` — the installer's damage is STILL in the working tree.
+    #   `SkillResult` documents that field as "the only honest thing to do is
+    #   name the files", and this returned 0 anyway, so the name was printed and
+    #   the exit code contradicted it (cold lane on 5204e57, F4).
+    return 1 if (result.lost_addenda or result.unrepaired) else 0

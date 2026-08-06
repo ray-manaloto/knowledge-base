@@ -83,14 +83,32 @@ if TYPE_CHECKING:
 #: Files the installer is known to damage, restored from git after it runs.
 #: Named rather than discovered: restoring "whatever the installer touched" would
 #: also revert the skill content we ran it FOR.
-_REPAIR = (".claude/settings.json", "CLAUDE.md")
+_REPAIR = (".claude/settings.json", "CLAUDE.md", ".claude/CLAUDE.md")
 
-#: `CLAUDE.md` is in that list because the installer rewrites it too — measured, it
-#: strips the blank line after `Rules:` in the graphify block, which rumdl then
-#: fails on. Found only by running the real installer: the unit tests use a fake
-#: one, so they could never have surfaced it.
+#: The ROOT `CLAUDE.md` is in that list because the installer rewrites it too —
+#: measured, it strips the blank line after `Rules:` in the graphify block, which
+#: rumdl then fails on. Found only by running the real installer: the unit tests
+#: use a fake one, so they could never have surfaced it.
+#:
+#: `.claude/CLAUDE.md` was MISSING until 2026-08-06 (cold lane on 5204e57, F9),
+#: and the pathspec `CLAUDE.md` does not match it. The installer writes both —
+#: `install.py:263` and `:629` target `.claude/CLAUDE.md`, `:1708` the root one —
+#: and this repo's `.claude/CLAUDE.md` is hand-authored and sits at its
+#: `md_size_budget`, so an installer append there breaks a gate rather than
+#: merely churning bytes. It has not fired yet only because the append is
+#: marker-idempotent (`_CLAUDE_MD_MARKER = "## graphify"`, `install.py:683`); it
+#: fires the first time upstream edits that block's content.
 
 _TIMEOUT = 300
+
+#: Written by the installer with `write_text(__version__)` — no trailing newline
+#: (`install.py:229`). Harmless while the file was gitignored; since it became
+#: TRACKED it fails hk's `newlines` builtin, which does not exclude the skill
+#: tree. Normalised HERE rather than left to a caller's `mise run fmt`, because
+#: only one of the two callers runs one: `currency.apply` commits what this
+#: returns without formatting, so a plain auto-applied bump produced a
+#: lint-failing commit (cold lane on 5204e57, F3).
+_STAMP_SUFFIX = ".graphify_version"
 
 
 @dataclass(frozen=True)
@@ -130,6 +148,29 @@ ADDENDA: dict[str, tuple[Addendum, ...]] = {
                 "graph — prefer the CLI when it is installed.\n"
             ),
         ),
+        Addendum(
+            path=".claude/skills/graphify/SKILL.md",
+            anchor="### Step 5 - Label communities\n",
+            text=(
+                "\n> **DO NOT RUN STEP 5 IN THIS REPO — use `mise run kb-label`.** Two reasons,\n"
+                "> both verified against the 0.9.34 installer template rather than assumed:\n"
+                ">\n"
+                "> 1. Its block writes `GRAPH_REPORT.md` and `.graphify_labels.json` BEFORE\n"
+                ">    attempting the `graph.json` export, and its final\n"
+                ">    `print('Report updated with community labels')` sits at indent 0 — so a\n"
+                ">    REFUSED export (the #479 shrink guard) prints an error and then reports\n"
+                ">    success, exiting 0 with two sidecars describing a graph that was never\n"
+                ">    written. Step 4 has the correct shape twenty lines earlier and its own\n"
+                ">    comment names the upstream issue this reintroduces (#1392).\n"
+                "> 2. It writes `graph.json` through graphify's bundled interpreter, which\n"
+                ">    bypasses the pinned-version gate every `kb-setup` graph writer pays and\n"
+                ">    is exactly what `kb_setup.hook_guard` denies.\n"
+                ">\n"
+                "> `mise run kb-label` has neither problem and needs no LLM. This note is an\n"
+                "> ADDENDUM, not a hand-edit: the tree is regenerated, so editing the block\n"
+                "> itself would be eaten by the next refresh. (Cold lane on 5204e57, F1/F2.)\n"
+            ),
+        ),
     ),
 }
 
@@ -141,6 +182,11 @@ class SkillResult:
     ran: bool
     changed: tuple[str, ...] = ()
     repaired: tuple[str, ...] = ()
+    #: The unified diff of what `_repair` reverted, captured BEFORE the revert.
+    #: Empty when nothing was reverted. A caller that shows only `repaired` names
+    #: the files and loses the bytes, which is how a legitimately-added upstream
+    #: hook would be discarded without trace.
+    repair_delta: str = ""
     #: Local addenda re-applied into the regenerated tree.
     addenda: tuple[str, ...] = ()
     #: Addenda that could NOT be re-applied — the file or its anchor is gone, so
@@ -166,8 +212,8 @@ def _git(repo_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _repair(repo_root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Revert whatever the installer dirtied in `_REPAIR`; return (reverted, still-dirty).
+def _repair(repo_root: Path) -> tuple[tuple[str, ...], tuple[str, ...], str]:
+    """Revert what the installer dirtied in `_REPAIR`; return (reverted, still-dirty, delta).
 
     **The rc is not enough, and neither is one call.** `git checkout -- a b` is
     ATOMIC across its pathspecs: if any one of them is unresolvable from the index
@@ -187,16 +233,27 @@ def _repair(repo_root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
     retried alone so one bad pathspec cannot veto the rest — and the ANSWER comes
     from re-reading the tree, not from any exit code. What a caller needs to know is
     "is the file clean now", and only `git status` can say that.
+
+    **The delta is CAPTURED before the revert, and returned.** Reverting with only
+    the filename recorded makes this a second way to go stale: a future graphify
+    that legitimately adds a hook would have it discarded with nothing to read.
+    The capture is `git diff` against the index over exactly the dirty paths, run
+    while the damage is still on disk — after the checkout there is nothing left
+    to diff. An untracked path contributes no diff and that is correct: there is
+    no committed version for it to differ FROM, and its whole content is already
+    named by `reverted`. (Cold lane on 5204e57, F8: `mise.toml` promised this
+    report and no code emitted one.)
     """
     dirty = _dirty(repo_root, _REPAIR)
     if not dirty:
-        return (), ()
+        return (), (), ""
+    delta = _git(repo_root, "diff", "--", *dirty).stdout
     _git(repo_root, "checkout", "--", *dirty)
     still = _dirty(repo_root, _REPAIR)
     for path in still:
         _git(repo_root, "checkout", "--", path)
     remaining = _dirty(repo_root, _REPAIR)
-    return tuple(p for p in dirty if p not in remaining), remaining
+    return tuple(p for p in dirty if p not in remaining), remaining, delta
 
 
 def _clear_backups(repo_root: Path, skill_dir: Path) -> None:
@@ -222,6 +279,29 @@ def _clear_backups(repo_root: Path, skill_dir: Path) -> None:
         if parent.is_dir():
             for bak in parent.glob("*.graphify-bak"):
                 bak.unlink(missing_ok=True)
+
+
+def _normalise_stamp(repo_root: Path, skill_dir: str) -> None:
+    """Give the installer's version stamp the trailing newline hk requires.
+
+    `install.py:229` writes it with `write_text(__version__)` — no newline. That
+    was invisible while the file was gitignored; since it became TRACKED
+    (2026-08-06) hk's `newlines` builtin fails on it, and `.claude/skills/**` is
+    in neither of hk's exclude lists.
+
+    Done here rather than left to `mise run fmt`, because only ONE of this
+    module's two callers runs a formatter: `currency.apply` commits what this
+    returns as-is, so an ordinary auto-applied graphify bump produced a
+    lint-failing commit (cold lane on 5204e57, F3). Fixing it at the writer
+    covers both callers and cannot drift apart the way two fixes would.
+    """
+    stamp = repo_root / skill_dir / _STAMP_SUFFIX
+    try:
+        text = stamp.read_text(encoding="utf-8")
+    except OSError:
+        return  # No stamp is not this function's problem to report.
+    if text and not text.endswith("\n"):
+        stamp.write_text(text + "\n", encoding="utf-8")
 
 
 def _apply_addenda(repo_root: Path, skill_dir: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -302,21 +382,33 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         # settings.json that this module exists to prevent. Returning early with
         # only "installer failed" left that sitting in the working tree, unnamed,
         # for whoever commits the bump next.
-        reverted, still = _repair(repo_root)
+        reverted, still, delta = _repair(repo_root)
+        # ADDENDA ON THE FAILURE PATH TOO, and for the same reason as the repair
+        # above. A half-finished installer regenerates the skill tree and THEN
+        # exits nonzero, so the local paragraph is already gone — and running
+        # only on the success path left `lost_addenda` at its empty default, so
+        # the one loss this whole mechanism exists to catch survived on the one
+        # path it did not cover (cold lane on 5204e57, F5).
+        f_applied, f_lost = _apply_addenda(repo_root, spec.skill_dir)
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]
         return SkillResult(
             ran=False,
             repaired=reverted,
             unrepaired=still,
+            repair_delta=delta,
+            addenda=f_applied,
+            lost_addenda=f_lost,
             note=(
                 f"installer failed (rc={proc.returncode}): {' / '.join(tail)}"
                 + (f". Reverted {', '.join(reverted)}" if reverted else "")
                 + (f". ⚠ STILL DIRTY, fix before committing: {', '.join(still)}" if still else "")
+                + (f". ⚠ LOCAL ADDENDUM LOST: {', '.join(f_lost)}" if f_lost else "")
             ),
         )
 
-    repaired, unrepaired = _repair(repo_root)
+    repaired, unrepaired, delta = _repair(repo_root)
     _clear_backups(repo_root, skill)
+    _normalise_stamp(repo_root, spec.skill_dir)
     # AFTER the repair and BEFORE reading `changed`: the addenda are edits to the
     # skill tree, which `_repair` never touches, and they must show up in the
     # changed set or a caller reading it would not know the tree moved.
@@ -332,6 +424,7 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         changed=changed,
         repaired=repaired,
         unrepaired=unrepaired,
+        repair_delta=delta,
         addenda=applied,
         lost_addenda=lost,
         note=(

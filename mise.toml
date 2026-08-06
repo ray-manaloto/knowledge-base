@@ -621,16 +621,28 @@ description = "Regenerate the vendored graphify skill from the PINNED graphify, 
 # step with a cause nobody would connect to the installer).
 #
 # Restores are REPORTED, never silent: each protected file goes back to its
-# pre-install bytes AND the reverted delta prints as a unified diff, so a future
-# graphify that legitimately adds a hook cannot have it discarded without trace.
-# `.claude/CLAUDE.md` is protected too and is NOT in #133's list — the installer
-# writes a `# graphify` block there, and that file is hand-authored and at its
-# `md_size_budget`, so an append breaks a gate rather than merely churning.
+# pre-install bytes AND the reverted delta is captured (before the revert — after
+# it there is nothing left to diff) and printed, so a future graphify that
+# legitimately adds a hook cannot have it discarded with only a filename recorded.
+#
+# THREE files are protected, and `_REPAIR` in kb_setup.currency.skill is the list:
+# `.claude/settings.json`, the ROOT `CLAUDE.md`, and `.claude/CLAUDE.md`. The
+# installer writes all three (`install.py:1708` the root one, `:263`/`:629` the
+# `.claude/` one), and both markdown files are hand-authored and sit at their
+# `md_size_budget`, so an installer append breaks a gate rather than merely
+# churning bytes.
 #
 # Refuses to run on a graphify that disagrees with the pin, via the same
 # `assert_pinned_graphify` the graph writers use: generating the skill from a stale
 # binary produces exactly the drift this task removes, while LOOKING like a refresh.
-# Logic in kb_setup.skill_refresh.
+# That gate is at THIS entry point and deliberately NOT inside
+# `kb_setup.currency.skill`, which does the actual refresh: `currency.apply` writes
+# the NEW pin and then calls that module, so a gate there would refuse every bump.
+#
+# Exits non-zero on either kind of surviving damage — a lost local addendum, or an
+# installer rewrite the repair could not revert — because the last thing it prints
+# is "go review the diff and commit".
+# Logic in kb_setup.skill_refresh over kb_setup.currency.skill.
 run = "uv run kb-setup skill-refresh"
 
 [tasks.kb-handoff-check]

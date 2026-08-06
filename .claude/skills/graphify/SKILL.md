@@ -488,6 +488,24 @@ Substitute `IS_DIRECTED` and `INPUT_PATH` as in Step 4. If a `GRAPH HEALTH WARNI
 
 ### Step 5 - Label communities
 
+> **DO NOT RUN STEP 5 IN THIS REPO — use `mise run kb-label`.** Two reasons,
+> both verified against the 0.9.34 installer template rather than assumed:
+>
+> 1. Its block writes `GRAPH_REPORT.md` and `.graphify_labels.json` BEFORE
+>    attempting the `graph.json` export, and its final
+>    `print('Report updated with community labels')` sits at indent 0 — so a
+>    REFUSED export (the #479 shrink guard) prints an error and then reports
+>    success, exiting 0 with two sidecars describing a graph that was never
+>    written. Step 4 has the correct shape twenty lines earlier and its own
+>    comment names the upstream issue this reintroduces (#1392).
+> 2. It writes `graph.json` through graphify's bundled interpreter, which
+>    bypasses the pinned-version gate every `kb-setup` graph writer pays and
+>    is exactly what `kb_setup.hook_guard` denies.
+>
+> `mise run kb-label` has neither problem and needs no LLM. This note is an
+> ADDENDUM, not a hand-edit: the tree is regenerated, so editing the block
+> itself would be eaten by the next refresh. (Cold lane on 5204e57, F1/F2.)
+
 Read `graphify-out/.graphify_analysis.json`. For each community key, look at its node labels and write a 2-5 word plain-language name (e.g. "Attention Mechanism", "Training Pipeline", "Data Loading").
 
 Then regenerate the report and save the labels for the visualizer:
