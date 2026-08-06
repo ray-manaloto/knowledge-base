@@ -225,3 +225,79 @@ def test_supersedes_shape_is_validated_per_chunk(declared: object, expect: int) 
     issues = [i for i in chunks.validate(chunk) if "supersedes" in i]
 
     assert len(issues) == expect, issues
+
+
+def test_the_merging_chunk_wins_regardless_of_its_capture_date(tmp_path: Path) -> None:
+    """`kb-merge` ownership is NOT replay ownership, and conflating them was a P1.
+
+    `build_merge` prunes on the INCOMING chunk's claims unconditionally
+    (`build.py:1531-1537`), so a lone merge is won by whatever is being merged,
+    whatever its capture date. Ranking by replay order there reported the exact
+    destructive case as clean: re-merging an OLDER committed chunk over a newer
+    sibling that legitimately declared the shared file.
+
+    Both halves are asserted, because only the pair shows the parameter is doing
+    work rather than being accepted and ignored.
+    """
+    old = _chunk(tmp_path, "old-docs", {"page.md": "2026-08-01"})
+    new = _chunk(tmp_path, "new-docs", {"page.md": "2026-08-09"}, supersedes=["page.md"])
+
+    # Replaying both: the newer chunk wins and has declared. Clean.
+    assert chunks.collision_issues([old, new]) == []
+
+    # Merging the OLDER one alone: it wins, it declared nothing, and it is about
+    # to delete the newer chunk's nodes for that file.
+    issues = chunks.collision_issues([old, new], merging=old)
+    # TWO problems, and both are true of this merge: it is undeclared, and the
+    # winner is also the staler capture. The inversion arm reaching the merge
+    # door was not designed in — it falls out of `how` being one word, which is
+    # the right kind of falling out.
+    assert len(issues) == 2, issues
+    assert "undeclared supersession" in issues[0]
+    assert "this merge makes old-docs.json own it" in issues[0]
+    assert "date inversion" in issues[1]
+    assert "by this merge" in issues[1]
+
+    # Merging the newer one is still fine — it declared.
+    assert chunks.collision_issues([old, new], merging=new) == []
+
+
+def test_merging_a_chunk_that_does_not_claim_the_file_falls_back_to_replay(
+    tmp_path: Path,
+) -> None:
+    """`merging` only decides files the incoming chunk actually claims.
+
+    A third chunk being merged says nothing about who owns a file it never
+    names, so those keep replay-order semantics. Without this the parameter
+    would silently re-attribute every collision in the corpus to whatever
+    happened to be merging.
+    """
+    a = _chunk(tmp_path, "a-docs", {"shared.md": "2026-08-01"})
+    b = _chunk(tmp_path, "b-docs", {"shared.md": "2026-08-02"})
+    c = _chunk(tmp_path, "c-docs", {"unrelated.md": "2026-08-03"})
+
+    issues = chunks.collision_issues([a, b, c], merging=c)
+
+    assert len(issues) == 1, issues
+    assert "replay makes b-docs.json own it" in issues[0]
+
+
+def test_assemble_carries_every_input_declaration_into_the_output(tmp_path: Path) -> None:
+    """A declaration dropped at assembly disarms the gate it was written for.
+
+    `assemble` validated `supersedes` on every input and then wrote a dict with
+    no such key, so a chunk built by `kb-assemble` arrived at the collision gate
+    having silently lost the one thing that lets it pass. Union across inputs,
+    sorted, and absent entirely when nothing declared — an empty list would be a
+    claim rather than a default.
+    """
+    a = _chunk(tmp_path, "a", {"x.md": "2026-08-01"}, supersedes=["x.md"])
+    b = _chunk(tmp_path, "b", {"y.md": "2026-08-01"}, supersedes=["y.md", "x.md"])
+    plain = _chunk(tmp_path, "p", {"z.md": "2026-08-01"})
+
+    out = chunks.assemble(tmp_path, "combined", [a, b])
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["supersedes"] == ["x.md", "y.md"]
+
+    bare = json.loads(chunks.assemble(tmp_path, "bare", [plain]).read_text(encoding="utf-8"))
+    assert "supersedes" not in bare

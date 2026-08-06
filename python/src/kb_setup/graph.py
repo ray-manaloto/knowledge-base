@@ -462,6 +462,26 @@ def _reset_merged_chunks(repo_root: Path, *, tag: str = "kb-build") -> None:
         print(f"[{tag}] WARNING: could not reset the merge ledger: {e}")
 
 
+def merged_chunk_paths(repo_root: Path) -> list[Path]:
+    """Chunks merged since the last build, resolved to paths — `[]` when unknown.
+
+    A read-only view of the recomposition ledger for callers that only need
+    "which chunks are in the graph but not in `sources/extractions/`". That set
+    is not decorative: `kb-merge` accepts a chunk from any path, and an
+    out-of-tree chunk's nodes sit in the graph exactly like a committed one's —
+    so `graphify_ops._committed_chunks` has to include them or the collision gate
+    has a blind side (cold lane, #189 round 1).
+
+    An unreadable ledger yields `[]` rather than raising. `_read_merged_chunks`
+    returns None there and its OWN callers must refuse, because they are about to
+    recompose FROM it; this caller is only widening a check, and a check that
+    refuses to run over a corrupt derived file is worse than one with a known
+    bound.
+    """
+    entries = _read_merged_chunks(repo_root)
+    return [_resolve(repo_root, e.chunk) for e in entries] if entries else []
+
+
 def _read_merged_chunks(repo_root: Path) -> list[MergedChunkEntry] | None:
     """The ledger's entries — `[]` if absent, `None` if present but unreadable.
 

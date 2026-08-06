@@ -191,3 +191,47 @@ def test_report_calls_a_self_remerge_expected_rather_than_a_loss(capsys) -> None
     assert "EXPECTED" in out
     assert "replaced its own prior contribution" in out
     assert "loss is real" not in out
+
+
+def test_the_prose_derivation_refreshes_the_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every graph write path ends in a prose derivation — so that is where counts land.
+
+    Without this the feature was largely dead in ordinary use. `kb-label`
+    rewrites `graph.json` and recorded nothing, the documented ingestion order is
+    "always relabel after a merge", and the ledger is fingerprint-gated — so the
+    merge AFTER any prior ingestion's label pass found the fingerprint moved and
+    reported "arithmetic NOT checked". The check existed and could almost never
+    run. (Cold lane, round 1, P2.)
+
+    `members` is absent by design: `ProseStats` counts hyperedges, not their
+    members, and inventing a zero would be worse than an absent key.
+    """
+    from kb_setup import graphify_ops, prose
+
+    g = _graph_file(tmp_path)
+    stats = prose.ProseStats(
+        nodes_in=500, nodes_out=40, links_in=900, links_out=60, hyperedges_in=7, hyperedges_out=7
+    )
+    monkeypatch.setattr(prose, "derive_for", lambda _root: stats)
+
+    assert graphify_ops._derive_prose(tmp_path, tag="kb-label", did="the graph was relabelled") == 0
+    assert graph_counts.read(tmp_path, g) == {"nodes": 500, "edges": 900, "hyperedges": 7}
+
+
+def test_a_failed_prose_derivation_records_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: no derivation, no counts — never a number from a run that failed."""
+    from kb_setup import graphify_ops, prose
+
+    g = _graph_file(tmp_path)
+
+    def _boom(_root: Path) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(prose, "derive_for", _boom)
+
+    assert graphify_ops._derive_prose(tmp_path, tag="kb-label", did="x") == 1
+    assert graph_counts.read(tmp_path, g) is None

@@ -1,6 +1,6 @@
 # #189 + #191 — cross-chunk collision + merge arithmetic: mutation arms
 
-**20 of 21 arms died**, control green at both ends, tree restored
+**24 of 25 arms died**, control green at both ends, tree restored
 (`RESTORED rc=0`). Run 2026-08-06 on `chore/post-197`. Row `A0` is a **declared
 no-op CONTROL** that must SURVIVE: if it ever dies, the harness is mutating
 something it should not and every other row is meaningless.
@@ -66,6 +66,29 @@ committed **and** sole claimant of every `source_file` it names — neither
 condition alone), and arms `A18`–`A20` exist so it cannot be quietly neutered
 back into always-EXPECTED.
 
+## Round 2: four arms the sweep could not have had
+
+`A21`–`A24` exist because the COLD REVIEW found four real defects that 21 green
+arms said nothing about — two of them P1. The sharpest is worth stating because
+it was a wrong MODEL rather than wrong code: `collision_issues` decided ownership
+by replay order, which is right for `kb-build` and wrong for a lone `kb-merge`,
+where `build_merge` prunes on the INCOMING chunk's claims unconditionally
+(`build.py:1531-1537`). Re-merging an OLDER committed chunk over a newer sibling
+that had legitimately declared the shared file was reported CLEAN, and would then
+have deleted the newer chunk's nodes — the gate's own subject, walking in through
+the gate. Every arm here had been mutating an implementation of the wrong rule.
+
+That is the second time in one round that a full sweep certified something the
+tests agreed with and the world did not. Mutation arms measure the tests; they
+cannot measure the premise.
+
+**Two arms reported `SKIPPED — pattern matched 0 times` on the first re-run after
+the fixes**, because the code they anchor to had moved. The harness reports that
+as *never ran* rather than as a survivor, which is the whole reason
+`source.count(old) != 1` is checked before the mutation is applied — three
+"survivors" in an earlier round were exactly this, misread. Patterns updated,
+both then died.
+
 ## What the arms cover
 
 Each arm is a break that could really happen — an inverted comparison, a deleted
@@ -100,15 +123,19 @@ transcribed, per `probes-need-a-control-arm.md` rule 8.
 | `A18 self-remerge committed` | `graphify_ops.py` | an UNCOMMITTED chunk's replacement is reported as its own re-extraction |
 | `A19 self-remerge exclusivity` | `graphify_ops.py` | a cross-chunk supersession is waved through as a routine re-merge |
 | `A20 report self branch` | `_merge_docs.py` | every replacement reads EXPECTED, including a real collision |
+| `A21 merge-door winner` | `chunks.py` | a lone kb-merge is judged by replay order, so an older chunk eats a newer one |
+| `A22 ledger in the collision set` | `graphify_ops.py` | a chunk merged from outside the tree is invisible to the collision gate |
+| `A23 assemble carries supersedes` | `chunks.py` | kb-assemble strips the declaration and the chunk then fails its own gate |
+| `A24 prose refreshes the ledger` | `graphify_ops.py` | every merge after a relabel gets a baseline of 0 instead of the real count |
 
 ## Result
 
 ```
 CONTROL (unmutated) rc=0  OK
 A0 CONTROL no-op             rc=0 SURVIVED   <- intended
-A1..A20                      rc=1 DIED       <- all twenty
+A1..A24                      rc=1 DIED       <- all twenty-four
 RESTORED rc=0  OK
-20/21 arms died
+24/25 arms died
 ```
 
 ## What a full sweep does NOT say
@@ -178,8 +205,8 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
     (
         "A0 CONTROL no-op",
         CHUNKS,
-        "def collision_issues(paths: list[Path]) -> list[str]:",
-        "def collision_issues(paths: list[Path]) -> list[str]:  # control-arm marker",
+        "def collision_issues(paths: list[Path], *, merging: Path | None = None) -> list[str]:",
+        "def collision_issues(paths: list[Path], *, merging: Path | None = None) -> list[str]:  # control",
         "NOTHING — this arm must SURVIVE; if it dies the harness is broken",
     ),
     (
@@ -287,11 +314,9 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
     (
         "A15 merge preflight",
         OPS,
-        "    collisions = _chunks.collision_issues"
-        "([chunk_path, *_committed_chunks(repo_root)])\n"
+        "        [chunk_path, *_committed_chunks(repo_root)], merging=chunk_path\n    )\n"
         "    if collisions:",
-        "    collisions = _chunks.collision_issues"
-        "([chunk_path, *_committed_chunks(repo_root)])\n"
+        "        [chunk_path, *_committed_chunks(repo_root)], merging=chunk_path\n    )\n"
         "    if False:",
         "kb-merge admits a chunk that collides with the committed corpus",
     ),
@@ -329,6 +354,34 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
         "    if self_remerge:\n        why = (",
         "    if True:\n        why = (",
         "every replacement reads EXPECTED, including a real collision",
+    ),
+    (
+        "A21 merge-door winner",
+        CHUNKS,
+        "    incoming = merging.resolve() if merging is not None else None",
+        "    incoming = None",
+        "a lone kb-merge is judged by replay order, so an older chunk eats a newer one",
+    ),
+    (
+        "A22 ledger in the collision set",
+        OPS,
+        "    return paths + [p for p in ledger if p.is_file() and p.resolve() not in known]",
+        "    return paths",
+        "a chunk merged from outside the tree is invisible to the collision gate",
+    ),
+    (
+        "A23 assemble carries supersedes",
+        CHUNKS,
+        "    if declared_supersedes:\n        combined[_SUPERSEDES] = sorted(declared_supersedes)",
+        "    if False:\n        combined[_SUPERSEDES] = sorted(declared_supersedes)",
+        "kb-assemble strips the declaration and the chunk then fails its own gate",
+    ),
+    (
+        "A24 prose refreshes the ledger",
+        OPS,
+        '{"nodes": stats.nodes_in, "edges": stats.links_in,',
+        '{"nodes": 0, "edges": stats.links_in,',
+        "every merge after a relabel gets a baseline of 0 instead of the real count",
     ),
 ]
 

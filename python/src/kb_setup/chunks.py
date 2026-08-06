@@ -480,8 +480,19 @@ def chunk_claims(path: Path) -> tuple[dict[str, str], set[str]]:
     return per_file, owned
 
 
-def collision_issues(paths: list[Path]) -> list[str]:
+def collision_issues(paths: list[Path], *, merging: Path | None = None) -> list[str]:
     """Refuse two chunks claiming one `source_file` unless the winner declares it.
+
+    **`merging` names the chunk a SINGLE merge is about to apply, and passing it
+    is not optional for that door.** Replay order decides ownership only when
+    every chunk is being replayed — `kb-build`, `kb-watch`. In a lone `kb-merge`,
+    `build_merge` prunes on the INCOMING chunk's claims unconditionally
+    (`build.py:1531-1537`), so the chunk being merged wins whatever its capture
+    date says. Ranking by replay order there answers a question nobody asked:
+    re-merging an OLDER committed chunk over a newer sibling that legitimately
+    declared the shared file was reported clean, and then silently deleted the
+    newer chunk's nodes — the exact loss this function exists to refuse, walking
+    in through the function itself. (Cold lane, round 1, P1.)
 
     `build_merge` drops every existing node whose `source_file` the incoming
     chunk also names, so the LAST chunk to claim a file replaces the other's
@@ -531,6 +542,7 @@ def collision_issues(paths: list[Path]) -> list[str]:
     ordered = replay_order(unique)
     rank = {p: i for i, p in enumerate(ordered)}
     claims = {p: chunk_claims(p) for p in unique}
+    incoming = merging.resolve() if merging is not None else None
 
     owners: dict[str, list[Path]] = {}
     for p, (per_file, _) in claims.items():
@@ -541,13 +553,17 @@ def collision_issues(paths: list[Path]) -> list[str]:
     for sf, holders in sorted(owners.items()):
         if len(holders) < _MIN_CHUNKS_FOR_COLLISION:
             continue
+        # The chunk being merged wins outright; otherwise the last to replay does.
         winner = max(holders, key=lambda p: rank[p])
+        how = "replay"
+        if incoming is not None and incoming in holders:
+            winner, how = incoming, "this merge"
         losers = [p for p in holders if p != winner]
         if sf not in claims[winner][1]:
             issues.append(
                 f"undeclared supersession: {winner.name} and "
                 f"{', '.join(p.name for p in losers)} both claim source_file "
-                f"{sf!r}; replay makes {winner.name} own it and DELETES the "
+                f"{sf!r}; {how} makes {winner.name} own it and DELETES the "
                 f"other(s)' nodes for that file. If that is intended, add {sf!r} "
                 f"to {winner.name}'s '{_SUPERSEDES}' list; if it is a basename "
                 f"collision between unrelated sources, qualify the identity "
@@ -558,8 +574,8 @@ def collision_issues(paths: list[Path]) -> list[str]:
         if stale:
             newer = ", ".join(f"{p.name} ({claims[p][0].get(sf, '')})" for p in stale)
             issues.append(
-                f"date inversion: {winner.name} owns source_file {sf!r} by replay "
-                f"order but captured it {won_at or '(undated)'}, older than "
+                f"date inversion: {winner.name} owns source_file {sf!r} by {how} "
+                f"but captured it {won_at or '(undated)'}, older than "
                 f"{newer} — the staler extraction wins"
             )
     return issues
@@ -611,6 +627,7 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     hyperedges: list = []
     seen: dict[str, str] = {}
     problems: list[str] = []
+    declared_supersedes: set[str] = set()
 
     for p in chunk_paths:
         try:
@@ -637,6 +654,9 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
             nodes.append(n)
         edges.extend(chunk.get("edges", []))
         hyperedges.extend(chunk.get("hyperedges") or [])
+        declared = chunk.get(_SUPERSEDES)
+        if isinstance(declared, list):
+            declared_supersedes.update(d for d in declared if isinstance(d, str) and d)
 
     # Re-validate the COMBINED hyperedge list against the union of node ids the
     # written artifact will actually contain. Calling `_hyperedge_issues`
@@ -664,5 +684,14 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
         "input_tokens": 0,
         "output_tokens": 0,
     }
+    # Carry the declarations forward, or assembly SILENTLY DISARMS them: this
+    # function validated `supersedes` on every input and then wrote a dict that
+    # had no such key, so a chunk assembled here lost the one thing that lets it
+    # pass the collision gate it was written to satisfy. Union, not the last
+    # writer's copy — each input chunk declares for the files IT claims, and the
+    # combined artifact claims all of them. Sorted so the same inputs always
+    # produce the same bytes. (Cold lane, round 1, P2.)
+    if declared_supersedes:
+        combined[_SUPERSEDES] = sorted(declared_supersedes)
     out.write_text(json.dumps(combined, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     return out

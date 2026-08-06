@@ -218,3 +218,49 @@ def test_self_remerge_only_when_the_chunk_exclusively_owns_its_files(tmp_path: P
     assert graphify_ops._self_remerge(tmp_path, ext / "solo-docs.json") is True
     assert graphify_ops._self_remerge(tmp_path, ext / "shared-a-docs.json") is False
     assert graphify_ops._self_remerge(tmp_path, loose) is False
+
+
+def test_committed_chunks_includes_out_of_tree_ledger_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A chunk merged from ANY path is in the graph, so it is in the collision set.
+
+    `kb-merge` accepts an out-of-tree chunk and `append_merged_chunk` records it
+    so `kb-watch` can replay it — its nodes sit in the graph exactly like a
+    committed chunk's. The glob alone therefore had a blind side: a new chunk
+    could claim a `source_file` that chunk already owned, pass the gate, and have
+    `build_merge` delete its nodes. Both halves are asserted so the ledger read
+    cannot be a no-op that happens to look right.
+    """
+    ext = tmp_path / "sources" / "extractions"
+    _write_chunk(ext / "committed-docs.json", "committed.md")
+    loose = tmp_path / "elsewhere" / "loose-docs.json"
+    _write_chunk(loose, "CHANGELOG.md")
+
+    monkeypatch.setattr(graph, "merged_chunk_paths", lambda _root: [loose])
+    found = {p.name for p in graphify_ops._committed_chunks(tmp_path)}
+    assert found == {"committed-docs.json", "loose-docs.json"}
+
+    monkeypatch.setattr(graph, "merged_chunk_paths", lambda _root: [])
+    assert {p.name for p in graphify_ops._committed_chunks(tmp_path)} == {"committed-docs.json"}
+
+
+def test_committed_chunks_survives_an_unreadable_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A corrupt derived file must narrow the check, never abort it.
+
+    `_read_merged_chunks` returns None for a corrupt ledger and its own callers
+    refuse — correctly, they are about to recompose FROM it. This caller is only
+    widening a set, and a collision check that raises on a corrupt derived file
+    would take the whole gate down with it.
+    """
+    ext = tmp_path / "sources" / "extractions"
+    _write_chunk(ext / "committed-docs.json", "committed.md")
+
+    def _boom(_root: Path) -> list[Path]:
+        raise OSError("ledger unreadable")
+
+    monkeypatch.setattr(graph, "merged_chunk_paths", _boom)
+
+    assert {p.name for p in graphify_ops._committed_chunks(tmp_path)} == {"committed-docs.json"}

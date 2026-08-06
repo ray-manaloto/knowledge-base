@@ -36,14 +36,33 @@ _MAX_SHOWN_ISSUES = 10
 
 
 def _committed_chunks(repo_root: Path) -> list[Path]:
-    """Every committed extraction chunk — the corpus a new chunk must not collide with.
+    """Every chunk whose nodes are, or will be, in the graph — the collision set.
 
-    A plain glob rather than the replay ledger: this answers "who else already
-    claims a `source_file`", which is a question about what is COMMITTED, not
-    about what the last build happened to replay. A chunk added to the tree but
-    not yet merged still owns its files the moment `kb-build` runs.
+    The glob over `sources/extractions/*.json` answers "who else already claims a
+    `source_file`" for everything committed, including a chunk added to the tree
+    but not yet merged: it still owns its files the moment `kb-build` runs.
+
+    **The glob alone was not the whole set.** `kb-merge` accepts a chunk from
+    ANY path — `graph.append_merged_chunk` exists precisely to record one, so
+    `kb-watch` can replay it — and an out-of-tree chunk's nodes are in the graph
+    just as much as a committed one's. Excluding them meant a new chunk could
+    claim a `source_file` an out-of-tree chunk already owned, pass the gate, and
+    have `build_merge` delete its nodes: the gate's own subject, reachable
+    through the one door it was not looking at. (Cold lane, round 1, P1.)
+
+    Best-effort on the ledger half — an unreadable or absent ledger yields the
+    glob rather than raising, because a collision check that refuses to run is
+    worse than one with a known bound, and `build()` resets the ledger anyway.
     """
-    return sorted((repo_root / "sources" / "extractions").glob("*.json"))
+    from kb_setup import graph as _graph
+
+    paths = sorted((repo_root / "sources" / "extractions").glob("*.json"))
+    try:
+        ledger = _graph.merged_chunk_paths(repo_root)
+    except OSError, ValueError:
+        return paths
+    known = {p.resolve() for p in paths}
+    return paths + [p for p in ledger if p.is_file() and p.resolve() not in known]
 
 
 def _self_remerge(repo_root: Path, chunk_path: Path) -> bool:
@@ -116,7 +135,9 @@ def _preflight(repo_root: Path, chunk_path: Path) -> int | None:
     issues = _chunks.validate_files([chunk_path]).get(chunk_path) or []
     if issues:
         return _refuse(chunk_path.name, "failed validation", issues)
-    collisions = _chunks.collision_issues([chunk_path, *_committed_chunks(repo_root)])
+    collisions = _chunks.collision_issues(
+        [chunk_path, *_committed_chunks(repo_root)], merging=chunk_path
+    )
     if collisions:
         return _refuse(chunk_path.name, "collides with the committed corpus", collisions)
     return None
@@ -133,6 +154,14 @@ def _record_counts(repo_root: Path, graph_path: Path, handoff: Path, *, tag: str
 
     Removed unconditionally, including when the merge failed and wrote nothing:
     a stale handoff from an earlier run must never be read as this run's result.
+
+    On the SUCCESS path `_derive_prose` records again a moment later and its
+    record wins — same node/edge/hyperedge counts, no `members`, because
+    `ProseStats` counts hyperedges rather than their members. This call is not
+    therefore redundant: it is the record that survives when the prose derivation
+    FAILS, which is precisely the run after which the next merge would otherwise
+    have no baseline. Two writers, one of them a fallback, and the richer of the
+    two is the one that can be lost.
     """
     from kb_setup import graph_counts
 
@@ -286,7 +315,7 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     printed after a `kb-label` run would send them looking at the wrong step.
     """
     try:
-        prose.derive_for(repo_root)
+        stats = prose.derive_for(repo_root)
     except (OSError, ValueError, SystemExit) as exc:
         print(
             f"[{tag}] {did}, but the prose graph could not be re-derived: "
@@ -295,6 +324,30 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
             file=sys.stderr,
         )
         return 1
+    # The prose derivation is the ONE parse of `graph.json` that happens after
+    # every write on this path, and it already counts both sides. So the counts
+    # ledger is refreshed from it for free (#191, cold lane round 1, P2).
+    #
+    # Without this the feature was largely dead in ordinary use: `kb-label`
+    # rewrites `graph.json` and never recorded counts, the `kb-curator` workflow
+    # is "always relabel after a merge", and the ledger is fingerprint-gated — so
+    # the merge AFTER any prior ingestion's label pass found the fingerprint moved
+    # and reported "arithmetic NOT checked". Correct, and useless: the check
+    # existed and could almost never run.
+    #
+    # `members` is deliberately NOT recorded here — `ProseStats` counts
+    # hyperedges, not their members, and inventing a zero would be worse than an
+    # absent key. `graph_counts.read` returns only the fields present, and the
+    # only field any consumer reads is `nodes`. `assert_composition` still
+    # records members on the build path, where it has them for free.
+    from kb_setup import graph_counts
+
+    graph_counts.record(
+        repo_root,
+        repo_root / "graphify-out" / "graph.json",
+        {"nodes": stats.nodes_in, "edges": stats.links_in, "hyperedges": stats.hyperedges_in},
+        tag=tag,
+    )
     return 0
 
 
