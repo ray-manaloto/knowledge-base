@@ -15,11 +15,21 @@ committed `sources/extractions/<name>-docs.json`. Driven by the mise tasks
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 # The exact node/edge shape graphify's doc merge (`_merge_docs.py` -> build_merge)
 # consumes. Kept in sync with the committed chunks under sources/extractions/.
 _NODE_REQUIRED = ("id", "label", "file_type", "source_file", "source_url", "captured_at")
+
+#: `captured_at` must be ISO `YYYY-MM-DD` when it carries a value:
+#: `replay_order` compares these lexically for supersession, so a malformed
+#: value ("zzz") would sort after every real date and hand its chunk the
+#: last-writer win over a genuinely newer extraction (cold lane round 2, P2).
+#: A JSON `null` stays legal — `graphify-docs.json` predates the field's
+#: enforcement and carries them; `chunk_captured_at`'s `or ""` sorts a null
+#: FIRST, which is the harmless direction (it can never supersede anything).
+_CAPTURED_AT_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _EDGE_REQUIRED = ("source", "target", "relation", "confidence", "confidence_score", "weight")
 #: Edges only. Hyperedges have a NARROWER tier set — see `_HYPEREDGE_CONFIDENCE`
 #: below — so widening this tuple (issue #177 will add AMBIGUOUS for edges) must
@@ -108,6 +118,15 @@ def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
         missing = [k for k in _NODE_REQUIRED if k not in n]
         if missing:
             issues.append(f"{label}: node {nid!r} missing field(s) {missing}")
+        captured = n.get("captured_at")
+        if captured is not None and (
+            not isinstance(captured, str) or not _CAPTURED_AT_RE.fullmatch(captured)
+        ):
+            issues.append(
+                f"{label}: node {nid!r} captured_at={captured!r} is not YYYY-MM-DD — "
+                f"replay_order compares these lexically for supersession, so a "
+                f"malformed date can beat a real one"
+            )
         origin = n.get("_origin")
         if origin != _SEMANTIC_ORIGIN:
             issues.append(

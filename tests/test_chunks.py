@@ -802,3 +802,29 @@ def test_chunk_captured_at_unreadable_file_is_empty_not_an_error(tmp_path) -> No
     bad.write_text("{not json")
 
     assert chunks.chunk_captured_at(bad) == ""
+
+
+def test_validate_flags_a_malformed_captured_at() -> None:
+    """A malformed date must die in validation, not win the sort.
+
+    "zzz" compares greater than any year lexically, so it would take the
+    last-writer supersession win from a real date (cold lane round 2, P2).
+    """
+    c = _chunk([_node("a", captured_at="zzz")], [])
+    assert any("captured_at" in i for i in chunks.validate(c))
+
+
+def test_validate_flags_a_non_string_captured_at() -> None:
+    c = _chunk([_node("a", captured_at=20260805)], [])
+    assert any("captured_at" in i for i in chunks.validate(c))
+
+
+def test_a_null_captured_at_stays_legal() -> None:
+    """CONTROL ARM: graphify-docs.json predates the field and carries nulls.
+
+    A null sorts FIRST via `chunk_captured_at`'s `or ""` — the harmless
+    direction, since it can never supersede — so refusing it would break a
+    committed chunk for no protective gain.
+    """
+    c = _chunk([_node("a", captured_at=None)], [])
+    assert chunks.validate(c) == []

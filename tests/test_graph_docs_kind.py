@@ -257,3 +257,58 @@ def test_update_all_includes_docs_manifests(monkeypatch, tmp_path):
     graph.update_all(tmp_path)
 
     assert sorted(seen) == ["mirror", "repo"], f"docs manifest must be updated too, saw {seen}"
+
+
+# --------------------------------------------------------------------------
+# 3. update(): the writer version gate sits on the CODE branch only
+# --------------------------------------------------------------------------
+#
+# The gate moved here from the dispatch layer (cold lane round 2, P2): a docs
+# pin advance is pure git and must never be blocked by a stale graphify it
+# does not run, while the code branch hands the artifact straight to the
+# binary and must refuse a stale one BEFORE it runs.
+
+
+def test_a_docs_update_never_pays_the_writer_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    m = _manifest(tmp_path, kind="docs")
+    monkeypatch.setattr(graph.mf, "load", lambda _p: m)
+    monkeypatch.setattr(graph.mf, "latest_commit", lambda _m: _NEW)
+    monkeypatch.setattr(graph, "_advance_docs_pin", lambda _m, _l: 0)
+
+    def boom(_root: object) -> None:
+        raise AssertionError("a docs pin advance was blocked by the version gate")
+
+    monkeypatch.setattr(graph, "assert_pinned_graphify", boom)
+
+    assert graph.update(tmp_path, "demo") == 0
+
+
+def test_a_code_update_pays_the_gate_before_any_graphify_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The tripwire raises BEFORE write_commit/clone/_run.
+
+    A stale binary must not advance the pin either, or a retry after
+    `mise install` would report "already at latest" and skip the re-extract
+    it never did.
+    """
+    m = _manifest(tmp_path, kind="code")
+    monkeypatch.setattr(graph.mf, "load", lambda _p: m)
+    monkeypatch.setattr(graph.mf, "latest_commit", lambda _m: _NEW)
+
+    def untouched(*_a: object, **_k: object) -> None:
+        raise AssertionError("the code path ran past the version gate")
+
+    monkeypatch.setattr(graph.mf, "write_commit", untouched)
+    monkeypatch.setattr(graph, "_ensure_clone", untouched)
+    monkeypatch.setattr(graph, "_run", untouched)
+
+    def tripwire(_root: object) -> None:
+        raise SystemExit("gate fired")
+
+    monkeypatch.setattr(graph, "assert_pinned_graphify", tripwire)
+
+    with pytest.raises(SystemExit, match="gate fired"):
+        graph.update(tmp_path, "demo")

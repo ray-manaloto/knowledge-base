@@ -27,7 +27,12 @@ from typing import TYPE_CHECKING
 
 from kb_setup import atomic, graph_checks, graphify_ops
 from kb_setup import manifest as mf
-from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
+from kb_setup.graphify_env import (
+    assert_pinned_graphify,
+    clean_env,
+    graphify_exe,
+    graphify_python,
+)
 
 if TYPE_CHECKING:
     from kb_setup.currency.config import ToolSpec
@@ -1478,6 +1483,12 @@ def update(repo_root: Path, name: str) -> int:
     print(f"[kb-update] {name}: {m.commit[:10]} -> {latest[:10]}")
     if m.kind == "docs":
         return _advance_docs_pin(m, latest)
+
+    # The writer version gate belongs to THIS branch, not the dispatch layer:
+    # the docs pin advance above is pure git and must never be blocked by a
+    # stale binary it does not run (cold lane round 2, P2). Only from here on
+    # does graphify touch the artifact.
+    assert_pinned_graphify(repo_root)
 
     m = mf.write_commit(m, latest)
     _ensure_clone(m)
