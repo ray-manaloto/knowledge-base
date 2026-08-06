@@ -11,7 +11,11 @@ scrutiny means an arm, not a re-read.
 This is the most-recorded lesson in the repo's own corpus and, until this file,
 **the only one with no rule** — measured in the 2026-08-06 self-reflection pass:
 9 rounds of handoffs and 6 work-memories record it, and a control-armed grep
-across all 22 rule files returned zero hits.
+across all 22 rule files returned zero hits. Those two counts are derived from
+the session handoffs in `.agent/plans/`, which are **gitignored** — so the
+committed, checkable source is
+`docs/research/reports/2026-08-06-self-reflection-pass.md` and the synthesis
+beside it, not the handoffs themselves.
 
 It is expensive. One `kb-review` loop ran five rounds without converging, cost
 **2.93M tokens**, and was reverted. Round 2 of another found **two defects that
@@ -28,12 +32,18 @@ Four sub-shapes, all observed here:
 | **raises a bound instead of removing it** | `--limit 200` truncates silently exactly as the default did at 30 |
 
 **A live instance, from the session that wrote this file.** Repairing dangling
-`[[wikilinks]]` in the memory store, the correction itself used the phrase
-"breaks every `[[wikilink]]` silently" — and a backticked double-bracket token
-*is* a link target. The fix for the dangling-link defect **introduced a dangling
-link**. It was caught only because the set was re-derived afterwards rather than
-the edit being trusted: the count came back 6 → 5, not 4, and the extra one was
-the fix's. Seconds to catch here; a round to catch anywhere else.
+`[[wikilinks]]`, the correction itself used the phrase "breaks every
+`[[wikilink]]` silently" — and a backticked double-bracket token *is* a link
+target. The fix for the dangling-link defect **introduced a dangling link**, in
+the same edit. It was caught only because the set was re-derived afterwards
+rather than the edit being trusted: the count came back one *higher* than the
+repair predicted, and the extra one was the fix's own. Seconds to catch here; a
+round to catch anywhere else.
+
+That anecdote is deliberately stated without its counts. The store it happened
+in is not in this repo and mutates continuously, so a pinned number here would
+be unverifiable by construction — which is itself rule 4 below. The mechanism is
+the lesson; the tally was never the evidence.
 
 ## Rules
 
@@ -72,9 +82,10 @@ the fix's. Seconds to catch here; a round to catch anywhere else.
    worst form is a comment **defending** the choice that is the bug, because the
    prose is what prevents your own re-read and what disarms the next reviewer.
    Observed: a docstring explaining that lexical containment was *deliberate*,
-   walked straight through by a symlink the next round; a rule file glossing
-   `dirty` with **inverted polarity** on the very field added to prevent a false
-   reading. Nobody re-reads a comment they agree with. When a comment states an
+   walked straight through by a symlink the next round; and a comment asserting
+   the exact opposite of what the line below it did, found by a cold lane in the
+   code its author had documented most confidently.
+   Nobody re-reads a comment they agree with. When a comment states an
    ordering, a precondition, or a "before/after", go read the lines — especially
    when you wrote both.
 

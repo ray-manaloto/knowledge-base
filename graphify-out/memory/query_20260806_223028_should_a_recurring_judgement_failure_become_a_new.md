@@ -19,7 +19,11 @@ stated trigger for a machine layer.
 
 Supporting measurements: compliance with query-the-graph-FIRST, the founding
 premise stated eagerly in CLAUDE.md, was 2 of 7. The branch-FIRST invariant is
-eager and was violated with six commits onto main. Credentials reached
+eager and was violated repeatedly — three commits onto this repo's main in one
+2026-08-03 incident, and at least six across four sessions once the sibling
+dotfiles repo is included. Carry that condition: the aggregate is
+cross-session and cross-repo, and quoting the six as a single incident in this
+repo contradicts the record at query_20260803_192203. Credentials reached
 transcripts three times, the last AFTER the prohibition was in every lane
 prompt.
 
