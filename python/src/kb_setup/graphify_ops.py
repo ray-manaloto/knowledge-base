@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import hyperedges, prose, stamps
+from kb_setup import prose, stamps
 from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
@@ -206,13 +206,13 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     re-derivation is undone by the very next step and `--prose` is stale again
     with nothing having failed. (Cold lane, round 1.)
 
-    A successful label also CARRIES HYPEREDGES across the run (#171 local
-    mitigation, #175): `graphify label`'s own graph.json round-trip loses them
-    (measured 5->0 on this repo's aggregate — see `hyperedges.py`'s module
-    docstring for the verified mechanism). The pre-run list is captured before
-    `_run` below launches anything and reattached in `_labelled`, before prose
-    re-derivation — `graph-prose.json`'s hyperedge-retention report
-    (`prose.ProseStats`) must see the restored list, not the emptied one.
+    Hyperedges are graphify's own job here since 0.9.34: the label round-trip
+    reads both graph.json slots and re-attaches survivors (#2485, verified on
+    the installed binary, not the release notes), so the 0.9.33-era
+    capture/reattach carry this function used to run was retired at that bump
+    — `hyperedges.py`'s module docstring records the mechanism and the
+    evidence. `prose.ProseStats`' hyperedge-retention report now describes
+    what graphify itself preserved, which is the fact worth reporting.
     """
     # Gate on the binary we are ABOUT TO RUN, not on PATH. The old
     # `shutil.which("graphify")` check sat directly in front of a
@@ -229,12 +229,7 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         )
         return 2
 
-    # Captured BEFORE anything runs: a missing graph.json (no `kb-build` yet)
-    # returns [] here, and the graphify call below fails on its own account
-    # (its own "no graph found" refusal) — this capture changes nothing about
-    # that path, it just also has nothing to carry.
-    carried = hyperedges.capture(_full_graph(repo_root))
-    # Same "before anything runs" reason, for the other artifact this operation
+    # Snapshotted BEFORE anything runs, for the artifact this operation
     # can move: `graphify label` regenerates GRAPH_REPORT.md as well as the graph
     # (it prints "GRAPH_REPORT.md and graph.json updated"). Bracketing the run is
     # what lets the stamp certify the report against the graph this label just
@@ -256,7 +251,6 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         return _labelled(
             repo_root,
             _run(base, "deterministic no-LLM hub labels (Gemini-free)"),
-            carried,
             views_before,
         )
 
@@ -265,38 +259,31 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         "claude-cli backend (opt-in; broken #2076 — expect fallback)",
     )
     if rc == 0:
-        return _labelled(repo_root, rc, carried, views_before)
+        return _labelled(repo_root, rc, views_before)
     print(
         "[kb-label] claude-cli backend failed (#2076) — deterministic no-LLM fallback.",
         file=sys.stderr,
     )
-    return _labelled(repo_root, _run(base, "deterministic fallback"), carried, views_before)
+    return _labelled(repo_root, _run(base, "deterministic fallback"), views_before)
 
 
 def _labelled(
     repo_root: Path,
     rc: int,
-    carried: list[hyperedges.Hyperedge],
     views_before: dict[str, dict[str, str]] | None = None,
 ) -> int:
-    """Restore carried hyperedges, refresh the currency stamp, then re-derive the prose graph.
+    """Refresh the currency stamp, then re-derive the prose graph.
 
-    All three are gated on `rc`, for the same reason `merge_chunk` gates: a labelling run that
-    failed may have left `graph.json` in any state, and either reattaching over
-    it, restamping it, or deriving from it would assert a fact ("the run
-    succeeded") that is false. The failing rc is the caller's job, and
-    returning it unchanged says so — `carried` is discarded along with it.
+    Both are gated on `rc`, for the same reason `merge_chunk` gates: a labelling run that
+    failed may have left `graph.json` in any state, and either restamping it
+    or deriving from it would assert a fact ("the run succeeded") that is
+    false. The failing rc is the caller's job, and returning it unchanged says so.
 
-    Reattach happens BEFORE the restamp and BEFORE `_derive_prose`, and in that
-    order, for two separate reasons:
-
-    - The currency stamp's fingerprint must cover graph.json's FINAL bytes, and
-      `reattach` is the last writer of that file — this mirrors
-      `artifacts.generate`, which orders capture -> subprocess -> reattach ->
-      restamp for the same reason (#179).
-    - `_derive_prose` reads graph.json fresh and reports what survived
-      (`prose.ProseStats.hyperedges_out`), so the restored list has to already
-      be on disk when it runs, not after.
+    Until the 0.9.34 bump a hyperedge reattach ran first, as the last writer
+    of graph.json, so the stamp would fingerprint ITS bytes (#179). With the
+    carry retired (`hyperedges.py`'s module docstring), graphify's own
+    `to_json` is the last writer again and the stamp certifies exactly the
+    bytes label wrote — one writer fewer between the run and its fingerprint.
 
     The restamp runs before `_derive_prose`, not after, because
     `graphify-out/graph-prose.json` is NOT in the stamped set —
@@ -323,7 +310,6 @@ def _labelled(
     """
     if rc != 0:
         return rc
-    hyperedges.reattach(_full_graph(repo_root), carried)
     stamps.refresh_after_regen(repo_root, tag="kb-label", views_before=views_before)
     return _derive_prose(repo_root, tag="kb-label", did="communities were relabelled")
 

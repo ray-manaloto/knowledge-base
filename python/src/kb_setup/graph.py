@@ -40,7 +40,7 @@ _STAMPED_TOOL = "graphify"
 
 #: Permission bits restored on the swapped-in graph.json — see
 #: `_recompose_into_temp`'s docstring. Same value and same reason as
-#: `hyperedges._GRAPH_MODE`; a separate constant because these are separate
+#: `prose._ARTIFACT_MODE`; a separate constant because these are separate
 #: modules and the integer is not worth a shared import.
 _GRAPH_MODE = 0o644
 
@@ -767,8 +767,8 @@ def _recompose_into_temp(
     The scratch file lives in the SAME directory as `real_out` (never the
     system temp dir), so the final `Path.replace` is guaranteed to be an
     atomic rename rather than risking a cross-filesystem copy — the same
-    reason `atomic.write_text`, `prose.derive` and `hyperedges._write_atomic`
-    all reserve their temp name beside the file they replace.
+    reason `atomic.write_text` and `prose.derive` both reserve their temp
+    name beside the file they replace.
 
     Every step above the swap runs against the SCRATCH file, never `real_out`
     — so the real `graphify-out/graph.json` stays exactly what the last
@@ -787,8 +787,8 @@ def _recompose_into_temp(
     tighten `graph.json` from world-readable to owner-only, and graphify's own
     `_atomic_replace` PRESERVES whatever mode is already there, so nothing
     downstream would ever repair it (#175 cold review, finding 5 — the exact
-    hazard `hyperedges._write_atomic` already guards against for its own
-    writes; see `hyperedges._GRAPH_MODE`).
+    hazard `prose.derive` already guards against for its own writes; see
+    `prose._ARTIFACT_MODE`).
     """
     gpy = graphify_python(repo_root)
     fd, tmp_name = tempfile.mkstemp(

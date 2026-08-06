@@ -449,7 +449,8 @@ def test_scan_survives_a_populated_graph_hyperedges_before_top_level_nodes(
 ) -> None:
     """Regression for the real post-#175 artifact shape.
 
-    `graph.hyperedges` (populated — `hyperedges.reattach`'s carry, not `[]`)
+    `graph.hyperedges` (populated — graphify writes the nested slot alongside
+    the top-level one, and since 0.9.34 `merge-graphs` does too, not `[]`)
     precedes the top-level `nodes` array (`node_link_data` writes `graph`
     before `nodes`), and a hyperedge's own member list is ALSO keyed
     `"nodes"`. Before `_skip_to`/`_iter_objects` were made depth-aware, this
