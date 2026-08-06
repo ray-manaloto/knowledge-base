@@ -176,8 +176,19 @@ from the human title instead of the slug.
 #216; `/clear-prep` integration still spec-only, per the standing decision that
 a loop is not automated until it has run once by hand.
 
-**Open issues: 71 → 77.** The backlog grew, which is the honest outcome of a
-pass whose verification stage refuted every proposed close.
+**Open issues: 71 → 76.** Six filed, and **#23 closed as COMPLETED by the
+maintainer** at 2026-08-06T23:13:50Z after reading the verification comment —
+the one close that happened, and it was a human decision that overrides the
+verifier's "do not close". The concrete work survives regardless: ask 4's
+actionable slice had already been extracted to **#215** before the close.
+
+The backlog still grew, which is the honest outcome of a pass whose
+verification stage refuted every close it had proposed itself.
+
+*(This figure was committed as "71 → 77" and was wrong within the hour — the
+count moved under it. Re-derived and corrected here rather than left standing,
+which is the failure mode `probes-need-a-control-arm.md` rule 6 names: a number
+can be invalidated by events after the commit that writes it.)*
 
 ---
 
