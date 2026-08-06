@@ -100,6 +100,46 @@ _MIN_HYPEREDGE_MEMBERS = 3
 _SEMANTIC_ORIGIN = "semantic"
 
 
+#: Optional top-level chunk key: the `source_file` values this chunk
+#: DELIBERATELY takes over from another committed chunk.
+#:
+#: `build_merge` prunes every existing node carrying a `source_file` the incoming
+#: chunk also names, so the last chunk to claim a file owns it outright. That is
+#: correct for re-extraction and catastrophic for a collision — and the two are
+#: indistinguishable from the data alone, which is why this key exists: a
+#: supersession is a CLAIM the author makes, in the artifact, reviewable in the
+#: diff.
+#:
+#: A CLI flag could not do this job. `build()` replays every committed chunk
+#: non-interactively, so a declaration that lives outside the artifact is absent
+#: on exactly the path that rebuilds the corpus from scratch.
+_SUPERSEDES = "supersedes"
+
+#: A `source_file` needs at least two claimants before ownership is even a
+#: question — and a one-chunk `collision_issues` call is a SET of one, which can
+#: never collide. Named rather than inlined so the two places that test it stay
+#: visibly the same test.
+_MIN_CHUNKS_FOR_COLLISION = 2
+
+
+def _supersedes_issues(declared: object, label: str) -> list[str]:
+    """Shape problems in a chunk's optional `supersedes` list.
+
+    Checked per-chunk even though the key is only USED cross-chunk, for the same
+    reason `_origin` is: a malformed declaration that is only noticed at merge
+    time is noticed by whoever is least able to fix it. A missing key is legal
+    and means "this chunk claims no other chunk's files".
+    """
+    if declared is None:
+        return []
+    if not isinstance(declared, list):
+        return [f"{label}: '{_SUPERSEDES}' is not a list"]
+    bad = [d for d in declared if not isinstance(d, str) or not d]
+    if bad:
+        return [f"{label}: '{_SUPERSEDES}' entries must be non-empty strings: {bad!r}"]
+    return []
+
+
 def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
     """Per-node schema/uniqueness problems; also returns the set of valid ids."""
     issues: list[str] = []
@@ -315,6 +355,7 @@ def validate(
     resolvable = ids | (known_ids or set())
     issues.extend(_edge_issues(edges, resolvable, label))
     issues.extend(_hyperedge_issues(chunk.get("hyperedges"), resolvable, label))
+    issues.extend(_supersedes_issues(chunk.get(_SUPERSEDES), label))
     return issues
 
 
@@ -367,6 +408,17 @@ def chunk_captured_at(path: Path) -> str:
         data = json.loads(path.read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
         return ""
+    if not isinstance(data, dict):
+        # THIRD instance of one defect class: valid JSON whose top level is an
+        # array/string/number reaches a `.get()` and raises `AttributeError`.
+        # `validate()` and `assemble()` were each fixed for it by the #176 cold
+        # review round 2; this function was not, and stayed reachable because
+        # `collision_issues` (#189) calls `replay_order` -> here on a set that has
+        # only been REPORTED on, not refused — `kb-setup validate-chunks` prints
+        # ✗ for the malformed chunk and then carries on to the cross-chunk pass.
+        # A guard "one function over" from two identical guards is not an edge
+        # case; it is where this class lives.
+        return ""
     nodes = data.get("nodes") or []
     dates = [str(n.get("captured_at") or "") for n in nodes if isinstance(n, dict)]
     return max((d for d in dates if d), default="")
@@ -394,6 +446,123 @@ def replay_order(paths: list[Path]) -> list[Path]:
     ties so the order stays total and deterministic.
     """
     return sorted(paths, key=lambda p: (chunk_captured_at(p), p.name))
+
+
+def chunk_claims(path: Path) -> tuple[dict[str, str], set[str]]:
+    """`({source_file: newest captured_at}, declared supersedes)` for one chunk.
+
+    Per-`source_file` dates, not the chunk-level max `chunk_captured_at` uses.
+    Supersession happens per file, so a chunk that mixes a fresh page with a
+    stale one has TWO answers and the chunk-level max only carries the newer —
+    which is the inversion `collision_issues` below can see and `replay_order`
+    structurally cannot (cold lane, #186 round 2, P1).
+
+    An unreadable chunk yields empty claims rather than raising: `validate_files`
+    is the door that reports a broken chunk with a real message, and failing
+    here would report the same defect worse.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return {}, set()
+    if not isinstance(data, dict):
+        return {}, set()
+    per_file: dict[str, str] = {}
+    for n in data.get("nodes") or []:
+        if not isinstance(n, dict):
+            continue
+        sf = n.get("source_file")
+        if not isinstance(sf, str) or not sf:
+            continue
+        per_file[sf] = max(per_file.get(sf, ""), str(n.get("captured_at") or ""))
+    declared = data.get(_SUPERSEDES)
+    owned = {d for d in declared if isinstance(d, str)} if isinstance(declared, list) else set()
+    return per_file, owned
+
+
+def collision_issues(paths: list[Path]) -> list[str]:
+    """Refuse two chunks claiming one `source_file` unless the winner declares it.
+
+    `build_merge` drops every existing node whose `source_file` the incoming
+    chunk also names, so the LAST chunk to claim a file replaces the other's
+    contribution to it entirely. Nothing else in the pipeline can see that: the
+    per-chunk schema check passes (both chunks are well-formed), the cold review
+    passes (it is corpus data, not behaviour), `kb-build` exits 0, and graphify's
+    own #479 shrink guard is structurally blind to it — `build_merge` reassigns
+    `existing_nodes` to the POST-prune list (`build.py:1536`) before the guard
+    compares `len(existing_nodes)` against the new count (`:1650`), so the loss
+    is subtracted from both sides of its own inequality.
+
+    Measured 2026-08-06 (PR #197): a new chunk destroyed **72 nodes** belonging
+    to `mattpocock-skills-docs.json` — two unrelated `CHANGELOG.md` files, both
+    reduced to a bare basename by `kb-extract.js`'s clone-relative identity. The
+    only detector was `[merge]`-line arithmetic done by eye, for the third round
+    running.
+
+    Two distinct problems are reported, and a chunk can carry both:
+
+    - **Undeclared supersession** — an intersection where the replay winner does
+      not name the shared file in its `supersedes` list. This is the collision
+      case, and it is the refusal that would have stopped the 72-node loss.
+    - **Date inversion** — an intersection where the winner's copy of that file
+      is OLDER than the loser's. Legal by replay order and almost never intended:
+      a declared supersession by a chunk holding the staler extraction. Reported
+      even when declared, because the declaration says "I take this file over",
+      not "I am the newer capture of it".
+
+    A file claimed by exactly one chunk is never reported, which is every file in
+    a healthy corpus. Chunks are deduplicated by RESOLVED path first, and that
+    `.resolve()` is load-bearing rather than tidy: `merge_chunk` passes the path
+    the operator typed (`sources/extractions/x.json`, relative) alongside
+    `_committed_chunks`' `repo_root`-joined absolute one, so the single most
+    routine re-merge there is hands this function two spellings of one file.
+    Without it, that ordinary case refuses itself.
+
+    Each chunk is parsed twice — once here and once by `replay_order` — which is
+    measured at **34 ms over the 19 committed chunks (3.5 MB) on 2026-08-06**, so
+    the obvious single-pass refactor buys nothing worth the extra state. That
+    figure is about THESE inputs; extraction chunks are small by construction
+    (the graph is where the size lives), but a corpus an order of magnitude
+    larger deserves a re-measure rather than an inherited number.
+    """
+    unique = list(dict.fromkeys(p.resolve() for p in paths))
+    if len(unique) < _MIN_CHUNKS_FOR_COLLISION:
+        return []
+    ordered = replay_order(unique)
+    rank = {p: i for i, p in enumerate(ordered)}
+    claims = {p: chunk_claims(p) for p in unique}
+
+    owners: dict[str, list[Path]] = {}
+    for p, (per_file, _) in claims.items():
+        for sf in per_file:
+            owners.setdefault(sf, []).append(p)
+
+    issues: list[str] = []
+    for sf, holders in sorted(owners.items()):
+        if len(holders) < _MIN_CHUNKS_FOR_COLLISION:
+            continue
+        winner = max(holders, key=lambda p: rank[p])
+        losers = [p for p in holders if p != winner]
+        if sf not in claims[winner][1]:
+            issues.append(
+                f"undeclared supersession: {winner.name} and "
+                f"{', '.join(p.name for p in losers)} both claim source_file "
+                f"{sf!r}; replay makes {winner.name} own it and DELETES the "
+                f"other(s)' nodes for that file. If that is intended, add {sf!r} "
+                f"to {winner.name}'s '{_SUPERSEDES}' list; if it is a basename "
+                f"collision between unrelated sources, qualify the identity "
+                f"instead (see #189)"
+            )
+        won_at = claims[winner][0].get(sf, "")
+        stale = [p for p in losers if claims[p][0].get(sf, "") > won_at]
+        if stale:
+            newer = ", ".join(f"{p.name} ({claims[p][0].get(sf, '')})" for p in stale)
+            issues.append(
+                f"date inversion: {winner.name} owns source_file {sf!r} by replay "
+                f"order but captured it {won_at or '(undated)'}, older than "
+                f"{newer} — the staler extraction wins"
+            )
+    return issues
 
 
 def _out_path(repo_root: Path, name: str) -> Path:

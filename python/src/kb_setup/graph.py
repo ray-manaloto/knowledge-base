@@ -696,6 +696,71 @@ def _verified_ledger_chunks(repo_root: Path) -> list[tuple[Path, str]]:
     return verified
 
 
+def _handoff_nodes(handoff: Path) -> int | None:
+    """The node count `_merge_docs.py` just wrote, consuming the handoff file.
+
+    Returns None — *unknown* — for a missing, unreadable or malformed handoff,
+    never a stale number: the file is removed on every read, so a value from an
+    earlier chunk can never be mistaken for this one's. That distinction is the
+    whole point of threading counts at all; a prior count that is quietly one
+    chunk out of date produces a confident, wrong "replaced" figure, which is
+    worse than admitting the arithmetic was not checked.
+    """
+    try:
+        data = json.loads(handoff.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return None
+    finally:
+        handoff.unlink(missing_ok=True)
+    n = data.get("nodes") if isinstance(data, dict) else None
+    return n if isinstance(n, int) else None
+
+
+def _replay_doc_chunks(
+    repo_root: Path, gpy: str, sources: Path, out: Path, chunk_paths: list[Path]
+) -> None:
+    """Replay every committed chunk in CAPTURE-DATE order, checking the arithmetic.
+
+    Order first, because it is the load-bearing part: `build_merge` gives a
+    `source_file` to the LAST chunk that names it, so replay order IS the
+    supersession rule — see `chunks.replay_order` for the measured defect (a
+    rebuild and an incremental merge producing different graphs from the same
+    committed corpus, chosen by the alphabet).
+
+    Each merge's post-count is then threaded into the NEXT merge as its prior, so
+    every step asserts its own arithmetic (#191). This is the loop where the
+    2026-08-05 rebuild silently swapped a fresh page's 69 nodes for an older
+    chunk's 13, and the only reason anyone noticed was a human subtracting
+    `+290 printed` from `total rose 221` across two printed lines.
+
+    The FIRST chunk's prior is deliberately UNKNOWN, and the ledger is not
+    consulted for it. By the time this runs `build()` has already re-seeded
+    `graph.json` from the freshly composed code layer, so the ledger describes a
+    DIFFERENT artifact — the previous build's — and any number it returned would
+    be a baseline for a file that no longer exists. Its fingerprint gate would
+    reject it anyway; not asking is the version of that which cannot be misread
+    later as "the ledger had nothing to say". So chunk 1 reports *not checked*,
+    and every chunk after it is checked against the merge immediately before it.
+
+    The ledger's own payoff is the INCREMENTAL path (`graphify_ops.merge_chunk`),
+    where the graph on disk really is the one it describes — and that is the path
+    the 2026-08-06 loss arrived on.
+    """
+    from kb_setup import chunks as _chunks
+
+    counts_out = out.with_name(".merge-counts.tmp.json")
+    prior_nodes: int | None = None
+    for chunk in _chunks.replay_order(chunk_paths):
+        name = chunk.stem.removesuffix("-docs")
+        root = str((sources / name).resolve())
+        argv = [gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)]
+        if prior_nodes is not None:
+            argv += ["--prior-nodes", str(prior_nodes)]
+        argv += ["--counts-out", str(counts_out)]
+        _run(argv, repo_root)
+        prior_nodes = _handoff_nodes(counts_out)
+
+
 def _validate_replay_chunks(paths: list[Path]) -> None:
     """Refuse if any chunk about to be replayed fails schema/integrity validation.
 
@@ -706,13 +771,23 @@ def _validate_replay_chunks(paths: list[Path]) -> None:
     from kb_setup import chunks as _chunks
 
     problems = {p: i for p, i in _chunks.validate_files(paths).items() if i}
-    if not problems:
-        return
-    lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
-    raise SystemExit(
-        f"{len(problems)} extraction chunk(s) failed validation — refusing to "
-        f"recompose:\n" + "\n".join(lines)
-    )
+    if problems:
+        lines = [f"  {p.name}: {i}" for p, issues in problems.items() for i in issues[:5]]
+        raise SystemExit(
+            f"{len(problems)} extraction chunk(s) failed validation — refusing to "
+            f"recompose:\n" + "\n".join(lines)
+        )
+    # Cross-chunk (#189). Checked HERE as well as in `kb-merge` because the two
+    # doors admit different inputs: `kb-merge` sees one fresh chunk against the
+    # corpus, while this sees the whole replay SET — which is the only place a
+    # collision between two ALREADY-committed chunks can surface. It is also the
+    # path a fresh clone takes, where nothing was ever merged interactively.
+    collisions = _chunks.collision_issues(paths)
+    if collisions:
+        raise SystemExit(
+            f"{len(collisions)} cross-chunk source_file collision(s) — refusing to "
+            f"recompose:\n  " + "\n  ".join(collisions)
+        )
 
 
 def _require_present(paths: list[Path], *, what: str) -> None:
@@ -916,7 +991,7 @@ def refresh_self(repo_root: Path) -> None:
     label_rc = graphify_ops.label(repo_root)
     if label_rc != 0:
         raise SystemExit(f"[kb-watch] label pass failed (rc={label_rc}) — aborting")
-    graph_checks.assert_composition(real_out, tag="kb-watch")
+    graph_checks.assert_composition(real_out, tag="kb-watch", repo_root=repo_root)
 
     _write_compose_manifest(
         repo_root,
@@ -1088,6 +1163,19 @@ def build(repo_root: Path) -> None:
             + "\nRun `mise run kb-validate-chunks -- sources/extractions/*.json` for the full list."
         )
 
+    # Cross-chunk source_file ownership (#189), BEFORE the stamp is cleared and
+    # before anything touches graph.json — same atomicity argument as the block
+    # above. A collision is invisible per-chunk: both chunks validate, and
+    # `build_merge` resolves the shared `source_file` by DELETING the replay
+    # loser's nodes for it, which is how a 2026-08-06 chunk destroyed 72 nodes of
+    # an unrelated source with every gate green.
+    collisions = _chunks.collision_issues(chunk_paths)
+    if collisions:
+        raise SystemExit(
+            f"{len(collisions)} cross-chunk source_file collision(s) — refusing to build:\n  "
+            + "\n  ".join(collisions)
+        )
+
     # Invalidate the stamp BEFORE anything touches graph.json. `build()` overwrites
     # the artifact at the seed step but only stamps at the very end, so any abort in
     # between — a merge failure, Ctrl-C — used to leave a NEW artifact under the OLD
@@ -1164,10 +1252,7 @@ def build(repo_root: Path) -> None:
     # (a rebuild and an incremental merge producing different graphs from the
     # same committed corpus).
     print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
-    for chunk in _chunks.replay_order(chunk_paths):
-        name = chunk.stem.removesuffix("-docs")
-        root = str((sources / name).resolve())
-        _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
+    _replay_doc_chunks(repo_root, gpy, sources, out, chunk_paths)
 
     # ONE final label pass — deterministic (no LLM; see `graphify_ops.label`'s own
     # docstring) — re-clusters the fully-composed graph and re-derives the prose
@@ -1186,7 +1271,7 @@ def build(repo_root: Path) -> None:
     # at most one merge prefix, every carried hyperedge still resolves. Checked
     # HERE, on the artifact this build just produced, so a regression is caught
     # on the next build rather than only on the next `mise run test`.
-    graph_checks.assert_composition(out, tag="kb-build")
+    graph_checks.assert_composition(out, tag="kb-build", repo_root=repo_root)
 
     # What `kb-watch` recomposes FROM (#175's follow-up). Recorded here, after
     # composition is proven correct, so a `refresh_self` reading it back is

@@ -108,15 +108,37 @@ function basename(p) {
 // replaced when the chunk replays. A bare basename therefore collides
 // GLOBALLY: two chunks both saying "hooks.md" (measured 2026-08-05 — a docs
 // re-extraction vs goal-engineering-docs.json) silently replace each other's
-// nodes, with the winner chosen by replay order. For a file inside a pinned
-// clone (…/sources/<name>/<rel>), the CLONE-RELATIVE path is the honest,
-// collision-free identity — and it is also what makes a later re-extraction
-// of the same page supersede this chunk's nodes on purpose. Outside a clone
-// (raw/ fetches, vendored media), the basename remains the identity, and an
-// explicit per-source `sourceFile` arg overrides both.
+// nodes, with the winner chosen by replay order.
+//
+// That comment was already here, and the regex under it handed back a bare
+// basename anyway. `/sources/[^/]+/(.+)$/` captures the CLONE-RELATIVE path,
+// which is collision-free for a nested file and IS THE BARE BASENAME for a file
+// at the clone's ROOT — so `sources/graphify/README.md` and
+// `sources/mattpocock-skills/README.md` were the same identity. Measured
+// 2026-08-06 (PR #197): six root files (`README.md`, `ARCHITECTURE.md`,
+// `AGENTS.md`, `SECURITY.md`, `BENCHMARKS.md`, `CHANGELOG.md`) became global
+// names and destroyed 72 nodes of an unrelated source. The comment was written
+// about hand-picked identities and never re-checked against what the regex
+// returns — a rule whose own example is the case it fails on.
+//
+// SOURCE-QUALIFIED now: the capture starts one segment earlier, so the identity
+// is `<source>/<clone-relative>` and a clone-root file cannot be a global name.
+// A later re-extraction of the same page still supersedes on purpose, because
+// the same file under the same source yields the same string.
+//
+// Outside a clone the bare basename is KEPT, deliberately, and this is not the
+// same gamble. `raw/` filenames are minted by `kb-add` from the URL
+// (`code.claude.com_docs_en_hooks.md`, `yt-0CZtRw0KrXo.txt`), so they are already
+// globally unique — measured over the committed corpus 2026-08-06: of the 90
+// bare identities, only 3 basenames are claimed by more than one chunk, and all
+// three are clone files, not `raw/` ones. Qualifying those with a parent
+// directory would change 2,663 nodes' identities to fix a collision they cannot
+// have, and every one of those changes would silently BREAK supersession on the
+// next re-extraction. An explicit per-source `sourceFile` arg overrides both and
+// remains the right answer for anything vendored.
 function sourceFileFor(s) {
   if (s.sourceFile) return s.sourceFile
-  const m = s.path.match(/\/sources\/[^/]+\/(.+)$/)
+  const m = s.path.match(/\/sources\/([^/]+\/.+)$/)
   return m ? m[1] : basename(s.path)
 }
 

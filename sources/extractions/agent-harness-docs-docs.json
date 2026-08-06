@@ -4,7 +4,7 @@
    "id": "ahd_subagents_subagent","_origin":"semantic",
    "label": "Subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -15,7 +15,7 @@
    "id": "ahd_subagents_context_preservation","_origin":"semantic",
    "label": "Context preservation as the primary motive",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -26,7 +26,7 @@
    "id": "ahd_subagents_delegation_by_description","_origin":"semantic",
    "label": "Delegation is decided from the description field",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -37,7 +37,7 @@
    "id": "ahd_subagents_scope_boundary_vs_teams","_origin":"semantic",
    "label": "Subagents are single-session; teams and background agents are not",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -48,7 +48,7 @@
    "id": "ahd_subagents_builtin_agents","_origin":"semantic",
    "label": "Built-in subagents",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -59,7 +59,7 @@
    "id": "ahd_subagents_explore_agent","_origin":"semantic",
    "label": "Explore built-in subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -70,7 +70,7 @@
    "id": "ahd_subagents_explore_model_cap","_origin":"semantic",
    "label": "Explore inherits the session model, capped at Opus on the Claude API",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -81,7 +81,7 @@
    "id": "ahd_subagents_explore_override_by_name","_origin":"semantic",
    "label": "A user/project subagent named Explore overrides the built-in",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -92,7 +92,7 @@
    "id": "ahd_subagents_plan_agent","_origin":"semantic",
    "label": "Plan built-in subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -103,7 +103,7 @@
    "id": "ahd_subagents_general_purpose_agent","_origin":"semantic",
    "label": "General-purpose built-in subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -114,7 +114,7 @@
    "id": "ahd_subagents_helper_agents","_origin":"semantic",
    "label": "Helper agents: statusline-setup and claude-code-guide",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -125,7 +125,7 @@
    "id": "ahd_subagents_explore_plan_skip_claude_md","_origin":"semantic",
    "label": "Explore and Plan skip CLAUDE.md and git status",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -136,7 +136,7 @@
    "id": "ahd_subagents_restrict_builtins","_origin":"semantic",
    "label": "Restricting or removing built-in subagents",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -147,7 +147,7 @@
    "id": "ahd_subagents_file_format","_origin":"semantic",
    "label": "Subagent files are Markdown with YAML frontmatter",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -158,7 +158,7 @@
    "id": "ahd_subagents_agents_command_wizard_removed","_origin":"semantic",
    "label": "/agents no longer opens a creation wizard (v2.1.198)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -169,7 +169,7 @@
    "id": "ahd_subagents_scope_precedence","_origin":"semantic",
    "label": "Five subagent scopes with fixed name-collision priority",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -180,7 +180,7 @@
    "id": "ahd_subagents_project_scope","_origin":"semantic",
    "label": "Project subagents in .claude/agents/",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -191,7 +191,7 @@
    "id": "ahd_subagents_nested_closest_wins","_origin":"semantic",
    "label": "Nested project directories: closest to cwd wins (v2.1.178)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -202,7 +202,7 @@
    "id": "ahd_subagents_add_dir_scanning","_origin":"semantic",
    "label": "--add-dir directories are scanned for agents",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -213,7 +213,7 @@
    "id": "ahd_subagents_user_scope","_origin":"semantic",
    "label": "User subagents in ~/.claude/agents/",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -224,7 +224,7 @@
    "id": "ahd_subagents_recursive_scan_identity","_origin":"semantic",
    "label": "Recursive scanning; identity comes only from `name`",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -235,7 +235,7 @@
    "id": "ahd_subagents_duplicate_name_hazard","_origin":"semantic",
    "label": "Duplicate names in one directory resolve by filesystem read order",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -246,7 +246,7 @@
    "id": "ahd_subagents_doctor_duplicate_report","_origin":"semantic",
    "label": "/doctor reports same-directory duplicate names (v2.1.205)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -257,7 +257,7 @@
    "id": "ahd_subagents_plugin_scoped_identifier","_origin":"semantic",
    "label": "Plugin subfolders become part of the scoped identifier",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -268,7 +268,7 @@
    "id": "ahd_subagents_cli_agents_flag","_origin":"semantic",
    "label": "--agents CLI flag defines session-only subagents as JSON",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -279,7 +279,7 @@
    "id": "ahd_subagents_managed_subagents","_origin":"semantic",
    "label": "Managed subagents deployed by administrators",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -290,7 +290,7 @@
    "id": "ahd_subagents_plugin_subagents","_origin":"semantic",
    "label": "Plugin subagents",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -301,7 +301,7 @@
    "id": "ahd_subagents_plugin_field_restrictions","_origin":"semantic",
    "label": "Plugin subagents ignore hooks, mcpServers, and permissionMode",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -312,7 +312,7 @@
    "id": "ahd_subagents_definitions_for_teammates","_origin":"semantic",
    "label": "Subagent definitions are reusable as agent-team teammates",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -323,7 +323,7 @@
    "id": "ahd_subagents_file_watching","_origin":"semantic",
    "label": "Agent directories are watched; edits apply without restart",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -334,7 +334,7 @@
    "id": "ahd_subagents_append_system_prompt_flag","_origin":"semantic",
    "label": "--append-subagent-system-prompt (v2.1.205)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -345,7 +345,7 @@
    "id": "ahd_subagents_working_directory","_origin":"semantic",
    "label": "Subagent working directory and non-persistent cd",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -356,7 +356,7 @@
    "id": "ahd_subagents_field_name","_origin":"semantic",
    "label": "Frontmatter field: name (required)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -367,7 +367,7 @@
    "id": "ahd_subagents_field_description","_origin":"semantic",
    "label": "Frontmatter field: description (required)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -378,7 +378,7 @@
    "id": "ahd_subagents_field_tools","_origin":"semantic",
    "label": "Frontmatter field: tools (allowlist)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -389,7 +389,7 @@
    "id": "ahd_subagents_field_disallowed_tools","_origin":"semantic",
    "label": "Frontmatter field: disallowedTools (denylist)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -400,7 +400,7 @@
    "id": "ahd_subagents_tools_precedence","_origin":"semantic",
    "label": "disallowedTools is applied before tools",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -411,7 +411,7 @@
    "id": "ahd_subagents_mcp_tool_patterns","_origin":"semantic",
    "label": "MCP server-level patterns in tools/disallowedTools",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -422,7 +422,7 @@
    "id": "ahd_subagents_zero_tools_error","_origin":"semantic",
    "label": "Zero-resolving tools list refuses to launch (v2.1.208)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -433,7 +433,7 @@
    "id": "ahd_subagents_field_model","_origin":"semantic",
    "label": "Frontmatter field: model (defaults to inherit)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -444,7 +444,7 @@
    "id": "ahd_subagents_model_resolution_order","_origin":"semantic",
    "label": "Four-step model resolution order",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -455,7 +455,7 @@
    "id": "ahd_subagents_subagent_model_env_inherit","_origin":"semantic",
    "label": "CLAUDE_CODE_SUBAGENT_MODEL=inherit equals unset (v2.1.196)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -466,7 +466,7 @@
    "id": "ahd_subagents_available_models_allowlist","_origin":"semantic",
    "label": "Model values are checked against the availableModels allowlist",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -477,7 +477,7 @@
    "id": "ahd_subagents_model_persists_on_resume","_origin":"semantic",
    "label": "Per-invocation model persists across resume (v2.1.211)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -488,7 +488,7 @@
    "id": "ahd_subagents_extended_thinking_inherited","_origin":"semantic",
    "label": "Extended thinking is inherited, with no per-subagent setting (v2.1.198)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -499,7 +499,7 @@
    "id": "ahd_subagents_two_tool_filters","_origin":"semantic",
    "label": "Subagent tool pool is narrowed by two filters",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -510,7 +510,7 @@
    "id": "ahd_subagents_always_removed_tools","_origin":"semantic",
    "label": "Tools removed from every subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -521,7 +521,7 @@
    "id": "ahd_subagents_background_tool_subset","_origin":"semantic",
    "label": "Background subagents keep only a reduced built-in tool set",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -532,7 +532,7 @@
    "id": "ahd_subagents_teammate_extra_tools","_origin":"semantic",
    "label": "Agent-team teammates keep task and cron tools",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -543,7 +543,7 @@
    "id": "ahd_subagents_agent_type_allowlist","_origin":"semantic",
    "label": "Agent(agent_type) restricts which subagents can be spawned",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -554,7 +554,7 @@
    "id": "ahd_subagents_task_renamed_agent","_origin":"semantic",
    "label": "The Task tool was renamed Agent in v2.1.63",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -565,7 +565,7 @@
    "id": "ahd_subagents_field_mcp_servers","_origin":"semantic",
    "label": "Frontmatter field: mcpServers",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -576,7 +576,7 @@
    "id": "ahd_subagents_mcp_context_avoidance","_origin":"semantic",
    "label": "Inline MCP servers keep tool descriptions out of the main context",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -587,7 +587,7 @@
    "id": "ahd_subagents_mcp_restrictions_apply","_origin":"semantic",
    "label": "MCP restrictions cover subagent-declared servers (v2.1.153)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -598,7 +598,7 @@
    "id": "ahd_subagents_field_permission_mode","_origin":"semantic",
    "label": "Frontmatter field: permissionMode",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -609,7 +609,7 @@
    "id": "ahd_subagents_permission_mode_semantics","_origin":"semantic",
    "label": "Permission mode behaviors",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -620,7 +620,7 @@
    "id": "ahd_subagents_bypass_permissions_warning","_origin":"semantic",
    "label": "bypassPermissions caveats and residual prompts",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -631,7 +631,7 @@
    "id": "ahd_subagents_parent_mode_precedence","_origin":"semantic",
    "label": "Parent permission mode can override the subagent's",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -642,7 +642,7 @@
    "id": "ahd_subagents_field_skills","_origin":"semantic",
    "label": "Frontmatter field: skills (preload)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -653,7 +653,7 @@
    "id": "ahd_subagents_skills_preload_limits","_origin":"semantic",
    "label": "Skills with disable-model-invocation cannot be preloaded",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -664,7 +664,7 @@
    "id": "ahd_subagents_skill_fork_inverse","_origin":"semantic",
    "label": "skills-in-subagent is the inverse of context: fork in a skill",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -675,7 +675,7 @@
    "id": "ahd_subagents_field_memory","_origin":"semantic",
    "label": "Frontmatter field: memory (persistent agent memory)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -686,7 +686,7 @@
    "id": "ahd_subagents_memory_runtime_effects","_origin":"semantic",
    "label": "What enabling memory changes at runtime",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -697,7 +697,7 @@
    "id": "ahd_subagents_memory_requires_auto_memory","_origin":"semantic",
    "label": "Subagent memory depends on auto memory being on",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -708,7 +708,7 @@
    "id": "ahd_subagents_field_max_turns","_origin":"semantic",
    "label": "Frontmatter field: maxTurns",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -719,7 +719,7 @@
    "id": "ahd_subagents_field_effort","_origin":"semantic",
    "label": "Frontmatter field: effort",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -730,7 +730,7 @@
    "id": "ahd_subagents_field_background","_origin":"semantic",
    "label": "Frontmatter field: background",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -741,7 +741,7 @@
    "id": "ahd_subagents_field_isolation_worktree","_origin":"semantic",
    "label": "Frontmatter field: isolation: worktree",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -752,7 +752,7 @@
    "id": "ahd_subagents_worktree_escape_checks","_origin":"semantic",
    "label": "Worktree containment checks on Bash/PowerShell commands",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -763,7 +763,7 @@
    "id": "ahd_subagents_field_color","_origin":"semantic",
    "label": "Frontmatter field: color",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -774,7 +774,7 @@
    "id": "ahd_subagents_field_initial_prompt","_origin":"semantic",
    "label": "Frontmatter field: initialPrompt",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -785,7 +785,7 @@
    "id": "ahd_subagents_field_hooks","_origin":"semantic",
    "label": "Frontmatter field: hooks",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -796,7 +796,7 @@
    "id": "ahd_subagents_stop_becomes_subagentstop","_origin":"semantic",
    "label": "Frontmatter Stop hooks convert to SubagentStop",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -807,7 +807,7 @@
    "id": "ahd_subagents_frontmatter_hooks_contexts","_origin":"semantic",
    "label": "Frontmatter hooks fire as subagent and as main session",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -818,7 +818,7 @@
    "id": "ahd_subagents_workspace_trust_hooks","_origin":"semantic",
    "label": "Project-subagent frontmatter hooks need workspace trust (v2.1.218)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -829,7 +829,7 @@
    "id": "ahd_subagents_settings_hooks_apply","_origin":"semantic",
    "label": "settings.json, managed, and plugin hooks all fire inside subagents",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -840,7 +840,7 @@
    "id": "ahd_subagents_lifecycle_events","_origin":"semantic",
    "label": "SubagentStart and SubagentStop project-level events",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -851,7 +851,7 @@
    "id": "ahd_subagents_matcher_is_regex","_origin":"semantic",
    "label": "Agent-type matchers are unanchored regular expressions",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -862,7 +862,7 @@
    "id": "ahd_subagents_pretooluse_conditional_rules","_origin":"semantic",
    "label": "PreToolUse hooks for conditional per-command rules",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -873,7 +873,7 @@
    "id": "ahd_subagents_hook_is_a_backstop","_origin":"semantic",
    "label": "The validating hook is a backstop, not the only control",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -884,7 +884,7 @@
    "id": "ahd_subagents_disable_specific","_origin":"semantic",
    "label": "Disable specific subagents with Agent(subagent-name)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -895,7 +895,7 @@
    "id": "ahd_subagents_explicit_invocation","_origin":"semantic",
    "label": "Three escalating ways to invoke a subagent explicitly",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -906,7 +906,7 @@
    "id": "ahd_subagents_at_mention","_origin":"semantic",
    "label": "@-mention controls which subagent, not its prompt",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -917,7 +917,7 @@
    "id": "ahd_subagents_agent_flag_session","_origin":"semantic",
    "label": "--agent runs the whole session as that subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -928,7 +928,7 @@
    "id": "ahd_subagents_agent_flag_resume_and_scoping","_origin":"semantic",
    "label": "--agent persists across resume; scoped names disambiguate plugins",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -939,7 +939,7 @@
    "id": "ahd_subagents_agent_setting_precedence","_origin":"semantic",
    "label": "The agent setting vs the --agent flag",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -950,7 +950,7 @@
    "id": "ahd_subagents_foreground_vs_background","_origin":"semantic",
    "label": "Foreground vs background subagents",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -961,7 +961,7 @@
    "id": "ahd_subagents_background_permission_prompts","_origin":"semantic",
    "label": "Background permission prompts surface in the main session (v2.1.186)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -972,7 +972,7 @@
    "id": "ahd_subagents_background_completion_notification","_origin":"semantic",
    "label": "Background results arrive as a completion notification (v2.1.211)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -983,7 +983,7 @@
    "id": "ahd_subagents_tasks_list_retention","_origin":"semantic",
    "label": "Completed background subagents stay in /tasks (v2.1.208)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -994,7 +994,7 @@
    "id": "ahd_subagents_disable_background_tasks","_origin":"semantic",
    "label": "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1005,7 +1005,7 @@
    "id": "ahd_subagents_api_errors","_origin":"semantic",
    "label": "API errors in subagents are reported as failures (v2.1.199)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1016,7 +1016,7 @@
    "id": "ahd_subagents_output_scanning","_origin":"semantic",
    "label": "Subagent output scanning (v2.1.210)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1027,7 +1027,7 @@
    "id": "ahd_subagents_scanning_is_not_a_control","_origin":"semantic",
    "label": "Output scanning is not a substitute for restricting a subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1038,7 +1038,7 @@
    "id": "ahd_subagents_pattern_isolate_output","_origin":"semantic",
    "label": "Pattern: isolate high-volume operations",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1049,7 +1049,7 @@
    "id": "ahd_subagents_pattern_parallel_research","_origin":"semantic",
    "label": "Pattern: parallel research, with a context caveat",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1060,7 +1060,7 @@
    "id": "ahd_subagents_pattern_chaining","_origin":"semantic",
    "label": "Pattern: chain subagents in sequence",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1071,7 +1071,7 @@
    "id": "ahd_subagents_when_to_use_main_conversation","_origin":"semantic",
    "label": "When to stay in the main conversation instead",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1082,7 +1082,7 @@
    "id": "ahd_subagents_alternatives_skills_and_btw","_origin":"semantic",
    "label": "Alternatives: Skills and /btw",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1093,7 +1093,7 @@
    "id": "ahd_subagents_depth_limit","_origin":"semantic",
    "label": "Subagent nesting depth limit (default three layers)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1104,7 +1104,7 @@
    "id": "ahd_subagents_depth_limit_env","_origin":"semantic",
    "label": "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH (v2.1.217)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1115,7 +1115,7 @@
    "id": "ahd_subagents_nested_config_and_panel","_origin":"semantic",
    "label": "Nested subagents resolve from the same scopes; panel shows the tree",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1126,7 +1126,7 @@
    "id": "ahd_subagents_session_limit","_origin":"semantic",
    "label": "Session subagent limit: 200 per session",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1137,7 +1137,7 @@
    "id": "ahd_subagents_session_limit_counting","_origin":"semantic",
    "label": "What counts toward the session subagent limit",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1148,7 +1148,7 @@
    "id": "ahd_subagents_concurrent_limit","_origin":"semantic",
    "label": "Concurrent subagent limit: 20 running",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1159,7 +1159,7 @@
    "id": "ahd_subagents_three_limits","_origin":"semantic",
    "label": "Three independent subagent limits",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1170,7 +1170,7 @@
    "id": "ahd_subagents_startup_context","_origin":"semantic",
    "label": "What loads at a subagent's startup",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1181,7 +1181,7 @@
    "id": "ahd_subagents_git_status_conditions","_origin":"semantic",
    "label": "Git status snapshot conditions",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1192,7 +1192,7 @@
    "id": "ahd_subagents_sibling_roster","_origin":"semantic",
    "label": "Sibling roster system reminder (v2.1.206)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1203,7 +1203,7 @@
    "id": "ahd_subagents_state_not_inherited","_origin":"semantic",
    "label": "Main-conversation state that never reaches a non-fork subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1214,7 +1214,7 @@
    "id": "ahd_subagents_resume","_origin":"semantic",
    "label": "Resuming a subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1225,7 +1225,7 @@
    "id": "ahd_subagents_sendmessage_resume","_origin":"semantic",
    "label": "SendMessage is the resume mechanism",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1236,7 +1236,7 @@
    "id": "ahd_subagents_explore_plan_not_resumable","_origin":"semantic",
    "label": "Explore and Plan are one-shot and cannot be resumed",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1247,7 +1247,7 @@
    "id": "ahd_subagents_user_stopped_no_autoresume","_origin":"semantic",
    "label": "A user-stopped subagent does not auto-resume (v2.1.191)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1258,7 +1258,7 @@
    "id": "ahd_subagents_sendmessage_identity_check","_origin":"semantic",
    "label": "SendMessage verifies the name still reaches the same agent (v2.1.199)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1269,7 +1269,7 @@
    "id": "ahd_subagents_agent_message_authority","_origin":"semantic",
    "label": "An agent's message is task direction, never approval (v2.1.198)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1280,7 +1280,7 @@
    "id": "ahd_subagents_transcripts","_origin":"semantic",
    "label": "Subagent transcript files and retention",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1291,7 +1291,7 @@
    "id": "ahd_subagents_auto_compaction","_origin":"semantic",
    "label": "Subagent auto-compaction",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1302,7 +1302,7 @@
    "id": "ahd_subagents_fork","_origin":"semantic",
    "label": "Fork: a subagent that inherits the whole conversation",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1313,7 +1313,7 @@
    "id": "ahd_subagents_fork_prompt_cache","_origin":"semantic",
    "label": "A fork reuses the parent's prompt cache",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1324,7 +1324,7 @@
    "id": "ahd_subagents_fork_vs_named","_origin":"semantic",
    "label": "Fork vs named subagent comparison",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1335,7 +1335,7 @@
    "id": "ahd_subagents_subtask_command","_origin":"semantic",
    "label": "/subtask starts a fork (v2.1.212)",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1346,7 +1346,7 @@
    "id": "ahd_subagents_fork_env_var","_origin":"semantic",
    "label": "CLAUDE_CODE_FORK_SUBAGENT and what fork mode changes",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1357,7 +1357,7 @@
    "id": "ahd_subagents_fork_limitations","_origin":"semantic",
    "label": "Fork limitations and experimental status",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1368,7 +1368,7 @@
    "id": "ahd_subagents_fork_worktree_isolation","_origin":"semantic",
    "label": "A fork can be spawned with isolation: worktree",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1379,7 +1379,7 @@
    "id": "ahd_subagents_fork_panel_controls","_origin":"semantic",
    "label": "Fork panel keyboard controls",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1390,7 +1390,7 @@
    "id": "ahd_subagents_transcript_view_commands","_origin":"semantic",
    "label": "In an agent transcript view, built-in commands still hit the main conversation",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1401,7 +1401,7 @@
    "id": "ahd_subagents_best_practices","_origin":"semantic",
    "label": "Subagent design best practices",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1412,7 +1412,7 @@
    "id": "ahd_subagents_example_code_reviewer","_origin":"semantic",
    "label": "Example: code-reviewer subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1423,7 +1423,7 @@
    "id": "ahd_subagents_example_debugger","_origin":"semantic",
    "label": "Example: debugger subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1434,7 +1434,7 @@
    "id": "ahd_subagents_example_data_scientist","_origin":"semantic",
    "label": "Example: data-scientist subagent",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1445,7 +1445,7 @@
    "id": "ahd_subagents_example_db_reader","_origin":"semantic",
    "label": "Example: db-reader subagent with a validating hook",
    "file_type": "concept",
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "source_url": "https://code.claude.com/docs/en/sub-agents.md",
    "captured_at": "2026-07-30",
    "author": "Anthropic",
@@ -1460,7 +1460,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1469,7 +1469,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1478,7 +1478,7 @@
    "relation": "bounded_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1487,7 +1487,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1496,7 +1496,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1505,7 +1505,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1514,7 +1514,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1523,7 +1523,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1532,7 +1532,7 @@
    "relation": "overrides",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1541,7 +1541,7 @@
    "relation": "requires",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1550,7 +1550,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1559,7 +1559,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1568,7 +1568,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1577,7 +1577,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1586,7 +1586,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1595,7 +1595,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1604,7 +1604,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1613,7 +1613,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1622,7 +1622,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1631,7 +1631,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1640,7 +1640,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1649,7 +1649,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1658,7 +1658,7 @@
    "relation": "extends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1667,7 +1667,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1676,7 +1676,7 @@
    "relation": "causes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1685,7 +1685,7 @@
    "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1694,7 +1694,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1703,7 +1703,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1712,7 +1712,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1721,7 +1721,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1730,7 +1730,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1739,7 +1739,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1748,7 +1748,7 @@
    "relation": "mirrors",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1757,7 +1757,7 @@
    "relation": "reuses",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1766,7 +1766,7 @@
    "relation": "monitors",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1775,7 +1775,7 @@
    "relation": "monitors",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1784,7 +1784,7 @@
    "relation": "extends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1793,7 +1793,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1802,7 +1802,7 @@
    "relation": "verifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1811,7 +1811,7 @@
    "relation": "supplies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1820,7 +1820,7 @@
    "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1829,7 +1829,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1838,7 +1838,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1847,7 +1847,7 @@
    "relation": "extends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1856,7 +1856,7 @@
    "relation": "verifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1865,7 +1865,7 @@
    "relation": "can_trigger",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1874,7 +1874,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1883,7 +1883,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1892,7 +1892,7 @@
    "relation": "bypasses",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1901,7 +1901,7 @@
    "relation": "extends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1910,7 +1910,7 @@
    "relation": "conditioned_on",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1919,7 +1919,7 @@
    "relation": "conditioned_on",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1928,7 +1928,7 @@
    "relation": "applies_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1937,7 +1937,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1946,7 +1946,7 @@
    "relation": "explains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1955,7 +1955,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1964,7 +1964,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1973,7 +1973,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1982,7 +1982,7 @@
    "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -1991,7 +1991,7 @@
    "relation": "overrides",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2000,7 +2000,7 @@
    "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2009,7 +2009,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2018,7 +2018,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2027,7 +2027,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2036,7 +2036,7 @@
    "relation": "gates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2045,7 +2045,7 @@
    "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2054,7 +2054,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2063,7 +2063,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2072,7 +2072,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2081,7 +2081,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2090,7 +2090,7 @@
    "relation": "enables",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2099,7 +2099,7 @@
    "relation": "contrasts_with",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2108,7 +2108,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2117,7 +2117,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2126,7 +2126,7 @@
    "relation": "gates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2135,7 +2135,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2144,7 +2144,7 @@
    "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2153,7 +2153,7 @@
    "relation": "complements",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2162,7 +2162,7 @@
    "relation": "demonstrates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2171,7 +2171,7 @@
    "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2180,7 +2180,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2189,7 +2189,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2198,7 +2198,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2207,7 +2207,7 @@
    "relation": "overridden_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2216,7 +2216,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2225,7 +2225,7 @@
    "relation": "conditioned_on",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2234,7 +2234,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2243,7 +2243,7 @@
    "relation": "causes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2252,7 +2252,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2261,7 +2261,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2270,7 +2270,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2279,7 +2279,7 @@
    "relation": "takes_precedence_over",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2288,7 +2288,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2297,7 +2297,7 @@
    "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2306,7 +2306,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2315,7 +2315,7 @@
    "relation": "qualified_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2324,7 +2324,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2333,7 +2333,7 @@
    "relation": "demonstrates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2342,7 +2342,7 @@
    "relation": "constrained_by",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2351,7 +2351,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2360,7 +2360,7 @@
    "relation": "constrained_by",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2369,7 +2369,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2378,7 +2378,7 @@
    "relation": "explained_by",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2387,7 +2387,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2396,7 +2396,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2405,7 +2405,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2414,7 +2414,7 @@
    "relation": "configures",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2423,7 +2423,7 @@
    "relation": "constrained_by",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2432,7 +2432,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2441,7 +2441,7 @@
    "relation": "counts",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2450,7 +2450,7 @@
    "relation": "bypassed_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2459,7 +2459,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2468,7 +2468,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2477,7 +2477,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2486,7 +2486,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2495,7 +2495,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2504,7 +2504,7 @@
    "relation": "complements",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2513,7 +2513,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2522,7 +2522,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2531,7 +2531,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2540,7 +2540,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2549,7 +2549,7 @@
    "relation": "verifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2558,7 +2558,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2567,7 +2567,7 @@
    "relation": "cannot_change",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2576,7 +2576,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2585,7 +2585,7 @@
    "relation": "logged_in",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2594,7 +2594,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2603,7 +2603,7 @@
    "relation": "explains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2612,7 +2612,7 @@
    "relation": "invokes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2621,7 +2621,7 @@
    "relation": "configures",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2630,7 +2630,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2639,7 +2639,7 @@
    "relation": "reuses",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2648,7 +2648,7 @@
    "relation": "observes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2657,7 +2657,7 @@
    "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2666,7 +2666,7 @@
    "relation": "recommends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2675,7 +2675,7 @@
    "relation": "recommends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2684,7 +2684,7 @@
    "relation": "recommends",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2693,7 +2693,7 @@
    "relation": "demonstrates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2702,7 +2702,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2711,7 +2711,7 @@
    "relation": "demonstrates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2720,7 +2720,7 @@
    "relation": "combines_with",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2729,7 +2729,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2738,7 +2738,7 @@
    "relation": "configures",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2747,7 +2747,7 @@
    "relation": "configures",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2756,7 +2756,7 @@
    "relation": "disables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2765,7 +2765,7 @@
    "relation": "takes_precedence_over",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2774,7 +2774,7 @@
    "relation": "takes_precedence_over",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2783,7 +2783,7 @@
    "relation": "uses",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   },
   {
@@ -2792,7 +2792,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "docs/claude-code/sub-agents.md",
+   "source_file": "agent-harness-docs/docs/claude-code/sub-agents.md",
    "weight": 1
   }
  ],
