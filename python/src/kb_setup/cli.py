@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | md-budget | skill-score [--write] [skill...] | "
+            "skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | "
             "session-state [--no-pr] | "
             "goal-check <path|--text ...> | "
@@ -181,6 +182,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import skill_eval
 
         return skill_eval.main(rest, repo_root)
+    if cmd == "skill-refresh":
+        from kb_setup import skill_refresh
+
+        return skill_refresh.refresh(repo_root)
     if cmd == "cc":
         from kb_setup import launch
 
