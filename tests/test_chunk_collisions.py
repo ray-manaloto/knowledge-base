@@ -301,3 +301,61 @@ def test_assemble_carries_every_input_declaration_into_the_output(tmp_path: Path
 
     bare = json.loads(chunks.assemble(tmp_path, "bare", [plain]).read_text(encoding="utf-8"))
     assert "supersedes" not in bare
+
+
+@pytest.mark.parametrize(
+    ("raw", "expect"),
+    [
+        ("docs/x.md", "docs/x.md"),
+        ("docs\\x.md", "docs/x.md"),
+        ("./docs/x.md", "docs/x.md"),
+        ("././docs/x.md", "docs/x.md"),
+        ("", None),
+        (None, None),
+        (12, None),
+    ],
+)
+def test_source_file_is_normalised_the_way_the_merge_compares_it(
+    raw: object, expect: str | None
+) -> None:
+    r"""`build_merge` matches `_norm_source_file`'s output, not the raw string.
+
+    Comparing raw strings asked a different question from the one the merge
+    answers: `docs\\x.md` and `docs/x.md` read as two identities to the gate and
+    as ONE to graphify, so a real supersession was judged disjoint and then
+    silently pruned. (Cold lane, round 2, P1.)
+    """
+    assert chunks.normalise_source_file(raw) == expect
+
+
+def test_two_spellings_of_one_identity_now_collide(tmp_path: Path) -> None:
+    """The defect, end to end — and the control that the pair is not just equal.
+
+    Without normalisation this pair passed the gate while graphify treated them
+    as one file. `unrelated/x.md` is the control: it must NOT collide, so the
+    refusal is coming from the identity rather than from the fixture shape.
+    """
+    a = _chunk(tmp_path, "a-docs", {"docs\\x.md": "2026-08-01"})
+    b = _chunk(tmp_path, "b-docs", {"./docs/x.md": "2026-08-02"})
+    c = _chunk(tmp_path, "c-docs", {"unrelated/x.md": "2026-08-03"})
+
+    assert len(chunks.collision_issues([a, b])) == 1
+    assert chunks.collision_issues([a, c]) == []
+
+
+def test_an_absolute_source_file_is_refused_per_chunk() -> None:
+    """What normalisation CANNOT reconcile is refused instead of approximated.
+
+    Relativising an absolute path needs the root graphify will be given, which
+    `chunk_claims` does not have and must not guess. So the contract is narrowed
+    at the door: emit the clone-relative form. Measured across all 3,733 committed
+    identities — zero are absolute, so this rejects nothing that exists.
+    """
+
+    def _mk(sf: str) -> dict:
+        return {"nodes": [_node("n", sf)], "edges": []}
+
+    assert [i for i in chunks.validate(_mk("/abs/docs/x.md")) if "ABSOLUTE" in i]
+    assert [i for i in chunks.validate(_mk("C:/docs/x.md")) if "ABSOLUTE" in i]
+    # CONTROL: the ordinary relative form is untouched.
+    assert not [i for i in chunks.validate(_mk("docs/x.md")) if "ABSOLUTE" in i]

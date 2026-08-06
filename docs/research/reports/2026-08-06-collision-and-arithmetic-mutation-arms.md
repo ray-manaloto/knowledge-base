@@ -1,6 +1,6 @@
 # #189 + #191 — cross-chunk collision + merge arithmetic: mutation arms
 
-**24 of 25 arms died**, control green at both ends, tree restored
+**29 of 30 arms died**, control green at both ends, tree restored
 (`RESTORED rc=0`). Run 2026-08-06 on `chore/post-197`. Row `A0` is a **declared
 no-op CONTROL** that must SURVIVE: if it ever dies, the harness is mutating
 something it should not and every other row is meaningless.
@@ -89,6 +89,28 @@ as *never ran* rather than as a survivor, which is the whole reason
 "survivors" in an earlier round were exactly this, misread. Patterns updated,
 both then died.
 
+## Round 2 added five more, and two more patterns went stale
+
+The cold lane's SECOND round ran with a **mutating brief** — execute, construct
+inputs, run the suite — rather than a reading one, and returned **9 findings, 3
+P1**, all reproducible, over code that 25 green arms had just certified. `A25`–`A29`
+pin the fixes.
+
+The sharpest was again a comparison asking the wrong question: `build_merge`
+matches `_norm_source_file`'s output (`build.py:275-287`), not the raw
+`source_file` string, so `docs\x.md` and `docs/x.md` were two identities to this
+gate and ONE to graphify — judged disjoint, then silently pruned. What
+normalisation cannot reconcile without a root (an absolute path) is now refused at
+the door rather than approximated; measured across all **3,733** committed
+identities, zero are absolute or backslashed, so the narrowing rejects nothing
+that exists.
+
+**Two more arms reported `SKIPPED — pattern matched 0 times`** after these fixes
+moved their anchors, on top of the two in round 1. Four stale patterns across two
+rounds is the honest cost of anchoring arms to source text — and every one was
+reported as NEVER RAN rather than as a survivor, which is the only reason the
+count above means anything.
+
 ## What the arms cover
 
 Each arm is a break that could really happen — an inverted comparison, a deleted
@@ -127,15 +149,20 @@ transcribed, per `probes-need-a-control-arm.md` rule 8.
 | `A22 ledger in the collision set` | `graphify_ops.py` | a chunk merged from outside the tree is invisible to the collision gate |
 | `A23 assemble carries supersedes` | `chunks.py` | kb-assemble strips the declaration and the chunk then fails its own gate |
 | `A24 prose refreshes the ledger` | `graphify_ops.py` | every merge after a relabel gets a baseline of 0 instead of the real count |
+| `A25 separator fold` | `chunks.py` | two spellings of one identity are judged disjoint, then silently pruned |
+| `A26 absolute guard` | `chunks.py` | an absolute source_file is accepted and compares as a different identity |
+| `A27 corrupt vs absent ledger` | `graph.py` | a corrupt ledger silently narrows the collision gate, unknown as permission |
+| `A28 stale handoff cleared` | `graphify_ops.py` | an interrupted run's counts are recorded against THIS run's graph |
+| `A29 wrong-typed payload` | `graph_counts.py` | a best-effort recorder crashes an otherwise-successful merge |
 
 ## Result
 
 ```
 CONTROL (unmutated) rc=0  OK
 A0 CONTROL no-op             rc=0 SURVIVED   <- intended
-A1..A24                      rc=1 DIED       <- all twenty-four
+A1..A29                      rc=1 DIED       <- all twenty-nine
 RESTORED rc=0  OK
-24/25 arms died
+29/30 arms died
 ```
 
 ## What a full sweep does NOT say
@@ -254,9 +281,8 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
     (
         "A7 supersedes read",
         CHUNKS,
-        "    owned = {d for d in declared if isinstance(d, str)}"
-        " if isinstance(declared, list) else set()",
-        "    owned = set()",
+        "        {n for n in (normalise_source_file(d) for d in declared) if n is not None}",
+        "        set()",
         "every declaration is ignored; refusal is unconditional",
     ),
     (
@@ -284,8 +310,8 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
     (
         "A11 recorded fingerprint",
         COUNTS,
-        '        "fingerprint": _fingerprint(graph_path),',
-        '        "fingerprint": "x",',
+        'payload: dict[str, object] = {"fingerprint": _fingerprint(graph_path), "tag": tag}',
+        'payload: dict[str, object] = {"fingerprint": "x", "tag": tag}',
         "the ledger certifies counts against an artifact it never observed",
     ),
     (
@@ -382,6 +408,41 @@ ARMS: list[tuple[str, Path, str, str, str]] = [
         '{"nodes": stats.nodes_in, "edges": stats.links_in,',
         '{"nodes": 0, "edges": stats.links_in,',
         "every merge after a relabel gets a baseline of 0 instead of the real count",
+    ),
+    (
+        "A25 separator fold",
+        CHUNKS,
+        '    cleaned = value.replace("\\\\", "/")',
+        '    cleaned = value',
+        "two spellings of one identity are judged disjoint, then silently pruned",
+    ),
+    (
+        "A26 absolute guard",
+        CHUNKS,
+        '        if isinstance(sf, str) and (sf.startswith("/") or (len(sf) > 1 and sf[1] == ":")):',
+        '        if False:',
+        "an absolute source_file is accepted and compares as a different identity",
+    ),
+    (
+        "A27 corrupt vs absent ledger",
+        GRAPH,
+        "    if entries is None:\n        return None",
+        "    if entries is None:\n        return []",
+        "a corrupt ledger silently narrows the collision gate, unknown as permission",
+    ),
+    (
+        "A28 stale handoff cleared",
+        OPS,
+        "    counts_out.unlink(missing_ok=True)",
+        "    pass",
+        "an interrupted run's counts are recorded against THIS run's graph",
+    ),
+    (
+        "A29 wrong-typed payload",
+        COUNTS,
+        "            if isinstance(counts.get(k), int) and not isinstance(counts.get(k), bool)",
+        "            if k in counts",
+        "a best-effort recorder crashes an otherwise-successful merge",
     ),
 ]
 

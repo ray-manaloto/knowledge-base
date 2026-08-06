@@ -462,7 +462,7 @@ def _reset_merged_chunks(repo_root: Path, *, tag: str = "kb-build") -> None:
         print(f"[{tag}] WARNING: could not reset the merge ledger: {e}")
 
 
-def merged_chunk_paths(repo_root: Path) -> list[Path]:
+def merged_chunk_paths(repo_root: Path) -> list[Path] | None:
     """Chunks merged since the last build, resolved to paths — `[]` when unknown.
 
     A read-only view of the recomposition ledger for callers that only need
@@ -472,14 +472,19 @@ def merged_chunk_paths(repo_root: Path) -> list[Path]:
     so `graphify_ops._committed_chunks` has to include them or the collision gate
     has a blind side (cold lane, #189 round 1).
 
-    An unreadable ledger yields `[]` rather than raising. `_read_merged_chunks`
-    returns None there and its OWN callers must refuse, because they are about to
-    recompose FROM it; this caller is only widening a check, and a check that
-    refuses to run over a corrupt derived file is worse than one with a known
-    bound.
+    **`None` for a CORRUPT ledger, `[]` for an absent one, and the distinction is
+    the whole point.** Collapsing them returned the same empty list either way, so
+    a corrupt derived file silently narrowed a REFUSAL gate back to the blind spot
+    the ledger was added to close — unknown read as permission, which is the shape
+    `_read_merged_chunks`'s own docstring refuses one function above. This caller
+    is only widening a check rather than recomposing from it, so it does not have
+    to abort; it does have to SAY SO, and it cannot say so if it cannot tell.
+    (Cold lane, round 2, P1.)
     """
     entries = _read_merged_chunks(repo_root)
-    return [_resolve(repo_root, e.chunk) for e in entries] if entries else []
+    if entries is None:
+        return None
+    return [_resolve(repo_root, e.chunk) for e in entries]
 
 
 def _read_merged_chunks(repo_root: Path) -> list[MergedChunkEntry] | None:

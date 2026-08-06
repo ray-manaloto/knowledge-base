@@ -167,6 +167,14 @@ def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
                 f"replay_order compares these lexically for supersession, so a "
                 f"malformed date can beat a real one"
             )
+        sf = n.get("source_file")
+        if isinstance(sf, str) and (sf.startswith("/") or (len(sf) > 1 and sf[1] == ":")):
+            issues.append(
+                f"{label}: node {nid!r} source_file {sf!r} is ABSOLUTE — the merge "
+                f"relativises it against a root this repo's collision gate does not "
+                f"have, so the two would compare different identities and a "
+                f"supersession could pass as disjoint. Emit the clone-relative form."
+            )
         origin = n.get("_origin")
         if origin != _SEMANTIC_ORIGIN:
             issues.append(
@@ -448,6 +456,33 @@ def replay_order(paths: list[Path]) -> list[Path]:
     return sorted(paths, key=lambda p: (chunk_captured_at(p), p.name))
 
 
+def normalise_source_file(value: object) -> str | None:
+    r"""A `source_file` in the form graphify will compare it in — or None.
+
+    `build_merge` does not match the raw string. It matches `_norm_source_file`'s
+    output (`build.py:275-287`): backslashes folded to forward slashes, and — when
+    a root is supplied — an absolute path relativised against it. Comparing raw
+    strings here therefore asked a DIFFERENT question from the one the merge
+    answers, so `docs\\x.md` and `docs/x.md` read as two identities to this gate
+    and as one to graphify: judged disjoint, then silently pruned. (Cold lane,
+    round 2, P1.)
+
+    The separator fold and a leading `./` are reconcilable without a root and are
+    done here. An ABSOLUTE path is not — relativising needs the root graphify will
+    be given, which this function does not have and must not guess. So it is
+    rejected by `validate()` instead, which closes the gap by construction rather
+    than by approximation. Measured 2026-08-06 across all 3,733 committed node
+    identities: **zero** are absolute, backslashed, or `./`-prefixed, so this
+    normalisation changes nothing that exists and only constrains what may arrive.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    cleaned = value.replace("\\", "/")
+    while cleaned.startswith("./"):
+        cleaned = cleaned[2:]
+    return cleaned or None
+
+
 def chunk_claims(path: Path) -> tuple[dict[str, str], set[str]]:
     """`({source_file: newest captured_at}, declared supersedes)` for one chunk.
 
@@ -471,12 +506,16 @@ def chunk_claims(path: Path) -> tuple[dict[str, str], set[str]]:
     for n in data.get("nodes") or []:
         if not isinstance(n, dict):
             continue
-        sf = n.get("source_file")
-        if not isinstance(sf, str) or not sf:
+        sf = normalise_source_file(n.get("source_file"))
+        if sf is None:
             continue
         per_file[sf] = max(per_file.get(sf, ""), str(n.get("captured_at") or ""))
     declared = data.get(_SUPERSEDES)
-    owned = {d for d in declared if isinstance(d, str)} if isinstance(declared, list) else set()
+    owned = (
+        {n for n in (normalise_source_file(d) for d in declared) if n is not None}
+        if isinstance(declared, list)
+        else set()
+    )
     return per_file, owned
 
 

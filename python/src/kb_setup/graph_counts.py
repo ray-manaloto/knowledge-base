@@ -76,7 +76,7 @@ def ledger_path(repo_root: Path) -> Path:
     return repo_root / _LEDGER
 
 
-def record(repo_root: Path, graph_path: Path, counts: Mapping[str, int], *, tag: str) -> None:
+def record(repo_root: Path, graph_path: Path, counts: Mapping[str, object], *, tag: str) -> None:
     """Record `counts` for the graph AS IT IS ON DISK RIGHT NOW.
 
     Call AFTER the write, never before: the fingerprint captured here is what a
@@ -84,15 +84,35 @@ def record(repo_root: Path, graph_path: Path, counts: Mapping[str, int], *, tag:
     the file. Recording pre-write bytes would certify counts against an artifact
     that no longer exists.
 
+    `counts` is `Mapping[str, object]`, NOT `Mapping[str, int]`, and the widening
+    is the honest annotation rather than a concession. This is called with
+    whatever a foreign-interpreter subprocess wrote to a JSON file — the values
+    are untrusted by construction, and an annotation promising `int` was a type
+    that LIED: it told every reader the validation had already happened, which is
+    precisely why the `int()` conversion below was written without a guard and
+    crashed a successful merge on `{"nodes": "many"}`.
+
     Best-effort by design — a ledger that cannot be written must not fail an
     otherwise-successful build. The cost of failure is one "cannot check" at the
     next writer, which is the same state a fresh clone starts in.
     """
-    payload = {
-        "fingerprint": _fingerprint(graph_path),
-        "tag": tag,
-        **{k: int(counts[k]) for k in _FIELDS if k in counts},
-    }
+    # `int(...)` on a value that is not a number raises, and this function is
+    # called from a merge path holding whatever a foreign-interpreter subprocess
+    # wrote to a file. A payload of `{"nodes": "many"}` therefore crashed an
+    # otherwise-successful merge with an uncaught ValueError — a best-effort
+    # recorder taking down its caller. Non-integers are DROPPED, so a partly
+    # usable payload still records what it can and the rest reads as unknown.
+    # (Cold lane, round 2, P2.)
+    payload: dict[str, object] = {"fingerprint": _fingerprint(graph_path), "tag": tag}
+    payload.update(
+        {
+            k: counts[k]
+            for k in _FIELDS
+            # `bool` IS an `int` in Python, so `True` would record as 1 — a count
+            # nobody measured, indistinguishable from one somebody did.
+            if isinstance(counts.get(k), int) and not isinstance(counts.get(k), bool)
+        }
+    )
     try:
         atomic.write_text(ledger_path(repo_root), json.dumps(payload, indent=2) + "\n")
     except OSError as e:

@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import graph, graph_counts, graphify_ops
+from kb_setup import _merge_docs, graph, graph_counts, graphify_ops
 
 if TYPE_CHECKING:
     import pytest
@@ -264,3 +264,136 @@ def test_committed_chunks_survives_an_unreadable_ledger(
     monkeypatch.setattr(graph, "merged_chunk_paths", _boom)
 
     assert {p.name for p in graphify_ops._committed_chunks(tmp_path)} == {"committed-docs.json"}
+
+
+class _FakeGraph:
+    """Enough of a networkx graph for `counts_for` — including `.graph`."""
+
+    def __init__(self, nodes: int, edges: int, hyperedges: list) -> None:
+        self._n, self._e = nodes, edges
+        self.graph = {"hyperedges": hyperedges}
+
+    def number_of_nodes(self) -> int:
+        return self._n
+
+    def number_of_edges(self) -> int:
+        return self._e
+
+
+def test_the_real_counts_producer_is_exercised() -> None:
+    """The ONLY producer of real ledger counts had no test at all.
+
+    `_merge_docs.main()` imports graphify and is unreachable from this
+    interpreter, so every arm in this suite fabricated the very dict the producer
+    is supposed to emit — a regression there (a renamed hyperedge slot, members
+    counted per-edge rather than summed) would have left the whole suite green.
+    Extracting `counts_for` is what makes it reachable. (Cold lane, round 2, P1.)
+
+    Both member spellings are covered, plus a non-dict entry, because graphify
+    writes `nodes` while older chunks say `members` and a malformed entry must
+    not turn a successful merge into a traceback.
+    """
+    g = _FakeGraph(
+        10,
+        20,
+        [{"nodes": ["a", "b", "c"]}, {"members": ["d", "e"]}, "not a dict", {"nodes": None}],
+    )
+
+    assert _merge_docs.counts_for(g) == {
+        "nodes": 10,
+        "edges": 20,
+        "hyperedges": 4,
+        "members": 5,
+    }
+
+
+def test_counts_for_an_empty_graph_attr() -> None:
+    """CONTROL: no hyperedges at all is 0/0, not a KeyError."""
+    assert _merge_docs.counts_for(_FakeGraph(3, 4, [])) == {
+        "nodes": 3,
+        "edges": 4,
+        "hyperedges": 0,
+        "members": 0,
+    }
+
+
+def test_a_stale_handoff_is_cleared_before_the_subprocess_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A leftover from an interrupted run must never be read as this run's counts.
+
+    The path is fixed and reused, and `_merge_docs.py` legitimately writes nothing
+    for a 0-node chunk or a refused export — so consuming-after was not enough.
+    The stub writes NO handoff, exactly like those cases; a stale file surviving
+    into the ledger is the defect. (Cold lane, round 2, P2.)
+    """
+    ext = tmp_path / "sources" / "extractions"
+    _write_chunk(ext / "c-docs.json", "c.md")
+    out = tmp_path / "graphify-out" / "graph.json"
+    out.parent.mkdir(parents=True)
+    out.write_text("{}", encoding="utf-8")
+    stale = out.with_name(".merge-counts.tmp.json")
+    stale.write_text(json.dumps({"nodes": 999_999}), encoding="utf-8")
+
+    monkeypatch.setattr(graphify_ops, "graphify_python", lambda _root: "true")
+    monkeypatch.setattr(graphify_ops, "clean_env", dict)
+    monkeypatch.setattr(graphify_ops, "_derive_prose", lambda *_a, **_k: 1)
+
+    graphify_ops.merge_chunk(tmp_path, str(ext / "c-docs.json"))
+
+    assert not stale.exists()
+    assert graph_counts.read(tmp_path, out) is None
+
+
+def test_record_survives_a_wrong_typed_payload(tmp_path: Path) -> None:
+    """A best-effort recorder must not take its caller down.
+
+    `int()` on a non-number raises, and this is called with whatever a
+    foreign-interpreter subprocess wrote to a file — so `{"nodes": "many"}`
+    crashed an otherwise-successful merge with an uncaught ValueError. Non-ints
+    are dropped, so a partly usable payload records what it can.
+
+    `True` is dropped too: `bool` IS an `int` in Python, so it would otherwise
+    record as 1 — a count nobody measured, indistinguishable from one somebody
+    did. (Cold lane, round 2, P2.)
+    """
+    g = tmp_path / "graphify-out" / "graph.json"
+    g.parent.mkdir(parents=True)
+    g.write_text("{}", encoding="utf-8")
+
+    graph_counts.record(
+        tmp_path, g, {"nodes": "many", "edges": 7, "hyperedges": True}, tag="kb-merge"
+    )
+
+    assert graph_counts.read(tmp_path, g) == {"edges": 7}
+
+
+def test_a_corrupt_ledger_is_distinguishable_from_an_absent_one(tmp_path: Path) -> None:
+    """`None` for corrupt, `[]` for absent — collapsing them re-opened the gap.
+
+    Both returned an empty list, so a corrupt derived file silently narrowed a
+    REFUSAL gate back to exactly the blind spot the ledger was added to close:
+    unknown read as permission. (Cold lane, round 2, P1.)
+    """
+    out = tmp_path / "graphify-out"
+    out.mkdir(parents=True)
+
+    assert graph.merged_chunk_paths(tmp_path) == []
+
+    (out / ".merged-chunks.json").write_text("{not json", encoding="utf-8")
+    assert graph.merged_chunk_paths(tmp_path) is None
+
+
+def test_a_corrupt_ledger_narrows_the_collision_set_out_loud(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """It may narrow the check; it may not do so in silence."""
+    ext = tmp_path / "sources" / "extractions"
+    _write_chunk(ext / "committed-docs.json", "committed.md")
+    (tmp_path / "graphify-out").mkdir(parents=True)
+    (tmp_path / "graphify-out" / ".merged-chunks.json").write_text("{not json", encoding="utf-8")
+
+    found = {p.name for p in graphify_ops._committed_chunks(tmp_path)}
+
+    assert found == {"committed-docs.json"}
+    assert "unreadable" in capsys.readouterr().err

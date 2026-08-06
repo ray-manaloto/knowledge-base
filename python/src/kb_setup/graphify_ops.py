@@ -60,6 +60,15 @@ def _committed_chunks(repo_root: Path) -> list[Path]:
     try:
         ledger = _graph.merged_chunk_paths(repo_root)
     except OSError, ValueError:
+        ledger = None
+    if ledger is None:
+        print(
+            "[kb-merge] WARNING: the recomposition ledger is unreadable, so the "
+            "collision check can only see committed chunks. A chunk merged from "
+            "outside sources/extractions/ is INVISIBLE to it right now. "
+            "`mise run kb-build` regenerates the ledger.",
+            file=sys.stderr,
+        )
         return paths
     known = {p.resolve() for p in paths}
     return paths + [p for p in ledger if p.is_file() and p.resolve() not in known]
@@ -221,7 +230,13 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     prior = graph_counts.read(repo_root, out)
     if prior is not None and "nodes" in prior:
         cmd += ["--prior-nodes", str(prior["nodes"])]
+    # CLEARED before launch, not merely consumed after. The path is fixed and
+    # reused, and `_merge_docs.py` legitimately writes nothing for a 0-node chunk
+    # or a refused export — so a leftover file from an interrupted earlier run
+    # would be read as THIS run's counts and recorded against this run's graph.
+    # (Cold lane, round 2, P2.)
     counts_out = out.with_name(".merge-counts.tmp.json")
+    counts_out.unlink(missing_ok=True)
     cmd += ["--counts-out", str(counts_out)]
     if _self_remerge(repo_root, chunk_path):
         cmd.append("--self-remerge")

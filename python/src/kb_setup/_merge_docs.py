@@ -86,6 +86,31 @@ def _opt(argv: list[str], flag: str) -> str | None:
     return argv[i + 1] if i + 1 < len(argv) else None
 
 
+def counts_for(g: object) -> dict[str, int]:
+    """The post-merge counts the caller records in the continuity ledger.
+
+    A named function rather than an inline block inside `main()` because `main()`
+    imports graphify and is unreachable from this repo's own interpreter — so the
+    ONLY producer of real ledger counts was untestable, and every arm in the suite
+    fabricated the dict it is supposed to emit. A regression here (a renamed
+    hyperedge slot, members counted per-edge instead of summed) would have left
+    the whole suite green. (Cold lane, round 2, P1.)
+
+    Reads BOTH hyperedge member spellings — graphify writes `nodes`, older chunks
+    say `members` — and skips a non-dict entry rather than raising, because this
+    runs after a successful merge and must not turn one into a traceback.
+    """
+    hyperedges = g.graph.get("hyperedges") or []
+    return {
+        "nodes": g.number_of_nodes(),
+        "edges": g.number_of_edges(),
+        "hyperedges": len(hyperedges),
+        "members": sum(
+            len(h.get("nodes", h.get("members")) or []) for h in hyperedges if isinstance(h, dict)
+        ),
+    }
+
+
 def _report(
     chunk_path: str, chunk: dict, prior: int | None, g: object, *, self_remerge: bool = False
 ) -> None:
@@ -203,21 +228,7 @@ def main() -> int:
     # NEXT one checkable, and a merge that could not check its own arithmetic is
     # exactly the one after which the ledger most needs re-establishing.
     if counts_out:
-        hyperedges = G.graph.get("hyperedges") or []
-        members = sum(
-            len(h.get("nodes", h.get("members")) or []) for h in hyperedges if isinstance(h, dict)
-        )
-        Path(counts_out).write_text(
-            json.dumps(
-                {
-                    "nodes": G.number_of_nodes(),
-                    "edges": G.number_of_edges(),
-                    "hyperedges": len(hyperedges),
-                    "members": members,
-                }
-            ),
-            encoding="utf-8",
-        )
+        Path(counts_out).write_text(json.dumps(counts_for(G)), encoding="utf-8")
     return 0
 
 
