@@ -140,12 +140,11 @@ produced nothing.**
 |---|---|---|
 | `kb-adversarial-verifier` (opus) | 7× | The pass's highest-value stage — 7 of 8 verdicts changed an answer |
 | `kb-synthesist` (opus) | 1× | 73KB; produced the prose-saturation and convergence results no reader could see |
-| `kb-advisor` (**fable**) | 1× | **No output. ~25 min, no file, no reply to a direct ping.** |
+| `kb-advisor` (**fable**) | 1× | Delivered two verdicts (21:52Z, 22:08Z) — **which reached the main loop only after the round had landed**, so the round shipped without them. See the correction below. |
 | `kb-corpus-curator`, `kb-tool-researcher`, `kb-extraction-worker` | 0× | Not applicable to this pass |
 
-**`kb-advisor`'s silence is a measurement for #208**, not a retry. The handoff
-predicted it: `model` frontmatter is only **step 3 of 4** in resolution, and a
-blocked model falls back silently. What is declared is not what runs.
+*(The paragraph that stood here claimed `kb-advisor`'s silence was a measurement
+for #208. It was false — see the correction below.)*
 
 **The roster has no reader role** — the four corpus readers ran as
 `general-purpose` because `kb-tool-researcher` binds itself to "one *peer tool*
