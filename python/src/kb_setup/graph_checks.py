@@ -50,7 +50,29 @@ _MAX_EXAMPLES = 5
 _MAX_SEPARATORS = 1
 
 
-def assert_composition(graph_path: Path, *, tag: str) -> None:
+def _record_counts(repo_root: Path | None, graph_path: Path, *, tag: str, **counts: int) -> None:
+    """Hand this build's counts to the ledger the next writer reads (#191).
+
+    Called only from `assert_composition`'s CLEAN path, and only there: that
+    function is the last thing to read `graph.json` in a build, it has already
+    paid for the parse, and the artifact it is looking at has just been vouched
+    for. Recording a graph that FAILS a composition invariant would hand the next
+    merge a baseline drawn from bytes this module is about to refuse.
+
+    `repo_root` is allowed to be None because the ledger is an enhancement, not a
+    precondition. A caller that omits it still gets every refusal
+    `assert_composition` exists for; the next writer then reports *prior count
+    unknown* rather than a wrong number, which is the same state a fresh clone
+    starts in.
+    """
+    if repo_root is None:
+        return
+    from kb_setup import graph_counts
+
+    graph_counts.record(repo_root, graph_path, counts, tag=tag)
+
+
+def assert_composition(graph_path: Path, *, tag: str, repo_root: Path | None = None) -> None:
     """Refuse a `graph.json` that violates this build's composition invariants.
 
     Loads the whole file with a plain `json.load` EXACTLY ONCE — accepted
@@ -139,6 +161,15 @@ def assert_composition(graph_path: Path, *, tag: str) -> None:
     )
 
     if not bad_depth and not dangling and not malformed:
+        _record_counts(
+            repo_root,
+            graph_path,
+            tag=tag,
+            nodes=len(ids),
+            edges=len(data.get("links") or data.get("edges") or []),
+            hyperedges=len(carried),
+            members=members_seen,
+        )
         return
 
     lines = [f"graph.json fails a build composition invariant ({graph_path}):"]

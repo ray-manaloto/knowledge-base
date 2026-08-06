@@ -163,6 +163,15 @@ in `sources/REGISTRY.md`.
      merge resolves against the combined node set. Do not "clean up" a cross-chunk
      edge the single-file view calls dangling: doing exactly that deleted four real
      relationships on 2026-08-03.
+   - **Two chunks may not claim one `source_file` unless the winner SAYS SO** (#189).
+     `build_merge` gives a file to the last chunk that names it and DELETES the
+     other's nodes for it — how a 2026-08-06 chunk destroyed 72 nodes of an unrelated
+     source with every gate green. `kb-merge` and `kb-build` now refuse an undeclared
+     intersection. If the supersession is intended (a re-extraction of the same page),
+     add the paths to a top-level `"supersedes": [...]` in the chunk; if two unrelated
+     sources collided on a basename, fix the IDENTITY instead. `kb-extract.js` emits
+     `<source>/<clone-relative>` for clone files precisely so a root `README.md` /
+     `CHANGELOG.md` / `SKILL.md` cannot be a global name.
 3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
    or `mise run kb-build` to replay all committed chunks. Both re-cluster; Louvain
    renumbers communities globally + non-deterministically → **every merge staleifies

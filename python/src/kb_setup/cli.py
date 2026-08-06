@@ -528,6 +528,22 @@ def _validate_chunks(rest: list[str]) -> int:
                 print(f"    {i}", file=sys.stderr)
         else:
             print(f"✓ {p}")
+
+    # Cross-chunk ownership (#189) — a property of the SET, so it is reported
+    # separately from the per-path rows rather than blamed on one of them. It is
+    # skipped, and SAID to be skipped, for a single path: silence there would be
+    # indistinguishable from "checked and clean", which is the reading that let
+    # a colliding chunk through with a ✓ beside it.
+    collisions = chunks.collision_issues(paths)
+    if collisions:
+        print(f"✗ cross-chunk: {len(collisions)} source_file collision(s):", file=sys.stderr)
+        for c in collisions:
+            print(f"    {c}", file=sys.stderr)
+        bad += 1
+    elif len(paths) > 1:
+        print(f"✓ cross-chunk: no source_file collisions across {len(paths)} chunks")
+    else:
+        print("- cross-chunk: SKIPPED (needs 2+ chunks; pass the whole corpus to check)")
     return 1 if bad else 0
 
 

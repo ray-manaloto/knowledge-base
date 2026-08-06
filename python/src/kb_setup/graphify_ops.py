@@ -12,6 +12,7 @@ auto-detected Gemini/OpenAI key.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -32,6 +33,155 @@ _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 #: point of the message is to name the CLASS, and the full list is one
 #: `mise run kb-validate-chunks` away.
 _MAX_SHOWN_ISSUES = 10
+
+
+def _committed_chunks(repo_root: Path) -> list[Path]:
+    """Every chunk whose nodes are, or will be, in the graph — the collision set.
+
+    The glob over `sources/extractions/*.json` answers "who else already claims a
+    `source_file`" for everything committed, including a chunk added to the tree
+    but not yet merged: it still owns its files the moment `kb-build` runs.
+
+    **The glob alone was not the whole set.** `kb-merge` accepts a chunk from
+    ANY path — `graph.append_merged_chunk` exists precisely to record one, so
+    `kb-watch` can replay it — and an out-of-tree chunk's nodes are in the graph
+    just as much as a committed one's. Excluding them meant a new chunk could
+    claim a `source_file` an out-of-tree chunk already owned, pass the gate, and
+    have `build_merge` delete its nodes: the gate's own subject, reachable
+    through the one door it was not looking at. (Cold lane, round 1, P1.)
+
+    Best-effort on the ledger half — an unreadable or absent ledger yields the
+    glob rather than raising, because a collision check that refuses to run is
+    worse than one with a known bound, and `build()` resets the ledger anyway.
+    """
+    from kb_setup import graph as _graph
+
+    paths = sorted((repo_root / "sources" / "extractions").glob("*.json"))
+    try:
+        ledger = _graph.merged_chunk_paths(repo_root)
+    except OSError, ValueError:
+        ledger = None
+    if ledger is None:
+        print(
+            "[kb-merge] WARNING: the recomposition ledger is unreadable, so the "
+            "collision check can only see committed chunks. A chunk merged from "
+            "outside sources/extractions/ is INVISIBLE to it right now. "
+            "`mise run kb-build` regenerates the ledger.",
+            file=sys.stderr,
+        )
+        return paths
+    known = {p.resolve() for p in paths}
+    return paths + [p for p in ledger if p.is_file() and p.resolve() not in known]
+
+
+def _self_remerge(repo_root: Path, chunk_path: Path) -> bool:
+    """True when re-merging this chunk can only replace its OWN prior nodes.
+
+    Two conditions, both necessary. The chunk must be COMMITTED — an uncommitted
+    one contributed nothing to the graph, so anything it replaces belongs to
+    somebody else. And it must be the ONLY committed claimant of every
+    `source_file` it names — otherwise the replacement is a cross-chunk
+    supersession, which is #189's subject and must not be waved through as
+    routine.
+
+    This is what lets `_merge_docs._report` phrase the most common merge there is
+    as EXPECTED rather than as a possible data loss. Measured 2026-08-06: a
+    re-merge of `claude-commands-docs.json` reports `REPLACED 10` with the total
+    unchanged — correct, and it happens on every single re-merge. A check that
+    prints "the loss is real" on that is a check people learn to skip.
+
+    It reads the corpus rather than trusting the path, so a chunk sitting in
+    `sources/extractions/` that ALSO shares a file with a sibling still gets the
+    unexpected-replacement wording.
+    """
+    from kb_setup import chunks as _chunks
+
+    committed = _committed_chunks(repo_root)
+    resolved = chunk_path.resolve()
+    if resolved not in {p.resolve() for p in committed}:
+        return False
+    mine, _ = _chunks.chunk_claims(resolved)
+    for other in committed:
+        if other.resolve() == resolved:
+            continue
+        theirs, _ = _chunks.chunk_claims(other)
+        if mine.keys() & theirs.keys():
+            return False
+    return True
+
+
+def _refuse(chunk_name: str, what: str, issues: list[str]) -> int:
+    """Print a bounded refusal and return the rc `kb-merge` exits with."""
+    print(f"[kb-merge] {chunk_name} {what} — refusing:", file=sys.stderr)
+    for i in issues[:_MAX_SHOWN_ISSUES]:
+        print(f"  {i}", file=sys.stderr)
+    if len(issues) > _MAX_SHOWN_ISSUES:
+        print(f"  … and {len(issues) - _MAX_SHOWN_ISSUES} more", file=sys.stderr)
+    return 2
+
+
+def _preflight(repo_root: Path, chunk_path: Path) -> int | None:
+    """Both pre-merge gates; an rc to return, or None meaning "go ahead".
+
+    TWO checks, asking genuinely different questions, and the second cannot be
+    folded into the first:
+
+    - **Per-chunk schema/integrity** — the same gate `build()` applies, added
+      after a chunk with a missing `_origin` marker merged happily and the damage
+      surfaced later as a node that had quietly stopped being retrievable.
+      `kb-merge` is the sharper of the two doors: it takes a FRESH extraction
+      straight off an agent, the input least likely to be well-formed.
+    - **Cross-chunk `source_file` ownership** against the COMMITTED corpus
+      (#189). Invisible to the first: two chunks can each be perfectly
+      well-formed and still name one `source_file`, which `build_merge` resolves
+      by deleting the replay loser's nodes for it. That is exactly how a
+      2026-08-06 chunk destroyed 72 nodes of an unrelated source with every gate
+      green — the per-chunk validator said ✓, the cold review passed it as data,
+      and `kb-build` exited 0.
+    """
+    from kb_setup import chunks as _chunks
+
+    issues = _chunks.validate_files([chunk_path]).get(chunk_path) or []
+    if issues:
+        return _refuse(chunk_path.name, "failed validation", issues)
+    collisions = _chunks.collision_issues(
+        [chunk_path, *_committed_chunks(repo_root)], merging=chunk_path
+    )
+    if collisions:
+        return _refuse(chunk_path.name, "collides with the committed corpus", collisions)
+    return None
+
+
+def _record_counts(repo_root: Path, graph_path: Path, handoff: Path, *, tag: str) -> None:
+    """Move `_merge_docs.py`'s counts into the ledger, then remove the handoff.
+
+    A file rather than a return value because the two halves run under DIFFERENT
+    interpreters: `_merge_docs.py` imports graphify and cannot import `kb_setup`,
+    so there is no in-process channel. Its stdout is deliberately not captured
+    either — the merge line is the operator's live progress, and swallowing it to
+    parse a number back out would trade a visible report for an invisible one.
+
+    Removed unconditionally, including when the merge failed and wrote nothing:
+    a stale handoff from an earlier run must never be read as this run's result.
+
+    On the SUCCESS path `_derive_prose` records again a moment later and its
+    record wins — same node/edge/hyperedge counts, no `members`, because
+    `ProseStats` counts hyperedges rather than their members. This call is not
+    therefore redundant: it is the record that survives when the prose derivation
+    FAILS, which is precisely the run after which the next merge would otherwise
+    have no baseline. Two writers, one of them a fallback, and the richer of the
+    two is the one that can be lost.
+    """
+    from kb_setup import graph_counts
+
+    try:
+        counts = json.loads(handoff.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        counts = None
+    finally:
+        handoff.unlink(missing_ok=True)
+    if isinstance(counts, dict):
+        graph_counts.record(repo_root, graph_path, counts, tag=tag)
 
 
 def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
@@ -58,29 +208,42 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
         print(f"[kb-merge] no such chunk: {chunk}", file=sys.stderr)
         return 2
 
-    # VALIDATE BEFORE MERGING — the same gate `build()` applies, for the same
-    # reason (cold review, 2026-08-03). Existing-file was the ONLY check here, so
-    # a chunk with a missing `_origin` marker or a dangling edge merged happily
-    # and the damage showed up later as a node that had quietly stopped being
-    # retrievable. `kb-merge` is the sharper of the two doors: it is the one used
-    # for a FRESH extraction, straight off an agent, which is precisely the input
-    # least likely to be well-formed.
-    from kb_setup import chunks as _chunks
-
-    issues = _chunks.validate_files([chunk_path]).get(chunk_path) or []
-    if issues:
-        print(f"[kb-merge] {chunk_path.name} failed validation — refusing:", file=sys.stderr)
-        for i in issues[:_MAX_SHOWN_ISSUES]:
-            print(f"  {i}", file=sys.stderr)
-        if len(issues) > _MAX_SHOWN_ISSUES:
-            print(f"  … and {len(issues) - _MAX_SHOWN_ISSUES} more", file=sys.stderr)
-        return 2
+    # BOTH gates BEFORE MERGING — schema, then cross-chunk ownership. See
+    # `_preflight` for what each catches and why neither subsumes the other.
+    preflight_rc = _preflight(repo_root, chunk_path)
+    if preflight_rc is not None:
+        return preflight_rc
     out = repo_root / "graphify-out" / "graph.json"
     src_root = root or str(chunk_path.resolve().parent)
     gpy = graphify_python(repo_root)
     cmd = [gpy, str(_MERGE_SCRIPT), str(chunk_path), src_root, str(out)]
+
+    # #191. `_merge_docs.py` knows what it ADDED and what the graph now HOLDS;
+    # the one number it cannot obtain for free is what the graph held BEFORE,
+    # because re-parsing several hundred MB to learn one integer is the most
+    # expensive possible way to ask. The ledger answers it for nothing — and
+    # answers `None` rather than a stale number whenever the graph moved outside
+    # a tracked writer, so the merge line reports "not checked" instead of a
+    # confident delta computed against fiction.
+    from kb_setup import graph_counts
+
+    prior = graph_counts.read(repo_root, out)
+    if prior is not None and "nodes" in prior:
+        cmd += ["--prior-nodes", str(prior["nodes"])]
+    # CLEARED before launch, not merely consumed after. The path is fixed and
+    # reused, and `_merge_docs.py` legitimately writes nothing for a 0-node chunk
+    # or a refused export — so a leftover file from an interrupted earlier run
+    # would be read as THIS run's counts and recorded against this run's graph.
+    # (Cold lane, round 2, P2.)
+    counts_out = out.with_name(".merge-counts.tmp.json")
+    counts_out.unlink(missing_ok=True)
+    cmd += ["--counts-out", str(counts_out)]
+    if _self_remerge(repo_root, chunk_path):
+        cmd.append("--self-remerge")
+
     print(f"  $ {' '.join(cmd)}")
     rc = subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+    _record_counts(repo_root, out, counts_out, tag="kb-merge")
     if rc != 0:
         # Gated on the merge's rc, not run unconditionally: a failed merge may
         # have left graph.json untouched or half-written, and deriving from
@@ -167,7 +330,7 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     printed after a `kb-label` run would send them looking at the wrong step.
     """
     try:
-        prose.derive_for(repo_root)
+        stats = prose.derive_for(repo_root)
     except (OSError, ValueError, SystemExit) as exc:
         print(
             f"[{tag}] {did}, but the prose graph could not be re-derived: "
@@ -176,6 +339,30 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
             file=sys.stderr,
         )
         return 1
+    # The prose derivation is the ONE parse of `graph.json` that happens after
+    # every write on this path, and it already counts both sides. So the counts
+    # ledger is refreshed from it for free (#191, cold lane round 1, P2).
+    #
+    # Without this the feature was largely dead in ordinary use: `kb-label`
+    # rewrites `graph.json` and never recorded counts, the `kb-curator` workflow
+    # is "always relabel after a merge", and the ledger is fingerprint-gated — so
+    # the merge AFTER any prior ingestion's label pass found the fingerprint moved
+    # and reported "arithmetic NOT checked". Correct, and useless: the check
+    # existed and could almost never run.
+    #
+    # `members` is deliberately NOT recorded here — `ProseStats` counts
+    # hyperedges, not their members, and inventing a zero would be worse than an
+    # absent key. `graph_counts.read` returns only the fields present, and the
+    # only field any consumer reads is `nodes`. `assert_composition` still
+    # records members on the build path, where it has them for free.
+    from kb_setup import graph_counts
+
+    graph_counts.record(
+        repo_root,
+        repo_root / "graphify-out" / "graph.json",
+        {"nodes": stats.nodes_in, "edges": stats.links_in, "hyperedges": stats.hyperedges_in},
+        tag=tag,
+    )
     return 0
 
 

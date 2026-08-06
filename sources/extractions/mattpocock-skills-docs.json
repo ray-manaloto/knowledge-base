@@ -719,7 +719,7 @@
    "id": "mps_adr_plugin_decision","_origin":"semantic",
    "label": "ADR 0002 decision: ship Claude plugin, defer Codex plugin",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -730,7 +730,7 @@
    "id": "mps_adr_plugin_claude_code_plugin","_origin":"semantic",
    "label": "Native Claude Code plugin",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -741,7 +741,7 @@
    "id": "mps_adr_plugin_codex_plugin_deferred","_origin":"semantic",
    "label": "Deferred native Codex plugin",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -752,7 +752,7 @@
    "id": "mps_adr_plugin_skills_sh_installer","_origin":"semantic",
    "label": "skills.sh universal installer",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -763,7 +763,7 @@
    "id": "mps_adr_plugin_plug_and_play_request","_origin":"semantic",
    "label": "Plug-and-play distribution request",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -774,7 +774,7 @@
    "id": "mps_adr_plugin_constraint","_origin":"semantic",
    "label": "Constraint: bucketed skills vs single-path selection",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -785,7 +785,7 @@
    "id": "mps_adr_plugin_bucketed_layout","_origin":"semantic",
    "label": "Bucketed skills layout",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -796,7 +796,7 @@
    "id": "mps_adr_plugin_promoted_buckets","_origin":"semantic",
    "label": "Promoted buckets (engineering, productivity)",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -807,7 +807,7 @@
    "id": "mps_adr_plugin_non_promoted_buckets","_origin":"semantic",
    "label": "Non-promoted buckets (misc, personal, in-progress, deprecated)",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -818,7 +818,7 @@
    "id": "mps_adr_plugin_skills_array_selection","_origin":"semantic",
    "label": "Claude plugin.json skills array of explicit paths",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -829,7 +829,7 @@
    "id": "mps_adr_plugin_codex_single_path","_origin":"semantic",
    "label": "Codex plugin.json single-path skills field",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -840,7 +840,7 @@
    "id": "mps_adr_plugin_marketplace_manifest","_origin":"semantic",
    "label": "marketplace.json single-plugin marketplace",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -851,7 +851,7 @@
    "id": "mps_adr_plugin_validation_verified","_origin":"semantic",
    "label": "End-to-end plugin verification",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -862,7 +862,7 @@
    "id": "mps_adr_plugin_escape_hatches_rejected","_origin":"semantic",
    "label": "Two Codex escape hatches tested and rejected",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -873,7 +873,7 @@
    "id": "mps_adr_plugin_rejected_whole_skills_dir","_origin":"semantic",
    "label": "Rejected: point Codex at ./skills/",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -884,7 +884,7 @@
    "id": "mps_adr_plugin_rejected_symlink_dir","_origin":"semantic",
    "label": "Rejected: curated flat directory of symlinks",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -895,7 +895,7 @@
    "id": "mps_adr_plugin_option_restructure","_origin":"semantic",
    "label": "Option A: restructure skills/ to promoted-only",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -906,7 +906,7 @@
    "id": "mps_adr_plugin_option_duplicate_copies","_origin":"semantic",
    "label": "Option B: commit duplicate flat copies",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -917,7 +917,7 @@
    "id": "mps_adr_plugin_revisit_trigger","_origin":"semantic",
    "label": "Revisit trigger for the Codex plugin",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -928,7 +928,7 @@
    "id": "mps_adr_plugin_invariant_entry_per_skill","_origin":"semantic",
    "label": "Invariant: every promoted skill has a plugin.json entry",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -939,7 +939,7 @@
    "id": "mps_adr_plugin_invariant_version_sync","_origin":"semantic",
    "label": "Invariant: plugin version tracks package.json version",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -950,7 +950,7 @@
    "id": "mps_adr_plugin_update_signal","_origin":"semantic",
    "label": "Plugin version as the user update signal",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -961,7 +961,7 @@
    "id": "mps_adr_plugin_historical_reason","_origin":"semantic",
    "label": "Half-remembered reason no plugin shipped earlier",
    "file_type": "concept",
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -972,7 +972,7 @@
    "id": "mps_changelog_dual_harness_metadata","_origin":"semantic",
    "label": "Dual-harness skill metadata",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -983,7 +983,7 @@
    "id": "mps_changelog_openai_agents_yaml","_origin":"semantic",
    "label": "agents/openai.yaml beside every SKILL.md",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -994,7 +994,7 @@
    "id": "mps_changelog_allow_implicit_invocation_false","_origin":"semantic",
    "label": "policy.allow_implicit_invocation: false",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1005,7 +1005,7 @@
    "id": "mps_changelog_agents_md_symlink","_origin":"semantic",
    "label": "AGENTS.md as a symlink to CLAUDE.md",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1016,7 +1016,7 @@
    "id": "mps_changelog_invocation_doc","_origin":"semantic",
    "label": "Dual-harness invocation model documented",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1027,7 +1027,7 @@
    "id": "mps_changelog_prototype_primary_source","_origin":"semantic",
    "label": "The prototype is a primary source",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1038,7 +1038,7 @@
    "id": "mps_changelog_throwaway_branch_context_pointer","_origin":"semantic",
    "label": "Throwaway branch plus context pointer",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1049,7 +1049,7 @@
    "id": "mps_changelog_claude_code_plugin","_origin":"semantic",
    "label": "Ship the skill set as a native Claude Code plugin",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1060,7 +1060,7 @@
    "id": "mps_changelog_single_plugin_marketplace","_origin":"semantic",
    "label": "Repo is its own single-plugin marketplace",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1071,7 +1071,7 @@
    "id": "mps_changelog_skills_sh_installer","_origin":"semantic",
    "label": "skills.sh remains the universal installer",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1082,7 +1082,7 @@
    "id": "mps_changelog_codex_plugin_deferred","_origin":"semantic",
    "label": "Native Codex plugin deferred (ADR 0002)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1093,7 +1093,7 @@
    "id": "mps_changelog_wayfinder_research_subagents","_origin":"semantic",
    "label": "Wayfinder burns research tickets down with subagents",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1104,7 +1104,7 @@
    "id": "mps_changelog_research_ticket_type","_origin":"semantic",
    "label": "Research ticket type",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1115,7 +1115,7 @@
    "id": "mps_changelog_one_ticket_per_session","_origin":"semantic",
    "label": "One ticket per session",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1126,7 +1126,7 @@
    "id": "mps_changelog_blocking_edges","_origin":"semantic",
    "label": "Blocking edges render the frontier",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1137,7 +1137,7 @@
    "id": "mps_changelog_yagni_scoping_filter","_origin":"semantic",
    "label": "YAGNI scoping filter on Explore",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1148,7 +1148,7 @@
    "id": "mps_changelog_improve_codebase_architecture","_origin":"semantic",
    "label": "improve-codebase-architecture skill",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1159,7 +1159,7 @@
    "id": "mps_changelog_ask_matt_router","_origin":"semantic",
    "label": "ask-matt router",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1170,7 +1170,7 @@
    "id": "mps_changelog_router_maintenance_rule","_origin":"semantic",
    "label": "Router re-check maintenance rule",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1181,7 +1181,7 @@
    "id": "mps_changelog_wayfinder_overreach_guard","_origin":"semantic",
    "label": "Wayfinder is the heaviest flow — do not over-reach for it",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1192,7 +1192,7 @@
    "id": "mps_changelog_wayfinder_handoff_to_spec","_origin":"semantic",
    "label": "Wayfinder hands off at /to-spec, it does not build",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1203,7 +1203,7 @@
    "id": "mps_changelog_setup_skill_simplification","_origin":"semantic",
    "label": "setup-matt-pocock-skills asks fewer, conditional questions",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1214,7 +1214,7 @@
    "id": "mps_changelog_one_file_per_ticket","_origin":"semantic",
    "label": "One markdown file per ticket",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1225,7 +1225,7 @@
    "id": "mps_changelog_external_prs_toggle","_origin":"semantic",
    "label": "External PRs as a request surface (a toggle, not a question)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1236,7 +1236,7 @@
    "id": "mps_changelog_grilling_general_use","_origin":"semantic",
    "label": "Grilling reworded for general use",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1247,7 +1247,7 @@
    "id": "mps_changelog_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1258,7 +1258,7 @@
    "id": "mps_changelog_code_review_promotion","_origin":"semantic",
    "label": "code-review promoted and hardened",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1269,7 +1269,7 @@
    "id": "mps_changelog_fowler_smell_baseline","_origin":"semantic",
    "label": "Always-on Fowler smell baseline",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1280,7 +1280,7 @@
    "id": "mps_changelog_grilling_confirmation_gate","_origin":"semantic",
    "label": "Grilling confirmation gate",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1291,7 +1291,7 @@
    "id": "mps_changelog_facts_vs_decisions","_origin":"semantic",
    "label": "Facts vs. decisions",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1302,7 +1302,7 @@
    "id": "mps_changelog_leading_word","_origin":"semantic",
    "label": "Leading word recruitment",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1313,7 +1313,7 @@
    "id": "mps_changelog_negation_failure_mode","_origin":"semantic",
    "label": "Negation (the elephant)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1324,7 +1324,7 @@
    "id": "mps_changelog_negative_space_failure_mode","_origin":"semantic",
    "label": "Negative Space (the void)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1335,7 +1335,7 @@
    "id": "mps_changelog_writing_great_skills","_origin":"semantic",
    "label": "writing-great-skills",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1346,7 +1346,7 @@
    "id": "mps_changelog_prototype_model_invoked","_origin":"semantic",
    "label": "prototype made model-invoked",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1357,7 +1357,7 @@
    "id": "mps_changelog_research_skill","_origin":"semantic",
    "label": "research skill",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1368,7 +1368,7 @@
    "id": "mps_changelog_wide_refactor","_origin":"semantic",
    "label": "Wide refactor and blast radius",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1379,7 +1379,7 @@
    "id": "mps_changelog_expand_contract","_origin":"semantic",
    "label": "Expand–contract slicing",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1390,7 +1390,7 @@
    "id": "mps_changelog_vertical_slice","_origin":"semantic",
    "label": "Vertical slice / tracer bullet",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1401,7 +1401,7 @@
    "id": "mps_changelog_to_spec_rename","_origin":"semantic",
    "label": "to-prd renamed to to-spec",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1412,7 +1412,7 @@
    "id": "mps_changelog_to_tickets_merge","_origin":"semantic",
    "label": "to-plan and to-issues merged into to-tickets",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1423,7 +1423,7 @@
    "id": "mps_changelog_tracker_medium","_origin":"semantic",
    "label": "The tracker medium decides parallelism, not the artifact",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1434,7 +1434,7 @@
    "id": "mps_changelog_native_tracker_relationships","_origin":"semantic",
    "label": "Prefer native sub-issues and blocking links",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1445,7 +1445,7 @@
    "id": "mps_changelog_main_flow","_origin":"semantic",
    "label": "Main flow: idea → /to-spec → /to-tickets → /implement",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1456,7 +1456,7 @@
    "id": "mps_changelog_wayfinder_situational_onramp","_origin":"semantic",
    "label": "Wayfinder is a situational on-ramp, not the main entry flow",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1467,7 +1467,7 @@
    "id": "mps_changelog_wayfinder_graduation","_origin":"semantic",
    "label": "decision-mapping renamed and graduated to wayfinder",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1478,7 +1478,7 @@
    "id": "mps_changelog_destination_field","_origin":"semantic",
    "label": "Destination as the leading word",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1489,7 +1489,7 @@
    "id": "mps_changelog_plan_dont_do","_origin":"semantic",
    "label": "Plan, don't do — decisions, not deliverables",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1500,7 +1500,7 @@
    "id": "mps_changelog_map_is_index","_origin":"semantic",
    "label": "The map is an index, not a store",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1511,7 +1511,7 @@
    "id": "mps_changelog_collaborative_map","_origin":"semantic",
    "label": "The map is collaborative by default (on the tracker)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1522,7 +1522,7 @@
    "id": "mps_changelog_claim_by_assignment","_origin":"semantic",
    "label": "Claim by assignment, not a label",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1533,7 +1533,7 @@
    "id": "mps_changelog_fog_vs_out_of_scope","_origin":"semantic",
    "label": "Fog vs. out of scope, split",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1544,7 +1544,7 @@
    "id": "mps_changelog_task_ticket_type","_origin":"semantic",
    "label": "A fourth `task` ticket type",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1555,7 +1555,7 @@
    "id": "mps_changelog_hitl_afk","_origin":"semantic",
    "label": "HITL / AFK ticket classification",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1566,7 +1566,7 @@
    "id": "mps_changelog_no_fog_early_exit","_origin":"semantic",
    "label": "No-fog early exit",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1577,7 +1577,7 @@
    "id": "mps_changelog_tdd_reference_only","_origin":"semantic",
    "label": "tdd reshaped as a reference-only skill",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1588,7 +1588,7 @@
    "id": "mps_changelog_seam","_origin":"semantic",
    "label": "Seam",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1599,7 +1599,7 @@
    "id": "mps_changelog_tautological_test","_origin":"semantic",
    "label": "Tautological-test anti-pattern",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1610,7 +1610,7 @@
    "id": "mps_changelog_triage_external_prs","_origin":"semantic",
    "label": "triage extended to external pull requests",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1621,7 +1621,7 @@
    "id": "mps_changelog_tracker_indirection","_origin":"semantic",
    "label": "Issue-tracker pointer indirection",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1632,7 +1632,7 @@
    "id": "mps_changelog_wayfinder_path_hardcode_fix","_origin":"semantic",
    "label": "Fix: wayfinder hardcoded the tracker doc path",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1643,7 +1643,7 @@
    "id": "mps_changelog_teach_reuse_first","_origin":"semantic",
    "label": "teach is reuse-first",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1654,7 +1654,7 @@
    "id": "mps_changelog_codebase_design","_origin":"semantic",
    "label": "codebase-design skill (deep-module vocabulary)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1665,7 +1665,7 @@
    "id": "mps_changelog_domain_modeling","_origin":"semantic",
    "label": "domain-modeling skill",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1676,7 +1676,7 @@
    "id": "mps_changelog_remove_caveman_zoom_out","_origin":"semantic",
    "label": "caveman and zoom-out removed",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1687,7 +1687,7 @@
    "id": "mps_changelog_diagnose_rename","_origin":"semantic",
    "label": "diagnose renamed to diagnosing-bugs",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1698,7 +1698,7 @@
    "id": "mps_changelog_grilling_shared_primitive","_origin":"semantic",
    "label": "grilling exposed as the shared interview primitive",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1709,7 +1709,7 @@
    "id": "mps_changelog_resolving_merge_conflicts","_origin":"semantic",
    "label": "resolving-merge-conflicts skill",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1720,7 +1720,7 @@
    "id": "mps_changelog_invocation_taxonomy","_origin":"semantic",
    "label": "User-invoked / Model-invoked taxonomy",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1731,7 +1731,7 @@
    "id": "mps_changelog_promoted_buckets","_origin":"semantic",
    "label": "Promoted buckets (engineering/, productivity/)",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1742,7 +1742,7 @@
    "id": "mps_changelog_docs_page_resync","_origin":"semantic",
    "label": "Docs-page re-sync rule",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1753,7 +1753,7 @@
    "id": "mps_changelog_grill_front_doors","_origin":"semantic",
    "label": "grill-me and grill-with-docs as the front doors",
    "file_type": "concept",
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CHANGELOG.md",
    "captured_at": "2026-08-02",
    "author": "mattpocock",
@@ -1764,7 +1764,7 @@
    "id": "mps_context_ubiquitous_language","_origin":"semantic",
    "label": "Matt Pocock Skills ubiquitous language (CONTEXT.md)",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1775,7 +1775,7 @@
    "id": "mps_context_skills_collection","_origin":"semantic",
    "label": "Matt Pocock Skills collection",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1786,7 +1786,7 @@
    "id": "mps_context_setup_command","_origin":"semantic",
    "label": "/setup-matt-pocock-skills per-repo configuration",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1797,7 +1797,7 @@
    "id": "mps_context_issue_tracker","_origin":"semantic",
    "label": "Issue tracker (canonical term)",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1808,7 +1808,7 @@
    "id": "mps_context_issue","_origin":"semantic",
    "label": "Issue (canonical term)",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1819,7 +1819,7 @@
    "id": "mps_context_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1830,7 +1830,7 @@
    "id": "mps_context_implementation_slice","_origin":"semantic",
    "label": "Implementation ticket / slice of a build",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1841,7 +1841,7 @@
    "id": "mps_context_wayfinder_map","_origin":"semantic",
    "label": "wayfinder:map",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1852,7 +1852,7 @@
    "id": "mps_context_triage_role","_origin":"semantic",
    "label": "Triage role",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1863,7 +1863,7 @@
    "id": "mps_context_triage_labels_doc","_origin":"semantic",
    "label": "docs/agents/triage-labels.md role-to-label mapping",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1874,7 +1874,7 @@
    "id": "mps_context_tracker_consumer_skills","_origin":"semantic",
    "label": "Tracker-consuming skills (to-tickets, to-spec, triage, qa)",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1885,7 +1885,7 @@
    "id": "mps_context_flagged_ambiguities","_origin":"semantic",
    "label": "Flagged ambiguities section",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1896,7 +1896,7 @@
    "id": "mps_context_backlog_retired","_origin":"semantic",
    "label": "'backlog' retired as a domain term",
    "file_type": "concept",
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/CONTEXT.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1907,7 +1907,7 @@
    "id": "mps_oos_trackers_mainstream_only_decision","_origin":"semantic",
    "label": "Out-of-scope: mainstream issue trackers only",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1918,7 +1918,7 @@
    "id": "mps_oos_trackers_setup_skill","_origin":"semantic",
    "label": "setup-matt-pocock-skills",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1929,7 +1929,7 @@
    "id": "mps_oos_trackers_hardcoded_cli_shape","_origin":"semantic",
    "label": "Each backend hard-codes a CLI shape",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1940,7 +1940,7 @@
    "id": "mps_oos_trackers_maintenance_surface_cost","_origin":"semantic",
    "label": "Permanent maintenance surface per backend",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1951,7 +1951,7 @@
    "id": "mps_oos_trackers_consuming_skills","_origin":"semantic",
    "label": "Core skills that consume a tracker backend",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1962,7 +1962,7 @@
    "id": "mps_oos_trackers_mainstream_judgment_call","_origin":"semantic",
    "label": "\"Mainstream\" is a judgment call",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1973,7 +1973,7 @@
    "id": "mps_oos_trackers_recognition_rule","_origin":"semantic",
    "label": "The recognition rule",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1984,7 +1984,7 @@
    "id": "mps_oos_trackers_signals_not_rules","_origin":"semantic",
    "label": "Stars, age and downloads are signals, not the rule",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -1995,7 +1995,7 @@
    "id": "mps_oos_trackers_mainstream_examples","_origin":"semantic",
    "label": "Mainstream examples: GitHub, GitLab, Backlog.md",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2006,7 +2006,7 @@
    "id": "mps_oos_trackers_non_mainstream_example","_origin":"semantic",
    "label": "Non-mainstream example: a brand-new few-hundred-star tool",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2017,7 +2017,7 @@
    "id": "mps_oos_trackers_escape_hatches","_origin":"semantic",
    "label": "Escape hatches for non-mainstream trackers",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2028,7 +2028,7 @@
    "id": "mps_oos_trackers_local_markdown","_origin":"semantic",
    "label": "`local markdown` tracker option",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2039,7 +2039,7 @@
    "id": "mps_oos_trackers_other_custom","_origin":"semantic",
    "label": "`other/custom` tracker option",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2050,7 +2050,7 @@
    "id": "mps_oos_trackers_prior_request_99","_origin":"semantic",
    "label": "Prior request #99 — dex as a tracker backend",
    "file_type": "concept",
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/.out-of-scope/mainstream-issue-trackers-only.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2061,7 +2061,7 @@
    "id": "mps_wayfinder_docs_wayfinder_skill","_origin":"semantic",
    "label": "wayfinder skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2072,7 +2072,7 @@
    "id": "mps_wayfinder_docs_shared_map","_origin":"semantic",
    "label": "the map (wayfinder:map issue)",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2083,7 +2083,7 @@
    "id": "mps_wayfinder_docs_decision_ticket","_origin":"semantic",
    "label": "decision ticket",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2094,7 +2094,7 @@
    "id": "mps_wayfinder_docs_plans_not_does","_origin":"semantic",
    "label": "it plans, it doesn't do",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2105,7 +2105,7 @@
    "id": "mps_wayfinder_docs_user_invocation","_origin":"semantic",
    "label": "user-invoked via /wayfinder",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2116,7 +2116,7 @@
    "id": "mps_wayfinder_docs_fog_criterion","_origin":"semantic",
    "label": "when to reach for it (too big + foggy)",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2127,7 +2127,7 @@
    "id": "mps_wayfinder_docs_to_spec","_origin":"semantic",
    "label": "to-spec skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2138,7 +2138,7 @@
    "id": "mps_wayfinder_docs_to_tickets","_origin":"semantic",
    "label": "to-tickets skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2149,7 +2149,7 @@
    "id": "mps_wayfinder_docs_setup_skill","_origin":"semantic",
    "label": "setup-matt-pocock-skills",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2160,7 +2160,7 @@
    "id": "mps_wayfinder_docs_tracker_wiring","_origin":"semantic",
    "label": "issue-tracker wiring (prerequisite)",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2171,7 +2171,7 @@
    "id": "mps_wayfinder_docs_wayfinding_operations_section","_origin":"semantic",
    "label": "Wayfinding operations section",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2182,7 +2182,7 @@
    "id": "mps_wayfinder_docs_local_markdown_fallback","_origin":"semantic",
    "label": "local-markdown map default",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2193,7 +2193,7 @@
    "id": "mps_wayfinder_docs_index_not_store","_origin":"semantic",
    "label": "the map is an index, not a store",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2204,7 +2204,7 @@
    "id": "mps_wayfinder_docs_progressive_resolution","_origin":"semantic",
    "label": "low-resolution load, zoom on demand",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2215,7 +2215,7 @@
    "id": "mps_wayfinder_docs_fog_of_war","_origin":"semantic",
    "label": "fog of war",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2226,7 +2226,7 @@
    "id": "mps_wayfinder_docs_ticket_test","_origin":"semantic",
    "label": "ticket-vs-fog test",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2237,7 +2237,7 @@
    "id": "mps_wayfinder_docs_graduation","_origin":"semantic",
    "label": "graduating fog into tickets",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2248,7 +2248,7 @@
    "id": "mps_wayfinder_docs_frontier","_origin":"semantic",
    "label": "the frontier",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2259,7 +2259,7 @@
    "id": "mps_wayfinder_docs_native_blocking","_origin":"semantic",
    "label": "tracker-native blocking",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2270,7 +2270,7 @@
    "id": "mps_wayfinder_docs_destination","_origin":"semantic",
    "label": "the destination",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2281,7 +2281,7 @@
    "id": "mps_wayfinder_docs_out_of_scope","_origin":"semantic",
    "label": "out of scope ruling",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2292,7 +2292,7 @@
    "id": "mps_wayfinder_docs_hitl_ticket","_origin":"semantic",
    "label": "HITL ticket",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2303,7 +2303,7 @@
    "id": "mps_wayfinder_docs_afk_ticket","_origin":"semantic",
    "label": "AFK ticket",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2314,7 +2314,7 @@
    "id": "mps_wayfinder_docs_research_ticket","_origin":"semantic",
    "label": "research ticket",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2325,7 +2325,7 @@
    "id": "mps_wayfinder_docs_research_subagent","_origin":"semantic",
    "label": "/research subagent fan-out",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2336,7 +2336,7 @@
    "id": "mps_wayfinder_docs_research_branch","_origin":"semantic",
    "label": "throwaway research/<name> branch",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2347,7 +2347,7 @@
    "id": "mps_wayfinder_docs_one_ticket_per_session","_origin":"semantic",
    "label": "at most one ticket per session",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2358,7 +2358,7 @@
    "id": "mps_wayfinder_docs_resolution_comment","_origin":"semantic",
    "label": "resolution comment",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2369,7 +2369,7 @@
    "id": "mps_wayfinder_docs_decisions_so_far","_origin":"semantic",
    "label": "Decisions so far log",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2380,7 +2380,7 @@
    "id": "mps_wayfinder_docs_ticket_naming","_origin":"semantic",
    "label": "refer to tickets by name",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2391,7 +2391,7 @@
    "id": "mps_wayfinder_docs_no_fog_stop","_origin":"semantic",
    "label": "no-fog stop condition",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2402,7 +2402,7 @@
    "id": "mps_wayfinder_docs_on_ramp","_origin":"semantic",
    "label": "big-idea on-ramp",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2413,7 +2413,7 @@
    "id": "mps_wayfinder_docs_grilling","_origin":"semantic",
    "label": "grilling skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2424,7 +2424,7 @@
    "id": "mps_wayfinder_docs_domain_modeling","_origin":"semantic",
    "label": "domain-modeling skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2435,7 +2435,7 @@
    "id": "mps_wayfinder_docs_prototype","_origin":"semantic",
    "label": "prototype skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2446,7 +2446,7 @@
    "id": "mps_wayfinder_docs_research_skill","_origin":"semantic",
    "label": "research skill",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2457,7 +2457,7 @@
    "id": "mps_wayfinder_docs_ask_matt","_origin":"semantic",
    "label": "ask-matt router",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2468,7 +2468,7 @@
    "id": "mps_wayfinder_docs_install_command","_origin":"semantic",
    "label": "npx skills add/update quickstart",
    "file_type": "concept",
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/docs/engineering/wayfinder.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2479,7 +2479,7 @@
    "id": "mps_wayfinder_skill_wayfinder_skill","_origin":"semantic",
    "label": "Wayfinder skill",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2490,7 +2490,7 @@
    "id": "mps_wayfinder_skill_destination","_origin":"semantic",
    "label": "Destination",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2501,7 +2501,7 @@
    "id": "mps_wayfinder_skill_map","_origin":"semantic",
    "label": "The Map",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2512,7 +2512,7 @@
    "id": "mps_wayfinder_skill_decision_ticket","_origin":"semantic",
    "label": "Decision ticket",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2523,7 +2523,7 @@
    "id": "mps_wayfinder_skill_plan_not_do","_origin":"semantic",
    "label": "Plan, don't do",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2534,7 +2534,7 @@
    "id": "mps_wayfinder_skill_refer_by_name","_origin":"semantic",
    "label": "Refer by name",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2545,7 +2545,7 @@
    "id": "mps_wayfinder_skill_map_index_not_store","_origin":"semantic",
    "label": "Map is an index, not a store",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2556,7 +2556,7 @@
    "id": "mps_wayfinder_skill_notes_block","_origin":"semantic",
    "label": "Notes block",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2567,7 +2567,7 @@
    "id": "mps_wayfinder_skill_decisions_so_far","_origin":"semantic",
    "label": "Decisions so far",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2578,7 +2578,7 @@
    "id": "mps_wayfinder_skill_not_yet_specified","_origin":"semantic",
    "label": "Not yet specified section",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2589,7 +2589,7 @@
    "id": "mps_wayfinder_skill_out_of_scope","_origin":"semantic",
    "label": "Out of scope",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2600,7 +2600,7 @@
    "id": "mps_wayfinder_skill_issue_tracker","_origin":"semantic",
    "label": "Issue tracker (tracker-specific operations)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2611,7 +2611,7 @@
    "id": "mps_wayfinder_skill_wayfinder_labels","_origin":"semantic",
    "label": "wayfinder:* labels",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2622,7 +2622,7 @@
    "id": "mps_wayfinder_skill_ticket_session_sizing","_origin":"semantic",
    "label": "One-session ticket sizing",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2633,7 +2633,7 @@
    "id": "mps_wayfinder_skill_claim_by_assignment","_origin":"semantic",
    "label": "Claiming a ticket by assignment",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2644,7 +2644,7 @@
    "id": "mps_wayfinder_skill_native_blocking","_origin":"semantic",
    "label": "Native blocking relationship",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2655,7 +2655,7 @@
    "id": "mps_wayfinder_skill_unblocked","_origin":"semantic",
    "label": "Unblocked ticket",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2666,7 +2666,7 @@
    "id": "mps_wayfinder_skill_frontier","_origin":"semantic",
    "label": "Frontier",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2677,7 +2677,7 @@
    "id": "mps_wayfinder_skill_resolution_recording","_origin":"semantic",
    "label": "Recording a resolution",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2688,7 +2688,7 @@
    "id": "mps_wayfinder_skill_assets_linked_not_pasted","_origin":"semantic",
    "label": "Assets linked, not pasted",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2699,7 +2699,7 @@
    "id": "mps_wayfinder_skill_hitl","_origin":"semantic",
    "label": "HITL ticket (human in the loop)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2710,7 +2710,7 @@
    "id": "mps_wayfinder_skill_afk","_origin":"semantic",
    "label": "AFK ticket (agent alone)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2721,7 +2721,7 @@
    "id": "mps_wayfinder_skill_research_ticket","_origin":"semantic",
    "label": "Research ticket type",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2732,7 +2732,7 @@
    "id": "mps_wayfinder_skill_prototype_ticket","_origin":"semantic",
    "label": "Prototype ticket type",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2743,7 +2743,7 @@
    "id": "mps_wayfinder_skill_grilling_ticket","_origin":"semantic",
    "label": "Grilling ticket type",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2754,7 +2754,7 @@
    "id": "mps_wayfinder_skill_task_ticket","_origin":"semantic",
    "label": "Task ticket type",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2765,7 +2765,7 @@
    "id": "mps_wayfinder_skill_companion_skills","_origin":"semantic",
    "label": "Companion skills (/grilling, /domain-modeling, /prototype)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2776,7 +2776,7 @@
    "id": "mps_wayfinder_skill_research_subagent","_origin":"semantic",
    "label": "/research subagent",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2787,7 +2787,7 @@
    "id": "mps_wayfinder_skill_fog_of_war","_origin":"semantic",
    "label": "Fog of war",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2798,7 +2798,7 @@
    "id": "mps_wayfinder_skill_fog_or_ticket_test","_origin":"semantic",
    "label": "Fog-or-ticket test",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2809,7 +2809,7 @@
    "id": "mps_wayfinder_skill_chart_the_map","_origin":"semantic",
    "label": "Chart the map (invocation mode)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2820,7 +2820,7 @@
    "id": "mps_wayfinder_skill_work_through_the_map","_origin":"semantic",
    "label": "Work through the map (invocation mode)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2831,7 +2831,7 @@
    "id": "mps_wayfinder_skill_one_ticket_per_session","_origin":"semantic",
    "label": "Never resolve more than one ticket per session",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2842,7 +2842,7 @@
    "id": "mps_wayfinder_skill_create_then_wire","_origin":"semantic",
    "label": "Create-then-wire (two-pass ticket creation)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2853,7 +2853,7 @@
    "id": "mps_wayfinder_skill_breadth_first_grilling","_origin":"semantic",
    "label": "Breadth-first frontier mapping",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2864,7 +2864,7 @@
    "id": "mps_wayfinder_skill_no_fog_no_map","_origin":"semantic",
    "label": "No fog means no map is needed",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2875,7 +2875,7 @@
    "id": "mps_wayfinder_skill_zoom_as_needed","_origin":"semantic",
    "label": "Zoom as needed",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2886,7 +2886,7 @@
    "id": "mps_wayfinder_skill_concurrent_sessions","_origin":"semantic",
    "label": "Concurrent sessions on one map",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -2897,7 +2897,7 @@
    "id": "mps_wayfinder_skill_user_invoked_only","_origin":"semantic",
    "label": "User-invoked only (disable-model-invocation)",
    "file_type": "concept",
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "source_url": "https://github.com/mattpocock/skills/blob/f34d927194a521688da962fff50708f6238d06af/skills/engineering/wayfinder/SKILL.md",
    "captured_at": "2026-08-02",
    "author": null,
@@ -3722,7 +3722,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3731,7 +3731,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3740,7 +3740,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3749,7 +3749,7 @@
    "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3758,7 +3758,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3767,7 +3767,7 @@
    "relation": "motivates",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3776,7 +3776,7 @@
    "relation": "forces",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3785,7 +3785,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3794,7 +3794,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3803,7 +3803,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3812,7 +3812,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3821,7 +3821,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3830,7 +3830,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3839,7 +3839,7 @@
    "relation": "verifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3848,7 +3848,7 @@
    "relation": "ships",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3857,7 +3857,7 @@
    "relation": "excludes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3866,7 +3866,7 @@
    "relation": "blocks",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3875,7 +3875,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3884,7 +3884,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3893,7 +3893,7 @@
    "relation": "addresses",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3902,7 +3902,7 @@
    "relation": "exposes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3911,7 +3911,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3920,7 +3920,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3929,7 +3929,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3938,7 +3938,7 @@
    "relation": "restructures",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3947,7 +3947,7 @@
    "relation": "gates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3956,7 +3956,7 @@
    "relation": "creates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3965,7 +3965,7 @@
    "relation": "creates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3974,7 +3974,7 @@
    "relation": "gates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3983,7 +3983,7 @@
    "relation": "requires",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -3992,7 +3992,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -4001,7 +4001,7 @@
    "relation": "explains",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "0002-ship-as-a-claude-code-plugin.md",
+   "source_file": "mattpocock-skills/.agents/adr/0002-ship-as-a-claude-code-plugin.md",
    "weight": 1
   },
   {
@@ -4010,7 +4010,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4019,7 +4019,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4028,7 +4028,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4037,7 +4037,7 @@
    "relation": "documents",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4046,7 +4046,7 @@
    "relation": "enforces",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4055,7 +4055,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4064,7 +4064,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4073,7 +4073,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4082,7 +4082,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4091,7 +4091,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4100,7 +4100,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4109,7 +4109,7 @@
    "relation": "requires",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4118,7 +4118,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4127,7 +4127,7 @@
    "relation": "mitigates",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4136,7 +4136,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4145,7 +4145,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4154,7 +4154,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4163,7 +4163,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4172,7 +4172,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4181,7 +4181,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4190,7 +4190,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4199,7 +4199,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4208,7 +4208,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4217,7 +4217,7 @@
    "relation": "classifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4226,7 +4226,7 @@
    "relation": "classifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4235,7 +4235,7 @@
    "relation": "reinforces",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4244,7 +4244,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4253,7 +4253,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4262,7 +4262,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4271,7 +4271,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4280,7 +4280,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4289,7 +4289,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4298,7 +4298,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4307,7 +4307,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4316,7 +4316,7 @@
    "relation": "verifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4325,7 +4325,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4334,7 +4334,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4343,7 +4343,7 @@
    "relation": "routes_to",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4352,7 +4352,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4361,7 +4361,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4370,7 +4370,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4379,7 +4379,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4388,7 +4388,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4397,7 +4397,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4406,7 +4406,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4415,7 +4415,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4424,7 +4424,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4433,7 +4433,7 @@
    "relation": "reinforces",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4442,7 +4442,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4451,7 +4451,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4460,7 +4460,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4469,7 +4469,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4478,7 +4478,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4487,7 +4487,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4496,7 +4496,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4505,7 +4505,7 @@
    "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4514,7 +4514,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4523,7 +4523,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4532,7 +4532,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4541,7 +4541,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4550,7 +4550,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4559,7 +4559,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4568,7 +4568,7 @@
    "relation": "requires",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4577,7 +4577,7 @@
    "relation": "restores",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4586,7 +4586,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4595,7 +4595,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4604,7 +4604,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4613,7 +4613,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4622,7 +4622,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4631,7 +4631,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4640,7 +4640,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4649,7 +4649,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4658,7 +4658,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4667,7 +4667,7 @@
    "relation": "reinforces",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4676,7 +4676,7 @@
    "relation": "requires",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4685,7 +4685,7 @@
    "relation": "reinforces",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4694,7 +4694,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4703,7 +4703,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4712,7 +4712,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4721,7 +4721,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4730,7 +4730,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4739,7 +4739,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4748,7 +4748,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4757,7 +4757,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4766,7 +4766,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4775,7 +4775,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4784,7 +4784,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4793,7 +4793,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4802,7 +4802,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4811,7 +4811,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4820,7 +4820,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4829,7 +4829,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4838,7 +4838,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4847,7 +4847,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4856,7 +4856,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4865,7 +4865,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4874,7 +4874,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4883,7 +4883,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4892,7 +4892,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4901,7 +4901,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4910,7 +4910,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4919,7 +4919,7 @@
    "relation": "defines",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4928,7 +4928,7 @@
    "relation": "defines",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4937,7 +4937,7 @@
    "relation": "defines",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4946,7 +4946,7 @@
    "relation": "documents",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4955,7 +4955,7 @@
    "relation": "triggers",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4964,7 +4964,7 @@
    "relation": "triggers",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4973,7 +4973,7 @@
    "relation": "triggers",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4982,7 +4982,7 @@
    "relation": "requires",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -4991,7 +4991,7 @@
    "relation": "reflects",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -5000,7 +5000,7 @@
    "relation": "defines",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -5009,7 +5009,7 @@
    "relation": "reinforces",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -5018,7 +5018,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CHANGELOG.md",
+   "source_file": "mattpocock-skills/CHANGELOG.md",
    "weight": 1
   },
   {
@@ -5027,7 +5027,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5036,7 +5036,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5045,7 +5045,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5054,7 +5054,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5063,7 +5063,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5072,7 +5072,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5081,7 +5081,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5090,7 +5090,7 @@
    "relation": "collapsed_into",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5099,7 +5099,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5108,7 +5108,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5117,7 +5117,7 @@
    "relation": "classifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5126,7 +5126,7 @@
    "relation": "maps_to_labels",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5135,7 +5135,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5144,7 +5144,7 @@
    "relation": "is_a",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5153,7 +5153,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5162,7 +5162,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5171,7 +5171,7 @@
    "relation": "is_a",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5180,7 +5180,7 @@
    "relation": "reads_and_writes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5189,7 +5189,7 @@
    "relation": "produces",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5198,7 +5198,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5207,7 +5207,7 @@
    "relation": "applies",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "CONTEXT.md",
+   "source_file": "mattpocock-skills/CONTEXT.md",
    "weight": 1
   },
   {
@@ -5216,7 +5216,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5225,7 +5225,7 @@
    "relation": "causes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5234,7 +5234,7 @@
    "relation": "justifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5243,7 +5243,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5252,7 +5252,7 @@
    "relation": "verifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5261,7 +5261,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5270,7 +5270,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5279,7 +5279,7 @@
    "relation": "informs",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5288,7 +5288,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5297,7 +5297,7 @@
    "relation": "exemplifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5306,7 +5306,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5315,7 +5315,7 @@
    "relation": "mitigates",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5324,7 +5324,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5333,7 +5333,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5342,7 +5342,7 @@
    "relation": "avoids",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5351,7 +5351,7 @@
    "relation": "rejects",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5360,7 +5360,7 @@
    "relation": "exemplifies",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "mainstream-issue-trackers-only.md",
+   "source_file": "mattpocock-skills/.out-of-scope/mainstream-issue-trackers-only.md",
    "weight": 1
   },
   {
@@ -5369,7 +5369,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5378,7 +5378,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5387,7 +5387,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5396,7 +5396,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5405,7 +5405,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5414,7 +5414,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5423,7 +5423,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5432,7 +5432,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5441,7 +5441,7 @@
    "relation": "substitutes_for",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5450,7 +5450,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5459,7 +5459,7 @@
    "relation": "enables",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5468,7 +5468,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5477,7 +5477,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5486,7 +5486,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5495,7 +5495,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5504,7 +5504,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5513,7 +5513,7 @@
    "relation": "clears",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5522,7 +5522,7 @@
    "relation": "produces",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5531,7 +5531,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5540,7 +5540,7 @@
    "relation": "renders",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5549,7 +5549,7 @@
    "relation": "bounds",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5558,7 +5558,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5567,7 +5567,7 @@
    "relation": "prevents",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5576,7 +5576,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5585,7 +5585,7 @@
    "relation": "is_a",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5594,7 +5594,7 @@
    "relation": "is_a",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5603,7 +5603,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5612,7 +5612,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5621,7 +5621,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5630,7 +5630,7 @@
    "relation": "is_a",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5639,7 +5639,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5648,7 +5648,7 @@
    "relation": "invokes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5657,7 +5657,7 @@
    "relation": "writes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5666,7 +5666,7 @@
    "relation": "accelerates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5675,7 +5675,7 @@
    "relation": "exempt_from",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5684,7 +5684,7 @@
    "relation": "governs",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5693,7 +5693,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5702,7 +5702,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5711,7 +5711,7 @@
    "relation": "conforms_to",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5720,7 +5720,7 @@
    "relation": "governs",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5729,7 +5729,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5738,7 +5738,7 @@
    "relation": "bypasses",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5747,7 +5747,7 @@
    "relation": "is_a",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5756,7 +5756,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5765,7 +5765,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5774,7 +5774,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5783,7 +5783,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5792,7 +5792,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5801,7 +5801,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5810,7 +5810,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5819,7 +5819,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5828,7 +5828,7 @@
    "relation": "precedes",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "wayfinder.md",
+   "source_file": "mattpocock-skills/docs/engineering/wayfinder.md",
    "weight": 1
   },
   {
@@ -5837,7 +5837,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5846,7 +5846,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5855,7 +5855,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5864,7 +5864,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5873,7 +5873,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5882,7 +5882,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5891,7 +5891,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5900,7 +5900,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5909,7 +5909,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5918,7 +5918,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5927,7 +5927,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5936,7 +5936,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5945,7 +5945,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5954,7 +5954,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5963,7 +5963,7 @@
    "relation": "identifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5972,7 +5972,7 @@
    "relation": "identifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5981,7 +5981,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5990,7 +5990,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -5999,7 +5999,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6008,7 +6008,7 @@
    "relation": "governs",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6017,7 +6017,7 @@
    "relation": "governs",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6026,7 +6026,7 @@
    "relation": "governs",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6035,7 +6035,7 @@
    "relation": "overrides",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6044,7 +6044,7 @@
    "relation": "names",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6053,7 +6053,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6062,7 +6062,7 @@
    "relation": "indexes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6071,7 +6071,7 @@
    "relation": "appends_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6080,7 +6080,7 @@
    "relation": "closes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6089,7 +6089,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6098,7 +6098,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6107,7 +6107,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6116,7 +6116,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6125,7 +6125,7 @@
    "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6134,7 +6134,7 @@
    "relation": "removes_from",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6143,7 +6143,7 @@
    "relation": "defines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6152,7 +6152,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6161,7 +6161,7 @@
    "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6170,7 +6170,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6179,7 +6179,7 @@
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6188,7 +6188,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6197,7 +6197,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6206,7 +6206,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6215,7 +6215,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6224,7 +6224,7 @@
    "relation": "classified_as",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6233,7 +6233,7 @@
    "relation": "classified_as",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6242,7 +6242,7 @@
    "relation": "classified_as",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6251,7 +6251,7 @@
    "relation": "classified_as",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6260,7 +6260,7 @@
    "relation": "classified_as",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6269,7 +6269,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6278,7 +6278,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6287,7 +6287,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6296,7 +6296,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6305,7 +6305,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6314,7 +6314,7 @@
    "relation": "records",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6323,7 +6323,7 @@
    "relation": "graduates_into",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6332,7 +6332,7 @@
    "relation": "clears",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6341,7 +6341,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6350,7 +6350,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6359,7 +6359,7 @@
    "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6368,7 +6368,7 @@
    "relation": "excluded_from",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6377,7 +6377,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6386,7 +6386,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6395,7 +6395,7 @@
    "relation": "exempt_from",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6404,7 +6404,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6413,7 +6413,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6422,7 +6422,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6431,7 +6431,7 @@
    "relation": "establishes",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6440,7 +6440,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6449,7 +6449,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6458,7 +6458,7 @@
    "relation": "surfaces",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6467,7 +6467,7 @@
    "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6476,7 +6476,7 @@
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6485,7 +6485,7 @@
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6494,7 +6494,7 @@
    "relation": "enables",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6503,7 +6503,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6512,7 +6512,7 @@
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   },
   {
@@ -6521,7 +6521,7 @@
    "relation": "routes_to",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
-   "source_file": "SKILL.md",
+   "source_file": "mattpocock-skills/skills/engineering/wayfinder/SKILL.md",
    "weight": 1
   }
  ],

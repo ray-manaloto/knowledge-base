@@ -70,6 +70,14 @@ graphify-out/.graphify_*
 # that actually produced the file (the stamp mechanism shipped without its own
 # ignore rule, so nothing had revealed the gap).
 graphify-out/.currency-stamp.json
+# Count continuity ledger (#191) + the handoff file `_merge_docs.py` writes its
+# post-merge counts to. Both DERIVED and both machine-local: the ledger is only
+# meaningful next to the graph.json fingerprint it records, and graph.json is
+# itself gitignored, so a committed ledger would describe an artifact no other
+# clone has. An absent ledger is the correct fresh-clone state — the next writer
+# reports "prior count unknown" and re-establishes it.
+graphify-out/.graph-counts.json
+graphify-out/.merge-counts.tmp.json
 # committed under graphify-out/: ONLY memory/ (authored work-memory).
 # graph.json / manifest.json / .graphify_* (labels, learning overlay) are derived.
 
