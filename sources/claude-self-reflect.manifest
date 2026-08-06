@@ -1,0 +1,12 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Prior art for the self-reflection loop (#TBD): Rust MCP conversation-memory server — searches past transcripts, task outcomes and plan docs. 0 skills/agents; value is the architecture. scope=study.
+url = https://github.com/ramakay/claude-self-reflect
+ref = main
+commit = 86afb4a3f3ecfd615e1ef012bcfe5b2ef45cb2cc
+kind = code
+# scope = study: an object of study (peer orchestration/memory tooling), not corpus
+# content we answer questions from. `scope` exists because pinned peer tools took
+# graph.json past its size cap; these five route to graphify-out/study-graph.json.
+# `kb-setup manifest-add` has no --scope flag (manifest.py NewSource), so this line
+# is hand-added after the write, deliberately, not an omission.
+scope = study

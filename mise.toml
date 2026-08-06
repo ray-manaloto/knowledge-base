@@ -33,8 +33,8 @@ min_version = { hard = "2026.7.14", soft = "2026.8.2" }
 python = "3.14.6"
 uv = "0.11.28"
 hk = "1.54.0"
-pkl = "0.32.0"
-typos = "1.48.0"
+pkl = "0.32.1"
+typos = "1.49.0"
 # graphify [all] resolves on host Python 3.14 (leiden/graspologic extra
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
@@ -45,12 +45,20 @@ typos = "1.48.0"
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
 "conda:ffmpeg" = "8.1.2"
 taplo = "0.10.0"
-rumdl = "v0.2.40"
+rumdl = "v0.2.52"
 gitleaks = "8.30.1"
 # agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
 # Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
 # on warnings-only, so without it every warning is invisible (dotfiles #250).
-"github:agent-sh/agnix" = "0.40.0"
+#
+# 0.40.0 -> 0.46.0 (2026-08-06). The floor that matters is **0.44.0**, which fixed
+# CC-AG-003/CC-SK-001 rejecting documented `model` values — `fable` among them.
+# That is load-bearing here: `.claude/CLAUDE.md`'s orchestration flow is
+# Fable-gated, and on 0.40.0 an agent file declaring `model: fable` FAILED
+# `mise run lint` while the pinned docs (`sub-agents.md:286`, `:303`) declare it
+# valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
+# 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
+"github:agent-sh/agnix" = "0.46.0"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, where it installs into a directory literally named `latest` and

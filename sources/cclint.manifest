@@ -1,0 +1,10 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Linter for the files Claude Code reads (CLAUDE.md, skills, subagents, hooks) — flags stale/invalid subagent model IDs, unresolved @path imports, dangerous bash, vague instructions. Candidate peer/complement to agnix's CC-AG-* rules. scope=study.
+url = https://github.com/felixgeelhaar/cclint
+ref = main
+commit = da801da4e75bb73f5e1a69c6ea0c666a49a14939
+kind = code
+# scope = study: a peer LINTER being evaluated against agnix's CC-AG-* rules,
+# not corpus content we answer questions from. `kb-setup manifest-add` has no
+# --scope flag, so this line is hand-added after the write.
+scope = study

@@ -1,6 +1,9 @@
 ---
 name: kb-tool-researcher
 description: Research ONE peer tool against this repo's graph and its pinned source, and write a gap analysis in both directions. Use when comparing an external retrieval/memory/observability tool to graphify.
+model: sonnet
+effort: high
+color: cyan
 ---
 
 # kb-tool-researcher — one peer tool, both directions
@@ -90,3 +93,40 @@ written 6 of 10 findings leaves 6.
 
 and a line stating how many claims you **refuted** during the work. Zero refuted
 means you did not actually try to break your own findings.
+
+## Query the graph FIRST — it is the point of this repo
+
+Before grepping source or reaching for the network, ask the graph. A graph read
+spends **zero LLM tokens**; re-deriving what the corpus already holds is the
+failure this repo exists to prevent. The `/graphify` skill
+(`.claude/skills/graphify/SKILL.md`) is the authority on these tools.
+
+```bash
+mise run kb-query -- "<question>" --prose --idf                  # about the DOCUMENTS
+mise run kb-query -- "<question>"                                # code / AST symbols
+mise run kb-query -- "<q>" --graph graphify-out/study-graph.json # peer tools pinned scope=study
+mise exec -- graphify explain "<concept>"                        # one concept, in depth
+mise exec -- graphify path "<A>" "<B>"                           # how two things relate
+```
+
+**Pick the right verb.** `--prose` reads the graph with every `_origin=ast` node
+stripped, so a question about *our own code* answered against it will come back
+confidently wrong. Symbols → `explain` or the unscoped graph; documents →
+`--prose --idf`.
+
+**The study sources are not in the default graph.** Anything pinned
+`scope = study` (the peer orchestration, memory and linter tools) is reachable
+ONLY via `--graph graphify-out/study-graph.json`. There is no `--study` flag.
+
+Derived views, already generated and cheaper than re-reading source:
+
+| artifact | what it is good for |
+|---|---|
+| `graphify-out/wiki/` | ~9,500 pages, one per community — broad navigation |
+| `graphify-out/obsidian/` | one note per node — following a single thread |
+| `graphify-out/GRAPH_REPORT.md` | architecture-level read when query/explain do not surface enough |
+
+**An empty graph result is NOT evidence of absence.** Control-arm it: run the
+same command shape on a term you KNOW is present. A miss is more often a
+vocabulary mismatch against the extracted node labels than a real gap — and
+those two are indistinguishable without the arm. State which arm you ran.

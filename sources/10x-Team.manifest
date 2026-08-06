@@ -1,0 +1,12 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# 13 SKILL.md + AGENTS.md + 2 commands — a worked multi-agent team roster to compare ours against. scope=study.
+url = https://github.com/Jaan-Mustafa/10x-Team
+ref = main
+commit = ea01f8262495e99a66ca292739b0517314e6914e
+kind = code
+# scope = study: an object of study (peer orchestration/memory tooling), not corpus
+# content we answer questions from. `scope` exists because pinned peer tools took
+# graph.json past its size cap; these five route to graphify-out/study-graph.json.
+# `kb-setup manifest-add` has no --scope flag (manifest.py NewSource), so this line
+# is hand-added after the write, deliberately, not an omission.
+scope = study
