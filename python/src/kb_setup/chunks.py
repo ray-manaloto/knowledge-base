@@ -335,6 +335,48 @@ def validate_files(paths: list[Path]) -> dict[Path, list[str]]:
     return out
 
 
+def chunk_captured_at(path: Path) -> str:
+    """The chunk's newest node-level `captured_at`, or `""` when none carries one.
+
+    ISO `YYYY-MM-DD` strings, so lexical `max`/`sort` IS date order. An
+    unreadable file returns `""` rather than raising: this feeds an ORDERING,
+    and `validate_files` (which `build()` runs first) is where a broken chunk
+    gets refused with a real message — failing here would just report the same
+    defect worse.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return ""
+    nodes = data.get("nodes") or []
+    dates = [str(n.get("captured_at") or "") for n in nodes if isinstance(n, dict)]
+    return max((d for d in dates if d), default="")
+
+
+def replay_order(paths: list[Path]) -> list[Path]:
+    """Committed chunks in the order `build()` must replay them: oldest capture FIRST.
+
+    `build_merge` makes the LAST chunk to name a `source_file` that file's
+    owner — it prunes every existing node carrying the same `source_file`
+    before adding its own (re-extraction idempotence). Replaying in glob order
+    therefore made supersession a NAMING accident, measured on the 2026-08-05
+    rebuild: the hooks/skills re-extraction chunk sorts before
+    `goal-engineering-docs.json`, whose nodes also say `source_file: hooks.md`,
+    so the rebuild silently replaced the fresh page's 69 nodes with the older
+    chunk's 13 (`[merge]` line arithmetic: +290 printed, total rose 221) —
+    while the incremental `kb-merge`, which runs the new chunk last, did the
+    exact reverse to the older chunk. Same committed corpus, two different
+    graphs, chosen by the alphabet: invariant 3's precise failure shape.
+
+    Capture date is the order supersession MEANS: a newer extraction of a file
+    replaces an older one, identically in the rebuild and the incremental
+    path. The key is the chunk's max node `captured_at`; a chunk with none
+    sorts first (it can never supersede a dated one), and the filename breaks
+    ties so the order stays total and deterministic.
+    """
+    return sorted(paths, key=lambda p: (chunk_captured_at(p), p.name))
+
+
 def _out_path(repo_root: Path, name: str) -> Path:
     stem = name.removesuffix(".json").removesuffix("-docs")
     return repo_root / "sources" / "extractions" / f"{stem}-docs.json"

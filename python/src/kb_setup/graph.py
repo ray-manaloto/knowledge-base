@@ -1153,19 +1153,26 @@ def build(repo_root: Path) -> None:
     # below, after every chunk has landed — not once per chunk.
     gpy = graphify_python(repo_root)
     # Already validated at the TOP of build(), before anything wrote graph.json.
+    # CAPTURE-DATE order, not the glob's alphabetical order: build_merge gives
+    # a source_file to the LAST chunk that names it, so replay order IS the
+    # supersession rule — see `chunks.replay_order` for the measured defect
+    # (a rebuild and an incremental merge producing different graphs from the
+    # same committed corpus).
     print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
-    for chunk in chunk_paths:
+    for chunk in _chunks.replay_order(chunk_paths):
         name = chunk.stem.removesuffix("-docs")
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
 
     # ONE final label pass — deterministic (no LLM; see `graphify_ops.label`'s own
-    # docstring) — re-clusters the fully-composed graph, carries hyperedges across
-    # graphify's own label/cluster-only round-trip (#171 — measured 5->0 without
-    # this), and re-derives the prose graph as its own last step. `build()` no
-    # longer calls `prose.derive_for` itself: this IS that call now, made by the
-    # function that already has to load graph.json for the label pass, rather
-    # than a second, separate load of the same file.
+    # docstring) — re-clusters the fully-composed graph and re-derives the prose
+    # graph as its own last step. Hyperedge survival across the label round-trip
+    # is graphify's own job since 0.9.34 (#171's carry was retired at that bump;
+    # `hyperedges.py`'s module docstring carries the history), and
+    # `assert_composition` below still refuses a dangling member either way.
+    # `build()` no longer calls `prose.derive_for` itself: this IS that call
+    # now, made by the function that already has to load graph.json for the
+    # label pass, rather than a second, separate load of the same file.
     label_rc = graphify_ops.label(repo_root)
     if label_rc != 0:
         raise SystemExit(f"[kb-build] final label pass failed (rc={label_rc}) — aborting")
