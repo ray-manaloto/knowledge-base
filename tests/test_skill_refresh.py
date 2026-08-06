@@ -67,6 +67,10 @@ def _wire(monkeypatch: pytest.MonkeyPatch, root: Path, installer, *, fmt_rc: int
     monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r=None: "/fake/graphify")
     monkeypatch.setattr(graphify_env, "clean_env", lambda _extra=None: {})
     monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r=None: "0.9.34")
+    # Neutral by default: the real ADDENDA point at the SHIPPED skill tree, which
+    # a tmp_path repo does not have, so leaving them live would make every arm
+    # below fail for a reason it is not about. The addenda arms set their own.
+    monkeypatch.setattr(skill_refresh, "ADDENDA", ())
     seen: list[str] = []
 
     def fake_run(cmd: list[str], **_kw: object) -> subprocess.CompletedProcess[str]:
@@ -237,12 +241,135 @@ def test_a_stale_binary_is_refused_before_the_installer_runs(tmp_path, monkeypat
         skill_refresh.refresh(root)
 
 
-def test_both_hand_owned_claude_files_are_protected() -> None:
+def test_every_hand_owned_file_the_installer_writes_is_protected() -> None:
     """The protected set is the contract.
 
-    `.claude/CLAUDE.md` is NOT in #133's list and is here deliberately: the
-    installer writes a `# graphify` block there, and that file is hand-authored
-    and sits at its `md_size_budget`, so an installer append breaks a gate
-    rather than merely churning bytes.
+    Neither `CLAUDE.md` is in #133's list, and both are here deliberately: the
+    installer writes a graphify block into each — its own output says
+    *"graphify section written to <repo>/CLAUDE.md"* — and both are
+    hand-authored and sit at their `md_size_budget`, so an installer append
+    breaks a gate rather than merely churning bytes.
     """
-    assert skill_refresh.PROTECTED == (".claude/settings.json", ".claude/CLAUDE.md")
+    assert skill_refresh.PROTECTED == (
+        ".claude/settings.json",
+        ".claude/CLAUDE.md",
+        "CLAUDE.md",
+    )
+
+
+# --------------------------------------------------------------------------
+# ADDENDA. Every arm below failed on this task's own FIRST LIVE RUN, which
+# destroyed PR #190's hand-added paragraph in `references/query.md` and
+# reported success.
+# --------------------------------------------------------------------------
+
+_ADDENDUM = skill_refresh.Addendum(
+    path="generated/note.md",
+    anchor="## Section\n",
+    text="\nlocal note that upstream does not carry.\n",
+)
+
+
+def _generated(root: Path, body: str) -> Path:
+    """A generated file at the addendum's path, carrying ``body``."""
+    path = root / _ADDENDUM.path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_an_addendum_wiped_by_the_installer_is_re_applied(tmp_path, monkeypatch, capsys) -> None:
+    """The regression this mechanism exists for: a wiped local note comes back."""
+    root = _repo(tmp_path)
+
+    def wipes(r: Path) -> int:
+        _generated(r, "intro\n\n## Section\n\nupstream text\n")
+        return 0
+
+    _wire(monkeypatch, root, wipes)
+    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
+
+    assert skill_refresh.refresh(root) == 0
+    assert _ADDENDUM.text in (root / _ADDENDUM.path).read_text(encoding="utf-8")
+    assert "re-applied this repo's local addendum" in capsys.readouterr().out
+
+
+def test_re_applying_an_addendum_twice_does_not_duplicate_it(tmp_path, monkeypatch) -> None:
+    """Idempotence. A refresh run twice must not stack the paragraph."""
+    root = _repo(tmp_path)
+    _wire(monkeypatch, root, lambda r: _generated(r, "## Section\n\nupstream\n") and 0)
+    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
+
+    skill_refresh.refresh(root)
+    skill_refresh.refresh(root)
+
+    body = (root / _ADDENDUM.path).read_text(encoding="utf-8")
+    assert body.count(_ADDENDUM.text) == 1
+
+
+def test_a_missing_anchor_fails_rather_than_dropping_the_note(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """An anchor upstream moved must stop the run, not vanish quietly.
+
+    This is the whole point. The refresh otherwise succeeds, so returning 0
+    would send the operator to commit a diff that silently dropped a local fix
+    — which is exactly what the first live run did.
+    """
+    root = _repo(tmp_path)
+    _wire(monkeypatch, root, lambda r: _generated(r, "upstream renamed the heading\n") and 0)
+    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
+
+    assert skill_refresh.refresh(root) == 1
+    out = capsys.readouterr().out
+    assert "ADDENDUM LOST" in out
+    assert _ADDENDUM.path in out
+
+
+def test_a_missing_addendum_file_also_fails(tmp_path, monkeypatch, capsys) -> None:
+    """A file upstream deleted is a lost note too — a distinct message.
+
+    Kept distinct from the anchor case because the remedies differ: one is
+    re-anchoring, the other is that the reference page is gone entirely.
+    """
+    root = _repo(tmp_path)
+    _wire(monkeypatch, root, lambda _r: 0)
+    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
+
+    assert skill_refresh.refresh(root) == 1
+    assert "does not exist after install" in capsys.readouterr().out
+
+
+def test_the_live_addendum_matches_what_the_shipped_skill_carries() -> None:
+    """The real `ADDENDA` entry must be applied in the tree that ships.
+
+    Without this, `ADDENDA` could hold a note whose anchor never existed and
+    every unit arm above — which uses a synthetic addendum — would still pass.
+    """
+    root = Path(__file__).resolve().parents[1]
+    for add in skill_refresh.ADDENDA:
+        body = (root / add.path).read_text(encoding="utf-8")
+        assert add.anchor in body, f"{add.path}: anchor missing from the shipped file"
+        assert add.text in body, f"{add.path}: addendum not applied in the shipped file"
+
+
+def test_the_installers_backup_is_removed_only_when_this_run_made_it(tmp_path, monkeypatch) -> None:
+    """A `.graphify-bak` this run created is debris; one that predates it is not.
+
+    Both directions in one arm, because the discriminator IS the pre-existence
+    check — a version that always deleted would pass a one-sided test.
+    """
+    root = _repo(tmp_path)
+    preexisting = root / f"{CLAUDE_MD}.graphify-bak"
+    preexisting.write_text("someone else's backup\n", encoding="utf-8")
+
+    def backs_up(r: Path) -> int:
+        (r / f"{SETTINGS}.graphify-bak").write_text(_GOOD_SETTINGS, encoding="utf-8")
+        (r / SETTINGS).write_text("{}", encoding="utf-8")
+        return 0
+
+    _wire(monkeypatch, root, backs_up)
+
+    assert skill_refresh.refresh(root) == 0
+    assert not (root / f"{SETTINGS}.graphify-bak").exists()
+    assert preexisting.read_text(encoding="utf-8") == "someone else's backup\n"
