@@ -104,6 +104,39 @@ def set_pin_version(text: str, mise_key: str, new_version: str) -> tuple[str, st
     raise KeyError(f"no mise.toml pin found for {mise_key!r}")
 
 
+def _skill_warnings(result: skill.SkillResult) -> list[str]:
+    """The skill-refresh conditions that make a bump NOT clean, led with.
+
+    Both are damage a reader would otherwise have to find by parsing prose, or
+    by noticing an absence:
+
+    - `unrepaired` — the installer's rewrite is still sitting in the working
+      tree, so whoever commits the bump picks it up. `_repair` reports it by
+      re-reading `git status`, never by trusting an exit code.
+    - `lost_addenda` — a note THIS repo added to the generated skill is gone and
+      could not be put back. It is invisible in the diff, because the file
+      simply reads as regenerated; leading with it is the only way a reviewer
+      learns it happened.
+
+    Extracted from `apply` rather than inlined: the second condition pushed that
+    function past its complexity ceiling, and the honest fix for "one more
+    branch" is a named function, not a suppression (`do-not.md` #9).
+    """
+    warnings: list[str] = []
+    if result.lost_addenda:
+        warnings.append(
+            f"⚠ local addendum lost: {', '.join(result.lost_addenda)} — a note this repo "
+            f"added to the generated skill is gone; re-anchor or retire it in "
+            f"currency.skill.ADDENDA"
+        )
+    if result.unrepaired:
+        warnings.append(
+            f"⚠ working tree still dirty: {', '.join(result.unrepaired)} — "
+            f"the installer's changes were NOT reverted; inspect before committing"
+        )
+    return warnings
+
+
 def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     """Edit the committable files for an authorized bump; return what changed.
 
@@ -174,20 +207,10 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     if skill_result.changed:
         changed.extend(skill_result.changed)
 
-    notes = ["rebuild pending — run `mise run kb-build` locally to re-stamp the graph"]
+    notes = [*_skill_warnings(skill_result)]
+    notes.append("rebuild pending — run `mise run kb-build` locally to re-stamp the graph")
     if spec.skill_dir:
         notes.append(f"skill: {skill_result.note}")
-    # Lead with unreverted damage rather than leaving it mid-sentence in the skill
-    # note. This is the only consumer of `SkillResult`, and the note is what a human
-    # reads to decide the bump is clean — so the one condition that makes it NOT
-    # clean has to be readable without parsing prose. `_repair` reports it by
-    # re-reading `git status`, not by trusting an exit code.
-    if skill_result.unrepaired:
-        notes.insert(
-            0,
-            f"⚠ working tree still dirty: {', '.join(skill_result.unrepaired)} — "
-            f"the installer's changes were NOT reverted; inspect before committing",
-        )
     return ApplyResult(
         tool=spec.name,
         from_version=verdict.current,

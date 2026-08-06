@@ -1,375 +1,129 @@
-"""`kb-skill-refresh` runs the generator and keeps what the generator must not own.
+"""`kb-setup skill-refresh` — the standalone entry point, not the refresh itself.
 
-The fake installer here does not merely record that it was called — it performs
-the **real** #133 regression on the file, byte for byte: rewrites the hook
-command to an absolute version-frozen path, drops the `"timeout": 15`, and
-strips the trailing newline. A stub that only asserted "subprocess.run was
-invoked" would pass against a `refresh()` that never restored anything, which is
-the entire behaviour under test (`stubbed-run-hides-second-writer-bugs`).
+The refresh lives in `kb_setup.currency.skill` and is tested in
+`test_currency_skill.py`. What is tested HERE is only what this entry point adds
+on top of it, and every arm is about an exit code: a task that returns 0 after
+something went wrong is how a broken skill reaches a commit.
 
-Every arm therefore reads the FILE afterwards, never the mock.
+The first version of this module was a SECOND IMPLEMENTATION of the refresh,
+written by reading #133's "Ask" without first checking whether this repo had
+already answered it. It was deleted rather than kept in sync
+(`use-tool-builtins.md`'s answer for duplicated custom code), so these arms
+deliberately do not re-test repair, backups, or the installer contract.
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 
 import pytest
 from kb_setup import graphify_env, skill_refresh
+from kb_setup.currency import config, skill
+from kb_setup.currency.config import ToolSpec
 
-SETTINGS = ".claude/settings.json"
-CLAUDE_MD = ".claude/CLAUDE.md"
-
-#: The hook command shape this repo commits — mise-relative, so it follows the
-#: pin on every clone. The installer replaces it with an absolute path.
-_MISE_HOOK = 'mise exec -C "${CLAUDE_PROJECT_DIR:-.}" -- graphify hook-guard search'
-
-#: The shape this repo commits: a mise-relative hook command with a timeout, and
-#: a trailing newline. All three are what the installer destroys.
-_GOOD_SETTINGS = (
-    json.dumps(
-        {
-            "hooks": {
-                "PreToolUse": [
-                    {
-                        "matcher": "Bash",
-                        "hooks": [
-                            {
-                                "type": "command",
-                                "command": _MISE_HOOK,
-                                "timeout": 15,
-                            }
-                        ],
-                    }
-                ]
-            }
-        },
-        indent=2,
-    )
-    + "\n"
+_SPEC = ToolSpec(
+    name="graphify",
+    mise_key="pipx:graphifyy",
+    skill_dir=".claude/skills/graphify",
+    skill_install=("true",),
 )
 
 
-def _repo(tmp_path: Path) -> Path:
-    """A repo root carrying both protected files and a stamp."""
-    (tmp_path / ".claude" / "skills" / "graphify").mkdir(parents=True)
-    (tmp_path / SETTINGS).write_text(_GOOD_SETTINGS, encoding="utf-8")
-    (tmp_path / CLAUDE_MD).write_text("# graphify\n\nhand-authored pointer.\n", encoding="utf-8")
-    (tmp_path / skill_refresh.STAMP).write_text("0.9.32", encoding="utf-8")
-    return tmp_path
-
-
-def _wire(monkeypatch: pytest.MonkeyPatch, root: Path, installer, *, fmt_rc: int = 0) -> list[str]:
-    """Point `refresh` at a fake graphify whose `install` runs ``installer``."""
-    monkeypatch.setattr(graphify_env, "assert_pinned_graphify", lambda _r=None: None)
-    monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r=None: "/fake/graphify")
-    monkeypatch.setattr(graphify_env, "clean_env", lambda _extra=None: {})
-    monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r=None: "0.9.34")
-    # Neutral by default: the real ADDENDA point at the SHIPPED skill tree, which
-    # a tmp_path repo does not have, so leaving them live would make every arm
-    # below fail for a reason it is not about. The addenda arms set their own.
-    monkeypatch.setattr(skill_refresh, "ADDENDA", ())
-    seen: list[str] = []
-
-    def fake_run(cmd: list[str], **_kw: object) -> subprocess.CompletedProcess[str]:
-        seen.append(" ".join(cmd))
-        if cmd[1:] == ["install", "--project"]:
-            return subprocess.CompletedProcess(cmd, installer(root))
-        return subprocess.CompletedProcess(cmd, fmt_rc)
-
-    monkeypatch.setattr(skill_refresh.subprocess, "run", fake_run)
-    return seen
-
-
-def _regressing_installer(root: Path) -> int:
-    """Reproduce #133's three regressions exactly, then stamp the new version.
-
-    Edited through the PARSED payload, not the raw text: the first version of
-    this fixture did a `str.replace` for `-C "${CLAUDE_PROJECT_DIR:-.}"`, which
-    never matched because the quotes are backslash-escaped inside JSON — so the
-    absolute-path regression silently did not happen and only two of the three
-    were actually exercised. Caught by the arm that asserts the offending bytes
-    appear in the printed diff (`prove-the-mutation-hit-the-line`).
-    """
-    hook = json.loads((root / SETTINGS).read_text(encoding="utf-8"))
-    entry = hook["hooks"]["PreToolUse"][0]["hooks"][0]
-    entry["command"] = entry["command"].replace(
-        'mise exec -C "${CLAUDE_PROJECT_DIR:-.}" -- graphify',
-        "/Users/x/.local/share/mise/installs/pipx-graphifyy/0.9.34/bin/graphify",
-    )
-    del entry["timeout"]
-    (root / SETTINGS).write_text(json.dumps(hook, indent=2), encoding="utf-8")  # no newline
-    (root / skill_refresh.STAMP).write_text("0.9.34", encoding="utf-8")
-    return 0
-
-
-def test_the_installers_settings_regression_is_reverted(tmp_path, monkeypatch) -> None:
-    """All three #133 regressions are undone, and the file is byte-identical.
-
-    Byte equality rather than three field assertions: the newline strip is one
-    of the three, and a field-wise check cannot see it.
-    """
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, _regressing_installer)
-
-    assert skill_refresh.refresh(root) == 0
-    assert (root / SETTINGS).read_text(encoding="utf-8") == _GOOD_SETTINGS
-
-
-def test_the_reverted_change_is_printed_not_swallowed(tmp_path, monkeypatch, capsys) -> None:
-    """A discarded installer change must leave a trace a human can read.
-
-    This is the arm that keeps the wrapper from becoming a second way to go
-    stale: a future graphify that legitimately adds a hook would otherwise have
-    it reverted with no trace at all.
-    """
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, _regressing_installer)
-    skill_refresh.refresh(root)
-
-    out = capsys.readouterr().out
-    assert "reverted the installer's rewrite" in out
-    # The diff must carry the actual offending bytes, not just say "it changed".
-    assert "pipx-graphifyy/0.9.34/bin/graphify" in out
-    assert "timeout" in out
-
-
-def test_an_untouched_file_reports_nothing(tmp_path, monkeypatch, capsys) -> None:
-    """CONTROL ARM: silence when the installer changed nothing.
-
-    Without this, a `refresh()` that printed "reverted" unconditionally would
-    pass every arm above while telling the operator a lie on every clean run.
-    """
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, lambda _r: 0)
-
-    assert skill_refresh.refresh(root) == 0
-    out = capsys.readouterr().out
-    assert "reverted" not in out
-    assert "CREATED" not in out
-    assert "DELETED" not in out
-
-
-def test_a_file_the_installer_creates_is_kept(tmp_path, monkeypatch, capsys) -> None:
-    """An absent protected file that the installer writes is a new artifact.
-
-    `None` and `""` are kept distinct in `_read` for exactly this: reverting a
-    creation would silently defeat a first-time `graphify install --project`.
-    """
-    root = _repo(tmp_path)
-    (root / CLAUDE_MD).unlink()
-
-    def creates(r: Path) -> int:
-        (r / CLAUDE_MD).write_text("# graphify\n", encoding="utf-8")
-        return 0
-
-    _wire(monkeypatch, root, creates)
-
-    assert skill_refresh.refresh(root) == 0
-    assert (root / CLAUDE_MD).read_text(encoding="utf-8") == "# graphify\n"
-    assert "CREATED by the installer" in capsys.readouterr().out
-
-
-def test_a_file_the_installer_deletes_is_restored(tmp_path, monkeypatch, capsys) -> None:
-    """Deletion is a rewrite to nothing and must be undone like any other."""
-    root = _repo(tmp_path)
-
-    def deletes(r: Path) -> int:
-        (r / SETTINGS).unlink()
-        return 0
-
-    _wire(monkeypatch, root, deletes)
-
-    assert skill_refresh.refresh(root) == 0
-    assert (root / SETTINGS).read_text(encoding="utf-8") == _GOOD_SETTINGS
-    assert "DELETED by the installer" in capsys.readouterr().out
-
-
-def test_a_failed_installer_restores_nothing_and_propagates_its_rc(
-    tmp_path, monkeypatch, capsys
+def _wire(
+    monkeypatch: pytest.MonkeyPatch,
+    result: skill.SkillResult,
+    *,
+    specs: tuple[ToolSpec, ...] = (_SPEC,),
+    fmt_rc: int = 0,
 ) -> None:
-    """A failed install leaves the tree alone and returns the installer's rc.
+    """Point the entry point at a canned refresh result and a canned `fmt`."""
+    monkeypatch.setattr(graphify_env, "assert_pinned_graphify", lambda _r=None: None)
+    monkeypatch.setattr(config, "load", lambda _r: specs)
+    monkeypatch.setattr(skill, "refresh", lambda _r, _s: result)
+    monkeypatch.setattr(
+        skill_refresh.subprocess,
+        "run",
+        lambda *_a, **_k: subprocess.CompletedProcess(["mise"], fmt_rc),
+    )
 
-    Restoring after a failure would be worse than useless: it would overwrite
-    whatever partial state the operator needs to diagnose, and a synthesized rc
-    would hide which step failed.
+
+def test_a_clean_refresh_exits_zero(tmp_path, monkeypatch) -> None:
+    """CONTROL ARM for every non-zero arm below."""
+    _wire(monkeypatch, skill.SkillResult(ran=True, note="ok"))
+    assert skill_refresh.refresh(tmp_path) == 0
+
+
+def test_a_stale_binary_is_refused_before_anything_runs(tmp_path, monkeypatch) -> None:
+    """The gate this entry point exists to add.
+
+    Generating the skill from a stale binary produces the exact drift a refresh
+    removes, while LOOKING like a refresh — live on this host, where the skill
+    sat at 0.9.32 under a 0.9.34 pin. Proven with a tripwire on the refresh:
+    reaching it would fail with a different message than the gate's.
     """
-    root = _repo(tmp_path)
-
-    def fails(r: Path) -> int:
-        (r / SETTINGS).write_text("half written", encoding="utf-8")
-        return 3
-
-    _wire(monkeypatch, root, fails)
-
-    assert skill_refresh.refresh(root) == 3
-    assert (root / SETTINGS).read_text(encoding="utf-8") == "half written"
-    assert "nothing restored" in capsys.readouterr().out
-
-
-def test_a_failed_fmt_propagates_its_own_rc(tmp_path, monkeypatch) -> None:
-    """`fmt` failing is reported as `fmt` failing, after the restores ran."""
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, _regressing_installer, fmt_rc=7)
-
-    assert skill_refresh.refresh(root) == 7
-    # The restore still happened — the formatter runs last, on purpose.
-    assert (root / SETTINGS).read_text(encoding="utf-8") == _GOOD_SETTINGS
-
-
-def test_a_stale_binary_is_refused_before_the_installer_runs(tmp_path, monkeypatch) -> None:
-    """The version gate fires FIRST — generating from a stale graphify IS the drift.
-
-    Proven with a tripwire on the installer: reaching it would fail with a
-    different message than the gate's.
-    """
-    root = _repo(tmp_path)
 
     def gate(_r=None) -> None:
         raise SystemExit("pinned gate fired")
 
     monkeypatch.setattr(graphify_env, "assert_pinned_graphify", gate)
     monkeypatch.setattr(
-        skill_refresh.subprocess,
-        "run",
-        lambda *_a, **_k: pytest.fail("the installer ran despite a stale binary"),
+        skill, "refresh", lambda *_a: pytest.fail("the refresh ran despite a stale binary")
     )
 
     with pytest.raises(SystemExit, match="pinned gate fired"):
-        skill_refresh.refresh(root)
+        skill_refresh.refresh(tmp_path)
 
 
-def test_every_hand_owned_file_the_installer_writes_is_protected() -> None:
-    """The protected set is the contract.
+def test_the_gate_is_absent_from_the_shared_module() -> None:
+    """It must stay OUT of `currency.skill`, and the reason is the other caller.
 
-    Neither `CLAUDE.md` is in #133's list, and both are here deliberately: the
-    installer writes a graphify block into each — its own output says
-    *"graphify section written to <repo>/CLAUDE.md"* — and both are
-    hand-authored and sit at their `md_size_budget`, so an installer append
-    breaks a gate rather than merely churning bytes.
+    `currency.apply` writes the NEW pin and then calls that module, so the
+    resolved binary legitimately disagrees at that moment and a gate there would
+    refuse every bump it exists to serve. Asserted rather than commented: "we
+    chose not to put it there" is invisible to a later reader, who sees only
+    that one path has a gate and the other does not, and reasonably adds it.
     """
-    assert skill_refresh.PROTECTED == (
-        ".claude/settings.json",
-        ".claude/CLAUDE.md",
-        "CLAUDE.md",
+    src = Path(skill.__file__).read_text(encoding="utf-8")
+    assert "assert_pinned_graphify" not in src
+
+
+def test_a_missing_tool_table_is_a_malformed_request(tmp_path, monkeypatch) -> None:
+    """Rc 2, not 1: nothing failed — the request could not be formed.
+
+    The same split `kb-skill-score` and `currency.run` draw for an unknown
+    `--tool`, because a silent 0 hides a typo in `currency.toml`.
+    """
+    _wire(monkeypatch, skill.SkillResult(ran=True), specs=())
+    assert skill_refresh.refresh(tmp_path) == 2
+
+
+def test_a_refresh_that_did_not_run_exits_nonzero(tmp_path, monkeypatch) -> None:
+    """`ran=False` covers a refusal AND an installer failure — both fail here.
+
+    `currency.apply` deliberately absorbs those into a note so an otherwise
+    authorized pin move still lands. A standalone refresh has nothing else to
+    land, so it reports.
+    """
+    _wire(monkeypatch, skill.SkillResult(ran=False, note="refusing: dirty"))
+    assert skill_refresh.refresh(tmp_path) == 1
+
+
+def test_a_failed_fmt_propagates_its_own_rc(tmp_path, monkeypatch) -> None:
+    """Its own rc, not a synthesized one, so a reader knows which step failed."""
+    _wire(monkeypatch, skill.SkillResult(ran=True), fmt_rc=7)
+    assert skill_refresh.refresh(tmp_path) == 7
+
+
+def test_a_lost_addendum_fails_an_otherwise_successful_refresh(tmp_path, monkeypatch) -> None:
+    """THE ARM THAT MATTERS: install fine, note lost, and it must NOT exit 0.
+
+    This is the exact shape of the 2026-08-06 defect — the refresh succeeded,
+    PR #190's paragraph was gone, and the run reported success, so the diff read
+    as a routine regeneration and nothing flagged it.
+    """
+    _wire(
+        monkeypatch,
+        skill.SkillResult(ran=True, lost_addenda=("references/query.md (anchor moved)",)),
     )
-
-
-# --------------------------------------------------------------------------
-# ADDENDA. Every arm below failed on this task's own FIRST LIVE RUN, which
-# destroyed PR #190's hand-added paragraph in `references/query.md` and
-# reported success.
-# --------------------------------------------------------------------------
-
-_ADDENDUM = skill_refresh.Addendum(
-    path="generated/note.md",
-    anchor="## Section\n",
-    text="\nlocal note that upstream does not carry.\n",
-)
-
-
-def _generated(root: Path, body: str) -> Path:
-    """A generated file at the addendum's path, carrying ``body``."""
-    path = root / _ADDENDUM.path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(body, encoding="utf-8")
-    return path
-
-
-def test_an_addendum_wiped_by_the_installer_is_re_applied(tmp_path, monkeypatch, capsys) -> None:
-    """The regression this mechanism exists for: a wiped local note comes back."""
-    root = _repo(tmp_path)
-
-    def wipes(r: Path) -> int:
-        _generated(r, "intro\n\n## Section\n\nupstream text\n")
-        return 0
-
-    _wire(monkeypatch, root, wipes)
-    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
-
-    assert skill_refresh.refresh(root) == 0
-    assert _ADDENDUM.text in (root / _ADDENDUM.path).read_text(encoding="utf-8")
-    assert "re-applied this repo's local addendum" in capsys.readouterr().out
-
-
-def test_re_applying_an_addendum_twice_does_not_duplicate_it(tmp_path, monkeypatch) -> None:
-    """Idempotence. A refresh run twice must not stack the paragraph."""
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, lambda r: _generated(r, "## Section\n\nupstream\n") and 0)
-    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
-
-    skill_refresh.refresh(root)
-    skill_refresh.refresh(root)
-
-    body = (root / _ADDENDUM.path).read_text(encoding="utf-8")
-    assert body.count(_ADDENDUM.text) == 1
-
-
-def test_a_missing_anchor_fails_rather_than_dropping_the_note(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    """An anchor upstream moved must stop the run, not vanish quietly.
-
-    This is the whole point. The refresh otherwise succeeds, so returning 0
-    would send the operator to commit a diff that silently dropped a local fix
-    — which is exactly what the first live run did.
-    """
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, lambda r: _generated(r, "upstream renamed the heading\n") and 0)
-    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
-
-    assert skill_refresh.refresh(root) == 1
-    out = capsys.readouterr().out
-    assert "ADDENDUM LOST" in out
-    assert _ADDENDUM.path in out
-
-
-def test_a_missing_addendum_file_also_fails(tmp_path, monkeypatch, capsys) -> None:
-    """A file upstream deleted is a lost note too — a distinct message.
-
-    Kept distinct from the anchor case because the remedies differ: one is
-    re-anchoring, the other is that the reference page is gone entirely.
-    """
-    root = _repo(tmp_path)
-    _wire(monkeypatch, root, lambda _r: 0)
-    monkeypatch.setattr(skill_refresh, "ADDENDA", (_ADDENDUM,))
-
-    assert skill_refresh.refresh(root) == 1
-    assert "does not exist after install" in capsys.readouterr().out
-
-
-def test_the_live_addendum_matches_what_the_shipped_skill_carries() -> None:
-    """The real `ADDENDA` entry must be applied in the tree that ships.
-
-    Without this, `ADDENDA` could hold a note whose anchor never existed and
-    every unit arm above — which uses a synthetic addendum — would still pass.
-    """
-    root = Path(__file__).resolve().parents[1]
-    for add in skill_refresh.ADDENDA:
-        body = (root / add.path).read_text(encoding="utf-8")
-        assert add.anchor in body, f"{add.path}: anchor missing from the shipped file"
-        assert add.text in body, f"{add.path}: addendum not applied in the shipped file"
-
-
-def test_the_installers_backup_is_removed_only_when_this_run_made_it(tmp_path, monkeypatch) -> None:
-    """A `.graphify-bak` this run created is debris; one that predates it is not.
-
-    Both directions in one arm, because the discriminator IS the pre-existence
-    check — a version that always deleted would pass a one-sided test.
-    """
-    root = _repo(tmp_path)
-    preexisting = root / f"{CLAUDE_MD}.graphify-bak"
-    preexisting.write_text("someone else's backup\n", encoding="utf-8")
-
-    def backs_up(r: Path) -> int:
-        (r / f"{SETTINGS}.graphify-bak").write_text(_GOOD_SETTINGS, encoding="utf-8")
-        (r / SETTINGS).write_text("{}", encoding="utf-8")
-        return 0
-
-    _wire(monkeypatch, root, backs_up)
-
-    assert skill_refresh.refresh(root) == 0
-    assert not (root / f"{SETTINGS}.graphify-bak").exists()
-    assert preexisting.read_text(encoding="utf-8") == "someone else's backup\n"
+    assert skill_refresh.refresh(tmp_path) == 1

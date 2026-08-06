@@ -142,7 +142,7 @@ upstream; that error is the whole reason this file exists.
   0.9.34's direction-respecting `path`, and the first `kb-skill-refresh` run
   destroyed it silently — the installer rewrites the whole tree, so the `git
   diff` read as a routine regeneration. Local additions now live in
-  `kb_setup.skill_refresh.ADDENDA`, are re-applied after every install, and
+  `kb_setup.currency.skill.ADDENDA`, are re-applied after every install, and
   **fail the run loudly** when their anchor is gone. Do not hand-edit this tree;
   add an addendum, or the next refresh eats it.
 

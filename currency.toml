@@ -513,7 +513,7 @@ RE-PROBED 2026-08-05 for v2026.8.2: still **0** occurrences, control `[env]` ->
 # `expected` (self-managed, like mise) rather than `mise_key`: pinning the
 # harness that runs the session is not a thing this repo can or should do. Bump
 # it after reviewing the release notes — that act IS the gap analysis.
-expected = "2.1.222"
+expected = "2.1.223"
 binary = "claude"
 github = "anthropics/claude-code"
 # `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
@@ -654,6 +654,39 @@ non-interactive mode … if no hook returns a decision, it denies the tool call"
 (hooks.md:1744). The 8-consecutive-blocks Stop cap: still exactly 1 occurrence
 against a bogus term at 0, so the standing disagreement stands. Still no
 `PermissionRequest` hook here; nothing changes."""
+[[tool.claude-code.watch]]
+kind = "local"
+ref = "2-1-223-review"
+note = """REVIEWED 2026-08-06, which is why `expected` moved 2.1.222 -> 2.1.223.
+The field's own rule is that the review IS the gap analysis, so this records what
+the review found rather than only that it happened.
+
+Read from the 2.1.223 entry in this repo's own pinned mirror
+(`sources/agent-harness-docs/docs/claude-code/changelog.md`, advanced to
+`75886c4142` in the same change) rather than from a fetch — the corpus is the
+source, which is the whole point of the mirror.
+
+THREE ITEMS TOUCH THIS REPO, none requiring a change:
+
+1. Two Bash permission-bypass fixes — "a crafted command could hide parts of
+   itself from permission checks" and commands "padded with tabs or invisible
+   Unicode". Same CLASS as `kb_setup.hook_guard`, which parses Bash to redirect
+   raw `graphify` calls. NOT a defect for us: that guard is documented as a
+   redirect, not a sandbox (`$(...)`, `sh -c`, `eval` and aliases pass by
+   design), so hiding bytes from it buys an evader nothing they could not get
+   by typing `sh -c`. Recorded because the next reader will meet these two
+   lines and reasonably wonder.
+2. "Fixed workflow scripts being able to use dynamic `import()` to run code
+   outside the workflow sandbox" — this repo runs `.claude/workflows/kb-extract.js`,
+   which uses no dynamic import. Fix inherited, nothing to do.
+3. `/review` became an alias of `/code-review`. Does not touch `kb-review`,
+   which is this repo's own skill and gate.
+
+NOT applicable: the `strictKnownMarketplaces` owner-wildcard entries (managed
+settings, which this repo does not write — `do-not.md` #11), and the
+`CLAUDE_CODE_DISABLE_1M_CONTEXT` widening (a session-model behaviour, not config
+here)."""
+
 
 # ---------------------------------------------------------------------------
 # hk — the git-hook gate this repo's `mise run lint` IS (#87)

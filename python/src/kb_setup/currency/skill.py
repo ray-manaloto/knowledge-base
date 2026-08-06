@@ -34,15 +34,38 @@ But it **regresses `.claude/settings.json`** three ways, every time:
 So the refresh is installer + repair, and the repair is not optional. Doing it by
 hand is how those three land in a commit unnoticed (#133).
 
+## The generated tree is not purely generated (`ADDENDA`)
+
+The installer rewrites its whole tree, so anything this repo hand-added to it is
+destroyed on every refresh — silently, because the `git diff` reads as a routine
+regeneration. That is not hypothetical: PR #190 hand-added a paragraph to
+`.claude/skills/graphify/references/query.md` recording that 0.9.34's `path`
+became direction-respecting (the fix for a cold-lane P2, and something upstream's
+own skill still does not carry), and a refresh ate it on 2026-08-06.
+
+`ADDENDA` re-applies each local addition after the installer runs, matched on a
+literal ANCHOR rather than a line number — upstream reflows this tree freely, and
+a line number would silently target the wrong place, which is worse than not
+applying at all. A missing anchor is REPORTED as a lost addendum rather than
+skipped: it means upstream moved the section the note annotates, which is exactly
+when a human must look.
+
 ## What it deliberately does NOT do
 
 It does not decide whether a refresh is warranted — the caller does, on the
-version having moved. And it does not touch `.graphify_version`; the installer
-writes that itself, and the file is gitignored here, so it is a local marker
-rather than a tracked fact. Treat a stamp lag as a prompt to look, never as
-evidence of content drift: at 0.9.31 -> 0.9.32 the stamp lagged while every
-shipped `references/*.md` was byte-identical and `install.py` had zero changed
-lines.
+version having moved. It does not touch `.graphify_version` either; the installer
+writes that itself. Treat a stamp lag as a prompt to look, never as evidence of
+content drift: at 0.9.31 -> 0.9.32 the stamp lagged while every shipped
+`references/*.md` was byte-identical and `install.py` had zero changed lines.
+(That stamp is TRACKED here since 2026-08-06 — the skill files it stamps are
+committed, so it is the only record of which version generated them.)
+
+And it does **not** gate on the running binary matching the pin, though the
+standalone `kb-setup skill-refresh` task does. The difference is the caller:
+`currency.apply` writes the NEW pin and then calls this, so at that moment the
+resolved binary legitimately disagrees with the pin and a gate here would refuse
+every bump it exists to serve. A deliberate refresh has no such excuse, so the
+gate lives at that entry point instead.
 """
 
 from __future__ import annotations
@@ -71,12 +94,60 @@ _TIMEOUT = 300
 
 
 @dataclass(frozen=True)
+class Addendum:
+    """One local paragraph re-applied to a generated skill file after install.
+
+    `text` is inserted directly after the first literal occurrence of `anchor`.
+    Both are matched literally, and `path` is repo-relative.
+    """
+
+    path: str
+    anchor: str
+    text: str
+
+
+#: Local additions to a generated skill tree, keyed by the tool's `skill_dir` so
+#: this module stays generic over `ToolSpec` — a second tool with a project skill
+#: adds its own key and needs no code change.
+#:
+#: Keep each list short. Every entry is a piece of upstream's file this repo has
+#: taken responsibility for, and an entry upstream later adopts should be DELETED
+#: rather than left in place: `_apply_addenda` is idempotent so it would not
+#: double the text, but a dead entry still fails the day its anchor moves.
+ADDENDA: dict[str, tuple[Addendum, ...]] = {
+    ".claude/skills/graphify": (
+        Addendum(
+            path=".claude/skills/graphify/references/query.md",
+            anchor='graphify path "NODE_A" "NODE_B"\n```\n',
+            text=(
+                "\nSince graphify 0.9.34 (#2487), `path` respects edge DIRECTION by default and\n"
+                "says so when no directed path exists — pass `--undirected` to search ignoring\n"
+                "direction. Before 0.9.34 it always searched an undirected view and could\n"
+                "silently return a path that traverses edges backwards, so the same query can\n"
+                "legitimately answer differently across that version boundary. The inline\n"
+                "fallback below inherits whatever the file's own `directed` flag yields from\n"
+                "`node_link_graph`, which is not necessarily the CLI's behaviour on the same\n"
+                "graph — prefer the CLI when it is installed.\n"
+            ),
+        ),
+    ),
+}
+
+
+@dataclass(frozen=True)
 class SkillResult:
     """What the refresh did — reported, never silently absorbed."""
 
     ran: bool
     changed: tuple[str, ...] = ()
     repaired: tuple[str, ...] = ()
+    #: Local addenda re-applied into the regenerated tree.
+    addenda: tuple[str, ...] = ()
+    #: Addenda that could NOT be re-applied — the file or its anchor is gone, so
+    #: this repo's local note is missing from the tree right now. Kept separate
+    #: from `unrepaired` because the remedy differs: that one is a `git checkout`
+    #: away, this one needs someone to re-anchor or retire the note.
+    lost_addenda: tuple[str, ...] = ()
     #: Paths the installer dirtied that are STILL dirty after the repair ran.
     #: Non-empty means damage is sitting in the working tree right now, and the
     #: only honest thing to do is name the files — a caller who commits after
@@ -153,6 +224,31 @@ def _clear_backups(repo_root: Path, skill_dir: Path) -> None:
                 bak.unlink(missing_ok=True)
 
 
+def _apply_addenda(repo_root: Path, skill_dir: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Re-apply this repo's local notes into the regenerated tree.
+
+    Returns `(applied, lost)`. Idempotent — an addendum already present is left
+    alone, so refreshing twice does not stack the paragraph.
+    """
+    applied: list[str] = []
+    lost: list[str] = []
+    for add in ADDENDA.get(skill_dir, ()):
+        path = repo_root / add.path
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            lost.append(f"{add.path} (file absent after install)")
+            continue
+        if add.text in text:
+            continue
+        if add.anchor not in text:
+            lost.append(f"{add.path} (anchor moved — re-anchor it in currency.skill.ADDENDA)")
+            continue
+        path.write_text(text.replace(add.anchor, add.anchor + add.text, 1), encoding="utf-8")
+        applied.append(add.path)
+    return tuple(applied), tuple(lost)
+
+
 def _dirty(repo_root: Path, paths: tuple[str, ...]) -> tuple[str, ...]:
     out = _git(repo_root, "status", "--porcelain", "--", *paths)
     return tuple(sorted({line[3:] for line in out.stdout.splitlines() if line[3:]}))
@@ -221,6 +317,10 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
 
     repaired, unrepaired = _repair(repo_root)
     _clear_backups(repo_root, skill)
+    # AFTER the repair and BEFORE reading `changed`: the addenda are edits to the
+    # skill tree, which `_repair` never touches, and they must show up in the
+    # changed set or a caller reading it would not know the tree moved.
+    applied, lost = _apply_addenda(repo_root, spec.skill_dir)
 
     changed = _dirty(repo_root, (spec.skill_dir,))
     return SkillResult(
@@ -232,8 +332,17 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         changed=changed,
         repaired=repaired,
         unrepaired=unrepaired,
+        addenda=applied,
+        lost_addenda=lost,
         note=(
             f"skill refreshed; {len(changed)} file(s) changed"
+            + (f"; re-applied local addenda to {', '.join(applied)}" if applied else "")
+            + (
+                f". ⚠ LOCAL ADDENDUM LOST: {', '.join(lost)} — this repo's note is NOT in "
+                f"the tree; the installer wiped it and it could not be put back"
+                if lost
+                else ""
+            )
             + (
                 f"; repaired {', '.join(repaired)} after the installer rewrote it"
                 if repaired

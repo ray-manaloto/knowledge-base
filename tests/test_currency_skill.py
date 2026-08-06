@@ -8,6 +8,7 @@ is about what it must REFUSE to do.
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 from kb_setup.currency import skill
@@ -229,3 +230,117 @@ def test_backups_beside_a_root_repair_path_are_cleared(tmp_path) -> None:
 
     assert not (repo / "CLAUDE.md.graphify-bak").exists()
     assert not (repo / ".claude" / "settings.json.graphify-bak").exists()
+
+
+# --------------------------------------------------------------------------
+# ADDENDA — every arm below failed on 2026-08-06, when a refresh destroyed PR
+# #190's hand-added paragraph in `references/query.md` and reported success.
+# --------------------------------------------------------------------------
+
+_ADDENDUM = skill.Addendum(
+    path=".claude/skills/graphify/references/query.md",
+    anchor="## Section\n",
+    text="\nlocal note that upstream does not carry.\n",
+)
+
+
+def _wipes(body: str) -> tuple[str, ...]:
+    """An installer argv that REGENERATES the addendum's file with ``body``.
+
+    A real process writing real bytes, like `_installer` above — the point is
+    that the addendum has to survive a genuine rewrite of the whole file, not a
+    monkeypatched stand-in for one.
+    """
+    return (
+        sys.executable,
+        "-c",
+        "import pathlib;"
+        f"p = pathlib.Path({_ADDENDUM.path!r});"
+        "p.parent.mkdir(parents=True, exist_ok=True);"
+        f"p.write_text({body!r}, encoding='utf-8')",
+    )
+
+
+def test_an_addendum_wiped_by_the_installer_is_re_applied(tmp_path, monkeypatch) -> None:
+    """The regression this exists for: a wiped local note comes back."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(skill, "ADDENDA", {".claude/skills/graphify": (_ADDENDUM,)})
+
+    result = skill.refresh(repo, _spec(skill_install=_wipes("intro\n\n## Section\n\nupstream\n")))
+
+    assert result.ran is True
+    assert result.lost_addenda == ()
+    assert _ADDENDUM.path in result.addenda
+    assert _ADDENDUM.text in (repo / _ADDENDUM.path).read_text(encoding="utf-8")
+
+
+def test_re_applying_an_addendum_twice_does_not_duplicate_it(tmp_path, monkeypatch) -> None:
+    """Idempotence — two refreshes must not stack the paragraph."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(skill, "ADDENDA", {".claude/skills/graphify": (_ADDENDUM,)})
+    spec = _spec(skill_install=_wipes("## Section\n\nupstream\n"))
+
+    skill.refresh(repo, spec)
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, timeout=30)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "r1"], check=True, timeout=30)
+    skill.refresh(repo, spec)
+
+    body = (repo / _ADDENDUM.path).read_text(encoding="utf-8")
+    assert body.count(_ADDENDUM.text) == 1
+
+
+def test_a_moved_anchor_is_reported_lost_rather_than_dropped(tmp_path, monkeypatch) -> None:
+    """An anchor upstream moved must be NAMED, not silently skipped.
+
+    Silence is what the destroying run did. The note has to say the tree is
+    missing something, or the reviewer sees a routine regeneration diff.
+    """
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(skill, "ADDENDA", {".claude/skills/graphify": (_ADDENDUM,)})
+
+    result = skill.refresh(repo, _spec(skill_install=_wipes("upstream renamed the heading\n")))
+
+    assert result.ran is True
+    assert result.addenda == ()
+    assert len(result.lost_addenda) == 1
+    assert "anchor moved" in result.lost_addenda[0]
+    assert "LOCAL ADDENDUM LOST" in result.note
+
+
+def test_a_missing_addendum_file_is_reported_distinctly(tmp_path, monkeypatch) -> None:
+    """A file upstream deleted is a lost note too, with a different remedy."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(skill, "ADDENDA", {".claude/skills/graphify": (_ADDENDUM,)})
+
+    result = skill.refresh(repo, _spec())  # `true` — writes nothing at all
+
+    assert len(result.lost_addenda) == 1
+    assert "file absent" in result.lost_addenda[0]
+
+
+def test_a_tool_with_no_addenda_reports_none(tmp_path) -> None:
+    """CONTROL ARM: silence when nothing is configured for this skill_dir.
+
+    Without it, a version that reported a lost addendum unconditionally would
+    pass every arm above while crying wolf on every other tool.
+    """
+    result = skill.refresh(_repo(tmp_path), _spec(skill_dir=".claude/skills/other"))
+
+    assert result.lost_addenda == ()
+    assert result.addenda == ()
+
+
+def test_the_live_addenda_are_applied_in_the_shipped_tree() -> None:
+    """The REAL entries must match the tree that ships.
+
+    Every arm above uses a synthetic addendum, so an `ADDENDA` entry whose
+    anchor never existed in the real file would pass all of them.
+    """
+    root = Path(__file__).resolve().parents[1]
+    for skill_dir, entries in skill.ADDENDA.items():
+        if not (root / skill_dir).is_dir():
+            continue
+        for add in entries:
+            body = (root / add.path).read_text(encoding="utf-8")
+            assert add.anchor in body, f"{add.path}: anchor missing from the shipped file"
+            assert add.text in body, f"{add.path}: addendum not applied in the shipped file"
