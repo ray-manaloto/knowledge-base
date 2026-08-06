@@ -123,6 +123,15 @@ def _skill_warnings(result: skill.SkillResult) -> list[str]:
     branch" is a named function, not a suppression (`do-not.md` #9).
     """
     warnings: list[str] = []
+    # The reverted BYTES, not just the filenames — and here as much as at the
+    # standalone entry point. `currency.apply` is the caller a human reads before
+    # committing an auto-applied bump, so dropping the delta here is precisely
+    # the "discarded without trace" case the capture exists to prevent, on the
+    # path that gets less scrutiny (cold lane round 2 on ea6ab63).
+    if result.repair_delta:
+        warnings.append(
+            "the installer's changes were reverted; it wanted:\n" + result.repair_delta.rstrip()
+        )
     if result.lost_addenda:
         warnings.append(
             f"⚠ local addendum lost: {', '.join(result.lost_addenda)} — a note this repo "

@@ -446,7 +446,90 @@ def test_the_version_stamp_gets_its_trailing_newline(tmp_path) -> None:
         "printf '0.9.34' > .claude/skills/graphify/.graphify_version"  # no \n, as install.py does
     )
 
-    # CONTROL ARM: the installer really did write it without one.
+    # CONTROL ARM, and it is an ASSERTION rather than a comment claiming one:
+    # run the same installer argv directly and confirm the raw output really
+    # lacks the newline. Without this the test passes against a fixture that
+    # already wrote one, proving nothing about `_normalise_stamp` (cold lane
+    # round 2 on ea6ab63, P3).
+    subprocess.run(write_stamp, cwd=repo, check=True, timeout=30)
+    assert stamp.read_text(encoding="utf-8") == "0.9.34"
+
     skill.refresh(repo, _spec(skill_install=write_stamp))
 
     assert stamp.read_text(encoding="utf-8") == "0.9.34\n"
+
+
+def test_the_graphify_addenda_registration_is_pinned() -> None:
+    """The REGISTRATION is the contract, not just "each registered one applies".
+
+    `test_the_live_addenda_are_applied_in_the_shipped_tree` checks that every
+    CONFIGURED addendum is present in the tree — so deleting an entry deletes
+    its own check, and the next skill refresh silently erases the note from the
+    shipped file. Mutation-confirmed by the cold lane on ea6ab63: removing the
+    23-line Step 5 entry passed the full suite.
+
+    Same shape as `test_the_writer_set_names_every_graph_writer` — membership
+    pinned, so removing one is a deliberate edit here rather than a silent loss.
+    """
+    entries = {a.path: a for a in skill.ADDENDA[".claude/skills/graphify"]}
+
+    assert set(entries) == {
+        ".claude/skills/graphify/references/query.md",
+        ".claude/skills/graphify/SKILL.md",
+    }
+    # Each is pinned by the CLAIM it carries, not merely by existing: an entry
+    # rewritten to say something else is the same silent loss with extra steps.
+    assert "--undirected" in entries[".claude/skills/graphify/references/query.md"].text
+    assert "mise run kb-label" in entries[".claude/skills/graphify/SKILL.md"].text
+    assert "Step 5" in entries[".claude/skills/graphify/SKILL.md"].anchor
+
+
+def test_a_failing_installer_still_normalises_the_stamp(tmp_path) -> None:
+    """An installer that writes the stamp and fails LATER still lands the pin.
+
+    `currency.apply` commits what it gets, so a newline-less tracked stamp then
+    fails hk's `newlines` for a reason nobody would connect to a FAILED install
+    (cold lane round 2 on ea6ab63).
+    """
+    repo = _repo(tmp_path)
+    stamp = repo / ".claude" / "skills" / "graphify" / ".graphify_version"
+    write_then_fail = (
+        sys.executable,
+        "-c",
+        "import pathlib, sys;"
+        "pathlib.Path('.claude/skills/graphify/.graphify_version')"
+        ".write_text('0.9.34', encoding='utf-8');"
+        "sys.exit(4)",
+    )
+
+    result = skill.refresh(repo, _spec(skill_install=write_then_fail))
+
+    assert result.ran is False
+    assert stamp.read_text(encoding="utf-8") == "0.9.34\n"
+
+
+def test_a_failed_delta_capture_says_so_rather_than_reading_as_empty(tmp_path, monkeypatch) -> None:
+    """A `git diff` that FAILED must not be indistinguishable from "no changes".
+
+    `_git` runs with `check=False`, and the checkout on the very next line
+    destroys the only copy of what the diff would have shown — so an unread rc
+    turns a capture failure into a silent, permanent loss (cold lane round 2 on
+    ea6ab63).
+    """
+    repo = _repo(tmp_path)
+    real = skill._git
+
+    def failing_diff(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "diff":
+            return subprocess.CompletedProcess(["git"], 128, stdout="", stderr="fatal: nope")
+        return real(root, *args)
+
+    monkeypatch.setattr(skill, "_git", failing_diff)
+    damage = _installer('printf \'{"hooks": "DAMAGE"}\\n\' > .claude/settings.json')
+
+    result = skill.refresh(repo, _spec(skill_install=damage))
+
+    assert "COULD NOT CAPTURE" in result.repair_delta
+    assert "128" in result.repair_delta
+    # The revert itself still happened — only its diff is unavailable.
+    assert "ORIGINAL" in (repo / ".claude" / "settings.json").read_text(encoding="utf-8")

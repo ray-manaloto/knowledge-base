@@ -247,7 +247,22 @@ def _repair(repo_root: Path) -> tuple[tuple[str, ...], tuple[str, ...], str]:
     dirty = _dirty(repo_root, _REPAIR)
     if not dirty:
         return (), (), ""
-    delta = _git(repo_root, "diff", "--", *dirty).stdout
+    # The capture's rc is READ. `_git` runs with `check=False`, so a failed
+    # `git diff` returns an empty stdout that is indistinguishable from "nothing
+    # to show" — and the checkout on the next line then destroys the only copy
+    # of what it would have shown. Reporting the failure keeps the two states
+    # apart, which is this repo's DRIFT/SKIP/OK discipline applied to a delta
+    # (cold lane round 2 on ea6ab63).
+    shown = _git(repo_root, "diff", "--", *dirty)
+    delta = (
+        shown.stdout
+        if shown.returncode == 0
+        else (
+            f"[skill] COULD NOT CAPTURE the reverted delta (git diff rc="
+            f"{shown.returncode}): {(shown.stderr or '').strip()[:200]}\n"
+            f"[skill] the revert below still happened; only its diff is unavailable.\n"
+        )
+    )
     _git(repo_root, "checkout", "--", *dirty)
     still = _dirty(repo_root, _REPAIR)
     for path in still:
@@ -383,6 +398,12 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         # only "installer failed" left that sitting in the working tree, unnamed,
         # for whoever commits the bump next.
         reverted, still, delta = _repair(repo_root)
+        # AND THE STAMP, for the third time on this path. An installer that
+        # writes the stamp and then fails later leaves a tracked, newline-less
+        # file behind while `currency.apply` still lands the pin — so the bump
+        # commit fails hk's `newlines` for a reason nobody would connect to a
+        # FAILED install (cold lane round 2 on ea6ab63).
+        _normalise_stamp(repo_root, spec.skill_dir)
         # ADDENDA ON THE FAILURE PATH TOO, and for the same reason as the repair
         # above. A half-finished installer regenerates the skill tree and THEN
         # exits nonzero, so the local paragraph is already gone — and running
