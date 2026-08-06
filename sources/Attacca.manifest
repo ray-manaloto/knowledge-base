@@ -1,0 +1,12 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Densest skill/agent collection of the six: plugins/*/skills/** (26 SKILL.md) + 3 agent files (critic, researcher, security-auditor) + 5 hooks. Default branch is master, and it is a GitHub TEMPLATE repo. scope=study.
+url = https://github.com/adihebbalae/Attacca
+ref = master
+commit = 34a52ce09db146035ca56db160388034de629693
+kind = code
+# scope = study: an object of study (peer orchestration/memory tooling), not corpus
+# content we answer questions from. `scope` exists because pinned peer tools took
+# graph.json past its size cap; these five route to graphify-out/study-graph.json.
+# `kb-setup manifest-add` has no --scope flag (manifest.py NewSource), so this line
+# is hand-added after the write, deliberately, not an omission.
+scope = study

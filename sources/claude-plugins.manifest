@@ -1,0 +1,12 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Claude plugin MARKETPLACE INDEX (not the plugins themselves) + docs/AGENTS.md. scope=study.
+url = https://github.com/2389-research/claude-plugins
+ref = main
+commit = 6b82b81af264234b9b722c8ef68ccbd57db4bc2a
+kind = code
+# scope = study: an object of study (peer orchestration/memory tooling), not corpus
+# content we answer questions from. `scope` exists because pinned peer tools took
+# graph.json past its size cap; these five route to graphify-out/study-graph.json.
+# `kb-setup manifest-add` has no --scope flag (manifest.py NewSource), so this line
+# is hand-added after the write, deliberately, not an omission.
+scope = study

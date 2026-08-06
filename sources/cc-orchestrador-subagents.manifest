@@ -1,0 +1,12 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Orchestrator + subagent collection (1 SKILL.md, 2 commands, .claude/settings.json). NO LICENCE declared upstream as of 2026-08-06 — pinned for study only. scope=study.
+url = https://github.com/AllanHarlen/cc-orchestrador-subagents
+ref = main
+commit = 911ce1afa17419e18be85656c57c918a50c715c2
+kind = code
+# scope = study: an object of study (peer orchestration/memory tooling), not corpus
+# content we answer questions from. `scope` exists because pinned peer tools took
+# graph.json past its size cap; these five route to graphify-out/study-graph.json.
+# `kb-setup manifest-add` has no --scope flag (manifest.py NewSource), so this line
+# is hand-added after the write, deliberately, not an omission.
+scope = study

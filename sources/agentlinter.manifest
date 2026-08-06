@@ -1,0 +1,10 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# 'ESLint for AI Agents' — 8 scoring dimensions over an agent workspace, with auto-fix. NO LICENCE declared upstream and last pushed 2026-04-20 (stale vs the frontmatter surface we target). Pinned for study only. scope=study.
+url = https://github.com/seojoonkim/agentlinter
+ref = main
+commit = e3ee53ebb58d4962baab7d855f50038bb58c83f8
+kind = code
+# scope = study: a peer LINTER being evaluated against agnix's CC-AG-* rules,
+# not corpus content we answer questions from. `kb-setup manifest-add` has no
+# --scope flag, so this line is hand-added after the write.
+scope = study
