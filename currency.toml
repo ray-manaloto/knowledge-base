@@ -143,7 +143,17 @@ RE-PROBED 2026-08-03 for 0.9.32, by exactly that method, from the pinned clone:
 label-touching lines. Control arm on the SAME diff — `graphify/build.py` +168/-27
 and `extractors/engine.py` +168/-10 — so the command discriminates rather than
 returning empty for every input. The 42-batch probe was therefore NOT run: with
-zero changed lines the gap cannot have moved. STILL PRESENT on 0.9.32."""
+zero changed lines the gap cannot have moved. STILL PRESENT on 0.9.32.
+
+RE-PROBED 2026-08-05 for 0.9.34, same method, via the GitHub compare API
+(`gh api .../compare/v0.9.33...v0.9.34`) because the local clone was absent at
+probe time. `graphify/llm.py` +12/-0 — the first llm.py movement since 0.9.30,
+so the cheap zero-diff arm did NOT settle it this time. Reading the patch did:
+all 12 added lines are the #2486 hyperedge member-ref coercion in
+`_sanitize_fragment`, zero label-touching lines. Control arm on the SAME
+compare — `graphify/build.py` +117/-21 and `cli.py` +78/-11 — so the probe
+discriminates. The 42-batch probe was therefore NOT run. STILL PRESENT on
+0.9.34."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -189,7 +199,13 @@ RE-PROBED 2026-08-03 for 0.9.32: `v0.9.32:pyproject.toml` carries `mcp>=1,<3` in
 BOTH the `mcp` and `all` extras — unchanged from 0.9.31. The ceiling stays
 lifted, so this remains RESOLVED. Read from the pinned clone's tag rather than
 from an installed tree, which is what makes it a claim about 0.9.32 and not about
-whatever happens to be on this host."""
+whatever happens to be on this host.
+
+RE-PROBED 2026-08-05 for 0.9.34: `pyproject.toml` at tag v0.9.34 carries
+`mcp>=1,<3` in BOTH the `mcp` and `all` extras — unchanged. Read via the GitHub
+contents API at the tag (the local clone was absent at probe time), which keeps
+it a claim about v0.9.34 rather than about whatever this host has installed.
+Remains RESOLVED."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -236,7 +252,28 @@ rather than newly happening. The message says "empties are no longer cached",
 which suggests they now retry and re-warn where they previously warned once and
 went quiet — but no committed prior build log exists to compare against, so do
 not repeat this as "new in 0.9.30". Re-probe by counting the warnings on the next
-bump."""
+bump.
+
+RE-PROBED 2026-08-05 on 0.9.34, by the recorded method: **38**, against 37 on
+2026-08-03. Control arm on the same log: 4 merge lines (the count is smaller
+than the old 29 because #175's single N-ary merge collapsed the per-source
+merge chatter — the grep still discriminates). NOT a comparable pair: the
+resync (060df22) added two manifests between the builds (`claude-code`,
+`rootly-graphify-importer`), and claude-code alone is a large repo carrying
+data-only `.json`. A +1 across a +2-source set change reads as unchanged in
+kind; no alarm, disposition stands."""
+
+# 2484/2485: the two hyperedge issues THIS repo filed (merge-graphs loss;
+# nested-slot read gap). Fixed in 0.9.34 — verified on the installed binary
+# 2026-08-05, arms A-E, which is what retired `kb_setup.hyperedges`' carry.
+# Watched so the upstream CLOSE surfaces as movement rather than being assumed.
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2484"
+
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2485"
 
 [[tool.graphify.watch]]
 kind = "issue"
@@ -299,7 +336,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.0"
+expected = "2026.8.2"
 # `mise --version` prints `2026.7.16 macos-arm64 (2026-07-29)`, so the engine's
 # default last-whitespace-field heuristic returns the build DATE. Anchored at the
 # start so it reads the version and not some later digit run.
@@ -324,7 +361,12 @@ MOVED 2026-08-03 for v2026.8.0: `soft` 2026.7.18 -> 2026.8.0 in the SAME change 
 `expected` above, which is exactly what this item exists to enforce. `hard` stays
 at 2026.7.14 — nothing between 7.18 and 8.0 introduces a known-bad behaviour that
 would justify raising the floor — and soft (8.0) > hard (7.14), so the warning
-band stays observable."""
+band stays observable.
+
+MOVED 2026-08-05 for v2026.8.2: `soft` 2026.8.0 -> 2026.8.2 in the same change as
+`expected`, same rule. `hard` stays at 2026.7.14 — 8.1/8.2 add features (remote
+task cache, `--affected`, the bootstrap resource system) and fixes; nothing
+makes an older mise newly dangerous — and soft (8.2) > hard (7.14)."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -345,7 +387,12 @@ not a use of it. A naive grep returns 8 and reads as a regression: **a watch ite
 that names a token makes itself grep-positive forever**, so exclude
 `currency.toml` and `docs/currency/` or the item refutes its own claim. Control
 arm: `mise run` -> 27 hits in `mise.toml`. 2026.8.0 touches `dotfiles add` only
-through `config --path <dir>`, which this repo does not use."""
+through `config --path <dir>`, which this repo does not use.
+
+RE-PROBED 2026-08-05 for v2026.8.2, with the recorded exclusions applied
+(`currency.toml` + `docs/currency/`): **0** uses. Control arm: `mise run` -> 33
+hits in `mise.toml`. Still INERT; the 8.2 bootstrap work expands
+`mise bootstrap` (the replacement surface), touching no deprecation timeline."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -360,7 +407,10 @@ signature table in `persistence-gate-retry.md` has to keep both.
 
 RE-PROBED 2026-08-03 for v2026.8.0: unchanged, and still correct to keep. This
 host is far above the 7.16 floor so the misleading form cannot appear here; the
-item survives for hosts that are not."""
+item survives for hosts that are not.
+
+RE-PROBED 2026-08-05 for v2026.8.2: unchanged — nothing in 8.1/8.2 touches
+remote-version listing's failure reporting. Same disposition."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -410,7 +460,18 @@ monorepo workspace inference (#11554 Cargo, #11556 uv, Go, Node) needs workspace
 metadata — control-armed, `[tool.uv.workspace]` appears **0** times in
 `pyproject.toml`; precompiled Ruby, aqua BOM checksums (#11552), brew-cask pours,
 the forgejo `fj` key path (#11545) and the asdf `depends` PATH fix are all on
-paths this repo never takes."""
+paths this repo never takes.
+
+RE-PROBED 2026-08-05 for v2026.8.2, and this time NOTHING lands on the PATH
+surface — 8.1 is task-cache/`--affected`/config-flag work, 8.2 is bootstrap
+provisioning; neither touches how a live shell resolves a binary, so
+`resolve_from_path` / `_is_mise_shim` / `_mise_shim_dirs` still stand.
+Re-measured the founding symptom the same day: `command -v graphify` in an
+inherited shell resolves to `installs/pipx-graphifyy/0.9.32/bin/graphify` — a
+STALE install dir, now two versions behind the 0.9.34 pin — while `mise exec --
+graphify --version` correctly reports 0.9.34. The skew is live, which is
+exactly why step 1 keeps looking at the live shell PATH and why
+version-sensitive calls go through `mise exec`."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -422,7 +483,10 @@ the 2027.4.0 release is not read as routine.
 
 RE-PROBED 2026-08-03 for v2026.8.0: `tera_v1` / `MISE_TERA_V1` -> **0** occurrences
 (control arm: `[env]` -> 1 in the same file, so the grep discriminates). Already
-on v2; nothing to do until 2027.4.0."""
+on v2; nothing to do until 2027.4.0.
+
+RE-PROBED 2026-08-05 for v2026.8.2: still **0** occurrences, control `[env]` ->
+1. Unchanged."""
 
 [tool.claude-code]
 # The harness itself. Tracked NOT for a mise pin — Claude Code manages its own
@@ -435,7 +499,7 @@ on v2; nothing to do until 2027.4.0."""
 # `expected` (self-managed, like mise) rather than `mise_key`: pinning the
 # harness that runs the session is not a thing this repo can or should do. Bump
 # it after reviewing the release notes — that act IS the gap analysis.
-expected = "2.1.220"
+expected = "2.1.222"
 binary = "claude"
 github = "anthropics/claude-code"
 # `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
@@ -471,7 +535,17 @@ read the change as a reduction — the effective budget is identical, and 60 is 
 documented maximum. Do not delete the field to "use the default": that is the one
 edit that would silently cost the audit ~58 of its 60 seconds.
 
-Re-probe on each docs review: if the ceiling moves, this number moves with it."""
+Re-probe on each docs review: if the ceiling moves, this number moves with it.
+
+RE-PROBED 2026-08-05 (hooks.md flagged CHANGED at the 2.1.220 -> 2.1.222 review):
+the mechanism holds verbatim — 1.5s shared budget, per-hook `timeout` raises it,
+ceiling still 60 — so the declared 60 stays correct. Two NEW facts on the same
+paragraph: (1) `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` now overrides the
+budget explicitly — an escape hatch, not needed here; (2) "Timeouts set on
+plugin-provided hooks don't raise the budget" — our audit hook is declared in
+`.claude/settings.json` (repo settings, not a plugin), so it still buys the 60;
+skillopt-sleep's SessionEnd hook IS plugin-provided, but it is an async
+marker-append that needs no budget. No config change."""
 
 [[tool.claude-code.watch]]
 kind = "local"
@@ -499,7 +573,12 @@ structural edit: the transcript-only/no-tools constraint (quoted verbatim in
 `references/rubric.md`), the **4,000-character** cap (`goal.py:GOAL_CHAR_CAP`),
 one goal per session, "setting a goal starts a turn with the condition as the
 directive" (T12's entire basis), the turn-clause bound, the `clear` aliases and
-the resume semantics."""
+the resume semantics.
+
+2026-08-05 (2.1.220 -> 2.1.222 review): goal.md's fingerprint HELD — only
+hooks.md and skills.md drifted — so there is nothing to re-derive; recorded so
+this item's silence at this review reads as "checked, unchanged" rather than
+"skipped"."""
 
 [[tool.claude-code.watch]]
 kind = "local"
@@ -519,7 +598,19 @@ it is merely un-invocable until an unrelated file read happens to arm it, so
 Same revision, no action: `/verify` records its own recipe to
 `.claude/skills/verify/SKILL.md` (v2.1.200+, edit behaviour narrowed in v2.1.205),
 and the cloud-session doc anchor moved from `claude-code-on-the-web` to
-`cloud-environments`."""
+`cloud-environments`.
+
+RE-PROBED 2026-08-05 (skills.md flagged CHANGED at the 2.1.220 -> 2.1.222
+review), and the page moved AGAIN in exactly this item's area — the second
+revision of the same claim in a week, which is why it stays tracked. Current
+text: nested skills load "when Claude reads or edits a file in a subdirectory";
+a name collision keeps BOTH skills available, the nested one under a
+directory-qualified name (`apps/web:deploy`) that IS invocable; an unqualified
+invocation loads the project-root skill with the variant list appended
+(requires >= 2.1.203). So the 2026-07-30 sentence "can't be invoked by name"
+is now stale for collision cases — the un-invocable window is only before any
+file in that subdirectory has been touched. STILL NO IMPACT HERE: every skill
+in this repo is repo-root, loaded at startup."""
 
 [[tool.claude-code.watch]]
 kind = "local"
@@ -541,7 +632,14 @@ disagreement about it: the "Claude Code overrides the hook and ends the turn aft
 8 consecutive blocks" Stop-hook cap is still present — 1 occurrence in both the
 2026-07-27 baseline and the current page, against a bogus term at 0. goal.md still
 never mentions a cap. The unreconciled-doc-disagreement node stays TRUE; do not
-re-derive it."""
+re-derive it.
+
+RE-PROBED 2026-08-05 (hooks.md flagged CHANGED at the 2.1.220 -> 2.1.222
+review): the claim is intact verbatim — "background subagents in
+non-interactive mode … if no hook returns a decision, it denies the tool call"
+(hooks.md:1744). The 8-consecutive-blocks Stop cap: still exactly 1 occurrence
+against a bogus term at 0, so the standing disagreement stands. Still no
+`PermissionRequest` hook here; nothing changes."""
 
 # ---------------------------------------------------------------------------
 # hk — the git-hook gate this repo's `mise run lint` IS (#87)
@@ -737,7 +835,14 @@ source checkout from `main` until the next release."
 Our marketplace entry uses a `github` source at `ref = main`, so we DO get the
 source checkout — this is recorded so the condition travels with the fact rather
 than being rediscovered. Re-check on the next release: once handoff mode ships to
-PyPI the distinction stops mattering, and this item can be closed."""
+PyPI the distinction stops mattering, and this item can be closed.
+
+RE-PROBED 2026-08-05 at the v0.2.0 review: upstream's latest release is STILL
+v0.2.0 (no "next release" yet), and the claim is still in the pinned clone at
+61735e39 (`plugins/claude-code/README.md:59`). The `main` pin therefore remains
+the required shape, and the engine's "'main' -> 'v0.2.0' could not be parsed"
+ambiguity is a version-string artifact, not a pending upgrade: the pinned
+commit post-dates the tag. Item stays open."""
 
 [[tool.skillopt.watch]]
 kind = "local"
@@ -751,4 +856,11 @@ Nothing is written live until a human runs `/skillopt-sleep adopt`, and every
 adopt backs up the prior file. That review is the control: `do-not.md` #11 keeps
 this repo out of `~/.claude`, and an unreviewed self-edit would route around it.
 Re-read the hook on every version bump — a change from marker-append to anything
-that spends budget or writes a tracked file is a different bargain."""
+that spends budget or writes a tracked file is a different bargain.
+
+RE-PROBED 2026-08-05 at the v0.2.0 review: `plugins/claude-code/hooks/
+on-session-end.sh` re-read at the pinned 61735e39 — still exactly a
+timestamp+PWD append to `~/.skillopt-sleep/session-end.log`, unconditional
+`exit 0`, no API spend, no tracked-file write. Same bargain. Also noted from
+the v0.2.0 notes: "Redact secrets before persisting cycle diagnostics" — a fix
+in the right direction for the surface this item watches."""

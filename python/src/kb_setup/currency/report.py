@@ -277,7 +277,18 @@ def _notes_excerpt(raw: str) -> str:
     if not notes:
         return ""
     truncated = len(notes) > _NOTES_EXCERPT_CHARS
-    body = notes[:_NOTES_EXCERPT_CHARS] + ("\n\n… (truncated)" if truncated else "")
+    if truncated:
+        cut = notes[:_NOTES_EXCERPT_CHARS]
+        # Cut at the last LINE boundary inside the budget, never mid-word: a
+        # half-token (the skillopt page once cut two letters into "backends")
+        # reads as a typo and the typos gate agrees — the same lint-hostage
+        # class the fence below exists for.
+        # A single line longer than the whole budget has no boundary to cut
+        # at; the raw cut is the fallback because mid-word beats empty.
+        head, nl, _ = cut.rpartition("\n")
+        body = (head if nl else cut) + "\n\n… (truncated)"
+    else:
+        body = notes
     longest = max((len(run) for run in re.findall(r"`+", body)), default=0)
     fence = "`" * max(3, longest + 1)
     return f"{fence}text\n{body}\n{fence}"

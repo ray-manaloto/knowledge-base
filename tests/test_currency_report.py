@@ -647,3 +647,46 @@ def test_a_missing_recommendation_renders_a_dash(tmp_path) -> None:
     _, detail = report.write_run(tmp_path, _record(latest="0.9.26", ambiguities=(ambiguity,)))
     assert detail is not None
     assert "- Recommended: —" in detail.read_text(encoding="utf-8")
+
+
+# --- _notes_excerpt truncation (the typos-gate hostage, 2026-08-05) -----------
+
+
+def test_notes_excerpt_truncates_at_a_line_boundary() -> None:
+    """A budget cut must never end mid-word.
+
+    The skillopt v0.2.0 page's excerpt ended two letters into "backends" — a
+    half-token the typos gate read as a misspelling and failed `mise run lint`
+    on a file the engine had just written. (The fragment is described, not
+    quoted: quoting it verbatim here would re-trip the same gate on THIS
+    file.) Same lint-hostage class as the fence this function already builds:
+    foreign text, our gate.
+    """
+    source_lines = [f"line {i} some words here" for i in range(200)]
+    notes = "\n".join(source_lines)
+    assert len(notes) > report._NOTES_EXCERPT_CHARS  # fixture sanity
+
+    body = report._notes_excerpt(notes)
+
+    assert "… (truncated)" in body
+    fence_inner = body.split("\n", 1)[1].rsplit("\n", 1)[0]
+    excerpt = fence_inner.split("\n\n… (truncated)")[0]
+    kept = excerpt.split("\n")
+    assert kept, "the excerpt must not be cut to nothing"
+    assert all(line in source_lines for line in kept), (
+        "every kept line must be a COMPLETE input line, not a prefix of one"
+    )
+
+
+def test_notes_excerpt_single_overlong_line_still_truncates_mid_word() -> None:
+    """CONTROL ARM: no line boundary means the raw cut, not an empty excerpt.
+
+    One line longer than the whole budget has no boundary to cut at — the raw
+    mid-word cut is correct there, because it beats losing the excerpt.
+    """
+    notes = "x" * (report._NOTES_EXCERPT_CHARS + 500)
+
+    body = report._notes_excerpt(notes)
+
+    assert "… (truncated)" in body
+    assert "x" * 200 in body, "content must survive; no boundary must not mean no excerpt"
