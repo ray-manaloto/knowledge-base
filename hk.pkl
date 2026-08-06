@@ -250,6 +250,21 @@ local lintSteps: Mapping<String, Step> = new {
   ["md_size_budget"] = new Step {
     check = "uv run kb-setup md-budget"
   }
+  //     skill_lint — a SKILL.md may not instruct a command a mise task owns.
+  //     Ray's standing directive ("skills call mise tasks that wrap the python
+  //     library"), tracked as #128, which had lived ONLY in prose. This repo's
+  //     own doctrine (mise-tasks-only.md) says markdown alone is "relying on
+  //     the LLM" and must never be the only layer — so here is the layer.
+  //
+  //     It is ~80 lines because it REUSES kb_setup.hook_guard.decide: the
+  //     PreToolUse guard (runtime) and this lint (authoring time) are two
+  //     consumers of ONE redirect table. A second table would drift, and a
+  //     test pins the shared identity. It runs unglobbed like md_size_budget:
+  //     6 files, and a gate scoped so narrowly it never fires is the failure
+  //     mode #214 records.
+  ["skill_lint"] = new Step {
+    check = "uv run kb-setup skill-lint"
+  }
 }
 
 hooks {

@@ -49,10 +49,30 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    / `import graphify`, is DENIED with the canonical task printed back
    (JSON `permissionDecision: "deny"` — deterministic, applies even in
    bypassPermissions mode). Tested in `tests/test_hook_guard.py`.
-2. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
+2. **hk step `skill_lint` (authoring-time deny).** `uv run kb-setup skill-lint`
+   fails the lint if a `SKILL.md` instructs, inside a shell fence, a command a
+   mise task already owns — printing the canonical task, not just a refusal.
+   Closes #128, Ray's standing "skills call mise tasks that wrap the python
+   library", which had lived only in prose here.
+
+   **It shares ONE decision function with layer 1**:
+   `kb_setup.skill_lint.check()` calls `hook_guard.decide()`, so the redirect
+   table, the read-only allowlist and the remediation wording exist once and are
+   enforced in both places. A redirect added to `_REDIRECT` is live at runtime
+   AND at authoring time with no second table to drift; a test pins that shared
+   identity. `decide` is an injectable parameter, so the walker is reusable for
+   a different command family without forking it.
+
+   Scope, stated because a gate's scope is what its green means: only
+   `.claude/skills/*/SKILL.md`, only inside ```` ```bash ````-class fences
+   (prose *describing* a tool is not an instruction), and the
+   installer-generated `.claude/skills/graphify/**` is excluded on
+   `md_budget`'s precedent. A glob matching nothing exits **1**, not 0 — a gate
+   that never asked the question is not a pass.
+3. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.
-3. **`mise run kb-ship` gates.** The `kb-review` receipt, then `lint`, `test`,
+4. **`mise run kb-ship` gates.** The `kb-review` receipt, then `lint`, `test`,
    `brain-audit`, and `eval` all run before a PR is pushed, so a workflow that
    bypasses a task and breaks something fails at ship time rather than in review.
 

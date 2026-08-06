@@ -272,6 +272,15 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 # when it is red, re-read every number from `uv run`.
 run = "uv run kb-setup eval"
 
+[tasks.kb-skill-lint]
+description = "Check every SKILL.md instructs mise tasks, not raw commands (#128)"
+# The authoring-time half of `mise-tasks-only.md`. Shares ONE decision function
+# with the PreToolUse guard (`kb_setup.hook_guard.decide`), so a redirect added
+# there is enforced at runtime AND at authoring time with no second table.
+# Also an hk step, so `mise run lint` covers it; this task is the direct handle
+# for working on a skill without running the whole suite.
+run = "uv run kb-setup skill-lint"
+
 [tasks.lint-docs]
 description = "Validate agent documentation (agnix)"
 # --strict: warnings-as-errors — parity with the hk `agnix` step. agnix exits 0
