@@ -13,6 +13,7 @@ from typing import Never
 
 import pytest
 from kb_setup.currency import apply as apply_mod
+from kb_setup.currency import skill
 from kb_setup.currency.apply import ApplyResult, NotAuthorizedError, apply, set_pin_version
 from kb_setup.currency.config import ToolSpec
 from kb_setup.currency.decide import Verdict
@@ -222,3 +223,25 @@ def test_a_clean_refresh_adds_no_warning(tmp_path, monkeypatch) -> None:
 
     assert "working tree still dirty" not in result.note
     assert result.note.startswith("rebuild pending")
+
+
+def test_the_reverted_delta_reaches_the_apply_note() -> None:
+    """`currency.apply` must carry the reverted BYTES, not just the filenames.
+
+    This is the caller a human reads before committing an auto-applied bump —
+    the path with LESS scrutiny than a deliberate `kb-skill-refresh` — so
+    dropping the delta here is exactly the "discarded without trace" case the
+    capture exists to prevent (cold lane round 2 on ea6ab63).
+    """
+    note = apply_mod._skill_warnings(
+        skill.SkillResult(
+            ran=True, repaired=(".claude/settings.json",), repair_delta="-old\n+new\n"
+        )
+    )
+
+    assert any("+new" in w and "-old" in w for w in note)
+
+
+def test_a_clean_refresh_adds_no_apply_warning() -> None:
+    """CONTROL ARM: no damage, no warnings — or every bump note cries wolf."""
+    assert apply_mod._skill_warnings(skill.SkillResult(ran=True)) == []

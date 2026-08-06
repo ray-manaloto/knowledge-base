@@ -488,6 +488,24 @@ Substitute `IS_DIRECTED` and `INPUT_PATH` as in Step 4. If a `GRAPH HEALTH WARNI
 
 ### Step 5 - Label communities
 
+> **DO NOT RUN STEP 5 IN THIS REPO — use `mise run kb-label`.** Two reasons,
+> both verified against the 0.9.34 installer template rather than assumed:
+>
+> 1. Its block writes `GRAPH_REPORT.md` and `.graphify_labels.json` BEFORE
+>    attempting the `graph.json` export, and its final
+>    `print('Report updated with community labels')` sits at indent 0 — so a
+>    REFUSED export (the #479 shrink guard) prints an error and then reports
+>    success, exiting 0 with two sidecars describing a graph that was never
+>    written. Step 4 has the correct shape twenty lines earlier and its own
+>    comment names the upstream issue this reintroduces (#1392).
+> 2. It writes `graph.json` through graphify's bundled interpreter, which
+>    bypasses the pinned-version gate every `kb-setup` graph writer pays and
+>    is exactly what `kb_setup.hook_guard` denies.
+>
+> `mise run kb-label` has neither problem and needs no LLM. This note is an
+> ADDENDUM, not a hand-edit: the tree is regenerated, so editing the block
+> itself would be eaten by the next refresh. (Cold lane on 5204e57, F1/F2.)
+
 Read `graphify-out/.graphify_analysis.json`. For each community key, look at its node labels and write a 2-5 word plain-language name (e.g. "Attention Mechanism", "Training Pipeline", "Data Loading").
 
 Then regenerate the report and save the labels for the visualizer:
@@ -499,6 +517,7 @@ from graphify.build import build_from_json
 from graphify.cluster import score_all
 from graphify.analyze import god_nodes, surprising_connections, suggest_questions
 from graphify.report import generate
+from graphify.export import to_json
 from pathlib import Path
 
 extraction = json.loads(Path('graphify-out/.graphify_extract.json').read_text(encoding=\"utf-8\"))
@@ -520,6 +539,13 @@ questions = suggest_questions(G, communities, labels)
 report = generate(G, communities, cohesion, labels, analysis['gods'], analysis['surprises'], detection, tokens, 'INPUT_PATH', suggested_questions=questions)
 Path('graphify-out/GRAPH_REPORT.md').write_text(report, encoding=\"utf-8\")
 Path('graphify-out/.graphify_labels.json').write_text(json.dumps({str(k): v for k, v in labels.items()}, ensure_ascii=False), encoding=\"utf-8\")
+# Re-export so graph.json nodes carry the curated community_name (#2490).
+# Same extraction as Step 4, so the #479 shrink-guard passes on node count;
+# if it still refuses, surface the guard message - do not force past it.
+wrote = to_json(G, communities, 'graphify-out/graph.json', community_labels=labels)
+if not wrote:
+    print('ERROR: refused to shrink graphify-out/graph.json (existing graph has more nodes; #479).')
+    print('If this shrink is intentional (you deleted files), re-run a full build with --force.')
 print('Report updated with community labels')
 "
 ```

@@ -23,6 +23,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | the bundled interpreter / `_merge_docs.py` | `mise run kb-merge -- <chunk>` |
 | `graphify transcribe` | `mise run kb-transcribe -- <audio>` |
 | regenerating wiki/graphml/svg by hand | `mise run kb-artifacts` |
+| `graphify install --project` (which regresses `.claude/settings.json` every run — #133), or copying the skill out of the pinned clone | `mise run kb-skill-refresh` — runs the GENERATOR (the skill tree is generated, never authored) via `kb_setup.currency.skill`, the SAME refresh a `currency apply` bump uses, then re-applies `currency.skill.ADDENDA` (this repo's local notes, which the installer wipes — it ate one on its first live run) and `fmt`s. Refuses a graphify that disagrees with the pin, and exits non-zero on a lost addendum |
 | `gh pr create` (+ push + gates by hand) | `mise run kb-ship` |
 | `gh pr merge` (+ watch + validate by hand) | `mise run kb-land -- <PR#>` |
 | a manual version-drift check | `mise run kb-currency-check` (offline) / `mise run kb-currency` |
