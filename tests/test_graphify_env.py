@@ -21,12 +21,9 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from kb_setup import graphify_env
-
-if TYPE_CHECKING:
-    import pytest
 
 _PINNED = "/mise/installs/pipx-graphifyy/0.9.26/bin/graphify"
 _ON_PATH = "/somewhere/else/graphify"
@@ -230,3 +227,96 @@ def test_extra_still_wins(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert env["GRAPHIFY_TEST"] == "on"
     assert env["__MISE_DIFF"] == "explicit"
+
+
+# --- the writer version gate (#186 cold lane, P1) -----------------------------
+#
+# The hyperedge carry is retired, so a stale pre-0.9.34 binary rewriting
+# graph.json silently destroys hyperedges with nothing left to restore them —
+# and graphify_exe's PATH fallback can hand exactly that binary back (live on
+# the host this was found on: bare `graphify` was 0.9.32 under a 0.9.34 pin).
+
+
+def _mise_toml(tmp_path: Path, tools_line: str) -> Path:
+    (tmp_path / "mise.toml").write_text(f"[tools]\n{tools_line}\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_pinned_version_reads_the_dict_form(tmp_path: Path) -> None:
+    root = _mise_toml(tmp_path, '"pipx:graphifyy" = { version = "0.9.34", extras = ["all"] }')
+    assert graphify_env.pinned_graphify_version(root) == "0.9.34"
+
+
+def test_pinned_version_reads_the_string_form(tmp_path: Path) -> None:
+    root = _mise_toml(tmp_path, '"pipx:graphifyy" = "0.9.30"')
+    assert graphify_env.pinned_graphify_version(root) == "0.9.30"
+
+
+def test_pinned_version_absent_pin_is_empty(tmp_path: Path) -> None:
+    root = _mise_toml(tmp_path, 'hk = "1.54.0"')
+    assert graphify_env.pinned_graphify_version(root) == ""
+
+
+def test_pinned_version_unreadable_toml_is_empty_not_an_error(tmp_path: Path) -> None:
+    (tmp_path / "mise.toml").write_text("[tools\nbroken", encoding="utf-8")
+    assert graphify_env.pinned_graphify_version(tmp_path) == ""
+
+
+def test_running_version_parses_a_real_subprocess(tmp_path: Path) -> None:
+    """Armed with a REAL exec, not a mock: the parse and the invocation together."""
+    import sys as _sys
+
+    exe = tmp_path / "fake-graphify"
+    exe.write_text(f"#!{_sys.executable}\nprint('graphify 1.2.3')\n", encoding="utf-8")
+    exe.chmod(0o755)
+
+    assert graphify_env.running_graphify_version(str(exe)) == "1.2.3"
+
+
+def test_running_version_unaskable_exe_is_empty(tmp_path: Path) -> None:
+    assert graphify_env.running_graphify_version(str(tmp_path / "absent")) == ""
+
+
+def test_gate_refuses_a_version_mismatch_naming_both(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r: "/stale/graphify")
+    monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r: "0.9.34")
+    monkeypatch.setattr(graphify_env, "running_graphify_version", lambda _e: "0.9.32")
+
+    with pytest.raises(SystemExit) as exc:
+        graphify_env.assert_pinned_graphify(tmp_path)
+
+    message = str(exc.value)
+    assert "0.9.32" in message
+    assert "0.9.34" in message
+    assert "mise install" in message
+
+
+def test_gate_passes_silently_on_a_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r: "/pinned/graphify")
+    monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r: "0.9.34")
+    monkeypatch.setattr(graphify_env, "running_graphify_version", lambda _e: "0.9.34")
+
+    assert graphify_env.assert_pinned_graphify(tmp_path) is None
+    assert capsys.readouterr().err == ""
+
+
+def test_gate_says_could_not_compare_rather_than_guessing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An unreadable side proceeds LOUDLY — never collapsed into pass or drift.
+
+    The real invocation fails with a better message than this gate could
+    synthesize, and an unpinned repo has nothing to enforce; but silence here
+    would be the "could not check, rendered as fine" collapse.
+    """
+    monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r: "/mystery/graphify")
+    monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r: "0.9.34")
+    monkeypatch.setattr(graphify_env, "running_graphify_version", lambda _e: "")
+
+    graphify_env.assert_pinned_graphify(tmp_path)
+
+    assert "could not compare" in capsys.readouterr().err

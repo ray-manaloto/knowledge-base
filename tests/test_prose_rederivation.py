@@ -28,11 +28,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from kb_setup import graphify_ops, hyperedges, prose, stamps
+from kb_setup import graphify_ops, prose, stamps
 from kb_setup.currency import config, sync
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
 #: What the stub writes as the merged graph: one AST node the derivation must
 #: drop, and one prose node it must keep. Naming the merged node lets a test
@@ -291,7 +291,7 @@ def test_a_failed_label_leaves_the_prose_graph_alone(
     assert _prose_ids(repo) == ["yesterday"]
 
 
-# --- hyperedge carry (#171 local mitigation, #175) --------------------------
+# --- hyperedges: graphify's own job since 0.9.34 (the carry is retired) ------
 
 _HYPEREDGE = {"id": "he1", "nodes": ["just_merged", "yesterday"]}
 
@@ -303,16 +303,21 @@ _PRE_LABEL_WITH_HYPEREDGE: dict[str, object] = {
 }
 
 
-def test_label_restores_hyperedges_the_round_trip_would_have_dropped(
+def test_label_leaves_graph_json_exactly_as_graphify_wrote_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The bug this carry exists for, reproduced end to end through `label()`.
+    """Nothing in `label()` rewrites the artifact — the carry is retired.
 
-    `_MERGED` (the stub's `writes=`) carries no hyperedges in either slot —
-    exactly what `build_from_json` + `to_json` leave on THIS repo's aggregate
-    graph (measured 5->0; see `hyperedges.py`'s module docstring for the
-    verified mechanism). Without the carry, `label()` would durably write that
-    loss back to disk; with it, the pre-run list survives the round trip.
+    Until the graphify 0.9.34 bump, `_labelled` was graph.json's LAST writer:
+    it re-attached the pre-run hyperedge list over whatever the subprocess
+    wrote, because 0.9.33's round-trip measurably destroyed the list
+    (upstream #2484/#2485, fixed in 0.9.34 and verified on the installed
+    binary — `hyperedges.py`'s module docstring). Restoring a list the
+    subprocess dropped would now defeat upstream's member revalidation, so
+    the pre-run state must NOT come back. Asserted as full-dict equality
+    against the stub's exact output: this fails if kb_setup code touches ANY
+    part of the file after the subprocess exits — which is precisely what a
+    resurrected carry would look like.
     """
     repo = _repo(tmp_path)
     (repo / "graphify-out" / "graph.json").write_text(
@@ -321,31 +326,6 @@ def test_label_restores_hyperedges_the_round_trip_would_have_dropped(
     _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
 
     assert graphify_ops.label(repo) == 0
-
-    on_disk = json.loads((repo / "graphify-out" / "graph.json").read_text(encoding="utf-8"))
-    assert on_disk["hyperedges"] == [_HYPEREDGE]
-    assert on_disk["graph"]["hyperedges"] == [_HYPEREDGE]
-
-
-def test_a_failed_label_does_not_restore_hyperedges(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """CONTROL ARM: rc != 0 leaves whatever the failed run wrote untouched.
-
-    Same reasoning as `test_a_failed_label_leaves_the_prose_graph_alone`: a
-    failed run's graph.json is in an unknown state, and reattaching the
-    captured pre-run list over it would assert a fact ("the run succeeded")
-    that is false. Asserted as full-dict equality against `_MERGED` — the
-    stub's exact output — so this fails if reattach touched ANY part of the
-    file, not just the two hyperedge slots.
-    """
-    repo = _repo(tmp_path)
-    (repo / "graphify-out" / "graph.json").write_text(
-        json.dumps(_PRE_LABEL_WITH_HYPEREDGE), encoding="utf-8"
-    )
-    _stub_graphify(monkeypatch, tmp_path, rc=1, writes=_MERGED)
-
-    assert graphify_ops.label(repo) == 1
 
     on_disk = json.loads((repo / "graphify-out" / "graph.json").read_text(encoding="utf-8"))
     assert on_disk == _MERGED
@@ -417,8 +397,8 @@ def test_a_failed_label_does_not_refresh_the_currency_stamp(
 
     graph.json may be in any state after a failed run, and stamping it would
     assert "this is the artifact the pin built" — a claim the same `rc != 0`
-    gate that protects the hyperedge carry and the prose re-derivation
-    (`_labelled`'s early `return rc`) also protects here.
+    gate that protects the prose re-derivation (`_labelled`'s early
+    `return rc`) also protects here.
     """
     repo = _repo(tmp_path)
     _with_currency_stamp(repo)
@@ -433,44 +413,38 @@ def test_a_failed_label_does_not_refresh_the_currency_stamp(
     assert after == before
 
 
-def test_label_restamps_after_reattach_not_before(
+def test_a_failed_prose_derivation_still_refreshes_the_stamp(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ordering requirement from #179: `reattach()` must run before the restamp.
+    """The restamp runs BEFORE `_derive_prose`, and does not gate on it.
 
-    The stamp's fingerprint has to cover graph.json's FINAL bytes, and
-    `reattach` is the last writer of that file — mirroring `artifacts.generate`,
-    which orders capture -> subprocess -> reattach -> restamp for the same
-    reason. Proven by call order, not by outcome: reading the fingerprint after
-    `label()` returns reflects the final disk state regardless of which ran
-    first, so an outcome-only assertion would pass even with the order flipped.
+    `graph-prose.json` is not in the stamped set (`currency.toml` declares
+    `graph.json` plus the derived views), so a prose derivation that fails
+    afterwards cannot invalidate a fingerprint that was never about it —
+    gating the restamp on the prose rc would only buy a permanent,
+    meaningless currency red on a graph that was legitimately relabelled
+    (`_labelled`'s docstring). Proven by outcome, and the outcome DOES
+    discriminate the order here: were the restamp placed after the prose step
+    and gated on its rc, this run would leave the stamp reading `before`.
     """
     repo = _repo(tmp_path)
-    (repo / "graphify-out" / "graph.json").write_text(
-        json.dumps(_PRE_LABEL_WITH_HYPEREDGE), encoding="utf-8"
-    )
     _with_currency_stamp(repo)
+    spec = config.load(repo)[0]
+    before = sync.read_stamp(repo, spec)
+
     _stub_graphify(monkeypatch, tmp_path, rc=0, writes=_MERGED)
 
-    calls: list[str] = []
-    real_reattach = hyperedges.reattach
-    real_refresh = stamps.refresh_after_regen
+    def boom(_root: Path) -> prose.ProseStats:
+        raise ValueError("no non-AST nodes")
 
-    def spy_reattach(graph_path: Path, edges: Sequence[Mapping[str, object]]) -> None:
-        calls.append("reattach")
-        real_reattach(graph_path, edges)
+    monkeypatch.setattr(prose, "derive_for", boom)
 
-    def spy_refresh(
-        repo_root: Path, *, tag: str, views_before: dict[str, dict[str, str]] | None = None
-    ) -> None:
-        calls.append("refresh")
-        real_refresh(repo_root, tag=tag, views_before=views_before)
+    assert graphify_ops.label(repo) == 1
 
-    monkeypatch.setattr(hyperedges, "reattach", spy_reattach)
-    monkeypatch.setattr(stamps, "refresh_after_regen", spy_refresh)
-
-    assert graphify_ops.label(repo) == 0
-    assert calls == ["reattach", "refresh"], f"restamp must run after reattach; got {calls}"
+    after = sync.read_stamp(repo, spec)
+    live_fp = sync.artifact_fingerprint(repo / "graphify-out" / "graph.json")
+    assert sync.stamped_fingerprints(after)["graphify-out/graph.json"] == live_fp
+    assert after != before
 
 
 # --- currency stamp refresh, the THIRD writer (#181) -------------------------

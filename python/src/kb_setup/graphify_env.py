@@ -8,9 +8,11 @@ graphify`); the KB repo's uv python cannot. Code that calls graphify's Python AP
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 #: One-shot latches for warnings that would otherwise repeat per call.
@@ -179,6 +181,91 @@ def graphify_exe(repo_root: Path | None = None) -> str:
             file=sys.stderr,
         )
     return fallback or "graphify"
+
+
+def pinned_graphify_version(repo_root: Path | None = None) -> str:
+    """The version `mise.toml` pins for `pipx:graphifyy`, or `""` when unpinned.
+
+    Reads the file directly rather than importing the currency engine: this is
+    one key in one table, and coupling the env module to `currency.config`'s
+    ToolSpec loading for it would invert the layering (currency depends on this
+    module's resolution helpers, not the other way around).
+    """
+    root = repo_root or Path.cwd()
+    try:
+        with (root / "mise.toml").open("rb") as fh:
+            data = tomllib.load(fh)
+    except OSError, tomllib.TOMLDecodeError:
+        return ""
+    entry = (data.get("tools") or {}).get("pipx:graphifyy")
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        return str(entry.get("version") or "")
+    return ""
+
+
+def running_graphify_version(exe: str) -> str:
+    """`<exe> --version`'s version token, or `""` when it cannot be asked.
+
+    graphify prints `graphify <version>`; the first dotted-number run is the
+    token, so a wrapper that prepends chatter still parses. `""` means the
+    question was never answered — the caller must not read it as a version.
+    """
+    try:
+        proc = subprocess.run(
+            [exe, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+            env=clean_env(),
+        )
+    except OSError, subprocess.SubprocessError:
+        return ""
+    text = ((proc.stdout or "") + " " + (proc.stderr or "")).strip()
+    m = re.search(r"\b(\d+\.\d+\.\d+(?:\.\d+)?)\b", text)
+    return m.group(1) if m else ""
+
+
+def assert_pinned_graphify(repo_root: Path | None = None) -> None:
+    """Refuse to let a graph WRITER run a graphify other than the pinned one.
+
+    Exists because the hyperedge carry was retired at 0.9.34 (cold lane on
+    #186, P1): `graphify_exe`'s PATH fallback can still hand back a stale
+    binary — live on this host, where bare `graphify` resolved to 0.9.32 under
+    a 0.9.34 pin — and a pre-0.9.34 `label`/`cluster-only` silently empties the
+    graph's hyperedges with no carry left to restore them, after which the
+    restamp asserts success. For a READER a stale binary is a worse answer;
+    for a WRITER it is destroyed data, so the writer tasks call this and
+    refuse (`SystemExit`) on a mismatch, naming both versions and the remedy.
+
+    Either side being unreadable is reported LOUDLY and not treated as a
+    mismatch: an unpinned repo has nothing to enforce, and an exe that cannot
+    answer `--version` will fail its real invocation with a better message
+    than this gate could synthesize. "Could not compare" is printed as itself
+    — never collapsed into either "current" or "drifted" (the currency
+    engine's DRIFT/SKIP/OK discipline, applied here).
+    """
+    root = repo_root or Path.cwd()
+    exe = graphify_exe(root)
+    pinned = pinned_graphify_version(root)
+    running = running_graphify_version(exe)
+    if not pinned or not running:
+        print(
+            f"[graphify] version gate could not compare (pin={pinned or 'UNKNOWN'}, "
+            f"running={running or 'UNKNOWN'}, exe={exe}) — proceeding unverified",
+            file=sys.stderr,
+        )
+        return
+    if pinned != running:
+        raise SystemExit(
+            f"[graphify] REFUSING to write the graph with graphify {running} ({exe}) "
+            f"while mise.toml pins {pinned}. A stale binary rewriting graph.json is "
+            f"how hyperedges were silently destroyed pre-0.9.34, and the carry that "
+            f"masked it is retired. Run `mise install`, then retry; "
+            f"`mise run kb-currency-check` shows what is stale."
+        )
 
 
 def _imports_graphify(py: Path) -> bool:

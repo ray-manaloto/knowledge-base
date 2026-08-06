@@ -27,7 +27,12 @@ from typing import TYPE_CHECKING
 
 from kb_setup import atomic, graph_checks, graphify_ops
 from kb_setup import manifest as mf
-from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
+from kb_setup.graphify_env import (
+    assert_pinned_graphify,
+    clean_env,
+    graphify_exe,
+    graphify_python,
+)
 
 if TYPE_CHECKING:
     from kb_setup.currency.config import ToolSpec
@@ -40,7 +45,7 @@ _STAMPED_TOOL = "graphify"
 
 #: Permission bits restored on the swapped-in graph.json — see
 #: `_recompose_into_temp`'s docstring. Same value and same reason as
-#: `hyperedges._GRAPH_MODE`; a separate constant because these are separate
+#: `prose._ARTIFACT_MODE`; a separate constant because these are separate
 #: modules and the integer is not worth a shared import.
 _GRAPH_MODE = 0o644
 
@@ -767,8 +772,8 @@ def _recompose_into_temp(
     The scratch file lives in the SAME directory as `real_out` (never the
     system temp dir), so the final `Path.replace` is guaranteed to be an
     atomic rename rather than risking a cross-filesystem copy — the same
-    reason `atomic.write_text`, `prose.derive` and `hyperedges._write_atomic`
-    all reserve their temp name beside the file they replace.
+    reason `atomic.write_text` and `prose.derive` both reserve their temp
+    name beside the file they replace.
 
     Every step above the swap runs against the SCRATCH file, never `real_out`
     — so the real `graphify-out/graph.json` stays exactly what the last
@@ -787,8 +792,8 @@ def _recompose_into_temp(
     tighten `graph.json` from world-readable to owner-only, and graphify's own
     `_atomic_replace` PRESERVES whatever mode is already there, so nothing
     downstream would ever repair it (#175 cold review, finding 5 — the exact
-    hazard `hyperedges._write_atomic` already guards against for its own
-    writes; see `hyperedges._GRAPH_MODE`).
+    hazard `prose.derive` already guards against for its own writes; see
+    `prose._ARTIFACT_MODE`).
     """
     gpy = graphify_python(repo_root)
     fd, tmp_name = tempfile.mkstemp(
@@ -1153,19 +1158,26 @@ def build(repo_root: Path) -> None:
     # below, after every chunk has landed — not once per chunk.
     gpy = graphify_python(repo_root)
     # Already validated at the TOP of build(), before anything wrote graph.json.
+    # CAPTURE-DATE order, not the glob's alphabetical order: build_merge gives
+    # a source_file to the LAST chunk that names it, so replay order IS the
+    # supersession rule — see `chunks.replay_order` for the measured defect
+    # (a rebuild and an incremental merge producing different graphs from the
+    # same committed corpus).
     print(f"[kb-build] merging {len(chunk_paths)} validated doc extraction(s)")
-    for chunk in chunk_paths:
+    for chunk in _chunks.replay_order(chunk_paths):
         name = chunk.stem.removesuffix("-docs")
         root = str((sources / name).resolve())
         _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)], repo_root)
 
     # ONE final label pass — deterministic (no LLM; see `graphify_ops.label`'s own
-    # docstring) — re-clusters the fully-composed graph, carries hyperedges across
-    # graphify's own label/cluster-only round-trip (#171 — measured 5->0 without
-    # this), and re-derives the prose graph as its own last step. `build()` no
-    # longer calls `prose.derive_for` itself: this IS that call now, made by the
-    # function that already has to load graph.json for the label pass, rather
-    # than a second, separate load of the same file.
+    # docstring) — re-clusters the fully-composed graph and re-derives the prose
+    # graph as its own last step. Hyperedge survival across the label round-trip
+    # is graphify's own job since 0.9.34 (#171's carry was retired at that bump;
+    # `hyperedges.py`'s module docstring carries the history), and
+    # `assert_composition` below still refuses a dangling member either way.
+    # `build()` no longer calls `prose.derive_for` itself: this IS that call
+    # now, made by the function that already has to load graph.json for the
+    # label pass, rather than a second, separate load of the same file.
     label_rc = graphify_ops.label(repo_root)
     if label_rc != 0:
         raise SystemExit(f"[kb-build] final label pass failed (rc={label_rc}) — aborting")
@@ -1471,6 +1483,12 @@ def update(repo_root: Path, name: str) -> int:
     print(f"[kb-update] {name}: {m.commit[:10]} -> {latest[:10]}")
     if m.kind == "docs":
         return _advance_docs_pin(m, latest)
+
+    # The writer version gate belongs to THIS branch, not the dispatch layer:
+    # the docs pin advance above is pure git and must never be blocked by a
+    # stale binary it does not run (cold lane round 2, P2). Only from here on
+    # does graphify touch the artifact.
+    assert_pinned_graphify(repo_root)
 
     m = mf.write_commit(m, latest)
     _ensure_clone(m)

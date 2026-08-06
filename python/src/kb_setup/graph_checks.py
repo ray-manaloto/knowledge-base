@@ -13,21 +13,20 @@ merging (or any other path that feeds an already-merged graph back into
 `merge-graphs`) is caught on the very next build, not only on the next
 `mise run test`.
 
-The hyperedge check exists for a related but distinct reason. `hyperedges.py`'s
-module docstring documents a MEASURED loss: graphify's own `label`/
-`cluster-only` round-trip silently drops any hyperedge whose member ids fail
-revalidation against the just-rebuilt node set (5 -> 0, measured on this
-repo's aggregate). `hyperedges.capture`/`reattach` sidesteps that by carrying
-the pre-run list through untouched — which is only correct so long as the ids
-it carries still resolve. If an earlier step in the SAME build (a merge, a
-re-prefix) silently changed a member's id without anything noticing, `capture`
-would faithfully carry forward a reference to a node that no longer exists — a
-durable, self-inflicted version of exactly the loss `hyperedges.py` exists to
-prevent, and one that mechanism cannot see because it only ever compares a
-list to itself. This function is the check FOR that: it runs on the file
-`graphify_ops.label` just captured from and re-derived the prose graph from,
-so a dangling member is caught here rather than discovered later by a query or
-a prose derivation silently missing it.
+The hyperedge check exists for a related but distinct reason. graphify's
+`label`/`cluster-only` round-trip revalidates every hyperedge member against
+the just-rebuilt node set and DROPS any hyperedge that fails — loudly since
+0.9.34 (one WARNING per casualty plus a summary line), silently before it,
+and this repo measured the silent form as 5 -> 0 on its own aggregate
+(`hyperedges.py`'s module docstring carries that history). So a dangling
+member in a freshly-built graph.json is a time bomb: the data is still
+present, and the very next label run will destroy it, correctly, by
+upstream's own rules. If an earlier step in the SAME build (a merge, a
+re-prefix) silently changed a member's id, nothing else would notice until
+that later, legitimate-looking loss. This function is the check FOR that: it
+runs on the file `build()` just produced, so a dangling member is caught here
+— while the cause is one commit away — rather than discovered later as a
+hyperedge count that quietly went down.
 """
 
 from __future__ import annotations

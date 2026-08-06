@@ -1,0 +1,14 @@
+{
+  "local:sleep-handoff-mode-needs-a-main-checkout": {
+    "comments": 0,
+    "state": "local",
+    "title": "SkillOpt's own plugin README, read at commit 61735e39: \"PyPI 0.2.0\nprovides the base Sleep CLI, but handoff mode and `--preferences` require a\nsource checkout from `main` until the next release.\"\n\nOur marketplace entry uses a `github` source at `ref = main`, so we DO get the\nsource checkout \u2014 this is recorded so the condition travels with the fact rather\nthan being rediscovered. Re-check on the next release: once handoff mode ships to\nPyPI the distinction stops mattering, and this item can be closed.",
+    "updated_at": ""
+  },
+  "local:sleep-writes-outside-this-project": {
+    "comments": 0,
+    "state": "local",
+    "title": "SkillOpt-Sleep is the one adopted plugin that writes outside the repo.\nIts SessionEnd hook appends to `~/.skillopt-sleep/session-end.log` (async, exit 0,\nno API spend, verified by reading `hooks/on-session-end.sh` at 61735e39), and the\nconsolidation cycle proposes edits to `CLAUDE.md` / `SKILL.md` files.\n\nNothing is written live until a human runs `/skillopt-sleep adopt`, and every\nadopt backs up the prior file. That review is the control: `do-not.md` #11 keeps\nthis repo out of `~/.claude`, and an unreviewed self-edit would route around it.\nRe-read the hook on every version bump \u2014 a change from marker-append to anything\nthat spends budget or writes a tracked file is a different bargain.",
+    "updated_at": ""
+  }
+}

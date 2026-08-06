@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from kb_setup import artifacts, hyperedges, prose
+from kb_setup import artifacts, prose
 
 
 def test_node_count_reads_graph(tmp_path) -> None:
@@ -25,7 +25,7 @@ def test_svg_in_default_registry_but_gated_by_limit() -> None:
     assert artifacts._SVG_NODE_LIMIT == 5000
 
 
-# --- hyperedge carry (#171 local mitigation, #175) --------------------------
+# --- the rewriting entry's extra obligations (#175; carry retired at 0.9.34) --
 
 _HYPEREDGE = {"id": "he1", "nodes": ["a"]}
 
@@ -46,35 +46,6 @@ def _graph_with_hyperedge(repo_root: Path) -> Path:
         encoding="utf-8",
     )
     return p
-
-
-def test_report_entry_carries_hyperedges_across_the_rewrite(tmp_path: Path, monkeypatch) -> None:
-    """`report` runs `cluster-only` — the one entry sharing `kb-label`'s lossy round-trip.
-
-    See `hyperedges.py`'s module docstring for the verified mechanism, and
-    `_REWRITES_GRAPH`'s comment above for why "report" is the only entry here
-    that needs it.
-    """
-    graph = _graph_with_hyperedge(tmp_path)
-
-    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
-        # Reproduce graphify's own lossy rewrite: cluster-only loads + rewrites
-        # graph.json, and on this repo's real aggregate that empties both slots.
-        graph.write_text(
-            json.dumps({"nodes": [{"id": "a", "label": "a"}], "links": [], "hyperedges": []}),
-            encoding="utf-8",
-        )
-        return subprocess.CompletedProcess(list(cmd), 0)
-
-    monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
-    monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
-    monkeypatch.setattr(artifacts.subprocess, "run", fake_run)
-
-    assert artifacts.generate(tmp_path, only=["report"]) == 0
-
-    on_disk = json.loads(graph.read_text(encoding="utf-8"))
-    assert on_disk["hyperedges"] == [_HYPEREDGE]
-    assert on_disk["graph"]["hyperedges"] == [_HYPEREDGE]
 
 
 def test_report_entry_re_derives_the_prose_graph_after_the_rewrite(
@@ -131,30 +102,31 @@ def test_report_entries_failed_prose_derivation_fails_generate(tmp_path: Path, m
     assert artifacts.generate(tmp_path, only=["report"]) == 1
 
 
-def test_a_non_rewriting_entry_never_touches_hyperedges(tmp_path: Path, monkeypatch) -> None:
-    """`graphml` only READS graph.json — capture()/reattach() must not even run.
+def test_a_non_rewriting_entry_pays_none_of_the_rewrite_obligations(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """`graphml` only READS graph.json — no prose re-derivation, no byte moved.
 
-    Paying a several-hundred-MB read for an entry that structurally cannot have
-    dropped anything would be pure cost with no defect to guard against. Checked
-    by call count, not just by outcome: an entry that happens to leave the file
-    unchanged would pass an outcome-only assertion even if it wastefully called
-    capture()/reattach() anyway.
+    The rewrite-only work is gated on `_REWRITES_GRAPH`, and a pure export
+    must pay none of it: re-deriving the prose graph after a run that could
+    not have changed its source would be pure cost. Checked by call count,
+    not just by outcome — an entry whose derivation happened to no-op would
+    pass an outcome-only assertion even while wastefully paying the read.
     """
     graph = _graph_with_hyperedge(tmp_path)
     before = graph.read_bytes()
-    calls: list[str] = []
+    derived: list[Path] = []
 
-    monkeypatch.setattr(hyperedges, "capture", lambda _p: (calls.append("capture"), [])[1])
-    monkeypatch.setattr(hyperedges, "reattach", lambda _p, _h: calls.append("reattach"))
     monkeypatch.setattr(artifacts, "ensure_runtime_deps", lambda _r: [])
     monkeypatch.setattr(artifacts, "graphify_exe", lambda _r: "/usr/bin/true")
+    monkeypatch.setattr(artifacts.prose, "derive_for", derived.append)
     monkeypatch.setattr(
         artifacts.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(list(cmd), 0)
     )
 
     assert artifacts.generate(tmp_path, only=["graphml"]) == 0
 
-    assert calls == []
+    assert derived == []
     assert graph.read_bytes() == before
 
 

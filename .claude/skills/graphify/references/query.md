@@ -197,6 +197,15 @@ Find the shortest path between two named concepts in the graph. Prefer the CLI w
 graphify path "NODE_A" "NODE_B"
 ```
 
+Since graphify 0.9.34 (#2487), `path` respects edge DIRECTION by default and
+says so when no directed path exists — pass `--undirected` to search ignoring
+direction. Before 0.9.34 it always searched an undirected view and could
+silently return a path that traverses edges backwards, so the same query can
+legitimately answer differently across that version boundary. The inline
+fallback below inherits whatever the file's own `directed` flag yields from
+`node_link_graph`, which is not necessarily the CLI's behaviour on the same
+graph — prefer the CLI when it is installed.
+
 If the CLI is unavailable, run it inline:
 
 ```bash

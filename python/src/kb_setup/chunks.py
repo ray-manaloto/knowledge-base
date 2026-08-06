@@ -15,11 +15,21 @@ committed `sources/extractions/<name>-docs.json`. Driven by the mise tasks
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 # The exact node/edge shape graphify's doc merge (`_merge_docs.py` -> build_merge)
 # consumes. Kept in sync with the committed chunks under sources/extractions/.
 _NODE_REQUIRED = ("id", "label", "file_type", "source_file", "source_url", "captured_at")
+
+#: `captured_at` must be ISO `YYYY-MM-DD` when it carries a value:
+#: `replay_order` compares these lexically for supersession, so a malformed
+#: value ("zzz") would sort after every real date and hand its chunk the
+#: last-writer win over a genuinely newer extraction (cold lane round 2, P2).
+#: A JSON `null` stays legal — `graphify-docs.json` predates the field's
+#: enforcement and carries them; `chunk_captured_at`'s `or ""` sorts a null
+#: FIRST, which is the harmless direction (it can never supersede anything).
+_CAPTURED_AT_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _EDGE_REQUIRED = ("source", "target", "relation", "confidence", "confidence_score", "weight")
 #: Edges only. Hyperedges have a NARROWER tier set — see `_HYPEREDGE_CONFIDENCE`
 #: below — so widening this tuple (issue #177 will add AMBIGUOUS for edges) must
@@ -108,6 +118,15 @@ def _node_issues(nodes: list, label: str) -> tuple[list[str], set[str]]:
         missing = [k for k in _NODE_REQUIRED if k not in n]
         if missing:
             issues.append(f"{label}: node {nid!r} missing field(s) {missing}")
+        captured = n.get("captured_at")
+        if captured is not None and (
+            not isinstance(captured, str) or not _CAPTURED_AT_RE.fullmatch(captured)
+        ):
+            issues.append(
+                f"{label}: node {nid!r} captured_at={captured!r} is not YYYY-MM-DD — "
+                f"replay_order compares these lexically for supersession, so a "
+                f"malformed date can beat a real one"
+            )
         origin = n.get("_origin")
         if origin != _SEMANTIC_ORIGIN:
             issues.append(
@@ -333,6 +352,48 @@ def validate_files(paths: list[Path]) -> dict[Path, list[str]]:
             continue
         out[p] = validate(chunk, label=p.name, known_ids=known)
     return out
+
+
+def chunk_captured_at(path: Path) -> str:
+    """The chunk's newest node-level `captured_at`, or `""` when none carries one.
+
+    ISO `YYYY-MM-DD` strings, so lexical `max`/`sort` IS date order. An
+    unreadable file returns `""` rather than raising: this feeds an ORDERING,
+    and `validate_files` (which `build()` runs first) is where a broken chunk
+    gets refused with a real message — failing here would just report the same
+    defect worse.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return ""
+    nodes = data.get("nodes") or []
+    dates = [str(n.get("captured_at") or "") for n in nodes if isinstance(n, dict)]
+    return max((d for d in dates if d), default="")
+
+
+def replay_order(paths: list[Path]) -> list[Path]:
+    """Committed chunks in the order `build()` must replay them: oldest capture FIRST.
+
+    `build_merge` makes the LAST chunk to name a `source_file` that file's
+    owner — it prunes every existing node carrying the same `source_file`
+    before adding its own (re-extraction idempotence). Replaying in glob order
+    therefore made supersession a NAMING accident, measured on the 2026-08-05
+    rebuild: the hooks/skills re-extraction chunk sorts before
+    `goal-engineering-docs.json`, whose nodes also say `source_file: hooks.md`,
+    so the rebuild silently replaced the fresh page's 69 nodes with the older
+    chunk's 13 (`[merge]` line arithmetic: +290 printed, total rose 221) —
+    while the incremental `kb-merge`, which runs the new chunk last, did the
+    exact reverse to the older chunk. Same committed corpus, two different
+    graphs, chosen by the alphabet: invariant 3's precise failure shape.
+
+    Capture date is the order supersession MEANS: a newer extraction of a file
+    replaces an older one, identically in the rebuild and the incremental
+    path. The key is the chunk's max node `captured_at`; a chunk with none
+    sorts first (it can never supersede a dated one), and the filename breaks
+    ties so the order stays total and deterministic.
+    """
+    return sorted(paths, key=lambda p: (chunk_captured_at(p), p.name))
 
 
 def _out_path(repo_root: Path, name: str) -> Path:

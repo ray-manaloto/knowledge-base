@@ -14,6 +14,15 @@ from kb_setup import __version__
 _ASSEMBLE_MIN_ARGS = 2  # <name> + at least one <chunk.json>
 
 
+#: Subcommands that ALWAYS hand graph.json to graphify. Each gets a
+#: pinned-version preflight in `main` — a stale graphify rewriting the
+#: artifact is data loss, not just a worse answer. `update` is deliberately
+#: NOT here: a `kind = docs` pin advance is pure git and must not be blocked
+#: by a stale binary it never runs (cold lane round 2, P2), so `graph.update`
+#: gates its own code-kind branch instead — the one place the kind is known.
+_GRAPH_WRITERS = frozenset({"build", "watch", "merge", "label", "artifacts"})
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch a kb-setup subcommand; returns the process exit code."""
     args = sys.argv[1:] if argv is None else argv
@@ -39,6 +48,16 @@ def main(argv: list[str] | None = None) -> int:
     if cmd in {"-V", "--version", "version"}:
         print(f"kb-setup {__version__}")
         return 0
+    if cmd in _GRAPH_WRITERS:
+        from kb_setup import graphify_env
+
+        # Writers only, and at the TASK layer rather than inside the library
+        # functions, deliberately: every real invocation enters here (the
+        # PreToolUse guard denies raw graphify), readers merely get worse
+        # answers from a stale binary while writers destroy data with it
+        # (cold lane on #186, P1 — see `assert_pinned_graphify`), and the
+        # library functions stay drivable by test stubs that fake the exe.
+        graphify_env.assert_pinned_graphify(repo_root)
     if cmd == "build":
         from kb_setup import graph
 

@@ -6,6 +6,7 @@ FAILS — a validator that can only pass is not a validator.
 """
 
 import json
+from pathlib import Path
 
 import pytest
 from kb_setup import chunks
@@ -742,3 +743,88 @@ def test_assemble_handles_a_null_hyperedges_key(tmp_path) -> None:
     out = chunks.assemble(tmp_path, "nullhyper", [c])
     got = json.loads(out.read_text())
     assert got["hyperedges"] == []
+
+
+# --- replay_order: capture-date supersession, not the alphabet (#186) ---------
+#
+# build_merge gives a source_file to the LAST chunk that names it, so replay
+# order IS the supersession rule. The fixture names are chosen so alphabetical
+# order and capture order fully DISAGREE — an accidental revert to the sorted()
+# glob cannot pass these by coincidence.
+
+
+def _dated_chunk(tmp_path: Path, name: str, dates: list[str | None]) -> Path:
+    p = tmp_path / name
+    nodes = [
+        {"id": f"{name}_{i}", **({"captured_at": d} if d else {})} for i, d in enumerate(dates)
+    ]
+    p.write_text(json.dumps({"nodes": nodes, "edges": []}))
+    return p
+
+
+def test_replay_order_is_capture_date_order_newest_last(tmp_path) -> None:
+    a = _dated_chunk(tmp_path, "a-newest.json", ["2026-08-05"])
+    b = _dated_chunk(tmp_path, "b-oldest.json", ["2026-07-01"])
+    c = _dated_chunk(tmp_path, "c-middle.json", ["2026-07-20"])
+
+    assert chunks.replay_order([a, b, c]) == [b, c, a]
+
+
+def test_replay_order_key_is_the_chunks_newest_node_date(tmp_path) -> None:
+    """A chunk assembled across days sorts by its newest capture, not its first."""
+    mixed = _dated_chunk(tmp_path, "a-mixed.json", ["2026-07-01", "2026-08-04"])
+    single = _dated_chunk(tmp_path, "b-single.json", ["2026-07-20"])
+
+    assert chunks.replay_order([mixed, single]) == [single, mixed]
+
+
+def test_replay_order_undated_sorts_first_and_ties_break_by_name(tmp_path) -> None:
+    """A chunk with no capture date can never supersede a dated one.
+
+    It sorts FIRST (every dated chunk replays after it, and wins), and two
+    equal keys fall back to the filename so the order stays total — the same
+    corpus must produce the same replay sequence on every machine.
+    """
+    undated = _dated_chunk(tmp_path, "z-undated.json", [None])
+    tie_b = _dated_chunk(tmp_path, "b-tie.json", ["2026-07-20"])
+    tie_a = _dated_chunk(tmp_path, "a-tie.json", ["2026-07-20"])
+
+    assert chunks.replay_order([tie_b, undated, tie_a]) == [undated, tie_a, tie_b]
+
+
+def test_chunk_captured_at_unreadable_file_is_empty_not_an_error(tmp_path) -> None:
+    """Ordering must not crash on a broken file.
+
+    `validate_files` is where a broken chunk gets refused with a real message,
+    and `build()` runs it first.
+    """
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+
+    assert chunks.chunk_captured_at(bad) == ""
+
+
+def test_validate_flags_a_malformed_captured_at() -> None:
+    """A malformed date must die in validation, not win the sort.
+
+    "zzz" compares greater than any year lexically, so it would take the
+    last-writer supersession win from a real date (cold lane round 2, P2).
+    """
+    c = _chunk([_node("a", captured_at="zzz")], [])
+    assert any("captured_at" in i for i in chunks.validate(c))
+
+
+def test_validate_flags_a_non_string_captured_at() -> None:
+    c = _chunk([_node("a", captured_at=20260805)], [])
+    assert any("captured_at" in i for i in chunks.validate(c))
+
+
+def test_a_null_captured_at_stays_legal() -> None:
+    """CONTROL ARM: graphify-docs.json predates the field and carries nulls.
+
+    A null sorts FIRST via `chunk_captured_at`'s `or ""` — the harmless
+    direction, since it can never supersede — so refusing it would break a
+    committed chunk for no protective gain.
+    """
+    c = _chunk([_node("a", captured_at=None)], [])
+    assert chunks.validate(c) == []

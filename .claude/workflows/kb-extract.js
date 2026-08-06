@@ -103,8 +103,25 @@ function basename(p) {
   return p.split('/').pop()
 }
 
+// The chunk-level identity build_merge PRUNES BY: the last chunk to name a
+// source_file owns that file — every existing node carrying the same value is
+// replaced when the chunk replays. A bare basename therefore collides
+// GLOBALLY: two chunks both saying "hooks.md" (measured 2026-08-05 — a docs
+// re-extraction vs goal-engineering-docs.json) silently replace each other's
+// nodes, with the winner chosen by replay order. For a file inside a pinned
+// clone (…/sources/<name>/<rel>), the CLONE-RELATIVE path is the honest,
+// collision-free identity — and it is also what makes a later re-extraction
+// of the same page supersede this chunk's nodes on purpose. Outside a clone
+// (raw/ fetches, vendored media), the basename remains the identity, and an
+// explicit per-source `sourceFile` arg overrides both.
+function sourceFileFor(s) {
+  if (s.sourceFile) return s.sourceFile
+  const m = s.path.match(/\/sources\/[^/]+\/(.+)$/)
+  return m ? m[1] : basename(s.path)
+}
+
 function commonPrompt(s) {
-  const file = basename(s.path)
+  const file = sourceFileFor(s)
   return `You are a knowledge-graph extractor for a graphify KB. Read the ENTIRE file at:
   ${s.path}
 (use the Read tool; read ALL of it — it may be long).${s.note ? `\nContext: ${s.note}` : ''}
@@ -199,7 +216,7 @@ Then your FINAL output is ONLY the StructuredOutput {key:"${s.key}", wrote:true,
 }
 
 function inventoryPrompt(s) {
-  const file = basename(s.path)
+  const file = sourceFileFor(s)
   return `You are a knowledge-graph extractor. Read the ENTIRE file at:
   ${s.path}
 It is a curated inventory (one entry per item, e.g. marketplace plugins).${s.note ? `\nContext: ${s.note}` : ''}
