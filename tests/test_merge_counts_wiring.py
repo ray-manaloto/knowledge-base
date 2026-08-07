@@ -28,30 +28,60 @@ def _handoff(tmp_path: Path, body: str) -> Path:
     return p
 
 
-def test_handoff_nodes_reads_then_consumes(tmp_path: Path) -> None:
+def test_handoff_counts_reads_then_consumes(tmp_path: Path) -> None:
     """One read, then unknown. A prior count must never outlive its own chunk."""
-    h = _handoff(tmp_path, json.dumps({"nodes": 42, "edges": 7}))
+    h = _handoff(tmp_path, json.dumps({"nodes": 42, "edges": 7, "hyperedges": 11}))
 
-    assert graph._handoff_nodes(h) == 42
+    assert graph._handoff_counts(h) == {"nodes": 42, "hyperedges": 11}
     assert not h.exists()
-    assert graph._handoff_nodes(h) is None
+    assert graph._handoff_counts(h) == {"nodes": None, "hyperedges": None}
 
 
-def test_handoff_nodes_consumes_even_when_unusable(tmp_path: Path) -> None:
+def test_handoff_counts_reports_unknown_per_field(tmp_path: Path) -> None:
+    """A handoff carrying one threaded field and not the other checks the one it has.
+
+    The whole reason `_handoff_counts` returns a mapping instead of a tuple: #198
+    records that `_derive_prose` writes `{nodes, edges, hyperedges}` and NOT
+    `members`, so a partial payload is a shape this repo really produces. An
+    all-or-nothing reader would answer "not checked" for a count sitting right
+    there in the file.
+    """
+    h = _handoff(tmp_path, json.dumps({"nodes": 42}))
+    assert graph._handoff_counts(h) == {"nodes": 42, "hyperedges": None}
+
+    h = _handoff(tmp_path, json.dumps({"hyperedges": 8}))
+    assert graph._handoff_counts(h) == {"nodes": None, "hyperedges": 8}
+
+
+def test_handoff_counts_consumes_even_when_unusable(tmp_path: Path) -> None:
     """A malformed handoff is removed too, so the NEXT chunk cannot inherit it.
 
     Returning None while leaving the file behind would be the worst of both:
     this chunk reports "not checked", and the chunk after it reads a count
     belonging to neither.
     """
-    for body in ("{not json", "[]", '{"nodes": "many"}', "{}"):
+    unknown = {"nodes": None, "hyperedges": None}
+    for body in ("{not json", "[]", '{"nodes": "many"}', "{}", '{"hyperedges": []}'):
         h = _handoff(tmp_path, body)
-        assert graph._handoff_nodes(h) is None, body
+        assert graph._handoff_counts(h) == unknown, body
         assert not h.exists(), body
 
 
-def test_handoff_nodes_on_a_missing_file_is_unknown(tmp_path: Path) -> None:
-    assert graph._handoff_nodes(tmp_path / "never-written.json") is None
+def test_handoff_counts_on_a_missing_file_is_unknown(tmp_path: Path) -> None:
+    assert graph._handoff_counts(tmp_path / "never-written.json") == {
+        "nodes": None,
+        "hyperedges": None,
+    }
+
+
+def test_every_threaded_count_is_one_the_merge_asserts_an_identity_over() -> None:
+    """`_THREADED_COUNTS` must stay a subset of what the ledger actually records.
+
+    A field threaded into argv that `graph_counts` never records would be a flag
+    `_merge_docs` waits on forever — silently "not checked" rather than broken,
+    which is the failure mode that reads as a pass.
+    """
+    assert set(graph._THREADED_COUNTS) <= set(graph_counts._FIELDS)
 
 
 def test_record_counts_moves_the_handoff_into_the_ledger(tmp_path: Path) -> None:
@@ -171,12 +201,12 @@ def test_replay_threads_each_count_into_the_next_chunk(
     graph_counts.record(tmp_path, out, {"nodes": 999}, tag="kb-build")
 
     seen: list[list[str]] = []
-    counter = iter((10, 25, 40))
+    counter = iter(({"nodes": 10, "hyperedges": 3}, {"nodes": 25}, {"nodes": 40}))
 
     def _fake_run(argv: list[str], _cwd: Path) -> None:
         seen.append(argv)
         Path(argv[argv.index("--counts-out") + 1]).write_text(
-            json.dumps({"nodes": next(counter)}), encoding="utf-8"
+            json.dumps(next(counter)), encoding="utf-8"
         )
 
     monkeypatch.setattr(graph, "_run", _fake_run)
@@ -184,10 +214,16 @@ def test_replay_threads_each_count_into_the_next_chunk(
         tmp_path, "py", tmp_path / "sources", out, sorted(chunks_dir.glob("*.json"))
     )
 
-    priors = [
-        argv[argv.index("--prior-nodes") + 1] if "--prior-nodes" in argv else None for argv in seen
-    ]
-    assert priors == [None, "10", "25"]
+    def _flag(argv: list[str], flag: str) -> str | None:
+        return argv[argv.index(flag) + 1] if flag in argv else None
+
+    assert [_flag(a, "--prior-nodes") for a in seen] == [None, "10", "25"]
+    # The hyperedge half threads on the SAME rule and independently of nodes
+    # (#198 item 1). Chunk 2 gets the 3 chunk 1 emitted; chunk 3 gets none,
+    # because chunk 2's handoff carried `nodes` alone — a partial payload must
+    # narrow the NEXT chunk's check to the field it can still establish, never
+    # carry a stale count forward and never suppress the node check as well.
+    assert [_flag(a, "--prior-hyperedges") for a in seen] == [None, "3", None]
     assert not out.with_name(".merge-counts.tmp.json").exists()
 
 
@@ -344,6 +380,71 @@ def test_a_stale_handoff_is_cleared_before_the_subprocess_runs(
 
     assert not stale.exists()
     assert graph_counts.read(tmp_path, out) is None
+
+
+def _capture_merge_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ledger: dict[str, int]
+) -> list[str]:
+    """Run `merge_chunk` against a ledger and return the argv it built.
+
+    `subprocess.run` is stubbed rather than pointed at `true` because what this
+    seam is about IS the argv — a stub that only makes the call succeed would let
+    the flags be deleted with every arm still green.
+    """
+    import subprocess
+
+    ext = tmp_path / "sources" / "extractions"
+    _write_chunk(ext / "c-docs.json", "c.md")
+    out = tmp_path / "graphify-out" / "graph.json"
+    out.parent.mkdir(parents=True)
+    out.write_text("{}", encoding="utf-8")
+    graph_counts.record(tmp_path, out, ledger, tag="kb-build")
+
+    seen: list[list[str]] = []
+
+    def _fake_run(cmd: list[str], **_kw: object) -> subprocess.CompletedProcess:
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(graphify_ops.subprocess, "run", _fake_run)
+    monkeypatch.setattr(graphify_ops, "graphify_python", lambda _root: "true")
+    monkeypatch.setattr(graphify_ops, "clean_env", dict)
+    monkeypatch.setattr(graphify_ops, "_derive_prose", lambda *_a, **_k: 1)
+
+    graphify_ops.merge_chunk(tmp_path, str(ext / "c-docs.json"))
+    return seen[0]
+
+
+def test_merge_chunk_passes_both_prior_counts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The INCREMENTAL path's half of #198 item 1.
+
+    `_replay_doc_chunks` and `merge_chunk` build argv separately — the divergence
+    that let the rebuild and incremental paths disagree in the first place — so
+    each needs its own arm. Covering one and calling the feature done is how the
+    node-only version survived a review that read only the other.
+    """
+    argv = _capture_merge_argv(tmp_path, monkeypatch, {"nodes": 100, "hyperedges": 11})
+
+    assert argv[argv.index("--prior-nodes") + 1] == "100"
+    assert argv[argv.index("--prior-hyperedges") + 1] == "11"
+
+
+def test_merge_chunk_checks_the_half_it_can_when_the_ledger_is_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing `nodes` must not suppress an available `hyperedges`, or the reverse.
+
+    This is the arm for passing the two flags INDEPENDENTLY rather than nesting the
+    hyperedge emission inside the node `if`. `_derive_prose` records
+    `{nodes, edges, hyperedges}` and not `members`, so a ledger entry carrying one
+    slot and not another is a shape this repo already produces — and a nested
+    version would go quiet on a check that was sitting right there.
+    """
+    only_nodes = _capture_merge_argv(tmp_path, monkeypatch, {"nodes": 100})
+    assert only_nodes[only_nodes.index("--prior-nodes") + 1] == "100"
+    assert "--prior-hyperedges" not in only_nodes
 
 
 def test_record_survives_a_wrong_typed_payload(tmp_path: Path) -> None:

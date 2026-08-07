@@ -1,0 +1,159 @@
+# Mutation arms for #198 item 1 — hyperedge count continuity across BOTH merge paths.
+#
+#   mise run kb-arms -- docs/research/reports/2026-08-07-hyperedge-continuity-arms.toml
+#   mise run kb-arms -- docs/research/reports/2026-08-07-hyperedge-continuity-arms.toml --dry-run
+#
+# Every `old` is line-exact against the commit that introduced it, so a later
+# refactor reports `PROBE BROKEN - pattern not found` rather than silently passing.
+#
+# What this sweep can and cannot say. It measures THE TESTS: whether deleting a
+# piece of the hyperedge wiring is noticed. It says nothing about the PREMISE —
+# that the four loss channels in `_HYPEREDGE_LOSS_CAUSES` are the real ones. That
+# came from reading graphify 0.9.35's installed `build.py` and `export.py`, and a
+# green sweep here is not evidence for it (`mutation-arms-cannot-measure-the-premise`).
+
+suites = [
+  "tests/test_graph_counts.py",
+  "tests/test_merge_counts_wiring.py",
+  "tests/test_chunks.py",
+]
+
+[[arm]]
+id = "A0 CONTROL"
+control = true
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''def _hyperedge_line('''
+new = '''def _hyperedge_line(  # control'''
+
+# --- the two argv builders, which is where this ticket's divergence lived ----- #
+
+[[arm]]
+id = "A1 incremental path drops the flag"
+file = "python/src/kb_setup/graphify_ops.py"
+old = '''    if prior is not None and "hyperedges" in prior:'''
+new = '''    if False:'''
+test = "test_merge_chunk_passes_both_prior_counts"
+meaning = "kb-merge stops checking hyperedges and no arm notices"
+
+[[arm]]
+id = "A2 rebuild path threads nodes only"
+file = "python/src/kb_setup/graph.py"
+old = '''            if value is not None:'''
+new = '''            if value is not None and field == "nodes":'''
+test = "test_replay_threads_each_count_into_the_next_chunk"
+meaning = "the REBUILD path regresses to node-only — the exact #186 blind spot"
+
+[[arm]]
+id = "A3 hyperedges removed from the threaded set"
+file = "python/src/kb_setup/graph.py"
+old = '''_THREADED_COUNTS = ("nodes", "hyperedges")'''
+new = '''_THREADED_COUNTS = ("nodes",)'''
+test = "test_replay_threads_each_count_into_the_next_chunk"
+meaning = "one table edit silently disarms both paths at once"
+
+[[arm]]
+id = "A4 handoff goes all-or-nothing"
+file = "python/src/kb_setup/graph.py"
+old = '''        field: v if isinstance(v := data.get(field), int) else None for field in _THREADED_COUNTS'''
+new = '''        field: data.get(field) if isinstance(data.get("nodes"), int) else None for field in _THREADED_COUNTS'''
+test = "test_handoff_counts_reports_unknown_per_field"
+meaning = "a partial payload suppresses a check whose count was sitting right there"
+
+# --- the report itself -------------------------------------------------------- #
+
+[[arm]]
+id = "A5 report never receives the prior"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''        priors.get("hyperedges"),'''
+new = '''        None,'''
+test = "test_the_186_shape_is_reported_while_the_node_half_is_correctly_silent"
+meaning = "every merge reports the hyperedge arithmetic as NOT CHECKED, forever"
+
+[[arm]]
+id = "A6 line computed but never printed"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''        if hyper is not None:
+            print(hyper)'''
+new = '''        if False:
+            print(hyper)'''
+test = "test_the_186_shape_is_reported_while_the_node_half_is_correctly_silent"
+meaning = "the whole feature is dead while every node arm stays green"
+
+[[arm]]
+id = "A7 a loss is rounded down to balanced"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''    if lost == 0:'''
+new = '''    if lost >= 0:'''
+test = "test_the_186_shape_is_reported_while_the_node_half_is_correctly_silent"
+meaning = "an off-by-one prints '0 lost' over a real loss"
+
+[[arm]]
+id = "A8 wording drifts back into node symmetry"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''            f"{_HYPEREDGE_LOSS_CAUSES}. Only the third announces itself, so read "
+            "graphify's stderr above before concluding which one this was."'''
+new = '''            "Every replaced node carried a source_file this chunk also names."'''
+test = "test_the_hyperedge_message_enumerates_causes_instead_of_asserting_one"
+meaning = "a confident single-cause sentence that is false three ways out of four"
+
+[[arm]]
+id = "A9 self-remerge guard removed"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''    if self_remerge:
+        why = (
+            "EXPECTED — this chunk is already committed and is the only claimant of "
+            "every source_file it names, so its prior hyperedges were replaced by "'''
+new = '''    if False:
+        why = (
+            "EXPECTED — this chunk is already committed and is the only claimant of "
+            "every source_file it names, so its prior hyperedges were replaced by "'''
+test = "test_a_hyperedge_self_remerge_does_not_cry_wolf"
+meaning = "the most common merge in the repo starts printing a false alarm"
+
+[[arm]]
+id = "A10 impossible-gain branch removed"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''    if lost < 0:'''
+new = '''    if False:'''
+test = "test_an_impossible_hyperedge_gain_is_reported_rather_than_assumed_away"
+meaning = "a graph gaining hyperedges from nowhere prints 'LOST -3' and reads as noise"
+
+# --- #198 item 2: the source_file-claim check kb-assemble never had ---------- #
+
+[[arm]]
+id = "A12 assemble stops running the claim check"
+file = "python/src/kb_setup/chunks.py"
+old = '''    problems.extend(assembly_overlaps(chunk_paths))'''
+new = '''    problems.extend([])'''
+test = "test_assemble_refuses_two_chunks_claiming_one_source_file"
+meaning = "the #198 item 2 gate is a validator nothing calls"
+
+[[arm]]
+id = "A13 claim check reads the wrong axis"
+file = "python/src/kb_setup/chunks.py"
+old = '''        per_file, _ = chunk_claims(p)
+        for sf in per_file:'''
+new = '''        per_file, declared = chunk_claims(p)
+        for sf in set(per_file) - declared:'''
+test = "test_assemble_refuses_a_declared_overlap_too"
+meaning = "a declared overlap is excused — the `collision_issues` semantics Ray ruled out"
+
+[[arm]]
+id = "A14 single-chunk guard removed"
+file = "python/src/kb_setup/chunks.py"
+old = '''    unique = list(dict.fromkeys(p.resolve() for p in chunk_paths))
+    if len(unique) < _MIN_CHUNKS_FOR_COLLISION:
+        return []
+    owners: dict[str, list[Path]] = {}'''
+new = '''    unique = list(chunk_paths)
+    owners: dict[str, list[Path]] = {}'''
+test = "test_assembly_overlaps_ignores_a_single_chunk"
+meaning = "the same file passed twice, or one chunk alone, refuses itself"
+
+[[arm]]
+id = "A11 non-numeric count crashes instead of degrading"
+file = "python/src/kb_setup/_merge_docs.py"
+old = '''    return int(raw) if raw is not None and raw.lstrip("-").isdigit() else None'''
+new = '''    return int(raw) if raw is not None else None'''
+test = "test_int_opt_degrades_a_non_numeric_count_to_not_checked"
+meaning = "a merge that succeeded is turned into a traceback by a count it only printed"

@@ -539,10 +539,50 @@ def collision_issues(paths: list[Path], *, merging: Path | None = None) -> list[
     contribution to it entirely. Nothing else in the pipeline can see that: the
     per-chunk schema check passes (both chunks are well-formed), the cold review
     passes (it is corpus data, not behaviour), `kb-build` exits 0, and graphify's
-    own #479 shrink guard is structurally blind to it — `build_merge` reassigns
-    `existing_nodes` to the POST-prune list (`build.py:1536`) before the guard
-    compares `len(existing_nodes)` against the new count (`:1650`), so the loss
-    is subtracted from both sides of its own inequality.
+    own #479 shrink guard is structurally blind to it.
+
+    THAT LAST CLAUSE IS STILL TRUE ON 0.9.35, BUT NO LONGER FOR THE REASON THIS
+    DOCSTRING USED TO GIVE — recorded rather than deleted, because a stale reason
+    for a live conclusion is how the conclusion gets discarded with it.
+
+    - **Through 0.9.34**: `build_merge` reassigned `existing_nodes` to the
+      POST-prune list before the guard compared its length against the new count,
+      so the loss was subtracted from both sides of its own inequality. 0.9.35
+      FIXED exactly that, in the #2497 rework: `_disk_nodes = existing_nodes`
+      snapshots the on-disk baseline BEFORE the rebind (`build.py:1633`), and the
+      guard now diffs by node identity rather than by count.
+    - **On 0.9.35**: it still cannot fire on THIS class, because its excuse
+      predicate IS its drop predicate. Nodes are dropped when `sf in own or
+      _norm_source_file(sf, root) in own` (`_kept`, `build.py:1639`), and
+      `_explained` excuses a lost node on `sf in own or _norm_source_file(sf, root)
+      in own` (`build.py:1851`) — the same test over the same `new_sem_sources`
+      set. Every node a basename collision destroys is excused by construction.
+      graphify's own comment at `:1818-1822` calls the neighbouring case a
+      "residual tradeoff (accepted)".
+
+    THERE IS A SECOND UPSTREAM GUARD, and it is the reason this was settled with a
+    live merge rather than a source read. `to_json` refuses a write whose NET node
+    count fell ("new graph has N nodes but existing graph.json has M (net -k).
+    Refusing to overwrite"). It is real and it does fire — but only on a net
+    shrink, and this failure mode is a net GAIN: the aggressor chunk adds its own
+    nodes while destroying someone else's. The measured PR #197 loss printed +796
+    with the total rising 681, i.e. 115 destroyed under a +681 net. A count guard
+    cannot see that, which is exactly what made 72 of those nodes silent.
+
+    Both halves were measured on 2026-08-07 against 0.9.35, on the real 342,266-node
+    graph, with the graph restored afterwards:
+
+    | aggressor vs victim | net | what refused |
+    |---|---|---|
+    | 2 nodes vs 3 | **-1** | `to_json`'s count guard — rc=1, nothing written |
+    | 5 nodes vs 3 | **+2** | **nothing.** rc=0, 3 nodes destroyed, `_explained` silent |
+
+    The first row is the trap: a toy reproduction that shrinks the graph triggers a
+    guard the real failure never touches, and would have been read as "upstream
+    covers this". Only the second row is representative.
+
+    So this function is not redundant with either upstream guard. Re-check the line
+    numbers above on the next graphify bump — they are the whole argument.
 
     Measured 2026-08-06 (PR #197): a new chunk destroyed **72 nodes** belonging
     to `mattpocock-skills-docs.json` — two unrelated `CHANGELOG.md` files, both
@@ -621,6 +661,57 @@ def collision_issues(paths: list[Path], *, merging: Path | None = None) -> list[
     return issues
 
 
+def assembly_overlaps(chunk_paths: list[Path]) -> list[str]:
+    """`source_file`s claimed by more than one chunk being ASSEMBLED into one (#198 item 2).
+
+    `assemble` checked node-ID collisions and never this one, so two extractions of
+    the same page — different ids, same `source_file` — concatenated cleanly into a
+    single committed chunk holding BOTH node sets for one file.
+
+    THE HARM IS DUPLICATION, NOT THE SILENT LOSS #189 IS ABOUT, and that difference
+    is why this is a separate function rather than a call to `collision_issues`.
+    Nothing prunes between chunks here; they all become one chunk's nodes. So:
+
+    - `collision_issues`' message is about DELETION ("makes X own it and DELETES the
+      other(s)' nodes"), which does not happen during assembly. Printing it here
+      would describe a loss that did not occur.
+    - `collision_issues` EXCUSES an overlap that a chunk declared in `supersedes`.
+      That excuse is void here. A declaration only takes effect when the chunk
+      MERGES, and by then this is a single chunk with nothing left to supersede —
+      so a declared overlap duplicates exactly as silently as an undeclared one.
+      Reusing that function would have shipped a gate blind to half its own class.
+
+    Every overlap is therefore reported, declared or not. The cry-wolf risk is low
+    by construction rather than by hope: `kb-extract` fans out ONE agent per source
+    (`.claude/workflows/kb-extract.js`), so two inputs claiming one file inside a
+    single batch is an anomaly, not a workflow. If a source ever is deliberately
+    split across workers, this refuses and the fix is to say so at the identity
+    level — not to widen the gate.
+
+    Claims come from `chunk_claims`, the one reader that knows how a `source_file`
+    is normalised; re-parsing costs 34 ms over the 19 committed chunks (measured
+    2026-08-06) and buys a single owner for "what does this chunk claim".
+    """
+    unique = list(dict.fromkeys(p.resolve() for p in chunk_paths))
+    if len(unique) < _MIN_CHUNKS_FOR_COLLISION:
+        return []
+    owners: dict[str, list[Path]] = {}
+    for p in unique:
+        per_file, _ = chunk_claims(p)
+        for sf in per_file:
+            owners.setdefault(sf, []).append(p)
+    return [
+        f"duplicate claim: {', '.join(sorted(q.name for q in holders))} all claim "
+        f"source_file {sf!r}; assembly CONCATENATES, so every one of those node "
+        f"sets lands in the combined chunk — a duplication, not a supersession. "
+        f"Adding {sf!r} to a '{_SUPERSEDES}' list does NOT fix this: that only "
+        f"takes effect when the combined chunk merges, by which point it is one "
+        f"chunk. Re-extract {sf!r} once, or leave the stale chunk out of the batch"
+        for sf, holders in sorted(owners.items())
+        if len(holders) >= _MIN_CHUNKS_FOR_COLLISION
+    ]
+
+
 def _out_path(repo_root: Path, name: str) -> Path:
     stem = name.removesuffix(".json").removesuffix("-docs")
     return repo_root / "sources" / "extractions" / f"{stem}-docs.json"
@@ -629,8 +720,12 @@ def _out_path(repo_root: Path, name: str) -> Path:
 def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     """Validate + union-merge per-source chunks into one committed doc chunk.
 
-    Each input chunk is validated on its own; then ids are checked for collisions
-    ACROSS the set (extraction prefixes ids per source, so a collision is a bug);
+    Each input chunk is validated on its own; then TWO cross-set collision checks
+    run, because a pair of chunks can collide on either axis independently:
+    node IDs (extraction prefixes ids per source, so a collision is a bug) and
+    `source_file` CLAIMS (`assembly_overlaps`, #198 item 2 — two extractions of one
+    page, different ids, both concatenated in). Only the first existed until
+    2026-08-07, and it is exactly the wrong instrument for the second;
     nodes/edges/hyperedges are concatenated (no cross-source dedup — the aggregate
     graph spans many sources, so `_merge_docs.py` merges with dedup=False by
     design). Writes `sources/extractions/<name>-docs.json` and returns its path.
@@ -709,6 +804,13 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     # accepted cost of also validating the artifact that actually gets written
     # against its own final node set, not something this call sidesteps.
     problems.extend(_hyperedge_issues(hyperedges, set(seen), f"{name} (combined)"))
+    # The `source_file`-claim check, alongside the id-collision one in the loop
+    # above (#198 item 2). Two chunks can collide on WHICH FILE THEY DESCRIBE while
+    # colliding on no id at all — extraction prefixes ids per source, so the id map
+    # is precisely the wrong instrument for it and reported clean on the shape that
+    # motivated this. Run on `chunk_paths`, the inputs, because the combined
+    # artifact has already lost the boundary the overlap is defined across.
+    problems.extend(assembly_overlaps(chunk_paths))
 
     if problems:
         raise ValueError(

@@ -231,6 +231,13 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     prior = graph_counts.read(repo_root, out)
     if prior is not None and "nodes" in prior:
         cmd += ["--prior-nodes", str(prior["nodes"])]
+    # #198 item 1. Passed INDEPENDENTLY of `--prior-nodes`, not inside the same
+    # `if`: `graph_counts` records four fields but `_derive_prose` writes only
+    # three (no `members`), so a ledger entry carrying one slot and not another is
+    # a shape this repo already produces. Nesting these would let a missing
+    # `nodes` silently suppress a hyperedge check that was perfectly available.
+    if prior is not None and "hyperedges" in prior:
+        cmd += ["--prior-hyperedges", str(prior["hyperedges"])]
     # CLEARED before launch, not merely consumed after. The path is fixed and
     # reused, and `_merge_docs.py` legitimately writes nothing for a 0-node chunk
     # or a refused export — so a leftover file from an interrupted earlier run

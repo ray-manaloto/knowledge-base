@@ -722,24 +722,42 @@ def _verified_ledger_chunks(repo_root: Path) -> list[tuple[Path, str]]:
     return verified
 
 
-def _handoff_nodes(handoff: Path) -> int | None:
-    """The node count `_merge_docs.py` just wrote, consuming the handoff file.
+#: The ledger fields threaded from one replayed chunk into the next as its prior.
+#: A SUBSET of `graph_counts._FIELDS` on purpose: these are the two `_merge_docs`
+#: asserts an identity over. `edges` has no such identity (a merge adds edges
+#: between pre-existing nodes, so no arithmetic predicts the total) and `members`
+#: is not produced by every writer — `_derive_prose` omits it, which #198 flags.
+#: Threading a field nothing checks would put a number in argv that no arm covers.
+_THREADED_COUNTS = ("nodes", "hyperedges")
 
-    Returns None — *unknown* — for a missing, unreadable or malformed handoff,
-    never a stale number: the file is removed on every read, so a value from an
-    earlier chunk can never be mistaken for this one's. That distinction is the
-    whole point of threading counts at all; a prior count that is quietly one
-    chunk out of date produces a confident, wrong "replaced" figure, which is
-    worse than admitting the arithmetic was not checked.
+
+def _handoff_counts(handoff: Path) -> dict[str, int | None]:
+    """The counts `_merge_docs.py` just wrote, consuming the handoff file.
+
+    Returns None PER FIELD — *unknown* — for a missing, unreadable or malformed
+    handoff, never a stale number: the file is removed on every read, so a value
+    from an earlier chunk can never be mistaken for this one's. That distinction is
+    the whole point of threading counts at all; a prior count that is quietly one
+    chunk out of date produces a confident, wrong "replaced" figure, which is worse
+    than admitting the arithmetic was not checked.
+
+    Returns the whole mapping rather than one field (#198 item 1) — and that is
+    forced, not stylistic. The handoff is UNLINKED on read, so a second
+    `_handoff_hyperedges` reading the same file could never see it: whichever ran
+    first would delete it and the other would report *unknown* forever, which is
+    the failure mode that looks exactly like a passing check.
     """
     try:
         data = json.loads(handoff.read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
-        return None
+        return dict.fromkeys(_THREADED_COUNTS)
     finally:
         handoff.unlink(missing_ok=True)
-    n = data.get("nodes") if isinstance(data, dict) else None
-    return n if isinstance(n, int) else None
+    if not isinstance(data, dict):
+        return dict.fromkeys(_THREADED_COUNTS)
+    return {
+        field: v if isinstance(v := data.get(field), int) else None for field in _THREADED_COUNTS
+    }
 
 
 def _replay_doc_chunks(
@@ -771,20 +789,35 @@ def _replay_doc_chunks(
     The ledger's own payoff is the INCREMENTAL path (`graphify_ops.merge_chunk`),
     where the graph on disk really is the one it describes — and that is the path
     the 2026-08-06 loss arrived on.
+
+    HYPEREDGES ARE THREADED HERE TOO (#198 item 1), and this path is the one that
+    needed it most: the #186 loss that started this whole ticket family — 11
+    hyperedges to 8, no nodes moved — was observed on a REBUILD, i.e. in this loop,
+    by a human diffing rebuild against incremental. Until now this loop threaded
+    `nodes` alone, so it would have replayed straight past it printing "0 replaced"
+    and been entirely correct about nodes while the thing it was written to catch
+    went by.
     """
     from kb_setup import chunks as _chunks
 
     counts_out = out.with_name(".merge-counts.tmp.json")
-    prior_nodes: int | None = None
+    prior: dict[str, int | None] = dict.fromkeys(_THREADED_COUNTS)
     for chunk in _chunks.replay_order(chunk_paths):
         name = chunk.stem.removesuffix("-docs")
         root = str((sources / name).resolve())
         argv = [gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)]
-        if prior_nodes is not None:
-            argv += ["--prior-nodes", str(prior_nodes)]
+        # Per field, not all-or-nothing: a handoff carrying `nodes` but not
+        # `hyperedges` (or the reverse) must still check the half it can. The
+        # loop emits `--prior-<field>` from one table so a field added to
+        # `_THREADED_COUNTS` is threaded here without a second edit — the
+        # divergence that let the incremental and rebuild paths disagree in the
+        # first place.
+        for field, value in prior.items():
+            if value is not None:
+                argv += [f"--prior-{field}", str(value)]
         argv += ["--counts-out", str(counts_out)]
         _run(argv, repo_root)
-        prior_nodes = _handoff_nodes(counts_out)
+        prior = _handoff_counts(counts_out)
 
 
 def _validate_replay_chunks(paths: list[Path]) -> None:
