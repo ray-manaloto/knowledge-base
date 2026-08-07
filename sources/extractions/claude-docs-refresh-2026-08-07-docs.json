@@ -1,0 +1,2149 @@
+{
+ "nodes": [
+  {
+   "id": "ccagents_doc",
+   "label": "Run agents in parallel (code.claude.com/docs/en/agents)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Comparison page for the four ways Claude Code takes on multiple tasks at once: subagents, agent view, agent teams, and dynamic workflows. The right one depends on whether you want to stay in each conversation yourself, hand tasks off and check back later, or have Claude coordinate a group of workers."
+  },
+  {
+   "id": "ccagents_subagents",
+   "label": "Subagents",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Delegated workers inside one session that do a side task in their own context and return a summary. Use when a side task would flood the main conversation with search results, logs, or file contents you will not reference again."
+  },
+  {
+   "id": "ccagents_agent_view",
+   "label": "Agent view (claude agents)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "One screen to dispatch and monitor sessions running in the background, opened with `claude agents`. A research preview. Use it when you have several independent tasks and want to hand them off, check status at a glance, and step in only when one needs you."
+  },
+  {
+   "id": "ccagents_agent_teams",
+   "label": "Agent teams",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multiple coordinated sessions with a shared task list and inter-agent messaging, managed by a lead. Experimental and disabled by default. Use it when you want Claude to split a project into pieces, assign them, and keep the workers in sync."
+  },
+  {
+   "id": "ccagents_dynamic_workflows",
+   "label": "Dynamic workflows",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A script that runs many subagents and cross-checks their results, for work too big to coordinate one turn at a time or that needs more than a single pass — a codebase-wide audit, a 500-file migration, cross-checked research, or a plan drafted from several angles."
+  },
+  {
+   "id": "ccagents_workers_are_claude_sessions",
+   "label": "Every worker is a Claude session",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "In every one of the four approaches the workers are Claude sessions. To involve a different tool, expose it to Claude as an MCP server rather than expecting a non-Claude worker."
+  },
+  {
+   "id": "ccagents_worktrees",
+   "label": "Worktrees for parallel isolation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Worktrees give each session a separate git checkout so parallel sessions never edit the same files. Agent view moves each dispatched session into its own worktree automatically, and subagents you spawn can each get one too. A supporting tool, not a way to run agents."
+  },
+  {
+   "id": "ccagents_batch_command",
+   "label": "/batch — packaged subagents + worktrees",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`/batch` is a skill that has Claude split one large change into 5 to 30 worktree-isolated subagents that each open a pull request. It is a packaged use of subagents and worktrees, not a separate coordination style."
+  },
+  {
+   "id": "ccagents_background_bash",
+   "label": "Background bash command spawns no agent",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A background bash command runs one shell command without blocking the conversation. It does not spawn an agent, so it solves a different problem than splitting work across agents."
+  },
+  {
+   "id": "ccagents_forked_subagent",
+   "label": "Forked subagent (/subtask)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Started with `/subtask`, a forked subagent inherits your full conversation context instead of starting fresh. It is a way to spawn a subagent, not a separate surface."
+  },
+  {
+   "id": "ccagents_fork_command",
+   "label": "/fork — copy the session into a background session",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`/fork` copies the whole session into a new background session that runs alongside it. With agent view turned off, `/fork` becomes the forked-subagent command instead and `/subtask` is not available."
+  },
+  {
+   "id": "ccagents_routine",
+   "label": "Routines run on a schedule, not in parallel",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A routine runs a session on a schedule in the cloud, not in parallel on your machine. As of 2026-08-07 the page says 'in the cloud'; it previously read 'in Anthropic's cloud'."
+  },
+  {
+   "id": "ccagents_token_multiplication",
+   "label": "Parallelism multiplies token usage",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Running several sessions or subagents at once multiplies token usage; the docs point at the Costs page for usage and rate-limit details. This is the standing cost caveat on every parallel approach."
+  },
+  {
+   "id": "ccagents_who_coordinates",
+   "label": "Choose by who coordinates the work",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The first selection axis: Claude delegating inside one conversation means subagents; you handing off and checking back means agent view; Claude planning, assigning and supervising means agent teams; a script holding the plan instead of Claude's turn-by-turn judgment means dynamic workflows."
+  },
+  {
+   "id": "ccagents_worker_communication",
+   "label": "Choose by whether workers must talk to each other",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The second selection axis: subagents report results back to the conversation that spawned them, agent view sessions report only to you, and teammates in an agent team share a task list and message each other directly."
+  },
+  {
+   "id": "ccagents_file_conflict_isolation",
+   "label": "Choose by whether tasks touch the same files",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The third selection axis: isolate overlapping work with worktrees. Subagents and sessions you run yourself can each use a separate worktree, but agent teams do NOT isolate teammates in worktrees — partition the work so each teammate owns a different set of files."
+  },
+  {
+   "id": "ccagents_claude_agents_screen",
+   "label": "claude agents — check background sessions",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "For background sessions, `claude agents` opens agent view: one screen showing every session, its state, and which ones need your input."
+  },
+  {
+   "id": "ccagents_agents_command_prints_notice",
+   "label": "/agents no longer opens a panel (v2.1.198)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "As of v2.1.198, `/agents` prints a notice pointing to the subagent file locations instead of opening a panel; create and edit custom subagents by asking Claude or editing the files directly. Despite the similar name, `/agents` is separate from `claude agents`."
+  },
+  {
+   "id": "ccagents_named_subagent_typeahead",
+   "label": "Named background subagents appear in @-mention typeahead",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "For subagents in the current session, named background subagents appear in the @-mention typeahead with their status — this is how you check on a running subagent rather than a panel."
+  },
+  {
+   "id": "ccagents_tasks_command",
+   "label": "/tasks — everything running in the background",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`/tasks` lists each item running in the background of the current session and lets you check on, attach to, or stop it. The list also includes subagents that have finished."
+  },
+  {
+   "id": "ccagents_workflows_command",
+   "label": "/workflows — running and completed workflow runs",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "For dynamic workflows, `/workflows` lists running and completed runs, the phase each is in, and how many agents have finished."
+  },
+  {
+   "id": "ccagents_mcp_for_other_tools",
+   "label": "Expose a non-Claude tool as an MCP server",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Because every worker is a Claude session, involving a different tool in parallel work means exposing that tool to Claude as an MCP server. There is no 'run a non-Claude agent' surface."
+  },
+  {
+   "id": "ccagents_cross_check_verification",
+   "label": "Workflows cross-check findings against each other",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "source_url": "https://code.claude.com/docs/en/agents",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The distinguishing capability of a dynamic workflow over a handful of subagents is verification: it runs many subagents and verifies their findings against each other, which is why it suits audits and cross-checked research."
+  },
+  {
+   "id": "ccmodelcfg_doc",
+   "label": "Model configuration (code.claude.com/docs/en/model-config)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Reference page for how Claude Code selects a model: aliases, the precedence order for setting one, enterprise allowlists and organization defaults, fallback behavior, effort levels, extended thinking and context, and the environment variables that pin provider model IDs."
+  },
+  {
+   "id": "ccmodelcfg_model_setting_accepts",
+   "label": "The model setting accepts an alias or a provider-specific name",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The `model` setting takes either a model alias or a model name — a full Anthropic API model name, an Amazon Bedrock inference profile ARN, a Microsoft Foundry deployment name, or a Google Cloud Agent Platform version name."
+  },
+  {
+   "id": "ccmodelcfg_base_url_not_model",
+   "label": "ANTHROPIC_BASE_URL changes where, not which",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`ANTHROPIC_BASE_URL` changes where requests are sent, not which model answers them. Routing Claude through an LLM gateway is a separate concern from model selection."
+  },
+  {
+   "id": "ccmodelcfg_aliases",
+   "label": "Model aliases",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Aliases select model settings without remembering exact version numbers: `default`, `best`, `fable`, `sonnet`, `opus`, `haiku`, `sonnet[1m]`, `opus[1m]`, and `opusplan`. Aliases point to the recommended version for your provider and update over time."
+  },
+  {
+   "id": "ccmodelcfg_alias_default",
+   "label": "`default` clears any model override",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`default` is a special value that clears any model override and reverts to the recommended model for your account type, or to the organization default model when an admin has set one. It is not itself a model alias."
+  },
+  {
+   "id": "ccmodelcfg_alias_best",
+   "label": "`best` — Fable 5 where available, else latest Opus",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The `best` alias uses Fable 5 where your organization has access to it, and otherwise the latest Opus model."
+  },
+  {
+   "id": "ccmodelcfg_alias_resolution_by_provider",
+   "label": "Alias resolution differs by provider",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`opus`/`sonnet` resolve differently per provider: Anthropic API gives Opus 5 / Sonnet 5; Claude Platform on AWS gives Opus 5 / Sonnet 4.6; Amazon Bedrock and Google Cloud's Agent Platform give Opus 5 / Sonnet 4.5; Microsoft Foundry gives Opus 4.6 / Sonnet 4.5. Where an alias resolves to an older model, select the full name or set ANTHROPIC_DEFAULT_*_MODEL."
+  },
+  {
+   "id": "ccmodelcfg_version_floors",
+   "label": "Version floors for the newest models",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Opus 5 requires Claude Code v2.1.219 or later, Sonnet 5 requires v2.1.197 or later, Opus 4.8 requires v2.1.154 or later, and Fable 5 requires v2.1.170 or later. Older versions do not show the model in the picker and cannot select it."
+  },
+  {
+   "id": "ccmodelcfg_pin_with_full_name",
+   "label": "Pin a version with the full model name, not an alias",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Because aliases update over time, pinning to a specific version requires the full model name, for example `claude-opus-5`, or the corresponding environment variable such as `ANTHROPIC_DEFAULT_OPUS_MODEL`."
+  },
+  {
+   "id": "ccmodelcfg_fable5",
+   "label": "Fable 5 — the most capable model in Claude Code",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Fable 5 suits tasks larger than a single sitting: it sustains long autonomous sessions, investigates before acting, and verifies its work more often than smaller models. It is not the default on any account type — select it with `/model fable`, a `model` setting, or the `best` alias."
+  },
+  {
+   "id": "ccmodelcfg_fable5_usage_guidance",
+   "label": "How to get the most from Fable 5",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Describe the outcome rather than the steps and set a goal to keep it working until that outcome holds; hand it ambiguous problems such as root-cause investigations and architecture decisions; skip verification reminders because it verifies itself; and size up tasks you would normally break into pieces."
+  },
+  {
+   "id": "ccmodelcfg_fable5_availability_check",
+   "label": "Fable 5 availability is checked server-side",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "On the Anthropic API the `/model` picker lists Fable 5 only after the server reports it available for your organization, but typing `/model fable` checks availability directly — so the selection can succeed before the picker lists the entry. Fable 5 is not available under zero data retention."
+  },
+  {
+   "id": "ccmodelcfg_setting_priority",
+   "label": "Model setting precedence order",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "In order of priority: `/model <alias|name>` during a session, `claude --model <alias|name>` at startup, the `ANTHROPIC_MODEL` environment variable, then the `model` field in a settings file."
+  },
+  {
+   "id": "ccmodelcfg_model_saves_default",
+   "label": "/model saves your choice as the default (v2.1.153)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "As of v2.1.153, `/model` writes the `model` field in user settings: Enter switches and saves as default, `s` switches for the session only, and typing `/model <name>` behaves like Enter. In v2.1.144-v2.1.152 it applied to the session only and `d` saved a default."
+  },
+  {
+   "id": "ccmodelcfg_session_scoped_selection",
+   "label": "--model and ANTHROPIC_MODEL are session-scoped",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The `--model` flag and `ANTHROPIC_MODEL` apply only to the session launched with them. To run different models in different terminals at once, launch each with its own `--model` flag rather than switching with `/model`."
+  },
+  {
+   "id": "ccmodelcfg_picker_prices_display_only",
+   "label": "Picker prices are a display label only",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Prices appear only when Claude Code talks to the Anthropic API directly or through a proxying gateway; on third-party providers the provider determines what you pay so rows show no price. The price never affects which model a row selects. Before v2.1.206 a row could show the price of a different model than it selected."
+  },
+  {
+   "id": "ccmodelcfg_resume_keeps_model",
+   "label": "Resumed sessions keep their transcript model",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sessions resumed with `--resume`, `--continue`, or `/resume` keep the model they used when the transcript was saved, so another session's `/model` choice cannot change it. If that model is retired or excluded by `availableModels`, the session falls through to normal precedence. On providers with provider-specific deployment IDs the transcript model is not restored at all."
+  },
+  {
+   "id": "ccmodelcfg_model_id_validation",
+   "label": "Model-name validation on the Anthropic API (v2.1.200)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "When the Agent SDK `setModel()` or a host app requests a switch, Claude Code checks the string is recognized — an alias, a picker entry, any name starting with `claude-`, or a configured custom option / `modelOverrides` entry — and rejects an unknown one with `Model \"<name>\" is not a recognized model id.` rather than failing on the next request. The check runs only on the Anthropic API and does not cover `--model`, `ANTHROPIC_MODEL`, or the `model` setting."
+  },
+  {
+   "id": "ccmodelcfg_retirement_warning",
+   "label": "Retirement and remap warnings name the requested model",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "When a requested model has a scheduled retirement date or is remapped to a newer version, a warning names it — a startup notice interactively, and from v2.1.182 on stderr in non-interactive mode with text output. It is suppressed for json/stream-json output; read `modelUsage` from the result message instead. The check also covers `model` in subagent frontmatter."
+  },
+  {
+   "id": "ccmodelcfg_available_models",
+   "label": "availableModels — the enterprise allowlist",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Administrators restrict which models users can select with `availableModels` in managed or policy settings. Entries match a model family such as `sonnet`, a version prefix such as `claude-sonnet-4-5`, or a full model ID such as `claude-sonnet-4-5-20250929`."
+  },
+  {
+   "id": "ccmodelcfg_allowlist_surfaces",
+   "label": "The allowlist applies everywhere a model can be specified",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "It covers the main session model, alias-resolution env vars, `/fast`, subagent and teammate models including `CLAUDE_CODE_SUBAGENT_MODEL` and `teammateDefaultModel`, skill and command `model` frontmatter, the `advisorModel` setting and `--advisor` flag, and the background-agent dispatch picker."
+  },
+  {
+   "id": "ccmodelcfg_family_alias_substitution",
+   "label": "A family alias resolves to the newest permitted version (v2.1.205)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "On the Anthropic API and Claude Platform on AWS, `opus`/`sonnet`/`haiku`/`fable` resolve to the newest version the allowlist permits, with a notice naming both requested and substituted models. The substitution needs a permitted version to land on; when no version of the family is permitted the alias is rejected like any other blocked value. Before v2.1.205 an alias was judged on its newest released version alone."
+  },
+  {
+   "id": "ccmodelcfg_blocked_selection_behavior",
+   "label": "Blocked selections behave differently per source",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`/model` is rejected with an error; `--model`/`ANTHROPIC_MODEL`/`model` are replaced at startup with a warning; a subagent or teammate override falls back to the inherited or default model rather than failing; a skill or command override is ignored and the session model runs; `advisorModel` disables the advisor; `--advisor` exits with an error at launch."
+  },
+  {
+   "id": "ccmodelcfg_automatic_changes_checked",
+   "label": "Claude Code's own model changes are allowlist-checked too",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Fallback-chain entries outside the allowlist are dropped; plan-mode upgrades use the newest permitted version of the upgrade family or are skipped; an automatic safety fallback whose target is excluded does not run, so the flagged request ends in a refusal; the auto-mode classifier falls back to the session model or Opus; fast mode is refused."
+  },
+  {
+   "id": "ccmodelcfg_surface_coverage",
+   "label": "Surface coverage — enforcement is universal, delivery is not",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Every surface enforces the allowlist it receives; what differs is which delivery mechanism reaches it. Server-managed settings are enforced on CLI/IDE, desktop local, web/mobile/cloud, and Agent SDK, but are not delivered to Cowork. MDM or managed settings files are not delivered in Anthropic-hosted cloud environments."
+  },
+  {
+   "id": "ccmodelcfg_self_hosted_fallback",
+   "label": "Self-hosted environments fall back to the runner image's managed settings",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Sessions routed to a self-hosted environment run on your own compute and fall back to the managed settings file in the runner image when your organization delivers no server-managed settings. When both exist the server-managed payload takes precedence, with a per-key `env` merge exception. Added to the page on 2026-08-07."
+  },
+  {
+   "id": "ccmodelcfg_default_unaffected_by_allowlist",
+   "label": "availableModels alone never constrains Default",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The Default picker option is not affected by `availableModels` unless `enforceAvailableModels` is also set; on its own the allowlist leaves Default resolving to the account's runtime default. An empty `availableModels: []` never engages Default enforcement at all."
+  },
+  {
+   "id": "ccmodelcfg_enforce_available_models",
+   "label": "enforceAvailableModels extends the allowlist to Default",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Set `enforceAvailableModels: true` alongside a non-empty `availableModels` in managed settings (v2.1.175+) and Default resolves to the first allowlist entry naming an allowed, available model. When no entry resolves, enforcement is skipped and Default falls back to the account-type default with a warning visible only under `--debug` — so keep at least one guaranteed-available entry."
+  },
+  {
+   "id": "ccmodelcfg_deploy_both_keys_together",
+   "label": "Deploy availableModels and enforceAvailableModels in one managed source",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "These keys do not merge across managed sources, so a pair placed in a managed settings file is ignored when the admin console delivers any settings. Deploy both in the highest-precedence managed source."
+  },
+  {
+   "id": "ccmodelcfg_model_is_not_enforcement",
+   "label": "The `model` setting is an initial selection, not enforcement",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`model` sets which model is active at session start, but users can still pick Default in `/model`, which resolves to the runtime default regardless — unless `enforceAvailableModels` redirects it. Fully controlling the experience needs `availableModels` + `enforceAvailableModels` + `model` + the `ANTHROPIC_DEFAULT_*_MODEL` env block together."
+  },
+  {
+   "id": "ccmodelcfg_merge_behavior",
+   "label": "availableModels merge behavior and wildcard disabling",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "When the highest-precedence managed source defines `availableModels` that list alone applies; user/project/local entries cannot extend it, and the key does not merge across admin-deployed managed sources. Within the effective list, naming a specific model in a family disables that family's wildcard: `[\"sonnet\", \"claude-sonnet-4-5\"]` allows only Sonnet 4.5 versions."
+  },
+  {
+   "id": "ccmodelcfg_mantle_model_ids",
+   "label": "Mantle model IDs are added as custom picker options",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "With the Amazon Bedrock Mantle endpoint enabled, `availableModels` entries starting with `anthropic.` are added to the picker as custom options and routed to Mantle — an exception to normal alias matching. A Mantle ID embeds a family name, so it counts as a specific entry and disables that family's wildcard."
+  },
+  {
+   "id": "ccmodelcfg_org_model_restrictions",
+   "label": "Organization model restrictions (v2.1.187)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Enterprise admins disable individual models in the claude.ai admin console. The restriction arrives with account entitlements and the server enforces it independently at session creation — separate from `availableModels`, which Claude Code itself enforces. It applies org-wide or per role, Haiku can never be disabled, and changes take effect on new requests within about a minute."
+  },
+  {
+   "id": "ccmodelcfg_both_restrictions_apply",
+   "label": "Both restriction systems apply together",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A model is selectable only when `availableModels` permits it AND the organization has not restricted it. Organization restrictions reach Anthropic API and LLM gateway sessions only — Bedrock, Agent Platform, Foundry, and Claude Platform on AWS do not receive them, so use `availableModels` there."
+  },
+  {
+   "id": "ccmodelcfg_org_default_model",
+   "label": "Organization default model (v2.1.196)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Enterprise admins set a Default model for the org or per custom role; the picker's Default row shows it labeled Org default. A role default takes precedence over the org-wide one, and when several roles differ the most capable model applies. It is a starting point, not a restriction — any other selection takes precedence."
+  },
+  {
+   "id": "ccmodelcfg_org_default_override",
+   "label": "Org default can be configured to override user selection",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "With override on, the org default beats `model` in user/project/local settings, so a `/model` choice applies for the session and the org default returns on the next launch, with `/model` showing `Your organization's default (<model>) applies on restart`. `--model`, `ANTHROPIC_MODEL`, managed settings and `--settings` still take precedence. Available to a limited set of organizations."
+  },
+  {
+   "id": "ccmodelcfg_org_effort_limits",
+   "label": "Organization effort limits (v2.1.195)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Admins cap the maximum effort level per model per custom role. Levels above the cap are absent from `/effort`, and naming a higher one runs at the cap — warned in interactive and plain-text `--print` runs, silently clamped with json/stream-json output or in background agents. When several roles grant the same model the least restrictive cap applies."
+  },
+  {
+   "id": "ccmodelcfg_default_by_account_type",
+   "label": "`default` resolves by account type",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Max, Team Premium, Enterprise pay-as-you-go and Anthropic API default to Opus 5; Claude Platform on AWS, Amazon Bedrock and Google Cloud's Agent Platform default to Opus 5; Pro, Team Standard and Enterprise subscription seats default to Sonnet 5; Microsoft Foundry defaults to Sonnet 4.5. An organization default replaces the account-type default first, then enforcement applies to it."
+  },
+  {
+   "id": "ccmodelcfg_opusplan",
+   "label": "`opusplan` — Opus to plan, Sonnet to execute",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`opusplan` uses `opus` in plan mode for reasoning and architecture, then switches to `sonnet` for code generation. The plan-mode Opus phase uses the same context window as the `opus` setting; use `opusplan[1m]` to force 1M context for both phases off an auto-upgrade tier."
+  },
+  {
+   "id": "ccmodelcfg_fallback_model_chains",
+   "label": "Fallback model chains — availability-based",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "When the primary model is overloaded, unavailable, or returns another non-retryable server error, Claude Code tries fallbacks in order. Authentication, billing, rate-limit, request-size and transport errors never trigger a switch. The switch lasts the current turn only, chains cap at three models after dedup, and `--fallback-model` beats the `fallbackModel` setting."
+  },
+  {
+   "id": "ccmodelcfg_fallback_chain_pruning",
+   "label": "Two kinds of chain entry are removed before the walk",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Entries outside `availableModels` are dropped when the chain is read; and during compaction Claude Code will not fall back to a model with a smaller context window than the primary's, since summarizing there would cut off part of the conversation. If every fallback is smaller, compaction shows the original error."
+  },
+  {
+   "id": "ccmodelcfg_chain_is_invisible",
+   "label": "A configured chain is invisible until it fires",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude Code does not confirm the chain at startup and `/status` does not display it. The notice shown when a switch happens is the first visible sign that a fallback is configured."
+  },
+  {
+   "id": "ccmodelcfg_automatic_model_fallback",
+   "label": "Automatic model fallback — content-based",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Fable 5 and Opus 5 run safety classifiers for cybersecurity and biology. Fable 5 re-runs biology flags on Opus 5 and cybersecurity flags on Opus 4.8; Opus 5 re-runs cybersecurity flags on Opus 4.8 but ends biology flags in a refusal, having no biology fallback. Category-based fallback requires v2.1.219. The session continues on the fallback model afterward."
+  },
+  {
+   "id": "ccmodelcfg_first_request_flag",
+   "label": "Fallback can trigger on the first request",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The first request carries workspace context such as CLAUDE.md content and git status, so a repository containing security or biology material can trip the classifier before you send anything unusual. Start with `claude --safe-mode` to check whether customizations are the trigger; git status and directory names are not customizations and are still included."
+  },
+  {
+   "id": "ccmodelcfg_switch_models_on_flag",
+   "label": "switchModelsOnFlag — ask before switching",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Turn off `switchModelsOnFlag` (or the `/config` toggle) and a flagged request pauses with two options: switch to the fallback, or edit the prompt and retry on the current model. The prompt is not shown when the category has no fallback or the target is blocked by `availableModels`; non-interactive and SDK integrations end the turn with a refusal."
+  },
+  {
+   "id": "ccmodelcfg_third_party_fallback_recognition",
+   "label": "Third-party fallback needs both models identifiable",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "On Bedrock, Agent Platform and Foundry, automatic fallback runs only when Claude Code can identify both models: Fable 5 by an ID containing `claude-fable-5`, `ANTHROPIC_DEFAULT_FABLE_MODEL`, or a `modelOverrides` mapping; and a resolvable fallback target. If either is unidentifiable, the flagged request ends in a refusal and you switch models manually."
+  },
+  {
+   "id": "ccmodelcfg_security_biology_workloads",
+   "label": "Security and biology workloads trigger fallback frequently",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Offensive security, CTF exercises and biology-adjacent codebases trigger fallback often, frequently on the first request. This is expected routing for these domains, not an account flag; organizations needing Fable-class capability there should ask about trusted access programs."
+  },
+  {
+   "id": "ccmodelcfg_effort_levels",
+   "label": "Effort levels control adaptive reasoning",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Effort lets the model decide whether and how much to think per step. Fable 5, Opus 5, Sonnet 5, Opus 4.8 and Opus 4.7 support low/medium/high/xhigh/max; Opus 4.6 and Sonnet 4.6 support low/medium/high/max. An unsupported level falls back to the highest supported level at or below it. The scale is calibrated per model, so a level name is not the same value across models."
+  },
+  {
+   "id": "ccmodelcfg_effort_defaults_and_hold",
+   "label": "Effort defaults and the first-run hold",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The default is `high` on every model that supports effort except Opus 4.7, which defaults to `xhigh`. First running Fable 5, Opus 4.8 or Opus 4.7 applies that model's default and HOLDS it across sessions until an explicit choice; Opus 5 has no such hold. A non-interactive `/effort` cannot release the hold and reports `Not applied` — pass `--effort` at launch instead."
+  },
+  {
+   "id": "ccmodelcfg_ultracode",
+   "label": "ultracode is a Claude Code setting, not a model effort level",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Ultracode sends `xhigh` to the model AND has Claude orchestrate dynamic workflows for substantive tasks. Session-only. Enable via `/effort ultracode`, `--effort ultracode` (v2.1.203+), or `\"ultracode\": true` through `--settings`/an SDK control request. The persisted `effortLevel` setting and `CLAUDE_CODE_EFFORT_LEVEL` do not accept it, and when workflows are off it sets `xhigh` only."
+  },
+  {
+   "id": "ccmodelcfg_setting_effort",
+   "label": "Where an effort level can be set, and what wins",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Set effort via `/effort`, the `/model` slider, `--effort`, `CLAUDE_CODE_EFFORT_LEVEL`, the `effortLevel` setting, or `effort` in skill/subagent frontmatter. The environment variable takes precedence over everything, then your configured level, then the model default; frontmatter overrides the session level but not the env var. Managed `effortLevel` is a starting default, not enforcement."
+  },
+  {
+   "id": "ccmodelcfg_ultrathink",
+   "label": "ultrathink — one-off deeper reasoning",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Including `ultrathink` anywhere in a prompt adds an in-context instruction for deeper reasoning on that turn; the effort level sent to the API is unchanged. Phrases such as 'think', 'think hard' and 'think more' are ordinary prompt text and are NOT recognized keywords."
+  },
+  {
+   "id": "ccmodelcfg_adaptive_reasoning",
+   "label": "Adaptive reasoning vs fixed thinking budgets",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Adaptive reasoning makes thinking optional per step. Fable 5, Sonnet 5, and Opus 4.7 and later always use it — the fixed-budget mode and `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING` do not apply. On Opus 4.6 and Sonnet 4.6 you can set that variable to revert to a fixed budget controlled by `MAX_THINKING_TOKENS`."
+  },
+  {
+   "id": "ccmodelcfg_extended_thinking",
+   "label": "Extended thinking controls",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Toggle for the session with Option+T / Alt+T, set the global default via `/config` (`alwaysThinkingEnabled`), or disable regardless of effort with `MAX_THINKING_TOKENS=0`. Thinking CANNOT be turned off on Fable 5 — none of the three has any effect there. You are charged for all thinking tokens generated, even collapsed or redacted."
+  },
+  {
+   "id": "ccmodelcfg_extended_context",
+   "label": "Extended 1M context by model and plan",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Fable 5, Sonnet 5, Opus 4.6+ and Sonnet 4.6 support a 1M token window. On Max/Team/Enterprise, Opus is upgraded to 1M automatically; Sonnet 4.6 with 1M is not part of that upgrade and requires usage credits on every plan including Max. The 1M window uses standard pricing with no premium beyond 200K. `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` removes 1M variants entirely."
+  },
+  {
+   "id": "ccmodelcfg_sonnet5_context",
+   "label": "Sonnet 5 always runs at 1M on the Anthropic API",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "There is no 200K variant, no `[1m]` suffix to select, and no usage credits required on any plan. Sessions auto-compact at about 967K tokens by default (`CLAUDE_CODE_AUTO_COMPACT_WINDOW` changes it). Two configurations budget 200K instead: an LLM gateway, where 1M support cannot be verified, and `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`."
+  },
+  {
+   "id": "ccmodelcfg_custom_model_option",
+   "label": "ANTHROPIC_CUSTOM_MODEL_OPTION adds one picker entry",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Adds a single custom entry at the bottom of the `/model` picker without replacing built-in aliases, with optional `_NAME` and `_DESCRIPTION` companions. Validation is skipped for its ID. Gateway deployments can populate the picker from `/v1/models` with `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` instead. Include the custom ID in `availableModels` or the entry is filtered out."
+  },
+  {
+   "id": "ccmodelcfg_family_env_vars",
+   "label": "ANTHROPIC_DEFAULT_*_MODEL family variables",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`ANTHROPIC_DEFAULT_FABLE_MODEL`, `_OPUS_MODEL`, `_SONNET_MODEL` and `_HAIKU_MODEL` control what each alias maps to; the Opus and Sonnet ones also back `opusplan`'s two phases, and the Haiku one backs background functionality. `ANTHROPIC_SMALL_FAST_MODEL` is deprecated in favor of `ANTHROPIC_DEFAULT_HAIKU_MODEL`."
+  },
+  {
+   "id": "ccmodelcfg_subagent_model_env",
+   "label": "CLAUDE_CODE_SUBAGENT_MODEL outranks frontmatter and the tool parameter",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "It sets the model for all subagents, agent teams and workflow agents, accepts an alias or full name, and OVERRIDES both the per-invocation `model` parameter and the subagent definition's `model` frontmatter. Set it to `inherit` to use normal model resolution instead."
+  },
+  {
+   "id": "ccmodelcfg_pin_third_party",
+   "label": "Pin model versions before rolling out on a third-party provider",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Without pinning, aliases resolve to a built-in per-provider default that can lag the newest release and may not be enabled in a user's account. Bedrock and Agent Platform then show a notice and fall back to an earlier version; Microsoft Foundry shows errors instead, having no equivalent startup check."
+  },
+  {
+   "id": "ccmodelcfg_1m_suffix_per_variable",
+   "label": "The [1m] suffix is read per variable, not per model",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Appending `[1m]` to a pinned ID applies the 1M window to all usage of that alias including opusplan's plan phase; Claude Code strips the suffix before sending the ID. On Bedrock, Agent Platform and Foundry, a model ID without `[1m]` in one variable uses 200K even if another variable sets the same model with the suffix."
+  },
+  {
+   "id": "ccmodelcfg_supported_capabilities",
+   "label": "_SUPPORTED_CAPABILITIES declares what a pinned model can do",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude Code enables effort and thinking by matching the model ID against known patterns, which provider-specific ARNs and deployment names often fail — leaving features disabled. `_SUPPORTED_CAPABILITIES` accepts effort, xhigh_effort, max_effort, thinking, adaptive_thinking and interleaved_thinking; when set, listed capabilities are enabled and unlisted ones disabled."
+  },
+  {
+   "id": "ccmodelcfg_model_overrides",
+   "label": "modelOverrides maps Anthropic IDs to provider strings",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Where the family variables configure one ID per alias, `modelOverrides` maps individual Anthropic model IDs to provider-specific strings — letting admins route each version to a specific inference profile ARN, version name or deployment for governance, cost allocation or regional routing. Unknown keys are ignored."
+  },
+  {
+   "id": "ccmodelcfg_overrides_with_allowlist",
+   "label": "modelOverrides is evaluated against the Anthropic ID, not the override",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "So an `availableModels` entry like `\"opus\"` keeps matching even when Opus versions are mapped to ARNs. When `availableModels` is set in managed settings, only `modelOverrides` from that managed source apply to IDs passed via `--model` or the env vars (v2.1.200+), and an excluded ID is never resolved through overrides from any source."
+  },
+  {
+   "id": "ccmodelcfg_prompt_caching_config",
+   "label": "Prompt caching can be disabled globally or per tier",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Claude Code uses prompt caching automatically. `DISABLE_PROMPT_CACHING=1` disables it for all models and takes precedence over the per-model variables `DISABLE_PROMPT_CACHING_HAIKU`, `_SONNET`, `_OPUS` and `_FABLE`."
+  },
+  {
+   "id": "ccmodelcfg_checking_current_model",
+   "label": "Checking which model is active",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The active model appears in a configured status line and in `/status`, which also shows account information. The current effort level is shown in the session header next to the model name, and briefly in the footer at startup and when it changes."
+  },
+  {
+   "id": "ccmodelcfg_host_managed_precedence",
+   "label": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST outranks managed model settings",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "source_url": "https://code.claude.com/docs/en/model-config",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "On platforms that embed Claude Code and set this variable, the host's model configuration takes precedence over managed model settings — while a managed `availableModels` allowlist stays in force unless the host supplies its own."
+  }
+ ],
+ "edges": [
+  {
+   "source": "ccagents_subagents",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_agent_view",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_agent_teams",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_dynamic_workflows",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_mcp_for_other_tools",
+   "target": "ccagents_workers_are_claude_sessions",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_file_conflict_isolation",
+   "target": "ccagents_worktrees",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_batch_command",
+   "target": "ccagents_subagents",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_batch_command",
+   "target": "ccagents_worktrees",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_forked_subagent",
+   "target": "ccagents_subagents",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_fork_command",
+   "target": "ccagents_forked_subagent",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_fork_command",
+   "target": "ccagents_agent_view",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_background_bash",
+   "target": "ccagents_doc",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_routine",
+   "target": "ccagents_doc",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_who_coordinates",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_worker_communication",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_file_conflict_isolation",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_who_coordinates",
+   "target": "ccagents_dynamic_workflows",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_who_coordinates",
+   "target": "ccagents_agent_teams",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_worker_communication",
+   "target": "ccagents_agent_teams",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_agent_teams",
+   "target": "ccagents_worktrees",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_claude_agents_screen",
+   "target": "ccagents_agent_view",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_agents_command_prints_notice",
+   "target": "ccagents_claude_agents_screen",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_named_subagent_typeahead",
+   "target": "ccagents_subagents",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_tasks_command",
+   "target": "ccagents_subagents",
+   "relation": "monitors",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_workflows_command",
+   "target": "ccagents_dynamic_workflows",
+   "relation": "monitors",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_dynamic_workflows",
+   "target": "ccagents_cross_check_verification",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_dynamic_workflows",
+   "target": "ccagents_subagents",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_token_multiplication",
+   "target": "ccagents_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_agent_view",
+   "target": "ccagents_worktrees",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccagents_workers_are_claude_sessions",
+   "target": "ccagents_token_multiplication",
+   "relation": "enables",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_agents.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_aliases",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_model_setting_accepts",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_alias_default",
+   "target": "ccmodelcfg_aliases",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_alias_best",
+   "target": "ccmodelcfg_aliases",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_opusplan",
+   "target": "ccmodelcfg_aliases",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_alias_resolution_by_provider",
+   "target": "ccmodelcfg_aliases",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_pin_with_full_name",
+   "target": "ccmodelcfg_alias_resolution_by_provider",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_version_floors",
+   "target": "ccmodelcfg_aliases",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_alias_best",
+   "target": "ccmodelcfg_fable5",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_fable5_usage_guidance",
+   "target": "ccmodelcfg_fable5",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_fable5_availability_check",
+   "target": "ccmodelcfg_fable5",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_fable5",
+   "target": "ccmodelcfg_automatic_model_fallback",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_setting_priority",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_model_saves_default",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_session_scoped_selection",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_resume_keeps_model",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_host_managed_precedence",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_model_id_validation",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_retirement_warning",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_picker_prices_display_only",
+   "target": "ccmodelcfg_setting_priority",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_base_url_not_model",
+   "target": "ccmodelcfg_model_setting_accepts",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_available_models",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_allowlist_surfaces",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_family_alias_substitution",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_blocked_selection_behavior",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_automatic_changes_checked",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_merge_behavior",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_mantle_model_ids",
+   "target": "ccmodelcfg_merge_behavior",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_surface_coverage",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_self_hosted_fallback",
+   "target": "ccmodelcfg_surface_coverage",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_enforce_available_models",
+   "target": "ccmodelcfg_default_unaffected_by_allowlist",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_enforce_available_models",
+   "target": "ccmodelcfg_available_models",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_deploy_both_keys_together",
+   "target": "ccmodelcfg_enforce_available_models",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_enforce_available_models",
+   "target": "ccmodelcfg_model_is_not_enforcement",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_org_model_restrictions",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_both_restrictions_apply",
+   "target": "ccmodelcfg_org_model_restrictions",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_both_restrictions_apply",
+   "target": "ccmodelcfg_available_models",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_alias_default",
+   "target": "ccmodelcfg_org_default_model",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_org_default_override",
+   "target": "ccmodelcfg_org_default_model",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_org_effort_limits",
+   "target": "ccmodelcfg_effort_levels",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_org_effort_limits",
+   "target": "ccmodelcfg_org_model_restrictions",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_default_by_account_type",
+   "target": "ccmodelcfg_alias_default",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_org_default_model",
+   "target": "ccmodelcfg_default_by_account_type",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_opusplan",
+   "target": "ccmodelcfg_extended_context",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_fallback_model_chains",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_fallback_chain_pruning",
+   "target": "ccmodelcfg_fallback_model_chains",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_chain_is_invisible",
+   "target": "ccmodelcfg_fallback_model_chains",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_fallback_chain_pruning",
+   "target": "ccmodelcfg_available_models",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_automatic_model_fallback",
+   "target": "ccmodelcfg_fallback_model_chains",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_first_request_flag",
+   "target": "ccmodelcfg_automatic_model_fallback",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_switch_models_on_flag",
+   "target": "ccmodelcfg_automatic_model_fallback",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_third_party_fallback_recognition",
+   "target": "ccmodelcfg_automatic_model_fallback",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_security_biology_workloads",
+   "target": "ccmodelcfg_automatic_model_fallback",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_family_env_vars",
+   "target": "ccmodelcfg_third_party_fallback_recognition",
+   "relation": "satisfies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_effort_levels",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_effort_defaults_and_hold",
+   "target": "ccmodelcfg_effort_levels",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_setting_effort",
+   "target": "ccmodelcfg_effort_levels",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_ultracode",
+   "target": "ccmodelcfg_effort_levels",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_ultrathink",
+   "target": "ccmodelcfg_effort_levels",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_effort_levels",
+   "target": "ccmodelcfg_adaptive_reasoning",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_adaptive_reasoning",
+   "target": "ccmodelcfg_extended_thinking",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_extended_thinking",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_extended_context",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_sonnet5_context",
+   "target": "ccmodelcfg_extended_context",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_1m_suffix_per_variable",
+   "target": "ccmodelcfg_extended_context",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_family_env_vars",
+   "target": "ccmodelcfg_aliases",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_subagent_model_env",
+   "target": "ccmodelcfg_family_env_vars",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_family_env_vars",
+   "target": "ccmodelcfg_pin_third_party",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_1m_suffix_per_variable",
+   "target": "ccmodelcfg_pin_third_party",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_supported_capabilities",
+   "target": "ccmodelcfg_pin_third_party",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_supported_capabilities",
+   "target": "ccmodelcfg_effort_levels",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_model_overrides",
+   "target": "ccmodelcfg_family_env_vars",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_overrides_with_allowlist",
+   "target": "ccmodelcfg_model_overrides",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_overrides_with_allowlist",
+   "target": "ccmodelcfg_available_models",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_custom_model_option",
+   "target": "ccmodelcfg_available_models",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_prompt_caching_config",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_checking_current_model",
+   "target": "ccmodelcfg_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  },
+  {
+   "source": "ccmodelcfg_host_managed_precedence",
+   "target": "ccmodelcfg_available_models",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [
+  {
+   "id": "ccagents_four_parallel_approaches",
+   "label": "The four ways to run agents in parallel",
+   "nodes": [
+    "ccagents_subagents",
+    "ccagents_agent_view",
+    "ccagents_agent_teams",
+    "ccagents_dynamic_workflows"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md"
+  },
+  {
+   "id": "ccagents_three_selection_axes",
+   "label": "The three axes that jointly decide which approach to use",
+   "nodes": [
+    "ccagents_who_coordinates",
+    "ccagents_worker_communication",
+    "ccagents_file_conflict_isolation"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md"
+  },
+  {
+   "id": "ccagents_status_surfaces",
+   "label": "Checking on running work — one command per approach",
+   "nodes": [
+    "ccagents_claude_agents_screen",
+    "ccagents_named_subagent_typeahead",
+    "ccagents_tasks_command",
+    "ccagents_workflows_command"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_agents.md"
+  },
+  {
+   "id": "ccmodelcfg_enterprise_control_stack",
+   "label": "The four settings that jointly control what model users run on",
+   "nodes": [
+    "ccmodelcfg_available_models",
+    "ccmodelcfg_enforce_available_models",
+    "ccmodelcfg_model_is_not_enforcement",
+    "ccmodelcfg_family_env_vars"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md"
+  },
+  {
+   "id": "ccmodelcfg_two_fallback_systems",
+   "label": "Two independent fallback systems and their shared allowlist check",
+   "nodes": [
+    "ccmodelcfg_fallback_model_chains",
+    "ccmodelcfg_automatic_model_fallback",
+    "ccmodelcfg_fallback_chain_pruning",
+    "ccmodelcfg_automatic_changes_checked"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md"
+  },
+  {
+   "id": "ccmodelcfg_default_resolution_chain",
+   "label": "What Default resolves to — account type, org default, then enforcement",
+   "nodes": [
+    "ccmodelcfg_alias_default",
+    "ccmodelcfg_default_by_account_type",
+    "ccmodelcfg_org_default_model",
+    "ccmodelcfg_enforce_available_models"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_model-config.md"
+  }
+ ],
+ "input_tokens": 0,
+ "output_tokens": 0,
+ "supersedes": [
+  "code.claude.com_docs_en_agents.md",
+  "code.claude.com_docs_en_model-config.md"
+ ]
+}

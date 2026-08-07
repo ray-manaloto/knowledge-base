@@ -587,7 +587,70 @@ def _validate_chunks(rest: list[str]) -> int:
         print(f"✓ cross-chunk: no source_file collisions across {len(paths)} chunks")
     else:
         print("- cross-chunk: SKIPPED (needs 2+ chunks; pass the whole corpus to check)")
+
+    bad += _report_edge_direction(paths)
     return 1 if bad else 0
+
+
+def _report_edge_direction(paths: list[Path]) -> int:
+    """Structural edge-direction contradictions (hard) and heuristics (advisory).
+
+    Reported AFTER the schema rows because it answers a different question: not
+    "is this chunk well-formed" but "does its edge set contradict itself". The two
+    channels are printed separately and only the hard one counts toward `bad` —
+    an advisory that failed a gate would be switched off, which is the failure
+    mode the module's own allowlist experiment demonstrated (1936 firings on
+    legitimate vocabulary).
+
+    It CANNOT see semantic direction: `bun_requirement requires channels` is
+    backwards and produces no cycle, no self-edge, nothing. Say so here rather
+    than let a green line imply the class is covered.
+
+    The chunks are handed to `check_many` as a SET, never looped over one at a
+    time: a cycle whose two halves sit in different files is invisible to a
+    per-file check, and re-extracting a page under a new chunk name is exactly
+    how a corpus acquires two files describing the same node ids.
+
+    The count in the green line is the number of chunks actually PARSED, not the
+    number passed in. An unreadable chunk is skipped here (`validate_files` is
+    what reports it, and fails the run), and reporting coverage of a file that
+    was never read is the shape of claim this repo's gates exist to refuse.
+    """
+    import json
+
+    from kb_setup import edge_direction
+
+    items: list[tuple[str, object]] = []
+    skipped: list[str] = []
+    for p in paths:
+        try:
+            chunk = json.loads(p.read_text(encoding="utf-8"))
+        except OSError, json.JSONDecodeError:
+            skipped.append(p.name)  # already reported (and failed) by `validate_files`
+            continue
+        items.append((p.name, chunk))
+
+    hard_total, soft_total = edge_direction.check_many(items)
+
+    if skipped:
+        print(
+            f"- edge direction: NOT CHECKED for {len(skipped)} unreadable chunk(s): "
+            f"{', '.join(skipped)}",
+            file=sys.stderr,
+        )
+    if hard_total:
+        print(f"✗ edge direction: {len(hard_total)} contradiction(s):", file=sys.stderr)
+        for h in hard_total:
+            print(f"    {h}", file=sys.stderr)
+    else:
+        print(
+            f"✓ edge direction: no structural contradictions across the UNION of "
+            f"{len(items)} chunk(s) (cycles/self-edges/both-way symmetric edges; "
+            f"SEMANTIC direction is NOT checked)"
+        )
+    for s in soft_total:
+        print(f"  ~ {s}")
+    return 1 if hard_total else 0
 
 
 if __name__ == "__main__":

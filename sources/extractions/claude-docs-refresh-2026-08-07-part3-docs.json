@@ -1,0 +1,3582 @@
+{
+ "nodes": [
+  {
+   "id": "ccglossary_doc",
+   "label": "Claude Code glossary",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Definitions for Claude Code terminology, each linking to the page covering it in depth. Model-level concepts (tokens, temperature, RAG) live in the platform glossary; Claude Desktop terms (desktop extension, MCPB, DXT) live in the Help Center. This page is the vocabulary boundary between the harness and the model."
+  },
+  {
+   "id": "ccglossary_agent_teams",
+   "label": "Agent teams",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Multiple independent Claude Code sessions coordinated by a team lead, with a shared task list and peer-to-peer messaging. Unlike subagents, teammates each have their OWN context window and you can interact with any of them directly. Experimental; enable with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`."
+  },
+  {
+   "id": "ccglossary_agentic_coding",
+   "label": "Agentic coding",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A workflow where the AI reads files, runs commands and makes changes autonomously while you watch, redirect, or step away — as opposed to chat assistants that only respond with text you must apply yourself. Claude Code is agentic because it has tools that let it ACT, not just advise."
+  },
+  {
+   "id": "ccglossary_agentic_harness",
+   "label": "Agentic harness",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The tools, context management and execution environment that turn a language model into a capable coding agent. Claude Code is the harness; Claude is the model inside it. The harness supplies file access, shell execution, permission gating, memory loading, and the loop chaining actions together."
+  },
+  {
+   "id": "ccglossary_agentic_loop",
+   "label": "Agentic loop",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The cycle Claude works through for every task: gather context, take action, verify results, repeat until done. Each tool use returns information informing the next step, and you can interrupt at any point to redirect. Most extension points — hooks, skills, MCP — plug into specific PHASES of this loop."
+  },
+  {
+   "id": "ccglossary_artifact",
+   "label": "Artifact",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A live, interactive web page Claude Code publishes from a session to a PRIVATE URL on claude.ai, updating in place when the session republishes. Sharing depends on plan: Pro/Max get a public link; Team/Enterprise share within the organization, plus public links once an Owner enables them."
+  },
+  {
+   "id": "ccglossary_auto_memory",
+   "label": "Auto memory",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Notes Claude writes for ITSELF from your corrections and preferences, stored per git repository under `~/.claude/projects/`; all worktrees of one repo share a directory. The first 200 lines or 25 KB of the `MEMORY.md` index loads at the start of every session. It is the Claude-written counterpart to CLAUDE.md, which you write."
+  },
+  {
+   "id": "ccglossary_auto_mode",
+   "label": "Auto mode",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A permission mode where a separate classifier model reviews actions in the background so most run without prompts; explicit ask rules still prompt. It blocks scope escalation, untrusted infrastructure and prompt injection. Crucially it NEVER SEES TOOL RESULTS, so injected instructions cannot influence its decisions."
+  },
+  {
+   "id": "ccglossary_bare_mode",
+   "label": "Bare mode",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "With `--bare`, Claude Code starts without loading hooks, skills, plugins, MCP servers, auto memory, or CLAUDE.md. Recommended for CI and scripted calls where you need the same result on every machine."
+  },
+  {
+   "id": "ccglossary_bundled_skills",
+   "label": "Bundled skills",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Prompt-based playbooks shipped with Claude Code, such as `/batch`, `/code-review`, `/debug` and `/loop`. Unlike built-in commands, which execute FIXED LOGIC, bundled skills give Claude a detailed prompt and let it orchestrate — so they can spawn agents, read files, and adapt to your codebase."
+  },
+  {
+   "id": "ccglossary_channel",
+   "label": "Channel",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "An MCP server that PUSHES events into your running session so Claude can react while you are away from the terminal. Two-way: Claude reads an inbound event and replies through the same channel. Telegram, Discord and iMessage ship in the research preview."
+  },
+  {
+   "id": "ccglossary_checkpoint",
+   "label": "Checkpoint",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A restore point created at each prompt you send; files are snapshotted before every edit so a checkpoint can revert them. Esc-Esc or `/rewind` restores code, conversation, or both. Saved with the conversation so a resumed session can still rewind. Separate from git, and they do NOT track changes made through the Bash tool."
+  },
+  {
+   "id": "ccglossary_claude_directory",
+   "label": "The .claude directory",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Where Claude Code reads project-scoped configuration: settings, hooks, skills, subagents, rules and auto memory. A project has `.claude/` at its root; user-level defaults live at `~/.claude/`. The page also places auto memory under `~/.claude/projects/` per git repository, so its inclusion in this project-scoped list is the glossary's own generalization, not a second location."
+  },
+  {
+   "id": "ccglossary_claude_md",
+   "label": "CLAUDE.md",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Persistent instructions you write, loaded at the start of every session as a USER MESSAGE AFTER the system prompt. Project-root CLAUDE.md survives compaction and is re-read fresh from disk. It can sit at `./CLAUDE.md`, `./.claude/CLAUDE.md`, `~/.claude/CLAUDE.md`, or as managed policy — all discovered files are CONCATENATED, broadest scope to most specific, never overriding each other."
+  },
+  {
+   "id": "ccglossary_command",
+   "label": "Command",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A reusable instruction invoked by typing `/name`. Built-ins such as `/clear`, `/model` and `/compact` control the session; you can define your own in `.claude/commands/` or install them from a plugin. Two unrelated uses of the word: `claude` CLI subcommands like `claude mcp add`, and the `command` field of a stdio MCP server entry."
+  },
+  {
+   "id": "ccglossary_compaction",
+   "label": "Compaction",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Automatic summarization when the context window nears its limit: older tool outputs clear first, then the conversation is summarized. Project-root CLAUDE.md and auto memory survive and reload from disk; INSTRUCTIONS GIVEN ONLY IN CONVERSATION MAY BE LOST. `/compact` triggers it manually, optionally with a focus."
+  },
+  {
+   "id": "ccglossary_connector",
+   "label": "Connector",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "An MCP server added to your claude.ai ACCOUNT rather than configured in Claude Code. Signing in with that account makes your connectors appear in `/mcp` alongside locally-added servers. Organizations can provision connectors and set per-tool controls on them."
+  },
+  {
+   "id": "ccglossary_context_window",
+   "label": "Context window",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The working memory for a session: conversation history, file contents, command outputs, CLAUDE.md, auto memory, loaded skills and system instructions. It fills until compaction summarizes it; `/context` shows what is using space."
+  },
+  {
+   "id": "ccglossary_dispatch",
+   "label": "Dispatch",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A phone-initiated task router that spawns a Claude Code session in the Desktop app when you send a coding task from the Claude mobile app; your prompt routes to the right tool automatically. Available on Pro and Max."
+  },
+  {
+   "id": "ccglossary_effort_level",
+   "label": "Effort level",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Controls how much of the adaptive-reasoning thinking budget Claude uses each turn. Higher means more thinking tokens and deeper reasoning; lower is faster and cheaper. Supported on Fable 5, Opus 4.6 and later, and Sonnet 4.6 and later."
+  },
+  {
+   "id": "ccglossary_extended_thinking",
+   "label": "Extended thinking",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Visible step-by-step reasoning the model performs before responding, adjusted with the effort level or capped with `MAX_THINKING_TOKENS` on models with a fixed thinking budget. It appears as gray italic text in the terminal."
+  },
+  {
+   "id": "ccglossary_hook",
+   "label": "Hook",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A user-defined handler executing automatically at a specific lifecycle point — before a tool runs, after a file edit, at session start. Handlers can be a shell command, HTTP endpoint, MCP tool, LLM prompt, or subagent. Hooks are DETERMINISTIC: they fire at fixed points rather than at the model's discretion. Three levels: hook event, matcher, hook handler."
+  },
+  {
+   "id": "ccglossary_managed_settings",
+   "label": "Managed settings",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Settings enforced org-wide by IT or DevOps, delivered from Anthropic's servers through the admin console or deployed to devices at an OS-level path OUTSIDE `~/.claude`. User and project settings cannot override them, apart from documented precedence exceptions. For security policies, compliance, or standardized fleet tooling."
+  },
+  {
+   "id": "ccglossary_mcp",
+   "label": "MCP (Model Context Protocol)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "An open standard for connecting AI tools to external data sources and services. MCP servers give Claude new tools for Slack, Jira, databases, browsers and hundreds of other integrations. Servers connect via `/mcp` or `.mcp.json`."
+  },
+  {
+   "id": "ccglossary_mcp_server",
+   "label": "MCP server",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A program giving Claude tools, prompts or resources over MCP. Added with `claude mcp add`, in `.mcp.json`, through a plugin, or as a claude.ai connector. A local stdio server is a process Claude Code starts from the `command` and `args` fields — which have nothing to do with the `/commands` you type at the prompt."
+  },
+  {
+   "id": "ccglossary_mcp_tool_search",
+   "label": "MCP Tool Search",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A context-saving mechanism that DEFERS MCP tool schemas until needed: only tool names load at startup and Claude fetches the full schema on demand. This keeps idle MCP servers from consuming much context — the direct answer to the per-conversation schema-injection cost of registering a server."
+  },
+  {
+   "id": "ccglossary_non_interactive_mode",
+   "label": "Non-interactive mode (formerly headless)",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Executes a single prompt and exits, invoked with `-p` or `--print`, for CI, scripts and piping. The run is STILL SAVED as a resumable session unless you pass `--no-session-persistence`. The Agent SDK is the Python and TypeScript equivalent."
+  },
+  {
+   "id": "ccglossary_output_style",
+   "label": "Output style",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A configuration modifying Claude's SYSTEM PROMPT to change response behavior, tone or format. Output styles turn off the software-engineering-specific parts of the default system prompt — unlike CLAUDE.md, which is delivered as a user message following it. Built-ins: Default, Proactive, Explanatory, Learning."
+  },
+  {
+   "id": "ccglossary_permission_mode",
+   "label": "Permission mode",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The baseline approval behavior for a session, cycled with Shift+Tab or a mode selector. The modes are `default`, `acceptEdits`, `plan`, `auto`, `dontAsk` and `bypassPermissions`. `default` is LABELED Manual in the CLI, VS Code, JetBrains and desktop, and `manual` is accepted as an alias for the value."
+  },
+  {
+   "id": "ccglossary_permission_rule",
+   "label": "Permission rule",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A settings entry allowing, asking about, or denying a tool invocation based on tool name and argument pattern. Rules evaluate deny -> ask -> allow, FIRST MATCH WINS. They are fine-grained controls layered on top of the broader permission mode."
+  },
+  {
+   "id": "ccglossary_plan_mode",
+   "label": "Plan mode",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A permission mode where Claude researches and proposes changes without editing source files — it can read, search and run exploration commands, then presents a plan for approval before touching anything. Enter with `/plan` or Shift+Tab."
+  },
+  {
+   "id": "ccglossary_plugin",
+   "label": "Plugin",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A bundle of skills, hooks, subagents and MCP servers packaged as one installable unit. Plugin skills are NAMESPACED as `plugin-name:skill-name` so multiple plugins coexist. Distributed across teams via a marketplace."
+  },
+  {
+   "id": "ccglossary_project_trust",
+   "label": "Project trust",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A dialog accepting a directory before Claude Code loads its configuration. Acceptance is saved per project directory EXCEPT your home directory, where trust is session-only and the prompt reappears each launch. Trust gates auto-installation of marketplace plugins and execution of project-defined hooks."
+  },
+  {
+   "id": "ccglossary_prompt_injection",
+   "label": "Prompt injection",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Hostile instructions embedded in a file, web page or tool result that attempt to redirect Claude toward actions you never asked for. Defenses: the permission system, command injection detection, and trust verification. Auto mode adds a server-side probe scanning tool results, plus a classifier that never sees tool results."
+  },
+  {
+   "id": "ccglossary_remote_control",
+   "label": "Remote Control",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A way to continue a LOCAL Claude Code session from your phone or browser via claude.ai — code execution and files stay on your machine, only the interface is remote. Different from Claude Code on the web, which runs in a cloud sandbox."
+  },
+  {
+   "id": "ccglossary_rules",
+   "label": "Rules",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Modular instruction files in `.claude/rules/` loading alongside CLAUDE.md. A rule can be PATH-SCOPED with YAML `paths:` frontmatter so it loads only when Claude reads a matching file, keeping context lean until it is relevant."
+  },
+  {
+   "id": "ccglossary_sandboxing",
+   "label": "Sandboxing",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "OS-level filesystem and network isolation for the Bash tool: commands run inside a boundary you define upfront, so Claude works freely within it without per-command approval prompts. A SEPARATE LAYER from permission rules."
+  },
+  {
+   "id": "ccglossary_session",
+   "label": "Session",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A conversation tied to your current directory with its own independent context window. Resumable with `claude -c`, forkable with `--fork-session` to preserve history under a new session ID, and runnable in parallel across terminals. `/clear` starts a new session; the previous one stays stored and reachable via `/resume`. Transcripts live under `~/.claude/projects/`."
+  },
+  {
+   "id": "ccglossary_settings_layers",
+   "label": "Settings layers",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Precedence from highest to lowest: managed policy, command-line arguments, `.claude/settings.local.json`, `.claude/settings.json`, then `~/.claude/settings.json`. ARRAYS MERGE across layers; scalars at a higher layer override lower ones, apart from documented exceptions."
+  },
+  {
+   "id": "ccglossary_skill",
+   "label": "Skill",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A `SKILL.md` file of instructions, knowledge, or a workflow that Claude adds to its toolkit — loaded automatically when relevant, or invoked directly with `/skill-name`. Follows the Agent Skills open standard, extended by Claude Code with invocation control and subagent execution. Skills are the recommended SUCCESSOR to custom commands; `.claude/commands/deploy.md` and `.claude/skills/deploy/SKILL.md` both create `/deploy`."
+  },
+  {
+   "id": "ccglossary_subagent",
+   "label": "Subagent",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A specialized assistant running in its OWN context window with a custom system prompt, specific tool access and independent permissions. It works a delegated task and returns a SUMMARY to the main conversation. Use it to keep large explorations out of your primary context or run parallel research. Built-ins: Explore, Plan, general-purpose."
+  },
+  {
+   "id": "ccglossary_surface",
+   "label": "Surface",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Any place you access Claude Code — CLI, VS Code, JetBrains, Desktop, claude.ai — all sharing the same engine. Local sessions read your local CLAUDE.md, settings and skills; CLOUD sessions start from a fresh clone and do NOT read `~/.claude/` on your machine. Slack and the Chrome extension are integrations connecting to a surface, not surfaces themselves."
+  },
+  {
+   "id": "ccglossary_teleport",
+   "label": "Teleport",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`/teleport` pulls a cloud Claude Code session into your local terminal: Claude fetches the branch, loads the conversation history, and resumes from the web session's last state. The reverse direction is `--cloud`, sending a local task to run on the web."
+  },
+  {
+   "id": "ccglossary_tool",
+   "label": "Tool",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "An action Claude can take: read a file, edit code, run a shell command, search the web, spawn a subagent. Tools are what make Claude Code agentic — without them Claude can only respond with text. Each tool use returns a result informing the next decision in the agentic loop."
+  },
+  {
+   "id": "ccglossary_turn",
+   "label": "Turn",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "One complete response from Claude within a session: it begins when you send a message and ends when Claude finishes responding, with any number of tool calls in between. STOP HOOKS FIRE AT THE END OF EACH TURN. A session is many turns; the agentic loop describes what happens inside one."
+  },
+  {
+   "id": "ccglossary_verification_loop",
+   "label": "Verification loop",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "How a session knows work is actually done rather than merely plausible: you give Claude a check it can run — a test suite, a build, a screenshot comparison — and it iterates until the check passes instead of stopping after one attempt. It is the PREREQUISITE for `/goal`, unattended runs and dynamic workflows: without one, the only thing deciding the agent is finished is the agent itself."
+  },
+  {
+   "id": "ccglossary_worktree_isolation",
+   "label": "Worktree isolation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "An isolation mode running Claude in a separate git worktree under `.claude/worktrees/`, enabled with `-w` or `isolation: worktree` in subagent config. Changes stay on a separate branch in a separate directory, so parallel agents do not overwrite each other's files."
+  },
+  {
+   "id": "ccglossary_deprecated_terms",
+   "label": "Deprecated and renamed terms",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "source_url": "https://code.claude.com/docs/en/glossary",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Terms surviving in older docs, blog posts and community content: 'headless mode' is now non-interactive mode (same `-p` flag, same behavior); 'custom commands' are now skills (`.claude/commands/` files still work); 'slash commands' are now just commands ('slash' dropped from product copy). Use the current name when searching."
+  },
+  {
+   "id": "cccommonwf_doc",
+   "label": "Common workflows — everyday Claude Code recipes",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Short step-by-step recipes for everyday development: exploring codebases, fixing bugs, refactoring, testing, PRs and documentation, plus resuming conversations, worktrees, plan mode, subagent delegation and piping into scripts. Higher-level prompting and context guidance lives on Best practices instead."
+  },
+  {
+   "id": "cccommonwf_overview_recipe",
+   "label": "Recipe: get a quick codebase overview",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "From the project root, start Claude and ask for a high-level overview, then narrow: 'explain the main architecture patterns used here', 'what are the key data models?', 'how is authentication handled?'. Start broad, then narrow."
+  },
+  {
+   "id": "cccommonwf_overview_tips",
+   "label": "Ask for conventions and a project glossary",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Beyond structure, the docs suggest asking about the coding conventions and patterns a project uses, and requesting a glossary of project-specific terms — vocabulary is treated as part of onboarding, not an extra."
+  },
+  {
+   "id": "cccommonwf_find_code",
+   "label": "Recipe: find relevant code and trace a flow",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Three escalating asks: find the files that handle a feature, ask how those files work together, then trace the execution flow end to end ('trace the login process from front-end to database'). Be specific and use the project's own domain language."
+  },
+  {
+   "id": "cccommonwf_code_intelligence_plugin",
+   "label": "Install a code intelligence plugin for precise navigation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "A language-specific code intelligence plugin gives Claude precise 'go to definition' and 'find references' navigation — a structural alternative to grepping, recommended in the find-relevant-code recipe."
+  },
+  {
+   "id": "cccommonwf_fix_bugs",
+   "label": "Recipe: fix bugs efficiently",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Share the error, ask for a few candidate fixes, then apply the chosen one. Tips: give Claude the command that reproduces the issue so it can get a stack trace, mention the reproduction steps, and say whether the error is intermittent or consistent."
+  },
+  {
+   "id": "cccommonwf_refactor",
+   "label": "Recipe: refactor to modern patterns",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Identify deprecated API usage, get recommendations, apply the change 'while maintaining the same behavior', then run the tests. Do refactoring in small, testable increments and ask for backward compatibility where it matters."
+  },
+  {
+   "id": "cccommonwf_large_migrations",
+   "label": "Whole-codebase language ports are a different scale",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The refactor recipe explicitly scopes itself out of porting an entire codebase to a new language, pointing at Anthropic's own large-scale code migration write-up instead — a signal that the incremental recipe does not stretch to that size."
+  },
+  {
+   "id": "cccommonwf_tests",
+   "label": "Recipe: add tests for uncovered code",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Identify untested functions, generate scaffolding, add edge-condition cases, then run and fix. Be specific about what BEHAVIOR you want verified rather than asking for tests generically."
+  },
+  {
+   "id": "cccommonwf_tests_match_conventions",
+   "label": "Claude matches your existing test style",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "It examines existing test files to match the style, frameworks and assertion patterns already in use — so the shape of new tests is inherited from the repo, not imposed."
+  },
+  {
+   "id": "cccommonwf_ask_for_edge_cases",
+   "label": "Ask Claude to find the edge cases you missed",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "For comprehensive coverage, have Claude analyze the code paths and suggest tests for error conditions, boundary values and unexpected inputs — the cases that are easy to overlook when writing tests from intent."
+  },
+  {
+   "id": "cccommonwf_prs",
+   "label": "Recipe: create pull requests",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Either ask directly ('create a pr for my changes') or go stepwise: summarize the changes, generate the PR, then refine the description. Review the generated PR before submitting and ask Claude to highlight risks."
+  },
+  {
+   "id": "cccommonwf_pr_session_link",
+   "label": "A PR created with gh pr create is linked to its session",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The link is automatic. Find the session later with `claude --from-pr 1234`, which opens the picker filtered to sessions linked to that PR, or paste the PR URL into the `/resume` picker search."
+  },
+  {
+   "id": "cccommonwf_docs",
+   "label": "Recipe: add and improve documentation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Find undocumented functions, generate comments, enhance them with context and examples, then check they follow project standards. Specify the style (JSDoc, docstrings), ask for examples, and prioritize public APIs, interfaces and complex logic."
+  },
+  {
+   "id": "cccommonwf_non_code_folders",
+   "label": "Claude Code works in notes and non-code folders",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Run it inside a notes vault, a docs folder, or any markdown collection to search, edit and reorganize the same way as code. `.claude/` and `CLAUDE.md` sit alongside other tools' config directories without conflict."
+  },
+  {
+   "id": "cccommonwf_reads_files_fresh",
+   "label": "Claude reads files fresh on each tool call",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "So it sees edits you make in another application the next time it reads that file. There is no stale in-memory copy to invalidate — which is what makes working alongside another editor safe."
+  },
+  {
+   "id": "cccommonwf_images_input",
+   "label": "Three ways to get an image into the conversation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Drag and drop into the window; copy and paste with Ctrl+V (Cmd+V also works in iTerm2 on macOS); or give Claude a path. Multiple images can be in one conversation."
+  },
+  {
+   "id": "cccommonwf_images_uses",
+   "label": "What images are actually for",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Analyze content, supply context (a screenshot of an error, a current schema), or generate code from visuals (CSS from a mockup, HTML for a component). Use them when a text description would be unclear or cumbersome — the stated selection rule."
+  },
+  {
+   "id": "cccommonwf_image_reference_click",
+   "label": "Cmd/Ctrl+Click an [Image #N] reference to open it",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "When Claude refers to an image as `[Image #1]`, Cmd+Click on macOS or Ctrl+Click on Windows/Linux opens it in your default viewer."
+  },
+  {
+   "id": "cccommonwf_at_references",
+   "label": "@ references include content without waiting for a read",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`@src/utils/auth.js` includes the FULL file content in the conversation; `@src/components` provides a directory LISTING with file information, not contents. Paths may be relative or absolute, and several files can be referenced in one message."
+  },
+  {
+   "id": "cccommonwf_at_pulls_claude_md",
+   "label": "An @ file reference also pulls in nearby CLAUDE.md",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Referencing a file adds the `CLAUDE.md` in that file's directory AND its parent directories to context — so an @ reference carries instructions with it, not just bytes. Easy to miss when reasoning about what is in context."
+  },
+  {
+   "id": "cccommonwf_at_typeahead",
+   "label": "Typing @ opens a path suggestion menu",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Enter or Tab accepts the highlighted path, and Enter again sends the message — so the first Enter does not send, which is the common surprise."
+  },
+  {
+   "id": "cccommonwf_at_mcp_resources",
+   "label": "@server:resource fetches from a connected MCP server",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "For example `@github:repos/owner/repo/issues`. The same `@` syntax spans local files, directories and MCP resources, so the reference surface is uniform across sources."
+  },
+  {
+   "id": "cccommonwf_scheduling_options",
+   "label": "Four scheduling options, chosen by WHERE the task runs",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Routines run in the cloud and survive your computer being off, and can trigger on API calls or GitHub events too. Desktop scheduled tasks run on your machine, for tasks needing local files or uncommitted changes. GitHub Actions run in CI, tied to repo events. `/loop` runs in the current CLI session only."
+  },
+  {
+   "id": "cccommonwf_loop_expiry",
+   "label": "/loop tasks stop when you start a new conversation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "They are bound to the session: a new conversation ends them, while `--resume` and `--continue` restore unexpired ones. So `/loop` is for quick polling while a session is open, not durable scheduling."
+  },
+  {
+   "id": "cccommonwf_scheduled_prompt_writing",
+   "label": "A scheduled prompt must state success AND what to do with results",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The task runs autonomously and CANNOT ask clarifying questions, so be explicit about both. The worked example names the filter, the action and the destination: review PRs labeled `needs-review`, leave inline comments, post a summary in a named Slack channel."
+  },
+  {
+   "id": "cccommonwf_ask_about_capabilities",
+   "label": "Claude has built-in access to its own documentation",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "It can answer questions about its own features and limitations, and ALWAYS has access to the latest Claude Code docs regardless of the version you are running. For hands-on demos rather than doc answers, `/powerup` runs interactive lessons."
+  },
+  {
+   "id": "cccommonwf_resume",
+   "label": "Resume a conversation across sittings",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Every conversation is saved locally. `claude --continue` resumes the most recent session in the current directory, printing `No conversation found to continue` and exiting if there is none; `claude --resume` chooses from a list, and `/resume` does the same from inside a running session."
+  },
+  {
+   "id": "cccommonwf_worktree_flag",
+   "label": "claude --worktree <name> starts an isolated parallel session",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Each worktree is a separate checkout on its own branch created from an existing commit, so you can work a feature in one terminal while Claude fixes a bug in another without colliding edits. Run the same command with a different name in a second terminal."
+  },
+  {
+   "id": "cccommonwf_worktree_needs_a_commit",
+   "label": "A worktree needs the repository to have at least one commit",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "In a repository with no commits the command fails with `Failed to resolve base branch \"HEAD\": git rev-parse failed` — a named error worth recognizing, because it reads as a git problem rather than an empty-repo one."
+  },
+  {
+   "id": "cccommonwf_plan_mode",
+   "label": "Plan before editing",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "`claude --permission-mode plan` has Claude read files and propose a plan while making NO edits until you approve. `⏸ plan mode on` shows in the status bar. Shift+Tab cycles mid-session, in the order `default` -> `acceptEdits` -> `plan`."
+  },
+  {
+   "id": "cccommonwf_delegate_research",
+   "label": "Delegate exploration so only the findings come back",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Exploring a large codebase fills your context with file reads. 'use a subagent to investigate how our auth system handles token refresh' has the subagent read in ITS OWN context window and report a summary — the stated reason to delegate is context economy, not speed."
+  },
+  {
+   "id": "cccommonwf_pipe_into_scripts",
+   "label": "Pipe Claude into scripts like any Unix tool",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "Stdin and stdout behave normally: `git log --oneline -20 | claude -p \"summarize these recent commits\"`. Suited to CI, pre-commit hooks and batch processing; non-interactive mode covers output formats, permission flags and fan-out patterns."
+  },
+  {
+   "id": "cccommonwf_recipes_are_surface_agnostic",
+   "label": "Every recipe works on any surface",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "source_url": "https://code.claude.com/docs/en/common-workflows",
+   "captured_at": "2026-08-07",
+   "author": null,
+   "contributor": null,
+   "rationale": "The prompt patterns are stated to work in any Claude Code surface, with the wording adapted to your project — so the PROMPT PATTERNS are not CLI-specific by design. The page's shell recipes — piping into `claude -p`, for example — still are."
+  },
+  {
+   "id": "ccbestprac_doc",
+   "label": "Best practices for Claude Code",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Patterns proven across Anthropic's internal teams and engineers using Claude Code in many codebases: verification, plan-then-code, prompt specificity, environment configuration, session management, and scaling to parallel sessions."
+  },
+  {
+   "id": "ccbestprac_agentic_not_chatbot",
+   "label": "The shift: you describe outcomes, Claude figures out how",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Unlike a chatbot that answers and waits, Claude Code reads files, runs commands, makes changes and works through problems autonomously. So instead of writing code and asking for review, you describe what you want and Claude explores, plans and implements."
+  },
+  {
+   "id": "ccbestprac_one_constraint",
+   "label": "MOST practices follow from one constraint: the context window",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The page states this explicitly: context fills fast and PERFORMANCE DEGRADES AS IT FILLS. It holds every message, every file read and every command output; one debugging session can consume tens of thousands of tokens. As it fills, Claude may 'forget' earlier instructions or make more mistakes."
+  },
+  {
+   "id": "ccbestprac_track_context",
+   "label": "Track context usage continuously",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "A custom status line surfaces context usage continuously, and the context-window walkthrough shows what loads at startup and what each file read costs. Context is named 'the most important resource to manage'."
+  },
+  {
+   "id": "ccbestprac_verification_loop",
+   "label": "Give Claude a check it can run",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Claude stops when the work LOOKS done; without a check, 'looks done' is the only signal and YOU become the verification loop, so every mistake waits for you to notice it. Give it something producing pass or fail and the loop closes on its own. This is 'the difference between a session you watch and one you walk away from'."
+  },
+  {
+   "id": "ccbestprac_what_counts_as_a_check",
+   "label": "What counts as a check",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Anything returning a signal Claude can read IN THE CONVERSATION: a test suite, a build exit code, a linter, a script diffing output against a fixture, or a browser screenshot compared against a design."
+  },
+  {
+   "id": "ccbestprac_four_gate_strengths",
+   "label": "Four strengths of gate, trading setup for attention",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "In one prompt (ask Claude to run the check and iterate); across a session (a `/goal` condition re-checked by a separate evaluator each turn); as a deterministic gate (a Stop hook script blocking the turn); or by a second opinion (a verification subagent or workflow). The prompt version works today; `/goal` and the Stop hook are what let an unattended run finish correctly."
+  },
+  {
+   "id": "ccbestprac_stop_hook_8_block_cap",
+   "label": "A Stop hook is overridden after 8 consecutive blocks",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Claude Code overrides the hook and ends the turn after 8 consecutive blocks — so a Stop hook is a strong gate, not an absolute one, and a check that can never pass will not loop forever."
+  },
+  {
+   "id": "ccbestprac_show_evidence",
+   "label": "Have Claude show evidence, not assert success",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The test output, the command it ran and what it returned, or a screenshot of the result. Reviewing evidence is faster than re-running the verification yourself, AND it works for sessions you were not watching — which is the case that matters."
+  },
+  {
+   "id": "ccbestprac_verification_examples",
+   "label": "Three before/after verification rewrites",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Provide criteria: name example test cases and say 'run the tests after implementing'. Verify UI visually: paste a screenshot, take one of the result, list differences and fix them. Address root causes: paste the error, verify the build succeeds, and say 'address the root cause, don't suppress the error'."
+  },
+  {
+   "id": "ccbestprac_explore_plan_code",
+   "label": "Explore, then plan, then code, then commit",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Letting Claude jump straight to coding can produce code that solves the WRONG PROBLEM. Plan mode separates exploration from execution: read and understand first, ask for a detailed plan, implement against the plan, then commit and open a PR."
+  },
+  {
+   "id": "ccbestprac_ctrl_g_edits_the_plan",
+   "label": "Ctrl+G opens the plan in your editor before Claude proceeds",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The plan is a directly editable artifact, not just something to approve or reject — you can rewrite it in your text editor before implementation starts."
+  },
+  {
+   "id": "ccbestprac_when_to_skip_planning",
+   "label": "Skip the plan if you could describe the diff in one sentence",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Plan mode adds overhead. For a typo, a log line or a rename, ask directly. Planning earns its cost when you are uncertain about the approach, the change spans multiple files, or you are unfamiliar with the code being modified."
+  },
+  {
+   "id": "ccbestprac_specific_prompts",
+   "label": "Specific context means fewer corrections",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Claude can infer intent but cannot read your mind. Reference specific files, mention constraints, and point to example patterns. Four documented rewrites: scope the task, point to sources, reference existing patterns, and describe the symptom plus the likely location plus what 'fixed' looks like."
+  },
+  {
+   "id": "ccbestprac_vague_is_sometimes_right",
+   "label": "A vague prompt is sometimes the right tool",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "When you are exploring and can afford to course-correct, something like 'what would you improve in this file?' can surface things you would not have thought to ask about. Specificity is a default, not a law."
+  },
+  {
+   "id": "ccbestprac_rich_content",
+   "label": "Five ways to give Claude rich content",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Reference files with `@` instead of describing where code lives; paste or drag images; give URLs for docs and API references (allowlist frequent domains with `/permissions`); pipe data in with `cat error.log | claude`; or tell Claude to fetch context itself via Bash, MCP tools or file reads."
+  },
+  {
+   "id": "ccbestprac_claude_md_purpose",
+   "label": "CLAUDE.md gives persistent context Claude cannot infer from code",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Read at the start of every conversation: Bash commands, code style, workflow rules. `/init` analyzes the codebase to detect build systems, test frameworks and patterns as a starting point; `/context` confirms the file actually loaded."
+  },
+  {
+   "id": "ccbestprac_claude_md_pruning_test",
+   "label": "The pruning test: would removing this line cause a mistake?",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Ask it of every line; if not, cut it. Stated bluntly: 'Bloated CLAUDE.md files cause Claude to ignore your actual instructions!' Because it loads every session, only broadly-applicable content belongs there."
+  },
+  {
+   "id": "ccbestprac_claude_md_include_exclude",
+   "label": "What belongs in CLAUDE.md, and what does not",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "INCLUDE: unguessable Bash commands, style rules differing from defaults, testing instructions, repository etiquette, project-specific architectural decisions, environment quirks, and non-obvious gotchas. EXCLUDE: anything derivable from the code, standard conventions, detailed API docs, frequently-changing information, long tutorials, file-by-file descriptions, and self-evident advice."
+  },
+  {
+   "id": "ccbestprac_claude_md_diagnostics",
+   "label": "Two symptoms that diagnose a CLAUDE.md problem",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "If Claude keeps violating a rule you wrote, the file is probably TOO LONG and the rule is getting lost. If Claude asks questions the file already answers, the PHRASING is ambiguous. Treat it like code: review it when things go wrong, prune regularly, and test changes by observing whether behavior actually shifts."
+  },
+  {
+   "id": "ccbestprac_claude_md_emphasis_and_git",
+   "label": "Emphasis improves adherence; check the file into git",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Adding 'IMPORTANT' or 'YOU MUST' tunes adherence. Committing it lets the team contribute, and the docs note the file 'compounds in value over time'."
+  },
+  {
+   "id": "ccbestprac_claude_md_imports",
+   "label": "CLAUDE.md can import other files with @path syntax",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "For example `@README.md`, `@package.json`, `@docs/git-instructions.md`, or `@~/.claude/my-project-instructions.md` for personal overrides — so shared and personal instructions can be composed rather than duplicated."
+  },
+  {
+   "id": "ccbestprac_claude_md_locations",
+   "label": "Five places a CLAUDE.md can live",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "`~/.claude/CLAUDE.md` for all sessions; `./CLAUDE.md` checked into git for the team; `./CLAUDE.local.md` gitignored for personal notes; parent directories for monorepos (both root and subdirectory files are pulled in); and CHILD directories, pulled in ON DEMAND when Claude reads a file there."
+  },
+  {
+   "id": "ccbestprac_skills_over_claude_md",
+   "label": "Sometimes-relevant knowledge belongs in a skill, not CLAUDE.md",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "CLAUDE.md loads every session, so domain knowledge or workflows relevant only sometimes should be skills — Claude loads them ON DEMAND without bloating every conversation. This is the load-cost distinction between the two surfaces."
+  },
+  {
+   "id": "ccbestprac_three_permission_reducers",
+   "label": "Three ways to reduce permission interruptions",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Auto mode (a classifier blocks only scope escalation, unknown infrastructure and hostile-content-driven actions); permission allowlists for specific known-safe tools; and sandboxing for OS-level filesystem and network isolation. The stated motivation is that 'after the tenth approval you're not really reviewing anymore, you're just clicking through'."
+  },
+  {
+   "id": "ccbestprac_cli_tools",
+   "label": "CLI tools are the most context-efficient external interface",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Install `gh`, `aws`, `gcloud`, `sentry-cli` and tell Claude to use them. Without `gh` Claude can still use the GitHub API, but UNAUTHENTICATED requests often hit rate limits. Claude also learns unfamiliar CLIs: 'Use `foo-cli-tool --help` to learn about foo tool, then use it to solve A, B, C.'"
+  },
+  {
+   "id": "ccbestprac_mcp_servers",
+   "label": "Connect MCP servers for issue trackers, databases and designs",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "`claude mcp add` with a name and URL or command, e.g. `claude mcp add --transport http notion https://mcp.notion.com/mcp`. Enables implementing features from issue trackers, querying databases, analyzing monitoring data and integrating Figma designs."
+  },
+  {
+   "id": "ccbestprac_hooks_are_deterministic",
+   "label": "Hooks are for what must happen every time, with zero exceptions",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Unlike CLAUDE.md instructions, which are ADVISORY, hooks are deterministic and guarantee the action happens. Claude can write them for you ('a hook that runs eslint after every file edit', 'a hook that blocks writes to the migrations folder'); `/hooks` browses what is configured."
+  },
+  {
+   "id": "ccbestprac_skills",
+   "label": "Skills carry domain knowledge and reusable workflows",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "A `SKILL.md` in `.claude/skills/<name>/` with `name` and `description` frontmatter. Claude applies them automatically when relevant, or you invoke them with `/skill-name`. Skills can also define repeatable multi-step workflows taking `$ARGUMENTS`."
+  },
+  {
+   "id": "ccbestprac_disable_model_invocation",
+   "label": "disable-model-invocation for workflows with side effects",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Set `disable-model-invocation: true` in a skill's frontmatter when you want to trigger it MANUALLY rather than have Claude decide — the documented criterion is workflows with side effects, such as one that pushes and opens a PR."
+  },
+  {
+   "id": "ccbestprac_custom_subagents",
+   "label": "Custom subagents in .claude/agents/",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "A markdown file with `name`, `description`, `tools` and `model` frontmatter plus a system prompt. They run in their own context with their own allowed tools, and suit tasks that read many files or need specialized focus. Tell Claude explicitly: 'Use a subagent to review this code for security issues.'"
+  },
+  {
+   "id": "ccbestprac_plugins",
+   "label": "Plugins bundle skills, hooks, subagents and MCP servers",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "`/plugin` browses the marketplace; they add skills, tools and integrations without configuration. For a typed language, a code intelligence plugin gives precise symbol navigation and automatic error detection after edits."
+  },
+  {
+   "id": "ccbestprac_ask_codebase_questions",
+   "label": "Ask Claude what you would ask a senior engineer",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "How does logging work; how do I add an API endpoint; what does this line do; what edge cases does this class handle; why does this call foo() instead of bar(). No special prompting required. Framed as an onboarding workflow that improves ramp-up and reduces load on other engineers."
+  },
+  {
+   "id": "ccbestprac_let_claude_interview_you",
+   "label": "For a larger feature, have Claude interview YOU first",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Start minimal and ask Claude to interview you with the AskUserQuestion tool about technical implementation, UI/UX, edge cases, concerns and tradeoffs — explicitly instructing it to skip obvious questions and dig into the hard parts — then write a complete spec to SPEC.md."
+  },
+  {
+   "id": "ccbestprac_fresh_session_for_the_spec",
+   "label": "Execute the spec in a FRESH session",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Once the spec is complete, start a new session so its context is focused entirely on implementation, with the written spec to reference. The interview's context is not needed for the build."
+  },
+  {
+   "id": "ccbestprac_spec_qualities",
+   "label": "The most useful specs are self-contained",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "They NAME the files and interfaces involved, STATE what is out of scope, and END with an end-to-end verification step proving the feature works. 'Time spent making the spec precise pays off more than time spent watching the implementation.'"
+  },
+  {
+   "id": "ccbestprac_course_correct_early",
+   "label": "Correct as soon as you notice it going off track",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Tight feedback loops produce better solutions faster. `Esc` stops mid-action with context PRESERVED so you can redirect; `Esc+Esc` or `/rewind` restores conversation and code state; 'undo that' has Claude revert; `/clear` resets between unrelated tasks."
+  },
+  {
+   "id": "ccbestprac_two_correction_rule",
+   "label": "After two failed corrections, /clear and rewrite the prompt",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Correcting the same issue more than twice means the context is cluttered with failed approaches. 'A clean session with a better prompt almost always outperforms a long session with accumulated corrections' — the fix is a restart carrying what you learned, not another correction."
+  },
+  {
+   "id": "ccbestprac_compaction_controls",
+   "label": "Compaction: automatic, focused, or partial",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Auto-compaction preserves code patterns, file states and key decisions. `/compact <instructions>` focuses it. `Esc+Esc` or `/rewind` at a message checkpoint offers 'Summarize from here' (condenses forward, keeps earlier context) or 'Summarize up to here' (condenses earlier, keeps recent in full)."
+  },
+  {
+   "id": "ccbestprac_customize_compaction_in_claude_md",
+   "label": "Customize what survives compaction from CLAUDE.md",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "An instruction such as 'When compacting, always preserve the full list of modified files and any test commands' makes critical context survive summarization — compaction behavior is configurable in prose, not only by flags."
+  },
+  {
+   "id": "ccbestprac_btw",
+   "label": "/btw asks a side question without growing context",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The answer appears in a dismissible overlay and NEVER enters conversation history, so you can check a detail without paying context for it."
+  },
+  {
+   "id": "ccbestprac_subagents_for_investigation",
+   "label": "Subagents are one of the most powerful tools BECAUSE context is the constraint",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Researching a codebase reads many files, all consuming YOUR context. A subagent runs in a separate context window and reports a summary. Also usable for verification after implementation: 'use a subagent to review this code for edge cases'."
+  },
+  {
+   "id": "ccbestprac_checkpoints_enable_risk",
+   "label": "Checkpoints let you try something risky on purpose",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Every prompt creates a checkpoint and files are snapshotted before each change. Instead of carefully planning every move, tell Claude to try something risky and rewind if it fails. Checkpoints save with the conversation, so you can close the terminal, resume later and still rewind."
+  },
+  {
+   "id": "ccbestprac_checkpoints_are_not_git",
+   "label": "Checkpoints do NOT capture Bash or external changes",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "They only track changes made through Claude's FILE EDITING TOOLS. Changes made by Bash commands or external processes are not captured, and the docs state plainly this is not a replacement for git."
+  },
+  {
+   "id": "ccbestprac_name_sessions_like_branches",
+   "label": "Name sessions and treat them like branches",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "`/rename` gives a session a descriptive name like `oauth-migration` so each workstream keeps its own persistent context and can be found later. `claude --continue` resumes the most recent; `claude --resume` picks from a list."
+  },
+  {
+   "id": "ccbestprac_non_interactive_formats",
+   "label": "Three non-interactive output formats",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Plain text by default; `--output-format json` returns a single JSON object with a `result` field; `--output-format stream-json` prints one JSON object per line starting with an init event. The run still creates a resumable session unless `--no-session-persistence` is passed."
+  },
+  {
+   "id": "ccbestprac_four_parallel_approaches",
+   "label": "Four ways to run multiple sessions",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Worktrees for isolated CLI checkouts; the desktop app for managing local sessions visually, each in its own worktree; Claude Code on the web for cloud sessions; and agent teams for automated coordination with shared tasks, messaging and a lead. Chosen by how much coordination you want to do yourself."
+  },
+  {
+   "id": "ccbestprac_writer_reviewer",
+   "label": "The Writer/Reviewer pattern — a fresh context is less biased",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Session A implements; session B reviews the file for edge cases, race conditions and consistency with existing patterns; session A then addresses the feedback. The stated reason is that a fresh context improves review because Claude will not be biased toward code it just wrote. The same shape works for tests: one Claude writes them, another writes code to pass them."
+  },
+  {
+   "id": "ccbestprac_fan_out",
+   "label": "Fan out across files with a loop of claude -p calls",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Have Claude write the task list to a file, loop over it invoking `claude -p` per item with `--allowedTools` scoping what each run may do, and TEST ON 2-3 FILES FIRST — refining the prompt on what goes wrong before running at scale. Claude also composes into pipelines: `claude -p \"...\" --output-format json | your_command`."
+  },
+  {
+   "id": "ccbestprac_verbose_off_in_production",
+   "label": "Use --verbose while developing, turn it off in production",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Stated directly for batch and pipeline use — verbose output is a debugging aid during development of the loop, not a production setting."
+  },
+  {
+   "id": "ccbestprac_auto_mode_aborts_headless",
+   "label": "In -p runs, auto mode ABORTS when the classifier repeatedly blocks",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Because there is no user to fall back to. So `claude --permission-mode auto -p \"...\"` fails loudly on repeated blocks rather than hanging or silently proceeding — a deliberate difference from interactive auto mode."
+  },
+  {
+   "id": "ccbestprac_adversarial_review",
+   "label": "Add an adversarial review step before calling it done",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The longer Claude works unattended, the more an independent check matters. A reviewer in a FRESH subagent context sees only the diff and your criteria — not the reasoning that produced the change — so it evaluates the result on its own terms. The bundled `/code-review` skill does the correctness variant."
+  },
+  {
+   "id": "ccbestprac_review_prompt_shape",
+   "label": "A spec-conformance review prompt names three things",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The work to check, the plan to check it against, and what COUNTS as a finding. The worked example: check every requirement is implemented, the listed edge cases have tests, and nothing outside scope changed — 'Report gaps, not style preferences.'"
+  },
+  {
+   "id": "ccbestprac_reviewer_will_always_find_something",
+   "label": "A reviewer asked to find gaps will report some even when the work is sound",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Because that is what it was asked to do. Chasing every finding leads to over-engineering — extra abstraction layers, defensive code, tests for cases that cannot happen. Tell the reviewer to flag only gaps affecting CORRECTNESS or the stated requirements, and treat the rest as optional."
+  },
+  {
+   "id": "ccbestprac_subagent_review_closes_the_loop",
+   "label": "A subagent reviewer returns findings to the implementing session directly",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "So the session can fix and re-review without you copying findings between windows. For longer autonomous runs, an agent team keeps this loop going across many tasks while you spot-check the recorded findings."
+  },
+  {
+   "id": "ccbestprac_five_failure_patterns",
+   "label": "Five common failure patterns and their fixes",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "The kitchen sink session (fix: `/clear` between unrelated tasks); correcting over and over (fix: `/clear` after two failures and rewrite the prompt); the over-specified CLAUDE.md (fix: prune ruthlessly, or convert a rule to a hook); the trust-then-verify gap (fix: always provide verification — 'if you can't verify it, don't ship it'); and the infinite exploration (fix: scope it or delegate to a subagent)."
+  },
+  {
+   "id": "ccbestprac_develop_intuition",
+   "label": "The patterns are starting points, not rules",
+   "_origin": "semantic",
+   "file_type": "concept",
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "source_url": "https://code.claude.com/docs/en/best-practices",
+   "captured_at": "2026-08-07",
+   "author": "Anthropic",
+   "contributor": null,
+   "rationale": "Sometimes you SHOULD let context accumulate because you are deep in one problem and the history is valuable; sometimes skip planning because the task is exploratory; sometimes a vague prompt is exactly right. Notice what you did when output was great and ask why when Claude struggled — was the context noisy, the prompt vague, the task too big for one pass?"
+  }
+ ],
+ "edges": [
+  {
+   "source": "ccglossary_agent_teams",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_agentic_coding",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_agentic_harness",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_agentic_loop",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_artifact",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_auto_memory",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_auto_mode",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_bare_mode",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_bundled_skills",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_channel",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_checkpoint",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_claude_directory",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_claude_md",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_command",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_compaction",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_connector",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_context_window",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_dispatch",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_effort_level",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_extended_thinking",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_hook",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_managed_settings",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_mcp",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_mcp_server",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_mcp_tool_search",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_non_interactive_mode",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_output_style",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_permission_mode",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_permission_rule",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_plan_mode",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_plugin",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_project_trust",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_prompt_injection",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_remote_control",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_rules",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_sandboxing",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_session",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_settings_layers",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_skill",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_subagent",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_surface",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_teleport",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_tool",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_turn",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_verification_loop",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_worktree_isolation",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_deprecated_terms",
+   "target": "ccglossary_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_subagent",
+   "target": "ccglossary_agent_teams",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_agentic_coding",
+   "target": "ccglossary_tool",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_agentic_harness",
+   "target": "ccglossary_agentic_loop",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_hook",
+   "target": "ccglossary_agentic_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_skill",
+   "target": "ccglossary_agentic_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_mcp",
+   "target": "ccglossary_agentic_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_tool",
+   "target": "ccglossary_agentic_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_turn",
+   "target": "ccglossary_session",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_agentic_loop",
+   "target": "ccglossary_turn",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_hook",
+   "target": "ccglossary_turn",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_context_window",
+   "target": "ccglossary_session",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_compaction",
+   "target": "ccglossary_context_window",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_claude_md",
+   "target": "ccglossary_compaction",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_auto_memory",
+   "target": "ccglossary_claude_md",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_rules",
+   "target": "ccglossary_claude_md",
+   "relation": "complements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_output_style",
+   "target": "ccglossary_claude_md",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_claude_md",
+   "target": "ccglossary_claude_directory",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_rules",
+   "target": "ccglossary_claude_directory",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_project_trust",
+   "target": "ccglossary_claude_directory",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_project_trust",
+   "target": "ccglossary_hook",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_permission_rule",
+   "target": "ccglossary_permission_mode",
+   "relation": "refines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_auto_mode",
+   "target": "ccglossary_permission_mode",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_plan_mode",
+   "target": "ccglossary_permission_mode",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_sandboxing",
+   "target": "ccglossary_permission_rule",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_auto_mode",
+   "target": "ccglossary_prompt_injection",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_permission_mode",
+   "target": "ccglossary_prompt_injection",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_channel",
+   "target": "ccglossary_mcp_server",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_connector",
+   "target": "ccglossary_mcp_server",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_mcp_server",
+   "target": "ccglossary_mcp",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_mcp_tool_search",
+   "target": "ccglossary_context_window",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_bundled_skills",
+   "target": "ccglossary_skill",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_skill",
+   "target": "ccglossary_command",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_plugin",
+   "target": "ccglossary_skill",
+   "relation": "contains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_managed_settings",
+   "target": "ccglossary_settings_layers",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_worktree_isolation",
+   "target": "ccglossary_subagent",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_verification_loop",
+   "target": "ccglossary_agentic_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_bare_mode",
+   "target": "ccglossary_non_interactive_mode",
+   "relation": "complements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_deprecated_terms",
+   "target": "ccglossary_non_interactive_mode",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_remote_control",
+   "target": "ccglossary_surface",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_teleport",
+   "target": "ccglossary_surface",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_dispatch",
+   "target": "ccglossary_surface",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_artifact",
+   "target": "ccglossary_surface",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_effort_level",
+   "target": "ccglossary_extended_thinking",
+   "relation": "constrains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "ccglossary_checkpoint",
+   "target": "ccglossary_session",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_overview_recipe",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_overview_tips",
+   "target": "cccommonwf_overview_recipe",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_find_code",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_code_intelligence_plugin",
+   "target": "cccommonwf_find_code",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_fix_bugs",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_refactor",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_large_migrations",
+   "target": "cccommonwf_refactor",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_tests",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_tests_match_conventions",
+   "target": "cccommonwf_tests",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_ask_for_edge_cases",
+   "target": "cccommonwf_tests",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_refactor",
+   "target": "cccommonwf_tests",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_prs",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_pr_session_link",
+   "target": "cccommonwf_prs",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_pr_session_link",
+   "target": "cccommonwf_resume",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_docs",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_non_code_folders",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_reads_files_fresh",
+   "target": "cccommonwf_non_code_folders",
+   "relation": "conceptually_related_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_images_input",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_images_uses",
+   "target": "cccommonwf_images_input",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_image_reference_click",
+   "target": "cccommonwf_images_input",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_at_references",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_at_pulls_claude_md",
+   "target": "cccommonwf_at_references",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_at_typeahead",
+   "target": "cccommonwf_at_references",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_at_mcp_resources",
+   "target": "cccommonwf_at_references",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_scheduling_options",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_loop_expiry",
+   "target": "cccommonwf_scheduling_options",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_scheduled_prompt_writing",
+   "target": "cccommonwf_scheduling_options",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_ask_about_capabilities",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_resume",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_worktree_flag",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_worktree_flag",
+   "target": "cccommonwf_worktree_needs_a_commit",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_plan_mode",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_delegate_research",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_pipe_into_scripts",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_recipes_are_surface_agnostic",
+   "target": "cccommonwf_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_worktree_flag",
+   "target": "cccommonwf_delegate_research",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_pipe_into_scripts",
+   "target": "cccommonwf_scheduling_options",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "cccommonwf_at_pulls_claude_md",
+   "target": "cccommonwf_reads_files_fresh",
+   "relation": "contrasts_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_common-workflows.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_agentic_not_chatbot",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_one_constraint",
+   "target": "ccbestprac_doc",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_track_context",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_verification_loop",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_what_counts_as_a_check",
+   "target": "ccbestprac_verification_loop",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_four_gate_strengths",
+   "target": "ccbestprac_verification_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_stop_hook_8_block_cap",
+   "target": "ccbestprac_four_gate_strengths",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_show_evidence",
+   "target": "ccbestprac_verification_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_verification_examples",
+   "target": "ccbestprac_verification_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_explore_plan_code",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_ctrl_g_edits_the_plan",
+   "target": "ccbestprac_explore_plan_code",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_when_to_skip_planning",
+   "target": "ccbestprac_explore_plan_code",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_specific_prompts",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_vague_is_sometimes_right",
+   "target": "ccbestprac_specific_prompts",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_rich_content",
+   "target": "ccbestprac_specific_prompts",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_purpose",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_pruning_test",
+   "target": "ccbestprac_claude_md_purpose",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_pruning_test",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_include_exclude",
+   "target": "ccbestprac_claude_md_pruning_test",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_diagnostics",
+   "target": "ccbestprac_claude_md_pruning_test",
+   "relation": "verifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_emphasis_and_git",
+   "target": "ccbestprac_claude_md_purpose",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_imports",
+   "target": "ccbestprac_claude_md_purpose",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_claude_md_locations",
+   "target": "ccbestprac_claude_md_purpose",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_skills_over_claude_md",
+   "target": "ccbestprac_claude_md_pruning_test",
+   "relation": "complements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_skills_over_claude_md",
+   "target": "ccbestprac_skills",
+   "relation": "routes_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_three_permission_reducers",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_cli_tools",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_mcp_servers",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_hooks_are_deterministic",
+   "target": "ccbestprac_claude_md_purpose",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_skills",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_disable_model_invocation",
+   "target": "ccbestprac_skills",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_custom_subagents",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_plugins",
+   "target": "ccbestprac_skills",
+   "relation": "contains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_plugins",
+   "target": "ccbestprac_custom_subagents",
+   "relation": "contains",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_ask_codebase_questions",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_let_claude_interview_you",
+   "target": "ccbestprac_specific_prompts",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_fresh_session_for_the_spec",
+   "target": "ccbestprac_let_claude_interview_you",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_spec_qualities",
+   "target": "ccbestprac_let_claude_interview_you",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_spec_qualities",
+   "target": "ccbestprac_verification_loop",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_course_correct_early",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_two_correction_rule",
+   "target": "ccbestprac_course_correct_early",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_two_correction_rule",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_compaction_controls",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_customize_compaction_in_claude_md",
+   "target": "ccbestprac_compaction_controls",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_btw",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_subagents_for_investigation",
+   "target": "ccbestprac_one_constraint",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_subagents_for_investigation",
+   "target": "ccbestprac_custom_subagents",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_checkpoints_enable_risk",
+   "target": "ccbestprac_course_correct_early",
+   "relation": "enables",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_checkpoints_are_not_git",
+   "target": "ccbestprac_checkpoints_enable_risk",
+   "relation": "contrasts_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_name_sessions_like_branches",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_non_interactive_formats",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_four_parallel_approaches",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_writer_reviewer",
+   "target": "ccbestprac_four_parallel_approaches",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_fan_out",
+   "target": "ccbestprac_non_interactive_formats",
+   "relation": "requires",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_verbose_off_in_production",
+   "target": "ccbestprac_fan_out",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_auto_mode_aborts_headless",
+   "target": "ccbestprac_three_permission_reducers",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_auto_mode_aborts_headless",
+   "target": "ccbestprac_non_interactive_formats",
+   "relation": "conceptually_related_to",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_adversarial_review",
+   "target": "ccbestprac_verification_loop",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_adversarial_review",
+   "target": "ccbestprac_writer_reviewer",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_review_prompt_shape",
+   "target": "ccbestprac_adversarial_review",
+   "relation": "defines",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_reviewer_will_always_find_something",
+   "target": "ccbestprac_adversarial_review",
+   "relation": "mitigates",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_subagent_review_closes_the_loop",
+   "target": "ccbestprac_adversarial_review",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_five_failure_patterns",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_five_failure_patterns",
+   "target": "ccbestprac_one_constraint",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_develop_intuition",
+   "target": "ccbestprac_doc",
+   "relation": "part_of",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_when_to_skip_planning",
+   "target": "ccbestprac_develop_intuition",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  },
+  {
+   "source": "ccbestprac_vague_is_sometimes_right",
+   "target": "ccbestprac_develop_intuition",
+   "relation": "part_of",
+   "confidence": "INFERRED",
+   "confidence_score": 0.5,
+   "source_file": "code.claude.com_docs_en_best-practices.md",
+   "weight": 1
+  }
+ ],
+ "hyperedges": [
+  {
+   "id": "ccglossary_memory_surfaces",
+   "label": "The four things that persist instructions across a session",
+   "nodes": [
+    "ccglossary_claude_md",
+    "ccglossary_auto_memory",
+    "ccglossary_rules",
+    "ccglossary_output_style",
+    "ccglossary_compaction"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md"
+  },
+  {
+   "id": "ccglossary_permission_layers",
+   "label": "The independent layers that gate an action",
+   "nodes": [
+    "ccglossary_permission_mode",
+    "ccglossary_permission_rule",
+    "ccglossary_sandboxing",
+    "ccglossary_project_trust",
+    "ccglossary_managed_settings"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md"
+  },
+  {
+   "id": "ccglossary_harness_core",
+   "label": "What makes Claude Code a harness rather than a chat assistant",
+   "nodes": [
+    "ccglossary_agentic_harness",
+    "ccglossary_agentic_loop",
+    "ccglossary_tool",
+    "ccglossary_agentic_coding",
+    "ccglossary_verification_loop"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_glossary.md"
+  },
+  {
+   "id": "cccommonwf_context_economy_tools",
+   "label": "The three ways this page keeps your context clean",
+   "nodes": [
+    "cccommonwf_delegate_research",
+    "cccommonwf_at_references",
+    "cccommonwf_resume"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md"
+  },
+  {
+   "id": "cccommonwf_recipe_set",
+   "label": "The six everyday prompt recipes",
+   "nodes": [
+    "cccommonwf_overview_recipe",
+    "cccommonwf_find_code",
+    "cccommonwf_fix_bugs",
+    "cccommonwf_refactor",
+    "cccommonwf_tests",
+    "cccommonwf_prs",
+    "cccommonwf_docs"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md"
+  },
+  {
+   "id": "cccommonwf_autonomy_prerequisites",
+   "label": "What a task running without you present needs",
+   "nodes": [
+    "cccommonwf_scheduling_options",
+    "cccommonwf_scheduled_prompt_writing",
+    "cccommonwf_loop_expiry",
+    "cccommonwf_pipe_into_scripts"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_common-workflows.md"
+  },
+  {
+   "id": "ccbestprac_context_economy_stack",
+   "label": "Everything on this page that exists because context is the constraint",
+   "nodes": [
+    "ccbestprac_one_constraint",
+    "ccbestprac_subagents_for_investigation",
+    "ccbestprac_two_correction_rule",
+    "ccbestprac_claude_md_pruning_test",
+    "ccbestprac_btw",
+    "ccbestprac_compaction_controls"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md"
+  },
+  {
+   "id": "ccbestprac_unattended_run_requirements",
+   "label": "What makes a run you can walk away from",
+   "nodes": [
+    "ccbestprac_verification_loop",
+    "ccbestprac_four_gate_strengths",
+    "ccbestprac_show_evidence",
+    "ccbestprac_adversarial_review",
+    "ccbestprac_auto_mode_aborts_headless"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md"
+  },
+  {
+   "id": "ccbestprac_instruction_surfaces",
+   "label": "Choosing where an instruction belongs — and what each costs",
+   "nodes": [
+    "ccbestprac_claude_md_purpose",
+    "ccbestprac_skills_over_claude_md",
+    "ccbestprac_hooks_are_deterministic",
+    "ccbestprac_custom_subagents",
+    "ccbestprac_plugins"
+   ],
+   "relation": "participate_in",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_best-practices.md"
+  }
+ ],
+ "input_tokens": 0,
+ "output_tokens": 0,
+ "supersedes": [
+  "code.claude.com_docs_en_best-practices.md",
+  "code.claude.com_docs_en_common-workflows.md",
+  "code.claude.com_docs_en_glossary.md"
+ ]
+}
