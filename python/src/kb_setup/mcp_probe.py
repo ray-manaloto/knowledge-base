@@ -71,6 +71,14 @@ _INITIALIZE_ID = 1
 _TOOLS_ID = 2
 _RESOURCES_ID = 3
 
+#: How long `_exit_detail` waits for an already-EOF'd child to be REAPED before
+#: giving up on naming its exit code. EOF on stdout precedes reaping, so a bare
+#: `poll()` there legitimately returns None on a loaded host — and `rc=None` is
+#: the LESS informative message, in the one function whose stated job is to say
+#: `rc=0` out loud. Short, because the child has already closed stdout: this
+#: waits on bookkeeping, not on work.
+_REAP_TIMEOUT_S = 5.0
+
 
 @dataclass(frozen=True)
 class Advertised:
@@ -165,6 +173,16 @@ class _Session:
         made the defect invisible for as long as it existed.
         """
         rc = self._proc.poll()
+        if rc is None:
+            # We are here because stdout hit EOF, which happens BEFORE the child
+            # is reaped — so `poll()` returning None is a race, not a running
+            # server. Under load it fires often enough to have failed this
+            # module's own test, and the failure mode is the bad direction:
+            # `rc=None` instead of the `rc=0` sentence below. Bounded, because a
+            # child that has closed stdout and still will not be reaped is a
+            # wedge and must fail rather than hang.
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                rc = self._proc.wait(timeout=_REAP_TIMEOUT_S)
         if rc == 0:
             return (
                 f"server closed stdout and exited rc=0 before answering id={want} "
