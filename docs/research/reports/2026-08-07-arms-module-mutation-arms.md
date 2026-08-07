@@ -182,6 +182,32 @@ no-op — the stub *is* the failure being modelled (a write that silently does n
 take, or a second writer between the write and the read), not a stand-in for the
 code under test.
 
+### The condition on round 1: I edited the tree while the lane was still alive
+
+Round 1's report carries an addendum saying so. Partway through finalising, it
+observed `python/src/kb_setup/arms.py` **modified and uncommitted** — my fix for
+the very P1 it had just reported — and correctly declined to evaluate it,
+recording that its findings "were verified against that commit's committed code,
+before this uncommitted change appeared".
+
+**A lane with a MUTATING brief executes code, so it is measuring the WORKING
+TREE, not the commit.** Editing production source while one is running can
+therefore corrupt its measurements, and nothing in the review flow prevents it:
+the brief pins a SHA, and `git diff` respects that, but `uv run pytest` does not.
+
+Nothing here was corrupted, and the reason is stated rather than assumed:
+
+1. the lane's own addendum places its verification before the edit;
+2. round 2 independently **re-armed all three fixes** by reverting each and
+   watching the named test go red (its items 3, 4, 5), which does not depend on
+   round 1's execution environment at all.
+
+So the findings stand. What does not stand is the impression that round 1 ran
+against a static tree. **The fix is to wait for the lane's report before
+touching a file it may execute** — and this is the third instance in one round
+of the same shape: an instrument and its subject sharing state, after the two
+`PYTHONDONTWRITEBYTECODE` findings above.
+
 ### And the harness caught its own arms going stale
 
 Those fixes moved the lines `A22` and `A23` were pointed at, and the next
