@@ -772,8 +772,13 @@ description = 'Record how a /goal round actually went: mise run kb-goal-outcome 
 run = "uv run kb-setup goal-outcome"
 
 [tasks.kb-validate-chunks]
-description = 'Schema-check extraction chunks (unique ids, no dangling edges): mise run kb-validate-chunks -- <chunk.json>...'
-# Standalone gate over sources/extractions/*.json (or scratch chunks). Logic in kb_setup.chunks.
+description = 'Schema + edge-direction check on extraction chunks: mise run kb-validate-chunks -- <chunk.json>...'
+# Standalone gate over sources/extractions/*.json (or scratch chunks). Logic in
+# kb_setup.chunks (schema, unique ids, no dangling edges, cross-chunk source_file
+# ownership) plus kb_setup.edge_direction (self-edges, cycles in part_of/requires/
+# depends_on, a symmetric contrasts_with emitted both ways). The direction half
+# reports SEMANTIC direction as unchecked rather than implying it is covered —
+# `bun_requirement requires channels` is backwards and trips none of it.
 run = "uv run kb-setup validate-chunks"
 
 [tasks.cc]
