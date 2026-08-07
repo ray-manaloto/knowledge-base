@@ -587,7 +587,52 @@ def _validate_chunks(rest: list[str]) -> int:
         print(f"✓ cross-chunk: no source_file collisions across {len(paths)} chunks")
     else:
         print("- cross-chunk: SKIPPED (needs 2+ chunks; pass the whole corpus to check)")
+
+    bad += _report_edge_direction(paths)
     return 1 if bad else 0
+
+
+def _report_edge_direction(paths: list[Path]) -> int:
+    """Structural edge-direction contradictions (hard) and heuristics (advisory).
+
+    Reported AFTER the schema rows because it answers a different question: not
+    "is this chunk well-formed" but "does its edge set contradict itself". The two
+    channels are printed separately and only the hard one counts toward `bad` —
+    an advisory that failed a gate would be switched off, which is the failure
+    mode the module's own allowlist experiment demonstrated (1936 firings on
+    legitimate vocabulary).
+
+    It CANNOT see semantic direction: `bun_requirement requires channels` is
+    backwards and produces no cycle, no self-edge, nothing. Say so here rather
+    than let a green line imply the class is covered.
+    """
+    import json
+
+    from kb_setup import edge_direction
+
+    hard_total: list[str] = []
+    soft_total: list[str] = []
+    for p in paths:
+        try:
+            chunk = json.loads(p.read_text(encoding="utf-8"))
+        except OSError, json.JSONDecodeError:
+            continue  # already reported by `validate_files` above
+        hard, soft = edge_direction.check(chunk, label=p.name)
+        hard_total.extend(hard)
+        soft_total.extend(soft)
+
+    if hard_total:
+        print(f"✗ edge direction: {len(hard_total)} contradiction(s):", file=sys.stderr)
+        for h in hard_total:
+            print(f"    {h}", file=sys.stderr)
+    else:
+        print(
+            f"✓ edge direction: no structural contradictions across {len(paths)} chunk(s) "
+            f"(cycles/self-edges/both-way symmetric edges; SEMANTIC direction is NOT checked)"
+        )
+    for s in soft_total:
+        print(f"  ~ {s}")
+    return 1 if hard_total else 0
 
 
 if __name__ == "__main__":

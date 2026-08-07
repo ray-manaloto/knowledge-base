@@ -1,0 +1,134 @@
+# Mutation arms for `kb_setup.edge_direction` (the direction gate added this round).
+#
+#   mise run kb-arms -- docs/research/reports/2026-08-07-edge-direction-arms.toml
+#   mise run kb-arms -- docs/research/reports/2026-08-07-edge-direction-arms.toml --dry-run
+#
+# WHY THIS SPEC EXISTS AT ALL. Every hard check in this module has ZERO
+# occurrences in the committed corpus except one real `contrasts_with` defect. So
+# the corpus cannot arm it: a gate whose FAIL direction is never exercised by real
+# data is exactly the decoration `probes-need-a-control-arm.md` rule 2 is about.
+# These arms delete each check's *wiring* and assert a test goes red.
+#
+# The mutations are deliberately DELETIONS of the call, not renames of the
+# definition — a renamed symbol still contains the original as a substring, and
+# the realistic break is the line that CALLS a check going missing in a refactor.
+
+suites = ["tests/test_edge_direction.py"]
+
+[[arm]]
+id = "D0 CONTROL"
+control = true
+file = "python/src/kb_setup/edge_direction.py"
+old = '''def check(chunk: object, *, label: str = "chunk") -> tuple[list[str], list[str]]:'''
+new = '''def check(chunk: object, *, label: str = "chunk") -> tuple[list[str], list[str]]:  # control'''
+
+# --- the three hard checks: delete each one's wiring ------------------------ #
+
+[[arm]]
+id = "D1 self-edge detection removed"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''        if src is not None and src == tgt:
+            hard.append(f"{label}: edge[{i}] is a SELF-EDGE: {src!r} {rel} itself")'''
+new = '''        if False:
+            hard.append(f"{label}: edge[{i}] is a SELF-EDGE: {src!r} {rel} itself")'''
+test = "test_a_self_edge_is_a_hard_failure"
+meaning = "self-edges could stop being reported and the suite would not notice"
+
+[[arm]]
+id = "D2 cycle detection never runs"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''    for rel in _ACYCLIC:
+        cycle = _find_cycle(_edge_pairs(edges, rel))'''
+new = '''    for rel in ():
+        cycle = _find_cycle(_edge_pairs(edges, rel))'''
+test = "test_a_two_cycle_in_part_of_is_caught"
+meaning = "the acyclic loop could be disconnected and no test would fail"
+
+[[arm]]
+id = "D3 symmetric-edge detection never runs"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''    for rel in _SYMMETRIC:
+        pairs = _edge_pairs(edges, rel)'''
+new = '''    for rel in ():
+        pairs = _edge_pairs(edges, rel)'''
+test = "test_contrasts_with_in_both_directions_is_caught"
+meaning = "the only hard check with a REAL corpus hit could be disconnected silently"
+
+# --- the near-miss guards: these are what make the checks checks ------------ #
+#
+# Each mutation below makes a check FIRE TOO BROADLY. If the suite still passes,
+# the check is indistinguishable from "flag everything", which is the failure mode
+# a FAIL-only arm cannot see.
+
+[[arm]]
+id = "D4 cycle check flags any revisited node"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''                if state == 1:
+                    return [*path[path.index(nxt) :], nxt]'''
+new = '''                if state in (1, 2):
+                    return [*path, nxt]'''
+test = "test_a_diamond_is_not_a_cycle"
+meaning = "a diamond (many members, one container) would be misreported as a cycle"
+
+[[arm]]
+id = "D5 acyclic set collapses across relations"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''def _edge_pairs(edges: list[Any], relation: str) -> set[tuple[str, str]]:
+    return {
+        (e["source"], e["target"])
+        for e in edges
+        if isinstance(e, dict)
+        and e.get("relation") == relation'''
+new = '''def _edge_pairs(edges: list[Any], relation: str) -> set[tuple[str, str]]:
+    return {
+        (e["source"], e["target"])
+        for e in edges
+        if isinstance(e, dict)
+        and e.get("relation") is not None'''
+test = "test_a_cycle_across_different_relations_is_not_flagged"
+meaning = "`a part_of b` + `b requires a` would be reported as a contradiction"
+
+[[arm]]
+id = "D6 prereq advisory promoted to a hard failure"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''            soft.append(
+                f"{label}: edge[{i}] {src!r} requires {tgt!r} — the SOURCE is named "'''
+new = '''            hard.append(
+                f"{label}: edge[{i}] {src!r} requires {tgt!r} — the SOURCE is named "'''
+test = "test_a_prereq_named_source_is_advisory_never_hard"
+meaning = "a naming HEURISTIC could start failing gates, which is how a lint gets switched off"
+
+[[arm]]
+id = "D7 prereq pattern becomes a substring match"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''    r"(?:^|_)(requirement|requirements|needs|need|prereq|prerequisite|required)(?:_|$)"'''
+new = '''    r"(requirement|requirements|needs|need|prereq|prerequisite|required)"'''
+test = "test_a_substring_match_does_not_fire_the_prereq_advisory"
+meaning = "`needle_parser` would be flagged because it contains `need`"
+
+[[arm]]
+id = "D8 bidirectional pair reported twice"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''            if (t, s) in pairs and (t, s) not in seen:
+                seen.add((s, t))'''
+new = '''            if (t, s) in pairs:
+                seen.add((s, t))'''
+test = "test_a_bidirectional_pair_is_reported_once_not_twice"
+meaning = "one defect would be counted twice, inflating any finding count built on it"
+
+# --- the deliberate ABSENCE: no relation allowlist -------------------------- #
+#
+# This arm injects the check the module was BUILT WITH and then deleted, because
+# it fired 1936 times on 308 legitimate verbs. The test must catch its return.
+
+[[arm]]
+id = "D9 relation allowlist reintroduced"
+file = "python/src/kb_setup/edge_direction.py"
+old = '''        if (
+            rel == "requires"'''
+new = '''        if isinstance(rel, str) and rel not in ("part_of", "requires", "enables"):
+            hard.append(f"{label}: edge[{i}] unknown relation {rel!r}")
+        if (
+            rel == "requires"'''
+test = "test_an_unusual_relation_verb_is_accepted"
+meaning = "a closed vocabulary could come back and red-light every committed chunk"
