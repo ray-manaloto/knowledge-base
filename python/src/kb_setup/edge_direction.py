@@ -29,6 +29,7 @@ reuse as legitimate (#231).
 
 from __future__ import annotations
 
+import itertools
 import re
 from typing import Any
 
@@ -77,15 +78,73 @@ _PREREQ_NAMED = re.compile(
 )
 
 
-def _edge_pairs(edges: list[Any], relation: str) -> set[tuple[str, str]]:
-    return {
-        (e["source"], e["target"])
-        for e in edges
-        if isinstance(e, dict)
-        and e.get("relation") == relation
-        and isinstance(e.get("source"), str)
-        and isinstance(e.get("target"), str)
-    }
+def _pairs_by_label(
+    items: list[tuple[str, list[Any]]], relation: str
+) -> dict[tuple[str, str], set[str]]:
+    """`(source, target)` -> the labels of every chunk that emitted that edge.
+
+    The value is a label SET rather than a bare pair set because the whole point
+    of unioning is that the two halves of a contradiction can live in different
+    files — and a message that cannot name both files sends the reader to look
+    for a cycle that is not in either one of them.
+    """
+    out: dict[tuple[str, str], set[str]] = {}
+    for label, edges in items:
+        for e in edges:
+            if (
+                isinstance(e, dict)
+                and e.get("relation") == relation
+                and isinstance(e.get("source"), str)
+                and isinstance(e.get("target"), str)
+            ):
+                out.setdefault((e["source"], e["target"]), set()).add(label)
+    return out
+
+
+def _where(labels: set[str]) -> str:
+    """The chunk(s) a contradiction's edges came from, as a message prefix."""
+    return "+".join(sorted(labels)) if labels else "chunk"
+
+
+def _cycle_reports(parsed: list[tuple[str, list[Any]]]) -> list[str]:
+    """One CYCLE line per acyclic relation that has one, over the UNION."""
+    out: list[str] = []
+    for rel in _ACYCLIC:
+        pairs = _pairs_by_label(parsed, rel)
+        cycle = _find_cycle(set(pairs))
+        if not cycle:
+            continue
+        involved: set[str] = set()
+        for s, t in itertools.pairwise(cycle):
+            involved |= pairs.get((s, t), set())
+        out.append(
+            f"{_where(involved)}: `{rel}` has a CYCLE: {' -> '.join(cycle)}. "
+            f"`{rel}` is antisymmetric, so at least one of these edges is reversed"
+        )
+    return out
+
+
+def _symmetric_reports(parsed: list[tuple[str, list[Any]]]) -> list[str]:
+    """One line per symmetric-relation pair emitted in both directions."""
+    out: list[str] = []
+    for rel in _SYMMETRIC:
+        pairs = _pairs_by_label(parsed, rel)
+        seen: set[tuple[str, str]] = set()
+        for s, t in sorted(pairs):
+            # A self-edge satisfies `(t, s) in pairs` trivially — it IS `(s, t)` —
+            # so without this it reported one edge as "both directions" of a pair.
+            # `_scan_edges` already reports it as a SELF-EDGE, which is the true
+            # description; a second, FALSE message next to a true one is how a
+            # reader learns to skim the channel.
+            if s == t or (t, s) not in pairs or (t, s) in seen:
+                continue
+            seen.add((s, t))
+            out.append(
+                f"{_where(pairs[s, t] | pairs[t, s])}: `{rel}` emitted in BOTH "
+                f"directions between {s!r} and {t!r}; the extraction contract "
+                f"says emit exactly one"
+            )
+    return out
 
 
 def _find_cycle(pairs: set[tuple[str, str]]) -> list[str] | None:
@@ -151,38 +210,67 @@ def _scan_edges(edges: list[Any], label: str) -> tuple[list[str], list[str]]:
     return (hard, soft)
 
 
+def check_many(items: list[tuple[str, object]]) -> tuple[list[str], list[str]]:
+    """`(hard_problems, advisories)` for a SET of `(label, chunk)` pairs.
+
+    The per-edge checks (self-edge, prerequisite naming) stay per chunk, because
+    they cite an `edge[i]` index that only means something inside one file. The
+    CYCLE and symmetric-relation checks run over the **union** of every chunk's
+    edges, and that is the whole reason this function exists.
+
+    Checking each file in isolation made a contradiction invisible exactly where
+    it is most likely: `a requires b` in one chunk and `b requires a` in another
+    is a real cycle, and neither file alone contains one. Measured on the
+    committed corpus when this was found — **10 node ids are declared in two
+    different chunks** (`claude-commands-docs` / `claude-commands-full-docs`, a
+    re-extraction pair), so the shape that enables it is already here; only the
+    relation coincidence was missing. Re-extracting a page under a new chunk name
+    is the routine operation that supplies it.
+
+    **The union is the right scope because it is the scope graphify merges at.**
+    Node identity is the id, so two chunks emitting the same id emit ONE node in
+    `graph.json` — a cycle spanning two chunks is a cycle in the merged graph, not
+    an artefact of putting the files side by side. `chunks.validate_files` already
+    resolves endpoints this way for the same reason ("matching what graphify does
+    at merge time"), so this makes the two checks agree rather than introducing a
+    new notion of scope. It also means the union cannot invent a contradiction:
+    the only way to get a false cycle here is two chunks reusing one id for
+    different concepts, which is #231's defect and is wrong independently of this.
+
+    A per-file loop over this function would reintroduce the gap, so callers pass
+    the whole set. `check()` below is the one-chunk case of it, not a parallel
+    implementation.
+    """
+    hard: list[str] = []
+    soft: list[str] = []
+    parsed: list[tuple[str, list[Any]]] = []
+
+    for label, chunk in items:
+        if not isinstance(chunk, dict):
+            hard.append(f"{label}: not a JSON object")
+            continue
+        edges = chunk.get("edges")
+        if not isinstance(edges, list):
+            continue  # `chunks.validate` already reports a non-list `edges`.
+        parsed.append((label, edges))
+        per_file_hard, per_file_soft = _scan_edges(edges, label)
+        hard.extend(per_file_hard)
+        soft.extend(per_file_soft)
+
+    hard.extend(_cycle_reports(parsed))
+    hard.extend(_symmetric_reports(parsed))
+    return (hard, soft)
+
+
 def check(chunk: object, *, label: str = "chunk") -> tuple[list[str], list[str]]:
     """`(hard_problems, advisories)` for one chunk's edges.
 
     Hard problems are contradictions — true regardless of what the nodes mean.
     Advisories are named heuristics; a caller may print them but must not fail on
     them, or the gate becomes noise and gets turned off.
+
+    A single-chunk shorthand for `check_many`. Anything holding more than one
+    chunk must call `check_many` instead of looping over this — see its docstring
+    for what a per-file loop cannot see.
     """
-    if not isinstance(chunk, dict):
-        return ([f"{label}: not a JSON object"], [])
-    edges = chunk.get("edges")
-    if not isinstance(edges, list):
-        return ([], [])  # `chunks.validate` already reports a non-list `edges`.
-
-    hard, soft = _scan_edges(edges, label)
-
-    for rel in _ACYCLIC:
-        cycle = _find_cycle(_edge_pairs(edges, rel))
-        if cycle:
-            hard.append(
-                f"{label}: `{rel}` has a CYCLE: {' -> '.join(cycle)}. "
-                f"`{rel}` is antisymmetric, so at least one of these edges is reversed"
-            )
-
-    for rel in _SYMMETRIC:
-        pairs = _edge_pairs(edges, rel)
-        seen: set[tuple[str, str]] = set()
-        for s, t in sorted(pairs):
-            if (t, s) in pairs and (t, s) not in seen:
-                seen.add((s, t))
-                hard.append(
-                    f"{label}: `{rel}` emitted in BOTH directions between {s!r} and "
-                    f"{t!r}; the extraction contract says emit exactly one"
-                )
-
-    return (hard, soft)
+    return check_many([(label, chunk)])

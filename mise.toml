@@ -779,6 +779,11 @@ description = 'Schema + edge-direction check on extraction chunks: mise run kb-v
 # depends_on, a symmetric contrasts_with emitted both ways). The direction half
 # reports SEMANTIC direction as unchecked rather than implying it is covered —
 # `bun_requirement requires channels` is backwards and trips none of it.
+#
+# PASS THE WHOLE CORPUS, not one chunk. Cycles and both-way symmetric edges are
+# checked over the UNION of every chunk given, because that is what graphify
+# merges — `a requires b` in one file and `b requires a` in another is a real
+# cycle that neither file contains alone, and a per-file run reports both green.
 run = "uv run kb-setup validate-chunks"
 
 [tasks.cc]

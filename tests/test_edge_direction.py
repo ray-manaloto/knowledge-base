@@ -10,7 +10,16 @@ because it is what distinguishes a check from a `return []`.
 
 from __future__ import annotations
 
+import json
+from typing import TYPE_CHECKING
+
+from kb_setup import cli
 from kb_setup import edge_direction as ed
+
+if TYPE_CHECKING:
+    import pathlib
+
+    import pytest
 
 
 def _edge(source: str, target: str, relation: str = "part_of") -> dict[str, object]:
@@ -129,6 +138,103 @@ def test_missing_endpoints_do_not_crash() -> None:
     ed.check({"edges": [{"relation": "part_of"}]})
 
 
+def test_a_contrasts_with_self_edge_is_not_also_called_both_directions() -> None:
+    """One edge cannot be "both directions" of a pair.
+
+    `(a, a)` satisfies `(t, s) in pairs` trivially — it IS `(s, t)` — so the
+    symmetric check reported a second, FALSE message beside the true SELF-EDGE
+    one. A false line next to a true one is worse than no line: it is what
+    teaches a reader to skim the channel.
+    """
+    hard, _ = ed.check(_chunk(_edge("a", "a", "contrasts_with")))
+    assert any("SELF-EDGE" in h for h in hard)
+    assert not [h for h in hard if "BOTH directions" in h]
+
+
+def test_a_cycle_split_across_two_chunks_is_caught() -> None:
+    """The P1 gap: neither file alone contains a cycle, together they do.
+
+    A per-file loop reports both files clean. This is not hypothetical — 10 node
+    ids are declared in two different committed chunks today, so only the
+    relation coincidence was missing.
+    """
+    hard, _ = ed.check_many(
+        [
+            ("left.json", _chunk(_edge("a", "b", "requires"))),
+            ("right.json", _chunk(_edge("b", "a", "requires"))),
+        ]
+    )
+    assert any("CYCLE" in h for h in hard)
+
+
+def test_a_cross_chunk_cycle_names_both_chunks() -> None:
+    """Otherwise the reader is sent to look for a cycle in one file that has none."""
+    hard, _ = ed.check_many(
+        [
+            ("left.json", _chunk(_edge("a", "b", "requires"))),
+            ("right.json", _chunk(_edge("b", "a", "requires"))),
+        ]
+    )
+    cycles = [h for h in hard if "CYCLE" in h]
+    assert len(cycles) == 1
+    assert "left.json" in cycles[0]
+    assert "right.json" in cycles[0]
+
+
+def test_a_cross_chunk_contrasts_with_pair_is_caught() -> None:
+    """Same isolation gap, on the symmetric-relation check."""
+    hard, _ = ed.check_many(
+        [
+            ("left.json", _chunk(_edge("a", "b", "contrasts_with"))),
+            ("right.json", _chunk(_edge("b", "a", "contrasts_with"))),
+        ]
+    )
+    both = [h for h in hard if "BOTH directions" in h]
+    assert len(both) == 1
+    assert "left.json" in both[0]
+    assert "right.json" in both[0]
+
+
+def test_two_chunks_that_do_not_share_a_cycle_stay_clean() -> None:
+    """The near-miss for the union: unioning must not INVENT a contradiction.
+
+    Two acyclic chunks whose ids happen to interleave are the ordinary case, and
+    a union check that flagged them would be switched off within one round.
+    """
+    hard, _ = ed.check_many(
+        [
+            ("left.json", _chunk(_edge("a", "b", "requires"))),
+            ("right.json", _chunk(_edge("b", "c", "requires"))),
+        ]
+    )
+    assert not hard
+
+
+def test_a_single_chunk_cycle_still_names_only_that_chunk() -> None:
+    hard, _ = ed.check_many([("only.json", _chunk(_edge("a", "b"), _edge("b", "a")))])
+    cycles = [h for h in hard if "CYCLE" in h]
+    assert len(cycles) == 1
+    assert cycles[0].startswith("only.json:")
+
+
+def test_check_is_exactly_the_one_chunk_case_of_check_many() -> None:
+    """Pins the delegation, so the two can never drift into disagreeing.
+
+    `check` was a parallel implementation before the union landed; a second copy
+    of these rules is how one of them silently stops matching the other.
+    """
+    chunk = _chunk(_edge("a", "a"), _edge("x", "y", "requires"), _edge("y", "x", "requires"))
+    assert ed.check(chunk, label="c.json") == ed.check_many([("c.json", chunk)])
+
+
+def test_check_many_reports_a_non_object_chunk_without_losing_the_others() -> None:
+    hard, _ = ed.check_many(
+        [("bad.json", ["not", "a", "chunk"]), ("ok.json", _chunk(_edge("a", "a")))]
+    )
+    assert any(h == "bad.json: not a JSON object" for h in hard)
+    assert any("SELF-EDGE" in h for h in hard)
+
+
 def test_an_unusual_relation_verb_is_accepted() -> None:
     """Regression guard for the check this module deliberately does NOT have.
 
@@ -137,3 +243,63 @@ def test_an_unusual_relation_verb_is_accepted() -> None:
     """
     hard, _ = ed.check(_chunk(_edge("a", "b", "conceptually_related_to")))
     assert not hard
+
+
+# --- the CLI wiring -------------------------------------------------------
+#
+# The union lives in `edge_direction.check_many`, but the gap it closes was in
+# `cli._report_edge_direction`, which looped. A module-level test alone would
+# leave the call site free to loop again and stay green — the "a validator
+# nothing calls is not a gate" shape this repo has walked into before.
+
+
+def _write(tmp_path: pathlib.Path, name: str, *edges: dict[str, object]) -> pathlib.Path:
+    p = tmp_path / name
+    p.write_text(json.dumps(_chunk(*edges)), encoding="utf-8")
+    return p
+
+
+def test_the_cli_unions_chunks_rather_than_looping(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The end-to-end P1 arm: two files, one cycle between them, rc must be 1."""
+    left = _write(tmp_path, "left.json", _edge("a", "b", "requires"))
+    right = _write(tmp_path, "right.json", _edge("b", "a", "requires"))
+    rc = cli._report_edge_direction([left, right])
+    out = capsys.readouterr()
+    assert rc == 1
+    assert "CYCLE" in out.err
+    assert "left.json" in out.err
+    assert "right.json" in out.err
+
+
+def test_the_cli_stays_green_on_two_unrelated_chunks(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The near-miss: unioning must not turn ordinary chunks red."""
+    left = _write(tmp_path, "left.json", _edge("a", "b", "requires"))
+    right = _write(tmp_path, "right.json", _edge("c", "d", "requires"))
+    rc = cli._report_edge_direction([left, right])
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "no structural contradictions" in out.out
+
+
+def test_an_unreadable_chunk_is_named_and_not_counted_as_covered(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """P2: the green line counted files it never parsed.
+
+    `validate_files` fails the run for the bad file, so this was never a
+    false-green on the GATE — but the coverage number was false, and a number
+    nobody can trust is the thing that makes the rest of the line unreadable.
+    """
+    good = _write(tmp_path, "good.json", _edge("a", "b", "requires"))
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    rc = cli._report_edge_direction([good, bad])
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "NOT CHECKED for 1 unreadable chunk(s): bad.json" in out.err
+    assert "across the UNION of 1 chunk(s)" in out.out
+    assert "2 chunk(s)" not in out.out

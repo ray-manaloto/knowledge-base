@@ -605,30 +605,48 @@ def _report_edge_direction(paths: list[Path]) -> int:
     It CANNOT see semantic direction: `bun_requirement requires channels` is
     backwards and produces no cycle, no self-edge, nothing. Say so here rather
     than let a green line imply the class is covered.
+
+    The chunks are handed to `check_many` as a SET, never looped over one at a
+    time: a cycle whose two halves sit in different files is invisible to a
+    per-file check, and re-extracting a page under a new chunk name is exactly
+    how a corpus acquires two files describing the same node ids.
+
+    The count in the green line is the number of chunks actually PARSED, not the
+    number passed in. An unreadable chunk is skipped here (`validate_files` is
+    what reports it, and fails the run), and reporting coverage of a file that
+    was never read is the shape of claim this repo's gates exist to refuse.
     """
     import json
 
     from kb_setup import edge_direction
 
-    hard_total: list[str] = []
-    soft_total: list[str] = []
+    items: list[tuple[str, object]] = []
+    skipped: list[str] = []
     for p in paths:
         try:
             chunk = json.loads(p.read_text(encoding="utf-8"))
         except OSError, json.JSONDecodeError:
-            continue  # already reported by `validate_files` above
-        hard, soft = edge_direction.check(chunk, label=p.name)
-        hard_total.extend(hard)
-        soft_total.extend(soft)
+            skipped.append(p.name)  # already reported (and failed) by `validate_files`
+            continue
+        items.append((p.name, chunk))
 
+    hard_total, soft_total = edge_direction.check_many(items)
+
+    if skipped:
+        print(
+            f"- edge direction: NOT CHECKED for {len(skipped)} unreadable chunk(s): "
+            f"{', '.join(skipped)}",
+            file=sys.stderr,
+        )
     if hard_total:
         print(f"✗ edge direction: {len(hard_total)} contradiction(s):", file=sys.stderr)
         for h in hard_total:
             print(f"    {h}", file=sys.stderr)
     else:
         print(
-            f"✓ edge direction: no structural contradictions across {len(paths)} chunk(s) "
-            f"(cycles/self-edges/both-way symmetric edges; SEMANTIC direction is NOT checked)"
+            f"✓ edge direction: no structural contradictions across the UNION of "
+            f"{len(items)} chunk(s) (cycles/self-edges/both-way symmetric edges; "
+            f"SEMANTIC direction is NOT checked)"
         )
     for s in soft_total:
         print(f"  ~ {s}")
