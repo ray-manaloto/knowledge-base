@@ -77,20 +77,21 @@ def test_heredoc_body_ends_at_its_own_delimiter():
     assert "import re" in bodies[1]
 
 
-def test_indented_closer_terminates_a_dash_heredoc():
-    """Cold lane P1 on c1374b99e032 — and the corruption was worse than the miss.
+def test_tab_indented_closer_terminates_a_dash_heredoc():
+    """Cold lane P1 on c1374b99e032, corrected by round 2 and by real bash.
 
-    `<<-` exists so the terminator may be indented. Demanding column 0 did not
-    merely drop the script: the lazy body ran forward to the next column-0 line
-    matching the delimiter and glued unrelated shell commands into what was then
-    reported as Python source.
+    `<<-` strips leading TABS, so a tab-indented terminator really does end the
+    heredoc — and demanding column 0 made the lazy body run forward to the next
+    column-0 delimiter. Verified against bash:
+
+        cat <<-'PY' … <TAB>PY   -> body is `line1` alone
     """
     command = (
         "for f in a b; do\n"
-        "    python3 - <<-'PY'\n"
-        "    import json\n"
-        "    print(f)\n"
-        "    PY\n"
+        "\tpython3 - <<-'PY'\n"
+        "\timport json\n"
+        "\tprint(f)\n"
+        "\tPY\n"
         "done\n"
         "echo unrelated\n"
         "PY\n"
@@ -99,24 +100,35 @@ def test_indented_closer_terminates_a_dash_heredoc():
     assert len(found) == 1
     body = found[0][1]
     assert "import json" in body
-    for leaked in ("done", "echo unrelated", "PY"):
+    for leaked in ("done", "echo unrelated"):
         assert leaked not in body, f"{leaked!r} leaked into the captured script body"
 
 
-def test_plain_heredoc_still_requires_column_zero():
-    """The MIRROR defect the conditional closer exists to avoid.
+def test_space_indented_closer_does_not_terminate_a_dash_heredoc():
+    r"""The MIRROR of the test above, and the defect round 2 caught.
 
-    Being permissive in both forms would end a plain `<<` body early on an
-    indented line that happens to equal the delimiter. Bash does not, so nor
-    does this.
+    Bash's `<<-` strips TABS only. A space-indented line equal to the delimiter
+    is ordinary body content, so treating it as a terminator silently truncates
+    the rest of a real script. Verified against bash:
+
+        cat <<-'PY' … `    PY` … line2 … PY  -> body is `line1\\n    PY\\nline2`
     """
-    command = "python3 - <<'PY'\nimport json\n    PY\nprint(1)\nPY\n"
+    command = "python3 - <<-'PY'\nimport json\n    PY\nprint(1)\nPY\n"
     found = list(distill.detect_scripts(command))
     assert len(found) == 1
-    assert "print(1)" in found[0][1], "an indented line ended a plain heredoc early"
+    assert "print(1)" in found[0][1], "a SPACE-indented line ended a <<- heredoc early"
 
 
-def test_escaped_quote_does_not_truncate_an_inline_payload():
+def test_plain_heredoc_still_requires_column_zero():
+    """A plain `<<` terminator must be at column 0 in bash, indent of any kind."""
+    for indent in ("    ", "\t"):
+        command = f"python3 - <<'PY'\nimport json\n{indent}PY\nprint(1)\nPY\n"
+        found = list(distill.detect_scripts(command))
+        assert len(found) == 1
+        assert "print(1)" in found[0][1], f"indent {indent!r} ended a plain heredoc early"
+
+
+def test_escaped_quote_does_not_truncate_a_double_quoted_payload():
     """Cold lane P2 on c1374b99e032: truncation fell under the floor, so ALL of it vanished."""
     payload = 'print(\\"hi\\"); x=1;' + ("y=2;" * 30)
     assert len(payload) >= distill.MIN_INLINE_CHARS
@@ -125,11 +137,41 @@ def test_escaped_quote_does_not_truncate_an_inline_payload():
     assert len(found[0][1]) == len(payload)
 
 
+def test_a_single_quoted_payload_has_no_escapes():
+    r"""The MIRROR of the test above — cold lane round 2, P1 on 37020536f63c.
+
+    Bash single quotes have NO escape mechanism: a trailing backslash is
+    literal and the very next `'` closes the string. Treating `\\'` as an escaped
+    quote kept scanning and glued unrelated shell text into the reported script.
+    Verified against bash:
+
+        bash -c "echo 'print(1)\\' AFTERQUOTE"  ->  print(1)\\ AFTERQUOTE
+    """
+    payload = "print(1); x=1;" + ("y=2;" * 30) + "\\"
+    assert len(payload) >= distill.MIN_INLINE_CHARS
+    command = f"python3 -c '{payload}' && echo AFTERQUOTE_SHOULD_NOT_LEAK"
+    found = list(distill.detect_scripts(command))
+    assert len(found) == 1
+    assert "AFTERQUOTE_SHOULD_NOT_LEAK" not in found[0][1]
+    assert found[0][1] == payload
+
+
 def test_a_vendored_clones_source_tree_is_still_ad_hoc():
     """Cold lane P3 on c1374b99e032 — somebody else's python/src is not ours."""
     assert distill.repo_source("/repo/python/src/kb_setup/x.py") is True
     assert distill.repo_source("/repo/sources/vendored/python/src/thing.py") is False
     assert distill.repo_source("/scratch/apython/src/foo.py") is False
+
+
+def test_the_vendored_marker_only_disqualifies_when_it_comes_first():
+    """The MIRROR of the test above — cold lane round 2, P3 on 37020536f63c.
+
+    A bare substring test would disown our own source for containing the word
+    `sources` further down the path. Position is the question, not presence.
+    """
+    assert distill.repo_source("/repo/python/src/kb_setup/sources/x.py") is True
+    assert distill.repo_source("/repo/tests/raw/fixture.py") is True
+    assert distill.repo_source("/repo/sources/v/python/src/kb_setup/sources/x.py") is False
 
 
 def test_short_inline_c_is_not_a_script():

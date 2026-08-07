@@ -81,37 +81,58 @@ DEFAULT_VENDORED_MARKERS: tuple[str, ...] = ("/sources/", "/raw/")
 # The quoted-or-bare delimiter is captured so the body ends at the RIGHT marker;
 # a fixed `EOF` would swallow the rest of a command that used `PY`.
 #
-# The closer is CONDITIONAL on the dash, because bash's two forms differ and
-# picking either one unconditionally is wrong. Plain `<<` requires the
-# terminator at column 0; `<<-` exists precisely so it may be indented. The
-# first version here accepted `<<-` on the way in and demanded column 0 on the
-# way out, so an indented terminator did not merely miss — the lazy body ran
-# FORWARD to the next column-0 line matching the delimiter and glued unrelated
-# shell commands into what was then reported as Python source (cold lane, P1 on
-# c1374b99e032). Being permissive in both forms would trade that for the mirror
-# defect: a plain `<<` body containing an indented line equal to the delimiter
-# would terminate early. `(?(dash)…)` asks the only question that decides it.
+# The closer is CONDITIONAL on the dash, and the indent class is **TABS ONLY**.
+# Both halves were established by running real bash rather than by reasoning,
+# and each half is a defect this pattern actually shipped:
+#
+#   `cat <<-'PY'` + tab-indented   PY  -> terminates      (so column-0-only MISSES it)
+#   `cat <<-'PY'` + space-indented PY  -> does NOT terminate; that line is BODY
+#   `cat  <<'PY'` + any indent         -> does NOT terminate
+#
+# v1 demanded column 0 for both forms, so a TAB-indented `<<-` terminator was
+# missed and the lazy body ran forward to the next column-0 delimiter (cold
+# lane, P1 on c1374b99e032). v2 then allowed `[ \t]*`, which is the MIRROR
+# defect: a space-indented line equal to the delimiter is ordinary body content
+# in bash, and treating it as a terminator silently truncates the rest of a real
+# script (cold lane round 2, P1 on 37020536f63c).
+#
+# The round-1 report's own reproduction used SPACES, so the "corruption" it
+# showed was in fact faithful bash behaviour. The observation was reproduced and
+# the premise was not checked — which is why this comment cites `bash`, not a
+# review.
 _HEREDOC = re.compile(
     r"(?:^|[;&|]|&&|\|\|)\s*"
     r"(?:\S*/)?(?:python[\d.]*|uv\s+run\s+(?:--\S+\s+)*python[\d.]*)\b[^\n<]*"
     r"<<(?P<dash>-)?\s*['\"]?(?P<delim>[A-Za-z_]\w*)['\"]?\s*\n"
-    r"(?P<body>.*?)^(?(dash)[ \t]*)(?P=delim)[ \t]*$",
+    r"(?P<body>.*?)^(?(dash)\t*)(?P=delim)$",
     re.DOTALL | re.MULTILINE,
 )
 
 # An interpreter fed a `-c` payload. Short one-liners are ordinary shell use, so
 # a length floor keeps `python -c "print(1)"` out; MIN_INLINE_CHARS is the seam.
 #
-# `(?:\\.|[^\\])*?` rather than `.*?` so a BACKSLASH-ESCAPED quote does not end
-# the payload. `-c "print(\"hi\"); …"` is ordinary bash, and the naive form
-# truncated it at the first escaped quote — to 7 characters, which then fell
-# under the length floor, so the whole script vanished with no signal (cold
-# lane, P2 on c1374b99e032). The floor turned a partial capture into a total
-# one: exactly the "loss happens past the gate" shape, inside the gate itself.
+# The two quote styles get SEPARATE branches, because bash's escape rules differ
+# and one rule applied to both is wrong in one direction or the other — verified
+# against real bash, not inferred:
+#
+#   -c "print(\"hi\"); …"     -> `\"` is an escaped quote; the string continues
+#   -c 'print(1)\'            -> single quotes have NO escapes at all; the
+#                                backslash is literal and the quote CLOSES here
+#
+# v1 used a shared `.*?`, so an escaped double quote truncated the payload to 7
+# characters — which then fell under the length floor, turning a partial capture
+# into a total loss with no signal (cold lane, P2 on c1374b99e032). v2 applied
+# escape-awareness to BOTH quote styles, the mirror defect: a single-quoted
+# payload ending in a backslash kept scanning past its real terminator and glued
+# unrelated shell text into the reported script (cold lane round 2, P1 on
+# 37020536f63c).
 _INLINE = re.compile(
     r"(?:^|[;&|]|&&|\|\|)\s*"
     r"(?:\S*/)?(?:python[\d.]*|uv\s+run\s+(?:--\S+\s+)*python[\d.]*)\b[^\n]*?"
-    r"\s-c\s+(?P<q>['\"])(?P<body>(?:\\.|[^\\])*?)(?P=q)",
+    r"\s-c\s+(?:"
+    r"'(?P<sbody>[^']*)'"
+    r'|"(?P<dbody>(?:\\.|[^\\"])*)"'
+    r")",
     re.DOTALL,
 )
 
@@ -284,8 +305,9 @@ def detect_scripts(command: str) -> Iterator[tuple[str, str]]:
     for m in _HEREDOC.finditer(command):
         yield "heredoc", m.group("body")
     for m in _INLINE.finditer(command):
-        body = m.group("body")
-        if len(body) >= MIN_INLINE_CHARS:
+        # Exactly one of the two quote branches matches; the other is None.
+        body = m.group("sbody") if m.group("sbody") is not None else m.group("dbody")
+        if body is not None and len(body) >= MIN_INLINE_CHARS:
             yield "inline", body
 
 
@@ -347,6 +369,12 @@ def repo_source(
     there is still ad hoc. The plain substring test called it ours and silently
     dropped it from detection (cold lane, P3 on c1374b99e032).
 
+    A vendored marker only disqualifies when it appears **before** the source
+    prefix. Testing it anywhere in the string was the mirror of the bug it fixed
+    (cold lane round 2, P3): `python/src/.../sources/...` is still our source,
+    and a bare substring test would have disowned it. Position is the whole
+    question — "is the prefix inside a clone" is not "does the word appear".
+
     **What this still cannot see, stated because a check owes that:** it decides
     from the path string alone, so a `python/src` belonging to an unrelated
     checkout elsewhere on disk would read as ours. That case does not arise for
@@ -357,9 +385,14 @@ def repo_source(
     replace the predicate through :class:`Policy`.
     """
     anchored = f"/{path.replace('\\', '/')}"
-    if any(marker in anchored for marker in vendored):
-        return False
-    return any(f"/{p}" in anchored for p in prefixes)
+    for prefix in prefixes:
+        at = anchored.find(f"/{prefix}")
+        if at == -1:
+            continue
+        if any(marker in anchored[:at] for marker in vendored):
+            continue
+        return True
+    return False
 
 
 def scripts_in(
