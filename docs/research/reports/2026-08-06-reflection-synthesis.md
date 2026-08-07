@@ -324,6 +324,27 @@ than about a question.
 That is where the file already wants to divide, and the six findings are a
 coherent unit on the far side of it.
 
+> **CALLER'S ANNOTATION, 2026-08-07 — this recommendation was REJECTED. Original
+> text preserved below, and so is every later mention of `arm-your-own-work.md`
+> in this document — the §4.4 and §5.1 table rows and the §appendix file list are
+> all stale in the same way and are deliberately not edited.**
+>
+> `kb-advisor` reviewed this synthesis and rejected the new eager file: the
+> M1/M12/M11/M4a/M5 cluster fires at exactly one moment — a fix exists and is
+> about to be trusted — and that moment belongs to the `kb-review` loop, not to
+> launch context. The §4.3 seam identified here is real; its destination was
+> wrong. **Ray adopted the advisor's allocation verbatim at clear-prep
+> 2026-08-06** (#216, decision comment).
+>
+> Shipped instead: the NORM as a ~9-line bridge in
+> `probes-need-a-control-arm.md` rule 2, and the PROCEDURE in
+> `.claude/skills/kb-review/SKILL.md` § *Arm your own fixes* +
+> `.claude/agents/kb-adversarial-verifier.md`. Zero eager cost, and the
+> procedure form is the one the corpus measured working.
+>
+> Its own §0.2 prose-saturation argument is what defeated it: where a reader
+> MEASURED prose failing for a class, more prose is not the remedy.
+
 **Recommendation: ONE new eager rule file — `arm-your-own-work.md`.**
 
 | section | source finding(s) | ~lines |

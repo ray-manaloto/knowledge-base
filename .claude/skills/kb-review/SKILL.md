@@ -175,6 +175,51 @@ bytes it never saw, which is the "gap wearing a reason's clothes" this gate exis
 to refuse. The file above is honest precisely because it says a lane did *not*
 re-run — the receipt records that a review happened, and this records what kind.
 
+### 4a. Arm your own fixes — before round 2, not after
+
+**The fix you just wrote to close a finding is the least-reviewed code in the
+diff.** It was written under time pressure, by whoever already misunderstood the
+area once, and it arrives wearing a finding's authority. Round 2 of one review
+here found **two defects that round 1's own fixes introduced**; the norm is
+`probes-need-a-control-arm.md` rule 2, and this is the procedure.
+
+Run these three before handing round 2 anything. Each is one command or one read.
+
+1. **Revert the fix — does its own test go red?** A test written alongside its
+   fix routinely cannot fail, and **neither a review lane nor a mutation sweep
+   can see that**: an arm mutates production code, so a test asserting nothing is
+   invisible to it. Reverting is the only cheap probe for this class. Still
+   green with the fix removed ⇒ you wrote decoration.
+2. **What input reaches the same verdict by a different route?** Mutate the
+   *fix*, not just the original defect, and prove the mutation hit the intended
+   LINE — three of five "survivors" in one round were a `str.replace` matching
+   the wrong occurrence. A survivor is not a coverage gap until the mutant is
+   shown to differ there.
+3. **Does the comment you just wrote describe the line below it?** The worst
+   form is a comment *defending* the choice that is the bug: the prose is what
+   prevents your own re-read and disarms the next reviewer. Nobody re-reads a
+   comment they agree with. Observed here — a docstring explaining that lexical
+   containment was deliberate, walked through by a symlink the next round; and a
+   comment asserting the exact opposite of the line beneath it.
+
+Two more that apply to what a fix *ships*:
+
+- **A check you add must declare what it cannot see, and its FAIL arm must
+  inject the ABSENCE it detects** — not a corruption of what is present. A check
+  that samples its own output is structurally blind to what never entered it:
+  one roundtrip reported *"11 tokens sampled, 0 missing"* while 974 chars were
+  absent. Ask of every gate: *what would be missing that this still calls clean?*
+- **A clean sweep is never evidence the change is correct.** Four here —
+  12/12, 15/15, 17/17, 21/21 — each immediately preceded a real blocking defect
+  in the code it scored, and twice the defect was **in the fix**. Report what it
+  proves (these lines are covered) and what it does not.
+
+Four fix-shapes to check yours against, all observed in this repo: it **removes
+a guard nobody re-armed**; it **trades one failure for its mirror** (a module
+built against unknown-as-known collapsed a CHECKED answer into unknown); it
+**makes the sequence unrunnable**; it **raises a bound instead of removing it**
+(`--limit 200` truncates as silently as the default did at 30).
+
 ### 5. Persist the lane's report, THEN write the receipt
 
 Write every lane's report verbatim to

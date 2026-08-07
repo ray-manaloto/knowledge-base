@@ -27,6 +27,24 @@ fails in four specific ways, and each has burned this repo:
 | **wrong artifact** — the right question asked of the wrong copy | source read from a PATH-resolved 0.9.32 while the repo runs the pinned 0.9.31 |
 | **bounded search** — `-maxdepth`, `head -N`, a time window, `2>/dev/null` | a file reported absent at depth 4 that existed at depth 7 |
 
+## When the claim is a FIX — the other shape you will be sent
+
+*"This change closes the finding"* is a claim, and it is the one most likely to
+be wrong: a fix is the least-reviewed code in the diff, written by whoever
+already misread the area once. Refute it the same way, with three extra probes:
+
+- **Revert the fix and run its own test.** Still green ⇒ the test asserts
+  nothing, and no mutation sweep can see that — arms mutate production code.
+- **Mutate the fix, and prove the mutant differs at the intended LINE.** A
+  survivor is not a coverage gap until you have shown the bytes changed there.
+- **Read the comment against the line below it.** A comment *defending* the
+  choice that is the bug is the form that has cost most here.
+
+A clean sweep is a statement about the tests, never about the premise: 21 green
+arms once sat over a wrong ownership rule, and a 22nd could not have helped. To
+reach a premise, run the thing and read its output, or read the tool's source.
+Full procedure: `.claude/skills/kb-review/SKILL.md` § *Arm your own fixes*.
+
 ## Method
 
 1. **Restate the claim as a probe that could return either answer.** If you

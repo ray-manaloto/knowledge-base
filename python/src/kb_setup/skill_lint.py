@@ -31,9 +31,10 @@ reduce tokens instead of having agents follow step-by-step instructions"* — is
 **not gateable and remains guidance**. No check can tell a skill that
 delegates from one that narrates: both are markdown naming tasks, and the
 difference is whether the *work* moved into the module. Pretending otherwise
-would be a green gate over a property nobody measured, which is the failure
-class `arm-your-own-work.md` rule 4 exists for. The second half is tracked as
-a build (#219, the distiller), not as a check.
+would be a green gate over a property nobody measured — the failure class
+`.claude/skills/kb-review/SKILL.md` § *Arm your own fixes* is about: a check
+must declare what it cannot see. The second half is tracked as a build
+(#219, the distiller), not as a check.
 """
 
 from __future__ import annotations
