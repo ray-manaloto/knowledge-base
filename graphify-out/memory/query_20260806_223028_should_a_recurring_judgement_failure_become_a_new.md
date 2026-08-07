@@ -36,8 +36,11 @@ rule already covers it, established by a control-armed grep rather than
 assumption. Three, its trigger is a behaviour, so path-scoping would make it
 absent exactly when needed.
 
-One file cleared all three: arm-your-own-work.md, 113 lines, +5.3% eager cost
-instead of +18.2%. The other 17 amendments are parked in issue 216 with their
+One file cleared all three: arm-your-own-work.md, at about +5.3% eager cost
+instead of +18.2%. (An earlier version of this memory said "113 lines". That
+was measured before a cold-review round grew the file to 124, so it was wrong
+within hours of being committed — the inherited-number failure this very round
+is about. The durable facts are the ratio and the criterion, not the count.) The other 17 amendments are parked in issue 216 with their
 per-row byte estimates, to be decided per row rather than adopted wholesale.
 
 ## Outcome

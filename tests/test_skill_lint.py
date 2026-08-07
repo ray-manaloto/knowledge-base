@@ -12,7 +12,7 @@ import inspect
 from pathlib import Path
 
 import pytest
-from kb_setup import hook_guard, skill_lint
+from kb_setup import cli, hook_guard, skill_lint
 
 _BAD = """# bad
 ```bash
@@ -134,6 +134,45 @@ def test_every_shell_fence_marker_is_scanned(tmp_path: Path, fence: str) -> None
     """
     _skill(tmp_path, "f", f"# f\n{fence}\ngraphify extract .\n```\n")
     assert skill_lint.check(tmp_path).failed
+
+
+def test_a_nested_fence_is_not_an_instruction(tmp_path: Path) -> None:
+    """A ```bash block INSIDE a ````markdown example is illustration, not instruction.
+
+    CommonMark closes a fence of N backticks only with N-or-more; a shorter run
+    inside is literal text. Without fence-length tracking, a SKILL.md
+    documenting *this gate* — the most likely file to contain such an example —
+    would be denied for its own example. Found by the cold lane on c20d982.
+    """
+    body = "# d\n````markdown\n```bash\ngraphify extract .\n```\n````\n"
+    _skill(tmp_path, "nested", body)
+    assert not skill_lint.check(tmp_path).failed
+
+
+def test_tilde_fences_are_scanned(tmp_path: Path) -> None:
+    """`~~~bash` renders identically to ```bash and must not bypass the gate.
+
+    A marker spelling is a bound (`probes-need-a-control-arm.md` rule 3). This
+    one was live: the first implementation returned zero findings for it.
+    """
+    _skill(tmp_path, "tilde", "# d\n~~~bash\ngraphify extract .\n~~~\n")
+    assert skill_lint.check(tmp_path).failed
+
+
+def test_gate_is_reachable_through_the_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """#128's named mutation: delete the CLI wiring line and this must go red.
+
+    Every other test calls `check`/`skill_lint_main` directly, so deleting the
+    dispatch branch left all 15 green while `uv run kb-setup skill-lint` was
+    already broken — a false green on exactly the regression the ticket named.
+    Only the hk step caught it. This closes that, at the level the ticket asked.
+    """
+    _skill(tmp_path, "bad", _BAD)
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["skill-lint"]) == 1
+
+    _skill(tmp_path, "bad", _GOOD)
+    assert cli.main(["skill-lint"]) == 0
 
 
 def test_the_real_repo_passes() -> None:

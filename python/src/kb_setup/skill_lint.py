@@ -22,6 +22,18 @@ The graph named the pattern before it was built: *"Lint messages inject
 remediation into agent context" enables "Enforce invariants, don't
 micromanage"* (`openai_com_index_harness-engineering.md`, EXTRACTED). So a
 finding prints the canonical task, never just a refusal.
+
+**What this gate does NOT enforce, stated plainly because #128 asked for it to
+be.** Ray's directive has two halves. This module covers the first — *skills
+call mise tasks that wrap the python library* — because it is a checkable
+property of a file. The second half — *"automate agents' work into skills to
+reduce tokens instead of having agents follow step-by-step instructions"* — is
+**not gateable and remains guidance**. No check can tell a skill that
+delegates from one that narrates: both are markdown naming tasks, and the
+difference is whether the *work* moved into the module. Pretending otherwise
+would be a green gate over a property nobody measured, which is the failure
+class `arm-your-own-work.md` rule 4 exists for. The second half is tracked as
+a build (#219, the distiller), not as a check.
 """
 
 from __future__ import annotations
@@ -46,10 +58,14 @@ DEFAULT_SKILL_GLOB = ".claude/skills/*/SKILL.md"
 # carve-out, same reason, as `md_budget.DEFAULT_EXCLUDED_PREFIXES`.
 DEFAULT_EXCLUDED_PREFIXES = (".claude/skills/graphify/",)
 
-# A fenced block whose info string marks it executable. A skill's prose and its
+# A CommonMark fence: 3+ backticks OR 3+ tildes, then an optional info string.
+# Both spellings render identically on GitHub, and recognising only backticks
+# let `~~~bash` bypass the gate entirely (cold lane on c20d982, P2).
+_FENCE = re.compile(r"^\s*(?P<marker>`{3,}|~{3,})\s*(?P<info>\S*)")
+
+# The info strings that mark a block executable. A skill's prose and its
 # JSON/markdown samples are not instructions; only shell fences are.
-_SHELL_FENCE = re.compile(r"^\s*```+\s*(bash|sh|shell|console|zsh)\b", re.IGNORECASE)
-_ANY_FENCE = re.compile(r"^\s*```")
+_SHELL_INFO = frozenset({"bash", "sh", "shell", "console", "zsh"})
 
 # A placeholder line is documentation of a shape, not an instruction to run it.
 # `<...>` and `$VAR`-only lines are templates; a leading `#` is a comment.
@@ -87,12 +103,30 @@ def command_lines(raw: str) -> Iterator[tuple[int, str]]:
     run it — flagging that would make the gate fire on its own documentation,
     which is how a gate loses its readers.
     """
-    in_shell = False
+    open_marker: str | None = None
+    is_shell = False
     for i, line in enumerate(raw.splitlines(), start=1):
-        if _ANY_FENCE.match(line):
-            in_shell = bool(_SHELL_FENCE.match(line)) if not in_shell else False
+        m = _FENCE.match(line)
+        if open_marker is None:
+            if m:
+                open_marker = m.group("marker")
+                is_shell = m.group("info").lower().split(",")[0] in _SHELL_INFO
             continue
-        if in_shell and not _PLACEHOLDER_ONLY.match(line):
+        # CommonMark: a fence of N chars closes only on N-or-more of the SAME
+        # char with NO info string. Tracking length is what stops a ```bash
+        # block *inside* a ````markdown example from being read as real
+        # instructions — the false positive the cold lane constructed, and one
+        # a SKILL.md documenting this very gate would hit.
+        if (
+            m
+            and m.group("marker")[0] == open_marker[0]
+            and len(m.group("marker")) >= len(open_marker)
+            and not m.group("info")
+        ):
+            open_marker = None
+            is_shell = False
+            continue
+        if is_shell and not _PLACEHOLDER_ONLY.match(line):
             yield i, line.strip()
 
 
