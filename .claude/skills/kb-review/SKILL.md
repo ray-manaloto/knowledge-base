@@ -183,6 +183,13 @@ area once, and it arrives wearing a finding's authority. Round 2 of one review
 here found **two defects that round 1's own fixes introduced**; the norm is
 `probes-need-a-control-arm.md` rule 2, and this is the procedure.
 
+**Do not hand-write the harness — `mise run kb-arms -- <spec.toml>` owns it**
+(`kb_setup.arms`, #160). Seven rounds wrote one in the scratchpad and three lost
+the `__pycache__` mitigation, which can credit an arm with a death the mutation
+never caused. Arms are TOML data: `id`/`file`/`old`/`new`/`test`, plus one
+`control = true` no-op row the loader REFUSES a spec without. `-- --dry-run`
+re-checks every pattern against the files after a fix moves lines, for free.
+
 Run these three before handing round 2 anything. Each is one command or one read.
 
 1. **Revert the fix — does its own test go red?** A test written alongside its
