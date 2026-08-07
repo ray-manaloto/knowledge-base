@@ -71,23 +71,47 @@ DEFAULT_SESSION_LIMIT = brain.DEFAULT_SESSION_LIMIT
 # Everything else (a scratchpad `.py`, a `/tmp` probe) is ad hoc by construction.
 DEFAULT_SOURCE_PREFIXES: tuple[str, ...] = ("python/src/", "tests/")
 
+# ...unless it sits inside a VENDORED clone, which carries its own `python/src`
+# and `tests`. That is another project's source tree, so a script written there
+# is still ad hoc. `sources/<name>/` clones are gitignored and re-fetched from a
+# pinned manifest, which is exactly why one can appear in a transcript path.
+DEFAULT_VENDORED_MARKERS: tuple[str, ...] = ("/sources/", "/raw/")
+
 # An interpreter fed a heredoc: `python3 - <<'PY' … PY`, `uv run python - <<EOF`.
 # The quoted-or-bare delimiter is captured so the body ends at the RIGHT marker;
 # a fixed `EOF` would swallow the rest of a command that used `PY`.
+#
+# The closer is CONDITIONAL on the dash, because bash's two forms differ and
+# picking either one unconditionally is wrong. Plain `<<` requires the
+# terminator at column 0; `<<-` exists precisely so it may be indented. The
+# first version here accepted `<<-` on the way in and demanded column 0 on the
+# way out, so an indented terminator did not merely miss — the lazy body ran
+# FORWARD to the next column-0 line matching the delimiter and glued unrelated
+# shell commands into what was then reported as Python source (cold lane, P1 on
+# c1374b99e032). Being permissive in both forms would trade that for the mirror
+# defect: a plain `<<` body containing an indented line equal to the delimiter
+# would terminate early. `(?(dash)…)` asks the only question that decides it.
 _HEREDOC = re.compile(
     r"(?:^|[;&|]|&&|\|\|)\s*"
     r"(?:\S*/)?(?:python[\d.]*|uv\s+run\s+(?:--\S+\s+)*python[\d.]*)\b[^\n<]*"
-    r"<<-?\s*['\"]?(?P<delim>[A-Za-z_]\w*)['\"]?\s*\n"
-    r"(?P<body>.*?)^(?P=delim)$",
+    r"<<(?P<dash>-)?\s*['\"]?(?P<delim>[A-Za-z_]\w*)['\"]?\s*\n"
+    r"(?P<body>.*?)^(?(dash)[ \t]*)(?P=delim)[ \t]*$",
     re.DOTALL | re.MULTILINE,
 )
 
 # An interpreter fed a `-c` payload. Short one-liners are ordinary shell use, so
 # a length floor keeps `python -c "print(1)"` out; MIN_INLINE_CHARS is the seam.
+#
+# `(?:\\.|[^\\])*?` rather than `.*?` so a BACKSLASH-ESCAPED quote does not end
+# the payload. `-c "print(\"hi\"); …"` is ordinary bash, and the naive form
+# truncated it at the first escaped quote — to 7 characters, which then fell
+# under the length floor, so the whole script vanished with no signal (cold
+# lane, P2 on c1374b99e032). The floor turned a partial capture into a total
+# one: exactly the "loss happens past the gate" shape, inside the gate itself.
 _INLINE = re.compile(
     r"(?:^|[;&|]|&&|\|\|)\s*"
     r"(?:\S*/)?(?:python[\d.]*|uv\s+run\s+(?:--\S+\s+)*python[\d.]*)\b[^\n]*?"
-    r"\s-c\s+(?P<q>['\"])(?P<body>.*?)(?P=q)",
+    r"\s-c\s+(?P<q>['\"])(?P<body>(?:\\.|[^\\])*?)(?P=q)",
     re.DOTALL,
 )
 
@@ -310,10 +334,32 @@ def _written_script(
     return body
 
 
-def repo_source(path: str, *, prefixes: tuple[str, ...] = DEFAULT_SOURCE_PREFIXES) -> bool:
-    """True when ``path`` names a file in this repo's committed source tree."""
-    normalised = path.replace("\\", "/")
-    return any(f"/{p}" in f"/{normalised}" for p in prefixes)
+def repo_source(
+    path: str,
+    *,
+    prefixes: tuple[str, ...] = DEFAULT_SOURCE_PREFIXES,
+    vendored: tuple[str, ...] = DEFAULT_VENDORED_MARKERS,
+) -> bool:
+    """True when ``path`` names a file in THIS repo's committed source tree.
+
+    A vendored clone under ``sources/<name>/`` carries its own ``python/src``
+    and ``tests`` — that is somebody else's source, and an ad-hoc script written
+    there is still ad hoc. The plain substring test called it ours and silently
+    dropped it from detection (cold lane, P3 on c1374b99e032).
+
+    **What this still cannot see, stated because a check owes that:** it decides
+    from the path string alone, so a `python/src` belonging to an unrelated
+    checkout elsewhere on disk would read as ours. That case does not arise for
+    the caller here — transcripts are located per project directory, so their
+    paths are this project's — and closing it properly needs the repo root
+    threaded to a predicate whose whole value is being a one-argument callable.
+    If this is ever called on paths from another source, pass ``vendored`` or
+    replace the predicate through :class:`Policy`.
+    """
+    anchored = f"/{path.replace('\\', '/')}"
+    if any(marker in anchored for marker in vendored):
+        return False
+    return any(f"/{p}" in anchored for p in prefixes)
 
 
 def scripts_in(

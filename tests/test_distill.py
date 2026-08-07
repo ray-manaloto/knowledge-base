@@ -77,6 +77,61 @@ def test_heredoc_body_ends_at_its_own_delimiter():
     assert "import re" in bodies[1]
 
 
+def test_indented_closer_terminates_a_dash_heredoc():
+    """Cold lane P1 on c1374b99e032 — and the corruption was worse than the miss.
+
+    `<<-` exists so the terminator may be indented. Demanding column 0 did not
+    merely drop the script: the lazy body ran forward to the next column-0 line
+    matching the delimiter and glued unrelated shell commands into what was then
+    reported as Python source.
+    """
+    command = (
+        "for f in a b; do\n"
+        "    python3 - <<-'PY'\n"
+        "    import json\n"
+        "    print(f)\n"
+        "    PY\n"
+        "done\n"
+        "echo unrelated\n"
+        "PY\n"
+    )
+    found = list(distill.detect_scripts(command))
+    assert len(found) == 1
+    body = found[0][1]
+    assert "import json" in body
+    for leaked in ("done", "echo unrelated", "PY"):
+        assert leaked not in body, f"{leaked!r} leaked into the captured script body"
+
+
+def test_plain_heredoc_still_requires_column_zero():
+    """The MIRROR defect the conditional closer exists to avoid.
+
+    Being permissive in both forms would end a plain `<<` body early on an
+    indented line that happens to equal the delimiter. Bash does not, so nor
+    does this.
+    """
+    command = "python3 - <<'PY'\nimport json\n    PY\nprint(1)\nPY\n"
+    found = list(distill.detect_scripts(command))
+    assert len(found) == 1
+    assert "print(1)" in found[0][1], "an indented line ended a plain heredoc early"
+
+
+def test_escaped_quote_does_not_truncate_an_inline_payload():
+    """Cold lane P2 on c1374b99e032: truncation fell under the floor, so ALL of it vanished."""
+    payload = 'print(\\"hi\\"); x=1;' + ("y=2;" * 30)
+    assert len(payload) >= distill.MIN_INLINE_CHARS
+    found = list(distill.detect_scripts(f'python3 -c "{payload}"'))
+    assert [k for k, _ in found] == ["inline"]
+    assert len(found[0][1]) == len(payload)
+
+
+def test_a_vendored_clones_source_tree_is_still_ad_hoc():
+    """Cold lane P3 on c1374b99e032 — somebody else's python/src is not ours."""
+    assert distill.repo_source("/repo/python/src/kb_setup/x.py") is True
+    assert distill.repo_source("/repo/sources/vendored/python/src/thing.py") is False
+    assert distill.repo_source("/scratch/apython/src/foo.py") is False
+
+
 def test_short_inline_c_is_not_a_script():
     """`python -c "print(1)"` is shell arithmetic, not an authored program."""
     assert list(distill.detect_scripts('python3 -c "print(1)"')) == []
