@@ -81,6 +81,29 @@ A finding becomes eager rule text only if **all three** hold:
 3. **Its trigger is a behaviour**, so `paths:`-scoping would make it absent
    exactly when needed (`md-size-budgets.md`'s trigger test).
 
+> **CALLER'S ANNOTATION, 2026-08-07 — this recommendation was REVERSED, and so
+> was the file it produced. Original text preserved below.**
+>
+> `kb-advisor`'s verdict reached the main loop after this pass shipped and
+> rejected the new eager file, on a sharper application of this pass's own
+> criterion: the cluster fires at exactly one moment — a fix exists and is about
+> to be trusted — which is a moment the `kb-review` loop already owns, and the
+> corpus measured *the procedure* working where the *lesson text* had failed
+> twice. **Ray adopted it verbatim at clear-prep 2026-08-06** (#216, decision
+> comment).
+>
+> So `.claude/rules/arm-your-own-work.md` is **deleted**, and its content is
+> redistributed, not lost: the NORM is a ~9-line bridge in
+> `probes-need-a-control-arm.md` rule 2; the PROCEDURE is
+> `.claude/skills/kb-review/SKILL.md` § *Arm your own fixes* plus
+> `.claude/agents/kb-adversarial-verifier.md`. Both later references to the file
+> in this document (§3 finding 3, §appendix) are stale in the same way.
+>
+> The governing criterion is now #216's: *eager text only for failures at the
+> moment of deciding, before any artifact exists; artifact-moment failures go to
+> the surface that handles the artifact; and where a reader MEASURED prose
+> failing for a class, prose is forbidden as the remedy.*
+
 **One file cleared all three.** `.claude/rules/arm-your-own-work.md`, 113 lines
 / 6,428 bytes, agnix `--strict` rc=0. Measured cost: eager context 120,305 →
 **126,732 bytes, +5.3%**. The other 17 amendments are specced in **#216**,

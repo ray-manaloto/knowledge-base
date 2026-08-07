@@ -424,7 +424,7 @@ _VERIFY_RE = re.compile(
 )
 
 
-def _transcripts_base(env: dict[str, str] | None = None, home: Path | None = None) -> Path:
+def transcripts_base(env: dict[str, str] | None = None, home: Path | None = None) -> Path:
     """The Claude Code projects dir (env-aware; never hardcoded)."""
     env = env if env is not None else dict(os.environ)
     home = home if home is not None else Path.home()
@@ -438,7 +438,7 @@ def _encode_cwd(cwd: Path) -> str:
     return re.sub(r"[/.]", "-", str(cwd))
 
 
-def _project_transcripts(base: Path, cwd: Path, *, limit: int) -> list[Path]:
+def project_transcripts(base: Path, cwd: Path, *, limit: int) -> list[Path]:
     """The ``limit`` most-recent transcript files for ``cwd`` (newest first)."""
     project_dir = base / _encode_cwd(cwd)
     if not project_dir.is_dir():
@@ -621,8 +621,8 @@ def transcript_audit(
     hook writes to (``.agent/brain-audit.md``), making the loop recurring rather
     than remember-to-run. No transcripts (e.g. a CI runner) is a clean no-op.
     """
-    base = _transcripts_base()
-    transcripts = _project_transcripts(base, repo_root, limit=limit)
+    base = transcripts_base()
+    transcripts = project_transcripts(base, repo_root, limit=limit)
     if not transcripts:
         sys.stdout.write(f"brain transcript-audit: no transcripts for {repo_root} under {base}\n")
         return 0

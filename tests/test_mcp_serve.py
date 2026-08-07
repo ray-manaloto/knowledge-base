@@ -384,3 +384,76 @@ def test_shutdown_reaps_a_grandchild(tmp_path):
         time.sleep(0.05)
     os.kill(grandchild, signal.SIGKILL)
     pytest.fail(f"grandchild {grandchild} survived _shutdown — it was orphaned, not reaped")
+
+
+class _UnreapedProc:
+    """A child that has hit EOF on stdout but is NOT yet reaped.
+
+    `poll()` returns None until someone `wait()`s — which is exactly what the
+    OS does in the window between stdout closing and the process being reaped.
+    Reproducing that window deterministically is the whole point: the real
+    failure only appears on a loaded host, so waiting for load is not a test.
+    """
+
+    def __init__(self, rc: int) -> None:
+        self._rc = rc
+        self.polls = 0
+        self.waits = 0
+        self.timeout_seen: float | None = None
+
+    def poll(self) -> int | None:
+        self.polls += 1
+        return None
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.waits += 1
+        self.timeout_seen = timeout
+        return self._rc
+
+
+class _WedgedProc(_UnreapedProc):
+    """A child that closed stdout and will never be reaped — must not hang."""
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.waits += 1
+        self.timeout_seen = timeout
+        raise subprocess.TimeoutExpired(cmd="server", timeout=timeout or 0)
+
+
+def _session_over(proc: object) -> mcp_probe._Session:
+    """A `_Session` bound to a stub process, bypassing the pipe wiring."""
+    session = mcp_probe._Session.__new__(mcp_probe._Session)
+    session._proc = proc
+    return session
+
+
+def test_an_unreaped_clean_exit_still_reports_rc_zero():
+    """The race that failed this module's own test under load.
+
+    EOF on stdout precedes reaping, so a bare `poll()` returns None and the
+    `rc=0` sentence — the one this function exists to produce — is skipped in
+    favour of the LESS informative `rc=None`.
+    """
+    proc = _UnreapedProc(0)
+    detail = _session_over(proc)._exit_detail(1)
+    assert "rc=0" in detail
+    assert "rc=None" not in detail
+    assert proc.waits == 1, "poll() returned None and nothing waited for the child"
+    assert proc.timeout_seen == mcp_probe._REAP_TIMEOUT_S, "the wait must be BOUNDED"
+
+
+def test_an_unreaped_nonzero_exit_reports_its_real_code():
+    """The MIRROR: waiting must not launder a real non-zero rc into 0."""
+    detail = _session_over(_UnreapedProc(3))._exit_detail(1)
+    assert "rc=3" in detail
+    assert "rc=0" not in detail
+
+
+def test_a_child_that_never_reaps_is_bounded_not_hung():
+    """A wedged child must fail with what we know, not block the probe forever."""
+    proc = _WedgedProc(0)
+    detail = _session_over(proc)._exit_detail(7)
+    assert "rc=None" in detail
+    assert "id=7" in detail
+    assert proc.waits == 1
+    assert proc.timeout_seen == mcp_probe._REAP_TIMEOUT_S

@@ -90,6 +90,14 @@ its issue tracker is the thing most likely to be quoted at you.
    a mutation must actually *destroy* what the check looks for, and it must be
    a break that could **really happen**. Deleting the line that CALLS a
    function is usually the realistic break; renaming its definition is not.
+
+   **Your own fix, test and comment are "the positive" too.** A fix is the
+   least-reviewed code in the diff; a test written alongside it routinely cannot
+   fail, and no mutation sweep can see that — so revert the fix and watch its own
+   test go red. An arm score is a statement about your TESTS, never about your
+   PREMISE, and a clean sweep is never evidence the change is correct.
+   **Procedure: the `kb-review` skill** § *Arm your own fixes* — it holds the
+   checklist and the worked failures; this rule holds only the norm.
 3. **Bound-limited searches are suspect by construction.** `-maxdepth`,
    `head -N`, `--limit`, a time window, a `2>/dev/null`: each can turn "absent"
    into "unreachable". Either remove the bound or prove the target is inside it.

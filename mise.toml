@@ -281,6 +281,17 @@ description = "Check every SKILL.md instructs mise tasks, not raw commands (#128
 # for working on a skill without running the whole suite.
 run = "uv run kb-setup skill-lint"
 
+[tasks.kb-distill]
+description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
+# The PRODUCING half of Ray's directive; `kb-skill-lint` is the policing half.
+# Detects the one act #160 records as this repo's costliest repeated manual
+# step — writing a throwaway script and running it — rather than mining command
+# frequency, which was measured over 60 real transcripts and REFUTED (git and
+# grep top every threshold). Evidence: `.agent/kb/reports/agents/distill-detection-probe.md`.
+# ALWAYS rc 0 and never a gate: an undistilled probe is a signal about future
+# cost, not a build failure. `-- --limit N --min-scripts N` to vary the bounds.
+run = "uv run kb-setup distill"
+
 [tasks.lint-docs]
 description = "Validate agent documentation (agnix)"
 # --strict: warnings-as-errors — parity with the hk `agnix` step. agnix exits 0
