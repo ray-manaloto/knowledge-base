@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """This repo's eval cases — tier 1 (reachability) and tier 2 (guard fixtures).
 
 The runner (:mod:`kb_setup.evals`) is shared; the CASES are per-repo, because

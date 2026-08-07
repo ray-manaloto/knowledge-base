@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Host-agent extraction chunks — validate + assemble into a committed doc chunk.
 
 A *chunk* is the JSON a host-agent extraction produces for one source:

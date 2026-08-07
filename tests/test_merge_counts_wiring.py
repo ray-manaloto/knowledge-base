@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The seam between `_merge_docs.py` and its two callers (#189, #191).
 
 `_merge_docs.py` runs under graphify's bundled interpreter and cannot import

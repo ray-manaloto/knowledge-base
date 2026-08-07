@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Count continuity across `graph.json` writers (#191).
 
 Three times running, the only thing that noticed a graph losing nodes was a

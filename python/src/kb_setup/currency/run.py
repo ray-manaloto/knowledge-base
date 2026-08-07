@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Orchestration and the three entry points the outside world uses.
 
 * `check`  — offline step 1 only. This is what the SessionStart hook runs, so it

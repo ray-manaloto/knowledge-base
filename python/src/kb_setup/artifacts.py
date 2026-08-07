@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Generate every graphify output artifact from the current graph.
 
 Single source of truth: the `_ARTIFACTS` registry (data, not copy-paste). Each

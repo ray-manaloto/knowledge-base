@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.manifest — name derivation + the add() write-guard.
 
 Network-free: name_from_url is pure, and add()'s exists-guard fires BEFORE the

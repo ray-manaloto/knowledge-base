@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The PreToolUse guard denies hand-run graphify and redirects to the mise task.
 
 Control-armed BOTH directions (probes-need-a-control-arm): every DENY case has a

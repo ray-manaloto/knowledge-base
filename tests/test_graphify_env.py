@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.graphify_env` — the PATH-independent resolver and clean_env.
 
 `graphify_exe` is the durable half of #40. The launcher can verify a PATH and

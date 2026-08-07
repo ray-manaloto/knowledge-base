@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Second-brain routing seam — record, aggregate, audit verified delegation outcomes.
 
 The Fable-5 architect delegates implementation to codex / antigravity / grok lanes.
@@ -279,9 +280,11 @@ def render_lessons(lessons: list[Lesson]) -> str:
     lines = [
         "# Routing lessons (advisory)",
         "",
-        f"Deterministic aggregation of verified outcomes. A tag other than `tentative` "
-        f"requires >= {MIN_CONSISTENT} one-sided, session-deduplicated votes. This is "
-        "ADVISORY over the static orchestrator-routing table — it nudges, never overrides.",
+        (
+            f"Deterministic aggregation of verified outcomes. A tag other than `tentative` "
+            f"requires >= {MIN_CONSISTENT} one-sided, session-deduplicated votes. This is "
+            "ADVISORY over the static orchestrator-routing table — it nudges, never overrides."
+        ),
         "",
         "| task-class | lane | tag | clean | rework/failed |",
         "| --- | --- | --- | --: | --: |",
@@ -570,18 +573,26 @@ def render_transcript_report(result: TranscriptAudit) -> str:
     lines = [
         "# Brain audit — verified delegations missing a routing record",
         "",
-        f"Scanned **{result.scanned}** recent session transcript(s). "
-        "ADVISORY only — this never blocks (SessionEnd cannot); the ship-gate is "
-        "`mise run brain-audit` (the closed-record precondition).",
+        (
+            f"Scanned **{result.scanned}** recent session transcript(s). "
+            "ADVISORY only — this never blocks (SessionEnd cannot); the ship-gate is "
+            "`mise run brain-audit` (the closed-record precondition)."
+        ),
         "",
         "| verdict | sessions | meaning |",
         "|---|---:|---|",
-        f"| verified-unrecorded | {alarm} | delegated + verified but recorded "
-        "NOTHING — record the outcome with `mise run brain-remember` |",
-        f"| under-recorded | {c.get('under-recorded', 0)} | fewer records than "
-        "delegations (some may be review lanes — check) |",
-        f"| unverified | {c.get('unverified', 0)} | delegated, no verification seen "
-        "— cannot tell abandoned from logs-missed (~21%, open-Q #1) |",
+        (
+            f"| verified-unrecorded | {alarm} | delegated + verified but recorded "
+            "NOTHING — record the outcome with `mise run brain-remember` |"
+        ),
+        (
+            f"| under-recorded | {c.get('under-recorded', 0)} | fewer records than "
+            "delegations (some may be review lanes — check) |"
+        ),
+        (
+            f"| unverified | {c.get('unverified', 0)} | delegated, no verification seen "
+            "— cannot tell abandoned from logs-missed (~21%, open-Q #1) |"
+        ),
         f"| recorded | {c.get('recorded', 0)} | a record for every delegation — closed |",
         f"| none | {c.get('none', 0)} | no implementation delegation this session |",
         "",
@@ -602,11 +613,13 @@ def render_transcript_report(result: TranscriptAudit) -> str:
     else:
         lines += ["_No gaps — every delegating session recorded its outcomes._", ""]
     lines += [
-        "Record a verified delegation with "
-        "`mise run brain-remember -- --task-class T --lane L --effort E "
-        "--verdict clean|rework|failed --session S`. See "
-        "`docs/specs/second-brain-design.md` §4a-3 and the enforcement research "
-        "open-Q #1.",
+        (
+            "Record a verified delegation with "
+            "`mise run brain-remember -- --task-class T --lane L --effort E "
+            "--verdict clean|rework|failed --session S`. See "
+            "`docs/specs/second-brain-design.md` §4a-3 and the enforcement research "
+            "open-Q #1."
+        ),
         "",
     ]
     return "\n".join(lines) + "\n"

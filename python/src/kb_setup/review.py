@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Receipts for the local cross-family review (`.claude/skills/kb-review`).
 
 The review itself cannot live here. It spawns Claude agents, and only the model
@@ -1058,8 +1059,10 @@ def _exempt_delta_note(repo_root: Path, candidate: str, sha: str) -> tuple[bool,
     if reviewed:
         return (
             False,
-            f"and reviewed ancestor {candidate[:12]} does not cover it: "
-            f"{_summarise(reviewed)} changed since, which no lane has read",
+            (
+                f"and reviewed ancestor {candidate[:12]} does not cover it: "
+                f"{_summarise(reviewed)} changed since, which no lane has read"
+            ),
             len(reviewed),
         )
 

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Repo lint checks implemented in python (zero-bash-logic).
 
 The KB has NO bash scripts and no inline shell logic in hk.pkl / mise.toml: every

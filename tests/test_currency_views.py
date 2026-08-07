@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.views (#182) — is each derived view describing the graph on disk?
 
 The defect these pin down was invisible by construction. `size:mtime_ns` can only

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`kb-insights` — print what the graph already computed and nobody reads.
 
 graphify computes four things on every `cluster-only` / `label` run and writes

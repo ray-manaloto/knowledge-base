@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tool-currency engine — the shared core both this repo and dotfiles run.
 
 Six steps, in the order Ray specified (2026-07-23):

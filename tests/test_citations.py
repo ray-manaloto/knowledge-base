@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the citation-extraction primitive (kb_setup.citations).
 
 Pure text-in / data-out, so every test here is a string and a list — no repo, no

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Verify a handoff's checkable claims — `mise run kb-handoff-check`.
 
 FIVE CHECKS, AND THEY ARE NOT ALL STATIC. Four ask the filesystem: do the cited

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Declarative per-tool currency config (`currency.toml`, one per repo).
 
 One `[tool.<name>]` table per tracked tool. graphify is the pilot; adding mise,

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 r"""Markdown instruction-file size budgets, BY LOAD CLASS — the shared engine.
 
 ``kb-setup md-budget`` (the ``md_size_budget`` hk step) is the ONE

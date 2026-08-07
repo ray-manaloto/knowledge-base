@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the handoff checker (kb_setup.handoff).
 
 Drives the public entry points — `check` and `main` — against a temporary

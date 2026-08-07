@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.review` — the local cross-family review receipt.
 
 Both directions of every gate, per `probes-need-a-control-arm.md`: a receipt

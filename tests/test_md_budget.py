@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for class-aware markdown budgets (kb_setup.md_budget).
 
 Every budget assertion here is paired with its FAIL direction, per

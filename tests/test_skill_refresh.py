@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`kb-setup skill-refresh` — the standalone entry point, not the refresh itself.
 
 The refresh lives in `kb_setup.currency.skill` and is tested in

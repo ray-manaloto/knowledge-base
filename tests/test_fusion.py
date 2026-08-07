@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.fusion` — reciprocal rank fusion (knowledge-base#12, P2).
 
 The load-bearing pair here is

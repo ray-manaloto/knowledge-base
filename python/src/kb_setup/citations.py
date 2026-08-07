@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Extract the checkable claims from an authored markdown document.
 
 PURE TEXT-IN / DATA-OUT. This module knows nothing about handoffs, this repo's

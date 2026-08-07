@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Single-source graphify operations: merge a doc chunk, label, transcribe.
 
 Each is wrapped by a mise task (kb-merge / kb-label / kb-transcribe) so NOTHING

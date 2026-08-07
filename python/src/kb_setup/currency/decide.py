@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Step 5 — the six-gate bar, and the questions a human still has to answer.
 
 Ray chose (2026-07-23) that an unambiguous bump may apply itself. That makes the

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Mechanical checks for a `/goal` goal+rider pair.
 
 WHAT THIS IS AND IS NOT. The `/goal` evaluator is a small fast model that reads

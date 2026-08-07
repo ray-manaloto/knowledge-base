@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Steps 2 and 3 — is there a newer version, and what do its release notes say?
 
 Deliberately split from judgment: this module *fetches*, it never decides. The

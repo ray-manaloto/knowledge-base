@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """In-build composition invariants for the merged aggregate graph (#175).
 
 `_merge_sources_into` (graph.py) composes every corpus sub-graph AND the self

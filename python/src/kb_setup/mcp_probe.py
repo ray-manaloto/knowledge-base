@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Speak MCP over stdio to a server command and report what it actually advertises.
 
 WHY THIS EXISTS. `mise run kb-serve` is the documented way every consumer reaches

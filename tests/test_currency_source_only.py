@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `source_only` — a tracked thing that is ingested, not installed.
 
 The class exists because declaring `microsoft/SkillOpt` any other way produces a

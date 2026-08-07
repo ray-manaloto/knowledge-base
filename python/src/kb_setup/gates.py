@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Run this repo's gates and record what actually happened — `mise run kb-gates`.
 
 WHAT THIS REPLACES. `/clear-prep` step 5 tells you to redirect a gate to a file

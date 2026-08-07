@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Count continuity across graph.json writers (#191).
 
 Two halves, and each is about the same failure: a graph losing nodes with every

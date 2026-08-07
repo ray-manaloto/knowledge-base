@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb-setup CLI — build / update the knowledge graph.
 
 Thin dispatch; logic lives in kb_setup.graph. Invoked by the mise tasks

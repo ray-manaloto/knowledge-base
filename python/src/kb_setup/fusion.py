@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Reciprocal Rank Fusion over two or more ranked lists (knowledge-base#12, P2).
 
 WHY THIS EXISTS. P0 fixed *which* nodes compete (`kb_setup.prose`) and P1 added

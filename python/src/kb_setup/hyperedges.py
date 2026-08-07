@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Read the hyperedge list off a parsed graph.json, wherever it lives.
 
 graph.json can carry hyperedges in two slots: the top-level `"hyperedges"` key

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.chunks — validate + assemble host-agent extraction chunks.
 
 Control-armed both directions: a clean chunk passes AND a broken one (dangling

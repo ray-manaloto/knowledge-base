@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.decide — the six-gate bar that authorizes an unattended bump.
 
 This is the safety-critical surface: `auto_apply=True` means a version change

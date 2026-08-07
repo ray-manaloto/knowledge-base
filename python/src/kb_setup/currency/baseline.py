@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """What upstream last offered, cached so the OFFLINE check can see a stale pin.
 
 WHY THIS EXISTS. Step 1 (`mise run kb-currency-check`, the SessionStart hook)

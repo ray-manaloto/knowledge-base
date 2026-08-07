@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the shared eval runner (kb_setup.evals).
 
 The runner's whole reason for existing is that a case which can only pass is

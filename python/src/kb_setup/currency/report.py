@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Step 6 — the committed, reviewable record of every run.
 
 Shape decided 2026-07-23: a **landing page** carrying one line per run, linking to

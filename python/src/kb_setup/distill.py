@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Distil a session's throwaway scripts into `skill -> mise task -> module` candidates.
 
 Ray, 2026-08-06: *"self-learning/self-improvement workflow should review the

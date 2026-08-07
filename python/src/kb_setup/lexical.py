@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """BM25/IDF lexical retrieval over the prose graph (knowledge-base#12, P1).
 
 WHY THIS EXISTS. P0 fixed *which nodes compete* — `graphify query` truncates at

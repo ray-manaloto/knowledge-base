@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """PreToolUse guard: NEVER run graphify by hand — go through a mise task.
 
 Ray, 2026-07-22: all graphify operations must be driven by a skill that calls a

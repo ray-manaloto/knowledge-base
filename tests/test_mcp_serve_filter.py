@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`kb-setup serve` narrows the advertised surface only when told to.
 
 Two properties, and the FIRST is the one that protects the repo. `kb-serve` was

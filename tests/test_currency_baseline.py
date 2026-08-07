@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.currency.baseline` — the offline pin-vs-upstream check.
 
 The gap this module closes: step 1 compared the INSTALL against the PIN, both of

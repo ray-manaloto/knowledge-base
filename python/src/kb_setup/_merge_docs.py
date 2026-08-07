@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Merge a committed doc-extraction chunk into graphify-out/graph.json.
 
 Runs under graphify's BUNDLED interpreter (imports graphify), invoked by

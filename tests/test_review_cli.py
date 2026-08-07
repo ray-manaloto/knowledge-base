@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the `kb-setup review-receipt` command.
 
 Split from `test_review.py` because the CLI is where two of this feature's

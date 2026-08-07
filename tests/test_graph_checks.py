@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `graph_checks.assert_composition` — the in-build invariant guard (#175).
 
 Two invariants, two failure fixtures, and controls for each: `test_merge_

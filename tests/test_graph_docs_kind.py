@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kind = docs` manifests — the docs-mirror ingestion path.
 
 TWO BEHAVIOURS, and both exist because a wrong answer here is SILENT.

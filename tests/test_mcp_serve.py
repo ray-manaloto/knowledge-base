@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`mise run kb-serve` must actually answer MCP — not merely exit 0.
 
 The defect these pin down (2026-08-02) was invisible for exactly the reason it
@@ -29,6 +30,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import cast
 
 import pytest
 from kb_setup import mcp_probe
@@ -421,9 +423,18 @@ class _WedgedProc(_UnreapedProc):
 
 
 def _session_over(proc: object) -> mcp_probe._Session:
-    """A `_Session` bound to a stub process, bypassing the pipe wiring."""
+    """A `_Session` bound to a stub process, bypassing the pipe wiring.
+
+    The `cast` is the point of the helper, not an escape from it: every stub
+    above implements only the handful of `Popen` members `_Session` actually
+    touches (`wait`, `poll`, `kill`, `stdout`), which is what makes these tests
+    able to reproduce a wedged or unreaped child at all. ty 0.0.69 began
+    flagging the bare assignment; a `cast` states the substitution in code
+    rather than hiding it behind a suppression, which this repo forbids
+    (`do-not.md` #9).
+    """
     session = mcp_probe._Session.__new__(mcp_probe._Session)
-    session._proc = proc
+    session._proc = cast("subprocess.Popen[str]", proc)
     return session
 
 

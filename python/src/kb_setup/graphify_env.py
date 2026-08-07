@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Locate graphify's bundled interpreter.
 
 graphify installs as a pipx tool with its OWN venv python (it can `import

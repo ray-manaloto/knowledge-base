@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Temp-then-rename writes — never truncate a durable artifact in place.
 
 `Path.write_text` truncates the destination first, so an interrupted write

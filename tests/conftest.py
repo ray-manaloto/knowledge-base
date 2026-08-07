@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Shared fixtures — currently the real-git harness the review tests need.
 
 `kb_setup.review`'s exempt-delta fallback is git behaviour end to end: ancestry,

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Refresh a tool's PROJECT-SCOPED agent skill when its version moves.
 
 The fourth thing a version bump has to carry, alongside the `mise.toml` pin, the

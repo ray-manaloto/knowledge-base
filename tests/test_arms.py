@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.arms` — the mutation harness promoted to a module (#160).
 
 Two of these ARE the acceptance criteria, and both are CONTROL-ARMED: they run

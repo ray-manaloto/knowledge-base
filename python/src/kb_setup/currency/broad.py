@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The broad sweep — `mise outdated` for every tool NOT deep-tracked.
 
 The deep engine (steps 1-6) gives a handful of tools full due-diligence. But a

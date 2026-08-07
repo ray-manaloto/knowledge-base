@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Step 1 — is the tool we RUN the tool we PINNED, and did it build our artifacts?
 
 This is the genuinely new check. Version *bumps* are already covered (Renovate,

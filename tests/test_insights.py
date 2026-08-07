@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`kb-insights` — reading what the graph already computed, honestly.
 
 The two tests that matter most are the ones written against measured defects:

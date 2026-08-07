@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Score this repo's skills with `plugin-eval`'s deterministic static layer.
 
 The answer to #124 — *"how do we MEASURE whether a skill works?"*. Before this,

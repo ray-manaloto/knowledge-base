@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Step 2's "and update" — apply an authorized bump to the committable files.
 
 The engine EDITS two things and returns what changed: the `mise.toml` pin and,

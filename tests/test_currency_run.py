@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.run — the manual `stamp` CLI and the `daily` report.
 
 Two behaviours are pinned here, each in BOTH directions:

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`capture_from_data()` — the two-slot hyperedge reader.
 
 Pure dict-level unit tests: no subprocess, no graphify, no file I/O. The one

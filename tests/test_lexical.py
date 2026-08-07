@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the BM25/IDF lexical scorer (kb_setup.lexical, knowledge-base#12 P1).
 
 The load-bearing test here is not "search returns something ranked" — any

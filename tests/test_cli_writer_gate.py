@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The graph-WRITER preflight in `cli.main` (#186 cold lane, P1).
 
 Writers get the pinned-version gate; readers never pay it. Tested at the

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Detect when a tracked DOCUMENTATION page changes, not just a version.
 
 WHY A VERSION PIN IS NOT ENOUGH. A tool's behaviour can change without its

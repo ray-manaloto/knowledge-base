@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.currency.docs` — documentation-drift detection.
 
 The point of this module is to notice when a page whose CONTENT is the interface

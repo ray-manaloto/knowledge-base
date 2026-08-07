@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Every merged source's node ids carry EXACTLY ONE `repo::` prefix (#120).
 
 Why this exists, measured on the 2026-08-03 aggregate before the fix:

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb-artifacts helpers: node counting + the large-graph svg skip."""
 
 import json

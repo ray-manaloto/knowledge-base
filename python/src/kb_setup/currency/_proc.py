@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The shared `subprocess.run → degrade, don't raise` shape the currency engine repeats.
 
 Every currency probe (`gh api`, `mise outdated`, `mise where`, …) shares one
