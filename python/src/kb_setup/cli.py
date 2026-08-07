@@ -34,8 +34,8 @@ def main(argv: list[str] | None = None) -> int:
             "affected <symbol> [--depth N] | insights [--top N] | serve | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
-            "brain [record|reflect|audit] | md-budget | skill-score [--write] [skill...] | "
-            "skill-refresh | "
+            "brain [record|reflect|audit] | md-budget | skill-lint | "
+            "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | "
             "session-state [--no-pr] | "
             "goal-check <path|--text ...> | "
@@ -140,6 +140,31 @@ def main(argv: list[str] | None = None) -> int:
     return _dispatch_ops(repo_root, cmd, rest)
 
 
+def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
+    """Dispatch the authoring-time lint gates; ``None`` when ``cmd`` is not one.
+
+    Grouped out of :func:`_dispatch_ops` because these three share a shape the
+    operational commands do not: each takes only the repo root, each is an hk
+    step, and each answers "is this tree well-formed to author in" rather than
+    "do something to the graph". Splitting them also kept `_dispatch_ops` under
+    ruff's statement ceiling when `skill-lint` was added — the ceiling doing the
+    job it exists for, rather than being suppressed.
+    """
+    if cmd == "no-lint-skip":
+        from kb_setup import lint_checks
+
+        return lint_checks.no_lint_skip(repo_root)
+    if cmd == "md-budget":
+        from kb_setup import md_budget
+
+        return md_budget.md_budget_main(repo_root)
+    if cmd == "skill-lint":
+        from kb_setup import skill_lint
+
+        return skill_lint.skill_lint_main(repo_root)
+    return None
+
+
 def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     """Dispatch the operational subcommands (hooks, brain, ship/land, currency, chunks)."""
     if cmd == "hookguard":
@@ -150,14 +175,9 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import brain
 
         return brain.dispatch(repo_root, rest)
-    if cmd == "no-lint-skip":
-        from kb_setup import lint_checks
-
-        return lint_checks.no_lint_skip(repo_root)
-    if cmd == "md-budget":
-        from kb_setup import md_budget
-
-        return md_budget.md_budget_main(repo_root)
+    lint_rc = _dispatch_lint(repo_root, cmd)
+    if lint_rc is not None:
+        return lint_rc
     if cmd == "handoff-check":
         from kb_setup import handoff
 
@@ -241,7 +261,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "currency [check|run|stamp|docs-reviewed] [--tool T --json --no-write] | "
         "manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
-        "brain [query|record|reflect|audit] | md-budget | skill-score [--write] [skill...] | "
+        "brain [query|record|reflect|audit] | md-budget | skill-lint | "
+        "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | "
         "session-state [--no-pr] | cc | cc-doctor | "
         "eval [--live] [--slow] | "

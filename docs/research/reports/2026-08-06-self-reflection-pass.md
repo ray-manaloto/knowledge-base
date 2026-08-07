@@ -140,12 +140,11 @@ produced nothing.**
 |---|---|---|
 | `kb-adversarial-verifier` (opus) | 7× | The pass's highest-value stage — 7 of 8 verdicts changed an answer |
 | `kb-synthesist` (opus) | 1× | 73KB; produced the prose-saturation and convergence results no reader could see |
-| `kb-advisor` (**fable**) | 1× | **No output. ~25 min, no file, no reply to a direct ping.** |
+| `kb-advisor` (**fable**) | 1× | Delivered two verdicts (21:52Z, 22:08Z) — **which reached the main loop only after the round had landed**, so the round shipped without them. See the correction below. |
 | `kb-corpus-curator`, `kb-tool-researcher`, `kb-extraction-worker` | 0× | Not applicable to this pass |
 
-**`kb-advisor`'s silence is a measurement for #208**, not a retry. The handoff
-predicted it: `model` frontmatter is only **step 3 of 4** in resolution, and a
-blocked model falls back silently. What is declared is not what runs.
+*(The paragraph that stood here claimed `kb-advisor`'s silence was a measurement
+for #208. It was false — see the correction below.)*
 
 **The roster has no reader role** — the four corpus readers ran as
 `general-purpose` because `kb-tool-researcher` binds itself to "one *peer tool*
@@ -176,8 +175,19 @@ from the human title instead of the slug.
 #216; `/clear-prep` integration still spec-only, per the standing decision that
 a loop is not automated until it has run once by hand.
 
-**Open issues: 71 → 77.** The backlog grew, which is the honest outcome of a
-pass whose verification stage refuted every proposed close.
+**Open issues: 71 → 76.** Six filed, and **#23 closed as COMPLETED by the
+maintainer** at 2026-08-06T23:13:50Z after reading the verification comment —
+the one close that happened, and it was a human decision that overrides the
+verifier's "do not close". The concrete work survives regardless: ask 4's
+actionable slice had already been extracted to **#215** before the close.
+
+The backlog still grew, which is the honest outcome of a pass whose
+verification stage refuted every close it had proposed itself.
+
+*(This figure was committed as "71 → 77" and was wrong within the hour — the
+count moved under it. Re-derived and corrected here rather than left standing,
+which is the failure mode `probes-need-a-control-arm.md` rule 6 names: a number
+can be invalidated by events after the commit that writes it.)*
 
 ---
 
