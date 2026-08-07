@@ -1,0 +1,295 @@
+# Mutation arms for `kb_setup.arms` itself (#160) — the module armed BY the module.
+#
+#   mise run kb-arms -- docs/research/reports/2026-08-07-arms-module-arms.toml
+#   mise run kb-arms -- docs/research/reports/2026-08-07-arms-module-arms.toml --dry-run
+#
+# This file is the whole point of the ticket: the eighth mutation harness in this
+# repo is DATA, not a program someone re-typed. Every `old` below is line-exact
+# against the commit that introduced it, so a later refactor makes the arm report
+# `PROBE BROKEN - pattern not found` rather than silently passing.
+#
+# Findings from the run are written up in `2026-08-07-arms-module-mutation-arms.md`.
+
+suites = ["tests/test_arms.py"]
+
+[[arm]]
+id = "A0 CONTROL"
+control = true
+file = "python/src/kb_setup/arms.py"
+old = '''def purge_bytecode(root: Path) -> int:'''
+new = '''def purge_bytecode(root: Path) -> int:  # control'''
+
+# --- protection 1: bytecode invalidation ----------------------------------- #
+
+[[arm]]
+id = "A1 purge call site"
+file = "python/src/kb_setup/arms.py"
+old = '''    purge(repo_root)
+    proc = subprocess.run('''
+new = '''    proc = subprocess.run('''
+test = "test_two_same_size_arms_die_and_survive_without_the_purge"
+meaning = "the purge could be deleted from run_suite and no test would notice"
+
+# A2 was this arm pointed at `test_two_same_size_arms_die_and_survive_without_the_purge`,
+# where it SURVIVED: the purge runs before every suite, so a `.pyc` written under
+# arm N is gone before arm N+1 and no verdict moves. Not inert though — the purge
+# can fail — so it is re-pointed at a test of the OBSERVABLE consequence and now
+# lives at A30, beside the other post-first-sweep arms.
+
+# --- protection 2: a probe that never ran is not a death -------------------- #
+
+[[arm]]
+id = "A3 absent pattern"
+file = "python/src/kb_setup/arms.py"
+old = '''    if hits == 0:'''
+new = '''    if False:'''
+test = "test_a_pattern_that_does_not_match_is_broken_not_a_death"
+meaning = "a stale arm is scored instead of refused"
+
+[[arm]]
+id = "A4 ambiguous pattern"
+file = "python/src/kb_setup/arms.py"
+old = '''    if hits > 1:'''
+new = '''    if False:'''
+test = "test_a_pattern_that_matches_more_than_once_is_broken_not_a_death"
+meaning = "an arm mutating the wrong occurrence is scored as a real result"
+
+[[arm]]
+id = "A5 no-op mutation"
+file = "python/src/kb_setup/arms.py"
+old = '''    if mutated == source:'''
+new = '''    if False:'''
+test = "test_a_no_op_mutation_is_broken_not_a_survivor"
+meaning = "an edit that changes nothing is reported as a coverage gap"
+
+[[arm]]
+id = "A6 named-test check"
+file = "python/src/kb_setup/arms.py"
+old = '''    if arm.test is not None and arm.test not in out:'''
+new = '''    if False:'''
+test = "test_a_red_suite_that_does_not_name_the_test_is_not_a_death"
+meaning = "a suite red for an unrelated reason is credited to the mutation"
+
+# --- protection 3: the mandatory green rows --------------------------------- #
+
+[[arm]]
+id = "A7 baseline abort"
+file = "python/src/kb_setup/arms.py"
+old = '''    if baseline_rc != 0:'''
+new = '''    if False:'''
+test = "test_a_red_baseline_aborts_before_any_arm_runs"
+meaning = "arms run against an already-red suite, where every death is free"
+
+[[arm]]
+id = "A8 control abort"
+file = "python/src/kb_setup/arms.py"
+old = '''        if arm.control and row.verdict is not Verdict.CONTROL_HELD:'''
+new = '''        if False:'''
+test = "test_a_control_arm_that_dies_aborts_the_run"
+meaning = "a demonstrably lying harness keeps printing rows people will believe"
+
+[[arm]]
+id = "A9 controls first"
+file = "python/src/kb_setup/arms.py"
+old = '''    ordered = [a for a in spec.arms if a.control] + [a for a in spec.arms if not a.control]'''
+new = '''    ordered = list(spec.arms)'''
+test = "test_controls_run_before_mutations_whatever_their_spec_order"
+meaning = "the control no longer runs before the arms it is supposed to validate"
+
+[[arm]]
+id = "A10 restored row in ok"
+file = "python/src/kb_setup/arms.py"
+old = '''            and self.restored_rc == 0
+'''
+new = ''''''
+test = "test_a_run_whose_restored_row_is_red_is_not_ok"
+meaning = "a run that left the tree dirty still reports ok"
+
+[[arm]]
+id = "A11 control required in ok"
+file = "python/src/kb_setup/arms.py"
+old = '''            and any(row.arm.control for row in self.rows)
+'''
+new = ''''''
+test = "test_a_report_with_no_control_row_is_not_ok"
+meaning = "a sweep with no control at all reports ok"
+
+# A12 was `and bool(self.rows)` in `Report.ok`. It SURVIVED the first sweep, and
+# the question "coverage gap or inert mutation?" was settled by measurement:
+# `any(...)` over an empty tuple is already False, so the clause was strictly
+# implied by the one below it and the two masked each other. The clause was
+# deleted rather than tested, and A11 now arms the empty case too. The arm is
+# recorded here as removed rather than dropped silently, because a shrinking
+# spec with no explanation reads as arms that were quietly abandoned.
+
+[[arm]]
+id = "A13 restore call"
+file = "python/src/kb_setup/arms.py"
+old = '''        _restore(path, original)'''
+new = '''        pass'''
+test = "test_the_file_is_restored_after_every_arm"
+meaning = "the working tree is left mutated after a run"
+
+[[arm]]
+id = "A14 restore on exception"
+file = "python/src/kb_setup/arms.py"
+old = '''    try:
+        rc, out = suite()
+    finally:
+        _restore(path, original)'''
+new = '''    rc, out = suite()
+    _restore(path, original)'''
+test = "test_the_file_is_restored_even_when_the_suite_raises"
+meaning = "an interrupted run leaves production source mutated on disk"
+
+# --- the spec loader -------------------------------------------------------- #
+
+[[arm]]
+id = "A15 control required in spec"
+file = "python/src/kb_setup/arms.py"
+old = '''    if arms and not any(arm.control for arm in arms):'''
+new = '''    if False:'''
+test = "test_a_spec_with_no_control_arm_is_refused"
+meaning = "a spec with no control arm is accepted"
+
+[[arm]]
+id = "A16 test required"
+file = "python/src/kb_setup/arms.py"
+old = '''    return (raw, True) if isinstance(raw, str) else (None, False)'''
+new = '''    return (raw if isinstance(raw, str) else None, True)'''
+test = "test_a_mutation_arm_with_no_test_is_refused"
+meaning = "arms are scored on the exit code alone again, as one earlier harness did"
+
+[[arm]]
+id = "A17 unknown key"
+file = "python/src/kb_setup/arms.py"
+old = '''    if unknown:'''
+new = '''    if False:'''
+test = "test_a_mistyped_key_is_refused_rather_than_ignored"
+meaning = "a typo'd `contol = true` silently demotes a control to a mutation arm"
+
+[[arm]]
+id = "A18 duplicate ids"
+file = "python/src/kb_setup/arms.py"
+old = '''        if arm.id in seen:'''
+new = '''        if False:'''
+test = "test_duplicate_arm_ids_are_refused"
+meaning = "two rows in the report cannot be told apart"
+
+[[arm]]
+id = "A19 control naming a test"
+file = "python/src/kb_setup/arms.py"
+old = '''    if control and table.get("test") is not None:'''
+new = '''    if False:'''
+test = "test_a_control_arm_naming_a_test_is_refused"
+meaning = "a control arm carries an expectation it can never meet"
+
+[[arm]]
+id = "A20 suites required"
+file = "python/src/kb_setup/arms.py"
+old = '''    if not isinstance(suites, list) or not suites or not all(isinstance(s, str) for s in suites):'''
+new = '''    if False:'''
+test = "test_a_spec_with_no_suites_is_refused"
+meaning = "a spec naming no suite runs pytest over the whole repo"
+
+[[arm]]
+id = "A21 arms required"
+file = "python/src/kb_setup/arms.py"
+old = '''    if not isinstance(tables, list) or not tables:'''
+new = '''    if False:'''
+test = "test_a_spec_with_no_arms_is_refused"
+meaning = "an empty spec is accepted and reports nothing wrong"
+
+[[arm]]
+id = "A22 toml parse error"
+file = "python/src/kb_setup/arms.py"
+old = '''    except (OSError, tomllib.TOMLDecodeError) as exc:'''
+new = '''    except OSError as exc:'''
+test = "test_unparsable_toml_is_a_spec_error_not_a_traceback"
+meaning = "a malformed spec raises a traceback instead of a refusal"
+
+[[arm]]
+id = "A23 known key set"
+file = "python/src/kb_setup/arms.py"
+old = '''_ARM_KEYS: frozenset[str] = frozenset({"id", "file", "old", "new", "test", "meaning", "control"})'''
+new = '''_ARM_KEYS: frozenset[str] = frozenset({"id", "file", "old", "new", "test", "control"})'''
+test = "test_a_valid_spec_loads"
+meaning = "a documented key is rejected as unknown"
+
+# A24 originally mutated the missing-required-key `errors.append` into a raise,
+# named `test_every_problem_is_reported_in_one_pass`, and SURVIVED. That was a
+# PROBE defect, not a coverage gap: the named test's spec has a missing `test`
+# and a missing control, never a missing required key, so the mutated line was
+# never reached. Re-pointed at the line the test actually exercises, and the
+# unreached line got a test of its own (A24b).
+[[arm]]
+id = "A24 all errors in one pass"
+file = "python/src/kb_setup/arms.py"
+old = '''        raise SpecError(f"{path}: " + "; ".join(errors))'''
+new = '''        raise SpecError(f"{path}: " + errors[0])'''
+test = "test_every_problem_is_reported_in_one_pass"
+meaning = "only the first problem is reported, so a stale spec takes N runs to fix"
+
+[[arm]]
+id = "A24b required key named"
+file = "python/src/kb_setup/arms.py"
+old = '''            errors.append(f"{where}: missing or non-string `{key}`")'''
+new = '''            errors.append(f"{where}: bad arm")'''
+test = "test_an_arm_missing_a_required_key_is_refused_and_names_it"
+meaning = "a refusal does not say WHICH key is wrong"
+
+[[arm]]
+id = "A29 purge honesty"
+file = "python/src/kb_setup/arms.py"
+old = '''            if cache.exists():
+                raise RuntimeError('''
+new = '''            if False:
+                raise RuntimeError('''
+test = "test_a_purge_that_did_not_purge_raises_rather_than_counting"
+meaning = "a purge that silently failed still reports the count of one that worked"
+
+[[arm]]
+id = "A30 dont-write-bytecode"
+file = "python/src/kb_setup/arms.py"
+old = '''        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},'''
+new = '''        env={**os.environ},'''
+test = "test_a_suite_run_writes_no_bytecode_of_its_own"
+meaning = "the second bytecode mitigation is unarmed - it survived the first sweep"
+
+# --- the CLI ---------------------------------------------------------------- #
+
+[[arm]]
+id = "A25 dry-run exit code"
+file = "python/src/kb_setup/arms.py"
+old = '''        return 1 if broken else 0'''
+new = '''        return 0'''
+test = "test_the_cli_dry_run_exits_1_on_a_stale_arm"
+meaning = "a dry run over stale arms exits 0"
+
+[[arm]]
+id = "A26 run exit code"
+file = "python/src/kb_setup/arms.py"
+old = '''    return 0 if report.ok else 1'''
+new = '''    return 0'''
+test = "test_the_cli_exits_1_when_an_arm_survives"
+meaning = "a run with survivors exits 0 - the gate-shaped failure this repo names most often"
+
+[[arm]]
+id = "A27 spec refusal exit code"
+file = "python/src/kb_setup/arms.py"
+old = '''        print(f"SPEC REFUSED: {exc}")
+        return 2'''
+new = '''        print(f"SPEC REFUSED: {exc}")
+        return 0'''
+test = "test_the_cli_refuses_a_bad_spec_with_rc_2"
+meaning = "a refused spec is indistinguishable from a clean run"
+
+[[arm]]
+id = "A28 usage exit code"
+file = "python/src/kb_setup/arms.py"
+old = '''        print("usage: kb-setup arms <spec.toml> [--dry-run]")
+        return 2'''
+new = '''        print("usage: kb-setup arms <spec.toml> [--dry-run]")
+        return 0'''
+test = "test_the_cli_usage_error_exits_2"
+meaning = "a mis-invocation reports success"

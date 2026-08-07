@@ -97,7 +97,9 @@ its issue tracker is the thing most likely to be quoted at you.
    test go red. An arm score is a statement about your TESTS, never about your
    PREMISE, and a clean sweep is never evidence the change is correct.
    **Procedure: the `kb-review` skill** § *Arm your own fixes* — it holds the
-   checklist and the worked failures; this rule holds only the norm.
+   checklist and the worked failures; this rule holds only the norm. **Never
+   hand-write the harness**: `mise run kb-arms -- <spec.toml>` (`kb_setup.arms`,
+   #160) owns the loop, and refuses a spec with no `control = true` row.
 3. **Bound-limited searches are suspect by construction.** `-maxdepth`,
    `head -N`, `--limit`, a time window, a `2>/dev/null`: each can turn "absent"
    into "unreachable". Either remove the bound or prove the target is inside it.

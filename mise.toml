@@ -292,6 +292,20 @@ description = "Propose skill/task/module candidates from this session's throwawa
 # cost, not a build failure. `-- --limit N --min-scripts N` to vary the bounds.
 run = "uv run kb-setup distill"
 
+[tasks.kb-arms]
+description = "Run a mutation-arm spec: mise run kb-arms -- <spec.toml> [--dry-run] (#160)"
+# NOT A GATE, and deliberately in no gate: it MUTATES tracked source files in the
+# working tree and restores them, so it appears in neither `kb-gates` nor
+# `kb-ship` nor `kb-land`. `kb-distill` is the precedent for a task whose comment
+# says outright what it is not.
+# It exists because seven successive rounds hand-wrote this harness in a
+# scratchpad and three of them lost the `__pycache__` `(mtime, size)` mitigation
+# — a same-size mutation is then served the PREVIOUS arm's bytecode, which can
+# credit an arm with a death the mutation never caused, i.e. a whole run that is
+# worthless while reading green. Logic in `kb_setup.arms`; arms are TOML data.
+# `-- --dry-run` validates every arm's pattern against the files without pytest.
+run = "uv run kb-setup arms"
+
 [tasks.lint-docs]
 description = "Validate agent documentation (agnix)"
 # --strict: warnings-as-errors — parity with the hk `agnix` step. agnix exits 0
