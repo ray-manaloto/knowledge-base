@@ -115,8 +115,12 @@ def test_assemble_writes_combined_chunk(tmp_path) -> None:
     (tmp_path / "sources" / "extractions").mkdir(parents=True)
     c1 = tmp_path / "c1.json"
     c2 = tmp_path / "c2.json"
+    # DISTINCT `source_file` per chunk, matching `kb-extract`'s one-agent-per-source
+    # fan-out. These fixtures always modelled two sources via the `x_`/`y_` id
+    # prefixes and left `source_file` at the shared default — a fidelity gap that
+    # went unnoticed until `assembly_overlaps` (#198 item 2) started reading it.
     c1.write_text(json.dumps(_chunk([_node("x_a"), _node("x_b")], [_edge("x_a", "x_b")])))
-    c2.write_text(json.dumps(_chunk([_node("y_a")], [])))
+    c2.write_text(json.dumps(_chunk([_node("y_a", source_file="other.md")], [])))
     out = chunks.assemble(tmp_path, "mytopic", [c1, c2])
     assert out == tmp_path / "sources" / "extractions" / "mytopic-docs.json"
     got = json.loads(out.read_text())
@@ -151,6 +155,89 @@ def test_assemble_raises_on_cross_chunk_id_collision(tmp_path) -> None:
     c2.write_text(json.dumps(_chunk([_node("dup")], [])))
     with pytest.raises(ValueError, match="collision"):
         chunks.assemble(tmp_path, "clash", [c1, c2])
+
+
+def test_assemble_refuses_two_chunks_claiming_one_source_file(tmp_path) -> None:
+    """#198 item 2. The ids DO NOT collide — which is the whole point.
+
+    Extraction prefixes ids per source, so two extractions of one page collide on
+    no id at all and the existing `seen` map reported them clean. What they share
+    is the FILE THEY DESCRIBE, and concatenating them puts both node sets in one
+    committed chunk: two descriptions of one page, indistinguishable afterwards.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c1 = tmp_path / "c1.json"
+    c2 = tmp_path / "c2.json"
+    c1.write_text(json.dumps(_chunk([_node("x_a", source_file="dup.md")], [])))
+    c2.write_text(json.dumps(_chunk([_node("y_a", source_file="dup.md")], [])))
+
+    with pytest.raises(ValueError, match="duplicate claim") as e:
+        chunks.assemble(tmp_path, "clash", [c1, c2])
+
+    assert "id collision" not in str(e.value)  # the OTHER axis stayed silent
+    assert not (tmp_path / "sources" / "extractions" / "clash-docs.json").exists()
+
+
+def test_assemble_refuses_a_declared_overlap_too(tmp_path) -> None:
+    """A `supersedes` declaration does not rescue an overlap during ASSEMBLY.
+
+    This is the arm for the decision that separates `assembly_overlaps` from
+    `collision_issues`, which excuses exactly this case. The declaration takes
+    effect when the combined chunk MERGES — by which point it is a single chunk
+    with nothing left to supersede, and both node sets are already inside it. An
+    implementation that reused `collision_issues` passes every other arm in this
+    file and lets this one through.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c1 = tmp_path / "c1.json"
+    c2 = tmp_path / "c2.json"
+    c1.write_text(json.dumps(_chunk([_node("x_a", source_file="dup.md")], [])))
+    declared = _chunk([_node("y_a", source_file="dup.md")], [])
+    declared["supersedes"] = ["dup.md"]
+    c2.write_text(json.dumps(declared))
+
+    with pytest.raises(ValueError, match="duplicate claim"):
+        chunks.assemble(tmp_path, "clash", [c1, c2])
+
+
+def test_assembly_overlaps_is_silent_on_the_ordinary_batch() -> None:
+    """One chunk per source is what `kb-extract` produces, and it must be clean.
+
+    A gate that fires on the normal fan-out is one people route around. Covered
+    here rather than only through `assemble` so the quiet direction has an arm of
+    its own — a check verified only where it fires is half-verified.
+    """
+    assert chunks.assembly_overlaps([]) == []
+
+
+def test_assembly_overlaps_reports_every_claimant(tmp_path) -> None:
+    """Three chunks on one file name all three, not just the losing pair."""
+    paths = []
+    for i in range(3):
+        p = tmp_path / f"c{i}.json"
+        p.write_text(json.dumps(_chunk([_node(f"n{i}", source_file="shared.md")], [])))
+        paths.append(p)
+
+    issues = chunks.assembly_overlaps(paths)
+
+    assert len(issues) == 1
+    for name in ("c0.json", "c1.json", "c2.json"):
+        assert name in issues[0], name
+
+
+def test_assembly_overlaps_ignores_a_single_chunk(tmp_path) -> None:
+    """A lone chunk claiming a file many times over is not an OVERLAP.
+
+    Intra-chunk repetition is normal — every node of a page names that page — and
+    reporting it would fire on literally every chunk this repo has.
+    """
+    p = tmp_path / "c.json"
+    p.write_text(
+        json.dumps(_chunk([_node("a", source_file="x.md"), _node("b", source_file="x.md")], []))
+    )
+
+    assert chunks.assembly_overlaps([p]) == []
+    assert chunks.assembly_overlaps([p, p]) == []  # same file passed twice
 
 
 def test_validate_files_maps_path_to_issues(tmp_path) -> None:
@@ -412,7 +499,7 @@ def test_assemble_carries_hyperedges_regression_for_170(tmp_path) -> None:
     c1.write_text(
         json.dumps(_chunk([_node("x_a"), _node("x_b"), _node("x_c")], [_edge("x_a", "x_b")], [h]))
     )
-    c2.write_text(json.dumps(_chunk([_node("y_a")], [])))
+    c2.write_text(json.dumps(_chunk([_node("y_a", source_file="other.md")], [])))
     out = chunks.assemble(tmp_path, "mytopic", [c1, c2])
     got = json.loads(out.read_text())
     assert got["hyperedges"] == [h], (
@@ -426,7 +513,12 @@ def test_assemble_hyperedges_empty_or_absent_both_assemble_cleanly(tmp_path) -> 
     c1 = tmp_path / "c1.json"
     c2 = tmp_path / "c2.json"
     c1.write_text(json.dumps(_chunk([_node("a")], [], [])))  # explicit "hyperedges": []
-    absent = {"nodes": [_node("b")], "edges": [], "input_tokens": 0, "output_tokens": 0}
+    absent = {
+        "nodes": [_node("b", source_file="other.md")],
+        "edges": [],
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
     c2.write_text(json.dumps(absent))  # "hyperedges" key absent entirely
     out = chunks.assemble(tmp_path, "cleantopic", [c1, c2])
     got = json.loads(out.read_text())

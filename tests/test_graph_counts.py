@@ -27,10 +27,16 @@ _COUNTS = {"nodes": 10, "edges": 20, "hyperedges": 3, "members": 9}
 
 
 class _Graph:
-    """The two methods `_report` calls on a networkx graph."""
+    """The surface `_report` touches on a networkx graph: two methods and `.graph`.
 
-    def __init__(self, nodes: int, edges: int = 0) -> None:
+    `.graph` is a real attribute rather than something `_report` getattrs its way
+    around, because that is what `build_merge` returns and a fallback would be a
+    branch no arm could reach (#198 item 1).
+    """
+
+    def __init__(self, nodes: int, edges: int = 0, hyperedges: int = 0) -> None:
         self._n, self._e = nodes, edges
+        self.graph = {"hyperedges": [{"id": f"h{i}"} for i in range(hyperedges)]}
 
     def number_of_nodes(self) -> int:
         return self._n
@@ -39,12 +45,24 @@ class _Graph:
         return self._e
 
 
-def _chunk(nodes: int, supersedes: list[str] | None = None) -> dict:
-    """A chunk shaped only as far as `_report` reads it: node count + declaration."""
+def _chunk(nodes: int, supersedes: list[str] | None = None, hyperedges: int = 0) -> dict:
+    """A chunk shaped only as far as `_report` reads it: counts + declaration."""
     body: dict = {"nodes": [{"id": f"n{i}"} for i in range(nodes)]}
     if supersedes is not None:
         body["supersedes"] = supersedes
+    if hyperedges:
+        body["hyperedges"] = [{"id": f"ch{i}"} for i in range(hyperedges)]
     return body
+
+
+def _priors(nodes: int | None = None, hyperedges: int | None = None) -> dict:
+    """What the graph held before, in the ledger's own shape.
+
+    A helper rather than a literal at every call site so that adding the next
+    ledger field (`edges`, `members` — #198 notes `_derive_prose` omits the
+    latter) does not mean editing every arm in this file.
+    """
+    return {"nodes": nodes, "hyperedges": hyperedges}
 
 
 def _graph_file(tmp_path: Path, body: str = "{}") -> Path:
@@ -124,7 +142,7 @@ def test_opt_reads_a_flag_value_and_tolerates_a_trailing_flag() -> None:
 
 
 def test_report_states_the_identity_when_nothing_was_replaced(capsys) -> None:
-    _merge_docs._report("c.json", _chunk(10), 100, _Graph(110))
+    _merge_docs._report("c.json", _chunk(10), _priors(nodes=100), _Graph(110))
 
     out = capsys.readouterr().out
     assert "0 replaced" in out
@@ -138,7 +156,7 @@ def test_report_names_the_replaced_count_when_the_arithmetic_disagrees(capsys) -
     The number this prints — 115 — is the one that took a human three rounds to
     notice, and 72 of it belonged to a source nobody was touching.
     """
-    _merge_docs._report("c.json", _chunk(796), 336488, _Graph(337169))
+    _merge_docs._report("c.json", _chunk(796), _priors(nodes=336488), _Graph(337169))
 
     out = capsys.readouterr().out
     assert "REPLACED 115 node(s)" in out
@@ -153,7 +171,7 @@ def test_report_still_flags_a_replacement_that_was_declared(capsys) -> None:
     that silently printed nothing would put the legitimate case and the
     catastrophic one back into the same silence.
     """
-    _merge_docs._report("c.json", _chunk(10, ["p.md"]), 100, _Graph(105))
+    _merge_docs._report("c.json", _chunk(10, ["p.md"]), _priors(nodes=100), _Graph(105))
 
     out = capsys.readouterr().out
     assert "REPLACED 5 node(s)" in out
@@ -171,6 +189,120 @@ def test_report_says_not_checked_rather_than_guessing(capsys) -> None:
     assert "replaced" not in out
 
 
+def test_the_186_shape_is_reported_while_the_node_half_is_correctly_silent(capsys) -> None:
+    """THE arm for #198 item 1: nodes balance, hyperedges do not.
+
+    The #186 loss — 11 hyperedges to 8, no nodes moved — is the FIRST incident this
+    whole ticket family was filed over, and the node-only assertion would have
+    printed "0 replaced" over it and been RIGHT. That is the point: this arm fails
+    if the hyperedge line is removed, and it also pins that the node line keeps
+    saying nothing, so a future reader cannot mistake the node half for the thing
+    that caught this.
+    """
+    _merge_docs._report(
+        "c.json",
+        _chunk(10),
+        _priors(nodes=100, hyperedges=11),
+        _Graph(110, hyperedges=8),
+    )
+
+    out = capsys.readouterr().out
+    assert "0 replaced" in out
+    assert "REPLACED" not in out
+    assert "LOST 3 hyperedge(s)" in out
+    assert "11 + 0 = 11" in out
+    assert "the graph holds 8" in out
+
+
+def test_the_hyperedge_message_enumerates_causes_instead_of_asserting_one(capsys) -> None:
+    """It may NOT reuse the node line's single-cause sentence.
+
+    A doc merge has one way to drop a node, so the node line names it. Hyperedges
+    have four (`_HYPEREDGE_LOSS_CAUSES`), only one of which is that same rule and
+    only one of which graphify announces — so a copied "every one carried a
+    source_file this chunk also names" would be a confident sentence that is false
+    three ways. This arm is what stops the wording drifting back into symmetry.
+    """
+    _merge_docs._report(
+        "c.json", _chunk(10), _priors(nodes=100, hyperedges=11), _Graph(110, hyperedges=8)
+    )
+
+    out = capsys.readouterr().out
+    assert "UNEXPECTED" in out
+    for fragment in ("source_file this chunk also names", "id collision", "stderr", "falsy"):
+        assert fragment in out, fragment
+    # The node line's claim, which must NOT be made about hyperedges.
+    assert "Every replaced node carried" not in out
+
+
+def test_a_hyperedge_line_is_silent_only_about_a_provably_empty_set() -> None:
+    """Nothing before, nothing incoming, nothing held — there is no claim to make.
+
+    Every OTHER unknown says so out loud. Silence that could mean "unchecked" is
+    how a gate gets read as a pass.
+    """
+    assert _merge_docs._hyperedge_line(0, 0, 0) is None
+    assert _merge_docs._hyperedge_line(None, 0, 0) is None
+
+    unknown = _merge_docs._hyperedge_line(None, 0, 5)
+    assert unknown is not None
+    assert "NOT checked" in unknown
+
+
+def test_a_hyperedge_self_remerge_does_not_cry_wolf() -> None:
+    """A routine re-merge balances to "every hyperedge it owns", every time.
+
+    Re-merging the committed 45-hyperedge `graphify-2026-08-06` chunk puts every
+    source_file it names into `new_sem_sources`, so all 45 prior hyperedges leave
+    the carry and its 45 new ones are added back: the arithmetic reads as 45 lost
+    on the single most common merge there is.
+    """
+    line = _merge_docs._hyperedge_line(92, 45, 92, self_remerge=True)
+
+    assert line is not None
+    assert "LOST 45 hyperedge(s)" in line
+    assert "EXPECTED" in line
+    assert "UNEXPECTED" not in line
+
+
+def test_a_declared_hyperedge_supersession_is_explained_not_hidden() -> None:
+    line = _merge_docs._hyperedge_line(11, 5, 13, declared=["p.md"])
+
+    assert line is not None
+    assert "LOST 3 hyperedge(s)" in line
+    assert "supersedes=['p.md']" in line
+
+
+def test_a_balanced_hyperedge_merge_states_the_identity() -> None:
+    line = _merge_docs._hyperedge_line(11, 5, 16)
+
+    assert line is not None
+    assert "11 + 5 = 16, 0 lost" in line
+    assert "LOST" not in line
+
+
+def test_an_impossible_hyperedge_gain_is_reported_rather_than_assumed_away() -> None:
+    """`build_merge` as read cannot produce this — which is exactly why it prints.
+
+    The kept set is a subset of (new + carried), so total <= prior + added. That is
+    an assumption about SOMEONE ELSE'S code, in a file that already carries one
+    comment which overstated what that code does.
+    """
+    line = _merge_docs._hyperedge_line(5, 1, 9)
+
+    assert line is not None
+    assert "UNEXPECTED GAIN of 3" in line
+
+
+def test_int_opt_degrades_a_non_numeric_count_to_not_checked() -> None:
+    argv = ["s", "--prior-nodes", "41", "--prior-hyperedges", "many", "--counts-out"]
+
+    assert _merge_docs._int_opt(argv, "--prior-nodes") == 41
+    assert _merge_docs._int_opt(argv, "--prior-hyperedges") is None
+    assert _merge_docs._int_opt(argv, "--counts-out") is None
+    assert _merge_docs._int_opt(argv, "--absent") is None
+
+
 def test_report_calls_a_self_remerge_expected_rather_than_a_loss(capsys) -> None:
     """The routine case, and the reason this branch exists at all.
 
@@ -185,7 +317,7 @@ def test_report_calls_a_self_remerge_expected_rather_than_a_loss(capsys) -> None
     pins that the wording actually changes, so the flag cannot be quietly ignored
     the way an unread parameter would be.
     """
-    _merge_docs._report("c.json", _chunk(10), 100, _Graph(100), self_remerge=True)
+    _merge_docs._report("c.json", _chunk(10), _priors(nodes=100), _Graph(100), self_remerge=True)
 
     out = capsys.readouterr().out
     assert "REPLACED 10 node(s)" in out
