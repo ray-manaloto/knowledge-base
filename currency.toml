@@ -153,7 +153,15 @@ all 12 added lines are the #2486 hyperedge member-ref coercion in
 `_sanitize_fragment`, zero label-touching lines. Control arm on the SAME
 compare — `graphify/build.py` +117/-21 and `cli.py` +78/-11 — so the probe
 discriminates. The 42-batch probe was therefore NOT run. STILL PRESENT on
-0.9.34."""
+0.9.34.
+
+RE-PROBED 2026-08-07 for 0.9.35, from `graphify/llm.py` at tag v0.9.35
+(raw.githubusercontent; the clone was absent at probe time). Counts unchanged:
+`_EXTRACTION_JSON_SCHEMA` x2, `def label_communities` x1, label-side schema
+constant x0 — with a bogus symbol at x0 in the same file, so the zero is an
+absence rather than a broken probe. `llm.py` grew 3115 -> 3127 lines. The
+42-batch probe was NOT run, per this item's own recorded method. STILL PRESENT
+on 0.9.35."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -219,7 +227,23 @@ schema, negotiated protocol version matching (empty detail). Same 10/6 surface
 Control-armed by the same run: `tests/test_mcp_serve.py` is 11 tests, 0 skipped,
 and its negative arms (rc=0-with-no-reply, refused initialize, errored
 `tools/list`, dropped `resources/list`) all still report failure, so the probe
-can produce the other answer. No `graphify-mcp` process survived shutdown."""
+can produce the other answer. No `graphify-mcp` process survived shutdown.
+
+RE-PROBED 2026-08-07 for 0.9.35: `pyproject.toml` at v0.9.35 carries
+`mcp>=1,<3` in BOTH extras — UNCHANGED since 0.9.31, so RESOLVED still stands.
+**Read this item's OPENING sentence with its version condition attached.** It
+states the 0.9.30 situation (`mcp<2`, load-bearing), and the 2026-08-07 run read
+it as the CURRENT disposition and reported the ceiling as newly widened by
+0.9.35. It was widened in 0.9.31. This item is kept precisely because its
+warning outlived its version condition — and that is the trap it then sprang on
+its next reader. SERVER PROBE RUN, because `graphify/serve.py` moved +38/-2 in
+this bump and this note says starting the server is the only conclusive probe:
+`kb_setup.mcp_probe.probe(["mise", "run", "kb-serve"])` completed a real
+JSON-RPC handshake against the installed 0.9.35 — **10 tools** (`query_graph`,
+`get_node`, `get_neighbors`, `get_community`, `god_nodes`, `graph_stats`,
+`shortest_path`, `list_prs`, `get_pr_impact`, `triage_prs`) and **6 resources**,
+the same surface 0.9.31/0.9.32/0.9.34 advertised. No `graphify-mcp` process
+survived shutdown."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -275,7 +299,17 @@ merge chatter — the grep still discriminates). NOT a comparable pair: the
 resync (060df22) added two manifests between the builds (`claude-code`,
 `rootly-graphify-importer`), and claude-code alone is a large repo carrying
 data-only `.json`. A +1 across a +2-source set change reads as unchanged in
-kind; no alarm, disposition stands."""
+kind; no alarm, disposition stands.
+
+RE-PROBED 2026-08-07 on 0.9.35, by the recorded method: **44**, against 38 on
+2026-08-05. Control arm on the same log: 42 `[merge]` lines, so the grep finds
+real matches. NOT a comparable pair, and this time that was CHECKED rather than
+assumed: `git log --since=2026-08-05T23:59 --diff-filter=A -- "sources/*.manifest"`
+lists **7** manifests added after the 38-count build (10x-Team, agentlinter,
+Attacca, cc-orchestrador-subagents, cclint, claude-plugins, claude-self-reflect).
+The recorded method says to compare only against a build with the same source
+set, so +6 warnings across a +7-source change carries no signal in either
+direction. No alarm, disposition stands."""
 
 # 2484/2485: the two hyperedge issues THIS repo filed (merge-graphs loss;
 # nested-slot read gap). Fixed in 0.9.34 — verified on the installed binary
