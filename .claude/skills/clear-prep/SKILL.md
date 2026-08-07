@@ -112,6 +112,7 @@ mise run kb-remember -- --question "<what this round asked>" \
                        --answer "<what was actually learned>" --outcome useful
 mise run kb-reflect                       # aggregate -> reflections/LESSONS.md
 mise run kb-goal-outcome -- <pair> --result <r> [--turns N]   # if a /goal ran
+mise run kb-distill                       # did this round hand-write a tool twice?
 ```
 
 `kb-remember` is what makes the corpus compound: a lesson that lives only in a
@@ -122,6 +123,23 @@ from. Both are cheap; skipping them is how a round's real finding evaporates.
 Also write anything durable into **auto-memory** (step 4a) — the two layers
 answer different questions. `graphify-out/memory/` teaches the *corpus*;
 auto-memory teaches the *next session*.
+
+**`kb-distill` is the third thing a round can leave behind, and the one nobody
+was capturing** (#219). It reads this project's transcripts for throwaway
+scripts — a `python3` heredoc, a scratchpad `.py` — and proposes a
+`skill -> mise task -> kb_setup module` for any shape written more than once.
+It lives here rather than in its own skill precisely because a task does not
+need one: `md-size-budgets.md`'s listing budget is a real cost, and the trigger
+for this one is "a round just ended", which is what this skill already is.
+
+Read its output as **leads**. It always exits 0 and gates nothing; an
+undistilled probe is a statement about future cost, not a failure. **Nothing to
+propose is the common, correct result** — a session of one-off work should
+produce an empty report, and that is what makes a non-empty one worth reading.
+The measured backdrop: 785 ad-hoc scripts across 40 sessions, of which
+`python/src/kb_setup` (patch a source file, run tests, restore) is the largest
+group — i.e. the mutation harness, hand-written five times and still tracked as
+open in #160.
 
 ## 3. Documentation sync — make the docs match what happened
 
