@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The gitleaks allowlist must not cover `graphify-out/memory/`.
 
 This is a regression gate for a real incident (2026-07-28, #66's own review).

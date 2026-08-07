@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Derive the prose-only graph — the same graph with the code-AST mass dropped.
 
 WHY THIS EXISTS (knowledge-base#12, P0). `graphify query` walks the graph and

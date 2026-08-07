@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for kb_setup.graph._ensure_clone — pin advance vs. an existing clone.
 
 The bug these pin: `_ensure_clone` used to `git checkout <pinned sha>` in an

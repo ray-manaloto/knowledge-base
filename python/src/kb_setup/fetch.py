@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Lossless source ingestion for the KB, with a verbatim-token roundtrip contract.
 
 Why this module exists

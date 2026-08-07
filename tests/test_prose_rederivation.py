@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Every writer of `graph.json` must re-derive `graph-prose.json`.
 
 The defect these pin down was invisible for the same reason it was expensive:

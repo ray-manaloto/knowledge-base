@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Cross-chunk `source_file` ownership (#189).
 
 Every arm here is about a defect NO per-chunk check can see: both chunks are

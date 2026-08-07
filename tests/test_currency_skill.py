@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`currency.skill` — refresh a project-scoped agent skill as part of a bump.
 
 The refresh runs an installer and then `git checkout --` on the files that
@@ -255,10 +256,12 @@ def _wipes(body: str) -> tuple[str, ...]:
     return (
         sys.executable,
         "-c",
-        "import pathlib;"
-        f"p = pathlib.Path({_ADDENDUM.path!r});"
-        "p.parent.mkdir(parents=True, exist_ok=True);"
-        f"p.write_text({body!r}, encoding='utf-8')",
+        (
+            "import pathlib;"
+            f"p = pathlib.Path({_ADDENDUM.path!r});"
+            "p.parent.mkdir(parents=True, exist_ok=True);"
+            f"p.write_text({body!r}, encoding='utf-8')"
+        ),
     )
 
 
@@ -376,11 +379,13 @@ def test_a_failing_installer_that_wiped_an_addendum_still_reports_it(tmp_path, m
     wipe_then_fail = (
         sys.executable,
         "-c",
-        "import pathlib, sys;"
-        f"p = pathlib.Path({_ADDENDUM.path!r});"
-        "p.parent.mkdir(parents=True, exist_ok=True);"
-        "p.write_text('upstream renamed the heading\\n', encoding='utf-8');"
-        "sys.exit(3)",
+        (
+            "import pathlib, sys;"
+            f"p = pathlib.Path({_ADDENDUM.path!r});"
+            "p.parent.mkdir(parents=True, exist_ok=True);"
+            "p.write_text('upstream renamed the heading\\n', encoding='utf-8');"
+            "sys.exit(3)"
+        ),
     )
 
     result = skill.refresh(repo, _spec(skill_install=wipe_then_fail))
@@ -496,10 +501,12 @@ def test_a_failing_installer_still_normalises_the_stamp(tmp_path) -> None:
     write_then_fail = (
         sys.executable,
         "-c",
-        "import pathlib, sys;"
-        "pathlib.Path('.claude/skills/graphify/.graphify_version')"
-        ".write_text('0.9.34', encoding='utf-8');"
-        "sys.exit(4)",
+        (
+            "import pathlib, sys;"
+            "pathlib.Path('.claude/skills/graphify/.graphify_version')"
+            ".write_text('0.9.34', encoding='utf-8');"
+            "sys.exit(4)"
+        ),
     )
 
     result = skill.refresh(repo, _spec(skill_install=write_then_fail))

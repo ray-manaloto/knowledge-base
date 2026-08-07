@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`scope = study` sources are ingested, but never into the corpus aggregate.
 
 Why this exists. P2 pinned three peer retrieval tools for a gap analysis and the

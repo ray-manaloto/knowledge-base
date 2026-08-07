@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Run mutation arms from a declarative spec — the harness as a module (#160).
 
 A mutation arm breaks one line of PRODUCTION code and asserts a NAMED test goes

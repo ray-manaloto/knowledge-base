@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.stamps — the shared best-effort currency-stamp refresh.
 
 Extracted from `artifacts._restamp` (#179) so `kb-artifacts` and `kb-label`

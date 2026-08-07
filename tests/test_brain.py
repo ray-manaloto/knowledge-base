@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the second-brain routing seam (kb_setup.brain).
 
 Covers the contract, the deterministic >=3/session-dedup aggregator (both the

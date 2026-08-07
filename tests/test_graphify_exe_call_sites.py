@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Every corpus-affecting call site must actually REACH `graphify_exe`.
 
 This file exists because the #40 fix shipped without it, and a cold reviewer

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for kb_setup.pr — the ship/land PR workflow.
 
 Every test drives the real functions with subprocess stubbed, and each

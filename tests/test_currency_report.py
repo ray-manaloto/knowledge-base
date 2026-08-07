@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.report + .issues — step 6's committed record and step 4's diff.
 
 The cadence rule (landing row always, detail page only when the run has content)

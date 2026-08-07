@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency._proc — the shared `subprocess.run → degrade, don't raise` shape.
 
 Six currency probes funnel through here, so every failure mode is exercised in

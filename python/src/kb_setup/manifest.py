@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Source manifests — `sources/<name>.manifest` pins an external repo by SHA.
 
 The external repo is NEVER committed; the manifest (url + ref + commit) plus the

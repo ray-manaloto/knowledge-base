@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`build()` must index THIS repo's own python library, not only its sources.
 
 Why this exists. `graphify affected "<symbol>"` is the blast-radius question —

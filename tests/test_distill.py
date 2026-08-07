@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.distill` — the #219 throwaway-script distiller.
 
 The load-bearing test in this file is :func:`test_one_off_session_proposes_nothing`.

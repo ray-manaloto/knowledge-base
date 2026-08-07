@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Skill lint: a SKILL.md may not instruct a command a mise task already owns.
 
 Ray's standing directive, restated 2026-08-06 and tracked as #128: *skills call

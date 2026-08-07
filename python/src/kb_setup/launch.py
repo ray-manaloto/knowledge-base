@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Launch a Claude Code session for this repo, with the environment PROVEN correct.
 
 WHY THIS EXISTS. `mise run cc` used to be a thin shell wrapper that execed

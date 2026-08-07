@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.sync — step 1, the in-sync check.
 
 Network-free and subprocess-free by construction: every check here reads files

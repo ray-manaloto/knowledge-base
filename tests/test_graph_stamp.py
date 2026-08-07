@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The build stamp must name the binary that ACTUALLY BUILT the graph.
 
 This file exists because of a regression introduced while fixing #40 and caught

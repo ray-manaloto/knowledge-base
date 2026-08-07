@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the advisory skill scorer (kb_setup.skill_eval).
 
 The load-bearing behaviour here is not "does it compute a number" — it is what

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the prose-only derived graph (kb_setup.prose).
 
 The load-bearing test in this file is not "AST nodes are dropped" — any filter

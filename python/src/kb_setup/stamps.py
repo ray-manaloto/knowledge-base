@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Shared currency-stamp refresh for any operation that rewrites graph.json wholesale.
 
 THREE callers need the exact same best-effort behaviour: `artifacts.generate`

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.staleness — does the graph still match its committed inputs?
 
 Every test here runs BOTH arms, because the failure this detector exists to

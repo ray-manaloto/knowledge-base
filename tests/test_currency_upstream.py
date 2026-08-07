@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.upstream — parsing the two upstreams, and their null shapes.
 
 The JSON-null class is the whole point of this file. `payload.get(k, default)`

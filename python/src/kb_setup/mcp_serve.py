@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Serve this repo's graph over MCP, optionally narrowing the advertised surface.
 
 WHY THIS EXISTS. `graphify-mcp` advertises **10 tools + 6 resources

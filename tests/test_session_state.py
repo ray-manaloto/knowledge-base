@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.session_state` — the working-state snapshot (#144).
 
 Driven against the real `git` fixture repo in `conftest.py`, per criterion 5:

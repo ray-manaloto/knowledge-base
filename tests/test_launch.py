@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.launch` — the verified Claude Code launcher.
 
 Every check here is armed in BOTH directions. A launcher that cannot refuse is

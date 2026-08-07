@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.fetch — lossless source ingestion + the verbatim-token roundtrip contract.
 
 Every check here pins its FAIL direction next to its pass. That is the whole

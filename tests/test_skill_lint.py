@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.skill_lint` — the #128 gate.
 
 Every test here exists because the corresponding arm was RUN, not assumed. The

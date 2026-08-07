@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.broad — the `mise outdated` sweep for non-deep-tracked tools.
 
 This is a SIGNAL renderer, not a decision surface, so the tests that matter are:

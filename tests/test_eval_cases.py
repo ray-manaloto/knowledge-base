@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for this repo's eval cases (kb_setup.eval_cases).
 
 The RUNNER is tested in `test_evals.py`. What is tested here is the CASES — and

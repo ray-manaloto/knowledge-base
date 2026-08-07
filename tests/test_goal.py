@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb_setup.goal` — the mechanical half of the goal+rider checks.
 
 EVERY CHECK IS ARMED IN BOTH DIRECTIONS. A checker verified only on the good

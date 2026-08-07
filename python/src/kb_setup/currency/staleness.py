@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Does the built graph still match the committed inputs it was built from?
 
 The question the currency engine could not previously ask. `sync` compares the

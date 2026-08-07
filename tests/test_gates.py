@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for kb_setup.gates — run the gates, record what actually happened.
 
 Every behavioural assertion here is PAIRED with a control arm, because the

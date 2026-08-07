@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """`kb-affected` — the reverse-dependency verb (`graphify_ops.affected`).
 
 Each refusal test is paired with a control arm, because a function that returns

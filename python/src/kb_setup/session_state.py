@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The session's working state as DATA — `mise run kb-session-state` (#144).
 
 WHAT THIS REPLACES. `/clear-prep` step 1 asks an agent to run four commands —

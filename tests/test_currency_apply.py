@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup.currency.apply — the "and update" step, which EDITS committable files.
 
 The safety-critical question is the same as decide's: what makes this apply a

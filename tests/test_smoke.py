@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Smoke tests — the scaffold imports and the CLI runs."""
 
 from kb_setup import __version__

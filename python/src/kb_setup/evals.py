@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Eval runner — tier-1 reachability probes and tier-2 fixtures, control arms enforced.
 
 The SHARED runner both this repo and ``ray-manaloto/dotfiles`` use (the
@@ -977,10 +978,12 @@ def _arm_lines(result: _ArmResult) -> list[str]:
     return [
         f"  [{result.arm.name}]",
         *_pair_lines(result.rows),
-        f"    SUITE: {len(natural)} pair(s) — natural scored on {scored[0]}, "
-        f"echo on {scored[1]}; mean recall natural "
-        f"{_mean(r.recall for r in natural):.2f} vs echo "
-        f"{_mean(r.recall for r in echo):.2f}",
+        (
+            f"    SUITE: {len(natural)} pair(s) — natural scored on {scored[0]}, "
+            f"echo on {scored[1]}; mean recall natural "
+            f"{_mean(r.recall for r in natural):.2f} vs echo "
+            f"{_mean(r.recall for r in echo):.2f}"
+        ),
     ]
 
 
@@ -1314,8 +1317,10 @@ def run_cases(cases: Sequence[Case], *, live: bool = False, slow: bool = False) 
 def render(report: Report, *, live: bool = False, slow: bool = False) -> str:
     """Render the case table plus the summary line."""
     lines = [
-        f"eval: {len(report.results)} case(s), live={'on' if live else 'off'}, "
-        f"slow={'on' if slow else 'off'}"
+        (
+            f"eval: {len(report.results)} case(s), live={'on' if live else 'off'}, "
+            f"slow={'on' if slow else 'off'}"
+        )
     ]
     for r in report.results:
         flag = "gated" if r.case.gated else "advisory"

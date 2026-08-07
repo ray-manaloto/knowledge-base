@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """#182 — does each derived view describe the graph that is on disk NOW?
 
 `sync`'s fingerprint is `size:mtime_ns`, so it can only detect a declared output

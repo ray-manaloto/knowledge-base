@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """A path excluded to protect it from FORMATTERS must stay visible to SCANNERS.
 
 Three paths in this repo are kept byte-for-byte verbatim — `graphify-out/memory/**`

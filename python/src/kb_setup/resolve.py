@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Turn a citation into a verdict against this repo's filesystem.
 
 FOUR STATES, NEVER A BOOLEAN. They are kept distinct for the reason

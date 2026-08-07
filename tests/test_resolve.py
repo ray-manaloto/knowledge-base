@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for the citation-resolution primitive (kb_setup.resolve).
 
 Three states, kept distinct for the reason the currency engine keeps them

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The zero-bash no-lint-skip check detects inline suppressions."""
 
 from pathlib import Path

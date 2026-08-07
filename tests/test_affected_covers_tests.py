@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """The `#101` depth test: can `affected` name the tests that cover OUR code?
 
 WHY THIS TEST IS ARTIFACT-LEVEL, AND WHY IT HAS TO BE. Every other test of the

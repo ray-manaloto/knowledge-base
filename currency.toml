@@ -547,7 +547,7 @@ RE-PROBED 2026-08-05 for v2026.8.2: still **0** occurrences, control `[env]` ->
 # `expected` (self-managed, like mise) rather than `mise_key`: pinning the
 # harness that runs the session is not a thing this repo can or should do. Bump
 # it after reviewing the release notes — that act IS the gap analysis.
-expected = "2.1.223"
+expected = "2.1.224"
 binary = "claude"
 github = "anthropics/claude-code"
 # `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
@@ -720,6 +720,54 @@ NOT applicable: the `strictKnownMarketplaces` owner-wildcard entries (managed
 settings, which this repo does not write — `do-not.md` #11), and the
 `CLAUDE_CODE_DISABLE_1M_CONTEXT` widening (a session-model behaviour, not config
 here)."""
+[[tool.claude-code.watch]]
+kind = "local"
+ref = "2-1-224-review"
+note = """REVIEWED 2026-08-07, which is why `expected` moved 2.1.223 -> 2.1.224.
+Same rule as the entry above: the review IS the gap analysis, so this records
+what it found.
+
+READ FROM THE GITHUB RELEASE API, NOT THE MIRROR, and that is a deviation worth
+stating. `sources/agent-harness-docs/docs/claude-code/changelog.md` is the
+preferred source, but its pin predates this release — control-armed, 2.1.224 -> 0
+hits while 2.1.223 -> 1, so the mirror is genuinely behind rather than the grep
+being wrong. Advancing it (`mise run kb-update -- agent-harness-docs`) is the
+follow-up, NOT done here.
+
+THE ONE ITEM THAT TOUCHES AN INVARIANT — checked, no change made:
+
+`ANTHROPIC_BEDROCK_REGION_PREFIX` is new: it selects a Bedrock cross-region
+inference profile over the `AWS_REGION`-derived one. It is worth a paragraph
+because it is the exact shape that defeats `graphify_env.clean_env()`: that
+function strips Bedrock triggers BY NAME while deliberately KEEPING `ANTHROPIC_*`
+as the Claude path, so a Bedrock-selecting variable named `ANTHROPIC_...` would
+walk straight through it.
+
+It does not, and the probe discriminates. Against the INSTALLED graphify 0.9.35:
+`ANTHROPIC_BEDROCK_REGION_PREFIX` -> 0 hits, control `ANTHROPIC_API_KEY` -> 4 in
+`llm.py`. graphify's bedrock path reads only `AWS_REGION` / `AWS_DEFAULT_REGION` /
+`AWS_PROFILE` (`llm.py:1655-1656`), all three already in `_STRIP_BACKEND_ENV`.
+It is a Claude Code variable; `detect_backend()` cannot see it.
+
+DELIBERATELY NOT ADDED to `_STRIP_BACKEND_ENV`. Stripping a name nothing reads is
+cargo-cult — it would make the list a record of what we feared rather than of what
+flips a backend, and every future reader would have to re-derive why it is there.
+
+THREE ITEMS THAT MATTER HERE, none requiring a change:
+
+1. The 200-subagent-per-session spawn cap is REMOVED. Directly relevant: a long
+   session previously refused new agents, which bites `kb-extract` fan-outs and
+   multi-round `kb-review`.
+2. Plugin install records were silently corrupted when one plugin is installed in
+   multiple projects — FIXED. This repo enables 10 project-scope plugins and the
+   sibling dotfiles repo has its own, so we were in scope for it.
+3. New `archive` plugin source (zip over HTTPS, optional SHA-256 pinning). A
+   candidate fix for the standing complaint that `skillopt`'s pin `main` cannot be
+   compared with upstream `v0.2.0`, so its drift reports UNKNOWN every session.
+   Evaluating it is a separate piece of work, not this bump.
+
+NOT applicable, armed rather than assumed: the >200-char project-path session-dir
+collision — this project's path is 56 characters."""
 
 
 # ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Tests for `kb-setup query` — the kb-query task's `--prose` form.
 
 What is actually under test is WHICH CORPUS ANSWERED. Everything else this

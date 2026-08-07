@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Ship and land a pull request for THIS repo.
 
 Sized for what this repo actually is: no ``.github/workflows/`` and no

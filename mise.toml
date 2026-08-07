@@ -30,8 +30,8 @@ min_version = { hard = "2026.7.14", soft = "2026.8.2" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
-python = "3.14.6"
-uv = "0.11.28"
+python = "3.14.7"
+uv = "0.12.2"
 hk = "1.54.0"
 pkl = "0.32.1"
 typos = "1.49.0"
@@ -104,8 +104,8 @@ fnox = "1.32.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-codex = "0.146.1"
-antigravity-cli = "1.1.10"
+codex = "0.147.0"
+antigravity-cli = "1.1.11"
 
 [settings]
 experimental = true

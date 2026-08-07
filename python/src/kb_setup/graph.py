@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Build / update the knowledge graph from committed inputs.
 
 Reproducibility model: the graph is rebuildable from two committed things —

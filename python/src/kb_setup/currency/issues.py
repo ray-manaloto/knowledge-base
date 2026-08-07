@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """Step 4 — have any tracked issues or local watch items moved since last run?
 
 "Tracked" covers two kinds deliberately. Upstream GitHub issues are fetched and

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Raymond Manaloto
 """kb_setup — thin helpers for the knowledge-base graphify substrate.
 
 Logic-light by policy (zero-bash-logic): recurring workflows are mise tasks that
