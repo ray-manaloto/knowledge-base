@@ -4,8 +4,12 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: pyproject.toml `[dev]` floor `ruff>=0.11`; RESOLVED version from `uv run ruff --version`
-#   pinned here:    0.15.22
+#   version source: pyproject.toml `[dependency-groups] dev` EXACT pin `ruff==0.16.1`,
+#                   confirmed against `uv run ruff --version`. It was a floor
+#                   (`ruff>=0.11`) when this manifest was written; the group moved to
+#                   exact pins, so the old wording named a constraint that no longer
+#                   exists and would send the next bumper to the wrong line.
+#   pinned here:    0.16.1
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -20,7 +24,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/ruff
-ref = 0.15.22
-commit = 0177a7e0d2c4a3805afa1960f106d72878766cbc
+ref = 0.16.1
+commit = 80790b348b5188e7fc253665540f442c6ec7dd05
 kind = code
 added = 2026-08-02

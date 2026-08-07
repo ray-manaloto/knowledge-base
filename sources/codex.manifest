@@ -5,7 +5,12 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] codex`
-#   pinned here:    0.146.0
+#   pinned here:    0.147.0
+# Note the tag prefix: releases are `rust-v<version>`, so `ref` is NOT the bare
+# version the two lines above name. Also: this manifest read 0.146.0 while
+# mise.toml ran 0.146.1, i.e. it was ALREADY drifting before the 0.147.0 bump —
+# the invariant above is stated in 13 manifests and enforced by nothing, which
+# is filed separately rather than fixed silently here.
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -20,7 +25,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/openai/codex
-ref = rust-v0.146.0
-commit = be449751a978f02e5bbba886999662956c7f38f5
+ref = rust-v0.147.0
+commit = 3ed6f04f6bf8b7c46299d1cb1ff99c74ce21a51d
 kind = code
 added = 2026-08-02
