@@ -5,7 +5,10 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] uv`
-#   pinned here:    0.11.28
+#   pinned here:    0.12.2
+# Cross-checkable without trusting this file: `uv --version` prints the tag's own
+# short commit (`46ead6098`), so binary and pin verify against each other — the
+# same property ty has and ruff does not.
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -20,7 +23,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/uv
-ref = 0.11.28
-commit = ebf0f43d7c4267876fc256f5fce75982c33f4399
+ref = 0.12.2
+commit = 46ead609859e3c8f8572ca44e766fa003fbec43a
 kind = code
 added = 2026-08-02
