@@ -88,6 +88,10 @@ _PRUNED: frozenset[str] = frozenset(
 #: same reason: stopping at the first failure hides whether the named test failed.
 _PYTEST_FLAGS: tuple[str, ...] = ("-q", "--no-header", "-rf", "-p", "no:cacheprovider")
 
+#: Said in one place because `load_spec` and the runner both refuse this, and two
+#: wordings for one refusal is how a reader concludes they are two rules.
+_ESCAPES = "`file` resolves outside the repo: {f} - an arm may only mutate this project"
+
 
 class Verdict(Enum):
     """What one arm's run established. Only `is_pass` verdicts count as evidence."""
@@ -100,6 +104,7 @@ class Verdict(Enum):
     BROKEN_AMBIGUOUS = "PROBE BROKEN - pattern is not unique"
     BROKEN_NO_OP = "PROBE BROKEN - mutation was a no-op edit"
     BROKEN_WRONG_TEST = "PROBE BROKEN - red suite did not name the test"
+    BROKEN_ESCAPES_REPO = "PROBE BROKEN - target is outside the repo"
     WOULD_APPLY = "would apply"
 
     @property
@@ -322,6 +327,42 @@ def plan_mutation(source: str, arm: Arm) -> Planned:
     return Planned(mutated)
 
 
+def contained_path(repo_root: Path, rel: str) -> Path | None:
+    """Resolve `rel` under `repo_root`, or None when it escapes the repo.
+
+    `repo_root / rel` is NOT containment. `Path.__truediv__` discards the left
+    operand when the right is absolute, so `Path("/repo") / "/etc/hosts"` is
+    `/etc/hosts` — and this module WRITES to that path. `..` traversal and a
+    symlink pointing out of the tree are the other two constructions; all three
+    were built and executed against the first version by the cold lane, which
+    watched it mutate and restore a file with nothing to do with this repo.
+
+    `.resolve()` on BOTH sides is what closes the symlink case. A lexical
+    comparison would pass a symlink straight through — that exact substitution
+    was defended in a docstring here once and walked through the next round.
+    `do-not.md` #11 is the invariant: nothing outside this project is ours.
+    """
+    candidate = (repo_root / rel).resolve()
+    root = repo_root.resolve()
+    return candidate if candidate == root or candidate.is_relative_to(root) else None
+
+
+def _read_target(repo_root: Path, arm: Arm) -> tuple[Path | None, str | None, Row | None]:
+    """Resolve and read an arm's target; the Row is set when it cannot be scored.
+
+    `UnicodeDecodeError` is caught beside `OSError` because it is a `ValueError`
+    subclass, so an `except OSError` misses it entirely and a binary target
+    crashed the whole run with a traceback instead of taking a verdict.
+    """
+    path = contained_path(repo_root, arm.file)
+    if path is None:
+        return None, None, Row(arm, Verdict.BROKEN_ESCAPES_REPO, None, _ESCAPES.format(f=arm.file))
+    try:
+        return path, path.read_text(encoding="utf-8"), None
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, None, Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")
+
+
 def check(spec: Spec, repo_root: Path) -> tuple[Row, ...]:
     """Validate every arm against the files WITHOUT running the suite (`--dry-run`).
 
@@ -330,11 +371,9 @@ def check(spec: Spec, repo_root: Path) -> tuple[Row, ...]:
     """
     rows: list[Row] = []
     for arm in spec.arms:
-        path = repo_root / arm.file
-        try:
-            source = path.read_text(encoding="utf-8")
-        except OSError as exc:
-            rows.append(Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}"))
+        _, source, refusal = _read_target(repo_root, arm)
+        if refusal is not None or source is None:
+            rows.append(refusal or Row(arm, Verdict.BROKEN_ABSENT, None, "unreadable"))
             continue
         planned = plan_mutation(source, arm)
         if planned.text is None and planned.verdict is not None:
@@ -378,11 +417,9 @@ def _score(arm: Arm, rc: int, out: str) -> Row:
 
 def _run_arm(arm: Arm, repo_root: Path, suite: Callable[[], tuple[int, str]]) -> Row:
     """Apply one arm, run the suite, restore the file, and score the result."""
-    path = repo_root / arm.file
-    try:
-        original = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")
+    path, original, refusal = _read_target(repo_root, arm)
+    if refusal is not None or path is None or original is None:
+        return refusal or Row(arm, Verdict.BROKEN_ABSENT, None, "unreadable")
     planned = plan_mutation(original, arm)
     if planned.text is None:
         if planned.verdict is None:
@@ -506,16 +543,22 @@ def _arm_from_table(index: int, table: object, errors: list[str]) -> Arm | None:
     )
 
 
-def load_spec(path: Path) -> Spec:
+def load_spec(path: Path, repo_root: Path) -> Spec:
     """Parse and VALIDATE a TOML arms spec; raises `SpecError` listing every problem.
 
     Validation is total rather than first-failure: a spec is authored in one
     sitting, and reporting one error per run is how a stale spec takes six runs
     to fix.
+
+    `repo_root` is here so containment is decided BEFORE the baseline runs. The
+    runner refuses an escaping arm too, and that is not a duplicate guard masking
+    this one: `run()` also accepts hand-built `Spec` objects that never pass
+    through here, so the two cover different entry points and each is armed
+    separately.
     """
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
         raise SpecError(f"{path}: {exc}") from exc
 
     errors: list[str] = []
@@ -534,6 +577,9 @@ def load_spec(path: Path) -> Spec:
         if arm.id in seen:
             errors.append(f"duplicate arm id {arm.id!r} - ids name rows in the report")
         seen.add(arm.id)
+    errors.extend(
+        _ESCAPES.format(f=arm.file) for arm in arms if contained_path(repo_root, arm.file) is None
+    )
     if arms and not any(arm.control for arm in arms):
         errors.append(
             "no `control = true` arm - a harness broken in any uniform way reads as "
@@ -552,7 +598,7 @@ def main(argv: list[str], repo_root: Path) -> int:
         print("usage: kb-setup arms <spec.toml> [--dry-run]")
         return 2
     try:
-        spec = load_spec(Path(args[0]))
+        spec = load_spec(Path(args[0]), repo_root)
     except SpecError as exc:
         print(f"SPEC REFUSED: {exc}")
         return 2

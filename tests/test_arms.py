@@ -342,6 +342,32 @@ def test_the_file_is_restored_after_every_arm(tmp_path: Path) -> None:
     assert module.read_text(encoding="utf-8") == before
 
 
+def test_a_restore_that_did_not_take_raises_rather_than_returning(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A SURVIVING mutant the cold lane found: deleting `_restore`'s verify changed nothing.
+
+    Nothing in the suite exercised a write that raises no exception and still
+    leaves the wrong bytes. The stub IS the failure being modelled — a write that
+    silently does not take (a full or read-only-by-another-process filesystem, or
+    a second writer between the write and the read) — not a stand-in for the code
+    under test.
+    """
+    target = tmp_path / "victim.py"
+    target.write_text("MUTATED\n", encoding="utf-8")
+    monkeypatch.setattr(Path, "write_text", lambda *_a, **_k: 0)
+    with pytest.raises(RuntimeError, match="failed to restore"):
+        arms._restore(target, "ORIGINAL\n")
+
+
+def test_a_restore_that_took_returns_quietly(tmp_path: Path) -> None:
+    """The control for the row above: the same call on a working filesystem is silent."""
+    target = tmp_path / "victim.py"
+    target.write_text("MUTATED\n", encoding="utf-8")
+    arms._restore(target, "ORIGINAL\n")
+    assert target.read_text(encoding="utf-8") == "ORIGINAL\n"
+
+
 def test_the_file_is_restored_even_when_the_suite_raises(tmp_path: Path) -> None:
     module = _victim(tmp_path)
     before = module.read_text(encoding="utf-8")
@@ -352,6 +378,95 @@ def test_the_file_is_restored_even_when_the_suite_raises(tmp_path: Path) -> None
     with pytest.raises(KeyboardInterrupt):
         arms._run_arm(_OTHER, tmp_path, explode)
     assert module.read_text(encoding="utf-8") == before
+
+
+# --------------------------------------------------------------------------- #
+# containment — an arm may only mutate this project
+# --------------------------------------------------------------------------- #
+
+
+def test_an_absolute_file_escapes_the_repo_and_is_refused(tmp_path: Path) -> None:
+    """`Path("/repo") / "/etc/hosts"` is `/etc/hosts`, and this module WRITES there."""
+    outside = tmp_path.parent / "outside_the_repo.txt"
+    outside.write_text("canary\n", encoding="utf-8")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    arm = arms.Arm("A1", str(outside), "canary", "MUTATED", test="test_x")
+    row = arms._run_arm(arm, repo, _fake_suite([(1, "FAILED test_x")]))
+    assert row.verdict is arms.Verdict.BROKEN_ESCAPES_REPO
+    assert outside.read_text(encoding="utf-8") == "canary\n", "it must not have been touched"
+
+
+def test_a_traversal_out_of_the_repo_is_refused(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (tmp_path / "sibling.txt").write_text("canary\n", encoding="utf-8")
+    arm = arms.Arm("A1", "../sibling.txt", "canary", "MUTATED", test="test_x")
+    assert arms._run_arm(arm, repo, _fake_suite([(1, "")])).verdict is (
+        arms.Verdict.BROKEN_ESCAPES_REPO
+    )
+
+
+def test_a_symlink_pointing_out_of_the_repo_is_refused(tmp_path: Path) -> None:
+    """Lexical containment would pass this straight through; `.resolve()` is why it does not."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("canary\n", encoding="utf-8")
+    (repo / "looks_local.py").symlink_to(outside)
+    arm = arms.Arm("A1", "looks_local.py", "canary", "MUTATED", test="test_x")
+    row = arms._run_arm(arm, repo, _fake_suite([(1, "")]))
+    assert row.verdict is arms.Verdict.BROKEN_ESCAPES_REPO
+    assert outside.read_text(encoding="utf-8") == "canary\n"
+
+
+def test_an_ordinary_in_repo_file_still_resolves(tmp_path: Path) -> None:
+    """The control: containment must not refuse the normal case it exists to allow."""
+    _victim(tmp_path)
+    assert arms.contained_path(tmp_path, "victim.py") == (tmp_path / "victim.py").resolve()
+    assert arms._run_arm(_OTHER, tmp_path, _fake_suite([(1, "test_other_is_one")])).verdict is (
+        arms.Verdict.DIED
+    )
+
+
+def test_dry_run_refuses_an_escaping_arm_too(tmp_path: Path) -> None:
+    """`--dry-run` reads the target, so it needs the same boundary as the real run."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (tmp_path / "outside.txt").write_text("canary\n", encoding="utf-8")
+    spec = arms.Spec(("t.py",), (arms.Arm("A1", "../outside.txt", "canary", "X", test="t"),))
+    assert arms.check(spec, repo)[0].verdict is arms.Verdict.BROKEN_ESCAPES_REPO
+
+
+def test_a_spec_naming_a_file_outside_the_repo_is_refused_before_anything_runs(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    body = _VALID.replace('file = "victim.py"', 'file = "/etc/hosts"', 1)
+    with pytest.raises(arms.SpecError, match="resolves outside the repo"):
+        arms.load_spec(_write_spec(tmp_path, body), repo)
+
+
+# --------------------------------------------------------------------------- #
+# unreadable targets — a ValueError is not an OSError
+# --------------------------------------------------------------------------- #
+
+
+def test_a_non_utf8_target_takes_a_verdict_instead_of_raising(tmp_path: Path) -> None:
+    """`UnicodeDecodeError` is a `ValueError`, so `except OSError` missed it entirely."""
+    (tmp_path / "binary.py").write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe")
+    arm = arms.Arm("A1", "binary.py", "PNG", "JPG", test="test_x")
+    row = arms._run_arm(arm, tmp_path, _fake_suite([(1, "")]))
+    assert row.verdict is arms.Verdict.BROKEN_ABSENT
+    assert "cannot read" in row.detail
+
+
+def test_a_non_utf8_spec_is_refused_rather_than_raising(tmp_path: Path) -> None:
+    path = tmp_path / "spec.toml"
+    path.write_bytes(b'suites = ["t.py"]\n# \xff\xfe\n')
+    with pytest.raises(arms.SpecError):
+        arms.load_spec(path, tmp_path)
 
 
 # --------------------------------------------------------------------------- #
@@ -379,7 +494,7 @@ _VALID = """
 
 
 def test_a_valid_spec_loads(tmp_path: Path) -> None:
-    spec = arms.load_spec(_write_spec(tmp_path, _VALID))
+    spec = arms.load_spec(_write_spec(tmp_path, _VALID), tmp_path)
     assert spec.suites == ("tests/test_victim.py",)
     assert [arm.id for arm in spec.arms] == ["A0", "A1"]
     assert spec.arms[0].control is True
@@ -404,38 +519,38 @@ def test_a_literal_string_keeps_backslashes_and_quotes_untouched(tmp_path: Path)
         new = '''{fragment}  # control'''
         """,
     )
-    assert arms.load_spec(path).arms[0].old == fragment
+    assert arms.load_spec(path, tmp_path).arms[0].old == fragment
 
 
 def test_a_spec_with_no_control_arm_is_refused(tmp_path: Path) -> None:
     body = _VALID.replace("control = true", 'test = "test_value_is_one"', 1)
     with pytest.raises(arms.SpecError, match="no `control = true` arm"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_a_mutation_arm_with_no_test_is_refused(tmp_path: Path) -> None:
     body = _VALID.replace('test = "test_other_is_one"', "", 1)
     with pytest.raises(arms.SpecError, match="`test` is required"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_a_control_arm_naming_a_test_is_refused(tmp_path: Path) -> None:
     body = _VALID.replace("control = true", 'control = true\ntest = "test_value_is_one"', 1)
     with pytest.raises(arms.SpecError, match="must not name a `test`"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_duplicate_arm_ids_are_refused(tmp_path: Path) -> None:
     body = _VALID.replace('id = "A1"', 'id = "A0"', 1)
     with pytest.raises(arms.SpecError, match="duplicate arm id"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_a_mistyped_key_is_refused_rather_than_ignored(tmp_path: Path) -> None:
     """A typo'd `cntrl` would silently demote a control arm to an ordinary one."""
     body = _VALID.replace("control = true", "cntrl = true", 1)
     with pytest.raises(arms.SpecError, match="unknown key"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_every_problem_is_reported_in_one_pass(tmp_path: Path) -> None:
@@ -444,7 +559,7 @@ def test_every_problem_is_reported_in_one_pass(tmp_path: Path) -> None:
         'test = "test_other_is_one"', "", 1
     )
     with pytest.raises(arms.SpecError) as excinfo:
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
     message = str(excinfo.value)
     assert "`test` is required" in message
     assert "no `control = true` arm" in message
@@ -461,7 +576,7 @@ def test_a_spec_whose_arms_all_fail_to_parse_reports_only_those_failures(tmp_pat
     """
     body = _VALID.replace("control = true", "", 1).replace('test = "test_other_is_one"', "", 1)
     with pytest.raises(arms.SpecError) as excinfo:
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
     message = str(excinfo.value)
     assert message.count("`test` is required") == 2
     assert "no `control = true` arm" not in message
@@ -471,23 +586,23 @@ def test_an_arm_missing_a_required_key_is_refused_and_names_it(tmp_path: Path) -
     """Found by a survivor: the first sweep's arm for this line mutated a branch no test reached."""
     body = _VALID.replace('file = "victim.py"', "", 1)
     with pytest.raises(arms.SpecError, match="missing or non-string `file`"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_a_spec_with_no_arms_is_refused(tmp_path: Path) -> None:
     with pytest.raises(arms.SpecError, match=r"\[\[arm\]\]"):
-        arms.load_spec(_write_spec(tmp_path, 'suites = ["t.py"]\n'))
+        arms.load_spec(_write_spec(tmp_path, 'suites = ["t.py"]\n'), tmp_path)
 
 
 def test_a_spec_with_no_suites_is_refused(tmp_path: Path) -> None:
     body = _VALID.replace('suites = ["tests/test_victim.py"]', "", 1)
     with pytest.raises(arms.SpecError, match="`suites`"):
-        arms.load_spec(_write_spec(tmp_path, body))
+        arms.load_spec(_write_spec(tmp_path, body), tmp_path)
 
 
 def test_unparsable_toml_is_a_spec_error_not_a_traceback(tmp_path: Path) -> None:
     with pytest.raises(arms.SpecError):
-        arms.load_spec(_write_spec(tmp_path, "suites = [\n"))
+        arms.load_spec(_write_spec(tmp_path, "suites = [\n"), tmp_path)
 
 
 # --------------------------------------------------------------------------- #

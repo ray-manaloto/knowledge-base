@@ -18,16 +18,23 @@ mise run kb-arms -- docs/research/reports/2026-08-07-arms-module-arms.toml --dry
 
 ## Result
 
-**Final sweep: 29 of 29 real arms DIED with the NAMED test failing, `A0` a
+**Final sweep: 35 of 35 real arms DIED with the NAMED test failing, `A0` a
 declared no-op CONTROL that held, baseline green, restored green.**
 
-Three sweeps were needed, and the two that were not clean are the report.
+Four sweeps were needed, and the ones that were not clean are the report.
 
 | sweep | arms | died | survived | what changed after |
 |---|---|---|---|---|
 | 1 | 28 | 25 | `A2`, `A12`, `A24` | one real gap, one inert mutation, one probe defect — below |
 | 2 | 29 | 28 | `A30` | the harness was setting the condition it was measuring |
-| 3 | 29 | **29** | none | — |
+| 3 | 29 | **29** | none | cold review round 1 → 1 P1 + 2 P2 |
+| 4 | 35 | **35** | none | six added arms REVERT the review's own fixes |
+
+Sweep 3 was clean and the cold lane then found a P1 in the same code. That is
+the fourth clean sweep in this repo immediately preceding a real defect, and it
+is worth stating plainly: **a full arm score is a statement about the tests, and
+says nothing about whether the module is safe.** No arm asks "may this write
+there at all?"
 
 ## Sweep 0: the harness refused to run at all, and was right to
 
@@ -125,6 +132,62 @@ count of a purge that worked — **the mitigation lying about itself**, which is
 the one failure this module cannot absorb, since every later verdict rests on it.
 
 It now checks the directory is gone and raises if it is not (`A29`, dies).
+
+## Sweep 3 was clean; the cold lane then found a P1 in the same code
+
+Round 1 of the `kb-review` cold lane (`fable-orchestrator:codex-reviewer`,
+OpenAI, MUTATING brief) over `f9cb5d1571978d` returned **3 findings — 1 P1, 2 P2
+— every one verified by execution rather than by reading**. Full report:
+`.agent/kb/review/reports/review-f9cb5d1571978de7eb3f33dc7112e443135e9550-cold.md`.
+
+### P1 — an arm could mutate any file on disk
+
+`path = repo_root / arm.file` is not containment. `Path.__truediv__` discards
+the left operand when the right is absolute, so `Path("/repo") / "/etc/hosts"`
+is `/etc/hosts` — **and this module writes to that path.** The lane built three
+constructions and ran them for real: an absolute path, a `../` traversal, and a
+symlink checked in under the repo. It caught the harness mid-run with a file
+*outside this repo* holding `MUTATED BY ARMS`, restored afterwards, with
+`git status` clean throughout — because nothing outside the tree is tracked.
+
+That is `do-not.md` #11 ("Do NOT edit anything outside this project") with a
+keyboard, and the module's own framing made it worse: "arms are data, never
+code" invites reviewing a spec more loosely than code, while a `file` value in
+that data reached anywhere on disk.
+
+Fixed with `contained_path()`, which resolves **both** sides before comparing.
+Lexical containment would have passed the symlink straight through — the exact
+substitution that was defended in a docstring in this repo once and walked
+through by a symlink the next round. A new `BROKEN_ESCAPES_REPO` verdict covers
+the runner, and `load_spec` now refuses an escaping spec before the baseline
+runs. Those are two entry points rather than two guards on one path: `run()`
+accepts hand-built `Spec` objects that never pass through the loader, so each is
+separately reachable and separately armed (`A31`, `A36`).
+
+### P2 — `UnicodeDecodeError` is a `ValueError`, not an `OSError`
+
+Three `except OSError` handlers therefore missed it, and a non-UTF-8 target or
+spec crashed the whole run with a traceback instead of taking the PROBE BROKEN
+verdict the docstring promises. Verified at all three sites by pointing an arm at
+a PNG-header blob and by feeding the loader raw `0xff 0xfe`. Now caught as
+`(OSError, UnicodeDecodeError)`.
+
+### P2 — `_restore`'s self-check was a verified surviving mutant
+
+The lane deleted the verify-and-raise, leaving only the `write_text`, and **all
+38 tests still passed**. Nothing exercised a write that raises no exception and
+still leaves the wrong bytes. Now tested (`A35`) by stubbing `write_text` to a
+no-op — the stub *is* the failure being modelled (a write that silently does not
+take, or a second writer between the write and the read), not a stand-in for the
+code under test.
+
+### And the harness caught its own arms going stale
+
+Those fixes moved the lines `A22` and `A23` were pointed at, and the next
+`--dry-run` reported both as **`PROBE BROKEN - pattern not found`** rather than
+scoring them. Protection 2, firing on live input rather than on a fixture, in
+the first hour of the module's life. Both were re-pointed; `A22` and `A34` now
+mutate the same `except` clause for two different reasons.
 
 ## What this sweep does NOT say
 

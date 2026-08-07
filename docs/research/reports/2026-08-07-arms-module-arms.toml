@@ -200,19 +200,25 @@ new = '''    if False:'''
 test = "test_a_spec_with_no_arms_is_refused"
 meaning = "an empty spec is accepted and reports nothing wrong"
 
+# A22 went STALE when the cold-review fix widened this except clause, and the
+# harness reported `PROBE BROKEN - pattern not found` rather than scoring it.
+# Re-pointed to drop ONLY the TOML arm of the tuple, so A22 and A34 mutate the
+# same line for two different reasons and neither masks the other.
 [[arm]]
 id = "A22 toml parse error"
 file = "python/src/kb_setup/arms.py"
-old = '''    except (OSError, tomllib.TOMLDecodeError) as exc:'''
-new = '''    except OSError as exc:'''
+old = '''    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
+        raise SpecError(f"{path}: {exc}") from exc'''
+new = '''    except (OSError, UnicodeDecodeError) as exc:
+        raise SpecError(f"{path}: {exc}") from exc'''
 test = "test_unparsable_toml_is_a_spec_error_not_a_traceback"
 meaning = "a malformed spec raises a traceback instead of a refusal"
 
 [[arm]]
 id = "A23 known key set"
 file = "python/src/kb_setup/arms.py"
-old = '''_ARM_KEYS: frozenset[str] = frozenset({"id", "file", "old", "new", "test", "meaning", "control"})'''
-new = '''_ARM_KEYS: frozenset[str] = frozenset({"id", "file", "old", "new", "test", "control"})'''
+old = '''_ARM_KEYS: frozenset[str] = frozenset({*_REQUIRED_ARM_KEYS, "test", "meaning", "control"})'''
+new = '''_ARM_KEYS: frozenset[str] = frozenset({*_REQUIRED_ARM_KEYS, "test", "control"})'''
 test = "test_a_valid_spec_loads"
 meaning = "a documented key is rejected as unknown"
 
@@ -293,3 +299,63 @@ new = '''        print("usage: kb-setup arms <spec.toml> [--dry-run]")
         return 0'''
 test = "test_the_cli_usage_error_exits_2"
 meaning = "a mis-invocation reports success"
+
+# --- arms for the COLD-REVIEW fixes (round 1: one P1, two P2) ---------------- #
+# Each of these REVERTS one fix, per `kb-review` § "Arm your own fixes" rule 1:
+# a fix is the least-reviewed code in the diff and a test written beside it
+# routinely cannot fail.
+
+[[arm]]
+id = "A31 containment"
+file = "python/src/kb_setup/arms.py"
+old = '''    return candidate if candidate == root or candidate.is_relative_to(root) else None'''
+new = '''    return candidate'''
+test = "test_an_absolute_file_escapes_the_repo_and_is_refused"
+meaning = "an arm can mutate ANY file on disk - `Path(a) / b` discards `a` when `b` is absolute"
+
+[[arm]]
+id = "A32 resolve not lexical"
+file = "python/src/kb_setup/arms.py"
+old = '''    candidate = (repo_root / rel).resolve()
+    root = repo_root.resolve()'''
+new = '''    candidate = Path(os.path.normpath(repo_root / rel))
+    root = Path(os.path.normpath(repo_root))'''
+test = "test_a_symlink_pointing_out_of_the_repo_is_refused"
+meaning = "a symlink inside the repo walks straight through lexical containment"
+
+[[arm]]
+id = "A33 target encoding"
+file = "python/src/kb_setup/arms.py"
+old = '''    except (OSError, UnicodeDecodeError) as exc:
+        return None, None, Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")'''
+new = '''    except OSError as exc:
+        return None, None, Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")'''
+test = "test_a_non_utf8_target_takes_a_verdict_instead_of_raising"
+meaning = "a binary target crashes the run - UnicodeDecodeError is a ValueError, not an OSError"
+
+[[arm]]
+id = "A34 spec encoding"
+file = "python/src/kb_setup/arms.py"
+old = '''    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:'''
+new = '''    except (OSError, tomllib.TOMLDecodeError) as exc:'''
+test = "test_a_non_utf8_spec_is_refused_rather_than_raising"
+meaning = "a non-UTF-8 spec raises a traceback instead of SPEC REFUSED"
+
+[[arm]]
+id = "A35 restore verify"
+file = "python/src/kb_setup/arms.py"
+old = '''    if path.read_text(encoding="utf-8") != original:'''
+new = '''    if False:'''
+test = "test_a_restore_that_did_not_take_raises_rather_than_returning"
+meaning = "a write that silently did not take leaves the tree dirty and says nothing"
+
+[[arm]]
+id = "A36 load-time containment"
+file = "python/src/kb_setup/arms.py"
+old = '''    errors.extend(
+        _ESCAPES.format(f=arm.file) for arm in arms if contained_path(repo_root, arm.file) is None
+    )
+'''
+new = ''''''
+test = "test_a_spec_naming_a_file_outside_the_repo_is_refused_before_anything_runs"
+meaning = "an escaping spec is only caught at use time, after the baseline has run"
