@@ -347,20 +347,27 @@ def contained_path(repo_root: Path, rel: str) -> Path | None:
     return candidate if candidate == root or candidate.is_relative_to(root) else None
 
 
-def _read_target(repo_root: Path, arm: Arm) -> tuple[Path | None, str | None, Row | None]:
-    """Resolve and read an arm's target; the Row is set when it cannot be scored.
+def _read_target(repo_root: Path, arm: Arm) -> tuple[Path, str] | Row:
+    """Resolve and read an arm's target, or return the Row saying why it cannot be scored.
 
     `UnicodeDecodeError` is caught beside `OSError` because it is a `ValueError`
     subclass, so an `except OSError` misses it entirely and a binary target
     crashed the whole run with a traceback instead of taking a verdict.
+
+    The return type is a UNION rather than a three-tuple of optionals. The
+    tuple version forced both callers to carry a `source is None and refusal is
+    None` fallback that no input could reach — dead defensive code, and the kind
+    an arm can never kill, so a sweep would score it as covered forever. An
+    annotation admitting a state the function cannot produce is what makes a
+    caller write a branch for it (cold lane round 2, P3).
     """
     path = contained_path(repo_root, arm.file)
     if path is None:
-        return None, None, Row(arm, Verdict.BROKEN_ESCAPES_REPO, None, _ESCAPES.format(f=arm.file))
+        return Row(arm, Verdict.BROKEN_ESCAPES_REPO, None, _ESCAPES.format(f=arm.file))
     try:
-        return path, path.read_text(encoding="utf-8"), None
+        return path, path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
-        return None, None, Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")
+        return Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")
 
 
 def check(spec: Spec, repo_root: Path) -> tuple[Row, ...]:
@@ -371,11 +378,11 @@ def check(spec: Spec, repo_root: Path) -> tuple[Row, ...]:
     """
     rows: list[Row] = []
     for arm in spec.arms:
-        _, source, refusal = _read_target(repo_root, arm)
-        if refusal is not None or source is None:
-            rows.append(refusal or Row(arm, Verdict.BROKEN_ABSENT, None, "unreadable"))
+        got = _read_target(repo_root, arm)
+        if isinstance(got, Row):
+            rows.append(got)
             continue
-        planned = plan_mutation(source, arm)
+        planned = plan_mutation(got[1], arm)
         if planned.text is None and planned.verdict is not None:
             rows.append(Row(arm, planned.verdict, None, planned.detail))
         else:
@@ -417,9 +424,10 @@ def _score(arm: Arm, rc: int, out: str) -> Row:
 
 def _run_arm(arm: Arm, repo_root: Path, suite: Callable[[], tuple[int, str]]) -> Row:
     """Apply one arm, run the suite, restore the file, and score the result."""
-    path, original, refusal = _read_target(repo_root, arm)
-    if refusal is not None or path is None or original is None:
-        return refusal or Row(arm, Verdict.BROKEN_ABSENT, None, "unreadable")
+    got = _read_target(repo_root, arm)
+    if isinstance(got, Row):
+        return got
+    path, original = got
     planned = plan_mutation(original, arm)
     if planned.text is None:
         if planned.verdict is None:

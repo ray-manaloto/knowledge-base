@@ -21,7 +21,7 @@ mise run kb-arms -- docs/research/reports/2026-08-07-arms-module-arms.toml --dry
 **Final sweep: 35 of 35 real arms DIED with the NAMED test failing, `A0` a
 declared no-op CONTROL that held, baseline green, restored green.**
 
-Four sweeps were needed, and the ones that were not clean are the report.
+Five sweeps were needed, and the ones that were not clean are the report.
 
 | sweep | arms | died | survived | what changed after |
 |---|---|---|---|---|
@@ -29,6 +29,7 @@ Four sweeps were needed, and the ones that were not clean are the report.
 | 2 | 29 | 28 | `A30` | the harness was setting the condition it was measuring |
 | 3 | 29 | **29** | none | cold review round 1 → 1 P1 + 2 P2 |
 | 4 | 35 | **35** | none | six added arms REVERT the review's own fixes |
+| 5 | 35 | **35** | none | after round 2's P3 fix — final |
 
 Sweep 3 was clean and the cold lane then found a P1 in the same code. That is
 the fourth clean sweep in this repo immediately preceding a real defect, and it
@@ -188,6 +189,36 @@ Those fixes moved the lines `A22` and `A23` were pointed at, and the next
 scoring them. Protection 2, firing on live input rather than on a fixture, in
 the first hour of the module's life. Both were re-pointed; `A22` and `A34` now
 mutate the same `except` clause for two different reasons.
+
+## Round 2 — 0 blocking, and the P3 is the same lesson twice
+
+Round 2 over `4f6e8a8d2a12` found **no P1 or P2**, and the reason it is worth
+reading is what it *cleared*: it constructed every legitimate case the new
+containment guard could have wrongly refused — a repo root reached through a
+symlink (the real macOS `/tmp` → `/private/tmp` case), redundant `./` segments,
+a nonexistent parent, an in-repo symlinked subdirectory — and confirmed the
+guard allows all of them while refusing every escape. It also ran the escaping
+spec end to end through `mise run kb-arms` and checked the task propagates rc=2.
+The mirror of a P1 is a guard that over-corrects, and this one does not.
+
+**P3 (fixed): a dead branch no arm could ever kill.** `_read_target` returned
+`tuple[Path | None, str | None, Row | None]`, so both callers carried a
+`source is None and refusal is None` fallback that no input could reach. This is
+the `bool(self.rows)` finding again, from the opposite direction: there the
+guard was implied by its neighbour, here the **annotation admitted a state the
+function cannot produce**, and the caller wrote a branch for it. A sweep scores
+such a branch as covered forever. Fixed by narrowing the return to
+`tuple[Path, str] | Row`; both fallbacks are gone.
+
+**P3 (accepted unfixed): case-insensitive filesystems.** `contained_path(repo,
+"SUB/FILE.TXT")` is accepted when the tracked file is `sub/file.txt`, because
+`Path.resolve()` does not canonicalise case. It is not an escape — the resolved
+path is still inside the repo — and the only consequence is that a row can
+display different casing than the tracked path.
+
+That fix moved a line a third arm pointed at, and the stale detector fired for
+the third time in this round. **All three stale reports were true and none was
+scored**, which is the property the module exists for.
 
 ## What this sweep does NOT say
 

@@ -326,10 +326,8 @@ meaning = "a symlink inside the repo walks straight through lexical containment"
 [[arm]]
 id = "A33 target encoding"
 file = "python/src/kb_setup/arms.py"
-old = '''    except (OSError, UnicodeDecodeError) as exc:
-        return None, None, Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")'''
-new = '''    except OSError as exc:
-        return None, None, Row(arm, Verdict.BROKEN_ABSENT, None, f"cannot read {arm.file}: {exc}")'''
+old = '''    except (OSError, UnicodeDecodeError) as exc:'''
+new = '''    except OSError as exc:'''
 test = "test_a_non_utf8_target_takes_a_verdict_instead_of_raising"
 meaning = "a binary target crashes the run - UnicodeDecodeError is a ValueError, not an OSError"
 
