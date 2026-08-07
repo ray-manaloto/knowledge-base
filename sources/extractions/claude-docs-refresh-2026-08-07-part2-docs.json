@@ -310,7 +310,7 @@
    "captured_at": "2026-08-07",
    "author": null,
    "contributor": null,
-   "rationale": "`/usage` breaks down what drives your plan limits by skill, subagent, plugin and MCP server — attribution rather than a single total. Shipped Week 21 (and shown again in Week 16)."
+   "rationale": "`/usage` breaks down what drives your plan limits by skill, subagent, plugin and MCP server — attribution rather than a single total. Shipped Week 21; `/usage` itself had already appeared in Week 16."
   },
   {
    "id": "ccwhatsnew_w20",
@@ -1198,7 +1198,7 @@
    "captured_at": "2026-08-07",
    "author": null,
    "contributor": null,
-   "rationale": "If `channelsEnabled` is disabled or unset, the MCP server still connects and its tools work, but channel messages do not arrive. A startup warning tells the user to have an admin enable the setting — the only signal distinguishing 'disabled' from 'nobody messaged me'."
+   "rationale": "Where the setting governs — claude.ai Team and Enterprise, and Console organizations that deploy managed settings — if `channelsEnabled` is disabled or unset, the MCP server still connects and its tools work, but channel messages do not arrive. A startup warning tells the user to have an admin enable the setting — the only signal distinguishing 'disabled' from 'nobody messaged me'."
   },
   {
    "id": "ccchannels_allowed_channel_plugins",
@@ -1222,7 +1222,7 @@
    "captured_at": "2026-08-07",
    "author": null,
    "contributor": null,
-   "rationale": "An empty array blocks every allowlisted plugin, but `--dangerously-load-development-channels` can still bypass that block for local testing. To block channels entirely INCLUDING the development flag, leave `channelsEnabled` unset instead. The intuitive lockdown is the weaker one."
+   "rationale": "An empty array blocks every allowlisted plugin, but `--dangerously-load-development-channels` can still bypass that block for local testing. To block channels entirely INCLUDING the development flag, leave `channelsEnabled` unset instead — in an organization where the setting governs; under Console API-key auth with no managed settings channels are permitted by default. The intuitive lockdown is the weaker one."
   },
   {
    "id": "ccchannels_dev_flag",
@@ -1498,7 +1498,7 @@
    "captured_at": "2026-08-07",
    "author": null,
    "contributor": null,
-   "rationale": "A workflow started by keyword runs inside the session's EXISTING permission mode, and its agents' tool calls receive the same permission checks and sandboxing as any other tool call. Opting into a workflow is not opting into looser permissions."
+   "rationale": "A workflow started by keyword runs inside the session's EXISTING permission mode, and its agents' tool calls receive the same permission checks and sandboxing as any other tool call. Opting into a workflow is not opting into looser permissions. The page ALSO states that workflow subagents always run in `acceptEdits` (workflows.md:179), so 'the same permission checks' holds for shell, web and MCP calls outside the allowlist — which still prompt mid-run — but NOT for file edits, which are auto-approved. Both statements are the page's own."
   },
   {
    "id": "ccworkflows_keyword_human_origin_only",
@@ -2294,7 +2294,7 @@
   {
    "source": "ccwhatsnew_ultrareview_cli",
    "target": "ccwhatsnew_w17",
-   "relation": "requires",
+   "relation": "builds_on",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_whats-new.md",
@@ -2357,7 +2357,7 @@
   {
    "source": "ccwhatsnew_computer_use_cli",
    "target": "ccwhatsnew_w13",
-   "relation": "requires",
+   "relation": "builds_on",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_whats-new.md",
@@ -2393,7 +2393,7 @@
   {
    "source": "ccwhatsnew_dynamic_workflows_launch",
    "target": "ccwhatsnew_nested_subagents",
-   "relation": "requires",
+   "relation": "precedes",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
    "source_file": "code.claude.com_docs_en_whats-new.md",
@@ -2474,7 +2474,7 @@
   {
    "source": "ccgoalpg_does_not_change_permissions",
    "target": "ccgoalpg_complements_auto_mode",
-   "relation": "requires",
+   "relation": "rationale_for",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_goal.md",
@@ -2580,9 +2580,9 @@
    "weight": 1
   },
   {
-   "source": "ccgoalpg_requirements",
-   "target": "ccgoalpg_is_a_stop_hook",
-   "relation": "requires",
+   "source": "ccgoalpg_is_a_stop_hook",
+   "target": "ccgoalpg_requirements",
+   "relation": "rationale_for",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_goal.md",
@@ -3059,6 +3059,15 @@
   {
    "source": "ccchannels_auth_requirements",
    "target": "ccchannels_channels_enabled",
+   "relation": "qualifies",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1,
+   "source_file": "code.claude.com_docs_en_channels.md",
+   "weight": 1
+  },
+  {
+   "source": "ccchannels_supported_set",
+   "target": "ccchannels_bun_requirement",
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3066,17 +3075,8 @@
    "weight": 1
   },
   {
-   "source": "ccchannels_bun_requirement",
-   "target": "ccchannels_supported_set",
-   "relation": "requires",
-   "confidence": "EXTRACTED",
-   "confidence_score": 1,
-   "source_file": "code.claude.com_docs_en_channels.md",
-   "weight": 1
-  },
-  {
-   "source": "ccchannels_bun_requirement",
-   "target": "ccchannels_fakechat",
+   "source": "ccchannels_fakechat",
+   "target": "ccchannels_bun_requirement",
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3102,8 +3102,8 @@
    "weight": 1
   },
   {
-   "source": "ccchannels_discord_message_content_intent",
-   "target": "ccchannels_discord",
+   "source": "ccchannels_discord",
+   "target": "ccchannels_discord_message_content_intent",
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3111,8 +3111,8 @@
    "weight": 1
   },
   {
-   "source": "ccchannels_discord_oauth_permissions",
-   "target": "ccchannels_discord",
+   "source": "ccchannels_discord",
+   "target": "ccchannels_discord_oauth_permissions",
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3120,8 +3120,8 @@
    "weight": 1
   },
   {
-   "source": "ccchannels_imessage_full_disk_access",
-   "target": "ccchannels_imessage",
+   "source": "ccchannels_imessage",
+   "target": "ccchannels_imessage_full_disk_access",
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3140,7 +3140,7 @@
   {
    "source": "ccchannels_bot_replies_need_active_channel",
    "target": "ccchannels_sender_allowlist",
-   "relation": "part_of",
+   "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_channels.md",
@@ -3383,7 +3383,7 @@
   {
    "source": "ccworkflows_args",
    "target": "ccworkflows_save_as_command",
-   "relation": "enables",
+   "relation": "complements",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_workflows.md",
@@ -3687,8 +3687,8 @@
    "weight": 1
   },
   {
-   "source": "ccworkflows_save_locations",
-   "target": "ccworkflows_monorepo_resolution",
+   "source": "ccworkflows_monorepo_resolution",
+   "target": "ccworkflows_save_locations",
    "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3723,9 +3723,9 @@
    "weight": 1
   },
   {
-   "source": "ccworkflows_agents_not_the_script_touch_the_disk",
-   "target": "ccworkflows_subagents_always_acceptedits",
-   "relation": "requires",
+   "source": "ccworkflows_subagents_always_acceptedits",
+   "target": "ccworkflows_agents_not_the_script_touch_the_disk",
+   "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_workflows.md",

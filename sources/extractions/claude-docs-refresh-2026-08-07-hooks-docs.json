@@ -22,7 +22,7 @@
    "captured_at": "2026-08-07",
    "author": "Anthropic",
    "contributor": null,
-   "rationale": "Once per SESSION (`SessionStart`, `SessionEnd`); once per TURN (`UserPromptSubmit`, `Stop`, `StopFailure`); and on every TOOL CALL inside the agentic loop (`PreToolUse`, `PostToolUse`) — except `EndConversation` calls, which skip both tool events."
+   "rationale": "Once per SESSION (`SessionStart`, `SessionEnd`); once per TURN (`UserPromptSubmit`, `Stop`, `StopFailure`); and on every TOOL CALL inside the agentic loop (`PreToolUse`, `PostToolUse`) — except `EndConversation` calls, which skip both tool events. The page states this taxonomy in its overview and places only these events in a cadence; many other documented events (`Notification`, `SubagentStart`, `PreCompact`, `ConfigChange`, `InstructionsLoaded`, the directory and file events) are not assigned to one."
   },
   {
    "id": "cchooks_three_nesting_levels",
@@ -46,7 +46,7 @@
    "captured_at": "2026-08-07",
    "author": "Anthropic",
    "contributor": null,
-   "rationale": "The event fires and Claude Code sends JSON on stdin; the `matcher` checks the tool name and activates the group; the optional `if` condition narrows further and decides whether the handler process SPAWNS AT ALL (avoiding spawn overhead); the handler runs and prints a decision; Claude Code acts on it."
+   "rationale": "The event fires and Claude Code sends the event JSON to the handler — on stdin for a `command` hook, as the POST body for an `http` hook; the `matcher` checks the tool name and activates the group; the optional `if` condition narrows further and decides whether the handler runs at all (for `command` hooks, avoiding spawn overhead); the handler runs and prints a decision; Claude Code acts on it."
   },
   {
    "id": "cchooks_silence_is_not_approval",
@@ -166,7 +166,7 @@
    "captured_at": "2026-08-07",
    "author": "Anthropic",
    "contributor": null,
-   "rationale": "`\"*\"`, `\"\"` or omitted matches all. Only letters, digits, `_`, `-`, spaces, `,` and `|` means EXACT string(s) separated by `|` or `,`. ANY other character makes it an UNANCHORED JavaScript regular expression. So the same string can mean two different things depending on one character."
+   "rationale": "`\"*\"`, `\"\"` or omitted matches all. Only letters, digits, `_`, `-`, spaces, `,` and `|` means EXACT string(s) separated by `|` or `,`. ANY other character makes it an UNANCHORED JavaScript regular expression. So the same string can mean two different things depending on one character. That character set holds for every matcher-supporting event EXCEPT `FileChanged` and `StopFailure`, which use a narrower one."
   },
   {
    "id": "cchooks_unanchored_regex_trap",
@@ -218,7 +218,7 @@
   },
   {
    "id": "cchooks_no_matcher_support",
-   "label": "Nine events have NO matcher support and always fire",
+   "label": "Ten events have NO matcher support and always fire",
    "_origin": "semantic",
    "file_type": "concept",
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -226,7 +226,7 @@
    "captured_at": "2026-08-07",
    "author": "Anthropic",
    "contributor": null,
-   "rationale": "`UserPromptSubmit`, `PostToolBatch`, `Stop`, `TeammateIdle`, `TaskCreated`, `TaskCompleted`, `WorktreeCreate`, `WorktreeRemove` and `MessageDisplay` — plus `CwdChanged`. A `matcher` added to one of these is SILENTLY IGNORED rather than rejected."
+   "rationale": "`UserPromptSubmit`, `PostToolBatch`, `Stop`, `TeammateIdle`, `TaskCreated`, `TaskCompleted`, `WorktreeCreate`, `WorktreeRemove` and `MessageDisplay` (one table row), plus `CwdChanged` (a row of its own) — ten in all. A `matcher` added to one of these is SILENTLY IGNORED rather than rejected."
   },
   {
    "id": "cchooks_mcp_tool_matching",
@@ -262,7 +262,7 @@
    "captured_at": "2026-08-07",
    "author": "Anthropic",
    "contributor": null,
-   "rationale": "`command` runs a shell command receiving JSON on stdin and replying via exit code and stdout; `http` POSTs the JSON to a URL and reads the response body in the same format; `mcp_tool` calls a tool on an already-connected MCP server and treats its text output like stdout; `prompt` sends a single-turn evaluation to a Claude model; `agent` spawns a subagent that can use Read/Grep/Glob to verify before deciding (experimental)."
+   "rationale": "`command` runs a shell command — or, when `args` is present, spawns the executable directly with no shell — receiving JSON on stdin and replying via exit code and stdout; `http` POSTs the JSON to a URL and reads the response body in the same format; `mcp_tool` calls a tool on an already-connected MCP server and treats its text output like stdout; `prompt` sends a single-turn evaluation to a Claude model; `agent` spawns a subagent that can use Read/Grep/Glob to verify before deciding (experimental)."
   },
   {
    "id": "cchooks_handlers_run_in_parallel",
@@ -530,7 +530,7 @@
   },
   {
    "id": "cchooks_common_input_fields",
-   "label": "The common input fields every hook receives",
+   "label": "The common input fields a hook receives",
    "_origin": "semantic",
    "file_type": "concept",
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -782,7 +782,7 @@
   },
   {
    "id": "cchooks_content_rewriting_hooks",
-   "label": "Four events can REWRITE content rather than only allow or block",
+   "label": "Three events can REWRITE content rather than only allow or block",
    "_origin": "semantic",
    "file_type": "concept",
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1079,7 +1079,7 @@
   {
    "source": "cchooks_resolution_walkthrough",
    "target": "cchooks_three_nesting_levels",
-   "relation": "defines",
+   "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1096,8 +1096,8 @@
   },
   {
    "source": "cchooks_jq_dependency",
-   "target": "cchooks_resolution_walkthrough",
-   "relation": "requires",
+   "target": "cchooks_doc",
+   "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1142,7 +1142,7 @@
   {
    "source": "cchooks_merge_not_replace",
    "target": "cchooks_locations",
-   "relation": "defines",
+   "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1159,7 +1159,7 @@
   },
   {
    "source": "cchooks_http_allowlists",
-   "target": "cchooks_five_handler_types",
+   "target": "cchooks_security_full_user_permissions",
    "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1214,7 +1214,7 @@
   {
    "source": "cchooks_no_matcher_support",
    "target": "cchooks_matcher_field_per_event",
-   "relation": "part_of",
+   "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1394,7 +1394,7 @@
   {
    "source": "cchooks_http_hook_fields",
    "target": "cchooks_http_allowlists",
-   "relation": "requires",
+   "relation": "constrained_by",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1419,9 +1419,9 @@
    "weight": 1
   },
   {
-   "source": "cchooks_mcp_tool_hook_fields",
-   "target": "cchooks_plugin_scoped_mcp_names",
-   "relation": "requires",
+   "source": "cchooks_plugin_scoped_mcp_names",
+   "target": "cchooks_mcp_tool_hook_fields",
+   "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1448,7 +1448,7 @@
   {
    "source": "cchooks_frontmatter_hooks_need_trust",
    "target": "cchooks_frontmatter_hooks",
-   "relation": "requires",
+   "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1484,7 +1484,7 @@
   {
    "source": "cchooks_no_controlling_terminal",
    "target": "cchooks_terminal_sequence_allowlist",
-   "relation": "requires",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1718,7 +1718,7 @@
   {
    "source": "cchooks_handler_type_support_tiers",
    "target": "cchooks_five_handler_types",
-   "relation": "defines",
+   "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1754,7 +1754,7 @@
   {
    "source": "cchooks_continue_on_block",
    "target": "cchooks_prompt_response_schema",
-   "relation": "part_of",
+   "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1772,7 +1772,7 @@
   {
    "source": "cchooks_ok_false_per_event",
    "target": "cchooks_continue_on_block",
-   "relation": "requires",
+   "relation": "qualifies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1862,7 +1862,7 @@
   {
    "source": "cchooks_async_json_validation",
    "target": "cchooks_async_and_asyncrewake",
-   "relation": "verifies",
+   "relation": "part_of",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",
@@ -1907,7 +1907,7 @@
   {
    "source": "cchooks_security_practices",
    "target": "cchooks_path_placeholders",
-   "relation": "requires",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_hooks.md",

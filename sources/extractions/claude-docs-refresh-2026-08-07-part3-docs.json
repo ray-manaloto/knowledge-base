@@ -154,7 +154,7 @@
    "captured_at": "2026-08-07",
    "author": null,
    "contributor": null,
-   "rationale": "Where Claude Code reads project-scoped configuration: settings, hooks, skills, subagents, rules and auto memory. A project has `.claude/` at its root; user-level defaults live at `~/.claude/`."
+   "rationale": "Where Claude Code reads project-scoped configuration: settings, hooks, skills, subagents, rules and auto memory. A project has `.claude/` at its root; user-level defaults live at `~/.claude/`. The page also places auto memory under `~/.claude/projects/` per git repository, so its inclusion in this project-scoped list is the glossary's own generalization, not a second location."
   },
   {
    "id": "ccglossary_claude_md",
@@ -982,7 +982,7 @@
    "captured_at": "2026-08-07",
    "author": null,
    "contributor": null,
-   "rationale": "The prompt patterns are stated to work in any Claude Code surface, with the wording adapted to your project — so nothing on this page is CLI-specific by design."
+   "rationale": "The prompt patterns are stated to work in any Claude Code surface, with the wording adapted to your project — so the PROMPT PATTERNS are not CLI-specific by design. The page's shell recipes — piping into `claude -p`, for example — still are."
   },
   {
    "id": "ccbestprac_doc",
@@ -2177,7 +2177,7 @@
   {
    "source": "ccglossary_hook",
    "target": "ccglossary_turn",
-   "relation": "verifies",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2222,7 +2222,7 @@
   {
    "source": "ccglossary_rules",
    "target": "ccglossary_claude_md",
-   "relation": "part_of",
+   "relation": "complements",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2240,7 +2240,7 @@
   {
    "source": "ccglossary_claude_md",
    "target": "ccglossary_claude_directory",
-   "relation": "part_of",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2258,7 +2258,7 @@
   {
    "source": "ccglossary_project_trust",
    "target": "ccglossary_claude_directory",
-   "relation": "verifies",
+   "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2267,7 +2267,7 @@
   {
    "source": "ccglossary_project_trust",
    "target": "ccglossary_hook",
-   "relation": "verifies",
+   "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2276,7 +2276,7 @@
   {
    "source": "ccglossary_permission_rule",
    "target": "ccglossary_permission_mode",
-   "relation": "part_of",
+   "relation": "refines",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2384,7 +2384,7 @@
   {
    "source": "ccglossary_plugin",
    "target": "ccglossary_skill",
-   "relation": "part_of",
+   "relation": "contains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2420,7 +2420,7 @@
   {
    "source": "ccglossary_bare_mode",
    "target": "ccglossary_non_interactive_mode",
-   "relation": "enables",
+   "relation": "complements",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2472,9 +2472,9 @@
    "weight": 1
   },
   {
-   "source": "ccglossary_extended_thinking",
-   "target": "ccglossary_effort_level",
-   "relation": "requires",
+   "source": "ccglossary_effort_level",
+   "target": "ccglossary_extended_thinking",
+   "relation": "constrains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_glossary.md",
@@ -2636,7 +2636,7 @@
   {
    "source": "cccommonwf_reads_files_fresh",
    "target": "cccommonwf_non_code_folders",
-   "relation": "enables",
+   "relation": "conceptually_related_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_common-workflows.md",
@@ -2760,8 +2760,8 @@
    "weight": 1
   },
   {
-   "source": "cccommonwf_worktree_needs_a_commit",
-   "target": "cccommonwf_worktree_flag",
+   "source": "cccommonwf_worktree_flag",
+   "target": "cccommonwf_worktree_needs_a_commit",
    "relation": "requires",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -3041,7 +3041,7 @@
   {
    "source": "ccbestprac_skills_over_claude_md",
    "target": "ccbestprac_claude_md_pruning_test",
-   "relation": "mitigates",
+   "relation": "complements",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_best-practices.md",
@@ -3122,7 +3122,7 @@
   {
    "source": "ccbestprac_plugins",
    "target": "ccbestprac_skills",
-   "relation": "part_of",
+   "relation": "contains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_best-practices.md",
@@ -3131,7 +3131,7 @@
   {
    "source": "ccbestprac_plugins",
    "target": "ccbestprac_custom_subagents",
-   "relation": "part_of",
+   "relation": "contains",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_best-practices.md",
@@ -3338,7 +3338,7 @@
   {
    "source": "ccbestprac_auto_mode_aborts_headless",
    "target": "ccbestprac_non_interactive_formats",
-   "relation": "contrasts_with",
+   "relation": "conceptually_related_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_best-practices.md",
@@ -3417,8 +3417,8 @@
    "weight": 1
   },
   {
-   "source": "ccbestprac_develop_intuition",
-   "target": "ccbestprac_when_to_skip_planning",
+   "source": "ccbestprac_when_to_skip_planning",
+   "target": "ccbestprac_develop_intuition",
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,
@@ -3426,8 +3426,8 @@
    "weight": 1
   },
   {
-   "source": "ccbestprac_develop_intuition",
-   "target": "ccbestprac_vague_is_sometimes_right",
+   "source": "ccbestprac_vague_is_sometimes_right",
+   "target": "ccbestprac_develop_intuition",
    "relation": "part_of",
    "confidence": "INFERRED",
    "confidence_score": 0.5,

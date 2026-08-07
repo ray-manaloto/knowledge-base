@@ -1119,18 +1119,18 @@
    "weight": 1
   },
   {
-   "source": "ccagents_workers_are_claude_sessions",
-   "target": "ccagents_mcp_for_other_tools",
-   "relation": "requires",
+   "source": "ccagents_mcp_for_other_tools",
+   "target": "ccagents_workers_are_claude_sessions",
+   "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_agents.md",
    "weight": 1
   },
   {
-   "source": "ccagents_worktrees",
-   "target": "ccagents_file_conflict_isolation",
-   "relation": "enables",
+   "source": "ccagents_file_conflict_isolation",
+   "target": "ccagents_worktrees",
+   "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_agents.md",
@@ -1245,9 +1245,9 @@
    "weight": 1
   },
   {
-   "source": "ccagents_agent_teams",
-   "target": "ccagents_worker_communication",
-   "relation": "enables",
+   "source": "ccagents_worker_communication",
+   "target": "ccagents_agent_teams",
+   "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_agents.md",
@@ -1292,7 +1292,7 @@
   {
    "source": "ccagents_tasks_command",
    "target": "ccagents_subagents",
-   "relation": "verifies",
+   "relation": "monitors",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_agents.md",
@@ -1301,7 +1301,7 @@
   {
    "source": "ccagents_workflows_command",
    "target": "ccagents_dynamic_workflows",
-   "relation": "verifies",
+   "relation": "monitors",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_agents.md",
@@ -1373,7 +1373,7 @@
   {
    "source": "ccmodelcfg_alias_default",
    "target": "ccmodelcfg_aliases",
-   "relation": "part_of",
+   "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1508,7 +1508,7 @@
   {
    "source": "ccmodelcfg_model_id_validation",
    "target": "ccmodelcfg_setting_priority",
-   "relation": "verifies",
+   "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1517,7 +1517,7 @@
   {
    "source": "ccmodelcfg_retirement_warning",
    "target": "ccmodelcfg_setting_priority",
-   "relation": "verifies",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1526,7 +1526,7 @@
   {
    "source": "ccmodelcfg_picker_prices_display_only",
    "target": "ccmodelcfg_setting_priority",
-   "relation": "part_of",
+   "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1650,9 +1650,9 @@
    "weight": 1
   },
   {
-   "source": "ccmodelcfg_model_is_not_enforcement",
-   "target": "ccmodelcfg_enforce_available_models",
-   "relation": "requires",
+   "source": "ccmodelcfg_enforce_available_models",
+   "target": "ccmodelcfg_model_is_not_enforcement",
+   "relation": "mitigates",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1686,8 +1686,8 @@
    "weight": 1
   },
   {
-   "source": "ccmodelcfg_org_default_model",
-   "target": "ccmodelcfg_alias_default",
+   "source": "ccmodelcfg_alias_default",
+   "target": "ccmodelcfg_org_default_model",
    "relation": "routes_to",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
@@ -1742,7 +1742,7 @@
   {
    "source": "ccmodelcfg_opusplan",
    "target": "ccmodelcfg_extended_context",
-   "relation": "requires",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1778,7 +1778,7 @@
   {
    "source": "ccmodelcfg_fallback_chain_pruning",
    "target": "ccmodelcfg_available_models",
-   "relation": "requires",
+   "relation": "references",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1830,9 +1830,9 @@
    "weight": 1
   },
   {
-   "source": "ccmodelcfg_third_party_fallback_recognition",
-   "target": "ccmodelcfg_family_env_vars",
-   "relation": "requires",
+   "source": "ccmodelcfg_family_env_vars",
+   "target": "ccmodelcfg_third_party_fallback_recognition",
+   "relation": "satisfies",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
@@ -1949,16 +1949,16 @@
   {
    "source": "ccmodelcfg_subagent_model_env",
    "target": "ccmodelcfg_family_env_vars",
-   "relation": "part_of",
+   "relation": "contrasts_with",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
    "weight": 1
   },
   {
-   "source": "ccmodelcfg_pin_third_party",
-   "target": "ccmodelcfg_family_env_vars",
-   "relation": "requires",
+   "source": "ccmodelcfg_family_env_vars",
+   "target": "ccmodelcfg_pin_third_party",
+   "relation": "enables",
    "confidence": "EXTRACTED",
    "confidence_score": 1,
    "source_file": "code.claude.com_docs_en_model-config.md",
