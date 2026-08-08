@@ -246,3 +246,42 @@ def test_the_reverted_delta_reaches_the_apply_note() -> None:
 def test_a_clean_refresh_adds_no_apply_warning() -> None:
     """CONTROL ARM: no damage, no warnings — or every bump note cries wolf."""
     assert apply_mod._skill_warnings(skill.SkillResult(ran=True)) == []
+
+
+# --- A row with no `mise_key` must REFUSE, not crash ---------------------------
+#
+# `apply()` passed `spec.mise_key` straight into `set_pin_version`, which raises
+# `KeyError: no mise.toml pin found for ''` for an `expected`-based row. That
+# escapes as a traceback rather than the clean "[currency] apply failed" every
+# other refusal produces, so it reads as an engine bug instead of "this tool is
+# not auto-applicable here".
+#
+# It became reachable for two more tools on 2026-08-08 when ruff and ty joined
+# currency.toml (#242) — they are uv `dev` deps, pinned in pyproject.toml, which
+# apply() does not own. Found by a cold review lane.
+
+
+def test_a_spec_with_no_mise_key_refuses_instead_of_raising_keyerror(tmp_path) -> None:
+    (tmp_path / "mise.toml").write_text('[tools]\nhk = "1.54.1"\n', encoding="utf-8")
+    spec = ToolSpec(name="ruff", mise_key="", binary="ruff", expected="0.16.2")
+    with pytest.raises(NotAuthorizedError, match=r"no `mise_key`"):
+        apply(tmp_path, spec, _verdict(current="0.16.2", latest="0.16.3"))
+
+
+def test_the_refusal_says_where_the_pin_actually_lives(tmp_path) -> None:
+    """A refusal that does not say what to do next is a dead end, not a gate."""
+    (tmp_path / "mise.toml").write_text('[tools]\nhk = "1.54.1"\n', encoding="utf-8")
+    spec = ToolSpec(name="ruff", mise_key="", binary="ruff", expected="0.16.2")
+    with pytest.raises(NotAuthorizedError) as e:
+        apply(tmp_path, spec, _verdict(current="0.16.2", latest="0.16.3"))
+    assert "pyproject.toml" in str(e.value)
+
+
+def test_a_spec_with_a_mise_key_still_reaches_the_pin_editor(tmp_path) -> None:
+    """CONTROL ARM: the guard must not have made every apply refuse."""
+    (tmp_path / "mise.toml").write_text('[tools]\nhk = "1.54.0"\n', encoding="utf-8")
+    spec = ToolSpec(name="hk", mise_key="hk", binary="hk")
+    # No `manifest`/`skill_dir`, so this is the minimal successful path.
+    result = apply(tmp_path, spec, _verdict(current="1.54.0", latest="1.54.1"))
+    assert isinstance(result, ApplyResult)
+    assert '"1.54.1"' in (tmp_path / "mise.toml").read_text(encoding="utf-8")

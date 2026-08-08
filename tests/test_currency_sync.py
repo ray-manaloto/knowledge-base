@@ -934,3 +934,79 @@ def test_a_non_matching_pattern_returns_empty_rather_than_falling_back(monkeypat
     )
     assert sync.observed_version("mise", r"^NOPE(\d+)") == ""
     assert sync.observed_version("mise") == "0.9.26"
+
+
+# --- A `manifest` on a self-managed row must actually be CHECKED (#242) --------
+#
+# It was not, until 2026-08-08: `check_sync` returned out of `_check_self_managed`
+# before `_check_manifest` could run, so the key was declared, parsed, and never
+# read. The hole was invisible in exactly the way that matters — a DEAD check
+# reports nothing, which is indistinguishable from a check that passed.
+#
+# Found by a cold review lane; the arm that proved it was reverting
+# `sources/mise.manifest` three releases and getting silence, while the identical
+# mutation on mise-managed `hk` fired.
+
+
+def _self_managed_with_manifest(tmp_path, *, ref: str) -> config.ToolSpec:
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "mise.manifest").write_text(
+        f"url = https://github.com/jdx/mise\nref = {ref}\ncommit = " + "0" * 40 + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        "[tool.mise]\n"
+        'binary = "mise"\n'
+        'expected = "2026.7.15"\n'
+        'manifest = "sources/mise.manifest"\n'
+        'version_pattern = "^v?(\\\\d+\\\\.\\\\d+\\\\.\\\\d+)"\n',
+        encoding="utf-8",
+    )
+    return config.load(tmp_path)[0]
+
+
+def test_a_self_managed_manifest_behind_the_running_version_is_drift(tmp_path, monkeypatch):
+    """THE regression arm: this reported nothing at all before the fix."""
+    spec = _self_managed_with_manifest(tmp_path, ref="v2026.7.0")
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "2026.7.15")
+    status = sync.check_sync(tmp_path, spec)
+    manifest = _finding(status, "manifest")
+    assert manifest.status == sync.DRIFT
+    assert "v2026.7.0" in manifest.detail
+    # And it must not claim a manager that is not involved: mise does not install
+    # mise. The wording follows the row shape.
+    assert "mise installs" not in manifest.detail
+    assert "the running version is" in manifest.detail
+
+
+def test_a_self_managed_manifest_matching_the_running_version_is_not_drift(tmp_path, monkeypatch):
+    """CONTROL ARM: the check must be able to return the other answer."""
+    spec = _self_managed_with_manifest(tmp_path, ref="v2026.7.15")
+    monkeypatch.setattr(sync.shutil, "which", lambda _b: "/usr/local/bin/mise")
+    monkeypatch.setattr(sync, "observed_version", lambda _b, _p="": "2026.7.15")
+    status = sync.check_sync(tmp_path, spec)
+    assert _finding(status, "manifest").status != sync.DRIFT
+
+
+def test_a_mise_managed_manifest_still_says_mise_installs(tmp_path) -> None:
+    """CONTROL ARM on the WORDING split: the original path must be unchanged.
+
+    Calls `_check_manifest` directly, because reaching it through `check_sync`
+    on the mise-managed path needs a whole `[tools]` pin and install dir — this
+    test is about one sentence, not about that plumbing.
+    """
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "hk.manifest").write_text(
+        "url = https://github.com/jdx/hk\nref = v1.54.0\ncommit = " + "0" * 40 + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        '[tool.hk]\nmise_key = "hk"\nbinary = "hk"\nmanifest = "sources/hk.manifest"\n',
+        encoding="utf-8",
+    )
+    spec = config.load(tmp_path)[0]
+    assert spec.self_managed is False
+    detail = sync._check_manifest(tmp_path, spec, "1.54.1").detail
+    assert "mise installs" in detail
+    assert "the running version is" not in detail
