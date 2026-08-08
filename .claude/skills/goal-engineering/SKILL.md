@@ -43,6 +43,23 @@ cross-reference.
 the part everyone skips, and it is the only thing that makes the next goal
 better rather than merely conformant.
 
+## Two preconditions, and one thing that resets
+
+Both from `goal.md`, re-read 2026-08-08 (the page is fingerprinted by
+`kb-currency` and moved again at 2.1.226):
+
+- **`/goal` can be unavailable, and says so.** It runs only in a workspace whose
+  trust dialog has been accepted, and not at all when `disableAllHooks` is set at
+  any settings level or `allowManagedHooksOnly` is set in managed settings — it
+  is a session-scoped Stop hook underneath. It reports the reason rather than
+  silently doing nothing, so this costs a message, never a mystery.
+- **A `--resume` resets the turn count, the timer, and the token-spend
+  baseline** while carrying the condition verbatim. A bounded goal therefore
+  reads bounded and is not, across a resume. Never write a turn bound as if it
+  were a spend ceiling; see `references/rubric.md` § the reporting clause, which
+  is the only durable record because the transcript survives what the counter
+  does not.
+
 ## Authoring
 
 A round is one **pair**: a `goal` capped at 4,000 characters (the text pasted
