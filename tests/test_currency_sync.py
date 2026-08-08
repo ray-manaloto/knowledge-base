@@ -226,31 +226,43 @@ def test_manifest_tracking_a_different_release_is_drift(tmp_path, monkeypatch) -
     assert _finding(sync.check_sync(root, _spec(root)), "manifest").status == sync.DRIFT
 
 
-def _clone_at(root, ref: str) -> str:
+def _git(root, *a: str) -> str:
+    """One git command in the `sources/graphify` clone, as stripped stdout."""
+    clone = root / "sources" / "graphify"
+    return subprocess.run(
+        ["git", "-C", str(clone), *a], capture_output=True, text=True, check=True, timeout=30
+    ).stdout.strip()
+
+
+def _clone_at(root, ref: str, *, annotated: bool = False) -> str:
     """A real git clone under `sources/graphify` with `ref` tagged. Returns the SHA.
 
     A real repository, not a stub, because the check under test resolves the tag
     with `git rev-list` against the tree `kb-build` will actually check out. A
     fake would only confirm the fake.
+
+    `annotated=True` makes it a TAG OBJECT rather than a lightweight ref, which
+    is the only way to reach the two-identity comparison in
+    `_check_manifest_commit`: a lightweight tag resolves to one SHA under both
+    resolvers, so a fixture built with one cannot tell a widened check from a
+    narrow one. The SHA returned is the PEELED commit either way; ask
+    `_git(root, "rev-parse", ref)` for the tag object.
     """
     clone = root / "sources" / "graphify"
     clone.mkdir(parents=True, exist_ok=True)
-
-    def run(*a: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            ["git", "-C", str(clone), *a], capture_output=True, text=True, check=True, timeout=30
-        )
-
     subprocess.run(["git", "init", "-q", str(clone)], check=True, timeout=30)
-    run("config", "user.email", "t@example.com")
-    run("config", "user.name", "T")
-    run("config", "commit.gpgsign", "false")
-    run("config", "tag.gpgsign", "false")
+    _git(root, "config", "user.email", "t@example.com")
+    _git(root, "config", "user.name", "T")
+    _git(root, "config", "commit.gpgsign", "false")
+    # Without this an annotated tag blocks on a pinentry prompt on any machine
+    # with `tag.gpgsign = true` set globally — a fixture that passes here and
+    # hangs on someone else's laptop, which is `conftest`'s recorded lesson.
+    _git(root, "config", "tag.gpgsign", "false")
     (clone / "f.txt").write_text("x\n", encoding="utf-8")
-    run("add", "--", "f.txt")
-    run("commit", "-q", "-m", "c")
-    run("tag", ref)
-    return run("rev-parse", "HEAD").stdout.strip()
+    _git(root, "add", "--", "f.txt")
+    _git(root, "commit", "-q", "-m", "c")
+    _git(root, "tag", *(["-a", "-m", f"release {ref}"] if annotated else []), ref)
+    return _git(root, "rev-parse", "HEAD")
 
 
 def test_manifest_matching_the_pin_is_ok(tmp_path, monkeypatch) -> None:
@@ -1060,9 +1072,77 @@ def test_rev_parse_and_rev_list_are_distinct_resolvers() -> None:
     `rev-list` peels for both `<ref>` and `<ref>^{}`, so asking it twice compared
     peeled against peeled and still reported drift on a correct manifest. Only
     `rev-parse` returns the tag object that `ls-remote` recorded.
+
+    A constants check, and on its own it was ALL the coverage #246 had: the two
+    tests beside it used manifests with no clone, so they reached the
+    `resolved is None` SKIP and never the widened compare. Dropping `tag_object`
+    entirely left every one of them green (cold lane, 2026-08-08). The three
+    tests below are the behavioural arm this one cannot be.
     """
     assert sync._RESOLVERS["rev-list"] == ("rev-list", "-n1")
     assert sync._RESOLVERS["rev-parse"] == ("rev-parse",)
+
+
+def test_the_fixture_annotated_tag_really_has_two_identities(tmp_path) -> None:
+    """CONTROL ARM ON THE FIXTURE, and it has to come first.
+
+    The three tests below are only meaningful if the tag object and the peeled
+    commit are actually DIFFERENT SHAs here. If git ever produced one SHA for
+    both — or the `-a` were dropped from the helper — those tests would keep
+    passing while testing nothing, which is precisely the defect they replace.
+    """
+    root = _repo(tmp_path)
+    peeled = _clone_at(root, "v0.9.25", annotated=True)
+    assert _git(root, "rev-parse", "v0.9.25") != peeled
+
+
+def test_an_annotated_tags_tag_object_sha_is_accepted(tmp_path) -> None:
+    """What `kb-manifest-add` actually records, via `git ls-remote`.
+
+    This is the row that reported DRIFT on a manifest pinned exactly right, and
+    it is the one a regression to a single `rev-list` resolver breaks.
+    """
+    root = _repo(tmp_path)
+    _clone_at(root, "v0.9.25", annotated=True)
+    _write_manifest(root, "v0.9.25", commit=_git(root, "rev-parse", "v0.9.25"))
+    assert sync._check_manifest(root, _spec(root), "0.9.25").status == sync.OK
+
+
+def test_an_annotated_tags_peeled_commit_is_also_accepted(tmp_path) -> None:
+    """The OTHER identity: a checkout of either SHA produces the same tree.
+
+    So both are true answers to "what does this ref name", and accepting both is
+    a widening rather than a normalisation.
+    """
+    root = _repo(tmp_path)
+    peeled = _clone_at(root, "v0.9.25", annotated=True)
+    _write_manifest(root, "v0.9.25", commit=peeled)
+    assert sync._check_manifest(root, _spec(root), "0.9.25").status == sync.OK
+
+
+def test_a_wrong_sha_still_drifts_through_the_widened_compare(tmp_path) -> None:
+    """CONTROL ARM: the check was WIDENED, not lost.
+
+    Two accepted SHAs is a check; three is a check that cannot fail. A manifest
+    naming neither identity must still report DRIFT.
+    """
+    root = _repo(tmp_path)
+    _clone_at(root, "v0.9.25", annotated=True)
+    _write_manifest(root, "v0.9.25", commit="0" * 40)
+    assert sync._check_manifest(root, _spec(root), "0.9.25").status == sync.DRIFT
+
+
+def test_a_lightweight_tag_costs_the_widening_no_precision(tmp_path) -> None:
+    """CONTROL ARM on the OTHER tag kind: one SHA under both resolvers.
+
+    Measured upstream on astral-sh/uv 0.12.3. If accepting two identities had
+    weakened the lightweight path, a wrong SHA here would stop drifting.
+    """
+    root = _repo(tmp_path)
+    peeled = _clone_at(root, "v0.9.25")
+    assert _git(root, "rev-parse", "v0.9.25") == peeled
+    _write_manifest(root, "v0.9.25", commit="0" * 40)
+    assert sync._check_manifest(root, _spec(root), "0.9.25").status == sync.DRIFT
 
 
 def test_the_unresolvable_skip_does_not_claim_the_clone_is_absent(tmp_path) -> None:

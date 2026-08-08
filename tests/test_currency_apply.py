@@ -87,12 +87,13 @@ def _repo(tmp_path: Path, *, mise=_TABLE, manifest=False) -> Path:
     return tmp_path
 
 
-def _spec(*, manifest: bool = False, skill: bool = False) -> ToolSpec:
+def _spec(*, manifest: bool = False, skill: bool = False, tag_prefix: str = "") -> ToolSpec:
     return ToolSpec(
         name="graphify",
         mise_key="pipx:graphifyy",
         binary="graphify",
         manifest="sources/graphify.manifest" if manifest else "",
+        tag_prefix=tag_prefix,
         # `skill_dir` is what gates the skill note in `apply()`; without it the
         # refresh result is never read at all, which is why the warning branch
         # went untested.
@@ -143,7 +144,9 @@ def test_a_successful_apply_edits_the_pin_and_reports_it(tmp_path) -> None:
 
 def test_apply_with_a_manifest_repins_ref_and_commit(tmp_path, monkeypatch) -> None:
     root = _repo(tmp_path, manifest=True)
-    monkeypatch.setattr(apply_mod.mf, "resolve_tag", lambda _u, v: (f"v{v}", "cafe1234"))
+    monkeypatch.setattr(
+        apply_mod.mf, "resolve_tag", lambda _u, v, *, prefix="": (f"{prefix or 'v'}{v}", "cafe1234")
+    )
     result = apply(root, _spec(manifest=True), _verdict())
     assert set(result.changed) == {"mise.toml", "sources/graphify.manifest"}
     assert result.manifest_ref == "v0.9.26"
@@ -161,7 +164,7 @@ def test_a_tag_that_resolves_nowhere_aborts_before_touching_mise(tmp_path, monke
     root = _repo(tmp_path, manifest=True)
     before = (root / "mise.toml").read_text(encoding="utf-8")
 
-    def _no_tag(_url: str, _v: str) -> Never:
+    def _no_tag(_url: str, _v: str, *, prefix: str = "") -> Never:
         raise RuntimeError("no tag found")
 
     monkeypatch.setattr(apply_mod.mf, "resolve_tag", _no_tag)
@@ -170,6 +173,57 @@ def test_a_tag_that_resolves_nowhere_aborts_before_touching_mise(tmp_path, monke
     assert (root / "mise.toml").read_text(encoding="utf-8") == before
     # The manifest, too, is untouched.
     assert "ref = v0.9.25" in (root / "sources" / "graphify.manifest").read_text(encoding="utf-8")
+
+
+# --- #245: the APPLY half of the prefixed tag --------------------------------
+
+
+def _prefixed_remote(monkeypatch, *tags: str) -> None:
+    """Patch `resolve_tag` with the REAL candidate logic over a fake remote.
+
+    Deliberately not a stub returning a fixed SHA. The defect was that
+    `apply()` never PASSED the prefix, and a stub that answers for any input
+    passes identically with and without the wiring — a test that cannot fail,
+    which is the sibling finding this batch also fixes.
+    """
+    import subprocess
+
+    def _ls_remote(argv: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
+        ref = argv[-1]
+        out = f"cafe1234\trefs/tags/{ref}\n" if ref in tags else ""
+        return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
+
+    monkeypatch.setattr(apply_mod.mf.subprocess, "run", _ls_remote)
+
+
+def test_apply_resolves_a_tag_carrying_the_declared_prefix(tmp_path, monkeypatch) -> None:
+    """The half of #245 that did NOT land, and the one that ACTS.
+
+    `ToolSpec.tag_prefix` reached only the sync-report comparison. `apply()`
+    called `resolve_tag` with no prefix at all, so an authorized codex bump —
+    tag `rust-v0.147.0` — still aborted, under a comment claiming it was fixed.
+    """
+    root = _repo(tmp_path, manifest=True)
+    _prefixed_remote(monkeypatch, "rust-v0.9.26")
+    result = apply(root, _spec(manifest=True, tag_prefix="rust-v"), _verdict())
+    assert result.manifest_ref == "rust-v0.9.26"
+    assert "ref = rust-v0.9.26" in (root / "sources" / "graphify.manifest").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_without_the_prefix_that_same_bump_aborts_untouched(tmp_path, monkeypatch) -> None:
+    """CONTROL ARM: the remote is the same; only the wiring differs.
+
+    And the abort must still be clean — the resolve happens before any write,
+    so mise.toml is byte-identical afterwards.
+    """
+    root = _repo(tmp_path, manifest=True)
+    before = (root / "mise.toml").read_text(encoding="utf-8")
+    _prefixed_remote(monkeypatch, "rust-v0.9.26")
+    with pytest.raises(RuntimeError, match="no tag found"):
+        apply(root, _spec(manifest=True), _verdict())
+    assert (root / "mise.toml").read_text(encoding="utf-8") == before
 
 
 # --------------------------------------------------------------------------
