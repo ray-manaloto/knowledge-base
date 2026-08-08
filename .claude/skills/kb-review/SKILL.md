@@ -136,6 +136,19 @@ finding count and the worst finding.
 citation is labelled `unverified` and reported as such rather than dropped —
 dropping it hides a lead, promoting it launders a guess.
 
+**A lane killed by its watchdog reviewed a SUBSET, and nothing records that.**
+The receipt has no field for it, the report reads like any other, and *N
+findings* from a lane that died mid-file is indistinguishable from *N findings*
+from one that finished. Measured on #253: round 1 spent its whole 600s window
+inside `graph_first.py` and never opened `hook_guard.py`, `eval_cases.py`,
+`settings.json` or the rule docs — a partial pass that would have read as a
+clean one. So when a lane times out, **name the files it never reached** in the
+report and in the PR body, and aim the next round at exactly those. Tell the
+lane to write its report incrementally (`agent-report-persistence.md` rule 3);
+the round-1 lane emitted nothing on death, and only its transcript survived.
+This costs the round nothing and is the difference between one cold pass and a
+claimed two.
+
 ### 4. Bound the review at TWO rounds
 
 Round 1 reviews. You fix. Round 2 verifies, **and is the last round.**
