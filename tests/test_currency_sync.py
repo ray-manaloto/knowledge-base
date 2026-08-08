@@ -1010,3 +1010,78 @@ def test_a_mise_managed_manifest_still_says_mise_installs(tmp_path) -> None:
     detail = sync._check_manifest(tmp_path, spec, "1.54.1").detail
     assert "mise installs" in detail
     assert "the running version is" not in detail
+
+
+# --- #245/#246: a prefixed tag, and an ANNOTATED tag's two identities ---------
+
+
+def test_a_tag_prefix_is_stripped_before_the_version_compare(tmp_path) -> None:
+    """Codex tags `rust-v0.147.0`, not `v0.147.0`.
+
+    Comparing that literally to an installed `0.147.0` reported drift on a
+    manifest pinned exactly right (#245).
+    """
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "codex.manifest").write_text(
+        "url = https://github.com/openai/codex\nref = rust-v0.147.0\ncommit = " + "0" * 40 + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        '[tool.codex]\nmise_key = "codex"\nbinary = "codex"\n'
+        'tag_prefix = "rust-v"\nmanifest = "sources/codex.manifest"\n',
+        encoding="utf-8",
+    )
+    spec = config.load(tmp_path)[0]
+    assert spec.tag_prefix == "rust-v"
+    # The REF compare passes; only the commit check can speak, and with no clone
+    # it must SKIP rather than claim agreement.
+    assert sync._check_manifest(tmp_path, spec, "0.147.0").status == sync.SKIP
+
+
+def test_without_the_prefix_the_same_pin_would_drift(tmp_path) -> None:
+    """CONTROL ARM: the prefix is what makes the row correct, not the widening."""
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "codex.manifest").write_text(
+        "url = https://github.com/openai/codex\nref = rust-v0.147.0\ncommit = " + "0" * 40 + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        '[tool.codex]\nmise_key = "codex"\nbinary = "codex"\nmanifest = "sources/codex.manifest"\n',
+        encoding="utf-8",
+    )
+    spec = config.load(tmp_path)[0]
+    assert spec.tag_prefix == ""
+    assert sync._check_manifest(tmp_path, spec, "0.147.0").status == sync.DRIFT
+
+
+def test_rev_parse_and_rev_list_are_distinct_resolvers() -> None:
+    """The first attempt at #246 failed BECAUSE they were not.
+
+    `rev-list` peels for both `<ref>` and `<ref>^{}`, so asking it twice compared
+    peeled against peeled and still reported drift on a correct manifest. Only
+    `rev-parse` returns the tag object that `ls-remote` recorded.
+    """
+    assert sync._RESOLVERS["rev-list"] == ("rev-list", "-n1")
+    assert sync._RESOLVERS["rev-parse"] == ("rev-parse",)
+
+
+def test_the_unresolvable_skip_does_not_claim_the_clone_is_absent(tmp_path) -> None:
+    """A SKIP whose stated reason is FALSE is how a real DRIFT gets read as fine.
+
+    It said "its clone is absent" while `sources/mise/.git` was a directory —
+    the ref simply did not resolve. Naming the wrong cause sends the reader to
+    fix something that is not broken.
+    """
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "hk.manifest").write_text(
+        "url = https://github.com/jdx/hk\nref = v1.54.1\ncommit = " + "0" * 40 + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        '[tool.hk]\nmise_key = "hk"\nbinary = "hk"\nmanifest = "sources/hk.manifest"\n',
+        encoding="utf-8",
+    )
+    spec = config.load(tmp_path)[0]
+    detail = sync._check_manifest(tmp_path, spec, "1.54.1").detail
+    assert "clone is absent" not in detail
+    assert "could not resolve that ref" in detail

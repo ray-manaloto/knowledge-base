@@ -55,6 +55,11 @@
             "type": "command",
             "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" brain-transcript-audit -- --output .agent/brain-audit.md",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-session-reflect -- --quiet",
+            "timeout": 60
           }
         ]
       }

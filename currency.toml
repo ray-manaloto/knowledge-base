@@ -1280,5 +1280,28 @@ version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # an assertion that something was wrong when it was right. One is silence about
 # a question; the other is a wrong answer to it. Only the second had to go.
 #
-# So codex sits alongside skillopt as a permanent, LABELLED unknown until the
-# engine learns a `tag_prefix`. Tracked as a repo issue, not as a TODO here.
+# PARTLY FIXED 2026-08-08 — and the part that is NOT fixed is stated first,
+# because this comment said "BOTH ARE FIXED" for one commit and the cold lane
+# caught it. `tag_prefix` reaches exactly ONE call site, `sync.py`'s manifest-ref
+# compare. It does NOT reach `apply.py`, which calls `manifest.resolve_tag()`
+# without it — and `resolve_tag` takes no prefix parameter at all, so it still
+# tries only `v<version>` and `<version>`. An auto-apply for codex would still
+# abort. Tracked in #245, which stays OPEN for that half.
+#
+# WHAT IS FIXED, armed and measured: the engine learned `tag_prefix` (#245) for
+# the ref compare, and
+# `_check_manifest_commit` now accepts EITHER identity of an annotated tag
+# (#246), because `ls-remote` records the tag OBJECT while `git rev-list` peels
+# to the commit and both name the same tree.
+#
+# Armed both ways on a real clone of jdx/mise at the annotated v2026.8.3: a
+# correct manifest reports OK where it reported DRIFT, and a deliberately wrong
+# `commit =` still reports DRIFT — the check was widened, not lost. Control:
+# astral-sh/uv's `0.12.3` is a LIGHTWEIGHT tag with one SHA, so the widening
+# costs no precision there.
+#
+# The first attempt at #246 did NOT work and the arm is why: `rev-list` peels
+# for both `<ref>` and `<ref>^{}`, so it compared peeled against peeled and
+# still reported drift. `rev-parse` is what returns the tag object.
+tag_prefix = "rust-v"
+manifest = "sources/codex.manifest"

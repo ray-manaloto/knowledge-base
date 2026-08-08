@@ -73,6 +73,19 @@ class ToolSpec:
     # naive "every extra must import" check would report drift that is not drift.
     extra_probes: tuple[str, ...] = ()
     manifest: str = ""
+    tag_prefix: str = ""
+    """What this project prefixes its release tags with, e.g. `rust-v` for codex.
+
+    Empty for the overwhelming majority: `manifest.resolve_tag` already tries
+    both `v<version>` and a bare `<version>`, which covers every other tool
+    tracked here. codex tags `rust-v0.147.0`, which neither candidate matches
+    and which the manifest check compared literally against an installed
+    `0.147.0` — reporting `the corpus describes code we do not run` about a
+    manifest pinned exactly right (#245).
+
+    A permanent FALSE drift is worse than a SKIP: it trains a reader to ignore
+    the line, which is how the real one gets missed.
+    """
     # The PROJECT-SCOPED agent skill this tool ships, and the argv that reinstalls
     # it. A skill is the fourth thing a version bump has to carry — after the pin,
     # the manifest and the clone — and it was the one nothing moved: at 0.9.32 the
@@ -257,6 +270,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         skill_dir=_str("skill_dir"),
         skill_install=_tuple("skill_install"),
         manifest=_str("manifest"),
+        tag_prefix=_str("tag_prefix"),
         artifact=_str("artifact"),
         artifacts=_tuple("artifacts"),
         inputs=_tuple("inputs"),
