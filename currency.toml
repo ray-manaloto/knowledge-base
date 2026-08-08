@@ -263,7 +263,21 @@ JSON-RPC handshake against the installed 0.9.35 — **10 tools** (`query_graph`,
 `get_node`, `get_neighbors`, `get_community`, `god_nodes`, `graph_stats`,
 `shortest_path`, `list_prs`, `get_pr_impact`, `triage_prs`) and **6 resources**,
 the same surface 0.9.31/0.9.32/0.9.34 advertised. No `graphify-mcp` process
-survived shutdown."""
+survived shutdown.
+
+RE-PROBED 2026-08-08 for 0.9.36: `pyproject.toml` at tag v0.9.36 carries
+`mcp>=1,<3` in BOTH the `mcp` extra (:59) and `all` (:88) — unchanged since
+0.9.31, so RESOLVED still stands. Control on the same file: a bogus `mcp>=9`
+-> 0 hits, so the grep discriminates. Read at the TAG via the contents API,
+which keeps it a claim about v0.9.36 rather than about this host.
+
+NO SERVER PROBE RUN, and this is the recorded method rather than a shortcut:
+the note says starting the server is the only conclusive probe, AND that it is
+owed when `graphify/serve.py` moves. It did not — `gh api compare
+v0.9.35...v0.9.36` lists **0** files matching `serve`, against a control of 4
+matching `dedup|cli` on the same compare, so the filter discriminates and the
+zero is an absence. (Read this item's OPENING sentence with its version
+condition attached; it describes 0.9.30, not today.)"""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -561,7 +575,40 @@ inherited shell resolves to `installs/pipx-graphifyy/0.9.32/bin/graphify` — a
 STALE install dir, now two versions behind the 0.9.34 pin — while `mise exec --
 graphify --version` correctly reports 0.9.34. The skew is live, which is
 exactly why step 1 keeps looking at the live shell PATH and why
-version-sensitive calls go through `mise exec`."""
+version-sensitive calls go through `mise exec`.
+
+RE-PROBED 2026-08-08 for v2026.8.3, and it lands on this surface again — a
+THIRD near-miss, so read it as carefully as the 7.18 and 8.0 entries. New
+setting `not_found_system_fallback` (`MISE_NOT_FOUND_SYSTEM_FALLBACK`, default
+`true`, #11755): setting it `false` "prevents a shim for a MISSING tool from
+silently falling back to a same-named binary on PATH".
+
+It does NOT retire `resolve_from_path` / `_is_mise_shim` / `_mise_shim_dirs`,
+and the reason is the same shape as the previous two: it governs what a SHIM
+does when its tool is absent. Ours is the opposite arrangement — the tool is
+present and correctly installed, and a STALE INSTALL DIR sits ahead of the
+shims, so the shim is never consulted at all. Nothing falls back; the wrong
+binary is found first.
+
+THE FOUNDING SYMPTOM WAS RE-MEASURED LIVE THIS SESSION, and it is worse than at
+the last review. After `mise install` moved uv/hk/graphify, `mise which`
+reported the new versions while a bare binary reported the OLD ones for all
+THREE at once: hk 1.54.0 vs pin 1.54.1, uv 0.12.2 vs 0.12.3, graphify 0.9.35 vs
+0.9.36. `MISE_ENV_CACHE=1`; the stale dirs sit at PATH positions 4, 5 and 8.
+`mise exec -- <tool>` and `mise run <task>` both resolve correctly — confirmed
+by `kb-build` stamping `built by graphify 0.9.36`. The engine's own
+`resolution` finding reported all three independently, which is a second probe
+of the same fact agreeing with the first.
+
+Nothing else in 2026.8.3 reaches this repo, checked rather than assumed: the
+flatpak-user and Linux font-cask bootstrap managers are Linux-only, the pipx
+`registry_url` is for private indexes (this repo uses PyPI), and the task
+precedence/`double_dash`/vfox/npm-shim fixes are on paths this repo does not
+take. TWO THAT DO, both improvements: `lockfile = true` now CREATES a missing
+project lockfile during `use`/`install`/upgrade (this repo sets it, and
+`mise.lock` exists), and a plain `mise lock` now PRESERVES the recorded
+python-build-standalone artifact instead of churning to the newest build —
+`--bump` advances it explicitly."""
 
 [[tool.mise.watch]]
 kind = "local"
