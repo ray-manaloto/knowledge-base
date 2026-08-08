@@ -123,9 +123,17 @@ def holds_python(repo_root: Path, paths: list[str]) -> bool:
     `kb-check` print three `rc=0 ok` rows and return 0 for a directory nobody
     had checked anything in. That is this module's own thesis inverted one
     function above where it is stated: *"nothing to check" is a FAILURE, not a
-    quiet 0*. It held for `x.rs` (ruff exits non-zero on a named non-Python
-    file) and failed for the case a dev-loop user actually hits — a typo'd path,
-    the wrong directory, an empty scratch dir. (Cold lane, round 1, BLOCKING.)
+    quiet 0*. It failed for the case a dev-loop user actually hits — a typo'd
+    path, the wrong directory, an empty scratch dir. (Cold lane, round 1,
+    BLOCKING.)
+
+    THIS PARAGRAPH USED TO SAY the thesis "held for `x.rs`, because ruff exits
+    non-zero on a named non-Python file". That is FALSE, and round 2 caught it:
+    `python_paths(root, ["x.rs"])` is `[]`, so **ruff is never invoked for
+    `x.rs` at all** — it reaches 2 through the pre-existing "nothing ran"
+    branch, before and after this fix. The mechanism was invented to explain a
+    correct outcome, which is the most durable kind of wrong comment: the
+    behaviour it describes is right, so nobody re-checks the reason.
 
     A `.py` path is trusted WITHOUT a stat: a named file that does not exist
     must still reach the tools, because they exit non-zero for it and that

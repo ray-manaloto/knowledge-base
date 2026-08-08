@@ -124,13 +124,26 @@ def test_a_directory_with_no_python_in_it_is_a_failure_not_a_clean_verdict(
     checked anything in.
 
     That is the module's own thesis inverted: *"nothing to check" is a FAILURE,
-    not a quiet 0* — which held for a named `x.rs` (ruff exits non-zero on it)
-    and failed for the case a dev-loop user actually hits: a typo'd path, the
-    wrong directory, an empty scratch dir. (Cold lane, round 1.)
+    not a quiet 0* — and it failed for the case a dev-loop user actually hits: a
+    typo'd path, the wrong directory, an empty scratch dir. (Cold lane, round 1.)
+
+    THE `chdir` IS THE TEST, and without it this could not fail — round 2 proved
+    that by reverting `check.py` alone and watching this stay green. The pre-fix
+    `python_paths` stat'd against the PROCESS CWD, which under pytest is the real
+    repo root; there is no `empty/` there, so the buggy code returned `[]` and
+    `main` reached 2 through the pre-existing "nothing ran" branch — the right
+    number for the wrong reason, which is indistinguishable from a pass.
+
+    The bug only reproduces when the process CWD is the root being checked, i.e.
+    the realistic `mise run` case. So the fixture has to BE that case. A test
+    whose assertion is satisfied by pre-existing behaviour rather than by the fix
+    is exactly what no mutation sweep can see, because the sweep mutates
+    production code and this test was never reading it.
 
     The stub returns 0 for everything ON PURPOSE — it reproduces the real tools'
     behaviour, so the assertion cannot be satisfied by a tool happening to fail.
     """
+    monkeypatch.chdir(tmp_path)
     (tmp_path / "empty").mkdir()
     (tmp_path / "empty" / "README.md").write_text("no python here\n", encoding="utf-8")
     _stub_rcs(monkeypatch, {})
