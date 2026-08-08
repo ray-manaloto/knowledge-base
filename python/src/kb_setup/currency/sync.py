@@ -1091,7 +1091,11 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     ref = manifest_ref(repo_root, spec)
     if not ref:
         return Finding("manifest", DRIFT, f"{spec.manifest} has no readable `ref =` line")
-    if ref.lstrip("v") != pinned:
+    # `rust-v0.147.0` -> `0.147.0`. Strip the project's declared prefix BEFORE
+    # the `v`, or a `rust-v` tag compares literally against an installed
+    # `0.147.0` and reports drift on a manifest pinned exactly right (#245).
+    bare = ref.removeprefix(spec.tag_prefix).lstrip("v") if spec.tag_prefix else ref.lstrip("v")
+    if bare != pinned:
         # "mise installs" is TRUE only on the mise-managed path. Since 2026-08-08
         # this is also reached for `expected`-based tools (mise itself,
         # claude-code, ruff, ty), which mise does not install — the first armed
@@ -1128,15 +1132,31 @@ def _check_manifest_commit(repo_root: Path, spec: ToolSpec, ref: str) -> Finding
     commit = _manifest_field(repo_root, spec, "commit")
     if not commit:
         return Finding("manifest", DRIFT, f"{spec.manifest} has no readable `commit =` line")
+    # BOTH identities of the tag, because an ANNOTATED tag legitimately has two
+    # SHAs and they name the same tree: `ls-remote` (what `kb-manifest-add`
+    # records) returns the TAG OBJECT, while `git rev-list -n1` PEELS to the
+    # commit. Comparing the recorded tag-object SHA against the peeled one
+    # reported drift on a manifest pinned exactly right — measured on
+    # jdx/mise v2026.8.3, dd76a503e34e vs e6d9aed080ef (#246).
+    #
+    # This is NOT normalising until they agree: a checkout of either SHA
+    # produces the same tree, so both are true answers to "what does this ref
+    # name". A LIGHTWEIGHT tag returns one SHA for both, so the widening costs
+    # no precision there — control-armed on astral-sh/uv 0.12.3, one SHA.
+    #
+    # NOT the bug #235 refuted: that was `manifest.latest_commit`, which passes
+    # an exact ref to `ls-remote` and never peels. Different function.
     resolved = _tag_commit(repo_root, spec, ref)
+    tag_object = _tag_commit(repo_root, spec, ref, resolver="rev-parse")
     if resolved is None:
         return Finding(
             "manifest",
             SKIP,
-            f"{spec.manifest} pins {ref}; its clone is absent so `commit` could not be "
-            f"checked against the tag — run `mise run kb-build`",
+            f"{spec.manifest} pins {ref}; the local clone could not resolve that ref "
+            f"(no clone, no `.git`, no such tag, or git unavailable), so `commit` was "
+            f"NOT checked — run `mise run kb-build`",
         )
-    if resolved != commit:
+    if commit not in {resolved, tag_object}:
         return Finding(
             "manifest",
             DRIFT,
@@ -1161,7 +1181,20 @@ def _manifest_field(repo_root: Path, spec: ToolSpec, key: str) -> str:
     return ""
 
 
-def _tag_commit(repo_root: Path, spec: ToolSpec, ref: str) -> str | None:
+_RESOLVERS = {
+    # PEELS an annotated tag to the commit it points at.
+    "rev-list": ("rev-list", "-n1"),
+    # Returns the TAG OBJECT itself — what `git ls-remote` reports and what
+    # `kb-manifest-add` therefore records. `rev-list` cannot produce this: it
+    # peels for BOTH `<ref>` and `<ref>^{}`, which is why the first attempt at
+    # #246 compared peeled against peeled and still reported drift.
+    "rev-parse": ("rev-parse",),
+}
+
+
+def _tag_commit(
+    repo_root: Path, spec: ToolSpec, ref: str, *, resolver: str = "rev-list"
+) -> str | None:
     """What `ref` resolves to in the local clone, or None when unresolvable.
 
     None means UNKNOWN — no clone, no such tag, no git — and the caller reports
@@ -1175,7 +1208,7 @@ def _tag_commit(repo_root: Path, spec: ToolSpec, ref: str) -> str | None:
         return None
     try:
         out = subprocess.run(
-            ["git", "-C", str(clone), "rev-list", "-n1", ref],
+            ["git", "-C", str(clone), *_RESOLVERS[resolver], ref],
             capture_output=True,
             text=True,
             check=False,
