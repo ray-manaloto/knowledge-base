@@ -14,6 +14,15 @@ the first option that returns the answer. Lower steps cost more tokens
    `graphify explain "X"` are the relationship/concept variants and are
    allowed direct (read-only, no task equivalent).
 
+   **This step is machine-enforced (#253).** `kb_setup.graph_first` DENIES a
+   repo- or directory-wide source search until one graph query has run in the
+   session, and prints the exact `mise run kb-query` to run. A `Read` of a named
+   file, a search scoped to ONE file, and any search of prose/logs/`/tmp` are
+   never denied — the target is *orientation*, which is the job the graph
+   replaces. There is no override token, by Ray's explicit decision. The
+   enforcement exists because the prior *warning* was measured at **0 of 19**
+   compliance in one session, against 62→0 for the guard that denies.
+
    **Control-arm an empty result** before concluding the corpus lacks it — see
    `probes-need-a-control-arm.md` § "The graph is a probe too". A miss may be a
    term-spelling mismatch against the extracted node labels, not an absence.

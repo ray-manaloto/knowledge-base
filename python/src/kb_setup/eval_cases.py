@@ -36,7 +36,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from kb_setup import evals, fusion, hook_guard, lexical, prose
+from kb_setup import evals, fusion, graph_first, hook_guard, lexical, prose
 
 #: Lane CLIs the routing doctrine names. `grok` is deliberately included and is
 #: NOT installed — the doctrine says availability is discovered at run time, so
@@ -153,6 +153,70 @@ GUARD_FIXTURES: tuple[evals.GuardFixture, ...] = (
     ),
     _D("uv run pytest tests/ -x -q", _ALLOW, "an ordinary uv command is untouched"),
     _D("git status --short", _ALLOW, "an unrelated command is untouched"),
+)
+
+#: The tier-2 corpus for `kb_setup.graph_first` (#253), graded against the REAL
+#: repo root, so `python/` is a directory and `hook_guard.py` is a file because
+#: they are — a guard that consults the filesystem should be graded on one.
+#:
+#: The must-ALLOW half is again the load-bearing one, and it is longer than the
+#: deny half on purpose. This guard's failure mode is not a missed search; it is
+#: blocking a targeted read, a log grep, or a `kb-query | rg` pipe — the last of
+#: which would punish the exact habit the guard exists to encourage.
+GRAPH_FIRST_FIXTURES: tuple[evals.GuardFixture, ...] = (
+    # --- must DENY: orientation over the tree, which is the graph's job
+    _D('rg "decide" .', _DENY, "a repo-wide search is orientation"),
+    _D("rg decide", _DENY, "rg with no path is repo-wide by default"),
+    _D('rg "hook_guard" python/', _DENY, "a source directory is a tree walk"),
+    _D('grep -rn "hook_guard" python/', _DENY, "recursive grep over source"),
+    _D("git grep decide", _DENY, "git grep walks the worktree with no -r"),
+    _D('ls -la && rg "decide" python/', _DENY, "a later segment still counts"),
+    _D(
+        "rg --sort path decide",
+        _DENY,
+        "P1, cold lane: an unlisted value-flag made a repo-wide search look targeted",
+    ),
+    _D(
+        "rg -g '!*.md' decide .",
+        _DENY,
+        "P1, cold lane: a NEGATED glob reaches every source file",
+    ),
+    # --- must ALLOW: everything that is not orientation
+    _D(
+        'rg "decide" python/src/kb_setup/hook_guard.py',
+        _ALLOW,
+        "ONE file is targeted work — Ray's scope, and the control for every deny above",
+    ),
+    _D(
+        'grep -n "decide" python/src/kb_setup/hook_guard.py',
+        _ALLOW,
+        "a non-recursive grep of one file was never a tree walk",
+    ),
+    _D('rg "TODO" docs/', _ALLOW, "prose is not the source the graph indexes"),
+    _D('rg "rc=" /tmp/out.log', _ALLOW, "a log grep is reading evidence in hand"),
+    _D('rg "handoff" .agent/plans/', _ALLOW, "a dotted prose root is still prose"),
+    _D('rg "TODO" -g "*.md" .', _ALLOW, "a restriction that cannot reach source"),
+    _D(
+        'mise run kb-query -- "how does X work" | rg decide',
+        _ALLOW,
+        "a PIPE searches bytes already in hand; denying it punishes the right habit",
+    ),
+    _D(
+        'echo "run rg decide python/ to find it"',
+        _ALLOW,
+        "text ABOUT a search — the direction every measured guard defect came from",
+    ),
+    _D(
+        'git commit -m "docs && rg decide"',
+        _ALLOW,
+        "P2, cold lane: a regex cannot see quoting, so a commit read as a search",
+    ),
+    _D(
+        "rg -e decide python/src/kb_setup/hook_guard.py",
+        _ALLOW,
+        "P2, cold lane: `-e` ate the pattern, so the real file was dropped as one",
+    ),
+    _D("ls -la", _ALLOW, "an unrelated command is untouched"),
 )
 
 
@@ -873,5 +937,14 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             "ever measured in it",
             GUARD_FIXTURES,
             hook_guard.decide,
+        ),
+        evals.guard_table_case(
+            "tier2.graph-first-fixtures",
+            "the PreToolUse graph-first guard denies a BROAD source search before "
+            "any graph query, and never a targeted, prose or piped one (#253)",
+            GRAPH_FIRST_FIXTURES,
+            lambda command: graph_first.decide(
+                "Bash", {"command": command}, repo_root, queried=False
+            ),
         ),
     ]

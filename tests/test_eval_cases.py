@@ -61,6 +61,7 @@ def test_the_expected_cases_are_declared() -> None:
         "tier1.mise-redaction-legible",
         "tier1.lane-health",
         "tier2.guard-fixtures",
+        "tier2.graph-first-fixtures",
         "tier2.kb-retrieval",
     }
 

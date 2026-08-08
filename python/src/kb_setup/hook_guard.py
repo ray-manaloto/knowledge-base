@@ -22,6 +22,9 @@ from __future__ import annotations
 import json
 import re
 import sys
+from pathlib import Path
+
+from kb_setup import graph_first
 
 # Command position: start of string or just after a shell separator, tolerating
 # an `env`/`VAR=x` prefix so `FOO=1 graphify add …` cannot slip past (it did
@@ -188,7 +191,12 @@ _REASON_BARE_PY = (
 #: A heredoc body is DATA, never a command — everything from `<<TAG` onward is
 #: payload the shell hands to a program. Matching inside it is how this guard
 #: denied the very commit message that documented it.
-_HEREDOC = re.compile(r"<<-?\s*'?\"?\w+")
+#:
+#: Imported from :mod:`kb_setup.graph_first` rather than defined twice: that
+#: guard needs the identical answer to "where do the shell's commands stop?", and
+#: two copies of a pattern this subtle is how a redirect table drifts from its
+#: enforcement. Same reason `decide` is shared with `skill_lint`.
+_HEREDOC = graph_first.HEREDOC
 
 #: A quoted span is likewise data: a grep pattern, an echo string, a `-m` message.
 _QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
@@ -245,18 +253,62 @@ def run() -> int:
         payload = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError, ValueError:
         return 0
-    if payload.get("tool_name") != "Bash":
+    tool_name = payload.get("tool_name")
+    if tool_name not in {"Bash", "Grep"}:
         return 0
-    command = (payload.get("tool_input") or {}).get("command", "")
-    if not isinstance(command, str) or not command.strip():
-        return 0
+    tool_input = payload.get("tool_input") or {}
+    if tool_name == "Bash":
+        reason = _graphify_redirect(tool_input)
+        if reason:
+            _deny(reason)
+            return 0
     try:
-        reason = decide(command)
+        reason = _graph_first(payload, tool_name, tool_input)
     except Exception:
         return 0
     if reason:
         _deny(reason)
     return 0
+
+
+def _graphify_redirect(tool_input: dict) -> str | None:
+    """The original guard's verdict for a Bash call, or None. Never raises.
+
+    Extracted from `run` so each guard is one call there rather than an inline
+    block — the ORDER of the two is load-bearing (see `_graph_first`), and an
+    order you can read in three lines is one that survives the next edit.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str) or not command.strip():
+        return None
+    try:
+        return decide(command)
+    except Exception:
+        return None
+
+
+def _graph_first(payload: dict, tool_name: str, tool_input: dict) -> str | None:
+    """Deny a broad source search until this session has queried the graph (#253).
+
+    Runs AFTER the graphify redirect above, and only on a command that redirect
+    allowed. Order matters in both directions: a denied `graphify query` must not
+    earn the unblock (it never runs), and a hand-run graphify must keep reporting
+    the mise-task redirect rather than being shadowed by this newer refusal.
+
+    `cwd` and `session_id` come from the payload — both verified present against a
+    real captured PreToolUse payload rather than assumed, because the whole
+    session-scoping design rests on the second one existing.
+    """
+    session_id = payload.get("session_id")
+    session_id = session_id if isinstance(session_id, str) else ""
+    cwd_raw = payload.get("cwd")
+    cwd = Path(cwd_raw) if isinstance(cwd_raw, str) and cwd_raw else Path.cwd()
+    if tool_name == "Bash":
+        command = tool_input.get("command", "")
+        if isinstance(command, str):
+            graph_first.note_query(cwd, session_id, command)
+    queried = graph_first.has_queried(cwd, session_id)
+    return graph_first.decide(tool_name, tool_input, cwd, queried=queried)
 
 
 if __name__ == "__main__":

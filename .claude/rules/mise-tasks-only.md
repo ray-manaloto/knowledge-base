@@ -70,6 +70,13 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    installer-generated `.claude/skills/graphify/**` is excluded on
    `md_budget`'s precedent. A glob matching nothing exits **1**, not 0 — a gate
    that never asked the question is not a pass.
+2b. **The SAME hook also denies a broad source search before any graph query**
+   (`kb_setup.graph_first`, #253) — a second directive, one entry point, so
+   `.claude/settings.json` matches `Bash|Grep` for this hook rather than `Bash`.
+   It is here because it is the *second* measurement of this rule's thesis: the
+   warning-only version of that directive was complied with **0 times out of
+   19** in one session, while the DENY above took its own violations 62 → 0.
+   See `research-doc-sources.md` step 0 for the scope.
 3. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.
