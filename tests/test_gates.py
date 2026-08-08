@@ -20,6 +20,7 @@ import json
 import subprocess
 import threading
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Never
 
@@ -1174,7 +1175,7 @@ def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
         if task == "brain-audit":
             time.sleep(0.05)
             raise KeyboardInterrupt
-        time.sleep(1.0)  # still in flight when the interrupt lands
+        time.sleep(0.3)  # still running when the interrupt lands; finishes after
         return subprocess.CompletedProcess(cmd, 0, "")
 
     monkeypatch.setattr(gates.subprocess, "run", run)
@@ -1187,9 +1188,88 @@ def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
     written = json.loads(_written(root)[0].read_text(encoding="utf-8"))["gates"]
     # Every requested gate appears exactly once — no duplicate, no omission.
     assert sorted(row["task"] for row in written) == sorted(_SAFE)
-    # And the one that genuinely finished is the one recorded as having finished.
+    # `brain-audit` is the ONLY gate that did not produce a result.
+    assert rows["brain-audit"]["rc"] is None
     assert rows["eval"]["rc"] == 0
-    assert rows["lint"]["rc"] is None
+
+
+def test_a_sibling_that_finished_after_the_interrupt_is_not_recorded_as_unrun(
+    monkeypatch, tmp_path
+):
+    """A gate that RAN TO COMPLETION must never be persisted as "did not run".
+
+    The HIGH finding of round 2, and the sharpest defect this round produced.
+    `as_completed` stopped handing over results the moment an exception left the
+    loop — but the pool's `shutdown(wait=True)` still waited, so `lint` and
+    `test` genuinely ran, genuinely printed their own PASS lines, and had their
+    results dropped. The padding then wrote them as `rc: None`, which this module
+    documents as "did not run". That is its own purpose inverted: not "could not
+    check rendered as green", but "ran and passed rendered as never ran" — and
+    reachable on the ship path, where all four gates are one batch.
+
+    The test that used to stand here ASSERTED THE BUG. It said
+    `rows["lint"]["rc"] is None` and its name called `lint` a gate that "really
+    did not run", while its own 1.01s runtime was `lint`'s sleep — proof the gate
+    it called unrun had run to completion. A test written alongside its own fix,
+    agreeing with it. The lane found this by instrumenting which subprocess calls
+    actually completed; no mutation of production code could have, because the
+    test asserted the wrong thing rather than nothing.
+
+    So the assertion here is tied to OBSERVED EXECUTION, not to a shape: the
+    mocked runner appends to `finished` only after its sleep, and every task in
+    that list must have a real `rc` in the record.
+    """
+    root = _repo(tmp_path, _SAFE)
+    finished: list[str] = []
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] != "mise":
+            return subprocess.CompletedProcess(cmd, 0, "")
+        task = cmd[-1]
+        if task == "brain-audit":
+            time.sleep(0.05)
+            raise KeyboardInterrupt
+        if task != "eval":
+            time.sleep(0.3)
+        finished.append(task)
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    with pytest.raises(KeyboardInterrupt):
+        gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    rows = _rows(_written(root)[0])
+    # The gates that really did run — asserted from the runner's own record of
+    # completion, so this cannot drift into agreeing with the implementation.
+    assert sorted(finished) == ["eval", "lint", "test"]
+    for task in finished:
+        assert rows[task]["rc"] == 0, f"{task} ran to completion but was recorded {rows[task]}"
+
+
+def test_a_gate_that_never_started_is_still_recorded_as_unrun(monkeypatch, tmp_path):
+    """CONTROL ARM: the sweep must not invent a result for a gate that raised.
+
+    Without this, the test above is satisfiable by recording `rc=0` for
+    everything — which would be the same class of lie in the other direction.
+    """
+    root = _repo(tmp_path, _SAFE)
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] != "mise":
+            return subprocess.CompletedProcess(cmd, 0, "")
+        if cmd[-1] == "brain-audit":
+            raise KeyboardInterrupt
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    with pytest.raises(KeyboardInterrupt):
+        gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    assert _rows(_written(root)[0])["brain-audit"]["rc"] is None
 
 
 def test_the_four_shipped_gates_form_a_single_batch():
@@ -1249,3 +1329,113 @@ def test_ordering_a_list_with_no_repeats_is_exactly_the_request(monkeypatch, tmp
     assert gate_run is not None
     written = json.loads(gate_run.path.read_text(encoding="utf-8"))["gates"]
     assert [row["task"] for row in written] == list(_SAFE)
+
+
+def test_results_arrive_in_completion_order_within_a_batch(monkeypatch, tmp_path):
+    """`iter_run` yields a batch's gates fastest-first, not in the order requested.
+
+    Pinned directly, because two other tests DEPEND on it without asserting it.
+    `test_the_record_keeps_requested_order_despite_completion_order` only has
+    work to do if results genuinely arrive out of order — rebuild the batch's
+    outcomes in submit order and that test still passes, vacuously, while the
+    reordering it exists to check has stopped happening. A property two tests
+    rest on should be somebody's assertion.
+    """
+    root = _repo(tmp_path, _SAFE)
+    delays = {"eval": 0.0, "brain-audit": 0.05, "test": 0.10, "lint": 0.15}
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] == "mise":
+            time.sleep(delays[cmd[-1]])
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    arrived = [r.task for r in gates.iter_run(root, _SAFE, stop_on_failure=False)]
+
+    assert arrived == ["eval", "brain-audit", "test", "lint"]
+    assert arrived != list(_SAFE)  # the inversion is the point
+
+
+def test_an_interrupt_on_the_main_thread_still_collects_the_gates_that_finished(
+    monkeypatch, tmp_path
+):
+    """Ctrl-C lands on the MAIN thread, not in a worker — and the sweep is for that.
+
+    Constructed deliberately, because the arm for the sweep SURVIVED without it
+    and the survival was informative rather than noise. The sibling test raises
+    `KeyboardInterrupt` inside the mocked subprocess, which makes it a *future's*
+    exception — `future.exception()` reports it, the `as_completed` loop runs to
+    the end, and every result is consumed. The sweep is never reached, so
+    deleting it changed nothing and no test noticed.
+
+    A real Ctrl-C does not work that way: the signal is delivered to the main
+    thread, which is sitting in `as_completed`. That path abandons the iterator
+    with siblings still running, and the pool then waits for them — the exact
+    shape of the round-2 HIGH. `as_completed` is patched here to raise after
+    handing over one future, which is the cheapest honest way to reach it.
+
+    Without the sweep this records the still-running gates as `rc: None` while
+    they run to completion. With it, the record says what happened.
+    """
+    root = _repo(tmp_path, _SAFE)
+    real_as_completed = gates.as_completed
+
+    def interrupted(fs: Iterable) -> Iterator:
+        # Hand over exactly one result, then interrupt the consumer — a Ctrl-C
+        # arriving while the main thread waits on the rest of the batch.
+        iterator = real_as_completed(fs)
+        yield next(iterator)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(gates, "as_completed", interrupted)
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] == "mise" and cmd[-1] != "eval":
+            time.sleep(0.2)  # still running when the interrupt lands
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    with pytest.raises(KeyboardInterrupt):
+        gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    rows = _rows(_written(root)[0])
+    # Every gate ran to completion — the pool waited for all of them — so every
+    # gate must carry a real exit code, not the "did not run" state.
+    assert [rows[t]["rc"] for t in _SAFE] == [0, 0, 0, 0]
+
+
+def test_an_unexpected_error_in_one_gate_does_not_discard_the_others(monkeypatch, tmp_path):
+    """A worker raising anything at all must not cost the batch its evidence.
+
+    The third shape, and the one `_invoke`'s own `except (OSError,
+    subprocess.SubprocessError)` does not cover: something raised in `_run_one`
+    outside the subprocess call — a closed stdout on the `print`, a `RuntimeError`
+    from a future refactor. Neither the interrupt handler (which names
+    `KeyboardInterrupt`/`SystemExit`) nor the sweep alone would keep it from
+    escaping `_run_batch` and taking three completed gates with it; reading each
+    future's outcome with `.exception()` instead of `.result()` is what does.
+
+    The error still surfaces — it is returned and re-raised, not swallowed.
+    Losing the failure would be the mirror defect of losing the results.
+    """
+    root = _repo(tmp_path, _SAFE)
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] == "mise" and cmd[-1] == "brain-audit":
+            msg = "gate runner blew up"
+            raise RuntimeError(msg)
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    with pytest.raises(RuntimeError, match="gate runner blew up"):
+        gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    rows = _rows(_written(root)[0])
+    assert [rows[t]["rc"] for t in ("lint", "test", "eval")] == [0, 0, 0]
+    assert rows["brain-audit"]["rc"] is None

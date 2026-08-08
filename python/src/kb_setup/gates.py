@@ -62,7 +62,7 @@ import subprocess
 import sys
 from collections import Counter
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -345,6 +345,79 @@ def _batches(tasks: tuple[str, ...]) -> Iterator[tuple[str, ...]]:
         yield tuple(batch)
 
 
+def _run_batch(
+    repo_root: Path, batch: tuple[str, ...]
+) -> tuple[list[GateResult], BaseException | None]:
+    """Run ``batch`` concurrently. Return EVERY completed result, and the first error.
+
+    A plain function rather than part of the generator, and that shape is the fix
+    for the defect this had. The previous form consumed `as_completed` inline and
+    yielded from the loop, so an exception on one gate exited the loop while its
+    siblings were still running — and the pool's `shutdown(wait=True)` then
+    WAITED for them, so they ran to completion, printed their own PASS line, and
+    had their results thrown away. `run_and_record` padded them as `rc: None`,
+    which is the recorded state for "did not run". A gate that ran and passed was
+    persisted as never having run: this module's own purpose, inverted. It is
+    reachable on the ship path, since all four `GATE_TASKS` are one batch.
+    (Cold lane round 2, HIGH — found by instrumenting which subprocess calls
+    actually completed, not by reading.)
+
+    Returning the exception instead of raising it is what makes that impossible:
+    the caller cannot receive the error without also receiving every result, so
+    there is no path on which one arrives and the other is dropped.
+
+    `future.exception()` rather than a `try` around `future.result()`, because it
+    REPORTS a failure instead of re-raising it — so collecting results needs no
+    blind `except` (`do-not.md` #9 forbids the suppression one would otherwise
+    want). The only errors that can reach the loop are raised on THIS thread, and
+    `KeyboardInterrupt`/`SystemExit` are named rather than caught blindly.
+    """
+    outcomes: list[GateResult] = []
+    consumed: set[Future[GateResult]] = set()
+    failure: BaseException | None = None
+    # `max_workers=len(batch)` because the batch is already the safety bound —
+    # every member has been declared concurrency-safe against every other. A
+    # smaller pool would only serialise gates that were cleared to overlap.
+    pool = ThreadPoolExecutor(max_workers=len(batch))
+    futures = [pool.submit(_run_one, repo_root, task, prefix_output=True) for task in batch]
+    try:
+        for future in as_completed(futures):
+            consumed.add(future)
+            exc = future.exception()
+            if exc is None:
+                outcomes.append(future.result())
+            elif failure is None:
+                failure = exc
+    except (KeyboardInterrupt, SystemExit) as exc:
+        # Ctrl-C during a multi-minute run — the case the module is built around.
+        # Recorded, not propagated from here, so the sweep below still runs.
+        failure = failure if failure is not None else exc
+    finally:
+        # `wait=True`: every worker is joined, so each future has SETTLED and the
+        # reads below cannot block. Skipping the wait would not make an interrupt
+        # faster — the gates are already running — it would only put the reads
+        # back on unsettled futures.
+        pool.shutdown(wait=True)
+
+    # THE SWEEP, and the whole point of this function. `as_completed` stops
+    # handing over results the moment the loop above leaves early, but the pool
+    # still waited for those gates, so they finished and printed their own
+    # PASS/FAIL. Collecting them here is the difference between recording what
+    # ran and recording what happened to be consumed first.
+    #
+    # Appended rather than merged, so the ones `as_completed` DID hand over keep
+    # their completion order — the property `iter_run` documents and two tests
+    # rely on. A sweep that rebuilt the list from `futures` would silently make
+    # every batch arrive in submit order instead, which reads as harmless and
+    # would quietly disarm those tests.
+    outcomes.extend(
+        f.result()
+        for f in futures
+        if f not in consumed and not f.cancelled() and f.exception() is None
+    )
+    return outcomes, failure
+
+
 def iter_run(
     repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool
 ) -> Iterator[GateResult]:
@@ -357,6 +430,13 @@ def iter_run(
     completed gate's evidence with it, leaving no record at all. Losing four
     minutes of gate results to an interrupt is the exact failure this module
     exists to prevent, arriving through the door nobody watched. (Cold lane, P2.)
+
+    A BATCH YIELDS ONLY ONCE IT HAS FINISHED — see :func:`_run_batch`. Streaming
+    each gate out of the concurrent loop as it completed is what let an
+    interrupted batch discard siblings that had already run, so the batch is
+    collected first and yielded after. Within a batch that costs nothing: the
+    next batch cannot start until this one is done anyway, and `_run_one` prints
+    each gate's PASS/FAIL live, so the terminal is no quieter than before.
 
     RESULTS ARRIVE IN COMPLETION ORDER, NOT REQUESTED ORDER, because the gates
     within a batch run concurrently. Nothing downstream may index a result by its
@@ -409,19 +489,16 @@ def iter_run(
                 stopped = True
             continue
 
-        # `max_workers=len(batch)` because the batch is already the safety bound —
-        # every member has been declared concurrency-safe against every other. A
-        # smaller pool would only serialise gates that were cleared to overlap.
-        with ThreadPoolExecutor(max_workers=len(batch)) as pool:
-            futures = [pool.submit(_run_one, repo_root, task, prefix_output=True) for task in batch]
-            for future in as_completed(futures):
-                result = future.result()
-                yield result
-                if not result.passed and stop_on_failure:
-                    # Stops the NEXT batch, not this one. Everything here is
-                    # already running; letting it finish costs nothing extra and
-                    # keeps the evidence it has already paid for.
-                    stopped = True
+        outcomes, failure = _run_batch(repo_root, batch)
+        for result in outcomes:
+            yield result
+            if not result.passed and stop_on_failure:
+                # Stops the NEXT batch, not this one. Everything here is already
+                # running; letting it finish costs nothing extra and keeps the
+                # evidence it has already paid for.
+                stopped = True
+        if failure is not None:
+            raise failure
 
 
 def in_requested_order(results: list[GateResult], tasks: tuple[str, ...]) -> list[GateResult]:

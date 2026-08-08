@@ -107,6 +107,69 @@ old = """    position: dict[str, int] = {}
         position.setdefault(task, i)"""
 new = """    position = {task: i for i, task in enumerate(tasks)}"""
 
+# THE COLD LANE'S ROUND-2 HIGH, armed as its own revert. Deleting the sweep
+# restores the shipped behaviour exactly: `as_completed` stops handing over
+# results when the loop leaves early, the pool waits for the siblings anyway, and
+# gates that RAN TO COMPLETION are recorded `rc: None` — "did not run".
+#
+# The test that stood here before ASSERTED THAT, so no mutation of production
+# code could have found it. It took a lane instrumenting which subprocess calls
+# actually completed. Recorded because it is the sharpest instance yet of "a test
+# written alongside its own fix cannot fail".
+#
+# THIS ARM SURVIVED ON ITS FIRST RUN, against
+# `test_a_sibling_that_finished_after_the_interrupt_is_not_recorded_as_unrun`,
+# and the survival was the finding. That test raises inside the mocked
+# subprocess, so the interrupt is a FUTURE'S exception — `future.exception()`
+# reports it, the loop runs to the end, everything is consumed, and the sweep is
+# never reached. The fix that closed the lane's HIGH for that shape was switching
+# `future.result()` to `future.exception()`; the sweep covers a DIFFERENT shape,
+# a Ctrl-C on the main thread, which no test had constructed.
+#
+# So the arm is re-pointed rather than deleted, and the reaching case was built
+# (`unreachable-by-construction-needs-an-arm`: construct it, or the claim is not
+# earned). Two mechanisms, two shapes, one arm each.
+[[arm]]
+id = "completed-siblings-are-swept-away"
+test = "test_an_interrupt_on_the_main_thread_still_collects_the_gates_that_finished"
+file = "python/src/kb_setup/gates.py"
+old = """    outcomes.extend(
+        f.result()
+        for f in futures
+        if f not in consumed and not f.cancelled() and f.exception() is None
+    )"""
+new = "    pass  # siblings dropped"
+
+# The THIRD shape, and the one `.exception()` alone covers: a worker raising
+# something the interrupt handler does not name. Reverting to `.result()` lets it
+# escape `_run_batch` and take three completed gates with it.
+[[arm]]
+id = "future-result-lets-a-worker-error-escape"
+test = "test_an_unexpected_error_in_one_gate_does_not_discard_the_others"
+file = "python/src/kb_setup/gates.py"
+old = """            exc = future.exception()
+            if exc is None:
+                outcomes.append(future.result())
+            elif failure is None:
+                failure = exc"""
+new = """            outcomes.append(future.result())"""
+
+# The tempting simplification, and it is the one that would SILENTLY DISARM
+# another arm: rebuilding from `futures` is shorter, still sweeps up every
+# straggler, and makes `record-keeps-completion-order` survive because submit
+# order already equals requested order. Armed against the test that exists to
+# pin completion order, precisely so the two cannot both go quiet.
+[[arm]]
+id = "batch-outcomes-rebuilt-in-submit-order"
+test = "test_results_arrive_in_completion_order_within_a_batch"
+file = "python/src/kb_setup/gates.py"
+old = """    outcomes.extend(
+        f.result()
+        for f in futures
+        if f not in consumed and not f.cancelled() and f.exception() is None
+    )"""
+new = """    outcomes[:] = [f.result() for f in futures if not f.cancelled() and f.exception() is None]"""
+
 [[arm]]
 id = "record-keeps-completion-order"
 test = "test_the_record_keeps_requested_order_despite_completion_order"
