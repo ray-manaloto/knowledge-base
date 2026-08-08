@@ -36,6 +36,10 @@ _MB = 1024 * 1024
 _GB = 1024 * 1024 * 1024
 #: Age filters are handed to docker as hours; it has no day unit.
 _HOURS_PER_DAY = 24
+#: A declared root needs at least this many path components. `/` is 1 and
+#: `/Users` is 2; `~/Library/Caches` is 4. Three keeps `/Users/<name>` — the
+#: home directory itself — out of bounds as well.
+_MIN_ROOT_PARTS = 3
 #: `ollama list` columns: NAME ID SIZE UNIT MODIFIED… — fewer means a header or blank.
 _OLLAMA_MIN_COLUMNS = 4
 #: A concrete version is `major.minor.patch`; `0.9` and `latest` are channels.
@@ -130,12 +134,30 @@ def load_config(path: Path) -> list[Category]:
                 name=name,
                 kind=block.get("kind", ""),
                 enabled=bool(block.get("enabled", True)),
-                age_days=int(block.get("age_days", defaults.get("age_days", 30))),
+                age_days=_check_age(name, block.get("age_days", defaults.get("age_days", 30))),
                 min_size_mb=int(block.get("min_size_mb", defaults.get("min_size_mb", 100))),
                 options=opts,
             )
         )
     return out
+
+
+def _check_age(name: str, raw: object) -> int:
+    """Refuse a negative or non-numeric `age_days`.
+
+    A negative value puts the cutoff in the FUTURE, so every entry reads as "not
+    touched since <a date yet to come>" and an age-filtered category silently
+    degrades into a whole-tree one — on the destructive path.
+
+    The value comes from untrusted TOML, so it is narrowed rather than coerced
+    with a suppression: a type annotation that over-promises is exactly what
+    disables the checking it appears to provide.
+    """
+    if not isinstance(raw, int) or isinstance(raw, bool):
+        raise ReclaimError(f"category {name!r}: age_days must be an integer, got {raw!r}")
+    if raw < 0:
+        raise ReclaimError(f"category {name!r}: age_days must be >= 0, got {raw}")
+    return raw
 
 
 def _guard_path(target: Path, roots: list[Path], repo_root: Path) -> None:
@@ -151,6 +173,16 @@ def _guard_path(target: Path, roots: list[Path], repo_root: Path) -> None:
         raise ReclaimError(f"refusing to act inside the repository: {target}")
     for root in roots:
         rr = root.expanduser().resolve()
+        if len(rr.parts) <= _MIN_ROOT_PARTS:
+            # A shallow root makes the guard vacuous: `/` is a parent of every
+            # path, so declaring it would let this delete anything on the
+            # machine while `_guard_path` reported the target as "inside a
+            # declared root". Confirmed by probe: a category rooted at `/`
+            # permitted removing ~/Documents.
+            raise ReclaimError(
+                f"root {root} is too shallow to be a reclaim root — it would "
+                f"authorise deleting anything beneath it"
+            )
         if rr == resolved:
             # A root is a CONTAINER, never a candidate. Permitting equality let
             # `scan_dirs` emit the configured root as its own finding, so
@@ -255,7 +287,7 @@ def scan_docker(cat: Category, _repo_root: Path) -> ScanResult:
         ctx = eng.get("context", "")
         rc, raw = _run(["docker", "system", "df", "--format", "json"], env_context=ctx)
         if rc == 0 and raw:
-            out.extend(_docker_df_findings(cat.name, ctx, raw))
+            out.extend(_docker_df_findings(cat.name, ctx, raw, cat.options.get("prune", {})))
         else:
             missing.append(f"context {ctx!r}: `docker system df` rc={rc} — daemon down?")
         img = _expand(eng.get("disk_image", ""))
@@ -275,8 +307,30 @@ def scan_docker(cat: Category, _repo_root: Path) -> ScanResult:
     return ScanResult(out, missing)
 
 
-def _docker_df_findings(cat_name: str, ctx: str, raw: str) -> list[Finding]:
-    """Turn `docker system df --format json` lines into per-type findings."""
+#: `docker system df`'s Type column -> the `prune` config key that governs it.
+_DF_TYPE_KEY = {
+    "Images": "images",
+    "Containers": "containers",
+    "Local Volumes": "volumes",
+    "Build Cache": "build_cache",
+}
+
+
+def _docker_df_findings(
+    cat_name: str, ctx: str, raw: str, prune: Mapping[str, object]
+) -> list[Finding]:
+    """Turn `docker system df --format json` lines into per-type findings.
+
+    Only types this config will actually PRUNE are counted. The plan used to
+    include every row `df` reports — so with `volumes = false` (the default) it
+    advertised volume bytes that `--apply` would never touch, and the headline
+    total promised more than the run could deliver.
+
+    The figure is still an UPPER BOUND even for enabled types: `df` reports
+    everything reclaimable, while the prune commands filter on `until={age}h`.
+    That is stated in each finding rather than left for the user to discover by
+    subtracting the plan from the result.
+    """
     out: list[Finding] = []
     for line in raw.splitlines():
         try:
@@ -284,14 +338,20 @@ def _docker_df_findings(cat_name: str, ctx: str, raw: str) -> list[Finding]:
         except json.JSONDecodeError:
             continue
         reclaimable = _parse_size(str(row.get("Reclaimable", "")))
-        if reclaimable <= 0:
+        row_type = str(row.get("Type", "?"))
+        key = _DF_TYPE_KEY.get(row_type)
+        enabled = bool(prune.get(key, key != "volumes")) if key else False
+        if reclaimable <= 0 or not enabled:
             continue
         out.append(
             Finding(
                 category=cat_name,
-                label=f"{ctx}: {row.get('Type', '?')} reclaimable",
+                label=f"{ctx}: {row_type} reclaimable",
                 size_bytes=reclaimable,
-                detail=f"total {row.get('Size', '?')}, active {row.get('Active', '?')}",
+                detail=(
+                    f"total {row.get('Size', '?')}, active {row.get('Active', '?')} — "
+                    f"UPPER BOUND: docker reports all reclaimable, the prune filters by age"
+                ),
             )
         )
     return out
@@ -960,7 +1020,13 @@ def _opt_list(argv: list[str], flag: str) -> set[str]:
         # as "no filter" and silently WIDENED `--only` to every category — the
         # opposite of what the user asked for, on the destructive path.
         raise ReclaimError(f"{flag} needs a comma-separated value")
-    return {p.strip() for p in argv[idx + 1].split(",") if p.strip()}
+    names = {p.strip() for p in argv[idx + 1].split(",") if p.strip()}
+    if not names:
+        # `--only ,` parsed to an empty set, which reads as "no filter" and
+        # silently widened the DESTRUCTIVE path to every category — the same
+        # class as the missing-value case above, one layer in.
+        raise ReclaimError(f"{flag} parsed to no category names: {argv[idx + 1]!r}")
+    return names
 
 
 def _apply_all(cats: list[Category], findings: list[Finding], repo_root: Path) -> int:

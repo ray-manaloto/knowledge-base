@@ -519,3 +519,88 @@ def test_a_failed_deletion_reaches_the_exit_code(tmp_path, capsys):
 
     assert rc == 1, "a REFUSED deletion did not reach the exit code"
     assert "REFUSED" in capsys.readouterr().out
+
+
+# ─── P1s from the cold cross-family review, 2026-08-07 ───────────────────────
+
+
+def test_a_shallow_root_is_refused_because_it_authorises_everything(tmp_path):
+    """A category rooted at `/` made the guard vacuous.
+
+    `/` is a parent of every path, so `_guard_path` would report any target as
+    "inside a declared root". Probed before fixing: a root of `/` permitted
+    deleting ~/Documents.
+    """
+    for shallow in (Path("/"), Path("/Users")):
+        with pytest.raises(reclaim.ReclaimError, match="too shallow"):
+            reclaim._guard_path(Path("/Users/someone/Documents"), [shallow], tmp_path / "repo")
+
+
+def test_a_deep_enough_root_still_works(tmp_path):
+    """Control arm: the shallow-root refusal must not break ordinary roots."""
+    root = tmp_path / "a" / "b" / "c"
+    (root / "entry").mkdir(parents=True)
+    reclaim._guard_path(root / "entry", [root], tmp_path / "repo")
+
+
+def test_a_filter_that_parses_to_nothing_is_refused(tmp_path):
+    """`--only ,` parsed to an empty set, which reads as 'no filter' = ALL."""
+    with pytest.raises(reclaim.ReclaimError, match="parsed to no category names"):
+        reclaim._opt_list(["--only", ","], "--only")
+    with pytest.raises(reclaim.ReclaimError, match="parsed to no category names"):
+        reclaim._opt_list(["--only", "  "], "--only")
+
+
+def test_a_negative_age_days_is_refused(tmp_path):
+    """A negative age puts the cutoff in the FUTURE, so everything reads stale."""
+    cfg = tmp_path / "reclaim.toml"
+    cfg.write_text(
+        "[defaults]\nage_days = 30\n\n"
+        "[category.c]\nenabled = true\nkind = 'dirs'\nage_days = -30\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(reclaim.ReclaimError, match="age_days must be >= 0"):
+        reclaim.load_config(cfg)
+
+
+def test_a_non_integer_age_days_is_refused(tmp_path):
+    cfg = tmp_path / "reclaim.toml"
+    cfg.write_text(
+        "[defaults]\nage_days = 30\n\n"
+        "[category.c]\nenabled = true\nkind = 'dirs'\nage_days = 'x'\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(reclaim.ReclaimError, match="must be an integer"):
+        reclaim.load_config(cfg)
+
+
+_DF_JSON = (
+    '{"Type":"Images","Size":"250GB","Reclaimable":"100GB","Active":"7"}\n'
+    '{"Type":"Local Volumes","Size":"12GB","Reclaimable":"4GB","Active":"18"}\n'
+)
+
+
+def test_the_docker_plan_excludes_types_the_config_will_not_prune():
+    """The plan promised volume bytes that `--apply` would never touch.
+
+    With `volumes = false` (the default, because a volume is the only copy of
+    what is in it), `docker system df`'s volume row was still counted — so the
+    headline total advertised more than the run could deliver.
+    """
+    findings = reclaim._docker_df_findings("docker", "ctx", _DF_JSON, {"volumes": False})
+    labels = [f.label for f in findings]
+    assert any("Images" in x for x in labels)
+    assert not any("Volumes" in x for x in labels), "counted a type it will not prune"
+
+
+def test_the_docker_plan_includes_volumes_when_they_are_enabled():
+    """Control arm for the test above: enabling the key brings the row back."""
+    findings = reclaim._docker_df_findings("docker", "ctx", _DF_JSON, {"volumes": True})
+    assert any("Volumes" in f.label for f in findings)
+
+
+def test_the_docker_estimate_says_it_is_an_upper_bound():
+    """`df` reports everything reclaimable; the prune filters by age."""
+    findings = reclaim._docker_df_findings("docker", "ctx", _DF_JSON, {})
+    assert findings
+    assert all("UPPER BOUND" in f.detail for f in findings)
