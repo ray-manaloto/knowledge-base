@@ -50,6 +50,19 @@ local baseExclude = List(
   // So: literal names for the derived top-level artifacts, `**` for the derived
   // subdirectories. A new derived artifact that is not listed just gets linted —
   // noise, which is the failure direction to prefer over blindness.
+  // graphify writes the graph ATOMICALLY: `.graph.json.<random>.tmp` first,
+  // then rename. That temp name matches none of the literals below, so a
+  // `mise run fmt` overlapping a `kb-build` picked one up — and `hk fix` WEDGED
+  // for 3h06m at 0.0% CPU trying to append a trailing newline to a ~499 MB JSON
+  // that then vanished under it, spinning on
+  // `failed to canonicalize file: … No such file or directory`. Measured
+  // 2026-08-08; the graph itself survived (357,217 nodes intact), but hk has no
+  // timeout of its own, so nothing would ever have aborted it.
+  //
+  // Safe despite hk's `*` crossing `/` (the trap documented above): every path
+  // this can match begins `graphify-out/.graph`, and the one thing that must
+  // stay visible — `graphify-out/memory/**` — does not.
+  "graphify-out/.graph*",
   "graphify-out/GRAPH_REPORT.md",
   "graphify-out/GRAPH_TREE.html",
   "graphify-out/graph.json",

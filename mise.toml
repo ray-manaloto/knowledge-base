@@ -125,6 +125,27 @@ postinstall = "mise reshim && hk install --mise"
 
 [env]
 HK_MISE = "1"
+# ─── mise's own logging CANNOT be configured from this file ──────────────────
+# Asked for 2026-08-08 after a `mise run fmt` wedged 3h06m at 0.0% CPU with the
+# shell pane showing only "No output available". MEASURED, both forms, with a
+# working control — do not re-add either:
+#
+#   [env] MISE_LOG_FILE = "…"       -> log file NOT written
+#   [settings] log_file = "…"       -> log file NOT written
+#   MISE_LOG_FILE=… mise run <task> -> WRITES (the control that discriminates)
+#
+# mise builds its logger before it evaluates this config, so the variables have
+# to already be in the environment. That puts them in the user's shell profile
+# or `~/.config/mise/config.toml` — both OUTSIDE this project, which `do-not.md`
+# #11 forbids this repo from writing. So it is the user's one-line call:
+#
+#   export MISE_LOG_FILE="$HOME/.local/state/mise/mise.log"
+#   export MISE_LOG_FILE_LEVEL=debug
+#
+# Default is already `~/.local/state/mise/mise.log`; what raising the level buys
+# is that a hang leaves a last-thing-it-did entry, since a hang by definition
+# produces no console output at all.
+# <https://mise.jdx.dev/configuration.html#mise-log-file-mise-log>
 # gitleaks does not auto-load .gitleaks.toml; point it there so the allowlist
 # (skip the gitignored sources/ research corpus + derived graphify-out/) always
 # applies — the corpus inherently contains secret-LIKE strings but is never committed.
