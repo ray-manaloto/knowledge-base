@@ -225,6 +225,13 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import gates
 
         return gates.main(rest, repo_root)
+    if cmd == "check":
+        from kb_setup import check
+
+        # NOT in `_ADVISORY`: this one's exit code is the answer. It is also not
+        # a gate — it writes no `.agent/kb/gates/` record, because a per-file
+        # check is not evidence about a commit.
+        return check.main(repo_root, rest)
     if cmd == "session-state":
         from kb_setup import session_state
 

@@ -1,0 +1,139 @@
+# Mutation arms for the session-reflect violation RATE (Ray's piped-rc call).
+#
+# The investigation that produced these found the DETECTOR innocent. Over the
+# 2026-08-08 transcript `piped-rc` fired on 17 commands and all 17 were real:
+# zero false positives (none was the `> log; echo "rc=$?"` form the handoff
+# guessed at), and zero false negatives against a looser arm. Control-armed in
+# four directions — violation fires, documented remedy silent, `${PIPESTATUS[0]}`
+# silent, `kb-query | head` silent.
+#
+# What was wrong was the REPORT, in two ways these arms guard:
+#
+#   1. `scan` returned on the first match, so `xN` counted COMMANDS while
+#      reading as violations. True figure 35, reported 17 — 10 of those commands
+#      chained more than one piped gate.
+#   2. The violations section printed no excerpt at all, while every other
+#      section printed one. That is why the count was never checked and was
+#      instead speculated about in a handoff.
+#
+# WHAT THESE ARMS CANNOT MEASURE:
+#
+#   * whether `piped-rc`'s PATTERN is right. It was verified by measurement
+#     against a real transcript, not by any test here, and no arm below would
+#     notice the pattern drifting.
+#   * whether 35 is the right number for any OTHER session. It is one round's
+#     rate, not a constant.
+#   * whether zsh is really the shell every future transcript will use. The
+#     exemption now names `${pipestatus[1]}` because it was ARMED in zsh 5.9 —
+#     `${PIPESTATUS[0]}` returns '' for a failing AND a passing gate there — but
+#     no test re-establishes the shell, and a bash transcript would be flagged
+#     for a compliant command.
+
+suites = ["tests/test_session_reflect.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/session_reflect.py"
+old = "EXCERPTS_PER_RULE = 3"
+new = "EXCERPTS_PER_RULE = 3  # inert control edit"
+
+# --- the count is violations, not commands -----------------------------------
+
+# THE defect, restored exactly. `search` finds the first match and stops, which
+# is the shape every other rule table in this module uses and therefore the
+# shape a future edit reverts to without thinking.
+[[arm]]
+id = "first-match-only"
+test = "test_a_command_chaining_four_lost_gates_counts_four"
+file = "python/src/kb_setup/session_reflect.py"
+old = "        for match in rule.pattern.finditer(command):"
+new = """        match = rule.pattern.search(command)
+        for match in ([match] if match else []):"""
+
+# Counting the matches but reporting one excerpt for all of them. Passes the
+# count arm and produces four identical rows — a louder version of exactly the
+# unauditable number this change exists to remove.
+[[arm]]
+id = "every-finding-carries-the-first-excerpt"
+test = "test_each_counted_violation_carries_its_own_bytes"
+file = "python/src/kb_setup/session_reflect.py"
+old = "            excerpt = \" \".join(match.group(0).split())[:110]"
+new = "            excerpt = \" \".join(rule.pattern.search(command).group(0).split())[:110]"
+
+# --- the bytes ----------------------------------------------------------------
+
+# The section reverting to count-and-remedy. This is the literal pre-fix render
+# and it must take the evidence rows down with it.
+[[arm]]
+id = "violations-render-drops-the-excerpts"
+test = "test_the_violations_section_shows_the_offending_bytes"
+file = "python/src/kb_setup/session_reflect.py"
+old = "        lines.extend(f\"    {f.excerpt}\" for f in found[:EXCERPTS_PER_RULE])"
+new = "        pass"
+
+# The display bound going silent. A truncation that does not announce itself
+# reads as "that was everything", which is how a bounded report becomes a wrong
+# one — the same rule `_capped` follows, and the same failure if it is dropped.
+[[arm]]
+id = "withheld-count-not-announced"
+test = "test_the_shown_excerpts_are_capped_and_say_how_many_were_withheld"
+file = "python/src/kb_setup/session_reflect.py"
+old = """        withheld = len(found) - EXCERPTS_PER_RULE
+        if withheld > 0:
+            lines.append(f\"    … {withheld} more (raise EXCERPTS_PER_RULE to see them)\")"""
+new = "        pass"
+
+# The cap not applying at all. Distinct from the arm above: here every excerpt
+# prints and the "more" line never appears because there is no remainder — a
+# rate section that runs to dozens of rows per rule, which is the volume the
+# skill records as teaching readers to skip the section.
+[[arm]]
+id = "cap-not-applied"
+test = "test_the_shown_excerpts_are_capped_and_say_how_many_were_withheld"
+file = "python/src/kb_setup/session_reflect.py"
+old = "        lines.extend(f\"    {f.excerpt}\" for f in found[:EXCERPTS_PER_RULE])"
+new = "        lines.extend(f\"    {f.excerpt}\" for f in found)"
+
+# --- the widening must not widen WHAT matches --------------------------------
+
+# The failure mode of turning a rate up: a compliant command starts contributing
+# to it. Dropping the `unless` check is the realistic version — it is one line,
+# and it is the guard that keeps a genuine status read from being reported as a
+# lost one.
+#
+# NAMED AGAINST THE PIPESTATUS TEST, NOT THE REDIRECT ONE. The first version of
+# this arm pointed at `test_a_compliant_command_still_counts_zero`, whose fixture
+# is `> log; echo "rc=$?"` — a command that never matches the PATTERN, so
+# `unless` is never consulted and the mutation was a guaranteed no-op. An arm
+# aimed at a guard the fixture cannot reach measures nothing and would have
+# SURVIVED for a reason that says nothing about the code.
+[[arm]]
+id = "exemption-ignored-so-compliance-counts"
+test = "test_pipestatus_reads_the_gates_own_status_and_is_exempt"
+file = "python/src/kb_setup/session_reflect.py"
+old = "        if rule.unless is not None and rule.unless.search(command):"
+new = "        if False:"
+
+# --- the remedy must be followable -------------------------------------------
+
+# Reverting the exemption to the bash spelling. In zsh that string expands to
+# nothing for a passing and a failing gate alike, so excusing it excuses the
+# ABSENCE of the status read the directive asks for — a false-negative
+# generator, and the fourth too-wide version of this one exemption.
+[[arm]]
+id = "exemption-back-to-the-inert-bash-spelling"
+test = "test_the_bash_spelling_is_inert_here_and_buys_no_exemption"
+file = "python/src/kb_setup/session_reflect.py"
+old = 'unless=r"\$\{?pipestatus\[1\]",'
+new = 'unless=r"\$\{?PIPESTATUS\[0\]",'
+
+# A remedy naming a task nobody defined. This is the realistic rot: a task gets
+# renamed, and the rule keeps confidently printing the old name — advice that
+# cannot be taken, which is worse than no advice because it looks actionable.
+[[arm]]
+id = "remedy-names-a-task-that-does-not-exist"
+test = "test_every_remedy_naming_a_mise_task_names_one_that_exists"
+file = "python/src/kb_setup/session_reflect.py"
+old = '            "mise run kb-check -- <paths>  (or kb-gates for the ship gates)",'
+new = '            "mise run kb-check-paths -- <paths>",'

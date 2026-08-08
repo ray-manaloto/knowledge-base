@@ -227,6 +227,150 @@ def test_replay_threads_each_count_into_the_next_chunk(
     assert not out.with_name(".merge-counts.tmp.json").exists()
 
 
+def _dated_chunk(path: Path, source_file: str, when: str) -> None:
+    """A chunk whose nodes carry `captured_at: when` — the replay-order key."""
+    _write_chunk(path, source_file)
+    path.write_text(path.read_text().replace("2026-08-01", when), encoding="utf-8")
+
+
+def _recompose_seen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replay: list[tuple[Path, str]]
+) -> list[list[str]]:
+    """Drive `_recompose_into_temp` over `replay`, returning the argv it built.
+
+    Everything below the replay loop is stubbed because none of it is the
+    subject: the swap, the stamp and the N-ary source merge all have their own
+    arms. `_run` is the seam that matters — the ORDER it is called in is the
+    property under test, and it is the property that was wrong.
+    """
+    out = tmp_path / "graphify-out" / "graph.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("{}", encoding="utf-8")
+
+    seen: list[list[str]] = []
+
+    def _fake_run(argv: list[str], _cwd: Path) -> None:
+        seen.append(argv)
+        if "--counts-out" in argv:
+            Path(argv[argv.index("--counts-out") + 1]).write_text(
+                json.dumps({"nodes": 10 * len(seen)}), encoding="utf-8"
+            )
+
+    monkeypatch.setattr(graph, "_run", _fake_run)
+    monkeypatch.setattr(graph, "graphify_python", lambda _root: "py")
+    monkeypatch.setattr(graph, "_merge_sources_into", lambda *_a, **_k: None)
+    monkeypatch.setattr(graph, "_clear_stamp", lambda *_a, **_k: None)
+
+    graph._recompose_into_temp(tmp_path, out, [], replay)
+    return seen
+
+
+def test_recompose_replays_in_capture_order_not_the_order_it_was_given(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`kb-watch` must supersede by capture date, exactly as `kb-build` does.
+
+    THE regression arm for the 2026-08-08 `kb-watch` failure. `_recompose_into_temp`
+    replayed `manifest.chunks` in the order the manifest stored them — which is
+    alphabetical — while `build()` applied `chunks.replay_order`. Same committed
+    corpus, two different graphs, chosen by the alphabet: the precise defect
+    `chunks.replay_order` exists to remove, fixed on one path and left live on
+    its sibling.
+
+    The fixture is the real pair, names and dates unchanged, because the names
+    are what carried the bug: `mirror` sorts AFTER `refresh` alphabetically and
+    BEFORE it by capture date, so an implementation that has merely been handed
+    a pre-sorted list still fails here — the input is deliberately in the wrong
+    order, which is how the manifest really holds it.
+    """
+    ext = tmp_path / "sources" / "extractions"
+    _dated_chunk(ext / "claude-code-docs-2026-08-05-refresh-docs.json", "hooks.md", "2026-08-05")
+    _dated_chunk(ext / "claude-code-docs-mirror-docs.json", "hooks.md", "2026-07-30")
+    given = sorted(ext.glob("*.json"))  # alphabetical, as `manifest.chunks` is
+    assert [p.name for p in given] == [
+        "claude-code-docs-2026-08-05-refresh-docs.json",
+        "claude-code-docs-mirror-docs.json",
+    ], "fixture must start in the WRONG order or this arm cannot fail"
+
+    seen = _recompose_seen(tmp_path, monkeypatch, [(p, str(tmp_path)) for p in given])
+
+    replayed = [Path(argv[2]).name for argv in seen]
+    assert replayed == [
+        "claude-code-docs-mirror-docs.json",
+        "claude-code-docs-2026-08-05-refresh-docs.json",
+    ]
+
+
+def test_recompose_threads_each_merges_count_into_the_next(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#191's arithmetic gate must fire on the recomposition path too.
+
+    It never had. Every `[merge]` line `kb-watch` printed said *prior node count
+    unknown — arithmetic NOT checked*, because this loop passed neither
+    `--prior-<field>` nor `--counts-out`. A silent-loss gate that is wired into
+    one of a feature's two callers is not a gate, and the half it was missing
+    from is the half that recomposes the whole corpus.
+    """
+    ext = tmp_path / "sources" / "extractions"
+    for i, when in enumerate(("2026-08-01", "2026-08-02", "2026-08-03")):
+        _dated_chunk(ext / f"c{i}-docs.json", f"f{i}.md", when)
+    given = sorted(ext.glob("*.json"))
+
+    seen = _recompose_seen(tmp_path, monkeypatch, [(p, str(tmp_path)) for p in given])
+
+    priors = [a[a.index("--prior-nodes") + 1] if "--prior-nodes" in a else None for a in seen]
+    assert priors == [None, "10", "20"]
+
+
+def test_recompose_replays_under_the_root_it_was_handed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL on the two arms above: routing through the shared loop kept the roots.
+
+    `_replay_doc_chunks` derives `sources/<name>`; recomposition carries a root
+    recorded at merge time (`chunk_roots`), and that difference is the entire
+    reason the two loops were separate. Sharing the loop by making it derive the
+    root itself would silently discard every recorded override — passing both
+    tests above while breaking the thing those overrides exist for.
+    """
+    ext = tmp_path / "sources" / "extractions"
+    _dated_chunk(ext / "a-docs.json", "a.md", "2026-08-01")
+    recorded = str(tmp_path / "sources" / "somewhere-else")
+
+    seen = _recompose_seen(tmp_path, monkeypatch, [(ext / "a-docs.json", recorded)])
+
+    assert seen[0][3] == recorded
+
+
+def test_both_replay_paths_order_by_the_same_key(tmp_path: Path) -> None:
+    """The invariant the split loops violated: one supersession rule, not two.
+
+    Asserted against `chunks.replay_key` itself rather than by re-deriving an
+    expected order here, because a test that reimplements the key is a second
+    implementation of exactly the thing that drifted.
+
+    THE FIXTURE IS THE LOAD-BEARING PART, and the first version of it was inert.
+    Bare `Path("a-docs.json")`/`Path("z-docs.json")` do not exist, so
+    `chunk_captured_at` returns the same value for both and name-order and
+    date-order AGREE — a mutation swapping the key to name-first was a genuine
+    no-op and survived the sweep. Real files whose alphabetical and chronological
+    orders are OPPOSITE are the only fixture that can tell the two apart.
+    """
+    from kb_setup import chunks as _chunks
+
+    _dated_chunk(tmp_path / "a-docs.json", "a.md", "2026-08-09")
+    _dated_chunk(tmp_path / "z-docs.json", "z.md", "2026-07-01")
+    paths = sorted(tmp_path.glob("*.json"))
+    assert [p.name for p in paths] == ["a-docs.json", "z-docs.json"]
+
+    ordered = _chunks.replay_order(paths)
+
+    assert ordered == sorted(paths, key=_chunks.replay_key)
+    # ...and that shared key really is the date one, not the alphabet.
+    assert [p.name for p in ordered] == ["z-docs.json", "a-docs.json"]
+
+
 def test_preflight_still_refuses_a_schema_break(tmp_path: Path) -> None:
     """The older gate must survive the refactor that added the newer one."""
     bad = tmp_path / "incoming" / "bad-docs.json"

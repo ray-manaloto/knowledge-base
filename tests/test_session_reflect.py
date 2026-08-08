@@ -10,6 +10,7 @@ must-NOT-fire case makes that visible as a defect rather than as thoroughness.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -155,25 +156,49 @@ def test_an_rc_captured_after_the_pipe_is_still_a_violation(tmp_path) -> None:
 
 
 def test_pipestatus_reads_the_gates_own_status_and_is_exempt(tmp_path) -> None:
-    """CONTROL ARM: the one piped form that does NOT lose the gate's rc."""
-    path = _transcript(tmp_path, "mise run lint | tail -5; echo ${PIPESTATUS[0]}")
+    """CONTROL ARM: the one piped form that does NOT lose the gate's rc.
+
+    ZSH SPELLING, and that is the finding rather than a detail. This repo's
+    shell is zsh 5.9 (`BASH_VERSION=none`), where the array is `pipestatus` and
+    is 1-indexed; element 1 is the pipeline's FIRST stage, i.e. the gate.
+    """
+    path = _transcript(tmp_path, "mise run lint | tail -5; echo ${pipestatus[1]}")
     assert "piped-rc" not in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
+def test_the_bash_spelling_is_inert_here_and_buys_no_exemption(tmp_path) -> None:
+    """`${PIPESTATUS[0]}` is a BASH array, and in zsh it expands to nothing.
+
+    Armed both directions before changing this: in zsh 5.9, `false | tail -1;
+    echo "${PIPESTATUS[0]}"` prints `''` and `true | tail -1; echo
+    "${PIPESTATUS[0]}"` also prints `''` — it cannot discriminate a failing gate
+    from a passing one. So a command writing it captured NOTHING while the old
+    exemption granted it a full pass: a false-negative generator, and the fourth
+    correction to this one exemption.
+
+    Every transcript this module reads is zsh, so the bash form is inert by
+    construction here. Excusing it would be excusing the absence of the very
+    thing the directive asks for.
+    """
+    path = _transcript(tmp_path, "mise run lint | tail -5; echo ${PIPESTATUS[0]}")
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
 def test_the_wrong_pipestatus_index_is_not_an_exemption(tmp_path) -> None:
-    r"""Index 1 is TAIL's status — the very thing the directive is about.
+    r"""Index 2 is TAIL's status — the very thing the directive is about.
 
     A bare `\bPIPESTATUS\b` exemption excused it, which is the same
     whole-command over-reach as the `rc=$?` exemption it replaced, reintroduced
-    one commit later (cold lane, round 1).
+    one commit later (cold lane, round 1). Re-spelled for zsh with the index
+    moved: 1-based, so the stage AFTER the gate is 2.
     """
-    path = _transcript(tmp_path, "mise run lint | tail -5; echo ${PIPESTATUS[1]}")
+    path = _transcript(tmp_path, "mise run lint | tail -5; echo ${pipestatus[2]}")
     assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
 def test_merely_mentioning_pipestatus_is_not_an_exemption(tmp_path) -> None:
     """The word in prose bought a full exemption for a real violation."""
-    path = _transcript(tmp_path, 'mise run lint | tail -5; echo "see PIPESTATUS docs"')
+    path = _transcript(tmp_path, 'mise run lint | tail -5; echo "see pipestatus docs"')
     assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
@@ -183,8 +208,10 @@ def test_the_pipestatus_exemption_requires_an_actual_expansion(tmp_path) -> None
     Third too-wide exemption on this one rule — `rc=$?`, bare `PIPESTATUS`, then
     an unsigiled `PIPESTATUS[0]`. `unless` is searched against the WHOLE command,
     so it must name a form that occurs only when the thing is really happening.
+    (The FOURTH was naming a bash-only spelling that expands to nothing in this
+    repo's shell — see `test_the_bash_spelling_is_inert_here_and_buys_no_exemption`.)
     """
-    path = _transcript(tmp_path, 'mise run lint | tail; echo "read PIPESTATUS[0] first"')
+    path = _transcript(tmp_path, 'mise run lint | tail; echo "read pipestatus[1] first"')
     assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
@@ -488,3 +515,132 @@ def test_without_quiet_the_full_report_prints(tmp_path, capsys) -> None:
     """CONTROL ARM: the flag must actually change something."""
     assert sr.reflect_main(tmp_path) == 0
     assert "## Hand-rolled work" in capsys.readouterr().out
+
+
+def test_every_remedy_naming_a_mise_task_names_one_that_exists(tmp_path) -> None:
+    """A remedy pointing at a task nobody defined is advice that cannot be taken.
+
+    Every rule carries the command it argues for — that is the whole reason
+    `Rule.remedy` is not optional. But nothing checked the command was real, and
+    the remedies are exactly the strings that rot: `piped-rc`'s used to be a
+    shell one-liner (`<cmd> > /tmp/out.log 2>&1; echo "rc=$?"`), which is shell
+    logic recommended by a repo whose first invariant forbids it, and which is
+    unfollowable in this shell besides. Repointing it at `kb-check` is only an
+    improvement if `kb-check` exists.
+
+    Reads `mise.toml` rather than a hardcoded list, because a second list of
+    task names is the drift this repo keeps paying for.
+    """
+    del tmp_path
+    declared = {
+        line.removeprefix("[tasks.").removesuffix("]").strip()
+        for line in Path("mise.toml").read_text(encoding="utf-8").splitlines()
+        if line.startswith("[tasks.")
+    }
+    assert "kb-check" in declared, "fixture is broken if it cannot see the task table"
+
+    named = {
+        word
+        for rule in (*sr.OWNED, *sr.DIRECTIVES, *sr.UNARMED)
+        for word in re.findall(r"mise run ([a-z0-9][\w-]*)", rule.remedy)
+    }
+
+    assert named, "no remedy names a mise task — this test would pass vacuously"
+    assert named <= declared, f"remedies name undefined tasks: {sorted(named - declared)}"
+
+
+# --- the count is VIOLATIONS, not commands -----------------------------------
+
+#: One command, four gates, four discarded exit codes. This shape is the ordinary
+#: one in a real transcript — measured at 10 of 17 flagged commands on 2026-08-08 —
+#: which is why counting it once understated the rate by roughly half.
+_FOUR_IN_ONE = (
+    "uv run ruff check a.py 2>&1 | tail -3; "
+    "uv run ruff format --check a.py 2>&1 | tail -3; "
+    "uv run ty check a.py 2>&1 | tail -2; "
+    "uv run pytest tests/ -q 2>&1 | tail -4"
+)
+
+
+def test_a_command_chaining_four_lost_gates_counts_four(tmp_path) -> None:
+    """A rate's numerator may not be silently deduplicated per command.
+
+    `scan` returned on the FIRST match, so `piped-rc x17` was a count of
+    COMMANDS while reading as a count of violations. Re-derived over the real
+    2026-08-08 transcript the true figure was 35 — the reported number was 49%
+    of the truth, and nothing in the report said so.
+    """
+    path = _transcript(tmp_path, _FOUR_IN_ONE)
+    found = sr.reflect(tmp_path, transcripts=[path]).violations
+
+    assert [f.rule.id for f in found] == ["piped-rc"] * 4
+
+
+def test_each_counted_violation_carries_its_own_bytes(tmp_path) -> None:
+    """Four findings must be four DIFFERENT excerpts, not one repeated.
+
+    Counting every match is only worth having if the matches are distinguishable
+    — four identical rows would be a louder version of the same unauditable
+    number. The excerpts are what let a reader see that `ty` and `pytest` are
+    separate losses rather than one command counted four times.
+    """
+    path = _transcript(tmp_path, _FOUR_IN_ONE)
+    excerpts = [f.excerpt for f in sr.reflect(tmp_path, transcripts=[path]).violations]
+
+    assert len(set(excerpts)) == 4
+
+
+def test_a_compliant_command_still_counts_zero(tmp_path) -> None:
+    """CONTROL ARM: counting every match must not start matching new things.
+
+    The change from `search` to `finditer` widens the numerator, and the failure
+    mode of widening a rate is that a compliant command starts contributing to
+    it. Same four gates, each redirected and its own rc recorded: zero.
+    """
+    compliant = "; ".join(
+        f'uv run {tool} > /tmp/o.log 2>&1; echo "rc=$?" >> /tmp/o.log'
+        for tool in ("ruff check a.py", "ty check a.py", "pytest tests/", "ruff format a.py")
+    )
+    path = _transcript(tmp_path, compliant)
+
+    assert "piped-rc" not in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
+def test_the_violations_section_shows_the_offending_bytes(tmp_path, capsys) -> None:
+    """A rate a reader cannot check is a rate a reader speculates about.
+
+    This section alone printed no excerpt, while `owned` and `unarmed` both did.
+    On 2026-08-08 a handoff recorded `piped-rc x17` alongside a guess about what
+    the 17 were; re-deriving them refuted the guess entirely. The bytes are what
+    turn the count into something falsifiable in the report itself.
+    """
+    path = _transcript(tmp_path, _FOUR_IN_ONE)
+    print(sr.render(sr.reflect(tmp_path, transcripts=[path])))
+    out = capsys.readouterr().out
+
+    assert "`piped-rc` x4" in out
+    assert "uv run ty check a.py 2>&1 | tail" in out
+
+
+def test_the_shown_excerpts_are_capped_and_say_how_many_were_withheld(tmp_path) -> None:
+    """A display bound must announce itself, or it reads as "that was everything".
+
+    The same rule `_capped` follows, applied per directive: silence about the
+    remainder is how a bounded report becomes a wrong one.
+
+    Excerpt rows are counted by their INDENT rather than by a `uv run` prefix.
+    A match at a chained command position legitimately begins at the separator
+    (`; uv run pytest …`), so only the first of eight would have matched the
+    prefix — an assertion that would have failed against correct output, which
+    is a test asserting the shape of its own misreading.
+    """
+    many = "; ".join(f"uv run pytest t{i}.py 2>&1 | tail -1" for i in range(8))
+    path = _transcript(tmp_path, many)
+
+    lines = sr._violation_lines(sr.reflect(tmp_path, transcripts=[path]).violations)
+    shown = [line for line in lines if line.startswith("    ") and "more (raise" not in line]
+
+    assert lines[0].startswith("- `piped-rc` x8")
+    assert len(shown) == sr.EXCERPTS_PER_RULE
+    assert all("pytest" in line for line in shown)
+    assert lines[-1].strip().startswith(f"… {8 - sr.EXCERPTS_PER_RULE} more")

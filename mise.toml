@@ -404,6 +404,28 @@ run = "agnix . --strict"
 description = "Full quality check (lint + test)"
 depends = ["lint", "test"]
 
+[tasks.kb-check]
+description = "Check specific paths (ruff + format + ty + their tests) with REAL exit codes"
+# The DEV-LOOP gate, and the one this repo did not have. `check` above is
+# whole-repo and `kb-gates` runs the four ship gates; neither answers "are these
+# two files clean?", so that question was being answered in the shell — measured
+# at **35** gate invocations piped into `head`/`tail` in a single session
+# (2026-08-08), every one of which returns the PIPE's exit code and reports a
+# failed gate as a success.
+#
+# The fix is the mandate, not a shell trick: `session_reflect`'s `piped-rc` used
+# to print `<cmd> > /tmp/out.log 2>&1; echo "rc=$?"` as its remedy — shell logic,
+# recommended by a repo whose first invariant forbids it, and unfollowable here
+# anyway (`${PIPESTATUS[0]}` is a BASH array; this shell is zsh, where it expands
+# to empty for a passing and a failing gate alike). `subprocess.run().returncode`
+# has no such problem.
+#
+# Runs every applicable tool even after one fails, so one pass tells you
+# everything wrong with the file. Exits non-zero if any tool failed AND if
+# nothing applicable was given — "I did not understand your argument" must not
+# read as "your file is clean".
+run = "uv run kb-setup check {{arg(name='paths', var=true, default='')}}"
+
 # ---------------------------------------------------------------------------
 # Knowledge-base tasks — the reason this repo exists
 # ---------------------------------------------------------------------------

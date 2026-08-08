@@ -1,0 +1,209 @@
+# Copyright (c) 2026 Raymond Manaloto
+"""Tests for `kb_setup.check` — the dev-loop gate (`mise run kb-check`).
+
+The defect this module exists to remove is a FALSE GREEN: a gate piped into
+`tail` returns the pipe's exit code, so a failing check reports success. Every
+arm here is therefore about a route to `0`, because that is this module's own
+failure class — if it can report clean when something is wrong, it has
+reproduced the bug it replaces one layer up.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from kb_setup import check
+
+if TYPE_CHECKING:
+    import pytest
+
+
+def _touch(path: Path, body: str = "x = 1\n") -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _stub_rcs(monkeypatch: pytest.MonkeyPatch, rcs: dict[str, int]) -> list[tuple[str, ...]]:
+    """Make each tool return a chosen rc, and record every argv built.
+
+    The argv is recorded because WHICH paths reach WHICH tool is half of what
+    this module decides; a stub that only supplied exit codes would let the path
+    routing be deleted with every arm still green.
+    """
+    seen: list[tuple[str, ...]] = []
+
+    def _fake(_root: Path, argv: tuple[str, ...]) -> int:
+        seen.append(argv)
+        for name, rc in rcs.items():
+            if name in argv:
+                return rc
+        return 0
+
+    monkeypatch.setattr(check, "_run", _fake)
+    return seen
+
+
+def test_a_failing_tool_makes_the_whole_run_non_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """THE arm. The entire point is that a failure cannot report success."""
+    _touch(tmp_path / "a.py")
+    _stub_rcs(monkeypatch, {"ty": 1})
+
+    assert check.main(tmp_path, ["a.py"]) == 1
+
+
+def test_all_tools_pass_is_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CONTROL ARM: the run can actually reach 0, so the arm above discriminates."""
+    _touch(tmp_path / "a.py")
+    _stub_rcs(monkeypatch, {})
+
+    assert check.main(tmp_path, ["a.py"]) == 0
+
+
+def test_every_tool_runs_even_after_one_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One pass must report everything wrong with the file, not the first thing.
+
+    Stopping at the first failure turns one fast check into three slow ones —
+    fix an import order, re-run, and only then discover `ty` had an opinion.
+    """
+    _touch(tmp_path / "a.py")
+    seen = _stub_rcs(monkeypatch, {"ruff": 1})
+
+    check.run(tmp_path, ["a.py"])
+
+    assert [argv[2] for argv in seen] == ["ruff", "ruff", "ty"]
+
+
+def test_a_skipped_tool_is_never_rendered_as_a_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SKIP, ok and FAIL are three states, and collapsing two of them is the bug.
+
+    With no test path given, pytest is not run — and "did not run" must not
+    appear as `rc=0 ok`. That collapse is the same shape as a piped gate: a
+    question that was never asked, displayed as an answer.
+    """
+    _touch(tmp_path / "a.py")
+    _stub_rcs(monkeypatch, {})
+
+    rendered = check.render(check.run(tmp_path, ["a.py"]))
+
+    assert "pytest   SKIP" in rendered
+    assert "pytest   rc=" not in rendered
+
+
+def test_nothing_checkable_is_a_failure_not_a_quiet_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`kb-check -- src/x.rs` must not read as "x.rs is clean".
+
+    An argument the tool did not understand is the cheapest possible false
+    green, and the one most likely to be believed — the command looked like it
+    worked.
+    """
+    _touch(tmp_path / "x.rs", "fn main() {}\n")
+    _stub_rcs(monkeypatch, {})
+
+    assert check.main(tmp_path, ["x.rs"]) == 2
+
+
+def test_no_paths_at_all_is_also_a_failure(tmp_path: Path) -> None:
+    assert check.main(tmp_path, []) == 2
+    assert check.main(tmp_path, ["--verbose"]) == 2
+
+
+def test_a_source_file_pulls_in_its_sibling_test(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Editing a module should run the tests that cover it, without being asked."""
+    _touch(tmp_path / "python" / "src" / "kb_setup" / "widget.py")
+    _touch(tmp_path / "tests" / "test_widget.py")
+    seen = _stub_rcs(monkeypatch, {})
+
+    check.run(tmp_path, ["python/src/kb_setup/widget.py"])
+
+    assert any("pytest" in argv and "tests/test_widget.py" in argv for argv in seen)
+
+
+def test_a_sibling_that_does_not_exist_is_not_invented(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM on the convention: it fires on existence, not on the name.
+
+    Handing pytest a path that is not there makes it exit non-zero for a reason
+    that has nothing to do with the code — a red that means "your guess was
+    wrong" while reading as "your tests failed".
+    """
+    _touch(tmp_path / "python" / "src" / "kb_setup" / "lonely.py")
+    _stub_rcs(monkeypatch, {})
+
+    outcomes = {o.tool: o for o in check.run(tmp_path, ["python/src/kb_setup/lonely.py"])}
+
+    assert outcomes["pytest"].skipped
+
+
+def test_a_test_file_is_not_given_to_pytest_twice(tmp_path: Path) -> None:
+    """A path that IS a test needs no sibling, and a duplicate double-counts.
+
+    pytest collects a file once per mention, so the summary would report twice
+    the tests the caller can see in their own argument list.
+    """
+    _touch(tmp_path / "tests" / "test_widget.py")
+
+    assert check.test_paths(tmp_path, ["tests/test_widget.py", "tests/test_widget.py"]) == [
+        "tests/test_widget.py"
+    ]
+
+
+def test_a_directory_is_passed_through_untouched(tmp_path: Path) -> None:
+    """The three tools each walk a directory with their OWN exclusion rules.
+
+    Expanding it here would mean reimplementing all three and getting at least
+    one wrong — a file ruff excludes and this module does not would be reported
+    against rules its own config says do not apply.
+    """
+    (tmp_path / "python").mkdir()
+
+    assert check.python_paths(["python", "a.py", "notes.md"]) == ["python", "a.py"]
+
+
+def test_a_tool_that_cannot_start_is_distinguishable_from_one_that_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tool that could not START is not a tool that disagreed with the code.
+
+    Both are non-zero, so no pass/fail decision changes — but a run reporting
+    `rc=127` says fix your environment, and `rc=1` says fix your file.
+    """
+
+    def _boom(_argv: tuple[str, ...], **_kw: object) -> None:
+        raise OSError("no such tool")
+
+    monkeypatch.setattr(check.subprocess, "run", _boom)
+    _touch(tmp_path / "a.py")
+
+    outcomes = {o.tool: o for o in check.run(tmp_path, ["a.py"])}
+
+    assert outcomes["ruff"].rc == check.RC_COULD_NOT_RUN
+    assert not outcomes["ruff"].passed
+
+
+def test_format_is_checked_never_applied(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """This reports; it does not rewrite the file you are mid-thought in.
+
+    `mise run fmt` is the verb that writes. A dev-loop helper that silently
+    reformats is the same surprise as `hk fix` running where `hk check` was
+    meant.
+    """
+    _touch(tmp_path / "a.py")
+    seen = _stub_rcs(monkeypatch, {})
+
+    check.run(tmp_path, ["a.py"])
+
+    formatter = next(argv for argv in seen if "format" in argv)
+    assert "--check" in formatter
