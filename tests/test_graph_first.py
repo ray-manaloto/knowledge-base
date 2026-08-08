@@ -32,6 +32,13 @@ DENY_COMMANDS = [
     # POSITION rather than by shape. See `_looks_like_a_path`.
     "rg --sort path decide",  # an unlisted value-flag ate the repo-wide-ness
     "rg -g '!*.md' decide .",  # a NEGATED glob reaches every source file
+    # --- the round-2 P1, which was a defect IN the round-1 fix. A repo-wide
+    # search with NO path argument, whose PATTERN merely contains a slash: two
+    # individually-defensible "ambiguity resolves to ALLOW" defaults composed
+    # into the least safe answer. See the module docstring.
+    "rg 'src/utils'",
+    'rg "kb_setup/hook_guard"',
+    "rg mise/kb-query",
 ]
 
 # Never denied — the control arm.
@@ -43,7 +50,10 @@ ALLOW_COMMANDS = [
     "grep -c pattern python/src/kb_setup/cli.py",
     # Prose, logs and /tmp are not source — acceptance criterion 3.
     'rg "TODO" docs/',
-    'rg "rc=" /private/tmp/base-lint.log',
+    # Absent on purpose: a test must own its environment, and the ABSENCE proves
+    # the prose rule (absolute, outside the project root) is what allows it —
+    # not `_is_single_file`, which now requires the path to exist.
+    'rg "rc=" /private/tmp/no-such-run.log',
     'grep -rn "lesson" graphify-out/memory/',
     'rg "handoff" .agent/plans/',
     'rg "TODO" -g "*.md" .',
@@ -51,7 +61,7 @@ ALLOW_COMMANDS = [
     # habit the guard exists to encourage, which is how session_reflect's
     # `_last_arg` once reported two properly-armed probes as UNARMED.
     'mise run kb-query -- "how does X work" | rg decide',
-    "cat /private/tmp/base-lint.log | grep -r pattern",
+    "cat /private/tmp/no-such-run.log | grep -r pattern",
     # Text ABOUT a search is not a search. This is the direction all four of
     # hook_guard's first-day false positives came from.
     'echo "run rg decide python/ to find it"',
@@ -64,6 +74,16 @@ ALLOW_COMMANDS = [
     # stated invariant.
     'git commit -m "docs && rg decide"',
     "rg -e decide python/src/kb_setup/hook_guard.py",
+    # A backslash escapes a quote everywhere but inside single quotes; without
+    # that the walker closed the string early and wrongly split the rest (round 2).
+    #
+    # The escaped quote count must be ODD. The first fixture written here used
+    # `"say \"hi\" && rg decide"` — two escapes, so the naive walker closed and
+    # REOPENED the string and landed back in a quoted span by luck, leaving the
+    # `&&` unsplit. The arm SURVIVED against it: a fixture that cannot exhibit
+    # the harm, not a dead line (`a-surviving-arm-can-be-a-no-op`).
+    'git commit -m "a \\" && rg decide"',
+    'git commit -m "fix \\" && rg decide python/ && echo done"',
     # Not searchers at all.
     "ls -la",
     "mise run lint",
@@ -125,7 +145,7 @@ def test_denies_a_broad_grep_tool_call(tool_input: dict, cwd: Path) -> None:
     [
         {"pattern": "decide", "path": "python/src/kb_setup/hook_guard.py"},
         {"pattern": "decide", "path": "docs"},
-        {"pattern": "decide", "path": "/private/tmp/base-lint.log"},
+        {"pattern": "decide", "path": "/private/tmp/no-such-run.log"},
         {"pattern": "decide", "glob": "*.md"},
     ],
 )
@@ -164,6 +184,20 @@ def test_the_marker_is_scoped_to_one_session(cwd: Path) -> None:
     graph_first.note_query(cwd, "sess-a", "mise run kb-query -- q")
     assert graph_first.has_queried(cwd, "sess-a") is True
     assert graph_first.has_queried(cwd, "sess-b") is False
+
+
+def test_a_malformed_session_id_never_reaches_the_filesystem(cwd: Path) -> None:
+    """An id is interpolated into a filename, so it is checked rather than trusted.
+
+    Claude Code generates a uuid and no exploit was constructed, but well-formed
+    input is a property of the caller, not of this module. A rejected id is
+    treated as no id at all, which ALLOWS — the guard declining to act on input
+    it does not understand, never writing outside `.agent/state/` on it.
+    """
+    for bad in ("../../etc/passwd", "a/b", "x" * 200, ""):
+        graph_first.note_query(cwd, bad, "mise run kb-query -- q")
+        assert graph_first.has_queried(cwd, bad) is True, f"should allow on {bad!r}"
+    assert not (cwd / ".agent" / "state" / "graph-first").exists(), "wrote a marker anyway"
 
 
 def test_an_unknown_session_allows(cwd: Path) -> None:

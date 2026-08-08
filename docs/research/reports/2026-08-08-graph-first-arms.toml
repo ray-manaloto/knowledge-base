@@ -191,20 +191,18 @@ new = """    if False:
 # same wrong idea (identify a path by POSITION), so a shared root cause gets two
 # independent arms rather than one.
 
-# P1. `rg --sort path decide` was ALLOWED: an unlisted value-flag shifted the
-# positional split, so the pattern was read as a path.
-[[arm]]
-id = "paths-identified-by-position-not-shape"
-test = "test_denies_a_broad_source_search_before_any_query"
-file = "python/src/kb_setup/graph_first.py"
-old = """        if _looks_like_a_path(word, cwd):
-            paths.append(word)
-    return paths"""
-new = """        paths.append(word)
-    return paths[1:]"""
-
-# P2, the same defect from the other side: `-e` consumes the pattern, so the
-# unconditional "drop the first positional" dropped the real file.
+# P1 + P2, ONE arm because they are one mutation. Positional path-finding
+# produced `rg --sort path decide` ALLOWED (an unlisted value-flag shifted the
+# split, so the pattern was read as a path) and `rg -e decide <file>` DENIED
+# (`-e` consumed the pattern, so the real file was dropped as "the pattern").
+#
+# It was written as TWO arms, one per direction. The DENY-direction arm then
+# reported `red suite did not name the test`: under the round-2 fix to
+# `_is_single_file`, a non-existent path no longer counts as a targeted file, so
+# the P1 input now denies even with this mutation applied. The later fix
+# independently closed one direction of the earlier hole — worth recording,
+# because the arm still passed its sweep while measuring something other than
+# what its id claimed. Merged, and pointed at the direction it can still see.
 [[arm]]
 id = "first-positional-dropped-as-the-pattern"
 test = "test_allows_targeted_prose_and_piped_searches"
@@ -236,3 +234,41 @@ old = """        elif ch in "'\\"":
             quote = ch"""
 new = """        elif False:
             quote = ch"""
+
+# --- ROUND 2 FIX ARMS: the cold lane's findings against b5b2a0c --------------
+#
+# The P1 here was a defect IN a round-1 fix, which is why round 2 exists at all
+# (`a-fix-can-be-the-defect`). It is armed by restoring the exact prior line.
+
+# P1. `_is_single_file` returned True for a path that does not exist, on the
+# module's "ambiguity resolves to ALLOW" principle. Composed with
+# `_looks_like_a_path`, that let `rg 'src/utils'` — repo-wide, no path argument,
+# pattern merely containing a slash — pass as a targeted single-file search.
+[[arm]]
+id = "a-missing-path-counts-as-a-targeted-file"
+test = "test_denies_a_broad_source_search_before_any_query"
+file = "python/src/kb_setup/graph_first.py"
+old = """        return (cwd / target).expanduser().is_file()
+    except OSError:
+        return False"""
+new = """        return not (cwd / target).expanduser().is_dir()
+    except OSError:
+        return True"""
+
+# P3. A backslash escapes the next character outside single quotes. Without it
+# the walker closed a `"…\\"…"` string early and wrongly split the remainder.
+[[arm]]
+id = "escaped-quote-closes-the-string"
+test = "test_allows_targeted_prose_and_piped_searches"
+file = "python/src/kb_setup/graph_first.py"
+old = """        if ch == "\\\\" and quote != "'":"""
+new = """        if False:"""
+
+# P3. The session id is interpolated into a filename. A rejected id must be
+# treated as no id at all rather than written.
+[[arm]]
+id = "session-id-not-validated"
+test = "test_a_malformed_session_id_never_reaches_the_filesystem"
+file = "python/src/kb_setup/graph_first.py"
+old = """    return session_id if _SAFE_SESSION_ID.match(session_id) else \"\""""
+new = """    return session_id"""

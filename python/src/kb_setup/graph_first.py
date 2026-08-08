@@ -36,11 +36,21 @@ will invoke.*
 
 Precision, not evasion, is the risk this module manages. Every measured defect in
 this repo's guard family has been a false positive
-(`a-guards-false-positives-are-text-about-the-guard`), so every ambiguous input
-resolves to ALLOW: an unparsable command, an unknown session, an unwritable
-state directory, a path that does not exist. A guard that blocks legitimate work
-gets switched off by the humans it annoys, which costs more than the orientation
-it saves.
+(`a-guards-false-positives-are-text-about-the-guard`), so almost every ambiguous
+input resolves to ALLOW: an unparsable command, an unknown or malformed session
+id, an unwritable state directory, a searcher after a pipe. A guard that blocks
+legitimate work gets switched off by the humans it annoys, which costs more than
+the orientation it saves.
+
+**One ambiguity resolves the other way, and it is worth reading before adding
+another.** A path argument that does not EXIST is not treated as a targeted file
+(see :func:`_is_single_file`). It was, on the general principle above, and that
+composed with :func:`_looks_like_a_path`'s own ambiguity — resolved toward "this
+word is a path" — into the round-2 P1: `rg 'src/utils'`, a repo-wide search whose
+PATTERN merely contains a slash, read as a single-file search and defeated the
+module. Two individually defensible defaults chained into the least safe answer,
+which is the thing to watch for here: the principle is about a SINGLE ambiguous
+input, and it does not compose for free.
 """
 
 from __future__ import annotations
@@ -110,12 +120,30 @@ def _state_path(root: Path, session_id: str) -> Path:
     which is exactly the scope of the directive. `.agent/state/` is the
     conventional home (`agent-artifact-conventions.md`) and is gitignored, so the
     marker never travels between machines.
+
+    The id is interpolated into a filename, so it is CHECKED rather than trusted
+    (cold lane, round 2, P3). Claude Code generates a uuid and no exploit was
+    constructed, but "the value is well-formed today" is a property of the
+    caller, not of this function — and a `../` in it would write outside
+    `.agent/state/`. An id that fails the check is treated as no id at all by
+    :func:`_session_key`, which means ALLOW.
     """
     return root / ".agent" / "state" / "graph-first" / f"{session_id}.queried"
 
 
+#: A session id we are willing to put in a path: uuid-shaped, no separators, no
+#: dots, bounded length.
+_SAFE_SESSION_ID = re.compile(r"\A[A-Za-z0-9_-]{1,128}\Z")
+
+
+def _session_key(session_id: str) -> str:
+    """`session_id` if it is safe to use as a filename, else "" (which allows)."""
+    return session_id if _SAFE_SESSION_ID.match(session_id) else ""
+
+
 def has_queried(root: Path, session_id: str) -> bool:
     """Has a graph query run in this session? Unreadable state means YES (allow)."""
+    session_id = _session_key(session_id)
     if not session_id:
         return True
     try:
@@ -133,6 +161,7 @@ def note_query(root: Path, session_id: str, command: str) -> None:
     unblocks a search is a far cheaper error than a successful query that does
     not.
     """
+    session_id = _session_key(session_id)
     if not session_id or not _GRAPH_QUERY.search(command):
         return
     try:
@@ -174,6 +203,14 @@ def _segments(command: str) -> list[tuple[str, bool]]:
     piped, quote, start, i = False, "", 0, 0
     while i < len(body):
         ch = body[i]
+        if ch == "\\" and quote != "'":
+            # A backslash escapes the next character everywhere except inside
+            # single quotes, where the shell treats it literally. Without this the
+            # walker closed a `"…\"…"` string early and wrongly split the remainder
+            # (cold lane, round 2, P3 — a real parser defect, though no verdict
+            # flip was constructed for it).
+            i += 2
+            continue
         if quote:
             quote = "" if ch == quote else quote
         elif ch in "'\"":
@@ -311,18 +348,30 @@ def _paths_of(words: list[str], cwd: Path) -> list[str]:
 
 
 def _is_single_file(target: str, cwd: Path) -> bool:
-    """Is `target` one file rather than a tree?
+    """Is `target` one EXISTING file — the only thing that proves a search targeted?
 
-    A path that does not exist counts as a file — the ambiguous case resolves to
-    ALLOW like every other one here. A trailing `/` or `.` is a tree by spelling
-    alone and needs no filesystem at all.
+    A non-existent path used to count as a file, on this module's standing
+    "ambiguity resolves to ALLOW" principle. That was the round-2 P1, and the
+    lesson is about composition rather than about either decision:
+    `_looks_like_a_path` resolves its ambiguity toward "this is a path", and this
+    function resolved its ambiguity toward "a path is one file". Each is
+    defensible alone. Together they made `rg 'src/utils'` — a repo-wide search
+    with NO path argument, whose PATTERN merely contains a slash — read as a
+    targeted single-file search and sail through, defeating the module entirely.
+    Two safe-looking defaults, chained, produced the least safe answer.
+
+    So existence is now required. This is the one place the module denies on an
+    ambiguity, and the asymmetry is why: what is given up is a search of a file
+    that is not there, which would have returned nothing anyway and costs one
+    `kb-query` to retry — against a hole that let any slash-bearing pattern skip
+    the guard. A path that is absent is not evidence of targeting.
     """
     if target in {".", ".."} or target.endswith("/"):
         return False
     try:
-        return not (cwd / target).expanduser().is_dir()
+        return (cwd / target).expanduser().is_file()
     except OSError:
-        return True
+        return False
 
 
 def _searches_the_tree(segment: str, cwd: Path, *, piped: bool) -> str | None:
@@ -351,6 +400,19 @@ def _searches_the_tree(segment: str, cwd: Path, *, piped: bool) -> str | None:
     return pattern or "<what you were looking for>"
 
 
+def _refusal(question: str) -> str:
+    """The deny message, with `question` made safe to sit inside the quoted example.
+
+    The template prints `mise run kb-query -- "{question}"`, so a pattern that
+    already carries quotes rendered a command you cannot paste (cold lane, round
+    2, P3 — cosmetic, but the whole remediation is "run exactly this"). Quotes are
+    stripped rather than escaped: the question is a seed for a natural-language
+    graph query, not a regex to preserve faithfully.
+    """
+    cleaned = question.replace('"', " ").replace("'", " ").strip()
+    return _REASON.format(question=cleaned or "<what you were looking for>")
+
+
 def _decide_grep(tool_input: dict[str, object], cwd: Path) -> str | None:
     """The Grep TOOL has no shell string to parse — its scope is structured fields.
 
@@ -370,7 +432,7 @@ def _decide_grep(tool_input: dict[str, object], cwd: Path) -> str | None:
     ):
         return None
     question = pattern if isinstance(pattern, str) and pattern else "<what you were looking for>"
-    return _REASON.format(question=question)
+    return _refusal(question)
 
 
 def decide(
@@ -394,5 +456,5 @@ def decide(
     for segment, piped in _segments(command):
         pattern = _searches_the_tree(segment, cwd, piped=piped)
         if pattern:
-            return _REASON.format(question=pattern)
+            return _refusal(pattern)
     return None
