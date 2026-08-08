@@ -150,12 +150,11 @@ its issue tracker is the thing most likely to be quoted at you.
    fact costs seconds and settles which side is broken. Disagreement is a
    finding, not noise — and the finding is usually your probe.
 8. **A generated table drifts from its generator — verify, don't copy.** An
-   evidence table transcribed by hand (or built by a regex over the generator's
-   source) is a probe with no control arm. One built this way silently dropped a
-   row and attached two labels to the wrong rows. If a document carries a table
-   produced by a script, re-derive it from the script's own data structure and
-   assert the two agree; that check costs one command and is the only thing standing between a
-   reader and a confident wrong number.
+   evidence table transcribed by hand (or regexed out of the generator's source)
+   is a probe with no control arm; one built that way silently dropped a row and
+   put two labels on the wrong rows. Re-derive it from the script's own data
+   structure and assert the two agree — one command between a reader and a
+   confident wrong number.
 9. **"Unreachable by construction" is a CLAIM, and it needs an arm like any
    other.** To say it, *construct the reaching case and watch it be rejected*.
    If you can construct it, it is reachable and you have just found your
@@ -175,6 +174,17 @@ its issue tracker is the thing most likely to be quoted at you.
    test's fixtures could not exhibit the harm (rule 3's bound, wearing a
    different hat). Treat a survival you predicted as owing MORE evidence than a
    surprising one, not less.
+
+   **And an arm can keep PASSING while measuring something its id does not
+   name** — a later fix can close the direction it probed, leaving it green
+   against a different failure. `kb-arms`' *red suite did not name the test*
+   catches that; re-derive what each arm measures after a fix, not just its anchor.
+10. **A "resolves to X" default is about ONE input, and does not compose.** Two
+   such decisions feeding each other can give the answer neither would alone: a
+   guard resolving "is this a path?" toward yes AND "does it exist?" toward
+   treat-it-as-a-file let a repo-wide search whose PATTERN merely held a `/`
+   pass as a targeted one. Neither function was wrong alone, so no arm on either
+   could find it — arm the CHAIN.
 
 ## Applies to
 

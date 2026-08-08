@@ -136,6 +136,25 @@ finding count and the worst finding.
 citation is labelled `unverified` and reported as such rather than dropped —
 dropping it hides a lead, promoting it launders a guess.
 
+**A lane killed by its watchdog reviewed a SUBSET, and nothing records that.**
+The receipt has no field for it, the report reads like any other, and *N
+findings* from a lane that died mid-file is indistinguishable from *N findings*
+from one that finished. Measured on #253: round 1 burned its whole 600s window
+on `graph_first.py`; it *opened* `hook_guard.py`, `eval_cases.py`,
+`settings.json` and the rule docs but reached no findings in them before it was
+killed. Read-but-unanalysed is the trap — harder to tell from a clean pass than
+never-opened, because the transcript shows the file. (This paragraph first said
+"never opened", and the round-2 lane caught it against the round-1 report still
+on disk. Even the lesson about overstated coverage overstated its own.)
+
+So when a lane times out, **name what it did not finish** — distinguishing
+not-opened from opened-without-findings — in the report and in the PR body, and
+aim the next round at exactly those. That next round is still round 2 of the
+two-round bound, not an extra one: a timeout costs coverage and buys no rounds.
+Tell every lane to write its report incrementally
+(`agent-report-persistence.md` rule 3); the round-1 lane emitted nothing on
+death, and only its transcript survived.
+
 ### 4. Bound the review at TWO rounds
 
 Round 1 reviews. You fix. Round 2 verifies, **and is the last round.**
