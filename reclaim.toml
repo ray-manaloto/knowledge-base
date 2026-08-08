@@ -84,16 +84,24 @@ kind = "dirs"
 age_days = 30
 paths = ["~/.cache"]
 
+# Content-addressed: every install touches its top-level directories, so an
+# age filter reports 0B forever here. `whole_tree` opts out of the age check
+# for this category ONLY — the package manager re-downloads on demand.
 [category.caches_bun]
 enabled = true
 kind = "dirs"
 age_days = 30
+whole_tree = true
 paths = ["~/.bun/install/cache"]
 
+# Content-addressed: every install touches its top-level directories, so an
+# age filter reports 0B forever here. `whole_tree` opts out of the age check
+# for this category ONLY — the package manager re-downloads on demand.
 [category.caches_npm]
 enabled = true
 kind = "dirs"
 age_days = 30
+whole_tree = true
 paths = ["~/.npm/_cacache"]
 
 # Homebrew is its OWN kind, not a `dirs` path, because `brew cleanup` reaches

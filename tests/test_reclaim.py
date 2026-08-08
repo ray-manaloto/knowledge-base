@@ -225,3 +225,175 @@ def test_brew_freed_bytes_reads_a_size_mid_sentence():
     real = "==> This operation would free approximately 9.1GB of disk space."
     assert reclaim._brew_freed_bytes(real) == 9_100_000_000
     assert reclaim._brew_freed_bytes("nothing to say here") == 0
+
+
+# ─── regressions from the 2026-08-07 two-axis review ─────────────────────────
+#
+# Every test below FAILS against the code as first committed. They exist because
+# the original suite asked only "inside the root" vs "outside the root" and never
+# whether the boundary ITSELF was excluded — so `--apply` would have rmtree'd the
+# whole of ~/Library/Caches while 17 green tests and four green gates said fine.
+
+
+def test_guard_refuses_the_declared_root_itself(tmp_path):
+    """A root is a container, not a candidate. THIS is the near-miss."""
+    root = tmp_path / "root"
+    root.mkdir()
+    with pytest.raises(reclaim.ReclaimError, match="root itself"):
+        reclaim._guard_path(root, [root], tmp_path / "repo")
+
+
+def test_scan_dirs_never_emits_the_configured_root(tmp_path):
+    """Whatever else it reports, the root must never be a deletion target."""
+    root = tmp_path / "cache"
+    (root / "old-entry").mkdir(parents=True)
+    cat = _cat(kind="dirs", age_days=0, options={"paths": [str(root)]})
+    findings = reclaim.scan_dirs(cat, tmp_path / "repo")
+    assert all(f.path != root for f in findings), "scan_dirs offered the root for deletion"
+
+
+def test_scan_dirs_skips_an_entry_touched_inside_the_age_window(tmp_path):
+    """age_days was declared on every cache category and read by none of them."""
+    root = tmp_path / "cache"
+    fresh = root / "in-use"
+    fresh.mkdir(parents=True)
+    (fresh / "live.bin").write_bytes(b"x" * 4096)
+
+    cat = _cat(kind="dirs", age_days=30, min_size_mb=0, options={"paths": [str(root)]})
+    findings = reclaim.scan_dirs(cat, tmp_path / "repo")
+
+    assert findings == [], "a cache written seconds ago was offered for deletion"
+
+
+def test_touched_since_reports_recent_when_it_cannot_ask(tmp_path):
+    """A failed probe must never be rendered as permission to delete."""
+    assert reclaim._touched_since(tmp_path / "does-not-exist", "2000-01-01T00:00:00") is True
+
+
+def test_age_stamp_is_absolute_because_the_relative_form_is_unusable(tmp_path):
+    """Control arm: the ABSOLUTE form filters; the relative form does not work here.
+
+    `find -newermt '-30 days'` errors outright on this machine's find, and on BSD
+    find it silently matches nothing — indistinguishable from "no recent files",
+    which would mark a live cache as stale and delete it.
+    """
+    old = tmp_path / "old.bin"
+    old.write_bytes(b"x")
+    os.utime(old, (0, 0))
+    new = tmp_path / "new.bin"
+    new.write_bytes(b"x")
+
+    stamp = reclaim._age_stamp(30)
+    assert stamp[4] == "-", f"not an absolute timestamp: {stamp}"
+    assert "T" in stamp, f"not an absolute timestamp: {stamp}"
+    # The mechanism discriminates: fresh file seen, ancient file not.
+    assert reclaim._touched_since(new, stamp) is True
+    assert reclaim._touched_since(old, stamp) is False
+
+
+def test_ollama_age_filter_keeps_a_fresh_model_and_drops_an_old_one():
+    """`keep = []` plus an unread age_days meant every model was a candidate."""
+    assert reclaim._ollama_is_stale("2 weeks ago", 14) is True
+    assert reclaim._ollama_is_stale("3 days ago", 14) is False
+    assert reclaim._ollama_is_stale("2 minutes ago", 14) is False
+    # Unparsable or absent -> NOT stale. An age that could not be established
+    # must never license a deletion.
+    assert reclaim._ollama_is_stale("", 14) is False
+    assert reclaim._ollama_is_stale("who knows", 14) is False
+
+
+def test_dir_size_keeps_dus_total_when_a_subtree_was_unreadable(tmp_path, monkeypatch):
+    """`du` exits 1 on an unreadable subtree while still printing a correct total.
+
+    Gating on rc==0 discarded that number and fell back to the slow python walk
+    for `~/Library/Caches` — the single largest tree, and the one the du rewrite
+    existed to speed up.
+    """
+    monkeypatch.setattr(reclaim, "_run", lambda *_a, **_k: (1, "2048\t/somewhere"))
+    (tmp_path / "f.bin").write_bytes(b"x")
+    assert reclaim._dir_size(tmp_path) == 2048 * 1024
+
+
+def test_only_with_a_missing_value_is_an_error_not_a_silent_widening():
+    """`--only` with no value returned an empty set, which meant EVERY category."""
+    with pytest.raises(reclaim.ReclaimError, match="needs a comma-separated value"):
+        reclaim._opt_list(["--apply", "--only"], "--only")
+    with pytest.raises(reclaim.ReclaimError, match="needs a comma-separated value"):
+        reclaim._opt_list(["--only", "--apply"], "--only")
+    assert reclaim._opt_list(["--only", "docker,ollama"], "--only") == {"docker", "ollama"}
+
+
+def test_main_exits_2_when_a_filter_flag_has_no_value(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "reclaim.toml").write_text(
+        "[defaults]\nage_days = 1\n\n[category.docker]\nenabled = true\nkind = 'docker'\n",
+        encoding="utf-8",
+    )
+    assert reclaim.main(["--only"], repo) == 2
+
+
+def test_docker_prune_respects_containers_false(monkeypatch):
+    """A config key that is declared and never read is a protection that lies."""
+    calls: list[list[str]] = []
+
+    def fake_run(argv, *, env_context=None) -> tuple[int, str]:
+        calls.append(argv)
+        return 0, ""
+
+    monkeypatch.setattr(reclaim, "_run", fake_run)
+    monkeypatch.setattr(reclaim, "_dir_size", lambda _p: 0)
+    cat = _cat(
+        kind="docker",
+        options={
+            "engines": [{"context": "x", "disk_image": "/nonexistent"}],
+            "prune": {"containers": False},
+        },
+    )
+    lines = reclaim.apply_docker(cat)
+    assert any("SKIPPED system prune" in line for line in lines)
+    assert not any("prune" in " ".join(c) for c in calls), "pruned despite containers=false"
+
+
+def test_scan_ollama_does_not_offer_a_freshly_pulled_model(monkeypatch):
+    """The age filter must be wired INTO scan_ollama, not merely exist beside it.
+
+    A mutation that removed the `_ollama_is_stale` call from `scan_ollama`
+    SURVIVED the first arms run: the unit test above exercised the helper
+    directly and never its point of use, so the wiring was untested while the
+    logic looked covered.
+    """
+    listing = (
+        "NAME              ID      SIZE      MODIFIED\n"
+        "fresh:latest      abc123  8.0 GB    2 minutes ago\n"
+        "ancient:latest    def456  9.0 GB    6 months ago\n"
+    )
+    monkeypatch.setattr(reclaim.shutil, "which", lambda _n: "/usr/local/bin/ollama")
+    monkeypatch.setattr(reclaim, "_run", lambda *_a, **_k: (0, listing))
+    cat = _cat(kind="ollama", age_days=14, options={"keep": []})
+
+    labels = [f.label for f in reclaim.scan_ollama(cat, Path("/repo"))]
+
+    assert "fresh:latest" not in labels, "a model pulled 2 minutes ago was offered for deletion"
+    assert "ancient:latest" in labels
+
+
+def test_whole_tree_is_opt_in_and_never_targets_the_root(tmp_path):
+    """`whole_tree` bypasses the age check — but only when explicitly written."""
+    root = tmp_path / "cache"
+    entry = root / "content-v2"
+    entry.mkdir(parents=True)
+    (entry / "blob").write_bytes(b"x" * 4096)  # fresh, so age would exclude it
+
+    off = _cat(kind="dirs", age_days=30, min_size_mb=0, options={"paths": [str(root)]})
+    assert reclaim.scan_dirs(off, tmp_path / "repo") == [], "age check skipped without opt-in"
+
+    on = _cat(
+        kind="dirs",
+        age_days=30,
+        min_size_mb=0,
+        options={"paths": [str(root)], "whole_tree": True},
+    )
+    findings = reclaim.scan_dirs(on, tmp_path / "repo")
+    assert [f.path for f in findings] == [entry]
+    assert root not in [f.path for f in findings], "whole_tree offered the root itself"

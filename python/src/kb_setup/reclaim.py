@@ -131,7 +131,14 @@ def _guard_path(target: Path, roots: list[Path], repo_root: Path) -> None:
         raise ReclaimError(f"refusing to act inside the repository: {target}")
     for root in roots:
         rr = root.expanduser().resolve()
-        if rr in (resolved, *resolved.parents):
+        if rr == resolved:
+            # A root is a CONTAINER, never a candidate. Permitting equality let
+            # `scan_dirs` emit the configured root as its own finding, so
+            # `--apply` would have rmtree'd the whole of ~/Library/Caches. The
+            # tests passed because they only ever asked "inside" vs "outside"
+            # and never that the boundary itself is excluded.
+            raise ReclaimError(f"refusing to act on the declared root itself: {target}")
+        if rr in resolved.parents:
             return
     raise ReclaimError(f"{target} escapes every declared root {[str(r) for r in roots]}")
 
@@ -169,8 +176,13 @@ def _dir_size(path: Path) -> int:
     if not path.exists():
         return 0
     if shutil.which("du"):
-        rc, out = _run(["du", "-sk", str(path)])
-        if rc == 0 and out:
+        # NOT `rc == 0`. `du` exits 1 when ANY subtree is unreadable while still
+        # printing a correct total, and `~/Library/Caches` reproducibly exits 1
+        # on macOS (sandboxed app caches) — the single largest configured tree.
+        # Gating on rc threw the good number away and fell back to the slow walk
+        # for exactly the path the du rewrite existed to speed up.
+        _rc, out = _run(["du", "-sk", str(path)])
+        if out:
             try:
                 return int(out.split()[0]) * 1024
             except ValueError, IndexError:
@@ -287,36 +299,107 @@ def scan_ollama(cat: Category, _repo_root: Path) -> list[Finding]:
         if len(parts) < _OLLAMA_MIN_COLUMNS:
             continue
         name = parts[0]
-        if name in keep:
+        modified = " ".join(parts[4:])
+        if name in keep or not _ollama_is_stale(modified, cat.age_days):
             continue
         out.append(
             Finding(
                 category=cat.name,
                 label=name,
                 size_bytes=_parse_size("".join(parts[2:4]).replace(" ", "")),
-                detail=" ".join(parts[4:]) or "no modified time reported",
+                detail=modified or "no modified time reported",
             )
         )
     return out
 
 
 def scan_dirs(cat: Category, _repo_root: Path) -> list[Finding]:
-    """Report each configured cache directory's total size."""
+    """Report ENTRIES INSIDE each configured cache root that are older than `age_days`.
+
+    Two things this deliberately does not do, both of which it used to.
+
+    It never emits the configured root as a finding. Doing so made `--apply`
+    an `rmtree` of the whole of `~/Library/Caches` — including caches of running
+    applications — and, since most of that tree needs Full Disk Access, it would
+    have failed partway and left it half-destroyed.
+
+    And it no longer ignores `age_days`. The key was declared on every cache
+    category and read by none of them, so a config advertising a 30-day window
+    deleted everything. `reclaim.toml` says age applies everywhere; now it does.
+    """
+    cutoff = _age_stamp(cat.age_days)
     out: list[Finding] = []
     for raw in cat.options.get("paths", []):
-        p = _expand(raw)
-        size = _dir_size(p)
-        if size >= cat.min_size_bytes:
-            out.append(
-                Finding(
-                    category=cat.name,
-                    label=str(p),
-                    size_bytes=size,
-                    detail="regenerable cache",
-                    path=p,
-                )
-            )
+        root = _expand(raw)
+        if not root.is_dir():
+            continue
+        for entry in sorted(root.iterdir()):
+            hit = _stale_entry(cat, entry, cutoff)
+            if hit:
+                out.append(hit)
     return out
+
+
+def _stale_entry(cat: Category, entry: Path, cutoff: str) -> Finding | None:
+    """One cache entry, or None if anything inside it was touched since `cutoff`.
+
+    `whole_tree = true` opts a category out of the age check. It exists because
+    the age filter is wrong for a CONTENT-ADDRESSED cache: `~/.npm/_cacache` has
+    three top-level directories that every install touches, so an age-filtered
+    scan reports 0B forever and the category is dead weight. It stays OFF by
+    default and must be written per category, because "delete regardless of age"
+    is exactly the behaviour that made the first version dangerous — the point is
+    that it is now a stated choice rather than an unstated one. The root itself
+    is still never a target; only its entries are.
+    """
+    if entry.is_symlink():
+        return None
+    if not cat.options.get("whole_tree", False) and _touched_since(entry, cutoff):
+        return None
+    size = _dir_size(entry)
+    if size < cat.min_size_bytes:
+        return None
+    return Finding(
+        category=cat.name,
+        label=entry.name,
+        size_bytes=size,
+        detail=(
+            "regenerable — WHOLE TREE, age ignored (whole_tree=true)"
+            if cat.options.get("whole_tree", False)
+            else f"regenerable — nothing inside modified since {cutoff[:10]}"
+        ),
+        path=entry,
+    )
+
+
+def _touched_since(path: Path, cutoff: str) -> bool:
+    """True if ANY file under `path` was modified since `cutoff`.
+
+    A directory's own mtime does not move when a file deep inside it is
+    rewritten in place, so the entry's `st_mtime` is not a safe staleness
+    signal for a cache tree. `find -newermt` answers the real question and
+    `-quit` stops it at the first hit.
+
+    The cutoff is an ABSOLUTE timestamp on purpose: the relative form
+    (`-newermt '-30 days'`) is not accepted by the `find` on this machine at
+    all, and on BSD `find` it silently matches nothing — indistinguishable
+    from "no recent files", which would mark a live cache as stale.
+    Control-armed in `tests/test_reclaim.py`.
+    """
+    rc, out = _run(["find", str(path), "-newermt", cutoff, "-print", "-quit"])
+    if rc != 0 and not out:
+        # Could not ask. Treat as RECENT — a scan that failed must never be
+        # rendered as permission to delete (`probes-need-a-control-arm.md`).
+        return True
+    return bool(out.strip())
+
+
+def _age_stamp(age_days: int) -> str:
+    """The cutoff as `YYYY-MM-DDTHH:MM:SS`, which `find -newermt` accepts."""
+    import datetime
+
+    when = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=age_days)
+    return when.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def scan_files(cat: Category, _repo_root: Path) -> list[Finding]:
@@ -471,6 +554,23 @@ def _brew_freed_bytes(out: str) -> int:
     return 0
 
 
+def _ollama_is_stale(modified: str, age_days: int) -> bool:
+    """True when `ollama list`'s MODIFIED column is older than `age_days`.
+
+    `ollama` prints a relative phrase ("2 weeks ago", "3 days ago"), not a
+    timestamp, so this parses that phrase. An UNPARSABLE or empty value is
+    treated as NOT stale — a model whose age could not be established must
+    never become a deletion candidate. Before this existed, `age_days` was
+    declared on the category and read by nothing, so `--apply` removed every
+    model including one pulled minutes earlier.
+    """
+    units = {"second": 0, "minute": 0, "hour": 0, "day": 1, "week": 7, "month": 30, "year": 365}
+    m = re.match(r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago", modified.strip())
+    if not m:
+        return False
+    return int(m.group(1)) * units[m.group(2)] >= age_days
+
+
 _SCANNERS = {
     "docker": scan_docker,
     "ollama": scan_ollama,
@@ -536,6 +636,15 @@ def apply_docker(cat: Category) -> list[str]:
         argv = ["docker", "system", "prune", "--force", "--filter", f"until={hours}h"]
         if prune.get("images", True):
             argv.append("--all")
+        if not prune.get("containers", True):
+            # `docker system prune` ALWAYS removes stopped containers and has no
+            # flag to keep them, so honouring `containers = false` means not
+            # running it. The key was previously declared and never read, which
+            # let the config claim a protection it did not provide.
+            lines.append(
+                f"  {ctx}: SKIPPED system prune — reclaim.toml sets prune.containers=false"
+            )
+            continue
         if prune.get("volumes", False):
             argv.append("--volumes")
         rc, out = _run(argv, env_context=ctx)
@@ -653,10 +762,10 @@ def _report(findings: list[Finding], cats: list[Category]) -> int:
 def main(argv: list[str], repo_root: Path) -> int:
     """`kb-setup reclaim` — report by default, reclaim only on an explicit --apply."""
     apply_it = "--apply" in argv
-    only = _opt_list(argv, "--only")
-    skip = _opt_list(argv, "--skip")
     cfg_path = repo_root / "reclaim.toml"
     try:
+        only = _opt_list(argv, "--only")
+        skip = _opt_list(argv, "--skip")
         cats = load_config(cfg_path)
     except ReclaimError as err:
         print(f"reclaim: {err}")
@@ -680,8 +789,11 @@ def _opt_list(argv: list[str], flag: str) -> set[str]:
     if flag not in argv:
         return set()
     idx = argv.index(flag)
-    if idx + 1 >= len(argv):
-        return set()
+    if idx + 1 >= len(argv) or argv[idx + 1].startswith("--"):
+        # A filter flag with no value used to return an empty set, which reads
+        # as "no filter" and silently WIDENED `--only` to every category — the
+        # opposite of what the user asked for, on the destructive path.
+        raise ReclaimError(f"{flag} needs a comma-separated value")
     return {p.strip() for p in argv[idx + 1].split(",") if p.strip()}
 
 

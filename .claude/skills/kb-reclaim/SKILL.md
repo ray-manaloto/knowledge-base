@@ -16,7 +16,7 @@ It **reports and deletes nothing**. Reclaiming is always an explicit second act:
 ```bash
 mise run kb-reclaim -- --apply
 mise run kb-reclaim -- --only docker,ollama --apply
-mise run kb-reclaim -- --skip caches
+mise run kb-reclaim -- --skip caches_system
 ```
 
 Policy lives in **`reclaim.toml`** at the repo root; the engine is
@@ -29,15 +29,45 @@ Policy lives in **`reclaim.toml`** at the repo root; the engine is
 | category | `kind` | what it finds |
 |---|---|---|
 | `docker` | `docker` | per-engine reclaimable images / build cache / volumes / containers, plus each engine's host-side disk image |
-| `ollama` | `ollama` | local model weights, with a `keep` allowlist |
-| `caches` | `dirs` | `~/Library/Caches`, `~/.cache`, bun and npm caches |
+| `ollama` | `ollama` | local model weights older than `age_days`, with a `keep` allowlist |
+| `caches_system` | `dirs` | entries in `~/Library/Caches` untouched for `age_days` |
+| `caches_xdg` | `dirs` | entries in `~/.cache` untouched for `age_days` |
+| `caches_bun` | `dirs` | `~/.bun/install/cache` — `whole_tree`, see below |
+| `caches_npm` | `dirs` | `~/.npm/_cacache` — `whole_tree`, see below |
+| `homebrew` | `homebrew` | `brew cleanup --prune`: stale downloads AND superseded Cellar versions |
 | `mise_installs` | `mise_versions` | superseded tool versions, keeping pinned + N newest |
 | `downloads` | `files` | installers/archives over a size and age threshold |
+
+One category per artifact type on purpose: a lumped `caches` block was
+all-or-nothing, so you could not keep bun's cache while dropping npm's.
 
 Every one can be disabled, re-scoped or re-thresholded in `reclaim.toml` without
 touching python. `--only` / `--skip` narrow a single run.
 
 ## The three things that will bite you
+
+### 0. A `dirs` category deletes ENTRIES, never the root — and this was a near-miss
+
+The first version emitted the **configured root itself** as a finding and never
+read `age_days`, so `--apply` would have `rmtree`d the whole of
+`~/Library/Caches`, `~/.cache`, `~/.bun/install/cache` and `~/.npm/_cacache`
+— caches of running apps included — while every category's config advertised a
+30-day window. `_guard_path` permitted it because `rr in (resolved, *parents)`
+is true on equality. **17 tests and four gates were green over this**; they only
+ever asked "inside the root" vs "outside the root", never whether the boundary
+itself was excluded.
+
+Now: `_guard_path` refuses `target == root`, and `scan_dirs` emits per-entry
+findings filtered by `find -newermt <absolute timestamp>` — absolute because the
+relative form errors outright on this machine and silently matches nothing on
+BSD `find`, which would mark a live cache as stale. A staleness probe that
+**fails** returns "recent", never "safe to delete".
+
+**`whole_tree = true`** opts one category out of the age check, for
+content-addressed caches (`_cacache`) whose top-level directories every install
+touches — an age-filtered scan reports `0B` there forever. It is off by default
+and must be written per category: "delete regardless of age" is the behaviour
+that made the first version dangerous, so it is now a stated choice.
 
 ### 1. A container disk image is SPARSE — never trust its apparent size
 
