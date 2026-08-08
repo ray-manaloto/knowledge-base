@@ -153,6 +153,84 @@ def test_a_directory_that_does_hold_python_still_runs(
     assert check.main(tmp_path, ["pkg"]) == 0
 
 
+def test_a_directory_whose_only_python_is_tool_excluded_is_not_checkable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The FIRST fix closed only the instance it was handed.
+
+    `rglob("*.py")` does not apply ruff/ty exclusions, so a directory whose only
+    Python sits under `.venv` (or `graphify-out`, `node_modules`) answered True,
+    ruff then reported "No Python files found" and exited **0**, and the summary
+    printed three `rc=0 ok` rows — the identical false green the round-1
+    BLOCKING finding named, one layer narrower. A finding is a SAMPLE of a
+    class.
+
+    Ruff is stubbed to return what it really returns for that input — empty
+    output — so the assertion is about OUR handling of that answer, not about
+    ruff's behaviour, which is measured separately and recorded in the
+    docstring.
+    """
+    (tmp_path / "proj" / ".venv" / "lib").mkdir(parents=True)
+    _touch(tmp_path / "proj" / ".venv" / "lib" / "mod.py")
+    monkeypatch.setattr(check, "_ruff_would_check", lambda _root, _paths: "")
+
+    assert check.holds_python(tmp_path, ["proj"]) is False
+
+
+def test_a_directory_ruff_would_really_check_is_checkable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: asking ruff must not make every directory unanswerable.
+
+    Without this, `_ruff_would_check` returning "" unconditionally passes the
+    test above and breaks the task's most useful invocation — the same
+    over-correction the previous round's control arm caught.
+    """
+    (tmp_path / "pkg").mkdir()
+    _touch(tmp_path / "pkg" / "mod.py")
+    monkeypatch.setattr(check, "_ruff_would_check", lambda _root, _paths: "pkg/mod.py")
+
+    assert check.holds_python(tmp_path, ["pkg"]) is True
+
+
+def test_ruff_failing_to_answer_is_not_a_clean_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FAIL-CLOSED: an unanswerable question must not read as "nothing wrong".
+
+    If ruff cannot be run at all, `_ruff_would_check` returns "" and `main`
+    exits 2. The tempting alternative — assume there is Python and let the tools
+    decide — hands the verdict to three tools that were never launched.
+    """
+
+    def _boom(_argv: tuple[str, ...], **_kw: object) -> None:
+        raise OSError("ruff is gone")
+
+    (tmp_path / "pkg").mkdir()
+    _touch(tmp_path / "pkg" / "mod.py")
+    monkeypatch.setattr(check.subprocess, "run", _boom)
+
+    assert check.holds_python(tmp_path, ["pkg"]) is False
+
+
+def test_a_named_python_file_skips_the_ruff_question_entirely(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A `.py` argument must not pay a subprocess to be believed.
+
+    Also the arm on fail-closed NOT over-reaching: with ruff unrunnable, a named
+    `.py` file is still checkable, because the tools' non-zero for an absent
+    file is the correct answer and must still be reached.
+    """
+
+    def _boom(_argv: tuple[str, ...], **_kw: object) -> None:
+        raise AssertionError("ruff must not be consulted for a named .py path")
+
+    monkeypatch.setattr(check.subprocess, "run", _boom)
+
+    assert check.holds_python(tmp_path, ["a.py"]) is True
+
+
 def test_a_named_python_file_reaches_the_tools_even_if_absent(tmp_path: Path) -> None:
     """A `.py` path is trusted WITHOUT a stat, and that is deliberate.
 

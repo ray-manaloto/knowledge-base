@@ -129,17 +129,55 @@ def holds_python(repo_root: Path, paths: list[str]) -> bool:
 
     A `.py` path is trusted WITHOUT a stat: a named file that does not exist
     must still reach the tools, because they exit non-zero for it and that
-    non-zero is the correct answer. Only directories are inspected, and only far
-    enough to answer "any at all" — `next(..., None)` stops at the first hit
-    rather than walking a large tree to build a list nothing reads.
+    non-zero is the correct answer.
+
+    A DIRECTORY IS ANSWERED BY RUFF, NOT BY `rglob`, and that is the second
+    round of this fix rather than its first shape. `rglob("*.py")` does not
+    apply the tools' exclusions, so a directory whose only Python sits under
+    `.venv` / `graphify-out` / `node_modules` came back True, ruff then said
+    *"No Python files found"* and exited **0**, and the summary printed three
+    `rc=0 ok` rows — the identical false green the first fix was written to
+    remove, one layer narrower. A finding is a SAMPLE of a class, and the first
+    fix closed only the instance it was handed.
+
+    `ruff check --show-files` prints the files ruff WOULD check, so the question
+    is asked of the tool instead of reimplementing three different exclusion
+    rule sets — which `python_paths` above explicitly warns against doing.
+
+    LIMITATION, stated rather than implied: ruff is a PROXY for all three tools.
+    ty's exclusions may differ, so a directory ruff excludes entirely and ty
+    would not is reported as nothing-to-check. That direction is the safe one
+    (it refuses rather than falsely passing), and closing it would mean asking
+    each tool separately for a case nobody has hit.
     """
-    for path in paths:
-        if path.endswith(".py"):
-            return True
-        candidate = _resolve(repo_root, path)
-        if candidate.is_dir() and next(candidate.rglob("*.py"), None) is not None:
-            return True
-    return False
+    if any(p.endswith(".py") for p in paths):
+        return True
+    directories = [p for p in paths if _resolve(repo_root, p).is_dir()]
+    return bool(directories) and bool(_ruff_would_check(repo_root, directories))
+
+
+def _ruff_would_check(repo_root: Path, paths: list[str]) -> str:
+    """Ruff's own list of the files it would check under `paths`; "" if none.
+
+    Captured rather than inherited — this one is a QUESTION, not a check, so its
+    output is data for the caller rather than something the user should see.
+    Every other invocation in this module inherits stdio on purpose.
+
+    A failure to run returns "" (nothing to check), which makes `main` exit 2
+    rather than 0. Fail-closed: an unanswerable question must not read as a
+    clean verdict, which is the whole subject of this module.
+    """
+    try:
+        completed = subprocess.run(
+            ("uv", "run", "ruff", "check", "--show-files", *paths),
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError, subprocess.SubprocessError:
+        return ""
+    return completed.stdout.strip()
 
 
 def sibling_test(repo_root: Path, path: str) -> str | None:

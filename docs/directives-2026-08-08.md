@@ -3,8 +3,30 @@
 **Status: the architectural program in §2 is NOT built. It is recorded here so
 it cannot be lost.** §1 shipped. §3 are findings that outlive the round.
 
-Written because Ray asked that nothing from this session be lost, and audited by
-a subagent against the raw session transcript rather than against recollection.
+Written because Ray asked that nothing from this session be lost:
+
+```text
+dont lose any of the requirements and notes ive provided in this session
+it should be persisted to a file where a subagent reviews this session to make sure nothing is lost
+```
+
+**The audit was run, and the first attempt at it FAILED — recorded because a
+failed audit reported as a clean one is worse than no audit.** A delegated
+subagent went silent, so the extraction was redone directly, and the first
+parser was wrong in BOTH directions: it counted `/clear` and an injected skill
+body as things Ray typed (4 false turns), and missed every mid-turn message.
+
+Cause: **a mid-turn user message carries no `message`/`role` key at all.** It is
+a top-level `{"type": "queue-operation", "operation": "enqueue", "content": …}`
+record, invisible to any role-based reader. Control arm before believing
+anything: six strings Ray demonstrably wrote → 8/39/3/3/9/14 hits, a
+known-absent string → 0. The data was always there; the reader was the defect —
+the same shape as querying `--prose` for a question about code (§2.6b).
+
+**Audit result: 4 genuine mid-turn messages and 4 `AskUserQuestion` answers
+(3 carrying free text), all present here.** Two were originally captured by
+their EFFECT rather than their words, and are now quoted verbatim — the one
+above, and §2.6's. An effect is not a note.
 
 ---
 
@@ -135,8 +157,13 @@ structured event stream with a human-rendering stdout sink* rather than
 
 ### 2.6 What the GRAPH says about §2 — asked properly, and control-armed
 
-Ray had to correct this twice, and the second correction was right: the round
-invoked `/graphify` once, ran **one** `kb-query`, **zero** `graphify path`,
+Ray had to correct this twice. The second correction, verbatim:
+
+```text
+you are still not running /graphify and graphiy query/explain and reflect and generated artifacts to research
+```
+
+It was right: the round invoked `/graphify` once, ran **one** `kb-query`, **zero** `graphify path`,
 **zero** `god-nodes`, and never opened `GRAPH_REPORT.md`, `wiki/` or
 `reflections/LESSONS.md` — including for §2, the largest research question in
 the session, which was deferred without querying the corpus at all. Asked
