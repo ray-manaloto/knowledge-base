@@ -20,7 +20,16 @@
 [defaults]
 # Fallback for any category that does not set its own.
 age_days = 30
-# Findings smaller than this are counted in the total but not listed individually.
+# Findings smaller than this are DROPPED — not scanned-and-summed. They do not
+# appear in the listing and they are NOT in the category total, so the headline
+# number is a floor with respect to this threshold as well as to anything the
+# scan could not reach. (This comment said "counted in the total but not listed"
+# until the standards review checked it against the code; on a tool whose whole
+# thesis is that an incomplete total must say so, its own config overstating
+# completeness was the worst possible place for that error.)
+#
+# Only the per-category LISTING tail is summed-but-unlisted: at most 12 findings
+# print, and the rest are reported as "… and N more totalling X".
 min_size_mb = 100
 
 

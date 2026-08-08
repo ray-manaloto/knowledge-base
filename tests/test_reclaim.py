@@ -350,9 +350,42 @@ def test_docker_prune_respects_containers_false(monkeypatch):
             "prune": {"containers": False},
         },
     )
-    lines = reclaim.apply_docker(cat)
-    assert any("SKIPPED system prune" in line for line in lines)
-    assert not any("prune" in " ".join(c) for c in calls), "pruned despite containers=false"
+    reclaim.apply_docker(cat)
+    issued = [" ".join(c) for c in calls]
+
+    # The key means EXACTLY what it says: no container prune is issued...
+    assert not any("container prune" in c for c in issued), "pruned containers despite the key"
+    # ...and nothing else is collaterally disabled. The first fix for this key
+    # skipped the whole `docker system prune`, which silently turned off image
+    # and volume pruning too — a patch that broke two other keys to honour one.
+    assert any("image prune" in c for c in issued), "images were collaterally disabled"
+    assert any("builder prune" in c for c in issued), "build cache was collaterally disabled"
+
+
+def test_each_docker_prune_key_maps_to_exactly_one_command():
+    """`docker system prune` could not express these keys; the per-type ones can.
+
+    It always removes stopped containers AND dangling images regardless of
+    `--all`, so `containers = false` and `images = false` both claimed
+    protections the command was incapable of providing.
+    """
+    all_on = reclaim._prune_commands(
+        {"containers": True, "images": True, "build_cache": True, "volumes": True}, 720
+    )
+    labels = [label for label, _ in all_on]
+    assert labels == ["container prune", "image prune", "builder prune", "volume prune"]
+
+    none_on = reclaim._prune_commands(
+        {"containers": False, "images": False, "build_cache": False, "volumes": False}, 720
+    )
+    assert none_on == [], "a key set false still issued its command"
+
+    # The age filter reaches the commands that support it. `volume prune` is
+    # absent from this assertion because docker gives it no `until` filter —
+    # stated rather than silently dropped.
+    for label, argv in all_on:
+        if label != "volume prune":
+            assert "until=720h" in " ".join(argv), f"{label} lost its age bound"
 
 
 def test_scan_ollama_does_not_offer_a_freshly_pulled_model(monkeypatch):

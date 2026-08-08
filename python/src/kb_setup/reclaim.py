@@ -28,6 +28,7 @@ import re
 import shutil
 import subprocess
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -705,32 +706,44 @@ def apply_docker(cat: Category) -> list[str]:
         ctx = eng.get("context", "")
         img = _expand(eng.get("disk_image", ""))
         before = _dir_size(img)
-        argv = ["docker", "system", "prune", "--force", "--filter", f"until={hours}h"]
-        if prune.get("images", True):
-            argv.append("--all")
-        if not prune.get("containers", True):
-            # `docker system prune` ALWAYS removes stopped containers and has no
-            # flag to keep them, so honouring `containers = false` means not
-            # running it. The key was previously declared and never read, which
-            # let the config claim a protection it did not provide.
-            lines.append(
-                f"  {ctx}: SKIPPED system prune — reclaim.toml sets prune.containers=false"
-            )
-            continue
-        if prune.get("volumes", False):
-            argv.append("--volumes")
-        rc, out = _run(argv, env_context=ctx)
-        lines.append(f"  {ctx}: prune rc={rc} — {out.splitlines()[-1] if out else 'no output'}")
-        if prune.get("build_cache", True):
-            brc, bout = _run(
-                ["docker", "builder", "prune", "--force", "--filter", f"until={hours}h"],
-                env_context=ctx,
-            )
-            tail = bout.splitlines()[-1] if bout else ""
-            lines.append(f"  {ctx}: builder prune rc={brc} — {tail}")
+        for label, argv in _prune_commands(prune, hours):
+            rc, out = _run(argv, env_context=ctx)
+            tail = out.splitlines()[-1] if out else "no output"
+            lines.append(f"  {ctx}: {label} rc={rc} — {tail}")
         after = _dir_size(img)
         lines.append(_image_delta_line(ctx, img, before, after))
     return lines
+
+
+def _prune_commands(prune: Mapping[str, object], hours: int) -> list[tuple[str, list[str]]]:
+    """One docker prune command PER TYPE, so each config key means what it says.
+
+    This was a single `docker system prune`, and that made two config keys lie.
+    `system prune` always removes stopped containers, and it always removes
+    dangling images whether or not `--all` is passed — so `containers = false`
+    and `images = false` both claimed protections the command could not provide.
+    The first was patched by skipping the whole prune, which then silently
+    disabled image and volume pruning too.
+
+    docker already ships per-type pruners (`container`/`image`/`volume`/`builder
+    prune`), so the fix is to use them rather than to keep interpreting one
+    coarse command (`use-tool-builtins.md`). Each key now maps to exactly one
+    command, and turning a key off omits exactly that command.
+    """
+    age = ["--filter", f"until={hours}h"]
+    cmds: list[tuple[str, list[str]]] = []
+    if prune.get("containers", True):
+        cmds.append(("container prune", ["docker", "container", "prune", "--force", *age]))
+    if prune.get("images", True):
+        cmds.append(("image prune", ["docker", "image", "prune", "--all", "--force", *age]))
+    if prune.get("build_cache", True):
+        cmds.append(("builder prune", ["docker", "builder", "prune", "--force", *age]))
+    if prune.get("volumes", False):
+        # No `until` filter: `docker volume prune` does not support one, so an
+        # age-bounded volume prune is not expressible. Off by default anyway —
+        # a volume is the only copy of whatever is in it.
+        cmds.append(("volume prune", ["docker", "volume", "prune", "--force"]))
+    return cmds
 
 
 def _image_delta_line(ctx: str, img: Path, before: int, after: int) -> str:

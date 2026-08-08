@@ -95,7 +95,20 @@ empty cache.
 
 - `--only` matching no category exits **2**. A filter that asked nothing is a
   malformed request, not an empty success.
-- Findings under `min_size_mb` are summed into the category total but not listed.
+- Findings under `min_size_mb` are **dropped, not summed** — they are neither
+  listed nor in the category total, so the headline number is a floor with
+  respect to that threshold too. Only the listing *tail* is summed-but-unlisted
+  (12 print, the rest report as "… and N more totalling X").
+
+## One thing to know if you edit the guard
+
+`kb_setup.hook_guard.decide()` is shared with `kb_setup.skill_lint.check()` —
+one decision function, enforced at runtime **and** at authoring time. So the
+bare-interpreter denial added 2026-08-07 also means a bare `python`/`python3`
+inside a ```bash fence in any `SKILL.md` fails `mise run lint`, not just a live
+Bash call. That is intended — a skill that *instructs* a bare interpreter is
+teaching the thing the guard exists to stop — but it is a second blast radius
+the change's own commit did not mention, so it is written down here.
 
 ## Before a large download
 
