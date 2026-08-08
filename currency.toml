@@ -343,7 +343,16 @@ lists **7** manifests added after the 38-count build (10x-Team, agentlinter,
 Attacca, cc-orchestrador-subagents, cclint, claude-plugins, claude-self-reflect).
 The recorded method says to compare only against a build with the same source
 set, so +6 warnings across a +7-source change carries no signal in either
-direction. No alarm, disposition stands."""
+direction. No alarm, disposition stands.
+
+RE-PROBED 2026-08-08 on 0.9.36, by the recorded method (count the warnings on
+the next build): the largest single warning covers **290 files**
+(`marketplace.json`, `plugin.json`, ...). NOT a comparable pair with the prior
+entry — this build advanced SEVEN manifests (claude-code four releases, mise
+three, hk, uv, graphify, ruff, agent-harness-docs), and claude-code alone
+carries data-only `.json`. The count is a function of how many data-only `.json`
+files are cloned, so the honest reading is unattributable rather than either
+"regression" or "fine". STILL PRESENT."""
 
 # 2484/2485: the two hyperedge issues THIS repo filed (merge-graphs loss;
 # nested-slot read gap). Fixed in 0.9.34 — verified on the installed binary
@@ -869,7 +878,16 @@ THREE ITEMS TOUCH THIS REPO, none requiring a change:
 NOT applicable: the `strictKnownMarketplaces` owner-wildcard entries (managed
 settings, which this repo does not write — `do-not.md` #11), and the
 `CLAUDE_CODE_DISABLE_1M_CONTEXT` widening (a session-model behaviour, not config
-here)."""
+here).
+
+SUPERSEDED 2026-08-08 by the 2.1.226 review: `expected` moved 2.1.224 -> 2.1.226
+and `sources/claude-code.manifest` advanced v2.1.222 -> v2.1.226, so the mirror
+this entry says was behind is now ahead of it. Kept rather than deleted because
+its THREE recorded dispositions still stand and would otherwise be re-derived:
+the two Bash permission-bypass fixes are not defects for `kb_setup.hook_guard`
+(documented as a redirect, not a sandbox), the workflow dynamic-`import()` fix is
+inherited (`kb-extract.js` uses none), and `/review` becoming an alias of
+`/code-review` does not touch this repo's own `kb-review`."""
 [[tool.claude-code.watch]]
 kind = "local"
 ref = "2-1-224-review"
@@ -917,7 +935,14 @@ THREE ITEMS THAT MATTER HERE, none requiring a change:
    Evaluating it is a separate piece of work, not this bump.
 
 NOT applicable, armed rather than assumed: the >200-char project-path session-dir
-collision — this project's path is 56 characters."""
+collision — this project's path is 56 characters.
+
+SUPERSEDED 2026-08-08 by the 2.1.226 review. Its one follow-up IS now done:
+this entry recorded that the mirror's pin predated 2.1.224 and that advancing
+`agent-harness-docs` was "the follow-up, NOT done here" — it advanced to
+33aef930 in this change, alongside `sources/claude-code.manifest` reaching
+v2.1.226. The `ANTHROPIC_BEDROCK_REGION_PREFIX` finding is unchanged and still
+deliberately NOT added to `_STRIP_BACKEND_ENV`."""
 
 
 # ---------------------------------------------------------------------------
