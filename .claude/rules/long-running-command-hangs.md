@@ -30,8 +30,23 @@ incident: unbounded wait + pipe-masked exit code.
    `mise run lint` runs the **read-only** `hk run check --all` — identical to
    what a reviewer runs, with no silent source rewriting (the fix path is
    `mise run fmt` → `hk fix`). hk itself has no `--timeout` flag, no `timeout`
-   step key, and no `HK_*` timeout env var, so if you need a hard bound put one
+   step key, and no `HK_*` timeout env var, so a hard bound has to come from
    outside it.
+
+   **"Outside it" has a name, and it is native.** A mise task carries a
+   `timeout` key (`task_props.timeout` in the pinned `sources/mise/schema/
+   mise-task.json`), so `[tasks.lint]` can bound the hk run that hk cannot bound
+   itself. This distinction is worth stating because the sentence above is
+   routinely read one clause too wide: **hk** has no timeout; the **mise task
+   wrapping hk** does. Same shape as `timeout` — `depends` runs in parallel,
+   `wait_for` orders a task only when the other is also running, and
+   `-c/--continue-on-error` finishes everything and still reports each failure's
+   own exit code. All four were probed against the INSTALLED 2026.8.3, not read
+   off a docs page (#248).
+
+   The one thing mise will not give you is **structured** per-task results — `-o`
+   offers only human formats — which is why `kb_setup.gates` still owns the
+   fan-out that writes `.agent/kb/gates/gates-<sha>.json`.
 
 2. **For any command expected to exceed ~30s, never wait blind.** Either
    bound it with a timeout, or run it in the background and monitor its

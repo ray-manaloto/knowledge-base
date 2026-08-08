@@ -23,6 +23,29 @@ record whose unreached gates were simply missing would read as a complete pass,
 which is this repo's oldest lesson — "could not check" is never rendered as green
 — arriving in the artifact instead of in the logic. They appear with ``rc: null``.
 
+WHY THE SCHEDULING IS CUSTOM, given that mise already schedules (#248 criterion
+5, `use-tool-builtins.md` rule 3). Nearly all of it is native and was probed on
+the INSTALLED mise 2026.8.3 rather than read from docs: `depends` runs
+dependencies in PARALLEL; a failing dependency CANCELS its still-running siblings
+and the wrapper's own body; the process rc is the FAILING TASK'S rc, not a
+generic 1; `-c/--continue-on-error` is report-everything; `wait_for` orders a task
+only if the other is also running, which is precisely "sequential where a writer
+is involved"; and `timeout`, `-j/--jobs` and `:::` are all task-level keys.
+
+Exactly ONE thing is missing, and it is the one this module exists for: mise
+surfaces per-task results only as prose on stderr (`[b] exited with status 3`).
+`-o` offers prefix/interleave/keep-order/replacing/timed/quiet/silent and no
+structured form, so a `depends` wrapper collapses four gates into one exit code.
+The record needs each gate's own `rc`, `sha`, `dirty` and `finished_at` AS DATA,
+and parsing that sentence would be a homegrown parser over output with no
+compatibility promise — a worse dependency than the scheduling it replaced.
+
+So the split is: mise owns everything about running ONE gate (and, via `-o
+prefix`, about keeping concurrent output attributable); this module owns only
+the fan-out, because only it can see the results. The concurrency itself is a
+`ThreadPoolExecutor` because the work is a `subprocess.run` per gate — the GIL is
+released for its whole duration, so threads are the mechanism, not a compromise.
+
 THE RUNNER IS THE ONE `ship` ALREADY USED. :func:`_invoke` keeps `pr._stream`'s
 INVOCATION exactly: one child, `mise run <task>`, inheriting this process's
 stdio. No capture, no shell, no wrapper. That is #146's criterion 8, and it is
@@ -37,7 +60,9 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections import Counter
 from collections.abc import Iterator
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -93,6 +118,25 @@ SHA_ABBREV = 12
 #: move dropped the `--live`/`--slow` sentences, which is how a comment that took
 #: two review rounds to get right decays into a summary of itself.
 GATE_TASKS = ("lint", "test", "brain-audit", "eval")
+
+#: Gates that may run CONCURRENTLY with each other. Everything not named here
+#: runs EXCLUSIVE — alone, with nothing else in flight — and that default is the
+#: point: a gate whose writes nobody has characterised must not be raced, because
+#: "we did not check" is not "it is safe". Adding a gate to `GATE_TASKS` therefore
+#: makes it slow and correct, never fast and unexamined.
+#:
+#: MEASURED, not reasoned. Every path the four wrote during a full `kb-gates` run
+#: was captured with `find -newer <stamp>`: `lint` writes `.rumdl_cache`, `test`
+#: writes `.pytest_cache`, `eval` and `brain-audit` wrote nothing, and the runner
+#: itself writes `.agent/kb/gates`. Disjoint, and all of them tool caches rather
+#: than tracked source. That measurement is what admits them here.
+#:
+#: `fmt`, `kb-build` and `kb-artifacts` are deliberately absent and must stay
+#: absent: they rewrite tracked files. This repo has already paid for overlapping
+#: one of them — a `mise run fmt` racing a `kb-build` wedged for 3h06m at 100%
+#: CPU (PR #244) — which is why the constraint is "sequential where a step writes
+#: files" rather than a general preference for caution.
+CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})
 
 
 @dataclass(frozen=True)
@@ -208,7 +252,7 @@ def undeclared(repo_root: Path, tasks: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(t for t in tasks if t not in declared)
 
 
-def _invoke(repo_root: Path, task: str) -> int:
+def _invoke(repo_root: Path, task: str, *, prefix_output: bool = False) -> int:
     """Run one gate with output streaming to the terminal; return its exit code.
 
     The INVOCATION is `pr._stream`'s, unchanged — same argv, same kwargs, stdio
@@ -216,15 +260,23 @@ def _invoke(repo_root: Path, task: str) -> int:
     way to deliver that is to move the call rather than rewrite it into something
     that looks equivalent.
 
+    ``prefix_output`` adds mise's own ``-o prefix``, and ONLY when this gate is
+    sharing the terminal with another one. Two gates inheriting the same stdio
+    interleave mid-line into something no reader can attribute, which would trade
+    criterion 8's live legibility for the concurrency — so the fix is mise's
+    native line-prefixing (`[lint] …`, `[test] …`) rather than capturing each
+    gate's output and replaying it, which would hold every line until the gate
+    ended and turn a 57-second run into a silent one. It stays OFF for a lone
+    gate so `kb-gates -- lint` is byte-identical to what it printed before.
+
     What deliberately differs is the failure rc. `_stream` returned 1 for "could
     not start", which the record could not tell from a gate that ran and failed.
     Since the record's entire job is being checkable later, the two get distinct
     values. Both are non-zero, so no caller's pass/fail decision changes.
     """
+    argv = ["mise", "run", "-o", "prefix", task] if prefix_output else ["mise", "run", task]
     try:
-        return subprocess.run(
-            ["mise", "run", task], cwd=repo_root, check=False, timeout=_GATE_TIMEOUT
-        ).returncode
+        return subprocess.run(argv, cwd=repo_root, check=False, timeout=_GATE_TIMEOUT).returncode
     except subprocess.TimeoutExpired:
         # Total wall-clock, NOT an idle timer — `subprocess.run`'s timeout has no
         # notion of output. The message said "no output for", which would have
@@ -234,6 +286,136 @@ def _invoke(repo_root: Path, task: str) -> int:
     except (OSError, subprocess.SubprocessError) as exc:
         print(f"  {task}: {exc}")
         return _RC_COULD_NOT_RUN
+
+
+def _run_one(repo_root: Path, task: str, *, prefix_output: bool) -> GateResult:
+    """Run one gate and describe what happened, including WHEN and against what.
+
+    HEAD and cleanliness are read per gate rather than once for the run: the
+    gates take minutes, nothing stops an amend landing in the middle of them, and
+    a single sha stamped across every row would make the later rows quietly
+    untrue. :func:`render` flags the divergence when it happens.
+    """
+    # `or None`, not the raw "". An empty sha is git failing transiently, not a
+    # commit — and `render`'s drift check filters falsy values, so the raw form
+    # produced a PASSING row bound to nothing, silently. None makes it the same
+    # three-state shape as `dirty`, and `bound_to_a_commit` reports it. (Cold lane
+    # round 2, P2.)
+    sha = head_sha(repo_root) or None
+    dirty = tree_dirty(repo_root)
+    # `flush=True` on both, and it is not cosmetic. Python block-buffers stdout
+    # when it is a file rather than a tty, while the gate's own child writes to
+    # the same fd unbuffered — so redirecting a run to a log put every "==> gate:"
+    # header at the END, after all four gates' output, in an order that reads as
+    # though nothing ran until the last second. Inherited from `pr._stream`'s
+    # caller, and exactly the live-output legibility criterion 8 protects.
+    #
+    # ONE `write` PER LINE, newline included, because these now come from several
+    # threads. `print("x", flush=True)` writes the text and the newline as two
+    # separate calls, so two gates starting together really did produce
+    # `==> gate: test==> gate: brain-audit` on one line. Passing the newline
+    # inside the string with `end=""` makes each header a single write, which is
+    # atomic enough that a reader can still attribute every line.
+    print(f"==> gate: {task}\n", end="", flush=True)
+    rc = _invoke(repo_root, task, prefix_output=prefix_output)
+    finished_at = datetime.now(UTC).isoformat()
+    print(f"{'PASS' if rc == 0 else 'FAIL'}  gate {task} rc={rc}\n", end="", flush=True)
+    return GateResult(task, rc, sha, finished_at, dirty)
+
+
+def _batches(tasks: tuple[str, ...]) -> Iterator[tuple[str, ...]]:
+    """Group ``tasks`` into runs that may execute together, in the ORDER GIVEN.
+
+    Consecutive :data:`CONCURRENT_SAFE` gates form one batch; anything else is a
+    batch of one and therefore runs alone. Order is preserved rather than
+    optimised — reordering to pack bigger batches would silently move a writer
+    past a reader the caller had deliberately put it after, which is the one
+    guarantee this function exists to keep.
+    """
+    batch: list[str] = []
+    for task in tasks:
+        if task in CONCURRENT_SAFE:
+            batch.append(task)
+            continue
+        if batch:
+            yield tuple(batch)
+            batch = []
+        yield (task,)
+    if batch:
+        yield tuple(batch)
+
+
+def _run_batch(
+    repo_root: Path, batch: tuple[str, ...]
+) -> tuple[list[GateResult], BaseException | None]:
+    """Run ``batch`` concurrently. Return EVERY completed result, and the first error.
+
+    A plain function rather than part of the generator, and that shape is the fix
+    for the defect this had. The previous form consumed `as_completed` inline and
+    yielded from the loop, so an exception on one gate exited the loop while its
+    siblings were still running — and the pool's `shutdown(wait=True)` then
+    WAITED for them, so they ran to completion, printed their own PASS line, and
+    had their results thrown away. `run_and_record` padded them as `rc: None`,
+    which is the recorded state for "did not run". A gate that ran and passed was
+    persisted as never having run: this module's own purpose, inverted. It is
+    reachable on the ship path, since all four `GATE_TASKS` are one batch.
+    (Cold lane round 2, HIGH — found by instrumenting which subprocess calls
+    actually completed, not by reading.)
+
+    Returning the exception instead of raising it is what makes that impossible:
+    the caller cannot receive the error without also receiving every result, so
+    there is no path on which one arrives and the other is dropped.
+
+    `future.exception()` rather than a `try` around `future.result()`, because it
+    REPORTS a failure instead of re-raising it — so collecting results needs no
+    blind `except` (`do-not.md` #9 forbids the suppression one would otherwise
+    want). The only errors that can reach the loop are raised on THIS thread, and
+    `KeyboardInterrupt`/`SystemExit` are named rather than caught blindly.
+    """
+    outcomes: list[GateResult] = []
+    consumed: set[Future[GateResult]] = set()
+    failure: BaseException | None = None
+    # `max_workers=len(batch)` because the batch is already the safety bound —
+    # every member has been declared concurrency-safe against every other. A
+    # smaller pool would only serialise gates that were cleared to overlap.
+    pool = ThreadPoolExecutor(max_workers=len(batch))
+    futures = [pool.submit(_run_one, repo_root, task, prefix_output=True) for task in batch]
+    try:
+        for future in as_completed(futures):
+            consumed.add(future)
+            exc = future.exception()
+            if exc is None:
+                outcomes.append(future.result())
+            elif failure is None:
+                failure = exc
+    except (KeyboardInterrupt, SystemExit) as exc:
+        # Ctrl-C during a multi-minute run — the case the module is built around.
+        # Recorded, not propagated from here, so the sweep below still runs.
+        failure = failure if failure is not None else exc
+    finally:
+        # `wait=True`: every worker is joined, so each future has SETTLED and the
+        # reads below cannot block. Skipping the wait would not make an interrupt
+        # faster — the gates are already running — it would only put the reads
+        # back on unsettled futures.
+        pool.shutdown(wait=True)
+
+    # THE SWEEP, and the whole point of this function. `as_completed` stops
+    # handing over results the moment the loop above leaves early, but the pool
+    # still waited for those gates, so they finished and printed their own
+    # PASS/FAIL. Collecting them here is the difference between recording what
+    # ran and recording what happened to be consumed first.
+    #
+    # Appended rather than merged, so the ones `as_completed` DID hand over keep
+    # their completion order — the property `iter_run` documents and two tests
+    # rely on. A sweep that rebuilt the list from `futures` would silently make
+    # every batch arrive in submit order instead, which reads as harmless and
+    # would quietly disarm those tests.
+    outcomes.extend(
+        f.result()
+        for f in futures
+        if f not in consumed and not f.cancelled() and f.exception() is None
+    )
+    return outcomes, failure
 
 
 def iter_run(
@@ -249,52 +431,128 @@ def iter_run(
     minutes of gate results to an interrupt is the exact failure this module
     exists to prevent, arriving through the door nobody watched. (Cold lane, P2.)
 
+    A BATCH YIELDS ONLY ONCE IT HAS FINISHED — see :func:`_run_batch`. Streaming
+    each gate out of the concurrent loop as it completed is what let an
+    interrupted batch discard siblings that had already run, so the batch is
+    collected first and yielded after. Within a batch that costs nothing: the
+    next batch cannot start until this one is done anyway, and `_run_one` prints
+    each gate's PASS/FAIL live, so the terminal is no quieter than before.
+
+    RESULTS ARRIVE IN COMPLETION ORDER, NOT REQUESTED ORDER, because the gates
+    within a batch run concurrently. Nothing downstream may index a result by its
+    position in ``tasks`` — :func:`run_and_record` restores the requested order
+    for the record, and pads by multiset difference rather than by count, which
+    is the only form that survives both concurrency and a repeated gate name.
+
+    CONCURRENCY IS BATCHED, NOT GLOBAL. :func:`_batches` puts consecutive
+    :data:`CONCURRENT_SAFE` gates in one batch and gives every other gate a batch
+    to itself, so a writer never overlaps anything. Batches themselves are
+    strictly sequential.
+
     ``stop_on_failure`` is off for `kb-gates`, where the point is to learn every
     gate's state in one pass, and on for the ship path, where there is nothing to
     gain by spending minutes on gates whose result cannot change the refusal.
-    Gates past the stop are yielded as "not run" rather than dropped.
+    Gates past the stop are yielded as "not run" rather than dropped. Within a
+    batch, however, it cancels NOTHING, and saying otherwise would be the kind of
+    claim that is true of the code and false of the machine: the pool is sized to
+    the batch, so every gate in it has already started by the time any of them can
+    fail. A `future.cancel()` loop was written here and removed once that was
+    checked rather than assumed — it could only ever have returned False.
+    Fail-fast is therefore real at BATCH granularity, which is where a run with a
+    writer in it has something left to skip.
 
-    HEAD is read PER GATE, not once for the run. The gates take minutes and
-    nothing stops an amend landing in the middle of them; a single sha stamped
-    across every row would make the later rows quietly untrue, which is the exact
-    failure this module exists to remove. :func:`render` flags the divergence.
+    THAT CHANGES THE SHIP PATH, and the change is stated rather than left to be
+    discovered. `pr.run_gates` passes the four :data:`GATE_TASKS` with
+    ``stop_on_failure=True``, and all four are :data:`CONCURRENT_SAFE`, so they
+    form ONE batch and none of them is ever skipped now. A ship whose `lint`
+    fails used to stop at roughly 12s and now takes the full ~61s of the slowest
+    gate. It is still strictly better than what the flag was protecting against —
+    the sum was 249s — and it buys the thing `--stop` was giving up, which is
+    every gate's state on a failing ship instead of only the first one's. But it
+    is a real regression in the one case the flag was named for, and if a future
+    gate makes that window painful the fix is a smaller batch, not a cancel loop
+    that cannot fire.
+
+    HEAD is read PER GATE, not once for the run — see :func:`_run_one`.
     """
     stopped = False
-    for task in tasks:
+    for batch in _batches(tasks):
         if stopped:
-            yield GateResult(task, None, None, None)
+            for task in batch:
+                yield GateResult(task, None, None, None)
             continue
-        # `or None`, not the raw "". An empty sha is git failing transiently, not
-        # a commit — and `render`'s drift check filters falsy values, so the raw
-        # form produced a PASSING row bound to nothing, silently. None makes it
-        # the same three-state shape as `dirty`, and `bound_to_a_commit` reports
-        # it. (Cold lane round 2, P2.)
-        sha = head_sha(repo_root) or None
-        dirty = tree_dirty(repo_root)
-        # `flush=True` on both, and it is not cosmetic. Python block-buffers stdout
-        # when it is a file rather than a tty, while the gate's own child writes
-        # to the same fd unbuffered — so redirecting a run to a log put every
-        # "==> gate:" header at the END, after all four gates' output, in an order
-        # that reads as though nothing ran until the last second. Inherited from
-        # `pr._stream`'s caller, seen in this task's first real run, and exactly
-        # the live-output legibility criterion 8 exists to protect.
-        print(f"==> gate: {task}", flush=True)
-        rc = _invoke(repo_root, task)
-        finished_at = datetime.now(UTC).isoformat()
-        print(f"{'PASS' if rc == 0 else 'FAIL'}  gate {task} rc={rc}", flush=True)
-        yield GateResult(task, rc, sha, finished_at, dirty)
-        if rc != 0 and stop_on_failure:
-            stopped = True
+
+        if len(batch) == 1:
+            result = _run_one(repo_root, batch[0], prefix_output=False)
+            yield result
+            if not result.passed and stop_on_failure:
+                stopped = True
+            continue
+
+        outcomes, failure = _run_batch(repo_root, batch)
+        for result in outcomes:
+            yield result
+            if not result.passed and stop_on_failure:
+                # Stops the NEXT batch, not this one. Everything here is already
+                # running; letting it finish costs nothing extra and keeps the
+                # evidence it has already paid for.
+                stopped = True
+        if failure is not None:
+            raise failure
+
+
+def in_requested_order(results: list[GateResult], tasks: tuple[str, ...]) -> list[GateResult]:
+    """``results`` sorted by each task's FIRST position in ``tasks``.
+
+    ONE definition, used by both :func:`run` and :func:`run_and_record`. Under
+    concurrency the order results arrive in is an accident of scheduling, and
+    having the eager runner and the recorder each decide separately what to do
+    about that is how they end up disagreeing — the same duplication that let
+    `run_and_record` and `pr.run_gates` drift over an unreadable HEAD.
+
+    FIRST position, via `setdefault`, and the distinction is a defect this
+    function shipped with. A `{task: i for i, task in enumerate(tasks)}`
+    comprehension is LAST-write-wins, so for `("lint", "test", "lint")` every
+    `lint` row took index 2 and the record came back `test, lint, lint` — the
+    first `lint` was requested before `test` and was sorted after it. Reachable
+    from the CLI, which accepts an arbitrary task list, and invisible to every
+    test here because they all used adjacent repeats. (Cold lane, P2, found by
+    executing the function rather than reading it.)
+
+    WHAT THIS DOES NOT PROMISE, stated because the docstring it replaces
+    overclaimed exactly here: with a repeated name the result is grouped, not
+    interleaved — `("lint", "test", "lint")` yields `lint, lint, test`. Two rows
+    for one task are genuinely indistinguishable (same name, both ran, only
+    `finished_at` differs), so there is no fact of the matter about which
+    requested slot each belongs in, and inventing one would be a presentation
+    step asserting something it cannot know. Grouping is the strongest honest
+    answer; `finished_at` carries the real chronology.
+
+    A task not in ``tasks`` sorts to the end rather than raising: this is a
+    presentation step, and it must not be the thing that destroys a record.
+    """
+    position: dict[str, int] = {}
+    for i, task in enumerate(tasks):
+        position.setdefault(task, i)
+    return sorted(results, key=lambda r: position.get(r.task, len(tasks)))
 
 
 def run(repo_root: Path, tasks: tuple[str, ...], *, stop_on_failure: bool) -> list[GateResult]:
-    """Run ``tasks`` in order; return one result per REQUESTED gate.
+    """Run ``tasks``; return one result per REQUESTED gate, IN REQUESTED ORDER.
 
     Writes nothing — :func:`record` does that, and either is usable without the
     other (criterion 2). The eager form over :func:`iter_run`, for every caller
     that has nothing to do with a partial run.
+
+    The reorder is not cosmetic. :func:`iter_run` yields in COMPLETION order, so
+    without it a caller that reasonably reads `results[0]` as "the first gate I
+    asked for" silently gets whichever gate happened to finish first — which is
+    stable enough while gates are slow and inverts the moment one is fast. A
+    caller that genuinely wants completion order has `iter_run`, which says so.
     """
-    return list(iter_run(repo_root, tasks, stop_on_failure=stop_on_failure))
+    return in_requested_order(
+        list(iter_run(repo_root, tasks, stop_on_failure=stop_on_failure)), tasks
+    )
 
 
 def record(repo_root: Path, results: list[GateResult], *, sha: str) -> Path:
@@ -645,7 +903,20 @@ def run_and_record(
         # assumed from the interpreter's behaviour.
         results.extend(iter_run(repo_root, tasks, stop_on_failure=stop_on_failure))
     finally:
-        results.extend(GateResult(t, None, None, None) for t in tasks[len(results) :])
+        # PAD BY MULTISET DIFFERENCE, never by count. `tasks[len(results):]` was
+        # correct only while results arrived in requested order, and concurrency
+        # ended that: with `lint` still running when `eval` finished, a count-based
+        # slice pads the name of a gate that DID run and omits one that did not,
+        # so the record asserts a result for the wrong gate. A `Counter`
+        # difference also keeps `kb-gates -- lint lint` right, where a set would
+        # collapse the two rows the CLI deliberately allows.
+        missing = Counter(tasks) - Counter(r.task for r in results)
+        results.extend(GateResult(t, None, None, None) for t in missing.elements())
+        # Restore the REQUESTED order for the artifact — see `in_requested_order`.
+        # `results[:]` because `results` is the name the `finally` and the return
+        # both close over; rebinding it here would record the ordered list and
+        # hand the caller the unordered one.
+        results[:] = in_requested_order(results, tasks)
         path = record(repo_root, results, sha=sha)
     return GateRun(results, sha, path), render(results, sha=sha, path=path)
 

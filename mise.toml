@@ -201,8 +201,33 @@ description = "Auto-fix formatting/lint issues"
 run = "hk fix"
 
 [tasks.test]
-description = "Run the Python test suite"
-run = "uv run pytest tests/ -x -q"
+description = "Run the Python test suite (pytest-xdist, one worker per core)"
+# `-n auto` lives HERE and not in `[tool.pytest.ini_options] addopts`, on purpose.
+# addopts applies to every invocation, including `uv run pytest tests/x.py::y`
+# while debugging one test — where spinning up 12 workers costs seconds and buys
+# nothing, and where a crashed worker replaces a real traceback with a protocol
+# error. The GATE wants throughput; a debugging run wants a stack trace. Putting
+# the flag on the task keeps `mise run test` parallel and leaves plain
+# `uv run pytest` serial, which is also `ci-local-parity.md` rule 1: the task IS
+# the gate's one definition.
+#
+# MEASURED, this host (12 logical / 8 performance cores, 2,059 tests, 71 files):
+# 219.2s serial -> 57s with `-n auto`, a 3.8x saving and the dominant term in
+# `kb-gates`' whole wall clock. Both runs emitted exactly 2,059 progress
+# characters, all passes, so the speedup is not xdist quietly collecting less —
+# an identical count is the control arm on that.
+#
+# ZERO test changes were needed to get there. That is a statement about the
+# suite, not about xdist: nothing in `tests/` depended on execution order or on
+# another test's leftovers. Worth knowing, because the day it stops being true
+# the failure will look like flakiness rather than like the shared-state defect
+# it is.
+#
+# `auto` rather than a number: it reads `os.cpu_count()`, so a smaller machine
+# gets fewer workers instead of thrashing. `-x` still stops the run, though under
+# xdist sibling workers may finish an in-flight test first, so more than one
+# failure can be reported. That is more information, not less.
+run = "uv run pytest tests/ -x -q -n auto"
 
 [tasks.eval]
 description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor, `-- --slow` retrieval"
