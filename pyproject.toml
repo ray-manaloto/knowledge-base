@@ -38,7 +38,21 @@ fetch = ["trafilatura>=2.0"]
 # Safe to pin exactly BECAUSE this is a `[dependency-groups]` table (PEP 735):
 # dev groups are not installed by consumers, so an `==` here binds nobody but us.
 # Contrast `[project.optional-dependencies]` below, which IS exported.
-dev = ["ruff==0.16.2", "ty==0.0.69", "pytest==9.1.1", "trafilatura==2.2.0"]
+#
+# `pytest-xdist` is here for WALL CLOCK, and the number that bought it is worth
+# keeping: `mise run kb-gates` measured 249s on a 12-core M-series host, of which
+# `test` alone was 219.2s — 88%. Parallelising the four GATES therefore has a
+# ceiling of 12%, which is why #248's premise was re-scoped by its own
+# measurement rather than implemented as written. The suite is 2,059 tests over
+# 71 files with a long tail (the 20 slowest sum to 94s), which is the shape that
+# parallelises well; a suite dominated by one slow test would not have been.
+dev = [
+  "ruff==0.16.2",
+  "ty==0.0.69",
+  "pytest==9.1.1",
+  "pytest-xdist==3.8.0",
+  "trafilatura==2.2.0",
+]
 
 [build-system]
 requires = ["hatchling"]

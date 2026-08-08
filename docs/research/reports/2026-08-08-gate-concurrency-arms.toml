@@ -1,0 +1,116 @@
+# Mutation arms for the concurrent gate runner (#248).
+#
+# Each row breaks ONE thing REALISTICALLY — the membership test that makes the
+# safe set mean anything, the flush that keeps a writer alone, the padding that
+# survives out-of-order completion — and the named test must go RED.
+#
+# WHAT THESE ARMS CANNOT MEASURE, said here because a clean sweep is a statement
+# about the TESTS and never about the premise
+# (`mutation-arms-cannot-measure-the-premise`):
+#
+#   * whether the four gates are ACTUALLY safe to overlap. That came from
+#     measurement — `find -newer <stamp>` over a full run showed `lint` writing
+#     only `.rumdl_cache` and `test` only `.pytest_cache` — and no green sweep
+#     here re-establishes it. If a gate starts writing tracked files, every arm
+#     below still passes.
+#   * whether any of this was worth doing. The 12% ceiling on gate parallelism
+#     and the 3.8x from `-n auto` are wall-clock measurements recorded in
+#     `mise.toml` and `pyproject.toml`, not properties a test asserts.
+#
+# ONE ARM IS DELIBERATELY ABSENT. A `future.cancel()` loop was written for the
+# within-a-batch fail-fast path and then removed, because the pool is sized to
+# the batch: every gate has started before any can fail, so `cancel()` could only
+# ever return False. Arming it would have produced a PREDICTED survival, which is
+# the most dangerous arm there is (`unreachable-by-construction-needs-an-arm`) —
+# the honest move was to delete the line, not to score it.
+
+suites = ["tests/test_gates.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/gates.py"
+old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})'
+new = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})  # inert control edit'
+
+# --- the safe set has to actually be consulted -------------------------------
+
+# The realistic break is an EMPTY set — someone refactors the names out, or a
+# future edit narrows it to nothing. Everything then runs exclusive: correct, and
+# silently four times slower, which is exactly the failure no result assertion
+# can see. Only the barrier notices.
+[[arm]]
+id = "safe-set-emptied"
+test = "test_concurrency_safe_gates_really_do_run_at_the_same_time"
+file = "python/src/kb_setup/gates.py"
+old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})'
+new = "CONCURRENT_SAFE = frozenset()"
+
+# The fail-CLOSED default, and the most valuable arm here. Treating every gate as
+# safe is the single edit that turns this module from "parallel where safe" into
+# "parallel", and it would pass every test that only looks at results — a race is
+# not a wrong answer, it is a wrong answer *sometimes*.
+[[arm]]
+id = "unknown-gates-treated-as-safe"
+test = "test_a_gate_outside_the_safe_set_never_overlaps_anything"
+file = "python/src/kb_setup/gates.py"
+old = """        if task in CONCURRENT_SAFE:
+            batch.append(task)
+            continue"""
+new = """        if True:
+            batch.append(task)
+            continue"""
+
+# --- the writer must stay alone ---------------------------------------------
+
+# Dropping the flush does not stop batching; it DEFERS it, so `lint` and `test`
+# end up running together AFTER the `fmt` that was meant to separate them. The
+# gates all still pass. This is the arm for Ray's actual constraint.
+[[arm]]
+id = "writer-does-not-flush-the-pending-batch"
+test = "test_a_writer_between_two_readers_separates_them"
+file = "python/src/kb_setup/gates.py"
+old = """        if batch:
+            yield tuple(batch)
+            batch = []
+        yield (task,)"""
+new = """        yield (task,)"""
+
+# --- the record must survive out-of-order completion --------------------------
+
+# The exact prior spelling. It was CORRECT before concurrency and is wrong after
+# it, which is the whole shape of this ticket's risk: the line nobody edited is
+# the one the change broke.
+[[arm]]
+id = "padding-by-count-instead-of-multiset"
+test = "test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run"
+file = "python/src/kb_setup/gates.py"
+old = """        missing = Counter(tasks) - Counter(r.task for r in results)
+        results.extend(GateResult(t, None, None, None) for t in missing.elements())"""
+new = """        results.extend(GateResult(t, None, None, None) for t in tasks[len(results) :])"""
+
+[[arm]]
+id = "record-keeps-completion-order"
+test = "test_the_record_keeps_requested_order_despite_completion_order"
+file = "python/src/kb_setup/gates.py"
+old = "        results[:] = in_requested_order(results, tasks)"
+new = "        pass  # order left as scheduled"
+
+# --- concurrent output has to stay attributable ------------------------------
+
+# Both directions, because either constant satisfies one half. Without the
+# prefix, four gates interleave into output no reader can attribute; with it
+# always on, a lone `kb-gates -- lint` stops printing what it always printed.
+[[arm]]
+id = "batched-gates-lose-mises-prefix"
+test = "test_only_a_shared_terminal_gets_mises_prefix"
+file = "python/src/kb_setup/gates.py"
+old = """                pool.submit(_run_one, repo_root, task, prefix_output=True) for task in batch"""
+new = """                pool.submit(_run_one, repo_root, task, prefix_output=False) for task in batch"""
+
+[[arm]]
+id = "lone-gate-gains-a-prefix-it-never-had"
+test = "test_only_a_shared_terminal_gets_mises_prefix"
+file = "python/src/kb_setup/gates.py"
+old = '    argv = ["mise", "run", "-o", "prefix", task] if prefix_output else ["mise", "run", task]'
+new = '    argv = ["mise", "run", "-o", "prefix", task]'

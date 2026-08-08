@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
+import time
 from pathlib import Path
 from typing import Never
 
@@ -37,6 +39,7 @@ _FAILING = "beta"
 
 def _repo(tmp_path: Path, tasks: tuple[str, ...] = _TASKS) -> Path:
     """A repo root whose `mise.toml` declares ``tasks``."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
     body = "".join(f'[tasks.{t}]\nrun = "true"\n\n' for t in tasks)
     (tmp_path / _MISE).write_text(body, encoding="utf-8")
     return tmp_path
@@ -938,3 +941,252 @@ def test_an_absent_field_is_unknown_rather_than_malformed(tmp_path):
     found, _ = gates.find_record(tmp_path, _SHA)
     assert found is not None
     assert (found.gates[0].sha, found.gates[0].dirty) == (None, None)
+
+
+# --------------------------------------------------------------------------
+# Concurrency (#248) — "parallel where safe, sequential where a step writes"
+#
+# Every test here is PAIRED, because concurrency has the same problem the
+# recorder has: a runner that quietly stayed sequential passes any assertion
+# about results, and a runner that quietly raced a writer passes any assertion
+# about speed. So concurrency is proven by a BARRIER (which can only be crossed
+# if the gates genuinely overlap) and exclusivity by a PEAK COUNTER (which a
+# sequential runner can never push above 1). Neither can be satisfied by the
+# other's implementation.
+# --------------------------------------------------------------------------
+
+#: Real gate names, because `CONCURRENT_SAFE` membership is what is under test.
+#: The suite's other tests deliberately use invented names and therefore exercise
+#: the EXCLUSIVE path — which is why they kept passing unchanged when batching
+#: landed, and why that alone was not evidence the new path worked.
+_SAFE = ("lint", "test", "brain-audit", "eval")
+
+#: Generous: it is only ever WAITED on when the runner has already failed, and a
+#: loaded machine running this suite under `-n auto` must not turn a correct
+#: implementation red.
+_BARRIER_TIMEOUT = 20.0
+
+#: Short: this one is waited on in the arm that is EXPECTED to time out, so it is
+#: pure cost. Long enough that a merely-slow thread start does not read as
+#: sequential execution.
+_NEGATIVE_TIMEOUT = 2.0
+
+
+def _barrier_stub(monkeypatch, parties: int, *, timeout: float) -> None:
+    """Make every gate wait for ``parties`` gates to be running at once.
+
+    The barrier IS the assertion. It can only be crossed if that many gates are
+    genuinely in flight together, so a runner that stayed sequential does not
+    return a wrong answer — it cannot return at all, and raises. There is no
+    sleep to tune and no threshold to get wrong.
+    """
+    barrier = threading.Barrier(parties)
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] == "mise":
+            barrier.wait(timeout=timeout)
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+
+
+def _peak_stub(monkeypatch, *, hold: float = 0.05) -> dict[str, int]:
+    """Record the greatest number of gates ever running SIMULTANEOUSLY.
+
+    A peak of 1 is a positive statement that nothing overlapped: the counter is
+    incremented inside the stub, so any overlap at all is observed. It cannot
+    under-report the way a timing comparison can.
+    """
+    lock = threading.Lock()
+    state = {"live": 0, "peak": 0}
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] != "mise":
+            return subprocess.CompletedProcess(cmd, 0, "")
+        with lock:
+            state["live"] += 1
+            state["peak"] = max(state["peak"], state["live"])
+        time.sleep(hold)
+        with lock:
+            state["live"] -= 1
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    return state
+
+
+def test_concurrency_safe_gates_really_do_run_at_the_same_time(monkeypatch, tmp_path):
+    """The positive arm: four gates must be in flight together, or this hangs out."""
+    root = _repo(tmp_path, _SAFE)
+    _barrier_stub(monkeypatch, len(_SAFE), timeout=_BARRIER_TIMEOUT)
+    _pin_sha(monkeypatch)
+
+    results = gates.run(root, _SAFE, stop_on_failure=False)
+
+    assert [r.task for r in results] == list(_SAFE)
+    assert all(r.passed for r in results)
+
+
+def test_the_barrier_arm_can_fail(monkeypatch, tmp_path):
+    """The control on the arm above: with gates that must NOT overlap, it breaks.
+
+    Without this, `test_concurrency_safe_gates_really_do_run_at_the_same_time`
+    would be a probe with one face — it would also pass against a stub that
+    ignored the barrier entirely. Here the SAME barrier, the same party count and
+    the same runner are pointed at names outside `CONCURRENT_SAFE`, and the only
+    thing that changed is whether the gates are allowed to overlap.
+    """
+    root = _repo(tmp_path, _TASKS)
+    _barrier_stub(monkeypatch, len(_TASKS), timeout=_NEGATIVE_TIMEOUT)
+    _pin_sha(monkeypatch)
+
+    with pytest.raises(threading.BrokenBarrierError):
+        gates.run(root, _TASKS, stop_on_failure=False)
+
+
+def test_a_gate_outside_the_safe_set_never_overlaps_anything(monkeypatch, tmp_path):
+    """Unknown gates run ALONE — the fail-closed default, measured not assumed."""
+    root = _repo(tmp_path, _TASKS)
+    state = _peak_stub(monkeypatch)
+    _pin_sha(monkeypatch)
+
+    gates.run(root, _TASKS, stop_on_failure=False)
+
+    assert state["peak"] == 1
+
+
+def test_a_writer_between_two_readers_separates_them(monkeypatch, tmp_path):
+    """`fmt` is not concurrency-safe, so the readers around it cannot merge.
+
+    This is the actual constraint — "sequential where a step writes files" — and
+    it is the case a naive implementation gets wrong by hoisting every safe gate
+    into one batch and running the writer beside them.
+    """
+    order = ("lint", "fmt", "test")
+    root = _repo(tmp_path, order)
+    state = _peak_stub(monkeypatch)
+    _pin_sha(monkeypatch)
+
+    gates.run(root, order, stop_on_failure=False)
+
+    assert state["peak"] == 1
+
+
+def test_two_safe_gates_around_a_writer_still_overlap_when_adjacent(monkeypatch, tmp_path):
+    """Control on the test above: the same names ADJACENT do batch together."""
+    order = ("lint", "test", "fmt")
+    root = _repo(tmp_path, order)
+    state = _peak_stub(monkeypatch)
+    _pin_sha(monkeypatch)
+
+    gates.run(root, order, stop_on_failure=False)
+
+    assert state["peak"] == 2
+
+
+def test_the_record_keeps_requested_order_despite_completion_order(monkeypatch, tmp_path):
+    """Rows come back in the order ASKED FOR, not the order the threads finished.
+
+    Concurrency makes completion order an accident of scheduling. Two records of
+    the same gate set whose rows are ordered differently would invite a reader to
+    think something about the run changed when nothing did.
+    """
+    root = _repo(tmp_path, _SAFE)
+    # `eval` finishes first and `lint` last — the exact inversion of the request.
+    delays = {"eval": 0.0, "brain-audit": 0.02, "test": 0.04, "lint": 0.06}
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] == "mise":
+            time.sleep(delays[cmd[-1]])
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    gate_run, _ = gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    assert gate_run is not None
+    written = json.loads(gate_run.path.read_text(encoding="utf-8"))
+    assert [row["task"] for row in written["gates"]] == list(_SAFE)
+
+
+def test_a_repeated_gate_keeps_both_rows_under_concurrency(monkeypatch, tmp_path):
+    """`kb-gates -- lint lint` still records TWO rows once padding is a multiset.
+
+    The count-based padding this replaced was correct only while results arrived
+    in requested order; a set-based fix would have collapsed the two rows the CLI
+    deliberately allows. The multiset difference is the only form that survives
+    both.
+    """
+    root = _repo(tmp_path, ("lint",))
+    _peak_stub(monkeypatch, hold=0.0)
+    _pin_sha(monkeypatch)
+
+    gate_run, _ = gates.run_and_record(root, ("lint", "lint"), stop_on_failure=False)
+
+    assert gate_run is not None
+    written = json.loads(gate_run.path.read_text(encoding="utf-8"))
+    assert [row["task"] for row in written["gates"]] == ["lint", "lint"]
+
+
+def test_only_a_shared_terminal_gets_mises_prefix(monkeypatch, tmp_path):
+    """`-o prefix` appears when gates share stdio, and NOT when one runs alone.
+
+    Both directions, because either alone is satisfiable by a constant: always
+    prefixing would change what `kb-gates -- lint` has always printed, and never
+    prefixing would let four concurrent gates interleave into unattributable
+    output.
+    """
+    seen: list = []
+    _stub(monkeypatch, failing="__none__", seen=seen)
+    _pin_sha(monkeypatch)
+
+    gates.run(_repo(tmp_path / "solo", ("lint",)), ("lint",), stop_on_failure=False)
+    assert _mise(seen)[0][0] == ["mise", "run", "lint"]
+
+    seen.clear()
+    gates.run(_repo(tmp_path / "batch", _SAFE), _SAFE, stop_on_failure=False)
+    for cmd, _kwargs in _mise(seen):
+        assert cmd[:4] == ["mise", "run", "-o", "prefix"]
+
+
+def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
+    monkeypatch, tmp_path
+):
+    """The record must name the UNRUN gates, not however many happen to be left.
+
+    This is the test that separates padding by multiset from padding by count,
+    and nothing else in the suite can: with results arriving in requested order
+    the two agree exactly. Here `eval` — requested LAST — finishes first, so a
+    `tasks[len(results):]` slice pads from index 1 and produces a record with
+    `eval` twice and `lint` missing entirely. Both halves of that are the
+    failure: a gate that never ran is claimed, and a gate that was requested
+    vanishes.
+    """
+    root = _repo(tmp_path, _SAFE)
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
+        if cmd[0] != "mise":
+            return subprocess.CompletedProcess(cmd, 0, "")
+        task = cmd[-1]
+        if task == "eval":  # finishes first, inverting the requested order
+            return subprocess.CompletedProcess(cmd, 0, "")
+        if task == "brain-audit":
+            time.sleep(0.05)
+            raise KeyboardInterrupt
+        time.sleep(1.0)  # still in flight when the interrupt lands
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    _pin_sha(monkeypatch)
+
+    with pytest.raises(KeyboardInterrupt):
+        gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    rows = _rows(_written(root)[0])
+    written = json.loads(_written(root)[0].read_text(encoding="utf-8"))["gates"]
+    # Every requested gate appears exactly once — no duplicate, no omission.
+    assert sorted(row["task"] for row in written) == sorted(_SAFE)
+    # And the one that genuinely finished is the one recorded as having finished.
+    assert rows["eval"]["rc"] == 0
+    assert rows["lint"]["rc"] is None

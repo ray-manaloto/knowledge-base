@@ -43,6 +43,17 @@ second loop is what makes the recorded results and the push decision the same
 numbers read once (#146). Adding a gate means editing `GATE_TASKS`;
 `gates.undeclared` then refuses at run time if the name is not in `mise.toml`.
 
+**A gate is EXCLUSIVE until someone measures otherwise (#248).** The gates now
+run concurrently, but only the names in `gates.CONCURRENT_SAFE` overlap; anything
+else gets a batch to itself. That default is fail-closed on purpose — a gate
+whose writes nobody characterised must not be raced — so adding a name to
+`GATE_TASKS` alone makes it correct and slow, which is the right way round. To
+make it fast, first establish what it writes (`find -newer <stamp>` across a real
+run is how the current four were cleared: `.rumdl_cache` and `.pytest_cache`,
+disjoint, no tracked files) and only then add it to `CONCURRENT_SAFE`.
+`fmt`, `kb-build` and `kb-artifacts` rewrite tracked files and must never be in
+it — a `fmt` overlapping a `kb-build` is the 3h06m wedge of PR #244.
+
 ## Rule 2: Every tool an hk step invokes must be pinned in `mise.toml`
 
 When adding an hk step with a `check` command, verify the binary is in
