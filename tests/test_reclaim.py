@@ -448,3 +448,41 @@ def test_main_warns_that_the_total_is_a_floor_when_something_was_unreachable(tmp
     )
     assert reclaim.main([], repo) == 0
     assert "COULD NOT BE CHECKED" in capsys.readouterr().out
+
+
+def test_an_unknown_kind_is_refused_not_defaulted_to_deletion(tmp_path, capsys):
+    """The cascade this replaced sent an unrecognised kind to `apply_deletions`.
+
+    That is the most destructive possible default for an unknown value, and it
+    made the module docstring false: adding a reclaimer needed a scanner, a
+    config block AND an apply branch, and forgetting the third was silent.
+    """
+    root = tmp_path / "r"
+    root.mkdir()
+    doomed = root / "f.bin"
+    doomed.write_bytes(b"x")
+    cat = _cat(name="weird", kind="not-a-real-kind", options={"paths": [str(root)]})
+    finding = reclaim.Finding("weird", "f.bin", 1, "d", path=doomed)
+
+    rc = reclaim._apply_all([cat], [finding], tmp_path / "repo")
+
+    assert doomed.exists(), "an unknown kind deleted a file by falling through"
+    assert rc == 2
+    assert "REFUSED" in capsys.readouterr().out
+
+
+def test_a_failed_deletion_reaches_the_exit_code(tmp_path, capsys):
+    """A run that could not delete used to print FAILED and still exit 0.
+
+    The real run this came from left 21.3G behind on a permission error and
+    reported success.
+    """
+    root = tmp_path / "r"
+    root.mkdir()
+    cat = _cat(name="c", kind="dirs", options={"paths": [str(root)]})
+    outside = reclaim.Finding("c", "escapee", 1, "d", path=tmp_path / "elsewhere")
+
+    rc = reclaim._apply_all([cat], [outside], tmp_path / "repo")
+
+    assert rc == 1, "a REFUSED deletion did not reach the exit code"
+    assert "REFUSED" in capsys.readouterr().out

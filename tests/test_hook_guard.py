@@ -8,6 +8,8 @@ ever denies (or only ever allows) is not a guard.
 
 import io
 import json
+import subprocess
+import sys
 
 import pytest
 from kb_setup.hook_guard import decide, run
@@ -132,6 +134,15 @@ _DENIED_BARE = [
     "ls && python3 foo.py",
     "cat f | python3 -",
     "python3 script.py",
+    # A NEWLINE is a command separator, and it was missing from the class until
+    # the spec review measured the hole. Multi-line Bash is the ordinary shape
+    # in this repo, so this was the COMMON evasion, not a corner case.
+    "cd /tmp\npython3 -c 'print(1)'",
+    "echo hi\npython3 script.py",
+    # No `-m pytest` exemption: one existed, justified by the arms harness — but
+    # that harness calls pytest through `subprocess`, which never reaches a Bash
+    # hook, so the exemption defended a case this guard cannot observe.
+    "python3 -m pytest tests/",
 ]
 
 #: The four FALSE POSITIVES this guard produced in its first five minutes, each
@@ -182,10 +193,22 @@ def test_allows_uv_run_and_non_command_mentions(command: str) -> None:
     assert decide(command) is None, f"guard misfired on: {command}"
 
 
-def test_the_arms_harness_invocation_is_not_broken_by_the_guard() -> None:
-    """`kb_setup.arms` runs `[sys.executable, "-m", "pytest", ...]`.
+def test_the_arms_harness_is_unaffected_without_needing_an_exemption() -> None:
+    """`kb_setup.arms` runs `[sys.executable, "-m", "pytest", ...]` via subprocess.
 
-    A guard that breaks the mutation harness would cost more than it saves —
-    every fix in this repo is verified through it.
+    A `subprocess` argv never routes through a Bash PreToolUse hook, so the
+    harness needs no carve-out — which is why the `-m pytest` exemption that once
+    existed here was removed rather than kept. It was a hole argued from a case
+    the guard cannot observe, and `python3 -m pytest` TYPED AT A SHELL is exactly
+    the bare interpreter the guard exists to deny (it is in `_DENIED_BARE`).
+
+    The arms harness is what verifies every fix in this repo, so this asserts the
+    thing that actually matters: it still runs.
     """
-    assert decide("python3 -m pytest tests/") is None
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "tests/test_hook_guard.py"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, f"the arms harness invocation broke: {proc.stderr[-400:]}"

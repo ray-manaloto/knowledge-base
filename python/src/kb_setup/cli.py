@@ -38,7 +38,6 @@ def main(argv: list[str] | None = None) -> int:
             "brain [record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
             "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
             "graph-counts [--by-source] [name...] | "
-            "graph-counts [--by-source] [name...] | "
             "md-budget | skill-lint | "
             "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | "

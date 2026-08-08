@@ -467,17 +467,42 @@ def _file_finding(cat: Category, p: Path, exts: tuple, cutoff: float) -> Finding
 
 
 def scan_mise_versions(cat: Category, _repo_root: Path) -> ScanResult:
-    """Report installed mise tool versions that are neither pinned nor newest."""
+    """Report installed mise tool versions that are neither pinned nor newest.
+
+    `mise ls` resolves configs relative to the CURRENT DIRECTORY, so it can only
+    ever see what *this* repo pins — a version another project depends on is
+    invisible here. That is not theoretical: this category removed three python
+    versions on 2026-08-07, and 15 `uv` tools on the same machine point at a
+    python outside this repo's config. They survived only because the version
+    they needed had already been removed by something else.
+
+    So an unreadable pin list now makes the whole category UNAVAILABLE rather
+    than an empty set. An empty set means "nothing is pinned, everything is fair
+    game", which is the most destructive possible reading of a failed probe.
+    """
     root = _expand(str(cat.options.get("root", "~/.local/share/mise/installs")))
     if not root.is_dir():
         return ScanResult(unavailable=[f"configured root does not exist: {root}"])
     keep_newest = int(cat.options.get("keep_newest", 1))
-    pinned = _mise_pinned() if cat.options.get("keep_pinned", True) else set()
+    pinned: set[str] | None = set()
+    if cat.options.get("keep_pinned", True):
+        pinned = _mise_pinned()
+        if pinned is None:
+            blocked = (
+                "could not read mise's pinned versions — refusing to offer any "
+                "tool version for deletion, since an unknown pin list would read "
+                "as 'nothing is pinned'"
+            )
+            return ScanResult(unavailable=[blocked])
     out: list[Finding] = []
     for tool in sorted(root.iterdir()):
         if tool.is_dir():
             out.extend(_stale_versions(cat, tool, keep_newest, pinned))
-    return ScanResult(out)
+    caveat = (
+        "`mise ls` sees only configs reachable from this directory — a version "
+        "pinned by ANOTHER project is not protected here; review the list before --apply"
+    )
+    return ScanResult(out, [caveat])
 
 
 def _stale_versions(cat: Category, tool: Path, keep_newest: int, pinned: set[str]) -> list[Finding]:
@@ -509,15 +534,21 @@ def _is_concrete(name: str) -> bool:
     return name.count(".") >= _VERSION_DOTS and name[0].isdigit()
 
 
-def _mise_pinned() -> set[str]:
-    """Every version any reachable mise config pins, as `tool@version` and bare."""
+def _mise_pinned() -> set[str] | None:
+    """Every version any reachable mise config pins — or None when it cannot be read.
+
+    `None` is not `set()`, and the distinction is the whole point: an empty set
+    says "nothing is pinned", which licenses deleting every version. A failed
+    probe must never be readable as permission to delete
+    (`probes-need-a-control-arm.md`), so the caller turns `None` into UNAVAILABLE.
+    """
     rc, raw = _run(["mise", "ls", "--json", "--installed"])
     if rc != 0 or not raw:
-        return set()
+        return None
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return set()
+        return None
     pinned: set[str] = set()
     for tool, entries in data.items():
         for e in entries if isinstance(entries, list) else []:
@@ -862,6 +893,20 @@ def main(argv: list[str], repo_root: Path) -> int:
     return rc
 
 
+#: kind -> applier, mirroring `_SCANNERS`. One uniform signature
+#: `(cat, findings, repo_root)` so the table is possible at all; the three that
+#: ignore an argument say so with `_`. The cascade this replaced defaulted an
+#: unknown kind to `apply_deletions`.
+_APPLIERS = {
+    "homebrew": lambda cat, _f, _r: apply_homebrew(cat),
+    "docker": lambda cat, _f, _r: apply_docker(cat),
+    "ollama": lambda cat, findings, _r: apply_ollama(cat, findings),
+    "dirs": apply_deletions,
+    "files": apply_deletions,
+    "mise_versions": apply_deletions,
+}
+
+
 def _opt_list(argv: list[str], flag: str) -> set[str]:
     """Comma-separated values for `flag`, or an empty set when absent."""
     if flag not in argv:
@@ -876,22 +921,37 @@ def _opt_list(argv: list[str], flag: str) -> set[str]:
 
 
 def _apply_all(cats: list[Category], findings: list[Finding], repo_root: Path) -> int:
-    """Execute every enabled category's reclamation, reporting each outcome."""
+    """Execute every enabled category's reclamation, reporting each outcome.
+
+    Dispatch is a MAP keyed by kind, deliberately mirroring `_SCANNERS`. It was an
+    `if/elif` cascade whose `else` fell through to `apply_deletions`, which meant a
+    `kind` nobody had written an applier for **defaulted to deleting files** — the
+    most destructive possible default for an unrecognised value. It also made this
+    module's own docstring false: adding a reclaimer was a scanner, a config block,
+    *and* an apply branch, and forgetting the third was silent.
+
+    An unknown kind is now refused by name rather than guessed at.
+    """
     print("\nreclaim: APPLYING")
+    rc = 0
     for cat in cats:
         if not cat.enabled:
             continue
         hits = [f for f in findings if f.category == cat.name]
         print(f"\n{cat.name}:")
-        if cat.kind == "homebrew":
-            lines = apply_homebrew(cat)
-        elif cat.kind == "docker":
-            lines = apply_docker(cat)
-        elif cat.kind == "ollama":
-            lines = apply_ollama(cat, hits)
-        else:
-            lines = apply_deletions(cat, hits, repo_root)
+        applier = _APPLIERS.get(cat.kind)
+        if applier is None:
+            print(f"  REFUSED — no applier for kind {cat.kind!r}; not guessing at deletion")
+            rc = 2
+            continue
+        lines = applier(cat, hits, repo_root)
         for line in lines or ["  nothing to do"]:
             print(line)
+        if any(line.lstrip().startswith(("FAILED", "REFUSED")) for line in lines):
+            # A failed deletion used to be printed and then discarded: `_apply_all`
+            # returned a hardcoded 0, so a run that could not remove anything still
+            # exited green. The real run that prompted this left 21.3G behind on a
+            # permission error and reported success.
+            rc = 1
     print("\nreclaim: done — re-run without --apply to see what remains")
-    return 0
+    return rc

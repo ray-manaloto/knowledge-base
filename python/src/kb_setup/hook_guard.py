@@ -154,12 +154,25 @@ def decide(command: str) -> str | None:
     return _bare_python(command)
 
 
-#: A bare interpreter at a COMMAND POSITION. `uv run python …` is unaffected —
-#: the lookbehind requires the token to start a command, and in `uv run python`
-#: the preceding token is `run`, so it never matches there.
-_BARE_PYTHON = re.compile(
-    r"(?:^|[|;&]\s*|\breturn\s+)\s*(?:command\s+)?(python3?)\b(?!\s*-m\s+pytest)"
-)
+#: A bare interpreter at a COMMAND POSITION. `uv run python …` is unaffected:
+#: the leading alternation requires the token to start a command, and in
+#: `uv run python` the preceding token is `run`, so it never matches there.
+#: (This comment said "lookbehind" until the standards review pointed out there
+#: is none — prose asserting a mechanism the next line does not implement.)
+#:
+#: **A NEWLINE is a command separator.** It was missing from this class until the
+#: spec review measured the hole: a second-line `python3 -c 1` was allowed while
+#: the control `"ls && python3 x.py"` denied, so the probe discriminated and the
+#: gap was real. Multi-line Bash is the ordinary shape here, not an exotic one,
+#: which made this the common evasion rather than a corner case.
+#:
+#: There is deliberately NO `-m pytest` exemption. One was written, justified by
+#: `kb_setup.arms` building `[sys.executable, "-m", "pytest", ...]` — but that is
+#: a `subprocess` argv (`arms.py`), which never reaches a Bash PreToolUse hook at
+#: all. The exemption defended a scenario this guard cannot observe, and a hole
+#: argued from an unreachable case is a hole. Typed at a shell, `python3 -m
+#: pytest` is exactly the bare interpreter Ray asked to deny.
+_BARE_PYTHON = re.compile(r"(?:^|[|;&\n]\s*|\breturn\s+)\s*(?:command\s+)?(python3?)\b")
 
 _REASON_BARE_PY = (
     "Do not run `{exe}` directly — use `uv run python …`, or the mise task that owns "
@@ -214,9 +227,8 @@ def _bare_python(command: str) -> str | None:
 
     Scoped to a command position AND to code rather than data (see `_code_only`),
     so it cannot fire on prose, a `--python3` flag, or a path containing the word.
-    `-m pytest` is exempted because the arms harness (`kb_setup.arms`) builds
-    `[sys.executable, "-m", "pytest", ...]`, and a guard that breaks the mutation
-    harness every fix in this repo is verified through would cost more than it saves.
+    The mutation harness is unaffected without any exemption: `kb_setup.arms`
+    invokes pytest through `subprocess`, which never routes through a Bash hook.
     """
     m = _BARE_PYTHON.search(_code_only(command))
     if not m:
