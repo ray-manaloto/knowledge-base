@@ -127,6 +127,19 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
 
 ## Progress log
 
+- **2026-08-07 — colibri pinned (local-LLM runtime).** `sources/colibri.manifest`
+  → [JustVugg/colibri](https://github.com/JustVugg/colibri) at the **v1.5.0
+  release** (`5e4b5c6a…`), `kind=code`, AST-only — free, no LLM, which is the
+  point: Ray flagged *"we are burning too many tokens w the graphify agent
+  work"*, and colibri runs models locally. Pinned to a release rather than
+  `main` on Ray's instruction. The next session evaluates it against
+  `/Users/rmanaloto/agy-graphify-research` before any of it is adopted; this pin
+  only makes the code queryable in the meantime.
+  **Caveat, filed as #235:** v1.5.0 is an **annotated** tag, so the recorded
+  `commit` is the tag OBJECT, not the commit (`8f512fc8…`). Control-armed —
+  fetch and checkout both rc=0 and HEAD peels correctly, so the pin works and is
+  left as-is; what is untested is `kb-update`'s comparison path.
+
 - **2026-07-23 — long-running-framework wave (sources #28–#56).** Staged ingestion for
   the autonomous-framework program (plan: `we-want-a-long-mighty-ladybug.md`).
   - **12 repos AST-ingested (free, no tokens)** via manifests + `kb-build`: openai/symphony

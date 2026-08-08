@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# colibri — local-LLM runtime (JustVugg). Pinned to the v1.5.0 RELEASE, not main (Ray, 2026-08-07). Ingested for AST only: the code + local traversal, free, no LLM. It is the candidate answer to graphify agent-work token burn, and the next session evaluates it against /Users/rmanaloto/agy-graphify-research.
+url = https://github.com/JustVugg/colibri
+ref = v1.5.0
+commit = 5e4b5c6a2179b5b7559657a6db100bed0cd45209
+kind = code

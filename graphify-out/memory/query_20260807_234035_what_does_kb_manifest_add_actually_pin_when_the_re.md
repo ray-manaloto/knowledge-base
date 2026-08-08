@@ -1,0 +1,17 @@
+---
+type: "query"
+date: "2026-08-07T23:40:35.905593+00:00"
+question: "What does kb-manifest-add actually pin when the ref is an annotated git tag?"
+contributor: "graphify"
+outcome: "useful"
+---
+
+# Q: What does kb-manifest-add actually pin when the ref is an annotated git tag?
+
+## Answer
+
+It records the TAG OBJECT, not the commit, whenever the tag is ANNOTATED - and nothing in this repo had exercised that until colibri v1.5.0 on 2026-08-07. kb-manifest-add stores whatever git ls-remote url ref returns. A lightweight tag resolves straight to the commit; an annotated tag resolves to the tag object, and the commit is only on the ^{} dereference line. Measured: colibri v1.5.0 gives 5e4b5c6a for refs/tags/v1.5.0 and 8f512fc8 for refs/tags/v1.5.0^{}, while the CONTROL - claude-code v2.1.222, the only other tag-pinned source here - returns no ^{} line at all because it is lightweight, so its recorded SHA really is the commit. That control is what made the asymmetry legible rather than looking like a one-off oddity. IMPACT IS NOT WHAT IT LOOKS LIKE: cloning is completely unaffected. git fetch --depth 1 origin <tag-object-sha> returns rc=0, git checkout of that sha returns rc=0 because git peels it, HEAD then reads 8f512fc8, and kb-build reproduces normally. So the pin is correct as written and should be LEFT ALONE rather than hand-normalised, because hand-editing it would make the file disagree with what manifest-add would regenerate. CORRECTED 2026-08-07 by the cold review lane on de01ce93cfd9, then re-measured: THE COMPARISON PATH IS FINE AND THERE IS NO DRIFT BUG. This record originally claimed manifest.latest_commit could compare a tag-object sha against a peeled one and report drift that is not drift, and cited a function resolve_release. Both were wrong. latest_commit passes the EXACT ref name to ls-remote, and an exact ref name returns ONLY the tag-object line - the ^{} line appears only under a glob. Control arm: git ls-remote <url> v1.5.0 gives one line (5e4b5c6a), while git ls-remote <url> 'v1.5.0*' gives two (5e4b5c6a and 8f512fc8), so the probe discriminates. The manifest stores 5e4b5c6a and latest_commit returns 5e4b5c6a - tag-sha against tag-sha, consistent. There is also no resolve_release; the sibling is resolve_tag, and it does NOT peel to the commit either: --refs strips the ^{} ROW, so it too returns the tag object 5e4b5c6a. Measured both invocations against the real remote. So both writers and the reader agree, and the second hypothesis this correction itself raised - that currency apply (resolve_tag) and kb-manifest-add (latest_commit) might write different shas for one tag - was refuted by that same measurement before it was reported. THE REAL LESSON IS ABOUT THIS RECORD, NOT ABOUT manifest.py: a correctly measured finding (the pin IS the tag object) was extended by pure reasoning into a bug that was never probed, and the unprobed half was written in the same confident voice as the measured half. A committed work-memory record is queryable by every future session, so an unmeasured mechanism in one is not a small error. Probe the second claim too, or mark it as a hypothesis. One residual, genuinely worth knowing: resolve_tag's docstring says --refs makes a peeled annotated tag yield one clean SHA, which reads as though that SHA is the commit; it is the tag object.
+
+## Outcome
+
+- Signal: useful
