@@ -96,7 +96,7 @@ new = '''            rf"(?m)"'''
 id = "mise-run-not-narrowed-to-gates"
 test = "test_piping_a_read_only_task_into_head_is_a_browse"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''_GATE_TASKS = "lint|lint-docs|test|fmt|eval|brain-audit|kb-gates"'''
+old = '''_GATE_TASKS = "lint-docs|lint|test|fmt|eval|brain-audit|kb-gates|check"'''
 new = '''_GATE_TASKS = r"\S+"'''
 
 # --- finding 4: counting greps armed by OCCURRENCE, not relatedness ----------
@@ -105,7 +105,7 @@ new = '''_GATE_TASKS = r"\S+"'''
 id = "armed-counts-occurrences-again"
 test = "test_two_counts_over_different_corpora_do_not_arm_each_other"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''    targets = [args.split()[-1] for args in _COUNT.findall(command) if args.split()]
+old = '''    targets = [t for args in _COUNT.findall(command) if (t := _last_arg(args))]
     return len(targets) >= MIN_RUN and any(targets.count(t) >= MIN_RUN for t in targets)'''
 new = '''    return len(_COUNT.findall(command)) >= MIN_RUN'''
 
@@ -144,5 +144,45 @@ new = '''    _git(root, "tag", ref)'''
 id = "relative-cd-checks-literal-slash-only"
 test = "test_a_shell_expanded_absolute_cd_is_not_a_violation"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?[/~$])[^\s;&|]+",'''
+old = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",'''
 new = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?!/)[^\s;&|]+",'''
+
+# --- ROUND 1 of the review OF THESE FIXES ------------------------------------
+#
+# Three of the cold lane's four findings were defects introduced BY the fixes
+# above — the recorded shape, not a surprise: a fix is the least-reviewed code
+# in a diff, written by whoever already misunderstood the area once. Each is
+# armed here against the version that shipped in 534fd65.
+
+# The `$` exemption went too far the other way and excused the rule's own hazard.
+[[arm]]
+id = "relative-cd-exempts-any-dollar"
+test = "test_a_bare_variable_target_is_still_flagged"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",'''
+new = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?[/~$])[^\s;&|]+",'''
+
+# A bare `\bPIPESTATUS\b` excuses the WRONG index — tail's status again.
+[[arm]]
+id = "pipestatus-exemption-unscoped"
+test = "test_the_wrong_pipestatus_index_is_not_an_exemption"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        unless=r"PIPESTATUS\[0\]",'''
+new = '''        unless=r"\bPIPESTATUS\b",'''
+
+# The composite gate `mise run check` (depends = lint + test) was omitted.
+[[arm]]
+id = "gate-task-list-omits-check"
+test = "test_the_composite_check_task_is_a_gate_too"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''_GATE_TASKS = "lint-docs|lint|test|fmt|eval|brain-audit|kb-gates|check"'''
+new = '''_GATE_TASKS = "lint|lint-docs|test|fmt|eval|brain-audit|kb-gates"'''
+
+# Whitespace-splitting a quoted path left two different corpora looking equal —
+# the false ARMED the function exists to remove, reproduced by its own tokenizer.
+[[arm]]
+id = "last-arg-not-quote-aware"
+test = "test_quoted_targets_are_compared_as_whole_arguments"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        words = shlex.split(args)'''
+new = '''        words = args.split()'''

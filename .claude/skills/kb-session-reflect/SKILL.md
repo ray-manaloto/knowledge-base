@@ -88,16 +88,29 @@ first draft of `piped-rc` matched any `| head`, fired **111 times in one
 session**, and looked thorough rather than broken. A rule at that volume teaches
 the reader to skip the section holding the real finding.
 
-Two failure shapes this module has already met, both worth checking a new rule
+Four failure shapes this module has already met, all worth checking a new rule
 against:
 
 - **The rule flags its own remedy.** `piped-rc` tripped on
   `mise run lint > log; echo "rc=$?" | tail -1` — the exact form it recommends —
-  because a lookahead inside the pattern sees only bytes after the pipe. That is
-  what `Rule.unless` exists for, and its control arm is what found it.
+  because its gap `[^|\n]*` ran past the `;` to the next pipe. The fix is
+  `_SEG`, which refuses to cross a command separator.
 - **The rule matches text ABOUT the rule.** A rule table contains every pattern
   by construction, so editing it trips it. `SELF` drops those commands;
   `kb_setup.hook_guard` records the same class.
+- **An exemption reaches further than the rule.** `Rule.unless` is searched
+  against the WHOLE command, so it is the loosest thing in a rule and the
+  easiest to over-write. `piped-rc` has now had two too-wide ones: `\brc=\$\?`
+  excused the very violation the rule names (that `$?` is `tail`'s), and its
+  replacement `\bPIPESTATUS\b` excused the wrong index and any prose mention of
+  the word. It is `PIPESTATUS\[0\]` now — index 0 is the only element holding a
+  piped gate's own status. **Write the exemption's must-STILL-fire arm**, not
+  just the rule's.
+- **A cheap regex hides an expensive one.** A rule meaning "A appears, and later
+  B" written as `A.*?B` under DOTALL retries the gap to end-of-string from every
+  `A`: measured 5.98 ms at k=200 rising to 395 ms at k=1600. Use `Rule.also` —
+  two linear searches — and note that `scan` checks `also` BEFORE `pattern`, so
+  the cheap filter is what keeps the expensive one off the adversarial input.
 
 ## See also
 

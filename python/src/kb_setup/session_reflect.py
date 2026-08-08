@@ -42,6 +42,7 @@ branches, so adding a detector is a table row plus a test. That mirrors
 from __future__ import annotations
 
 import re
+import shlex
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
@@ -205,12 +206,18 @@ and its pipe, so excluding `&` outright would stop `mise run lint 2>&1 | tail`
 and still refuses the separator.
 """
 
-_GATE_TASKS = "lint|lint-docs|test|fmt|eval|brain-audit|kb-gates"
+_GATE_TASKS = "lint-docs|lint|test|fmt|eval|brain-audit|kb-gates|check"
 """The `mise run` tasks whose exit code is EVIDENCE, so losing it is the defect.
 
 Deliberately a list rather than `mise run \\S+`: most tasks here are reads
 (`kb-query`, `kb-session-state`), and piping a read into `head` is a display
 bound on output already in hand, not a discarded gate.
+
+A hand-maintained list's failure mode is OMISSION, and it had one on arrival:
+`check` (`mise.toml`, `depends = ["lint", "test"]`) is the composite gate, so
+`mise run check | tail` discarded two gates' exit codes and tripped nothing
+(cold lane, round 1). Longest-first ordering so `lint-docs` is not read as
+`lint` followed by a stray `-docs`.
 """
 
 DIRECTIVES: tuple[Rule, ...] = (
@@ -224,13 +231,22 @@ DIRECTIVES: tuple[Rule, ...] = (
     ),
     _rule(
         "relative-cd",
-        # `["']?[/~$]` — not just a literal leading `/`. `cd ~`, `cd "$HOME/repo"`
-        # and `cd $(git rev-parse --show-toplevel)` all resolve to an ABSOLUTE
-        # path after expansion, and flagging them inflated the reported rate with
-        # commands that were already compliant (cold lane, 2026-08-08). What the
-        # directive is actually about is a target relative to a cwd that persists
-        # across Bash calls, and none of those three is one.
-        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?[/~$])[^\s;&|]+",
+        # Not just a literal leading `/`. `cd ~`, `cd "$HOME/repo"` and
+        # `cd $(git rev-parse --show-toplevel)` all resolve to an ABSOLUTE path
+        # after expansion, and flagging them inflated the reported rate with
+        # commands that were already compliant. What the directive is about is a
+        # target relative to a cwd that persists across Bash calls, and none of
+        # those three is one.
+        #
+        # The exemption names those forms rather than exempting `$` wholesale,
+        # which was the first fix and went too far the other way: `REL=sources/x;
+        # cd $REL` is the rule's exact hazard and a blanket `$` excused it (cold
+        # lane, round 1). A bare `$VAR` therefore FIRES. That costs a false
+        # positive on `cd $REPO_ROOT` holding an absolute path — accepted, because
+        # a variable's contents cannot be read from the command, so the honest
+        # report is "could not be shown absolute" and this rule reports a rate of
+        # candidates, not a verdict on each.
+        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",
         "git -C <path> …, or an absolute path",
         "cwd persists across Bash calls; two relative cds once made "
         "`gh issue view` return a different repository's PR.",
@@ -272,7 +288,20 @@ DIRECTIVES: tuple[Rule, ...] = (
         # It replaces a `\brc=\$\?` exemption that was checked against the whole
         # command and therefore excused fix 3's false negative all over again —
         # the very defect the tightened lookahead exists to catch.
-        unless=r"\bPIPESTATUS\b",
+        #
+        # INDEX 0 specifically, not a bare `\bPIPESTATUS\b`. The gate is the
+        # left-hand side of the pipe, so index 0 is the only element that holds
+        # its status: `mise run lint | tail; echo ${PIPESTATUS[1]}` reads TAIL's
+        # again and was excused, and so was any command that merely contained
+        # the word — `echo "see PIPESTATUS docs"` bought a full exemption. That
+        # is the same whole-command over-reach as the exemption it replaced,
+        # reintroduced one commit later (cold lane, round 1).
+        #
+        # What remains unexcused: an unrelated `${PIPESTATUS[0]}` for a DIFFERENT
+        # pipeline in the same command. That is a false negative on an input
+        # nobody has written, and closing it would mean parsing the pipeline
+        # rather than matching it.
+        unless=r"PIPESTATUS\[0\]",
     ),
 )
 """Standing directives whose compliance is a RATE, not a yes/no."""
@@ -325,9 +354,27 @@ def _armed(command: str) -> bool:
     would be fooled by a trailing flag — both under-report (a stdin pair is
     called unarmed), which is the safe direction for a rule whose whole subject
     is claiming an answer you did not get.
+
+    Split with `shlex`, not `str.split`, because a quoted path is one argument.
+    Whitespace-splitting `grep -c missing "a corpus"; grep -c known "b corpus"`
+    left both as the trailing token `corpus"` — so two probes over DIFFERENT
+    corpora matched, and the function reported the precise false ARMED it was
+    written to remove (cold lane, round 1). `shlex` raises on an unbalanced
+    quote, which a transcript fragment can easily carry; that falls back to the
+    whitespace split rather than losing the command, since an approximate target
+    is still better than none.
     """
-    targets = [args.split()[-1] for args in _COUNT.findall(command) if args.split()]
+    targets = [t for args in _COUNT.findall(command) if (t := _last_arg(args))]
     return len(targets) >= MIN_RUN and any(targets.count(t) >= MIN_RUN for t in targets)
+
+
+def _last_arg(args: str) -> str:
+    """The final shell WORD of `args`, quotes resolved; "" when there is none."""
+    try:
+        words = shlex.split(args)
+    except ValueError:
+        words = args.split()
+    return words[-1] if words else ""
 
 
 def _normalise(command: str) -> str:

@@ -160,6 +160,34 @@ def test_pipestatus_reads_the_gates_own_status_and_is_exempt(tmp_path) -> None:
     assert "piped-rc" not in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
+def test_the_wrong_pipestatus_index_is_not_an_exemption(tmp_path) -> None:
+    r"""Index 1 is TAIL's status — the very thing the directive is about.
+
+    A bare `\bPIPESTATUS\b` exemption excused it, which is the same
+    whole-command over-reach as the `rc=$?` exemption it replaced, reintroduced
+    one commit later (cold lane, round 1).
+    """
+    path = _transcript(tmp_path, "mise run lint | tail -5; echo ${PIPESTATUS[1]}")
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
+def test_merely_mentioning_pipestatus_is_not_an_exemption(tmp_path) -> None:
+    """The word in prose bought a full exemption for a real violation."""
+    path = _transcript(tmp_path, 'mise run lint | tail -5; echo "see PIPESTATUS docs"')
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
+def test_the_composite_check_task_is_a_gate_too(tmp_path) -> None:
+    """`mise run check` is `depends = ["lint", "test"]` — two gates, one rc.
+
+    A hand-maintained task list fails by OMISSION, and this one had one on
+    arrival: piping the composite gate discarded both exit codes and tripped
+    nothing.
+    """
+    path = _transcript(tmp_path, "mise run check | tail -20")
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
 def test_grepping_for_the_word_pytest_is_not_a_lost_gate(tmp_path) -> None:
     r"""FALSE POSITIVE: `\bpytest\b` matched the word ANYWHERE in the command.
 
@@ -205,10 +233,31 @@ def test_a_shell_expanded_absolute_cd_is_not_a_violation(tmp_path) -> None:
     What the directive is about is a target relative to a cwd that persists
     across Bash calls, and none of these is one.
     """
-    for command in ("cd ~", 'cd "$HOME/repo"', "cd $(git rev-parse --show-toplevel)"):
+    for command in (
+        "cd ~",
+        'cd "$HOME/repo"',
+        "cd ${HOME}/repo",
+        "cd $(git rev-parse --show-toplevel)",
+    ):
         path = _transcript(tmp_path, command, name=f"s{abs(hash(command))}")
         found = _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
         assert "relative-cd" not in found, command
+
+
+def test_a_bare_variable_target_is_still_flagged(tmp_path) -> None:
+    """The first fix exempted `$` WHOLESALE, and went too far the other way.
+
+    `REL=sources/x; cd $REL` is the rule's exact hazard — a target relative to a
+    cwd that persists across Bash calls — and a blanket `$` excused it (cold
+    lane, round 1). The exemption names the provably-absolute forms instead.
+
+    This knowingly costs a false positive on a variable holding an absolute
+    path: a variable's contents cannot be read from the command, so "could not
+    be shown absolute" is the honest reading, and this rule reports a rate of
+    candidates rather than a verdict on each.
+    """
+    path = _transcript(tmp_path, "REL=sources/mise; cd $REL")
+    assert "relative-cd" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
 # --- counting greps are a RATE, not a row each -------------------------------
@@ -244,6 +293,36 @@ def test_a_shared_target_among_several_counts_is_armed(tmp_path) -> None:
     path = _transcript(tmp_path, "grep -c a f; grep -c b g; grep -c c f")
     report = sr.reflect(tmp_path, transcripts=[path])
     assert (report.counts, report.counts_armed) == (1, 1)
+
+
+def test_quoted_targets_are_compared_as_whole_arguments(tmp_path) -> None:
+    """A quoted path is ONE argument, and `str.split` did not know that.
+
+    `grep -c missing "a corpus"; grep -c known "b corpus"` left both targets as
+    the trailing token `corpus"`, so two probes over different corpora matched —
+    the exact false ARMED this function was written to remove, reproduced by its
+    own tokenizer (cold lane, round 1).
+    """
+    path = _transcript(tmp_path, 'grep -c missing "a corpus"; grep -c known "b corpus"')
+    report = sr.reflect(tmp_path, transcripts=[path])
+    assert (report.counts, report.counts_armed) == (1, 0)
+
+
+def test_a_genuinely_shared_quoted_target_is_still_armed(tmp_path) -> None:
+    """CONTROL ARM: quote-awareness must not stop real pairs from matching."""
+    path = _transcript(tmp_path, 'grep -c a "one file"; grep -c b "one file"')
+    report = sr.reflect(tmp_path, transcripts=[path])
+    assert (report.counts, report.counts_armed) == (1, 1)
+
+
+def test_an_unbalanced_quote_falls_back_rather_than_raising(tmp_path) -> None:
+    """A transcript fragment can carry one, and `shlex` raises on it.
+
+    Losing the whole command to a ValueError would be a worse answer than an
+    approximate target, in a module that never gates anything.
+    """
+    path = _transcript(tmp_path, 'grep -c a "unbalanced; grep -c b f')
+    assert sr.reflect(tmp_path, transcripts=[path]).counts == 1
 
 
 # --- the graph-first ratio ----------------------------------------------------
