@@ -1190,3 +1190,62 @@ def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
     # And the one that genuinely finished is the one recorded as having finished.
     assert rows["eval"]["rc"] == 0
     assert rows["lint"]["rc"] is None
+
+
+def test_the_four_shipped_gates_form_a_single_batch():
+    """Pins the claim `iter_run`'s docstring makes about the ship path.
+
+    All four of `GATE_TASKS` being concurrency-safe is what makes them one batch,
+    and one batch is why `stop_on_failure=True` no longer skips anything on the
+    ship path. That is a real behaviour change, so it is asserted rather than
+    left as prose agreeing with itself.
+
+    If a gate is ever added to `GATE_TASKS` without being cleared for
+    `CONCURRENT_SAFE`, this goes red — which is the intended outcome, because the
+    docstring's statement about ship timing would have quietly stopped being true.
+    """
+    assert list(gates._batches(gates.GATE_TASKS)) == [gates.GATE_TASKS]
+    assert set(gates.GATE_TASKS) <= gates.CONCURRENT_SAFE
+
+
+def test_a_non_adjacent_repeat_keeps_its_first_requested_position(monkeypatch, tmp_path):
+    """A gate repeated NON-adjacently must not drag its first row to the back.
+
+    The gap the whole concurrency suite had: every other repeat test uses
+    ADJACENT duplicates, where last-write-wins and first-write-wins agree, so a
+    `{task: i for ...}` comprehension passed all of them while sorting
+    `("lint", "test", "lint")` to `test, lint, lint`. Found by a lane that
+    executed the function instead of reading it.
+
+    The assertion is GROUPED order, not the literal request, and deliberately so
+    — two rows for one gate are indistinguishable, so `lint, lint, test` is the
+    strongest thing that is actually true. Asserting the literal
+    `lint, test, lint` would be pinning a fact the data cannot carry.
+    """
+    root = _repo(tmp_path, ("lint", "test"))
+    _peak_stub(monkeypatch, hold=0.0)
+    _pin_sha(monkeypatch)
+
+    gate_run, _ = gates.run_and_record(root, ("lint", "test", "lint"), stop_on_failure=False)
+
+    assert gate_run is not None
+    written = json.loads(gate_run.path.read_text(encoding="utf-8"))["gates"]
+    assert [row["task"] for row in written] == ["lint", "lint", "test"]
+
+
+def test_ordering_a_list_with_no_repeats_is_exactly_the_request(monkeypatch, tmp_path):
+    """CONTROL ARM: with no duplicate name, the order IS the requested order.
+
+    Without this the test above is satisfiable by a function that groups by name
+    and ignores position entirely — which would reorder the ordinary four-gate
+    record and no other test would notice.
+    """
+    root = _repo(tmp_path, _SAFE)
+    _peak_stub(monkeypatch, hold=0.0)
+    _pin_sha(monkeypatch)
+
+    gate_run, _ = gates.run_and_record(root, _SAFE, stop_on_failure=False)
+
+    assert gate_run is not None
+    written = json.loads(gate_run.path.read_text(encoding="utf-8"))["gates"]
+    assert [row["task"] for row in written] == list(_SAFE)

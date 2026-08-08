@@ -358,11 +358,6 @@ def iter_run(
     minutes of gate results to an interrupt is the exact failure this module
     exists to prevent, arriving through the door nobody watched. (Cold lane, P2.)
 
-    ``stop_on_failure`` is off for `kb-gates`, where the point is to learn every
-    gate's state in one pass, and on for the ship path, where there is nothing to
-    gain by spending minutes on gates whose result cannot change the refusal.
-    Gates past the stop are yielded as "not run" rather than dropped.
-
     RESULTS ARRIVE IN COMPLETION ORDER, NOT REQUESTED ORDER, because the gates
     within a batch run concurrently. Nothing downstream may index a result by its
     position in ``tasks`` — :func:`run_and_record` restores the requested order
@@ -385,6 +380,18 @@ def iter_run(
     checked rather than assumed — it could only ever have returned False.
     Fail-fast is therefore real at BATCH granularity, which is where a run with a
     writer in it has something left to skip.
+
+    THAT CHANGES THE SHIP PATH, and the change is stated rather than left to be
+    discovered. `pr.run_gates` passes the four :data:`GATE_TASKS` with
+    ``stop_on_failure=True``, and all four are :data:`CONCURRENT_SAFE`, so they
+    form ONE batch and none of them is ever skipped now. A ship whose `lint`
+    fails used to stop at roughly 12s and now takes the full ~61s of the slowest
+    gate. It is still strictly better than what the flag was protecting against —
+    the sum was 249s — and it buys the thing `--stop` was giving up, which is
+    every gate's state on a failing ship instead of only the first one's. But it
+    is a real regression in the one case the flag was named for, and if a future
+    gate makes that window painful the fix is a smaller batch, not a cancel loop
+    that cannot fire.
 
     HEAD is read PER GATE, not once for the run — see :func:`_run_one`.
     """
@@ -418,7 +425,7 @@ def iter_run(
 
 
 def in_requested_order(results: list[GateResult], tasks: tuple[str, ...]) -> list[GateResult]:
-    """``results`` reordered to match ``tasks``. Stable, so repeats keep their order.
+    """``results`` sorted by each task's FIRST position in ``tasks``.
 
     ONE definition, used by both :func:`run` and :func:`run_and_record`. Under
     concurrency the order results arrive in is an accident of scheduling, and
@@ -426,10 +433,30 @@ def in_requested_order(results: list[GateResult], tasks: tuple[str, ...]) -> lis
     about that is how they end up disagreeing — the same duplication that let
     `run_and_record` and `pr.run_gates` drift over an unreadable HEAD.
 
+    FIRST position, via `setdefault`, and the distinction is a defect this
+    function shipped with. A `{task: i for i, task in enumerate(tasks)}`
+    comprehension is LAST-write-wins, so for `("lint", "test", "lint")` every
+    `lint` row took index 2 and the record came back `test, lint, lint` — the
+    first `lint` was requested before `test` and was sorted after it. Reachable
+    from the CLI, which accepts an arbitrary task list, and invisible to every
+    test here because they all used adjacent repeats. (Cold lane, P2, found by
+    executing the function rather than reading it.)
+
+    WHAT THIS DOES NOT PROMISE, stated because the docstring it replaces
+    overclaimed exactly here: with a repeated name the result is grouped, not
+    interleaved — `("lint", "test", "lint")` yields `lint, lint, test`. Two rows
+    for one task are genuinely indistinguishable (same name, both ran, only
+    `finished_at` differs), so there is no fact of the matter about which
+    requested slot each belongs in, and inventing one would be a presentation
+    step asserting something it cannot know. Grouping is the strongest honest
+    answer; `finished_at` carries the real chronology.
+
     A task not in ``tasks`` sorts to the end rather than raising: this is a
     presentation step, and it must not be the thing that destroys a record.
     """
-    position = {task: i for i, task in enumerate(tasks)}
+    position: dict[str, int] = {}
+    for i, task in enumerate(tasks):
+        position.setdefault(task, i)
     return sorted(results, key=lambda r: position.get(r.task, len(tasks)))
 
 

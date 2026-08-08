@@ -89,6 +89,24 @@ old = """        missing = Counter(tasks) - Counter(r.task for r in results)
         results.extend(GateResult(t, None, None, None) for t in missing.elements())"""
 new = """        results.extend(GateResult(t, None, None, None) for t in tasks[len(results) :])"""
 
+# THE COLD LANE'S P2, armed as its own revert. This is the code AS FIRST
+# WRITTEN: a dict comprehension is last-write-wins, so every `lint` row in
+# `("lint", "test", "lint")` took index 2 and the first one sorted after `test`.
+#
+# It passed all eleven concurrency tests written alongside it, because every one
+# of them used an ADJACENT repeat — the single case where first-write and
+# last-write agree. The lane found it by EXECUTING the function; no amount of
+# reading the diff would have, and the sweep that scored 7/7 the round before was
+# green over this exact line.
+[[arm]]
+id = "requested-order-keyed-by-last-occurrence"
+test = "test_a_non_adjacent_repeat_keeps_its_first_requested_position"
+file = "python/src/kb_setup/gates.py"
+old = """    position: dict[str, int] = {}
+    for i, task in enumerate(tasks):
+        position.setdefault(task, i)"""
+new = """    position = {task: i for i, task in enumerate(tasks)}"""
+
 [[arm]]
 id = "record-keeps-completion-order"
 test = "test_the_record_keeps_requested_order_despite_completion_order"
@@ -105,8 +123,8 @@ new = "        pass  # order left as scheduled"
 id = "batched-gates-lose-mises-prefix"
 test = "test_only_a_shared_terminal_gets_mises_prefix"
 file = "python/src/kb_setup/gates.py"
-old = """                pool.submit(_run_one, repo_root, task, prefix_output=True) for task in batch"""
-new = """                pool.submit(_run_one, repo_root, task, prefix_output=False) for task in batch"""
+old = "pool.submit(_run_one, repo_root, task, prefix_output=True)"
+new = "pool.submit(_run_one, repo_root, task, prefix_output=False)"
 
 [[arm]]
 id = "lone-gate-gains-a-prefix-it-never-had"
