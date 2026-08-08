@@ -196,6 +196,15 @@ OWNED: tuple[Rule, ...] = (
 )
 """Work an existing task already owns. The remedy is the point of the row."""
 
+_CMD_POS = r"(?:^|[;&|]\s*|\b(?:if|then|elif|else|do|while|until)\s+)"
+"""Where a COMMAND can start: line start, after a separator, or after a keyword.
+
+The keyword arm is the part that had to be added. `[;&|]` alone missed
+`if mise run test | head; then …` — a gate inside a conditional, whose exit code
+is not merely discarded but is the thing the conditional branches on, so it is
+the worst case of the directive rather than an edge one (cold lane, round 2).
+"""
+
 _SEG = r"(?:[^|\n;&]|&(?!&))*"
 """Bytes inside ONE simple command — never across `;`, `&&`, `||` or a pipe.
 
@@ -246,7 +255,16 @@ DIRECTIVES: tuple[Rule, ...] = (
         # a variable's contents cannot be read from the command, so the honest
         # report is "could not be shown absolute" and this rule reports a rate of
         # candidates, not a verdict on each.
-        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",
+        #
+        # QUOTING IS NOT DECORATION, and treating a leading quote as skippable
+        # was the round-2 defect: what expands depends on WHICH quote (round 2).
+        #   `/`     absolute quoted or not      -> ["']? allowed
+        #   `~`     expands ONLY unquoted       -> no quote allowed
+        #   `$…`    expands unquoted and in ""  -> "? allowed, never '
+        # So `cd "~/repo"` and `cd '$HOME/repo'` are RELATIVE paths naming
+        # directories literally called `~` and `$HOME`, and both were excused.
+        r"(?m)(?:^|[;&|]\s*)cd\s+"
+        r"(?!(?:[\"']?/|~|\"?(?:\$\(|\$\{?HOME)))[^\s;&|]+",
         "git -C <path> …, or an absolute path",
         "cwd persists across Bash calls; two relative cds once made "
         "`gh issue view` return a different repository's PR.",
@@ -277,7 +295,7 @@ DIRECTIVES: tuple[Rule, ...] = (
             #    `;` to the pipe, and `mise run lint | tail; echo "rc=$?"` (the
             #    real violation) was SUPPRESSED because the lookahead ran past
             #    the `;` to an `rc=` that is `tail`'s status, not the gate's.
-            rf"(?m)(?:^|[;&|]\s*)"
+            rf"(?m){_CMD_POS}"
             rf"(?:mise run (?:{_GATE_TASKS})|hk |pytest|uv run (?:ruff|ty|pytest))"
             rf"{_SEG}\|\s*(?:tail|head)\b(?!{_SEG}\brc=)",
             '<cmd> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log',
@@ -297,11 +315,20 @@ DIRECTIVES: tuple[Rule, ...] = (
         # is the same whole-command over-reach as the exemption it replaced,
         # reintroduced one commit later (cold lane, round 1).
         #
+        # The `$` sigil is REQUIRED, because without it this was still matching
+        # a literal substring anywhere in the command: `echo "read PIPESTATUS[0]
+        # first"` bought a full exemption while nothing expanded anything. That
+        # is the third time this one rule's exemption has been written too wide
+        # — `rc=$?`, then bare `PIPESTATUS`, then an unsigiled `PIPESTATUS[0]` —
+        # which says the shape is the defect, not the instances: `unless` is
+        # searched against the WHOLE command, so it must name a form that only
+        # occurs when the thing is actually happening (cold lane, round 2).
+        #
         # What remains unexcused: an unrelated `${PIPESTATUS[0]}` for a DIFFERENT
         # pipeline in the same command. That is a false negative on an input
         # nobody has written, and closing it would mean parsing the pipeline
         # rather than matching it.
-        unless=r"PIPESTATUS\[0\]",
+        unless=r"\$\{?PIPESTATUS\[0\]",
     ),
 )
 """Standing directives whose compliance is a RATE, not a yes/no."""
@@ -368,12 +395,28 @@ def _armed(command: str) -> bool:
     return len(targets) >= MIN_RUN and any(targets.count(t) >= MIN_RUN for t in targets)
 
 
+_REDIRECT = ("<", ">", ">>", "<<", "2>", "2>>", "&>", "&>>")
+"""Operators after which a word names a STREAM, never the corpus being counted."""
+
+
 def _last_arg(args: str) -> str:
-    """The final shell WORD of `args`, quotes resolved; "" when there is none."""
+    """The final shell WORD of `args`, quotes resolved; "" when there is none.
+
+    Everything from the first redirection is dropped. `grep -c missing corpus >
+    /tmp/miss; grep -c known corpus > /tmp/control` compared `/tmp/miss` against
+    `/tmp/control` and called a genuinely armed pair UNARMED — the mirror of the
+    round-1 defect, and a worse direction than it looks: redirecting each count
+    to its own file is what a careful probe DOES, so the rule punished the habit
+    it exists to encourage (cold lane, round 2).
+    """
     try:
         words = shlex.split(args)
     except ValueError:
         words = args.split()
+    for i, word in enumerate(words):
+        if word in _REDIRECT:
+            words = words[:i]
+            break
     return words[-1] if words else ""
 
 

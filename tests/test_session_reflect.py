@@ -177,6 +177,27 @@ def test_merely_mentioning_pipestatus_is_not_an_exemption(tmp_path) -> None:
     assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
+def test_the_pipestatus_exemption_requires_an_actual_expansion(tmp_path) -> None:
+    """Without the `$` sigil nothing is read; the text is just text.
+
+    Third too-wide exemption on this one rule — `rc=$?`, bare `PIPESTATUS`, then
+    an unsigiled `PIPESTATUS[0]`. `unless` is searched against the WHOLE command,
+    so it must name a form that occurs only when the thing is really happening.
+    """
+    path = _transcript(tmp_path, 'mise run lint | tail; echo "read PIPESTATUS[0] first"')
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
+def test_a_gate_inside_a_conditional_is_still_a_lost_rc(tmp_path) -> None:
+    """`if mise run test | head; then` — the WORST case, not an edge one.
+
+    The exit code is not merely discarded, it is what the conditional branches
+    on. A command-position anchor of `^` or `[;&|]` alone never saw it.
+    """
+    path = _transcript(tmp_path, "if mise run test | head; then echo ok; fi")
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
 def test_the_composite_check_task_is_a_gate_too(tmp_path) -> None:
     """`mise run check` is `depends = ["lint", "test"]` — two gates, one rc.
 
@@ -260,6 +281,20 @@ def test_a_bare_variable_target_is_still_flagged(tmp_path) -> None:
     assert "relative-cd" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
+def test_quoting_decides_what_expands_so_a_quote_is_not_skippable(tmp_path) -> None:
+    """`cd "~/repo"` and `cd '$HOME/repo'` are RELATIVE, and were excused.
+
+    A leading quote was treated as decoration to be skipped over. It is not:
+    `~` expands only UNQUOTED, and `$…` expands unquoted or in double quotes but
+    never in single. Both commands here name directories literally called `~`
+    and `$HOME` beneath the cwd — the rule's own hazard, wearing a quote.
+    """
+    for command in ('cd "~/repo"', "cd '$HOME/repo'"):
+        path = _transcript(tmp_path, command, name=f"q{abs(hash(command))}")
+        found = _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+        assert "relative-cd" in found, command
+
+
 # --- counting greps are a RATE, not a row each -------------------------------
 
 
@@ -313,6 +348,28 @@ def test_a_genuinely_shared_quoted_target_is_still_armed(tmp_path) -> None:
     path = _transcript(tmp_path, 'grep -c a "one file"; grep -c b "one file"')
     report = sr.reflect(tmp_path, transcripts=[path])
     assert (report.counts, report.counts_armed) == (1, 1)
+
+
+def test_counts_redirected_to_separate_files_are_still_armed(tmp_path) -> None:
+    """A redirect names a STREAM, never the corpus — and this one punished care.
+
+    `grep -c missing corpus > /tmp/miss; grep -c known corpus > /tmp/control`
+    compared `/tmp/miss` against `/tmp/control` and called a genuinely armed
+    pair UNARMED. Redirecting each count to its own file is what a careful probe
+    DOES, so the rule was penalising the habit it exists to encourage.
+    """
+    path = _transcript(
+        tmp_path, "grep -c missing corpus > /tmp/miss; grep -c known corpus > /tmp/control"
+    )
+    report = sr.reflect(tmp_path, transcripts=[path])
+    assert (report.counts, report.counts_armed) == (1, 1)
+
+
+def test_a_redirect_does_not_make_unrelated_counts_look_armed(tmp_path) -> None:
+    """CONTROL ARM: stripping redirects must not collapse different corpora."""
+    path = _transcript(tmp_path, "grep -c missing a > /tmp/x; grep -c known b > /tmp/y")
+    report = sr.reflect(tmp_path, transcripts=[path])
+    assert (report.counts, report.counts_armed) == (1, 0)
 
 
 def test_an_unbalanced_quote_falls_back_rather_than_raising(tmp_path) -> None:

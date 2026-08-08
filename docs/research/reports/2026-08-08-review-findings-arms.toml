@@ -88,7 +88,7 @@ new = '''_SEG = r"[^|\n]*"'''
 id = "gate-matches-mid-command"
 test = "test_grepping_for_the_word_pytest_is_not_a_lost_gate"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''            rf"(?m)(?:^|[;&|]\s*)"'''
+old = '''            rf"(?m){_CMD_POS}"'''
 new = '''            rf"(?m)"'''
 
 # `mise run <anything>` again, so a read-only browse is reported as a lost gate.
@@ -144,8 +144,10 @@ new = '''    _git(root, "tag", ref)'''
 id = "relative-cd-checks-literal-slash-only"
 test = "test_a_shell_expanded_absolute_cd_is_not_a_violation"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",'''
-new = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?!/)[^\s;&|]+",'''
+old = '''        r"(?!(?:[\"']?/|~|\"?(?:\$\(|\$\{?HOME)))[^\s;&|]+",
+        "git -C <path> …, or an absolute path",'''
+new = '''        r"(?!/)[^\s;&|]+",
+        "git -C <path> …, or an absolute path",'''
 
 # --- ROUND 1 of the review OF THESE FIXES ------------------------------------
 #
@@ -159,15 +161,15 @@ new = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?!/)[^\s;&|]+",'''
 id = "relative-cd-exempts-any-dollar"
 test = "test_a_bare_variable_target_is_still_flagged"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",'''
-new = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?[/~$])[^\s;&|]+",'''
+old = '''        r"(?!(?:[\"']?/|~|\"?(?:\$\(|\$\{?HOME)))[^\s;&|]+",'''
+new = '''        r"(?![\"']?[/~$])[^\s;&|]+",'''
 
 # A bare `\bPIPESTATUS\b` excuses the WRONG index — tail's status again.
 [[arm]]
 id = "pipestatus-exemption-unscoped"
 test = "test_the_wrong_pipestatus_index_is_not_an_exemption"
 file = "python/src/kb_setup/session_reflect.py"
-old = '''        unless=r"PIPESTATUS\[0\]",'''
+old = '''        unless=r"\$\{?PIPESTATUS\[0\]",'''
 new = '''        unless=r"\bPIPESTATUS\b",'''
 
 # The composite gate `mise run check` (depends = lint + test) was omitted.
@@ -186,3 +188,45 @@ test = "test_quoted_targets_are_compared_as_whole_arguments"
 file = "python/src/kb_setup/session_reflect.py"
 old = '''        words = shlex.split(args)'''
 new = '''        words = args.split()'''
+
+# --- ROUND 2, the last review round ------------------------------------------
+#
+# Four more, all in this one module, and three of the four are AGAIN defects in
+# round 1's fixes. The shape that repeated: a fix aimed at one over-reach landed
+# a different over-reach in the same rule.
+
+# A gate inside a conditional — the exit code is what the branch READS.
+[[arm]]
+id = "cmd-position-misses-shell-keywords"
+test = "test_a_gate_inside_a_conditional_is_still_a_lost_rc"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''_CMD_POS = r"(?:^|[;&|]\s*|\b(?:if|then|elif|else|do|while|until)\s+)"'''
+new = '''_CMD_POS = r"(?:^|[;&|]\s*)"'''
+
+# No `$` sigil means the literal text in a comment or an echo bought a pass.
+[[arm]]
+id = "pipestatus-exemption-has-no-sigil"
+test = "test_the_pipestatus_exemption_requires_an_actual_expansion"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        unless=r"\$\{?PIPESTATUS\[0\]",'''
+new = '''        unless=r"PIPESTATUS\[0\]",'''
+
+# Treating a leading quote as skippable: `~` does not expand in ANY quotes and
+# `$…` does not expand in single ones, so both targets are relative.
+[[arm]]
+id = "relative-cd-skips-over-any-quote"
+test = "test_quoting_decides_what_expands_so_a_quote_is_not_skippable"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        r"(?!(?:[\"']?/|~|\"?(?:\$\(|\$\{?HOME)))[^\s;&|]+",'''
+new = '''        r"(?![\"']?(?:[/~]|\$\(|\$\{?HOME))[^\s;&|]+",'''
+
+# A redirect names a stream, not a corpus — and this one punished careful probing.
+[[arm]]
+id = "last-arg-keeps-redirect-targets"
+test = "test_counts_redirected_to_separate_files_are_still_armed"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    for i, word in enumerate(words):
+        if word in _REDIRECT:
+            words = words[:i]
+            break'''
+new = '''    pass'''
