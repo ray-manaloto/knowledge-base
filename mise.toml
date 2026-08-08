@@ -281,6 +281,19 @@ description = "Check every SKILL.md instructs mise tasks, not raw commands (#128
 # for working on a skill without running the whole suite.
 run = "uv run kb-setup skill-lint"
 
+[tasks.kb-reclaim]
+description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --apply to reclaim"
+# REPORT-ONLY by default and there is no config key that changes that: reclaiming
+# needs `-- --apply` on every run. A deleter whose destructive mode can be armed
+# from a config file is a destructive action at a distance, which is precisely
+# what `reclaim.toml` must not become.
+#
+# Policy lives in `reclaim.toml` — every category can be disabled, re-scoped or
+# re-thresholded there, and `--only`/`--skip` narrow a single run. Docker cleanup
+# is ONE category, not the tool: adding a reclaimer is a scanner plus a config
+# block. See `.claude/skills/kb-reclaim/SKILL.md`.
+run = "uv run kb-setup reclaim {{arg(name='args', var=true, default='')}}"
+
 [tasks.kb-distill]
 description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
 # The PRODUCING half of Ray's directive; `kb-skill-lint` is the policing half.

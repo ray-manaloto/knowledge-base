@@ -1,0 +1,99 @@
+# Disk reclamation — WHAT may be reclaimed, and under what conditions.
+#
+# The engine is `kb_setup.reclaim`; the seam is `mise run kb-reclaim`. This file
+# is the whole policy surface: every category below can be disabled, re-scoped,
+# or re-thresholded without touching python.
+#
+# ─── The two safety properties, stated here because this is the file people edit
+#
+# 1. **Dry run is the default.** `mise run kb-reclaim` measures and prints a plan
+#    and deletes NOTHING. Reclaiming requires `-- --apply`, every time. There is
+#    no config key that makes apply the default, deliberately: a destructive
+#    action at a distance (`probes-need-a-control-arm.md`'s lesson applied to
+#    deletion) is exactly what a config-driven deleter would otherwise become.
+# 2. **A category can only ever act inside its own declared roots**, and never
+#    inside this repository. `reclaim.py` refuses a path that escapes them, so a
+#    typo here fails closed rather than deleting something else.
+#
+# `age_days` everywhere means "not modified / not used for longer than this".
+
+[defaults]
+# Fallback for any category that does not set its own.
+age_days = 30
+# Findings smaller than this are counted in the total but not listed individually.
+min_size_mb = 100
+
+
+# ─── Containers ──────────────────────────────────────────────────────────────
+# Docker is usually the largest single reclaimable object on a dev Mac, and it is
+# the one with a genuine gotcha: on macOS the engine's storage lives inside ONE
+# sparse disk image, so pruning frees space INSIDE the image without shrinking
+# the file macOS reports. The engine therefore measures the image before and
+# after and tells you whether it actually moved.
+[category.docker]
+enabled = true
+kind = "docker"
+age_days = 30
+# One entry per engine you actually use. Each is pruned in its own context, so a
+# dormant VM (colima here) is reported separately rather than hidden inside a
+# single total. `disk_image` is the host-side file whose size is the real signal.
+[[category.docker.engines]]
+context = "desktop-linux"
+disk_image = "~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
+[[category.docker.engines]]
+context = "colima"
+disk_image = "~/.config/colima"
+
+[category.docker.prune]
+images = true
+build_cache = true
+containers = true
+# Anonymous volumes are OFF by default: unlike an image, a volume is the only
+# copy of whatever is in it, and `docker system df` cannot tell you what that is.
+volumes = false
+
+
+# ─── Local model weights ─────────────────────────────────────────────────────
+[category.ollama]
+enabled = true
+kind = "ollama"
+age_days = 14
+# Model names never removed regardless of age, e.g. ["qwen3:0.6b"].
+keep = []
+
+
+# ─── Regenerable caches ──────────────────────────────────────────────────────
+# Everything here rebuilds on demand. Highest volume, lowest risk; the only cost
+# of being wrong is a slower next build.
+[category.caches]
+enabled = true
+kind = "dirs"
+age_days = 30
+paths = [
+  "~/Library/Caches",
+  "~/.cache",
+  "~/.bun/install/cache",
+  "~/.npm/_cacache",
+]
+
+
+# ─── Stale toolchain versions ────────────────────────────────────────────────
+# mise keeps every version it has ever installed. This repo alone has ~50
+# graphify builds on disk while `mise.toml` pins one.
+[category.mise_installs]
+enabled = true
+kind = "mise_versions"
+root = "~/.local/share/mise/installs"
+# Never remove a version any mise config pins, nor the N newest per tool.
+keep_pinned = true
+keep_newest = 1
+
+
+# ─── Downloaded installers and archives ──────────────────────────────────────
+[category.downloads]
+enabled = true
+kind = "files"
+age_days = 30
+min_size_mb = 200
+paths = ["~/Downloads"]
+extensions = [".dmg", ".pkg", ".zip", ".iso", ".tar.gz"]
