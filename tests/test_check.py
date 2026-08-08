@@ -148,16 +148,45 @@ def test_a_sibling_that_does_not_exist_is_not_invented(
 
 
 def test_a_test_file_is_not_given_to_pytest_twice(tmp_path: Path) -> None:
-    """A path that IS a test needs no sibling, and a duplicate double-counts.
+    """A path that IS a test needs no sibling, and the target list stays tidy.
 
-    pytest collects a file once per mention, so the summary would report twice
-    the tests the caller can see in their own argument list.
+    NOT a correctness fix, and the docstring here used to say it was — "pytest
+    collects a file once per mention, so the summary would report twice the
+    tests". Measured against the real pytest: an exact duplicate collects
+    **14**, identical to the file alone, and `tests/test_check.py tests/`
+    collects **2101**, identical to the directory alone. pytest deduplicates by
+    node id, containment included.
+
+    Kept because `render` echoes the target list and a repeated path invites a
+    reader to reconcile a duplicate that means nothing.
     """
     _touch(tmp_path / "tests" / "test_widget.py")
 
     assert check.test_paths(tmp_path, ["tests/test_widget.py", "tests/test_widget.py"]) == [
         "tests/test_widget.py"
     ]
+
+
+def test_the_tests_directory_reaches_pytest(tmp_path: Path) -> None:
+    """`kb-check -- tests/` must RUN the tests, not report SKIP.
+
+    It reported `pytest SKIP  no applicable path was given` while ruff, format
+    and ty all ran over the same argument — this module's own failure class one
+    layer down, on the most obvious way to invoke it. Found by dogfooding the
+    tool on this repo, not by any test, which is why this one exists.
+    """
+    assert check.test_paths(tmp_path, ["tests"]) == ["tests"]
+    assert check.test_paths(tmp_path, ["tests/"]) == ["tests/"]
+
+
+def test_a_non_test_directory_does_not_reach_pytest(tmp_path: Path) -> None:
+    """CONTROL ARM: the directory arm keys on `tests`, not on being a directory.
+
+    Without this, "any directory goes to pytest" would pass the test above and
+    hand `python/src/` to pytest on every run — collecting nothing, slowly, and
+    reporting an exit code about the wrong question.
+    """
+    assert check.test_paths(tmp_path, ["python/src/kb_setup"]) == []
 
 
 def test_a_directory_is_passed_through_untouched(tmp_path: Path) -> None:

@@ -111,9 +111,19 @@ def sibling_test(repo_root: Path, path: str) -> str | None:
 def test_paths(repo_root: Path, paths: list[str]) -> list[str]:
     """Every path pytest should be pointed at: the given tests, plus siblings.
 
-    De-duplicated while KEEPING ORDER, because pytest given the same file twice
-    collects it twice and the summary then double-counts — a count nobody can
-    reconcile against the file list they typed.
+    De-duplicated while KEEPING ORDER — for the REPORTED target list, not for
+    pytest's benefit. The first version of this docstring claimed pytest
+    "collects it twice and the summary double-counts", and that is measured
+    false: `tests/test_check.py tests/test_check.py` collects **14**, the same
+    as the file alone, and `tests/test_check.py tests/` collects **2101**, the
+    same as the directory alone. pytest deduplicates by node id, including the
+    containment case.
+
+    So the honest reason is narrower and worth keeping anyway: `render` prints
+    the target list, and a row echoing a path twice invites a reader to
+    reconcile a duplicate that means nothing. A tidy report, not a correctness
+    fix — recorded as such, because a rationale that sounds like a correctness
+    fix is one nobody re-checks.
     """
     found: list[str] = []
     for path in paths:
@@ -124,8 +134,25 @@ def test_paths(repo_root: Path, paths: list[str]) -> list[str]:
 
 
 def _is_test(path: str) -> bool:
+    """A path pytest should be pointed at: a `test_*.py` file, OR a test DIRECTORY.
+
+    The directory arm was missing and `mise run kb-check -- tests/` reported
+    `pytest SKIP  no applicable path was given` — while ruff, format and ty all
+    ran over the same argument. That is this module's own failure class one
+    layer down: a question that WAS asked, displayed as one that was not, on the
+    single most obvious way to invoke it. Found by dogfooding rather than by any
+    test, which is why the test now exists.
+
+    A directory is recognised by `tests` appearing in its parts and the path not
+    naming a `.py` file — pytest walks it from there, applying its own
+    collection rules rather than ours.
+    """
     parts = Path(path).parts
-    return TESTS_DIR in parts and Path(path).name.startswith(_TEST_PREFIX)
+    if TESTS_DIR not in parts:
+        return False
+    if Path(path).suffix == ".py":
+        return Path(path).name.startswith(_TEST_PREFIX)
+    return True
 
 
 def _run(repo_root: Path, argv: tuple[str, ...]) -> int:

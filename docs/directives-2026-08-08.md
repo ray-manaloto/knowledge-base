@@ -133,7 +133,129 @@ question put to Ray, and **not yet answered**, is whether the intent is *one
 structured event stream with a human-rendering stdout sink* rather than
 *reports become log lines*.
 
-### 2.6 Explicitly NOT decided
+### 2.6 What the GRAPH says about §2 — asked properly, and control-armed
+
+Ray had to correct this twice, and the second correction was right: the round
+invoked `/graphify` once, ran **one** `kb-query`, **zero** `graphify path`,
+**zero** `god-nodes`, and never opened `GRAPH_REPORT.md`, `wiki/` or
+`reflections/LESSONS.md` — including for §2, the largest research question in
+the session, which was deferred without querying the corpus at all. Asked
+properly, the graph has two things to say:
+
+**1. The corpus genuinely does NOT cover Python structured logging — a real
+miss, not a term-spelling one.** `kb-query --prose --idf "structured logging
+library sinks async offload serialization"` returns only Claude-Code *hook*
+async material (top 9.72, all off-target). **Control arm, same command shape:**
+`"shrink guard merge supersede node loss"` → **26.68** on `build_merge Shrink
+Guard` with four more on target. The probe discriminates, so the negative is
+believable.
+
+That makes §2's research an **ingestion** task, not a web-search task — which
+is this repo's entire thesis (*query-first; research and ingest on a miss*).
+The candidate libraries' docs and repos should become `sources/`, after which
+the choice is graph-answerable, source-cited and reproducible by the next
+session instead of resting on one agent's recollection (§2.6 below).
+
+**2. `pydantic-ai` is already in the corpus** (score 15.77,
+`marketplace-235-relevant.txt`) — the only R6-adjacent material present. Worth
+reading before choosing, since `datamodel-code-generator` emits pydantic models.
+
+### 2.6b The layer mistake that made the graph look useless
+
+Recorded because it explains the low usage rather than excusing it, and it is
+the *same* lesson already in work-memory as *query the graph with the right verb*.
+
+| probe | result |
+|---|---|
+| `kb-query --prose --idf "replay order supersession capture date chunk"` | top hit **10.75**, every hit off-target |
+| `graphify explain "replay_order"` | the exact answer — `chunks.py:L436`, its callers, `replay_key()`, and `[rationale_for]` carrying the docstring *"Committed chunks in the order `build()` must replay them: oldest capture FIRST"* |
+
+**`--prose` reads `graph-prose.json`, which is the graph MINUS every
+`_origin=ast` node.** A question about this repo's own code therefore cannot be
+answered there by construction — the docstring rationale that held today's whole
+root cause lives on the code layer as a `rationale_for` edge. The answer was in
+the graph the entire morning; the wrong surface was queried and the graph was
+then written off.
+
+**Rule of thumb this yields:** prose layer for what the *documents* say; `explain`
+/ `path` / `god-nodes` for what this *repo* does. A symbol name is always the
+second kind.
+
+### 2.6d R10 — candidate libraries must be ACTIVELY developed
+
+Ray, on choosing §2's libraries:
+
+```text
+all candidates must be libraries with active development (say commits within the last month)
+```
+
+- **R10** — every candidate must show **commits within the last month**. "say"
+  marks it as a stated threshold rather than a hard constant; treat one month as
+  the bar and report the actual last-commit date per candidate so the judgement
+  is checkable rather than asserted.
+
+This is a **screening** criterion, applied before evaluation — a library that
+fails it does not get compared on merit. It also means the check has a shelf
+life: a candidate list assembled today is stale in a month, so record the date
+each figure was measured (`verify-before-advancing.md` § *carry a fact's
+CONDITION*).
+
+### 2.6e R11 — fold in the parallel session's research, and REFUTE it
+
+Ray:
+
+```text
+and note insight from another claude session on stdout/stderr and other related research
+```
+
+**The same architectural program is running in the `dotfiles` repo**, and that
+session's scope overlaps §2 almost exactly: structured logging with sinks, no
+direct stdout/stderr, models **only** via `datamodel-code-generator`, **msgspec
+universal and enforced**, and logs reviewed for warnings/errors rather than
+skipped. Two repos, one program — so §2 here must not contradict what lands
+there.
+
+**Where that session's work lives** (read before starting §2):
+
+| artifact | path |
+|---|---|
+| requirements + decision ledger (R1–R20, D1–D32; Ray's messages verbatim) | `~/dev/github/ray-manaloto/dotfiles/.agent/requirements-devcontainer-gcc162.md` |
+| committed research report | `dotfiles` branch `research/devcontainer-lifecycle-spec-20260808`, commit `09a2e9a`, `docs/research/runs/research-20260808-devcontainer-lifecycle-spec/report.md` |
+| full transcript | `~/.claude/projects/-Users-rmanaloto-dev-github-ray-manaloto-dotfiles/a88f42b4-de10-4ab0-aa47-b6a06af9f76c.jsonl` |
+
+**Ray's instruction is INDEPENDENT research, not ratification** — read it, then
+try to break it. Their findings that bear directly on R5/R6/R7, each already
+control-armed there and each wanting a second route here:
+
+1. **`datamodel-codegen` silently DROPS `unevaluatedProperties: false` for
+   `msgspec.Struct` output.** pydantic emits `extra='forbid'`; msgspec emits
+   nothing, and **`--extra-fields forbid` is ignored** for msgspec. Attribution
+   arm: the flag *works* for pydantic. Likely upstream (`model/msgspec.py:127`
+   has the mapping but never reaches it). **This is the single most important
+   one for R6** — it means codegen'd msgspec models do not reject unknown fields.
+2. **msgspec has NO `pathlib.Path` support in either direction** — needs a
+   `dec_hook` AND an `enc_hook`, and they are **not global**, so they thread
+   through every call site. `kb_setup` is `Path`-saturated, so this is a direct
+   cost against R7.
+3. **`--preset` is NOT a reproducibility pin** — it renames every field to
+   snake_case with wire aliases and drops `from __future__ import annotations`,
+   i.e. it changes the generated models' **public API**.
+4. Open question they flagged where this repo has a stake: `pydantic-settings`
+   is used for env-var loading and **no adoptable msgspec-native settings
+   library exists** (`msgspec-settings`: 1 commit, 16 downloads/month) —
+   hand-roll ~22 lines vs keep pydantic-settings for settings only.
+
+**Two probe traps they paid for, recorded so this repo does not pay again:**
+
+- **PyPI full-text search is BLIND** — returns HTTP 200 with a ~3 KB challenge
+  page and zero `/project/` links. Use per-package `pypi.org/pypi/<name>/json`,
+  and state a known-404 and a known-200 control. **R10's last-commit check must
+  not be built on the blind route.**
+- **A GitHub issue-search shape can be silently blind**: `"gcc 16.2 in:title"`
+  returned 0 — and so did the control `"gcc 16.1 in:title"`, so the probe was
+  broken, not the world. A quoted-phrase search found it immediately.
+
+### 2.6f Explicitly NOT decided
 
 **The library was not chosen.** "async + structured + sinks + Rust-backed" is
 not one existing package; it is a combination of an event model, a
@@ -143,11 +265,22 @@ Naming one from recollection would be the inherited-number failure
 current sources, per `research-doc-sources.md` and
 `tool-currency-and-native-first.md`.
 
-### 2.7 Sequencing recommendation (Ray has not ruled on this)
+### 2.7 Sequencing — RULED ON by Ray
 
-Land the verified branch first, then run §2 as its own round beginning with
-research rather than edits: it touches 38 modules, changes the CLI contract, and
-needs its own review.
+Ray chose **"Finish: review, ship, land"** for this round, and **"ingest the
+candidates as sources"** for §2's research. So:
+
+1. **This round ends at `kb-land`.** The `kb-watch` fix is corpus-blocking and
+   must not sit unmerged.
+2. **§2 is the next round, and it STARTS WITH INGESTION**, not with edits and
+   not with a web search. The candidates' docs and repos become
+   `sources/*.manifest`; `kb-build` AST-extracts them for free (no LLM); then
+   R1–R11 are answered from the graph with citations. That is the only form in
+   which the answer survives the session — and it is this repo's own thesis
+   (query-first, ingest on a miss), applied to itself.
+3. Screening is **R10** (commits within the last month) before merit.
+4. Read the `dotfiles` ledger (§2.6e) first, then **research independently and
+   try to refute it** — Ray asked for a second route, not a second opinion.
 
 ---
 
