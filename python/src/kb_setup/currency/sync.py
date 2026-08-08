@@ -826,7 +826,7 @@ def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
     return Finding("resolution", OK, f"PATH reaches the pinned {resolved}"), resolved
 
 
-def _check_self_managed(spec: ToolSpec) -> SyncStatus:
+def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
     """Step 1 for a tool that bootstraps the toolchain and pins nothing.
 
     Every mise-pin check is inapplicable here by construction, so none of them
@@ -834,6 +834,20 @@ def _check_self_managed(spec: ToolSpec) -> SyncStatus:
     correct permanent state rather than drift, and there is no install-dir path
     segment to read a version from. What remains is the one question that
     matters — is the binary a shell actually reaches the version we reviewed?
+
+    THE MANIFEST CHECK IS NOT ONE OF THE INAPPLICABLE ONES, and treating it as
+    such was a silent hole. This function used to `return` before
+    `check()` could reach `_check_manifest`, so a `manifest` key on an
+    `expected`-based row was DEAD CONFIG: declared, parsed, never read. Measured
+    2026-08-08 — `sources/mise.manifest` reverted THREE releases reported
+    nothing, while the identical mutation on `hk` (mise-managed) fired, so the
+    probe discriminates and the silence was the checker's, not the manifest's.
+
+    That is #242's own defect reappearing one layer down: the issue was "tools
+    with a manifest that this table never names", and the fix named them in a
+    row shape whose code path could not act on the name. `applies_here` and
+    `source_only` genuinely are inapplicable; "which source did we ingest" is a
+    question about the REPO and does not care how the binary is managed.
 
     This costs one subprocess (~11 ms for mise), which the mise-managed path
     deliberately avoids. The trade is worth it only because the alternative is
@@ -873,6 +887,11 @@ def _check_self_managed(spec: ToolSpec) -> SyncStatus:
                 ),
             ),
         )
+    # Compared against the RUNNING version, not `expected`: the manifest's job
+    # is to describe the code we actually execute, which is the same question
+    # the mise-managed path asks of its pin. On a self-updated host those two
+    # differ, and the version finding above already says so.
+    manifest = _check_manifest(repo_root, spec, running)
     if running != spec.expected:
         return SyncStatus(
             tool=spec.name,
@@ -887,6 +906,7 @@ def _check_self_managed(spec: ToolSpec) -> SyncStatus:
                     f"them, then bump `expected` in currency.toml to record that you "
                     f"have",
                 ),
+                manifest,
             ),
         )
     return SyncStatus(
@@ -895,6 +915,7 @@ def _check_self_managed(spec: ToolSpec) -> SyncStatus:
         resolved=running,
         findings=(
             Finding("version", OK, f"{spec.binary} on PATH is the reviewed {running} ({found})"),
+            manifest,
         ),
     )
 
@@ -1071,10 +1092,18 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not ref:
         return Finding("manifest", DRIFT, f"{spec.manifest} has no readable `ref =` line")
     if ref.lstrip("v") != pinned:
+        # "mise installs" is TRUE only on the mise-managed path. Since 2026-08-08
+        # this is also reached for `expected`-based tools (mise itself,
+        # claude-code, ruff, ty), which mise does not install — the first armed
+        # run printed "sources/claude-code.manifest pins v2.1.222 but mise
+        # installs 2.1.226", asserting a manager that is not involved. A finding
+        # that misnames its own evidence teaches the reader to distrust the
+        # check, so the verb follows the row shape.
+        how = "the running version is" if spec.self_managed else "mise installs"
         return Finding(
             "manifest",
             DRIFT,
-            f"{spec.manifest} pins {ref} but mise installs {pinned} — "
+            f"{spec.manifest} pins {ref} but {how} {pinned} — "
             f"the corpus describes code we do not run",
         )
     return _check_manifest_commit(repo_root, spec, ref)
@@ -1256,7 +1285,7 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
         return _check_source_only(repo_root, spec)
 
     if spec.self_managed:
-        return _check_self_managed(spec)
+        return _check_self_managed(repo_root, spec)
 
     pinned, declared_extras = pinned_version(repo_root, spec)
     if not pinned:

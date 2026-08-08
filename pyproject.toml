@@ -38,7 +38,7 @@ fetch = ["trafilatura>=2.0"]
 # Safe to pin exactly BECAUSE this is a `[dependency-groups]` table (PEP 735):
 # dev groups are not installed by consumers, so an `==` here binds nobody but us.
 # Contrast `[project.optional-dependencies]` below, which IS exported.
-dev = ["ruff==0.16.1", "ty==0.0.69", "pytest==9.1.1", "trafilatura==2.2.0"]
+dev = ["ruff==0.16.2", "ty==0.0.69", "pytest==9.1.1", "trafilatura==2.2.0"]
 
 [build-system]
 requires = ["hatchling"]

@@ -173,6 +173,26 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     if not verdict.has_upgrade:
         raise NotAuthorizedError(f"{spec.name}: no upgrade pending ({verdict.current} is current)")
 
+    if not spec.mise_key:
+        # A row with no `mise_key` has no `[tools]` pin for this function to move
+        # — `expected`-based tools either self-update (mise, claude-code) or are
+        # pinned somewhere apply() does not own (ruff and ty live in
+        # pyproject.toml's `dev` group). Falling through raised a bare
+        # `KeyError: no mise.toml pin found for ''` from `set_pin_version`, which
+        # reads as an engine bug rather than as "this tool cannot be auto-applied
+        # here" — and it escapes as a traceback instead of the clean
+        # "[currency] apply failed" that every other refusal produces.
+        #
+        # Refusing is also the honest answer, not merely the tidy one: applying
+        # would have to edit a file whose format this function does not know, and
+        # a half-applied bump is exactly what the resolve-everything-first
+        # ordering below exists to prevent. (Cold lane, 2026-08-08.)
+        raise NotAuthorizedError(
+            f"{spec.name}: no `mise_key`, so there is no mise.toml pin to move — "
+            f"bump it where it is actually pinned (pyproject.toml for ruff/ty, or "
+            f"`expected` in currency.toml for a self-updating tool), then re-run"
+        )
+
     mise_path = repo_root / "mise.toml"
     new_text, old = set_pin_version(
         mise_path.read_text(encoding="utf-8"), spec.mise_key, verdict.latest

@@ -161,7 +161,27 @@ RE-PROBED 2026-08-07 for 0.9.35, from `graphify/llm.py` at tag v0.9.35
 constant x0 — with a bogus symbol at x0 in the same file, so the zero is an
 absence rather than a broken probe. `llm.py` grew 3115 -> 3127 lines. The
 42-batch probe was NOT run, per this item's own recorded method. STILL PRESENT
-on 0.9.35."""
+on 0.9.35.
+
+RE-PROBED 2026-08-08 for 0.9.36. The cheap zero-diff arm did NOT settle it:
+`gh api .../compare/v0.9.35...v0.9.36` reports `graphify/llm.py` +6/-1 AND
+`tests/test_labeling.py` +70/-6, so a label-touching line moved for the first
+time since 0.9.30. Control arm on the SAME compare — `dedup.py` +87/-7,
+`cli.py` +66/-16 — so the command discriminates.
+
+Reading the patch settled it, and it is a DIFFERENT label defect: #2534, the
+community-label prompt colliding with the discard sentinel. `_community_label_lines`
+changed `f"Community {cid}: ..."` to a bare `f"{cid}: ..."` because the old
+string doubled as `_placeholder_community_labels`' sentinel, so a model echoing
+the key back produced a name the caller's filter dropped. The prompt gained one
+line explaining the new input format. Neither touches the schema.
+
+STILL PRESENT on 0.9.36, structurally, against the INSTALLED
+`0.9.36/.../graphify/llm.py`: `_EXTRACTION_JSON_SCHEMA` x2, label-side schema
+constant x0, `def label_communities` x1, and zero schema/response_format on the
+label path. Control: a bogus symbol x0 in the same file, and the x2 above is
+what proves the command finds things. The 42-batch probe was NOT run — it needs
+an LLM backend, and graphify's is Claude-only-and-broken here (#2076)."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -243,7 +263,21 @@ JSON-RPC handshake against the installed 0.9.35 — **10 tools** (`query_graph`,
 `get_node`, `get_neighbors`, `get_community`, `god_nodes`, `graph_stats`,
 `shortest_path`, `list_prs`, `get_pr_impact`, `triage_prs`) and **6 resources**,
 the same surface 0.9.31/0.9.32/0.9.34 advertised. No `graphify-mcp` process
-survived shutdown."""
+survived shutdown.
+
+RE-PROBED 2026-08-08 for 0.9.36: `pyproject.toml` at tag v0.9.36 carries
+`mcp>=1,<3` in BOTH the `mcp` extra (:59) and `all` (:88) — unchanged since
+0.9.31, so RESOLVED still stands. Control on the same file: a bogus `mcp>=9`
+-> 0 hits, so the grep discriminates. Read at the TAG via the contents API,
+which keeps it a claim about v0.9.36 rather than about this host.
+
+NO SERVER PROBE RUN, and this is the recorded method rather than a shortcut:
+the note says starting the server is the only conclusive probe, AND that it is
+owed when `graphify/serve.py` moves. It did not — `gh api compare
+v0.9.35...v0.9.36` lists **0** files matching `serve`, against a control of 4
+matching `dedup|cli` on the same compare, so the filter discriminates and the
+zero is an absence. (Read this item's OPENING sentence with its version
+condition attached; it describes 0.9.30, not today.)"""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -309,7 +343,16 @@ lists **7** manifests added after the 38-count build (10x-Team, agentlinter,
 Attacca, cc-orchestrador-subagents, cclint, claude-plugins, claude-self-reflect).
 The recorded method says to compare only against a build with the same source
 set, so +6 warnings across a +7-source change carries no signal in either
-direction. No alarm, disposition stands."""
+direction. No alarm, disposition stands.
+
+RE-PROBED 2026-08-08 on 0.9.36, by the recorded method (count the warnings on
+the next build): the largest single warning covers **290 files**
+(`marketplace.json`, `plugin.json`, ...). NOT a comparable pair with the prior
+entry — this build advanced SEVEN manifests (claude-code four releases, mise
+three, hk, uv, graphify, ruff, agent-harness-docs), and claude-code alone
+carries data-only `.json`. The count is a function of how many data-only `.json`
+files are cloned, so the honest reading is unattributable rather than either
+"regression" or "fine". STILL PRESENT."""
 
 # 2484/2485: the two hyperedge issues THIS repo filed (merge-graphs loss;
 # nested-slot read gap). Fixed in 0.9.34 — verified on the installed binary
@@ -384,7 +427,14 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.2"
+expected = "2026.8.3"
+# ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
+# `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
+# this table never named it, so `sync.py` reported a clean SKIP while the
+# manifest sat at v2026.8.0 against an installed 2026.8.3 — three releases of
+# corpus describing code we do not run. Found by counting, not by a check: the
+# engine cannot flag a manifest it was never told about.
+manifest = "sources/mise.manifest"
 # `mise --version` prints `2026.7.16 macos-arm64 (2026-07-29)`, so the engine's
 # default last-whitespace-field heuristic returns the build DATE. Anchored at the
 # start so it reads the version and not some later digit run.
@@ -414,7 +464,13 @@ band stays observable.
 MOVED 2026-08-05 for v2026.8.2: `soft` 2026.8.0 -> 2026.8.2 in the same change as
 `expected`, same rule. `hard` stays at 2026.7.14 — 8.1/8.2 add features (remote
 task cache, `--affected`, the bootstrap resource system) and fixes; nothing
-makes an older mise newly dangerous — and soft (8.2) > hard (7.14)."""
+makes an older mise newly dangerous — and soft (8.2) > hard (7.14).
+
+RE-PROBED 2026-08-08 at the 2026.8.2 -> 2026.8.3 self-update: `soft` moved to
+2026.8.3 in the SAME change as `expected`, which is this item's whole rule.
+`hard` stays 2026.7.14 — nothing in 2026.8.3 touches the env-file
+secret-expansion or task-freshness fixes that set the floor. soft > hard still
+holds, so the warning band remains observable."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -440,7 +496,10 @@ through `config --path <dir>`, which this repo does not use.
 RE-PROBED 2026-08-05 for v2026.8.2, with the recorded exclusions applied
 (`currency.toml` + `docs/currency/`): **0** uses. Control arm: `mise run` -> 33
 hits in `mise.toml`. Still INERT; the 8.2 bootstrap work expands
-`mise bootstrap` (the replacement surface), touching no deprecation timeline."""
+`mise bootstrap` (the replacement surface), touching no deprecation timeline.
+
+RE-PROBED 2026-08-08 for 2026.8.3: unchanged — no `mise dotfiles` item in the
+release notes."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -458,7 +517,13 @@ host is far above the 7.16 floor so the misleading form cannot appear here; the
 item survives for hosts that are not.
 
 RE-PROBED 2026-08-05 for v2026.8.2: unchanged — nothing in 8.1/8.2 touches
-remote-version listing's failure reporting. Same disposition."""
+remote-version listing's failure reporting. Same disposition.
+
+RE-PROBED 2026-08-08 for 2026.8.3: unchanged. No release note in this version
+touches remote-version listing or its error text; the closest item (#11756) is
+about `minimum_release_age` reading GitHub's `published_at` rather than the
+commit `created_at`, which is a filter-correctness fix, not a fetch-failure
+reporting one. The >= 7.16 "fetch failure" wording therefore still stands."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -519,7 +584,40 @@ inherited shell resolves to `installs/pipx-graphifyy/0.9.32/bin/graphify` — a
 STALE install dir, now two versions behind the 0.9.34 pin — while `mise exec --
 graphify --version` correctly reports 0.9.34. The skew is live, which is
 exactly why step 1 keeps looking at the live shell PATH and why
-version-sensitive calls go through `mise exec`."""
+version-sensitive calls go through `mise exec`.
+
+RE-PROBED 2026-08-08 for v2026.8.3, and it lands on this surface again — a
+THIRD near-miss, so read it as carefully as the 7.18 and 8.0 entries. New
+setting `not_found_system_fallback` (`MISE_NOT_FOUND_SYSTEM_FALLBACK`, default
+`true`, #11755): setting it `false` "prevents a shim for a MISSING tool from
+silently falling back to a same-named binary on PATH".
+
+It does NOT retire `resolve_from_path` / `_is_mise_shim` / `_mise_shim_dirs`,
+and the reason is the same shape as the previous two: it governs what a SHIM
+does when its tool is absent. Ours is the opposite arrangement — the tool is
+present and correctly installed, and a STALE INSTALL DIR sits ahead of the
+shims, so the shim is never consulted at all. Nothing falls back; the wrong
+binary is found first.
+
+THE FOUNDING SYMPTOM WAS RE-MEASURED LIVE THIS SESSION, and it is worse than at
+the last review. After `mise install` moved uv/hk/graphify, `mise which`
+reported the new versions while a bare binary reported the OLD ones for all
+THREE at once: hk 1.54.0 vs pin 1.54.1, uv 0.12.2 vs 0.12.3, graphify 0.9.35 vs
+0.9.36. `MISE_ENV_CACHE=1`; the stale dirs sit at PATH positions 4, 5 and 8.
+`mise exec -- <tool>` and `mise run <task>` both resolve correctly — confirmed
+by `kb-build` stamping `built by graphify 0.9.36`. The engine's own
+`resolution` finding reported all three independently, which is a second probe
+of the same fact agreeing with the first.
+
+Nothing else in 2026.8.3 reaches this repo, checked rather than assumed: the
+flatpak-user and Linux font-cask bootstrap managers are Linux-only, the pipx
+`registry_url` is for private indexes (this repo uses PyPI), and the task
+precedence/`double_dash`/vfox/npm-shim fixes are on paths this repo does not
+take. TWO THAT DO, both improvements: `lockfile = true` now CREATES a missing
+project lockfile during `use`/`install`/upgrade (this repo sets it, and
+`mise.lock` exists), and a plain `mise lock` now PRESERVES the recorded
+python-build-standalone artifact instead of churning to the newest build —
+`--bump` advances it explicitly."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -534,7 +632,12 @@ RE-PROBED 2026-08-03 for v2026.8.0: `tera_v1` / `MISE_TERA_V1` -> **0** occurren
 on v2; nothing to do until 2027.4.0.
 
 RE-PROBED 2026-08-05 for v2026.8.2: still **0** occurrences, control `[env]` ->
-1. Unchanged."""
+1. Unchanged.
+
+RE-PROBED 2026-08-08 for 2026.8.3: unchanged — no templating or tera item in
+the release. The 2026.8.3 changes are bootstrap package managers (flatpak-user,
+Linux font casks), a pipx `registry_url`, a shim `not_found_system_fallback`
+setting, and task/lockfile/python fixes."""
 
 [tool.claude-code]
 # The harness itself. Tracked NOT for a mise pin — Claude Code manages its own
@@ -547,9 +650,14 @@ RE-PROBED 2026-08-05 for v2026.8.2: still **0** occurrences, control `[env]` ->
 # `expected` (self-managed, like mise) rather than `mise_key`: pinning the
 # harness that runs the session is not a thing this repo can or should do. Bump
 # it after reviewing the release notes — that act IS the gap analysis.
-expected = "2.1.224"
+expected = "2.1.226"
 binary = "claude"
 github = "anthropics/claude-code"
+# ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
+# furthest — the manifest sat at v2.1.222 against an installed 2.1.226 — and it
+# is the manifest that matters most, because `sources/agent-harness-docs` and
+# this pin are what a "what does Claude Code do?" query reads.
+manifest = "sources/claude-code.manifest"
 # `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
 # is `Code)` — the same trap mise's `2026.7.15 macos-arm64 (2026-07-27)` set,
 # where the default heuristic returned the build DATE. Capture explicitly.
@@ -593,7 +701,21 @@ budget explicitly — an escape hatch, not needed here; (2) "Timeouts set on
 plugin-provided hooks don't raise the budget" — our audit hook is declared in
 `.claude/settings.json` (repo settings, not a plugin), so it still buys the 60;
 skillopt-sleep's SessionEnd hook IS plugin-provided, but it is an async
-marker-append that needs no budget. No config change."""
+marker-append that needs no budget. No config change.
+
+RE-PROBED 2026-08-08 (hooks.md flagged CHANGED at the 2.1.224 -> 2.1.226
+review): the mechanism holds VERBATIM at `hooks.md:2856` — 1.5 s shared budget,
+per-hook `timeout` raises it, ceiling still 60, plugin-provided timeouts still
+do not raise it, `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` still the explicit
+override. `.claude/settings.json` still declares `timeout: 60`, which remains
+the documented maximum. Control: a bogus term x0 on the same page.
+
+NEW on the same page (`hooks.md:415`), recorded because it is the surrounding
+context this item's number lives in: the per-hook `timeout` DEFAULTS are now
+tabulated — 600 s for `command`/`http`/`mcp_tool`, 30 for `prompt`, 60 for
+`agent`; `UserPromptSubmit` lowers the first three to 30 and `MessageDisplay`
+to 10. None of that changes the SessionEnd figure, which is governed by the
+shared-budget rule rather than by the default. No config change."""
 
 [[tool.claude-code.watch]]
 kind = "local"
@@ -626,7 +748,26 @@ the resume semantics.
 2026-08-05 (2.1.220 -> 2.1.222 review): goal.md's fingerprint HELD — only
 hooks.md and skills.md drifted — so there is nothing to re-derive; recorded so
 this item's silence at this review reads as "checked, unchanged" rather than
-"skipped"."""
+"skipped".
+
+RE-PROBED 2026-08-08 (goal.md flagged CHANGED). Every tracked claim HOLDS: the
+4,000-character cap (`goal.md:68`), the Haiku-on-the-Claude-API default with the
+third-party caveat and the globally-scoped `ANTHROPIC_DEFAULT_HAIKU_MODEL`
+override (`:122`, `:127`, `:130`), and the no-tools/transcript-only constraint
+(`:60`, `:133`).
+
+BUT THE PAGE CHANGED SOMEWHERE THAT MATTERED, and finding it is the reason a
+fingerprint is tracked rather than a claim list. `goal.md:106`: "The condition
+carries over, but the turn count, timer, and token-spend baseline all reset on
+resume." A goal's TEXT survives a `--resume` verbatim while the counter it
+bounds returns to zero — so a bounded condition reads bounded and is not, and a
+resumed round silently buys its whole allowance again. `goal-engineering`
+carried turn bounds in `references/rubric.md` and said NOTHING about resume
+(grep `resume` over the skill -> 0, control `4,000` -> 1). Patched in the same
+change: rubric.md gains the reset and its two consequences, SKILL.md gains a
+preconditions section. Also newly recorded there, same page (`:141`): `/goal`
+is unavailable without workspace trust and under `disableAllHooks` /
+`allowManagedHooksOnly`, and it says so rather than failing silently."""
 
 [[tool.claude-code.watch]]
 kind = "local"
@@ -658,7 +799,16 @@ invocation loads the project-root skill with the variant list appended
 (requires >= 2.1.203). So the 2026-07-30 sentence "can't be invoked by name"
 is now stale for collision cases — the un-invocable window is only before any
 file in that subdirectory has been touched. STILL NO IMPACT HERE: every skill
-in this repo is repo-root, loaded at startup."""
+in this repo is repo-root, loaded at startup.
+
+RE-PROBED 2026-08-08 (skills.md flagged CHANGED): this item's area is unchanged
+from the 2026-08-05 reading. `skills.md:154` still says nested skills "aren't
+loaded at startup", load "the first time Claude reads or edits a file inside
+that subdirectory", and are un-invocable until then; `:124`-`:134` still carry
+the collision behaviour (both kept, nested one under `apps/web:deploy`,
+unqualified invocation loads the project-root skill with the variant list
+appended, requires >= 2.1.203). STILL NO IMPACT HERE — every skill in this repo
+is at the repo-root `.claude/skills/`, which loads at startup."""
 
 [[tool.claude-code.watch]]
 kind = "local"
@@ -687,7 +837,16 @@ review): the claim is intact verbatim — "background subagents in
 non-interactive mode … if no hook returns a decision, it denies the tool call"
 (hooks.md:1744). The 8-consecutive-blocks Stop cap: still exactly 1 occurrence
 against a bogus term at 0, so the standing disagreement stands. Still no
-`PermissionRequest` hook here; nothing changes."""
+`PermissionRequest` hook here; nothing changes.
+
+RE-PROBED 2026-08-08 (hooks.md flagged CHANGED): intact verbatim at
+`hooks.md:1736` — "In sessions that can't show a prompt, such as background
+subagents in non-interactive mode, Claude Code still runs these hooks, and if no
+hook returns a decision, it denies the tool call." The 8-consecutive-blocks Stop
+cap is still exactly 1 occurrence, with a discriminating control ("9 consecutive
+blocks" -> 0), so the standing goal.md/hooks.md disagreement stands unchanged.
+This repo still registers no `PermissionRequest` hook (0 occurrences in
+`.claude/settings.json`, control `PreToolUse` -> 1). Nothing changes."""
 [[tool.claude-code.watch]]
 kind = "local"
 ref = "2-1-223-review"
@@ -719,7 +878,16 @@ THREE ITEMS TOUCH THIS REPO, none requiring a change:
 NOT applicable: the `strictKnownMarketplaces` owner-wildcard entries (managed
 settings, which this repo does not write — `do-not.md` #11), and the
 `CLAUDE_CODE_DISABLE_1M_CONTEXT` widening (a session-model behaviour, not config
-here)."""
+here).
+
+SUPERSEDED 2026-08-08 by the 2.1.226 review: `expected` moved 2.1.224 -> 2.1.226
+and `sources/claude-code.manifest` advanced v2.1.222 -> v2.1.226, so the mirror
+this entry says was behind is now ahead of it. Kept rather than deleted because
+its THREE recorded dispositions still stand and would otherwise be re-derived:
+the two Bash permission-bypass fixes are not defects for `kb_setup.hook_guard`
+(documented as a redirect, not a sandbox), the workflow dynamic-`import()` fix is
+inherited (`kb-extract.js` uses none), and `/review` becoming an alias of
+`/code-review` does not touch this repo's own `kb-review`."""
 [[tool.claude-code.watch]]
 kind = "local"
 ref = "2-1-224-review"
@@ -767,7 +935,14 @@ THREE ITEMS THAT MATTER HERE, none requiring a change:
    Evaluating it is a separate piece of work, not this bump.
 
 NOT applicable, armed rather than assumed: the >200-char project-path session-dir
-collision — this project's path is 56 characters."""
+collision — this project's path is 56 characters.
+
+SUPERSEDED 2026-08-08 by the 2.1.226 review. Its one follow-up IS now done:
+this entry recorded that the mirror's pin predated 2.1.224 and that advancing
+`agent-harness-docs` was "the follow-up, NOT done here" — it advanced to
+33aef930 in this change, alongside `sources/claude-code.manifest` reaching
+v2.1.226. The `ANTHROPIC_BEDROCK_REGION_PREFIX` finding is unchanged and still
+deliberately NOT added to `_STRIP_BACKEND_ENV`."""
 
 
 # ---------------------------------------------------------------------------
@@ -851,7 +1026,17 @@ which of the two it is, and so any revival is a decision rather than a rediscove
 RE-PROBED 2026-08-03 for v1.54.0: unchanged in substance. 1.53.0 carried the
 #1099 fix already recorded; 1.54.0 adds `check_failed_files`, command-effect
 declarations and perf (17% smaller binary, 31% faster startup) with no
-dependency-graph change. The ban stays a CHOICE, still deliberately not retired."""
+dependency-graph change. The ban stays a CHOICE, still deliberately not retired.
+
+RE-PROBED 2026-08-08 for v1.54.1: unchanged in substance, and the release is
+adjacent to this item without moving it. 1.54.1 is four bug fixes; the relevant
+one (#1140) makes hk print an end-of-run hint on a git `index.lock` conflict
+"pointing to `exclusive = true`, `depends`, or separate groups", and the docs
+now steer authors toward `stage` for hk-owned staging and `exclusive` for
+legacy commands that write the index directly. That is GUIDANCE, not a
+dependency-graph change — upstream's own advice now names `exclusive` first,
+which is what this repo already does. The ban stays a CHOICE, still
+deliberately not retired."""
 
 [[tool.hk.watch]]
 kind = "local"
@@ -870,7 +1055,20 @@ RE-PROBED 2026-08-03 at the 1.52.0 -> 1.54.0 bump, and the method held: the
 version occurred exactly TWICE in `hk.pkl` (`amends` + `import`) and once in
 `mise.toml`. All three moved in one edit, asserted on the count rather than
 replaced blindly, then `hk validate` (rc=0) and `mise run lint` (rc=0) confirmed
-the new binary agrees with the new schemas — which is this item's whole point."""
+the new binary agrees with the new schemas — which is this item's whole point.
+
+RE-PROBED 2026-08-08 at the 1.54.0 -> 1.54.1 bump, and the method held again:
+the version occurred exactly TWICE in `hk.pkl` (`amends` + `import`) and once in
+`mise.toml`. Asserted on the count before editing (2, with a control of 0 for a
+version not present), moved all three in one change, then `hk validate` rc=0 and
+`mise run lint` rc=0 confirmed the new binary agrees with the new schemas.
+
+NEW this round, and it is the failure this item exists to prevent wearing a
+different hat: after `mise install`, a bare `hk` still ran **1.54.0** while
+`mise which hk` reported 1.54.1. `MISE_ENV_CACHE=1` and the stale install dirs
+sit at PATH positions 4/5/8, ahead of the shims. So "did the bump take?" cannot
+be answered with `hk version`; use `mise exec -- hk version` or the absolute
+path. The engine's own `resolution` check reports this independently."""
 
 # ---------------------------------------------------------------------------
 # fnox — the credential tool the shell's secrets come from (#86)
@@ -993,3 +1191,94 @@ timestamp+PWD append to `~/.skillopt-sleep/session-end.log`, unconditional
 `exit 0`, no API spend, no tracked-file write. Same bargain. Also noted from
 the v0.2.0 notes: "Redact secrets before persisting cycle diagnostics" — a fix
 in the right direction for the surface this item watches."""
+
+# ─── Added 2026-08-08 (#242): the four tools with BOTH a pin and a manifest that
+# this table had never heard of. Until now a currency run checked 7 tools while
+# the repo pinned 11, so uv/ruff/codex/ty drifted in BOTH directions unwatched —
+# the pin against upstream, and the manifest against the pin. Nothing reported a
+# problem, because a tool absent from this file produces no row at all: not a
+# DRIFT, not even a SKIP. That is the one failure mode this engine is otherwise
+# built to refuse, arriving as silence rather than as a green tick.
+#
+# All four are ordinary pinned tools, so they take `mise_key` (like hk) rather
+# than `expected` (like mise/claude-code, which self-update).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[tool.uv]
+mise_key = "uv"
+binary = "uv"
+github = "astral-sh/uv"
+pypi = "uv"
+# `uv --version` prints `uv 0.12.3 (5072309 2026-08-07 aarch64-apple-darwin)` —
+# the last whitespace field is the target triple, so anchor rather than take the
+# default heuristic. Same trap as mise and claude-code above.
+version_pattern = '^uv (\d+\.\d+\.\d+)'
+manifest = "sources/uv.manifest"
+
+[tool.ruff]
+# NOT a `[tools]` pin: ruff is a `dev` dependency in the root pyproject.toml
+# (`ruff==0.16.2`), reached as `uv run ruff`. So there is no `mise_key` — the
+# engine offers exactly three managers and none of them is uv, which is why this
+# takes `expected` (the version we have REVIEWED) rather than pretending mise
+# owns it. Bump `expected` and the pyproject pin in the same change, or this row
+# asserts a review that did not happen.
+expected = "0.16.2"
+binary = "ruff"
+github = "astral-sh/ruff"
+pypi = "ruff"
+version_pattern = '^ruff (\d+\.\d+\.\d+)'
+manifest = "sources/ruff.manifest"
+
+[tool.ty]
+# Same shape as ruff: a `dev` dependency (`ty==0.0.69`), not a mise pin, so
+# `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
+# it needs a row rather than trust — a 0.0.x bump can carry a breaking change
+# with no marker to trip gate 3.
+expected = "0.0.69"
+binary = "ty"
+github = "astral-sh/ty"
+pypi = "ty"
+version_pattern = '^ty (\d+\.\d+\.\d+)'
+manifest = "sources/ty.manifest"
+
+[tool.codex]
+mise_key = "codex"
+binary = "codex"
+github = "openai/codex"
+# ⚠️ codex tags releases `rust-v<version>`, NOT `v<version>` — so
+# `manifest.resolve_tag`'s `v<x>` / `<x>` pair resolves NEITHER, and an apply
+# would abort rather than mispin. Recorded here so that abort reads as a known
+# shape rather than a bug; advance `sources/codex.manifest` by hand.
+#
+# ⚠️ `mise ls-remote codex` is the WRONG instrument for "does this version
+# exist" — the aqua registry lags GitHub by a day or more (mise.toml records the
+# measurement: 0.146.1 was Latest upstream for ~4h and absent from all 277 rows).
+# Verify a codex bump by attempting the install.
+version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
+# `manifest` is DELIBERATELY ABSENT, and this is the one row where that is the
+# correct answer rather than the #242 hole this whole section closes.
+#
+# It was declared, run, and REFUTED by its own first output: the check compares
+# the manifest ref to the installed version, and `rust-v0.147.0` != `0.147.0`,
+# so it reported `the corpus describes code we do not run` for a manifest that
+# is pinned exactly right. A permanent false DRIFT is worse than a SKIP — it
+# trains a reader to ignore the line, which is how the real one gets missed.
+# Same reasoning as `[tool.graphify]`'s absent `svg` artifact above.
+#
+# The fix belongs in the ENGINE (teach it a ref prefix), not in a row that lies
+# in the meantime. Until then codex's manifest is advanced by hand, and this
+# comment is what stops the next reader "fixing" the omission.
+#
+# THE SAME PREFIX ALSO DEFEATS VERSION TRACKING, and that one is KEPT. The first
+# full run reported `codex 0.147.0, latest UNKNOWN` — the engine cannot read
+# `rust-v0.147.0` as a version, so no upstream baseline is ever recorded.
+#
+# Keeping that row while deleting the manifest row is not inconsistent, and the
+# difference is the whole doctrine of this engine: UNKNOWN is an HONEST answer
+# ("checked, could not tell"), and the run renders it under `NOT CHECKED against
+# upstream (this is not a pass)`. The manifest row produced a false DRIFT —
+# an assertion that something was wrong when it was right. One is silence about
+# a question; the other is a wrong answer to it. Only the second had to go.
+#
+# So codex sits alongside skillopt as a permanent, LABELLED unknown until the
+# engine learns a `tag_prefix`. Tracked as a repo issue, not as a TODO here.

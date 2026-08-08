@@ -231,7 +231,28 @@ a hung session, a dead agent, or a finished round.
   phase boundary, before any command expected to exceed ~2 minutes, and
   carrying the turn count against the bound.
 
-Two things make this a test rather than a style note:
+**A TURN BOUND DOES NOT SURVIVE A RESUME, and that is what makes the reporting
+clause load-bearing rather than courteous.** `goal.md:106`, read 2026-08-08:
+
+> "A goal that was still active when a session ended is restored when you resume
+> that session with `--resume` or `--continue`. The condition carries over, but
+> **the turn count, timer, and token-spend baseline all reset on resume.**"
+
+So the *text* of a bounded condition survives verbatim while the counter it
+bounds goes back to zero — a `--resume` silently buys the round its whole
+allowance again, as many times as it is resumed. Nothing announces this; the
+condition still reads as bounded, which is precisely the wrong-belief failure
+mode below. Two consequences:
+
+- **Never treat a turn bound as a spend ceiling.** It bounds one unbroken run,
+  not the round. If the real limit is total work, the condition must carry
+  something that does not reset — a committed artifact, a merged PR, a receipt.
+- **A clause obliging Claude to CARRY the turn count into the conversation is
+  the only durable record**, because the transcript survives the resume that
+  the counter does not. That is the recommendation above, and this is its
+  strongest argument.
+
+Two more things make the reporting clause a test rather than a style note:
 
 1. **A turn bound already implies it.** *"Claude reports progress against that
    clause each turn and the evaluator judges it from the conversation."* A goal

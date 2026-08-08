@@ -1,14 +1,14 @@
 {
   "https://code.claude.com/docs/en/goal.md": {
-    "checked_at": "2026-08-06T19:40:05.607205+00:00",
-    "sha256": "c7b6a5a7206d5282be2127db044443c4855d3e50e46656ff2b6106aaa34d363c"
+    "checked_at": "2026-08-08T07:26:48.429556+00:00",
+    "sha256": "c27f13450f1869c41752e4cf19fbc2238e1ff1c3f4868a77fb2bb68dcb159993"
   },
   "https://code.claude.com/docs/en/hooks.md": {
-    "checked_at": "2026-08-06T19:40:05.607205+00:00",
-    "sha256": "752d3f5e868f28d114afc8090e6e037c40b81625fed2b6fa51e3a6b7ad157b99"
+    "checked_at": "2026-08-08T07:26:48.429556+00:00",
+    "sha256": "d29d21b554b5c6bd0b0ed1f7a28161c1cd05954510a6fd0acb84b74d496987fb"
   },
   "https://code.claude.com/docs/en/skills.md": {
-    "checked_at": "2026-08-06T19:40:05.607205+00:00",
-    "sha256": "29b37eb3d81ab899a1b83ce7672668deb44f1395ebf15f5bfc69df13b30d53b3"
+    "checked_at": "2026-08-08T07:26:48.429556+00:00",
+    "sha256": "a833dd5c96b9b111de0daec5fc6436e210c8cdc009e51306d32438746db0b5a5"
   }
 }
