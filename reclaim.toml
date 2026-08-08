@@ -40,9 +40,13 @@ age_days = 30
 [[category.docker.engines]]
 context = "desktop-linux"
 disk_image = "~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
-[[category.docker.engines]]
-context = "colima"
-disk_image = "~/.config/colima"
+# colima was here until 2026-08-07 and its removal is the lesson: an engine
+# whose daemon is down can never be PRUNED through the docker CLI, so the entry
+# produced zero reclaimable bytes and one permanent COULD NOT CHECK — a warning
+# nobody could act on, which is how people learn to ignore warnings. Finding the
+# engine was right (`docker context ls`); treating a dormant one as a prune
+# target was not. That VM was torn down natively (`colima delete -d -f`, 40.99G
+# freed) because discarding a VM is a DECISION, not a prune.
 
 [category.docker.prune]
 images = true

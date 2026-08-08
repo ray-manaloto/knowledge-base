@@ -151,7 +151,77 @@ def decide(command: str) -> str | None:
 
     if _GRAPHIFY_PYBIN.search(command) or _PY_DRIVES_GRAPHIFY.search(command):
         return _REASON_PY
-    return None
+    return _bare_python(command)
+
+
+#: A bare interpreter at a COMMAND POSITION. `uv run python …` is unaffected —
+#: the lookbehind requires the token to start a command, and in `uv run python`
+#: the preceding token is `run`, so it never matches there.
+_BARE_PYTHON = re.compile(
+    r"(?:^|[|;&]\s*|\breturn\s+)\s*(?:command\s+)?(python3?)\b(?!\s*-m\s+pytest)"
+)
+
+_REASON_BARE_PY = (
+    "Do not run `{exe}` directly — use `uv run python …`, or the mise task that owns "
+    "this work. A bare interpreter resolves off $PATH, so it silently depends on "
+    "whether a venv happens to be active: this repo ran its gates on 3.14.0 under a "
+    "3.14.7 pin for two weeks that way. `uv run` reads pyproject.toml and cannot "
+    "drift. If you are about to write a throwaway script for the second time, that "
+    "is what `mise run kb-distill` exists to catch — give it a kb_setup module and a "
+    "mise task instead (Ray, standing directive; kb_setup.hook_guard)."
+)
+
+
+#: A heredoc body is DATA, never a command — everything from `<<TAG` onward is
+#: payload the shell hands to a program. Matching inside it is how this guard
+#: denied the very commit message that documented it.
+_HEREDOC = re.compile(r"<<-?\s*'?\"?\w+")
+
+#: A quoted span is likewise data: a grep pattern, an echo string, a `-m` message.
+_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+
+
+def _code_only(command: str) -> str:
+    """Strip heredoc bodies and quoted spans, leaving the shell's CODE.
+
+    Written after **four measured false positives in five minutes**, every one of
+    them text that *described* the guard rather than invoking an interpreter:
+
+    1. a probe whose test data listed ``&& python3`` as a case;
+    2. a heredoc writing this guard's own test file;
+    3. ``grep`` whose search PATTERN contained ``; python``;
+    4. the ``git commit`` message documenting all of the above.
+
+    That is the direction every measured defect in this repo's guards has come
+    from — dotfiles #176 is the same shape one level up, and had to allowlist a
+    commit message describing the graphify ban. Precision over recall is the
+    trade this guard family makes on purpose: it is a redirect, not a sandbox,
+    and a guard that misfires on ordinary prose gets disabled by the humans it
+    annoys, which costs more than the evasions it prevents.
+    """
+    head = _HEREDOC.split(command, maxsplit=1)[0]
+    return _QUOTED.sub(" ", head)
+
+
+def _bare_python(command: str) -> str | None:
+    """Deny a bare `python`/`python3` at a command position; allow `uv run python`.
+
+    Ray, 2026-08-07, after catching this session shelling out to `python3 -c` eight
+    times while building a tool whose whole premise is skill -> mise task -> python
+    library. The measured harm is not hypothetical: `python3` resolved correctly
+    here only because a venv happened to be active, which is luck rather than
+    correctness.
+
+    Scoped to a command position AND to code rather than data (see `_code_only`),
+    so it cannot fire on prose, a `--python3` flag, or a path containing the word.
+    `-m pytest` is exempted because the arms harness (`kb_setup.arms`) builds
+    `[sys.executable, "-m", "pytest", ...]`, and a guard that breaks the mutation
+    harness every fix in this repo is verified through would cost more than it saves.
+    """
+    m = _BARE_PYTHON.search(_code_only(command))
+    if not m:
+        return None
+    return _REASON_BARE_PY.format(exe=m.group(1))
 
 
 def run() -> int:

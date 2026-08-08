@@ -137,9 +137,19 @@ GUARD_FIXTURES: tuple[evals.GuardFixture, ...] = (
         "a commit message describing the ban — dotfiles hit exactly this in #176",
     ),
     _D(
-        'rg "import graphify" . ; python -c "print(1)"',
+        'rg "import graphify" . ; uv run python -c "print(1)"',
         _ALLOW,
         "the python head and the payload are in DIFFERENT segments",
+    ),
+    _D(
+        "python3 -c \"import shutil; print(shutil.disk_usage('/'))\"",
+        _DENY,
+        "a bare interpreter resolves off $PATH and follows whatever venv is active",
+    ),
+    _D(
+        "uv run python -c \"import shutil; print(shutil.disk_usage('/'))\"",
+        _ALLOW,
+        "the control arm for the row above — uv run must never be blocked",
     ),
     _D("uv run pytest tests/ -x -q", _ALLOW, "an ordinary uv command is untouched"),
     _D("git status --short", _ALLOW, "an unrelated command is untouched"),

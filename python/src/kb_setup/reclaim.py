@@ -807,6 +807,27 @@ def _report(
     return total
 
 
+def _free_bytes() -> int:
+    """Free bytes on the volume this repo lives on."""
+    return shutil.disk_usage("/").free
+
+
+def _print_disk(label: str, before: int | None = None) -> int:
+    """Print free space, and the delta when a baseline is given.
+
+    Folded in here rather than given its own task because this module already
+    computes disk numbers — and because measuring free space by hand was the
+    single most-repeated throwaway probe of the session that wrote it (eight
+    times), which is exactly the shape `kb-distill` exists to catch.
+    """
+    free = _free_bytes()
+    if before is None:
+        print(f"disk: {human(free)} free {label}")
+    else:
+        print(f"disk: {human(free)} free {label} — {human(free - before)} returned")
+    return free
+
+
 def main(argv: list[str], repo_root: Path) -> int:
     """`kb-setup reclaim` — report by default, reclaim only on an explicit --apply."""
     apply_it = "--apply" in argv
@@ -822,6 +843,7 @@ def main(argv: list[str], repo_root: Path) -> int:
     if only and not cats:
         print(f"reclaim: --only {sorted(only)} matched no category in {cfg_path}")
         return 2
+    before = _print_disk("before")
     findings, unavailable = plan(cats, repo_root)
     total = _report(findings, cats, unavailable)
     n_real = sum(1 for f in findings if not f.informational)
@@ -835,7 +857,9 @@ def main(argv: list[str], repo_root: Path) -> int:
     if not apply_it:
         print("reclaim: DRY RUN — nothing was deleted. Re-run with `-- --apply` to reclaim.")
         return 0
-    return _apply_all(cats, findings, repo_root)
+    rc = _apply_all(cats, findings, repo_root)
+    _print_disk("after", before)
+    return rc
 
 
 def _opt_list(argv: list[str], flag: str) -> set[str]:

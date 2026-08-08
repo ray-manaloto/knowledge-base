@@ -37,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
             "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
+            "graph-counts [--by-source] [name...] | "
+            "graph-counts [--by-source] [name...] | "
             "md-budget | skill-lint | "
             "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | "
@@ -174,7 +176,7 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
 #: `reclaim` is advisory in the same sense — it gates nothing — but it is the one
 #: member that CAN delete, and only behind an explicit `--apply`. Grouped here
 #: because its default path (report, rc 0, no mutation) is identical to the others'.
-_ADVISORY = frozenset({"distill", "arms", "reclaim"})
+_ADVISORY = frozenset({"distill", "arms", "reclaim", "graph-counts"})
 
 
 def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
@@ -187,6 +189,10 @@ def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import reclaim
 
         return reclaim.main(rest, repo_root)
+    if cmd == "graph-counts":
+        from kb_setup import graph_counts
+
+        return graph_counts.report(repo_root, rest)
     from kb_setup import arms
 
     return arms.main(rest, repo_root)
