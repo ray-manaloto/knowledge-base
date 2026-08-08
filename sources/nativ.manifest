@@ -1,0 +1,9 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# nativ (Blaizzy) — Swift/MLX macOS app: "Local AI, native to your Mac. Chat, serve,
+# monitor, and connect MLX models from one macOS app." Pinned to release v0.2.2 (Ray,
+# 2026-08-07). Ingested for AST only — free, no LLM. The MLX arm of the local-LLM
+# face-off: MLX targets Apple silicon natively, which is the axis colibri does not cover.
+url = https://github.com/Blaizzy/nativ
+ref = v0.2.2
+commit = ab99cfa016766ca3f0c48b332a2714cd1f8c5ad6
+kind = code

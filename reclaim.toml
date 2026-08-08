@@ -62,20 +62,56 @@ age_days = 14
 keep = []
 
 
-# ─── Regenerable caches ──────────────────────────────────────────────────────
-# Everything here rebuilds on demand. Highest volume, lowest risk; the only cost
-# of being wrong is a slower next build.
-[category.caches]
+# ─── Regenerable caches — ONE CATEGORY PER ARTIFACT TYPE ─────────────────────
+# Deliberately not a single `caches` block with four paths. Ray, 2026-08-07:
+# "this should actually have categories for each type. aim for as flexible/
+# modular as possible". A lumped category is all-or-nothing — you could not keep
+# the npm cache while dropping bun's — and its total hides which tree the space
+# is actually in. Splitting them costs four blocks and buys `--only caches_npm`.
+#
+# All of these rebuild on demand; the only cost of being wrong is a slower next
+# build. They are listed newest-cost-first as measured on this machine.
+
+[category.caches_system]
 enabled = true
 kind = "dirs"
 age_days = 30
-paths = [
-  "~/Library/Caches",
-  "~/.cache",
-  "~/.bun/install/cache",
-  "~/.npm/_cacache",
-]
+paths = ["~/Library/Caches"]
 
+[category.caches_xdg]
+enabled = true
+kind = "dirs"
+age_days = 30
+paths = ["~/.cache"]
+
+[category.caches_bun]
+enabled = true
+kind = "dirs"
+age_days = 30
+paths = ["~/.bun/install/cache"]
+
+[category.caches_npm]
+enabled = true
+kind = "dirs"
+age_days = 30
+paths = ["~/.npm/_cacache"]
+
+# Homebrew is its OWN kind, not a `dirs` path, because `brew cleanup` reaches
+# things no path can: superseded Cellar versions and vendored portable-ruby
+# trees, neither of which is under `brew --cache`. It also brings its own
+# `--prune=<days>` window and `--dry-run`, so the age policy and the measurement
+# are brew's rather than ours (`use-tool-builtins.md`).
+#
+# ⚠️ OVERLAP: `brew --cache` is `~/Library/Caches/Homebrew`, which is INSIDE
+# `caches_system` above. Both enabled means those bytes appear in two totals.
+# Kept enabled anyway because the Cellar portion is uniquely reachable here —
+# but if you disable `caches_system`, this is the one that still gets the cache.
+[category.homebrew]
+enabled = true
+kind = "homebrew"
+age_days = 30
+# `--scrub` also drops downloads for currently-installed versions.
+scrub = false
 
 # ─── Stale toolchain versions ────────────────────────────────────────────────
 # mise keeps every version it has ever installed. This repo alone has ~50

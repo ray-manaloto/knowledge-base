@@ -24,6 +24,7 @@ whether it actually moved — turning a silent non-effect into a stated one.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tomllib
@@ -142,9 +143,8 @@ def _allocated(st: object) -> int:
     and a container disk image is always sparse: this repo's `Docker.raw` reports
     `st_size` 1858.2G against `st_blocks*512` 285.8G — the latter matching `du`.
     Summing apparent sizes once produced a report claiming 2.3TB was reclaimable
-    on a 1.8TB disk, which is the kind of confidently wrong number a measurement
-    tool exists not to emit. `st_blocks` is always 512-byte units per POSIX,
-    regardless of the filesystem's own block size.
+    on a 1.8TB disk. `st_blocks` is always 512-byte units per POSIX, regardless
+    of the filesystem's own block size.
     """
     blocks = getattr(st, "st_blocks", None)
     if blocks is None:  # pragma: no cover - non-POSIX fallback
@@ -153,12 +153,36 @@ def _allocated(st: object) -> int:
 
 
 def _dir_size(path: Path) -> int:
-    """Allocated bytes under `path`, following no symlinks and ignoring unreadables."""
-    total = 0
+    """Allocated bytes under `path`, measured with `du` and only then by hand.
+
+    `du` is not an optimisation here, it is the correct tool twice over
+    (`use-tool-builtins.md`). It reports ALLOCATED blocks natively — the exact
+    sparse-file semantics `_allocated` had to hand-roll — and it does so in C:
+    `~/.npm/_cacache` (21GB of tiny files) takes **3.5s** via `du -sk` against
+    minutes for a python `rglob` + per-file `stat`. The first version of this
+    module used the python walk and a whole-machine scan never finished; it was
+    killed after 15 minutes having printed nothing.
+
+    The python fallback survives only for a host without `du`, and it is the
+    slow path by construction, not the default.
+    """
     if not path.exists():
         return 0
+    if shutil.which("du"):
+        rc, out = _run(["du", "-sk", str(path)])
+        if rc == 0 and out:
+            try:
+                return int(out.split()[0]) * 1024
+            except ValueError, IndexError:
+                pass
+    return _dir_size_slow(path)
+
+
+def _dir_size_slow(path: Path) -> int:
+    """Allocated bytes under `path` by walking it — the no-`du` fallback."""
     if path.is_file():
         return _allocated(path.stat())
+    total = 0
     for p in path.rglob("*"):
         try:
             if p.is_file() and not p.is_symlink():
@@ -392,12 +416,68 @@ def _mise_pinned() -> set[str]:
     return pinned
 
 
+def scan_homebrew(cat: Category, _repo_root: Path) -> list[Finding]:
+    """Ask `brew cleanup --dry-run` what it would free — do not walk paths.
+
+    Homebrew earns its own kind rather than another cache path for one reason:
+    `brew cleanup` also removes **old versions of installed formulae from the
+    Cellar** and stale vendored portable-ruby trees, neither of which lives in
+    `brew --cache`. A `dirs` category pointed at the cache can never reach them.
+
+    The size is brew's own figure, so it stays right when brew's policy changes.
+    """
+    if not shutil.which("brew"):
+        return []
+    argv = ["brew", "cleanup", "--dry-run", f"--prune={cat.age_days}"]
+    if cat.options.get("scrub", False):
+        argv.append("--scrub")
+    rc, out = _run(argv)
+    if rc != 0:
+        return []
+    size = _brew_freed_bytes(out)
+    if size <= 0:
+        return []
+    return [
+        Finding(
+            category=cat.name,
+            label=f"brew cleanup --prune={cat.age_days}",
+            size_bytes=size,
+            detail=(
+                "brew's own estimate: stale downloads, superseded Cellar versions "
+                "and vendored ruby. Overlaps `caches_homebrew` on the cache portion "
+                "only — enable one or the other to avoid counting those bytes twice"
+            ),
+        )
+    ]
+
+
+#: brew's summary reads "...would free approximately 9.1GB of disk space." — the
+#: size is MID-SENTENCE, so it must be extracted by pattern rather than by
+#: trimming the tail. The first version trimmed, handed `_parse_size` the string
+#: "9.1GB of disk space", and got 0 back: the category reported "nothing found"
+#: over a real 9.1GB. A silent zero from a parser is indistinguishable from an
+#: empty result, which is why this pattern is pinned by its own test.
+_BREW_SIZE_RE = re.compile(r"([\d.]+)\s*(TB|GB|MB|kB|B)\b")
+
+
+def _brew_freed_bytes(out: str) -> int:
+    """Pull the `would free approximately N` figure out of brew's summary line."""
+    for line in reversed(out.splitlines()):
+        if "free approximately" not in line:
+            continue
+        m = _BREW_SIZE_RE.search(line.rsplit("approximately", 1)[-1])
+        if m:
+            return _parse_size(f"{m.group(1)}{m.group(2)}")
+    return 0
+
+
 _SCANNERS = {
     "docker": scan_docker,
     "ollama": scan_ollama,
     "dirs": scan_dirs,
     "files": scan_files,
     "mise_versions": scan_mise_versions,
+    "homebrew": scan_homebrew,
 }
 
 
@@ -420,6 +500,10 @@ def plan(cats: list[Category], repo_root: Path) -> list[Finding]:
         scanner = _SCANNERS.get(cat.kind)
         if not cat.enabled or scanner is None:
             continue
+        # Printed BEFORE the scan, not after. Sizing a cache tree is the slow
+        # part of this tool, and a scanner that announces itself only on
+        # completion is indistinguishable from one that has hung.
+        print(f"scanning {cat.name} ({cat.kind})…", flush=True)
         out.extend(scanner(cat, repo_root))
     return sorted(out, key=lambda f: f.size_bytes, reverse=True)
 
@@ -527,6 +611,16 @@ def apply_ollama(_cat: Category, findings: list[Finding]) -> list[str]:
     return lines
 
 
+def apply_homebrew(cat: Category) -> list[str]:
+    """Run `brew cleanup` with its OWN prune window — never delete brew paths by hand."""
+    argv = ["brew", "cleanup", f"--prune={cat.age_days}"]
+    if cat.options.get("scrub", False):
+        argv.append("--scrub")
+    rc, out = _run(argv)
+    tail = out.splitlines()[-1] if out else "no output"
+    return [f"  brew cleanup rc={rc} — {tail}"]
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
 
@@ -599,7 +693,9 @@ def _apply_all(cats: list[Category], findings: list[Finding], repo_root: Path) -
             continue
         hits = [f for f in findings if f.category == cat.name]
         print(f"\n{cat.name}:")
-        if cat.kind == "docker":
+        if cat.kind == "homebrew":
+            lines = apply_homebrew(cat)
+        elif cat.kind == "docker":
             lines = apply_docker(cat)
         elif cat.kind == "ollama":
             lines = apply_ollama(cat, hits)

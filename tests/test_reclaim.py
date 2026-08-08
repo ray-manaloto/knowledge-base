@@ -213,3 +213,15 @@ def test_repo_config_is_loadable_and_declares_every_kind_a_scanner_handles():
     assert cats, "shipped config declared no categories"
     for cat in cats:
         assert cat.kind in reclaim._SCANNERS, f"{cat.name} declares unknown kind {cat.kind!r}"
+
+
+def test_brew_freed_bytes_reads_a_size_mid_sentence():
+    """Regression: brew puts the size mid-line, and trimming the tail returned 0.
+
+    The first version handed `_parse_size` the string "9.1GB of disk space" and
+    got 0, so the homebrew category reported "nothing found" over a real 9.1GB —
+    a silent zero, which reads exactly like an empty result.
+    """
+    real = "==> This operation would free approximately 9.1GB of disk space."
+    assert reclaim._brew_freed_bytes(real) == 9_100_000_000
+    assert reclaim._brew_freed_bytes("nothing to say here") == 0

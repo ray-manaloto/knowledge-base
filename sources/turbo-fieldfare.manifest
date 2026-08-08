@@ -1,0 +1,10 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# turbo-fieldfare (drumih) — Swift, Apple-silicon local inference: "Gemma 4 26B-A4B
+# inference in ~2 GB of RAM on any M-series MacBook". Pinned to release 0.4.1 (Ray,
+# 2026-08-07). Ingested for AST only — free, no LLM. Entered the local-LLM face-off
+# alongside colibri because colibri's own planner has NO Apple/Metal GPU discovery
+# (discover_gpus() is NVIDIA->AMD only; returns [] on this M2 Max, measured).
+url = https://github.com/drumih/turbo-fieldfare
+ref = 0.4.1
+commit = 417f38934c7590db15e7a2baa35f3cea05828dda
+kind = code
