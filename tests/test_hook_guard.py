@@ -8,6 +8,8 @@ ever denies (or only ever allows) is not a guard.
 
 import io
 import json
+import subprocess
+import sys
 
 import pytest
 from kb_setup.hook_guard import decide, run
@@ -63,8 +65,15 @@ ALLOW = [
     'rg "_merge_docs.py" .',
     'rg "graphify.transcribe" python/',
     # The same payload with a python head in a DIFFERENT segment: the head and
-    # the payload must co-occur in one segment, or `rg …; python -c …` denies.
-    'rg "import graphify" . ; python -c "print(1)"',
+    # the payload must co-occur in one segment, or `rg …; <python> -c …` denies.
+    #
+    # Written with `uv run python` since 2026-08-07. It was a bare `python -c`,
+    # which the new bare-interpreter guard denies — correctly, but for a reason
+    # this row is not about. The row exists to pin the GRAPHIFY payload check's
+    # segment anchoring, so it has to reach that check rather than being stopped
+    # earlier; a fixture that denies for the wrong reason still passes a
+    # DENY assertion and silently stops testing what it names.
+    'rg "import graphify" . ; uv run python -c "print(1)"',
 ]
 
 
@@ -107,3 +116,99 @@ def test_run_ignores_non_bash_tools(monkeypatch, capsys) -> None:
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
     assert run() == 0
     assert capsys.readouterr().out.strip() == ""
+
+
+# ─── bare interpreter denial (Ray, 2026-08-07) ───────────────────────────────
+#
+# These live in the SUITE rather than in an ad-hoc probe for a reason worth
+# keeping: the first two attempts to check this guard were shell commands whose
+# own TEST DATA contained the denied patterns, so the guard fired on the probe
+# itself — twice. A guard whose patterns appear in ordinary text cannot be
+# exercised from the command line it guards, which is also why writing this file
+# needed the Write tool rather than a heredoc. That is the guard working.
+
+_DENIED_BARE = [
+    'python3 -c "import shutil"',
+    "python3 - <<PY",
+    'python -c "x"',
+    "ls && python3 foo.py",
+    "cat f | python3 -",
+    "python3 script.py",
+    # A NEWLINE is a command separator, and it was missing from the class until
+    # the spec review measured the hole. Multi-line Bash is the ordinary shape
+    # in this repo, so this was the COMMON evasion, not a corner case.
+    "cd /tmp\npython3 -c 'print(1)'",
+    "echo hi\npython3 script.py",
+    # No `-m pytest` exemption: one existed, justified by the arms harness — but
+    # that harness calls pytest through `subprocess`, which never reaches a Bash
+    # hook, so the exemption defended a case this guard cannot observe.
+    "python3 -m pytest tests/",
+]
+
+#: The four FALSE POSITIVES this guard produced in its first five minutes, each
+#: text that DESCRIBED the guard rather than invoking an interpreter. They are
+#: fixtures rather than an anecdote because they are the evidence for
+#: `_code_only`, and because this is the direction every measured defect in this
+#: repo's guards has come from — not evasion.
+_MEASURED_FALSE_POSITIVES = [
+    # 1. a probe whose own test data listed the denied shapes
+    "echo \"cases: 'ls && python3 foo.py' and 'python3 -c x'\"",
+    # 2. a heredoc writing this guard's test file (body is DATA, not commands)
+    "cat >> tests/test_hook_guard.py <<'TEOF'\nls && python3 foo.py\nTEOF",
+    # 3. a grep whose SEARCH PATTERN contained a denied shape
+    "grep -n 'import graphify . ; python' tests/test_hook_guard.py",
+    # 4. the commit message documenting all of the above
+    'git commit -m "guard: deny bare python3, e.g. `ls && python3 x`"',
+]
+
+_ALLOWED_PY = [
+    *_MEASURED_FALSE_POSITIVES,
+    'uv run python -c "x"',
+    "uv run python -V",
+    "uv run kb-setup reclaim",
+    "uv run pytest tests/",
+    "grep python3 file.txt",
+    'echo "use python3 for this"',
+    "/usr/bin/python3 -c 'x'",
+    "ls -la",
+]
+
+
+@pytest.mark.parametrize("command", _DENIED_BARE)
+def test_denies_a_bare_interpreter_at_a_command_position(command: str) -> None:
+    """A bare `python`/`python3` resolves off $PATH and silently follows the venv."""
+    reason = decide(command)
+    assert reason is not None, f"guard let a bare interpreter through: {command}"
+    assert "uv run python" in reason, "the refusal must name the replacement"
+
+
+@pytest.mark.parametrize("command", _ALLOWED_PY)
+def test_allows_uv_run_and_non_command_mentions(command: str) -> None:
+    """The control arm. A guard that also blocks `uv run python` is an outage.
+
+    `/usr/bin/python3` is deliberately allowed: it names an explicit interpreter
+    rather than resolving off `$PATH`, so it does not have the drift this guard
+    exists to prevent.
+    """
+    assert decide(command) is None, f"guard misfired on: {command}"
+
+
+def test_the_arms_harness_is_unaffected_without_needing_an_exemption() -> None:
+    """`kb_setup.arms` runs `[sys.executable, "-m", "pytest", ...]` via subprocess.
+
+    A `subprocess` argv never routes through a Bash PreToolUse hook, so the
+    harness needs no carve-out — which is why the `-m pytest` exemption that once
+    existed here was removed rather than kept. It was a hole argued from a case
+    the guard cannot observe, and `python3 -m pytest` TYPED AT A SHELL is exactly
+    the bare interpreter the guard exists to deny (it is in `_DENIED_BARE`).
+
+    The arms harness is what verifies every fix in this repo, so this asserts the
+    thing that actually matters: it still runs.
+    """
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "tests/test_hook_guard.py"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, f"the arms harness invocation broke: {proc.stderr[-400:]}"

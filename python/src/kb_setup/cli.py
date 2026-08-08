@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
             "brain [record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
+            "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
+            "graph-counts [--by-source] [name...] | "
             "md-budget | skill-lint | "
             "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | "
@@ -170,15 +172,26 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
 #: Advisory analysers: they propose or measure, they gate nothing, and neither is
 #: wired into `kb-gates`/`kb-ship`. Grouped so the ops dispatch stays under its
 #: statement budget rather than growing a branch per tool.
-_ADVISORY = frozenset({"distill", "arms"})
+#: `reclaim` is advisory in the same sense — it gates nothing — but it is the one
+#: member that CAN delete, and only behind an explicit `--apply`. Grouped here
+#: because its default path (report, rc 0, no mutation) is identical to the others'.
+_ADVISORY = frozenset({"distill", "arms", "reclaim", "graph-counts"})
 
 
 def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
-    """Dispatch the advisory analysers (`distill`, `arms`)."""
+    """Dispatch the advisory analysers (`distill`, `arms`, `reclaim`)."""
     if cmd == "distill":
         from kb_setup import distill
 
         return distill.distill_main(repo_root, rest)
+    if cmd == "reclaim":
+        from kb_setup import reclaim
+
+        return reclaim.main(rest, repo_root)
+    if cmd == "graph-counts":
+        from kb_setup import graph_counts
+
+        return graph_counts.report(repo_root, rest)
     from kb_setup import arms
 
     return arms.main(rest, repo_root)
@@ -283,6 +296,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
         "brain [query|record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
+        "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | "

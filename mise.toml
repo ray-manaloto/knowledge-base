@@ -281,6 +281,29 @@ description = "Check every SKILL.md instructs mise tasks, not raw commands (#128
 # for working on a skill without running the whole suite.
 run = "uv run kb-setup skill-lint"
 
+[tasks.kb-graph-counts]
+description = "Print graph.json's node/link/hyperedge counts (+ --by-source)"
+# The seam `kb_setup.graph_counts` never had. It had callers and a ledger but no
+# way to ASK it anything, so 25 sessions hand-wrote 125 throwaway json probes
+# (`kb-distill` candidate #2) — one of which shipped a false "the graph has ZERO
+# edges" finding into a handoff, a memory record AND a commit message, because
+# graph.json spells it `links` and a `.get("edges", [])` probe returns 0 on a
+# perfectly healthy graph. Deciding that spelling once is the whole point.
+run = "uv run kb-setup graph-counts {{arg(name='args', var=true, default='')}}"
+
+[tasks.kb-reclaim]
+description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --apply to reclaim"
+# REPORT-ONLY by default and there is no config key that changes that: reclaiming
+# needs `-- --apply` on every run. A deleter whose destructive mode can be armed
+# from a config file is a destructive action at a distance, which is precisely
+# what `reclaim.toml` must not become.
+#
+# Policy lives in `reclaim.toml` — every category can be disabled, re-scoped or
+# re-thresholded there, and `--only`/`--skip` narrow a single run. Docker cleanup
+# is ONE category, not the tool: adding a reclaimer is a scanner plus a config
+# block. See `.claude/skills/kb-reclaim/SKILL.md`.
+run = "uv run kb-setup reclaim {{arg(name='args', var=true, default='')}}"
+
 [tasks.kb-distill]
 description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
 # The PRODUCING half of Ray's directive; `kb-skill-lint` is the policing half.

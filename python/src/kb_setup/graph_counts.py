@@ -145,3 +145,56 @@ def read(repo_root: Path, graph_path: Path) -> dict[str, int] | None:
     if not recorded or recorded != _fingerprint(graph_path):
         return None
     return {k: int(v) for k, v in data.items() if k in _FIELDS and isinstance(v, int)}
+
+
+def report(repo_root: Path, argv: list[str] | None = None) -> int:
+    """`kb-graph-counts` — print the graph's counts, and per-source if asked.
+
+    This seam is the point of the whole function. `graph_counts` already had
+    callers and a ledger, but no way to simply ASK it anything — so 25 sessions
+    hand-wrote 125 throwaway `json.load(open('graphify-out/graph.json'))` probes
+    (`mise run kb-distill`, candidate #2), and one of them shipped a false
+    "the graph has ZERO edges" finding into a handoff, a memory record and a
+    commit message. `graph.json` is networkx node-link JSON: the key is `links`,
+    and there is no `edges` key on any graphify graph, which a `.get("edges", [])`
+    probe reports as 0 on a perfectly healthy graph.
+
+    Reading the counts from one place means that spelling is decided once.
+    """
+    args = argv or []
+    graph_path = repo_root / "graphify-out" / "graph.json"
+    if not graph_path.is_file():
+        print(f"graph-counts: no graph at {graph_path} — run `mise run kb-build`")
+        return 2
+
+    data = json.loads(graph_path.read_text(encoding="utf-8"))
+    nodes = data.get("nodes") or []
+    links = data.get("links") or data.get("edges") or []
+    hyper = data.get("hyperedges") or []
+    print(f"nodes       {len(nodes):>9,}")
+    print(f"links       {len(links):>9,}")
+    print(f"hyperedges  {len(hyper):>9,}")
+    print(f"keys        {sorted(data)}")
+    if "--by-source" in args:
+        _print_by_source(nodes, args)
+    return 0
+
+
+def _print_by_source(nodes: list, args: list[str]) -> None:
+    """Per-source node counts, keyed on the `::` id prefix.
+
+    The prefix, not `source_file`: a probe written against `source_file` this
+    session reported a freshly-ingested source as **0 nodes** while it actually
+    had 5,057. Same spelling-bound class as `links` vs `edges` above.
+    """
+    from collections import Counter
+
+    counts: Counter[str] = Counter()
+    for n in nodes:
+        node_id = str(n.get("id", ""))
+        counts[node_id.split("::", maxsplit=1)[0] if "::" in node_id else "(no prefix)"] += 1
+    wanted = [a for a in args if not a.startswith("--")]
+    rows = [(k, counts.get(k, 0)) for k in wanted] if wanted else counts.most_common(20)
+    print()
+    for name, n in rows:
+        print(f"  {name:<28} {n:>8,}")

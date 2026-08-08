@@ -1,0 +1,1066 @@
+# Copyright (c) 2026 Raymond Manaloto
+"""Disk reclamation: measure what is reclaimable, and (only on `--apply`) reclaim it.
+
+The policy lives in `reclaim.toml`; this module is the engine. Every category is a
+`kind` handled by one scanner, so adding "clean up X" is a scanner plus a config
+block — docker cleanup is one such subset, not the whole tool.
+
+Two properties this module exists to guarantee, both tested:
+
+* **Dry run is the default.** `plan()` never mutates anything; `apply()` is only
+  reached from an explicit `--apply`. Nothing in `reclaim.toml` can flip that.
+* **A category acts only inside its own declared roots.** `_guard_path` refuses a
+  target that escapes them or lands inside this repository, so a typo in the
+  config fails closed rather than deleting something else.
+
+What it deliberately does NOT do: compact a container engine's disk image. On
+macOS the engine's storage is one sparse file, and pruning frees space *inside*
+it without shrinking the file. Rewriting a live VM disk is not something to
+hand-roll (`use-tool-builtins.md`), and no `docker` subcommand on this platform
+exposes it. So the docker scanner measures the image before and after and reports
+whether it actually moved — turning a silent non-effect into a stated one.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+import tomllib
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+
+_MB = 1024 * 1024
+_GB = 1024 * 1024 * 1024
+#: Age filters are handed to docker as hours; it has no day unit.
+_HOURS_PER_DAY = 24
+#: A declared root needs at least this many path components. `/` is 1 and
+#: `/Users` is 2; `~/Library/Caches` is 4. Three keeps `/Users/<name>` — the
+#: home directory itself — out of bounds as well.
+_MIN_ROOT_PARTS = 3
+#: `ollama list` columns: NAME ID SIZE UNIT MODIFIED… — fewer means a header or blank.
+_OLLAMA_MIN_COLUMNS = 4
+#: A concrete version is `major.minor.patch`; `0.9` and `latest` are channels.
+_VERSION_DOTS = 2
+#: Per category, how many findings are listed individually before the tail is summed.
+_LIST_LIMIT = 12
+
+
+@dataclass(frozen=True)
+class Finding:
+    """One reclaimable thing, with the size that justifies acting on it."""
+
+    category: str
+    label: str
+    size_bytes: int
+    detail: str
+    #: Absolute path to remove, or None for a finding whose action is a command
+    #: (docker prune) rather than a deletion.
+    path: Path | None = None
+    #: Context, not a candidate: printed, but NEVER summed into the reclaimable
+    #: total. A container disk image is the worked example — its bytes are the
+    #: same bytes the engine's own "reclaimable" figure already counts, so adding
+    #: both double-counts the only part that could actually be freed.
+    informational: bool = False
+
+
+@dataclass
+class Category:
+    """One configured category, already merged with `[defaults]`."""
+
+    name: str
+    kind: str
+    enabled: bool
+    age_days: int
+    min_size_mb: int
+    options: dict = field(default_factory=dict)
+
+    @property
+    def min_size_bytes(self) -> int:
+        """Findings below this are summed but not listed individually."""
+        return self.min_size_mb * _MB
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    """What a scanner found, AND what it could not ask.
+
+    The second half is the point. Every scanner used to `return []` when its
+    binary was absent, its daemon down, or its configured path missing — and
+    `_report` then printed "nothing found — scanned, not skipped", a line
+    asserting precisely the distinction that `return []` had destroyed. A typo'd
+    path in `reclaim.toml` was indistinguishable from a genuinely empty cache.
+
+    Three states, kept distinct on `kb_setup.currency`'s precedent: FOUND
+    (findings), UNAVAILABLE (`unavailable` reasons), and a real empty (neither).
+    """
+
+    findings: list[Finding] = field(default_factory=list)
+    #: One human-readable reason per thing that could not be asked.
+    unavailable: list[str] = field(default_factory=list)
+
+
+class ReclaimError(RuntimeError):
+    """A configuration or safety violation — never a scan miss."""
+
+
+def human(n: int) -> str:
+    """Format a byte count the way `du -h` would, to one decimal."""
+    if n >= _GB:
+        return f"{n / _GB:.1f}G"
+    if n >= _MB:
+        return f"{n / _MB:.0f}M"
+    return f"{n}B"
+
+
+def _expand(raw: str) -> Path:
+    """Expand `~` and resolve, without requiring the path to exist."""
+    return Path(raw).expanduser()
+
+
+def load_config(path: Path) -> list[Category]:
+    """Parse `reclaim.toml` into categories, merging `[defaults]` into each."""
+    if not path.is_file():
+        raise ReclaimError(f"no reclaim config at {path}")
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    defaults = raw.get("defaults", {})
+    out: list[Category] = []
+    for name, block in raw.get("category", {}).items():
+        opts = {k: v for k, v in block.items() if k not in {"enabled", "kind", "age_days"}}
+        out.append(
+            Category(
+                name=name,
+                kind=block.get("kind", ""),
+                enabled=bool(block.get("enabled", True)),
+                age_days=_check_age(name, block.get("age_days", defaults.get("age_days", 30))),
+                min_size_mb=int(block.get("min_size_mb", defaults.get("min_size_mb", 100))),
+                options=opts,
+            )
+        )
+    return out
+
+
+def _check_age(name: str, raw: object) -> int:
+    """Refuse a negative or non-numeric `age_days`.
+
+    A negative value puts the cutoff in the FUTURE, so every entry reads as "not
+    touched since <a date yet to come>" and an age-filtered category silently
+    degrades into a whole-tree one — on the destructive path.
+
+    The value comes from untrusted TOML, so it is narrowed rather than coerced
+    with a suppression: a type annotation that over-promises is exactly what
+    disables the checking it appears to provide.
+    """
+    if not isinstance(raw, int) or isinstance(raw, bool):
+        raise ReclaimError(f"category {name!r}: age_days must be an integer, got {raw!r}")
+    if raw < 0:
+        raise ReclaimError(f"category {name!r}: age_days must be >= 0, got {raw}")
+    return raw
+
+
+def _guard_path(target: Path, roots: list[Path], repo_root: Path) -> None:
+    """Refuse a target outside every declared root, or inside this repository.
+
+    This is the safety property that makes a config-driven deleter tolerable: the
+    config chooses WHICH root, never whether the root is honoured.
+    """
+    resolved = target.resolve()
+    if resolved == Path(resolved.anchor):
+        raise ReclaimError(f"refusing to act on the filesystem root: {target}")
+    if repo_root.resolve() in (resolved, *resolved.parents):
+        raise ReclaimError(f"refusing to act inside the repository: {target}")
+    for root in roots:
+        rr = root.expanduser().resolve()
+        if len(rr.parts) <= _MIN_ROOT_PARTS:
+            # A shallow root makes the guard vacuous: `/` is a parent of every
+            # path, so declaring it would let this delete anything on the
+            # machine while `_guard_path` reported the target as "inside a
+            # declared root". Confirmed by probe: a category rooted at `/`
+            # permitted removing ~/Documents.
+            raise ReclaimError(
+                f"root {root} is too shallow to be a reclaim root — it would "
+                f"authorise deleting anything beneath it"
+            )
+        if rr == resolved:
+            # A root is a CONTAINER, never a candidate. Permitting equality let
+            # `scan_dirs` emit the configured root as its own finding, so
+            # `--apply` would have rmtree'd the whole of ~/Library/Caches. The
+            # tests passed because they only ever asked "inside" vs "outside"
+            # and never that the boundary itself is excluded.
+            raise ReclaimError(f"refusing to act on the declared root itself: {target}")
+        if rr in resolved.parents:
+            return
+    raise ReclaimError(f"{target} escapes every declared root {[str(r) for r in roots]}")
+
+
+def _allocated(st: object) -> int:
+    """Bytes a file actually occupies on disk, not the size it advertises.
+
+    `st_size` is the APPARENT size. For a sparse file the two differ enormously,
+    and a container disk image is always sparse: this repo's `Docker.raw` reports
+    `st_size` 1858.2G against `st_blocks*512` 285.8G — the latter matching `du`.
+    Summing apparent sizes once produced a report claiming 2.3TB was reclaimable
+    on a 1.8TB disk. `st_blocks` is always 512-byte units per POSIX, regardless
+    of the filesystem's own block size.
+    """
+    blocks = getattr(st, "st_blocks", None)
+    if blocks is None:  # pragma: no cover - non-POSIX fallback
+        return int(getattr(st, "st_size", 0))
+    return int(blocks) * 512
+
+
+def _dir_size(path: Path) -> int:
+    """Allocated bytes under `path`, measured with `du` and only then by hand.
+
+    `du` is not an optimisation here, it is the correct tool twice over
+    (`use-tool-builtins.md`). It reports ALLOCATED blocks natively — the exact
+    sparse-file semantics `_allocated` had to hand-roll — and it does so in C:
+    `~/.npm/_cacache` (21GB of tiny files) takes **3.5s** via `du -sk` against
+    minutes for a python `rglob` + per-file `stat`. The first version of this
+    module used the python walk and a whole-machine scan never finished; it was
+    killed after 15 minutes having printed nothing.
+
+    The python fallback survives only for a host without `du`, and it is the
+    slow path by construction, not the default.
+    """
+    if not path.exists():
+        return 0
+    if shutil.which("du"):
+        # NOT `rc == 0`. `du` exits 1 when ANY subtree is unreadable while still
+        # printing a correct total, and `~/Library/Caches` reproducibly exits 1
+        # on macOS (sandboxed app caches) — the single largest configured tree.
+        # Gating on rc threw the good number away and fell back to the slow walk
+        # for exactly the path the du rewrite existed to speed up.
+        _rc, out = _run(["du", "-sk", str(path)])
+        if out:
+            try:
+                return int(out.split()[0]) * 1024
+            except ValueError, IndexError:
+                pass
+    return _dir_size_slow(path)
+
+
+def _dir_size_slow(path: Path) -> int:
+    """Allocated bytes under `path` by walking it — the no-`du` fallback."""
+    if path.is_file():
+        return _allocated(path.stat())
+    total = 0
+    for p in path.rglob("*"):
+        try:
+            if p.is_file() and not p.is_symlink():
+                total += _allocated(p.stat())
+        except OSError:
+            continue
+    return total
+
+
+def _run(argv: list[str], *, env_context: str | None = None) -> tuple[int, str]:
+    """Run a command, returning (rc, stdout). Never raises on a non-zero rc."""
+    cmd = list(argv)
+    if env_context:
+        cmd = [cmd[0], "--context", env_context, *cmd[1:]]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900, check=False)
+    except (OSError, subprocess.TimeoutExpired) as err:
+        return 1, f"{err}"
+    return proc.returncode, proc.stdout.strip()
+
+
+# ─── scanners ────────────────────────────────────────────────────────────────
+
+
+def scan_docker(cat: Category, _repo_root: Path) -> ScanResult:
+    """Report each configured engine's reclaimable bytes and its disk-image size.
+
+    Two numbers per engine, and they answer different questions: `docker system
+    df` says what is reclaimable INSIDE the engine, while the disk image says
+    what macOS has actually committed. They routinely disagree, which is the
+    whole reason both are printed.
+    """
+    if not shutil.which("docker"):
+        return ScanResult(unavailable=["`docker` is not on PATH"])
+    out: list[Finding] = []
+    missing: list[str] = []
+    for eng in cat.options.get("engines", []):
+        ctx = eng.get("context", "")
+        rc, raw = _run(["docker", "system", "df", "--format", "json"], env_context=ctx)
+        if rc == 0 and raw:
+            out.extend(_docker_df_findings(cat.name, ctx, raw, cat.options.get("prune", {})))
+        else:
+            missing.append(f"context {ctx!r}: `docker system df` rc={rc} — daemon down?")
+        img = _expand(eng.get("disk_image", ""))
+        size = _dir_size(img)
+        if size:
+            out.append(
+                Finding(
+                    category=cat.name,
+                    label=f"{ctx}: disk image on host",
+                    size_bytes=size,
+                    detail=f"{img} — pruning frees space INSIDE this, it may not shrink",
+                    informational=True,
+                )
+            )
+        elif not img.exists():
+            missing.append(f"context {ctx!r}: disk image {img} does not exist")
+    return ScanResult(out, missing)
+
+
+#: `docker system df`'s Type column -> the `prune` config key that governs it.
+_DF_TYPE_KEY = {
+    "Images": "images",
+    "Containers": "containers",
+    "Local Volumes": "volumes",
+    "Build Cache": "build_cache",
+}
+
+
+def _docker_df_findings(
+    cat_name: str, ctx: str, raw: str, prune: Mapping[str, object]
+) -> list[Finding]:
+    """Turn `docker system df --format json` lines into per-type findings.
+
+    Only types this config will actually PRUNE are counted. The plan used to
+    include every row `df` reports — so with `volumes = false` (the default) it
+    advertised volume bytes that `--apply` would never touch, and the headline
+    total promised more than the run could deliver.
+
+    The figure is still an UPPER BOUND even for enabled types: `df` reports
+    everything reclaimable, while the prune commands filter on `until={age}h`.
+    That is stated in each finding rather than left for the user to discover by
+    subtracting the plan from the result.
+    """
+    out: list[Finding] = []
+    for line in raw.splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        reclaimable = _parse_size(str(row.get("Reclaimable", "")))
+        row_type = str(row.get("Type", "?"))
+        key = _DF_TYPE_KEY.get(row_type)
+        enabled = bool(prune.get(key, key != "volumes")) if key else False
+        if reclaimable <= 0 or not enabled:
+            continue
+        out.append(
+            Finding(
+                category=cat_name,
+                label=f"{ctx}: {row_type} reclaimable",
+                size_bytes=reclaimable,
+                detail=(
+                    f"total {row.get('Size', '?')}, active {row.get('Active', '?')} — "
+                    f"UPPER BOUND: docker reports all reclaimable, the prune filters by age"
+                ),
+            )
+        )
+    return out
+
+
+def _parse_size(text: str) -> int:
+    """Parse docker's human sizes (`120.9GB (48%)`) into bytes; 0 if unparsable."""
+    head = text.split("(", maxsplit=1)[0].strip()
+    units = {"TB": 1000**4, "GB": 1000**3, "MB": 1000**2, "kB": 1000, "B": 1}
+    for suffix, mult in units.items():
+        if head.endswith(suffix):
+            try:
+                return int(float(head[: -len(suffix)].strip()) * mult)
+            except ValueError:
+                return 0
+    return 0
+
+
+def scan_ollama(cat: Category, _repo_root: Path) -> ScanResult:
+    """Report ollama models, honouring the `keep` allowlist."""
+    if not shutil.which("ollama"):
+        return ScanResult(unavailable=["`ollama` is not on PATH"])
+    rc, raw = _run(["ollama", "list"])
+    if rc != 0:
+        return ScanResult(unavailable=[f"`ollama list` rc={rc} — could not enumerate models"])
+    keep = set(cat.options.get("keep", []))
+    out: list[Finding] = []
+    for line in raw.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) < _OLLAMA_MIN_COLUMNS:
+            continue
+        name = parts[0]
+        modified = " ".join(parts[4:])
+        if name in keep or not _ollama_is_stale(modified, cat.age_days):
+            continue
+        out.append(
+            Finding(
+                category=cat.name,
+                label=name,
+                size_bytes=_parse_size("".join(parts[2:4]).replace(" ", "")),
+                detail=modified or "no modified time reported",
+            )
+        )
+    return ScanResult(out)
+
+
+def scan_dirs(cat: Category, _repo_root: Path) -> ScanResult:
+    """Report ENTRIES INSIDE each configured cache root that are older than `age_days`.
+
+    Two things this deliberately does not do, both of which it used to.
+
+    It never emits the configured root as a finding. Doing so made `--apply`
+    an `rmtree` of the whole of `~/Library/Caches` — including caches of running
+    applications — and, since most of that tree needs Full Disk Access, it would
+    have failed partway and left it half-destroyed.
+
+    And it no longer ignores `age_days`. The key was declared on every cache
+    category and read by none of them, so a config advertising a 30-day window
+    deleted everything. `reclaim.toml` says age applies everywhere; now it does.
+    """
+    cutoff = _age_stamp(cat.age_days)
+    out: list[Finding] = []
+    missing: list[str] = []
+    for raw in cat.options.get("paths", []):
+        root = _expand(raw)
+        if not root.is_dir():
+            missing.append(f"configured path does not exist: {root}")
+            continue
+        for entry in sorted(root.iterdir()):
+            hit = _stale_entry(cat, entry, cutoff)
+            if hit:
+                out.append(hit)
+    return ScanResult(out, missing)
+
+
+def _stale_entry(cat: Category, entry: Path, cutoff: str) -> Finding | None:
+    """One cache entry, or None if anything inside it was touched since `cutoff`.
+
+    `whole_tree = true` opts a category out of the age check. It exists because
+    the age filter is wrong for a CONTENT-ADDRESSED cache: `~/.npm/_cacache` has
+    three top-level directories that every install touches, so an age-filtered
+    scan reports 0B forever and the category is dead weight. It stays OFF by
+    default and must be written per category, because "delete regardless of age"
+    is exactly the behaviour that made the first version dangerous — the point is
+    that it is now a stated choice rather than an unstated one. The root itself
+    is still never a target; only its entries are.
+    """
+    if entry.is_symlink():
+        return None
+    if not cat.options.get("whole_tree", False) and _touched_since(entry, cutoff):
+        return None
+    size = _dir_size(entry)
+    if size < cat.min_size_bytes:
+        return None
+    return Finding(
+        category=cat.name,
+        label=entry.name,
+        size_bytes=size,
+        detail=(
+            "regenerable — WHOLE TREE, age ignored (whole_tree=true)"
+            if cat.options.get("whole_tree", False)
+            else f"regenerable — nothing inside modified since {cutoff[:10]}"
+        ),
+        path=entry,
+    )
+
+
+def _touched_since(path: Path, cutoff: str) -> bool:
+    """True if ANY file under `path` was modified since `cutoff`.
+
+    A directory's own mtime does not move when a file deep inside it is
+    rewritten in place, so the entry's `st_mtime` is not a safe staleness
+    signal for a cache tree. `find -newermt` answers the real question and
+    `-quit` stops it at the first hit.
+
+    The cutoff is an ABSOLUTE timestamp on purpose: the relative form
+    (`-newermt '-30 days'`) is not accepted by the `find` on this machine at
+    all, and on BSD `find` it silently matches nothing — indistinguishable
+    from "no recent files", which would mark a live cache as stale.
+    Control-armed in `tests/test_reclaim.py`.
+    """
+    rc, out = _run(["find", str(path), "-newermt", cutoff, "-print", "-quit"])
+    if rc != 0 and not out:
+        # Could not ask. Treat as RECENT — a scan that failed must never be
+        # rendered as permission to delete (`probes-need-a-control-arm.md`).
+        return True
+    return bool(out.strip())
+
+
+def _age_stamp(age_days: int) -> str:
+    """The cutoff as `YYYY-MM-DDTHH:MM:SS`, which `find -newermt` accepts."""
+    import datetime
+
+    when = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=age_days)
+    return when.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def scan_files(cat: Category, _repo_root: Path) -> ScanResult:
+    """Report files matching the configured extensions, over size and age."""
+    cutoff = _age_cutoff(cat.age_days)
+    out: list[Finding] = []
+    exts = tuple(cat.options.get("extensions", []))
+    missing: list[str] = []
+    for raw in cat.options.get("paths", []):
+        root = _expand(raw)
+        if not root.is_dir():
+            missing.append(f"configured path does not exist: {root}")
+            continue
+        for p in root.iterdir():
+            hit = _file_finding(cat, p, exts, cutoff)
+            if hit:
+                out.append(hit)
+    return ScanResult(out, missing)
+
+
+def _file_finding(cat: Category, p: Path, exts: tuple, cutoff: float) -> Finding | None:
+    """One file's finding, or None when it fails any of the three filters."""
+    try:
+        if not p.is_file() or not p.name.endswith(exts):
+            return None
+        st = p.stat()
+    except OSError:
+        return None
+    if st.st_size < cat.min_size_bytes or st.st_mtime > cutoff:
+        return None
+    age = int((_now() - st.st_mtime) / 86400)
+    return Finding(
+        category=cat.name,
+        label=p.name,
+        size_bytes=_allocated(st),
+        detail=f"{age}d old — {p.parent}",
+        path=p,
+    )
+
+
+def scan_mise_versions(cat: Category, _repo_root: Path) -> ScanResult:
+    """Report installed mise tool versions that are neither pinned nor newest.
+
+    `mise ls` resolves configs relative to the CURRENT DIRECTORY, so it can only
+    ever see what *this* repo pins — a version another project depends on is
+    invisible here. That is not theoretical: this category removed three python
+    versions on 2026-08-07, and 15 `uv` tools on the same machine point at a
+    python outside this repo's config. They survived only because the version
+    they needed had already been removed by something else.
+
+    So an unreadable pin list now makes the whole category UNAVAILABLE rather
+    than an empty set. An empty set means "nothing is pinned, everything is fair
+    game", which is the most destructive possible reading of a failed probe.
+    """
+    root = _expand(str(cat.options.get("root", "~/.local/share/mise/installs")))
+    if not root.is_dir():
+        return ScanResult(unavailable=[f"configured root does not exist: {root}"])
+    keep_newest = int(cat.options.get("keep_newest", 1))
+    pinned: set[str] | None = set()
+    if cat.options.get("keep_pinned", True):
+        pinned = _mise_pinned()
+        if pinned is None:
+            blocked = (
+                "could not read mise's pinned versions — refusing to offer any "
+                "tool version for deletion, since an unknown pin list would read "
+                "as 'nothing is pinned'"
+            )
+            return ScanResult(unavailable=[blocked])
+    out: list[Finding] = []
+    for tool in sorted(root.iterdir()):
+        if tool.is_dir():
+            out.extend(_stale_versions(cat, tool, keep_newest, pinned))
+    caveat = (
+        "`mise ls` sees only configs reachable from this directory — a version "
+        "pinned by ANOTHER project is not protected here; review the list before --apply"
+    )
+    return ScanResult(out, [caveat])
+
+
+def _stale_versions(cat: Category, tool: Path, keep_newest: int, pinned: set[str]) -> list[Finding]:
+    """Versions of one tool that may go: not pinned, not a channel alias, not newest."""
+    versions = [
+        d for d in tool.iterdir() if d.is_dir() and not d.is_symlink() and _is_concrete(d.name)
+    ]
+    versions.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+    out: list[Finding] = []
+    for d in versions[keep_newest:]:
+        if f"{tool.name}@{d.name}" in pinned or d.name in pinned:
+            continue
+        size = _dir_size(d)
+        if size >= cat.min_size_bytes:
+            out.append(
+                Finding(
+                    category=cat.name,
+                    label=f"{tool.name}@{d.name}",
+                    size_bytes=size,
+                    detail=f"superseded — {len(versions)} versions of {tool.name} installed",
+                    path=d,
+                )
+            )
+    return out
+
+
+def _is_concrete(name: str) -> bool:
+    """True for a full version like `0.9.35`, false for channels like `0.9` or `latest`."""
+    return name.count(".") >= _VERSION_DOTS and name[0].isdigit()
+
+
+def _mise_pinned() -> set[str] | None:
+    """Every version any reachable mise config pins — or None when it cannot be read.
+
+    `None` is not `set()`, and the distinction is the whole point: an empty set
+    says "nothing is pinned", which licenses deleting every version. A failed
+    probe must never be readable as permission to delete
+    (`probes-need-a-control-arm.md`), so the caller turns `None` into UNAVAILABLE.
+    """
+    rc, raw = _run(["mise", "ls", "--json", "--installed"])
+    if rc != 0 or not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    pinned: set[str] = set()
+    for tool, entries in data.items():
+        for e in entries if isinstance(entries, list) else []:
+            if isinstance(e, dict) and e.get("requested_version"):
+                pinned.add(f"{tool}@{e.get('version', '')}")
+                pinned.add(str(e.get("version", "")))
+    return pinned
+
+
+def scan_homebrew(cat: Category, _repo_root: Path) -> ScanResult:
+    """Ask `brew cleanup --dry-run` what it would free — do not walk paths.
+
+    Homebrew earns its own kind rather than another cache path for one reason:
+    `brew cleanup` also removes **old versions of installed formulae from the
+    Cellar** and stale vendored portable-ruby trees, neither of which lives in
+    `brew --cache`. A `dirs` category pointed at the cache can never reach them.
+
+    The size is brew's own figure, so it stays right when brew's policy changes.
+    """
+    if not shutil.which("brew"):
+        return ScanResult(unavailable=["`brew` is not on PATH"])
+    argv = ["brew", "cleanup", "--dry-run", f"--prune={cat.age_days}"]
+    if cat.options.get("scrub", False):
+        argv.append("--scrub")
+    rc, out = _run(argv)
+    if rc != 0:
+        return ScanResult(unavailable=[f"`brew cleanup --dry-run` rc={rc}"])
+    size = _brew_freed_bytes(out)
+    if size <= 0:
+        return ScanResult()
+    return ScanResult(
+        [
+            Finding(
+                category=cat.name,
+                label=f"brew cleanup --prune={cat.age_days}",
+                size_bytes=size,
+                detail=(
+                    "brew's own estimate: stale downloads, superseded Cellar versions "
+                    "and vendored ruby. Overlaps `caches_system` on the cache portion "
+                    "only — enable one or the other to avoid counting those bytes twice"
+                ),
+            )
+        ]
+    )
+
+
+#: brew's summary reads "...would free approximately 9.1GB of disk space." — the
+#: size is MID-SENTENCE, so it must be extracted by pattern rather than by
+#: trimming the tail. The first version trimmed, handed `_parse_size` the string
+#: "9.1GB of disk space", and got 0 back: the category reported "nothing found"
+#: over a real 9.1GB. A silent zero from a parser is indistinguishable from an
+#: empty result, which is why this pattern is pinned by its own test.
+_BREW_SIZE_RE = re.compile(r"([\d.]+)\s*(TB|GB|MB|kB|B)\b")
+
+
+def _brew_freed_bytes(out: str) -> int:
+    """Pull the `would free approximately N` figure out of brew's summary line."""
+    for line in reversed(out.splitlines()):
+        if "free approximately" not in line:
+            continue
+        m = _BREW_SIZE_RE.search(line.rsplit("approximately", 1)[-1])
+        if m:
+            return _parse_size(f"{m.group(1)}{m.group(2)}")
+    return 0
+
+
+def _ollama_is_stale(modified: str, age_days: int) -> bool:
+    """True when `ollama list`'s MODIFIED column is older than `age_days`.
+
+    `ollama` prints a relative phrase ("2 weeks ago", "3 days ago"), not a
+    timestamp, so this parses that phrase. An UNPARSABLE or empty value is
+    treated as NOT stale — a model whose age could not be established must
+    never become a deletion candidate. Before this existed, `age_days` was
+    declared on the category and read by nothing, so `--apply` removed every
+    model including one pulled minutes earlier.
+    """
+    units = {"second": 0, "minute": 0, "hour": 0, "day": 1, "week": 7, "month": 30, "year": 365}
+    m = re.match(r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago", modified.strip())
+    if not m:
+        return False
+    return int(m.group(1)) * units[m.group(2)] >= age_days
+
+
+_SCANNERS = {
+    "docker": scan_docker,
+    "ollama": scan_ollama,
+    "dirs": scan_dirs,
+    "files": scan_files,
+    "mise_versions": scan_mise_versions,
+    "homebrew": scan_homebrew,
+}
+
+
+def _now() -> float:
+    """Wall clock as epoch seconds — one seam so tests can pin it."""
+    import time
+
+    return time.time()
+
+
+def _age_cutoff(age_days: int) -> float:
+    """Mtime below this counts as stale."""
+    return _now() - age_days * 86400
+
+
+def plan(cats: list[Category], repo_root: Path) -> tuple[list[Finding], dict[str, list[str]]]:
+    """Scan every enabled category. Read-only by construction — nothing mutates.
+
+    Returns the findings AND a per-category map of what could not be asked, so
+    the reporter can keep UNAVAILABLE distinct from a real empty.
+    """
+    out: list[Finding] = []
+    unavailable: dict[str, list[str]] = {}
+    for cat in cats:
+        scanner = _SCANNERS.get(cat.kind)
+        if not cat.enabled:
+            continue
+        if scanner is None:
+            unavailable[cat.name] = [f"no scanner for kind {cat.kind!r}"]
+            continue
+        # Printed BEFORE the scan, not after. Sizing a cache tree is the slow
+        # part of this tool, and a scanner that announces itself only on
+        # completion is indistinguishable from one that has hung.
+        print(f"scanning {cat.name} ({cat.kind})…", flush=True)
+        res = scanner(cat, repo_root)
+        out.extend(res.findings)
+        if res.unavailable:
+            unavailable[cat.name] = res.unavailable
+    return sorted(out, key=lambda f: f.size_bytes, reverse=True), unavailable
+
+
+# ─── apply ───────────────────────────────────────────────────────────────────
+
+
+def _category_roots(cat: Category) -> list[Path]:
+    """The only directories this category is permitted to act inside."""
+    if cat.kind == "mise_versions":
+        return [_expand(str(cat.options.get("root", "~/.local/share/mise/installs")))]
+    return [_expand(p) for p in cat.options.get("paths", [])]
+
+
+def apply_docker(cat: Category) -> list[str]:
+    """Prune each engine with docker's OWN age filter, then re-measure the image.
+
+    The re-measure is the point. `docker system prune` reports what it freed
+    inside the engine, and on macOS that number routinely has no effect on the
+    host file — so a run that reports "freed 120GB" while the disk image is
+    unchanged is reported as exactly that, rather than as 120GB of disk.
+    """
+    lines: list[str] = []
+    hours = cat.age_days * _HOURS_PER_DAY
+    prune = cat.options.get("prune", {})
+    for eng in cat.options.get("engines", []):
+        ctx = eng.get("context", "")
+        img = _expand(eng.get("disk_image", ""))
+        before = _dir_size(img)
+        for label, argv in _prune_commands(prune, hours):
+            rc, out = _run(argv, env_context=ctx)
+            tail = out.splitlines()[-1] if out else "no output"
+            lines.append(f"  {ctx}: {label} rc={rc} — {tail}")
+        after = _dir_size(img)
+        lines.append(_image_delta_line(ctx, img, before, after))
+    return lines
+
+
+def _prune_commands(prune: Mapping[str, object], hours: int) -> list[tuple[str, list[str]]]:
+    """One docker prune command PER TYPE, so each config key means what it says.
+
+    This was a single `docker system prune`, and that made two config keys lie.
+    `system prune` always removes stopped containers, and it always removes
+    dangling images whether or not `--all` is passed — so `containers = false`
+    and `images = false` both claimed protections the command could not provide.
+    The first was patched by skipping the whole prune, which then silently
+    disabled image and volume pruning too.
+
+    docker already ships per-type pruners (`container`/`image`/`volume`/`builder
+    prune`), so the fix is to use them rather than to keep interpreting one
+    coarse command (`use-tool-builtins.md`). Each key now maps to exactly one
+    command, and turning a key off omits exactly that command.
+    """
+    age = ["--filter", f"until={hours}h"]
+    cmds: list[tuple[str, list[str]]] = []
+    if prune.get("containers", True):
+        cmds.append(("container prune", ["docker", "container", "prune", "--force", *age]))
+    if prune.get("images", True):
+        cmds.append(("image prune", ["docker", "image", "prune", "--all", "--force", *age]))
+    if prune.get("build_cache", True):
+        cmds.append(("builder prune", ["docker", "builder", "prune", "--force", *age]))
+    if prune.get("volumes", False):
+        # No `until` filter: `docker volume prune` does not support one, so an
+        # age-bounded volume prune is not expressible. Off by default anyway —
+        # a volume is the only copy of whatever is in it.
+        cmds.append(("volume prune", ["docker", "volume", "prune", "--force"]))
+    return cmds
+
+
+def _image_delta_line(ctx: str, img: Path, before: int, after: int) -> str:
+    """State plainly whether the host-side disk image actually shrank."""
+    if before == 0:
+        return f"  {ctx}: no disk image found at {img} — host-side effect UNKNOWN, not zero"
+    if after >= before:
+        return (
+            f"  {ctx}: disk image {human(before)} -> {human(after)} — DID NOT SHRINK. "
+            f"Space was freed inside the engine; macOS still holds the file. "
+            f"Reclaim it via Docker Desktop > Settings > Resources (or Troubleshoot > "
+            f"Clean/Purge data). This tool will not rewrite a live VM disk."
+        )
+    return f"  {ctx}: disk image {human(before)} -> {human(after)} — freed {human(before - after)}"
+
+
+def apply_deletions(cat: Category, findings: list[Finding], repo_root: Path) -> list[str]:
+    """Delete this category's findings, refusing anything outside its roots."""
+    roots = _category_roots(cat)
+    lines: list[str] = []
+    for f in findings:
+        if f.path is None:
+            continue
+        try:
+            _guard_path(f.path, roots, repo_root)
+        except ReclaimError as err:
+            lines.append(f"  REFUSED {f.label}: {err}")
+            continue
+        lines.append(_delete_one(f))
+    return lines
+
+
+def _delete_one(f: Finding) -> str:
+    """Remove one finding's path, reporting the outcome rather than raising."""
+    target = f.path
+    if target is None or not target.exists():
+        return f"  SKIP {f.label}: no longer present"
+    try:
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+    except OSError as err:
+        return f"  FAILED {f.label}: {err}"
+    return f"  removed {f.label} ({human(f.size_bytes)})"
+
+
+def apply_ollama(_cat: Category, findings: list[Finding]) -> list[str]:
+    """Remove ollama models through ollama's own CLI, never by deleting blobs.
+
+    Blobs are content-addressed and shared between models, so deleting a blob
+    directory by hand corrupts every other model that references it.
+    """
+    lines: list[str] = []
+    for f in findings:
+        rc, out = _run(["ollama", "rm", f.label])
+        verb = "removed" if rc == 0 else f"FAILED rc={rc}"
+        lines.append(f"  {verb} {f.label} ({human(f.size_bytes)}) {out}")
+    return lines
+
+
+def apply_homebrew(cat: Category) -> list[str]:
+    """Run `brew cleanup` with its OWN prune window — never delete brew paths by hand."""
+    argv = ["brew", "cleanup", f"--prune={cat.age_days}"]
+    if cat.options.get("scrub", False):
+        argv.append("--scrub")
+    rc, out = _run(argv)
+    tail = out.splitlines()[-1] if out else "no output"
+    return [f"  brew cleanup rc={rc} — {tail}"]
+
+
+# ─── CLI ─────────────────────────────────────────────────────────────────────
+
+
+def _report(
+    findings: list[Finding], cats: list[Category], unavailable: dict[str, list[str]]
+) -> int:
+    """Print the ranked plan. Returns the total reclaimable bytes."""
+    by_cat: dict[str, list[Finding]] = {}
+    for f in findings:
+        by_cat.setdefault(f.category, []).append(f)
+    total = 0
+    for cat in cats:
+        hits = by_cat.get(cat.name, [])
+        if not cat.enabled:
+            print(f"\n{cat.name}: DISABLED in reclaim.toml")
+            continue
+        blocked = unavailable.get(cat.name, [])
+        sub = sum(f.size_bytes for f in hits if not f.informational)
+        total += sub
+        n_real = sum(1 for f in hits if not f.informational)
+        print(f"\n{cat.name} ({cat.kind}) — {human(sub)} across {n_real} item(s)")
+        for reason in blocked:
+            print(f"  COULD NOT CHECK — {reason}")
+        if not hits and not blocked:
+            print("  nothing found — scanned, not skipped")
+        elif not hits:
+            print("  nothing found in what COULD be checked — this is not a clean result")
+        for f in hits[:_LIST_LIMIT]:
+            tag = "  (context, not counted)" if f.informational else ""
+            print(f"  {human(f.size_bytes):>7}  {f.label}  [{f.detail}]{tag}")
+        if len(hits) > _LIST_LIMIT:
+            rest = sum(f.size_bytes for f in hits[_LIST_LIMIT:] if not f.informational)
+            print(f"  … and {len(hits) - _LIST_LIMIT} more totalling {human(rest)}")
+    return total
+
+
+def _free_bytes() -> int:
+    """Free bytes on the volume this repo lives on."""
+    return shutil.disk_usage("/").free
+
+
+def _print_disk(label: str, before: int | None = None) -> int:
+    """Print free space, and the delta when a baseline is given.
+
+    Folded in here rather than given its own task because this module already
+    computes disk numbers — and because measuring free space by hand was the
+    single most-repeated throwaway probe of the session that wrote it (eight
+    times), which is exactly the shape `kb-distill` exists to catch.
+    """
+    free = _free_bytes()
+    if before is None:
+        print(f"disk: {human(free)} free {label}{_snapshot_note()}")
+    else:
+        print(f"disk: {human(free)} free {label} — {human(free - before)} returned")
+    return free
+
+
+def _snapshot_note() -> str:
+    """Warn when local APFS snapshots make 'free' larger than what you can use.
+
+    On APFS, `statvfs`-style free space counts PURGEABLE bytes — space held by
+    Time Machine local snapshots that macOS will reclaim under pressure, but that
+    a large download cannot simply take. So "you have 786G free" can be true and
+    still not answer "will a 372G checkpoint fit".
+
+    The skill's own eval found this: the BASELINE agent — working without this
+    tool — cross-checked `tmutil listlocalsnapshots /` before trusting the free
+    number, and the skill did not. On a tool whose headline use case is
+    "will this fit", that was the wrong thing to be missing.
+
+    Silent when there are none, and silent when `tmutil` cannot be reached: this
+    is a caveat on a number, not a gate.
+    """
+    if not shutil.which("tmutil"):
+        return ""
+    rc, out = _run(["tmutil", "listlocalsnapshots", "/"])
+    if rc != 0:
+        return ""
+    n = sum(1 for line in out.splitlines() if "com.apple.TimeMachine" in line)
+    if not n:
+        return ""
+    return (
+        f"  ⚠️ {n} local APFS snapshot(s) — some of that 'free' space is PURGEABLE, "
+        "not yours to take; `tmutil deletelocalsnapshots /` releases it"
+    )
+
+
+def main(argv: list[str], repo_root: Path) -> int:
+    """`kb-setup reclaim` — report by default, reclaim only on an explicit --apply."""
+    apply_it = "--apply" in argv
+    cfg_path = repo_root / "reclaim.toml"
+    try:
+        only = _opt_list(argv, "--only")
+        skip = _opt_list(argv, "--skip")
+        cats = load_config(cfg_path)
+    except ReclaimError as err:
+        print(f"reclaim: {err}")
+        return 2
+    cats = [c for c in cats if (not only or c.name in only) and c.name not in skip]
+    if only and not cats:
+        print(f"reclaim: --only {sorted(only)} matched no category in {cfg_path}")
+        return 2
+    before = _print_disk("before")
+    findings, unavailable = plan(cats, repo_root)
+    total = _report(findings, cats, unavailable)
+    n_real = sum(1 for f in findings if not f.informational)
+    print(f"\nreclaim: {human(total)} reclaimable across {n_real} finding(s)")
+    if unavailable:
+        n = sum(len(v) for v in unavailable.values())
+        print(
+            f"reclaim: {n} thing(s) COULD NOT BE CHECKED in "
+            f"{', '.join(sorted(unavailable))} — the total above is a floor, not the answer"
+        )
+    if not apply_it:
+        print("reclaim: DRY RUN — nothing was deleted. Re-run with `-- --apply` to reclaim.")
+        return 0
+    rc = _apply_all(cats, findings, repo_root)
+    _print_disk("after", before)
+    return rc
+
+
+#: kind -> applier, mirroring `_SCANNERS`. One uniform signature
+#: `(cat, findings, repo_root)` so the table is possible at all; the three that
+#: ignore an argument say so with `_`. The cascade this replaced defaulted an
+#: unknown kind to `apply_deletions`.
+_APPLIERS = {
+    "homebrew": lambda cat, _f, _r: apply_homebrew(cat),
+    "docker": lambda cat, _f, _r: apply_docker(cat),
+    "ollama": lambda cat, findings, _r: apply_ollama(cat, findings),
+    "dirs": apply_deletions,
+    "files": apply_deletions,
+    "mise_versions": apply_deletions,
+}
+
+
+def _opt_list(argv: list[str], flag: str) -> set[str]:
+    """Comma-separated values for `flag`, or an empty set when absent."""
+    if flag not in argv:
+        return set()
+    idx = argv.index(flag)
+    if idx + 1 >= len(argv) or argv[idx + 1].startswith("--"):
+        # A filter flag with no value used to return an empty set, which reads
+        # as "no filter" and silently WIDENED `--only` to every category — the
+        # opposite of what the user asked for, on the destructive path.
+        raise ReclaimError(f"{flag} needs a comma-separated value")
+    names = {p.strip() for p in argv[idx + 1].split(",") if p.strip()}
+    if not names:
+        # `--only ,` parsed to an empty set, which reads as "no filter" and
+        # silently widened the DESTRUCTIVE path to every category — the same
+        # class as the missing-value case above, one layer in.
+        raise ReclaimError(f"{flag} parsed to no category names: {argv[idx + 1]!r}")
+    return names
+
+
+def _apply_all(cats: list[Category], findings: list[Finding], repo_root: Path) -> int:
+    """Execute every enabled category's reclamation, reporting each outcome.
+
+    Dispatch is a MAP keyed by kind, deliberately mirroring `_SCANNERS`. It was an
+    `if/elif` cascade whose `else` fell through to `apply_deletions`, which meant a
+    `kind` nobody had written an applier for **defaulted to deleting files** — the
+    most destructive possible default for an unrecognised value. It also made this
+    module's own docstring false: adding a reclaimer was a scanner, a config block,
+    *and* an apply branch, and forgetting the third was silent.
+
+    An unknown kind is now refused by name rather than guessed at.
+    """
+    print("\nreclaim: APPLYING")
+    rc = 0
+    for cat in cats:
+        if not cat.enabled:
+            continue
+        hits = [f for f in findings if f.category == cat.name]
+        print(f"\n{cat.name}:")
+        applier = _APPLIERS.get(cat.kind)
+        if applier is None:
+            print(f"  REFUSED — no applier for kind {cat.kind!r}; not guessing at deletion")
+            rc = 2
+            continue
+        lines = applier(cat, hits, repo_root)
+        for line in lines or ["  nothing to do"]:
+            print(line)
+        if any(line.lstrip().startswith(("FAILED", "REFUSED")) for line in lines):
+            # A failed deletion used to be printed and then discarded: `_apply_all`
+            # returned a hardcoded 0, so a run that could not remove anything still
+            # exited green. The real run that prompted this left 21.3G behind on a
+            # permission error and reported success.
+            rc = 1
+    print("\nreclaim: done — re-run without --apply to see what remains")
+    return rc

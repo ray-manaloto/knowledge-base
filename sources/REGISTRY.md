@@ -138,7 +138,23 @@ crowding prose out of the query budget (#12). `kind = docs` is the path.
   **Caveat, filed as #235:** v1.5.0 is an **annotated** tag, so the recorded
   `commit` is the tag OBJECT, not the commit (`8f512fc8…`). Control-armed —
   fetch and checkout both rc=0 and HEAD peels correctly, so the pin works and is
-  left as-is; what is untested is `kb-update`'s comparison path.
+  left as-is. **CORRECTED 2026-08-07:** the comparison path is fine — `latest_commit`
+  passes the exact ref name, which returns only the tag-object line, so it compares
+  tag-SHA to tag-SHA. #235's premise was refuted by measurement.
+
+- **2026-08-07 — the local-LLM face-off gains its two Apple-native arms.**
+  `sources/turbo-fieldfare.manifest` → [drumih/turbo-fieldfare](https://github.com/drumih/turbo-fieldfare)
+  at release **0.4.1** (`417f3893…`), and `sources/nativ.manifest` →
+  [Blaizzy/nativ](https://github.com/Blaizzy/nativ) at **v0.2.2** (`ab99cfa0…`).
+  Both `kind=code`, AST-only — free, no LLM. Added by Ray to sit beside colibri
+  in the local-LLM evaluation.
+  **Why they are not redundant with colibri:** both are Swift and target Apple
+  silicon directly (turbo-fieldfare runs Gemma 4 26B-A4B in ~2 GB of RAM on any
+  M-series MacBook; nativ drives MLX models). colibri does not cover that axis —
+  its `discover_gpus()` is NVIDIA→AMD only and returns `[]` on this M2 Max, and
+  its `memory_available()` reports ~26 GB against 96 GB of real memory because it
+  counts only reclaimable pages (both measured live, 2026-08-07; see
+  `docs/research/reports/2026-08-07-colibri-hardware-preflight.md`).
 
 - **2026-07-23 — long-running-framework wave (sources #28–#56).** Staged ingestion for
   the autonomous-framework program (plan: `we-want-a-long-mighty-ladybug.md`).

@@ -1,0 +1,95 @@
+# Revert arm for every fix made after the 2026-08-07 two-axis review.
+#
+# Each row REVERTS one fix to what shipped, and the row's test must go RED.
+# A fix whose own test still passes without it is decoration
+# (`mutation-arms-are-a-floor-not-a-ceiling`), and this whole batch exists
+# because 17 green tests sat over a bug that would have deleted ~/Library/Caches.
+
+suites = ["tests/test_reclaim.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/reclaim.py"
+old = "_MB = 1024 * 1024"
+new = "_MB = 1024 * 1024  # inert control edit"
+
+# HIGH 1 — the guard permitted the declared root itself, so scan_dirs could
+# offer ~/Library/Caches for rmtree. Reverting the equality check.
+[[arm]]
+id = "guard-permits-root-again"
+test = "test_guard_refuses_the_declared_root_itself"
+file = "python/src/kb_setup/reclaim.py"
+old = """        if rr == resolved:"""
+new = """        if False:"""
+
+# HIGH 2 — scan_dirs ignored age_days and emitted the root. Revert to emitting
+# the root with no age filter at all.
+[[arm]]
+id = "scan-dirs-ignores-age-again"
+test = "test_scan_dirs_skips_an_entry_touched_inside_the_age_window"
+file = "python/src/kb_setup/reclaim.py"
+old = """    if not cat.options.get("whole_tree", False) and _touched_since(entry, cutoff):
+        return None"""
+new = """    if False:
+        return None"""
+
+# HIGH 2b — a failed staleness probe used to be silence; now it means RECENT.
+[[arm]]
+id = "failed-probe-licenses-deletion"
+test = "test_touched_since_reports_recent_when_it_cannot_ask"
+file = "python/src/kb_setup/reclaim.py"
+old = """    if rc != 0 and not out:"""
+new = """    if False:"""
+
+# HIGH 3 — ollama ignored age_days entirely.
+[[arm]]
+id = "ollama-ignores-age-again"
+test = "test_scan_ollama_does_not_offer_a_freshly_pulled_model"
+file = "python/src/kb_setup/reclaim.py"
+old = """        if name in keep or not _ollama_is_stale(modified, cat.age_days):"""
+new = """        if name in keep:"""
+
+# HIGH 3b — an unparseable ollama age used to be treated as stale.
+[[arm]]
+id = "unparseable-age-counts-as-stale"
+test = "test_ollama_age_filter_keeps_a_fresh_model_and_drops_an_old_one"
+file = "python/src/kb_setup/reclaim.py"
+old = """    if not m:
+        return False"""
+new = """    if not m:
+        return True"""
+
+# MEDIUM — du's answer was discarded whenever a subtree was unreadable.
+[[arm]]
+id = "du-answer-discarded-on-rc1"
+test = "test_dir_size_keeps_dus_total_when_a_subtree_was_unreadable"
+file = "python/src/kb_setup/reclaim.py"
+old = """        _rc, out = _run(["du", "-sk", str(path)])
+        if out:"""
+new = """        _rc, out = _run(["du", "-sk", str(path)])
+        if _rc == 0 and out:"""
+
+# MEDIUM — a filter flag with no value silently widened --only to everything.
+[[arm]]
+id = "only-with-no-value-widens-again"
+test = "test_only_with_a_missing_value_is_an_error_not_a_silent_widening"
+file = "python/src/kb_setup/reclaim.py"
+old = """        raise ReclaimError(f"{flag} needs a comma-separated value")"""
+new = """        return set()"""
+
+# MEDIUM — prune.containers was declared and never read.
+[[arm]]
+id = "containers-key-unread-again"
+test = "test_docker_prune_respects_containers_false"
+file = "python/src/kb_setup/reclaim.py"
+old = """        if not prune.get("containers", True):"""
+new = """        if False:"""
+
+# The whole_tree escape hatch must stay OPT-IN; defaulting it on restores the bug.
+[[arm]]
+id = "whole-tree-defaults-on"
+test = "test_whole_tree_is_opt_in_and_never_targets_the_root"
+file = "python/src/kb_setup/reclaim.py"
+old = """    if not cat.options.get("whole_tree", False) and _touched_since(entry, cutoff):"""
+new = """    if not cat.options.get("whole_tree", True) and _touched_since(entry, cutoff):"""

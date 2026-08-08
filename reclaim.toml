@@ -1,0 +1,188 @@
+# Disk reclamation — WHAT may be reclaimed, and under what conditions.
+#
+# The engine is `kb_setup.reclaim`; the seam is `mise run kb-reclaim`. This file
+# is the whole policy surface: every category below can be disabled, re-scoped,
+# or re-thresholded without touching python.
+#
+# ─── The two safety properties, stated here because this is the file people edit
+#
+# 1. **Dry run is the default.** `mise run kb-reclaim` measures and prints a plan
+#    and deletes NOTHING. Reclaiming requires `-- --apply`, every time. There is
+#    no config key that makes apply the default, deliberately: a destructive
+#    action at a distance (`probes-need-a-control-arm.md`'s lesson applied to
+#    deletion) is exactly what a config-driven deleter would otherwise become.
+# 2. **A category can only ever act inside its own declared roots**, and never
+#    inside this repository. `reclaim.py` refuses a path that escapes them, so a
+#    typo here fails closed rather than deleting something else.
+#
+# `age_days` everywhere means "not modified / not used for longer than this".
+
+[defaults]
+# Fallback for any category that does not set its own.
+age_days = 30
+# Findings smaller than this are DROPPED — not scanned-and-summed. They do not
+# appear in the listing and they are NOT in the category total, so the headline
+# number is a floor with respect to this threshold as well as to anything the
+# scan could not reach. (This comment said "counted in the total but not listed"
+# until the standards review checked it against the code; on a tool whose whole
+# thesis is that an incomplete total must say so, its own config overstating
+# completeness was the worst possible place for that error.)
+#
+# Only the per-category LISTING tail is summed-but-unlisted: at most 12 findings
+# print, and the rest are reported as "… and N more totalling X".
+min_size_mb = 100
+
+
+# ─── Containers ──────────────────────────────────────────────────────────────
+# Docker is usually the largest single reclaimable object on a dev Mac, and it is
+# the one with a genuine gotcha: on macOS the engine's storage lives inside ONE
+# sparse disk image, so pruning frees space INSIDE the image without shrinking
+# the file macOS reports. The engine therefore measures the image before and
+# after and tells you whether it actually moved.
+[category.docker]
+enabled = true
+kind = "docker"
+age_days = 30
+# One entry per engine you actually use. Each is pruned in its own context, so a
+# dormant VM (colima here) is reported separately rather than hidden inside a
+# single total. `disk_image` is the host-side file whose size is the real signal.
+[[category.docker.engines]]
+context = "desktop-linux"
+disk_image = "~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
+# colima was here until 2026-08-07 and its removal is the lesson: an engine
+# whose daemon is down can never be PRUNED through the docker CLI, so the entry
+# produced zero reclaimable bytes and one permanent COULD NOT CHECK — a warning
+# nobody could act on, which is how people learn to ignore warnings. Finding the
+# engine was right (`docker context ls`); treating a dormant one as a prune
+# target was not. That VM was torn down natively (`colima delete -d -f`, 40.99G
+# freed) because discarding a VM is a DECISION, not a prune.
+
+[category.docker.prune]
+images = true
+build_cache = true
+containers = true
+# Anonymous volumes are OFF by default: unlike an image, a volume is the only
+# copy of whatever is in it, and `docker system df` cannot tell you what that is.
+volumes = false
+
+
+# ─── Local model weights ─────────────────────────────────────────────────────
+[category.ollama]
+enabled = true
+kind = "ollama"
+age_days = 14
+# Model names never removed regardless of age, e.g. ["qwen3:0.6b"].
+keep = []
+
+
+# ─── Regenerable caches — ONE CATEGORY PER ARTIFACT TYPE ─────────────────────
+# Deliberately not a single `caches` block with four paths. Ray, 2026-08-07:
+# "this should actually have categories for each type. aim for as flexible/
+# modular as possible". A lumped category is all-or-nothing — you could not keep
+# the npm cache while dropping bun's — and its total hides which tree the space
+# is actually in. Splitting them costs four blocks and buys `--only caches_npm`.
+#
+# All of these rebuild on demand; the only cost of being wrong is a slower next
+# build. They are listed newest-cost-first as measured on this machine.
+
+[category.caches_system]
+enabled = true
+kind = "dirs"
+age_days = 30
+paths = ["~/Library/Caches"]
+
+[category.caches_xdg]
+enabled = true
+kind = "dirs"
+age_days = 30
+paths = ["~/.cache"]
+
+# Content-addressed: every install touches its top-level directories, so an
+# age filter reports 0B forever here. `whole_tree` opts out of the age check
+# for this category ONLY — the package manager re-downloads on demand.
+[category.caches_bun]
+enabled = true
+kind = "dirs"
+age_days = 30
+whole_tree = true
+paths = ["~/.bun/install/cache"]
+
+# Content-addressed: every install touches its top-level directories, so an
+# age filter reports 0B forever here. `whole_tree` opts out of the age check
+# for this category ONLY — the package manager re-downloads on demand.
+[category.caches_npm]
+enabled = true
+kind = "dirs"
+age_days = 30
+whole_tree = true
+paths = ["~/.npm/_cacache"]
+
+# Homebrew is its OWN kind, not a `dirs` path, because `brew cleanup` reaches
+# things no path can: superseded Cellar versions and vendored portable-ruby
+# trees, neither of which is under `brew --cache`. It also brings its own
+# `--prune=<days>` window and `--dry-run`, so the age policy and the measurement
+# are brew's rather than ours (`use-tool-builtins.md`).
+#
+# ⚠️ OVERLAP: `brew --cache` is `~/Library/Caches/Homebrew`, which is INSIDE
+# `caches_system` above. Both enabled means those bytes appear in two totals.
+# Kept enabled anyway because the Cellar portion is uniquely reachable here —
+# but if you disable `caches_system`, this is the one that still gets the cache.
+[category.homebrew]
+enabled = true
+kind = "homebrew"
+age_days = 30
+# `--scrub` also drops downloads for currently-installed versions.
+scrub = false
+
+# ─── Stale toolchain versions ────────────────────────────────────────────────
+# mise keeps every version it has ever installed. This repo alone has ~50
+# graphify builds on disk while `mise.toml` pins one.
+[category.mise_installs]
+enabled = true
+kind = "mise_versions"
+root = "~/.local/share/mise/installs"
+# Never remove a version any mise config pins, nor the N newest per tool.
+keep_pinned = true
+keep_newest = 1
+
+
+# ─── Downloaded installers and archives ──────────────────────────────────────
+[category.downloads]
+enabled = true
+kind = "files"
+age_days = 30
+min_size_mb = 200
+paths = ["~/Downloads"]
+extensions = [".dmg", ".pkg", ".zip", ".iso", ".tar.gz"]
+
+
+# ─── JetBrains ───────────────────────────────────────────────────────────────
+# Added 2026-08-07 after the skill's OWN EVAL found the gap: a baseline agent
+# working WITHOUT this tool surfaced ~136 GB of JetBrains data that no category
+# here could see, while the with-skill run saw "81 GB App Support" and had
+# nowhere to put it. That is what an eval is for, and it is the reason the
+# with-vs-without comparison is worth running rather than reasoning about.
+#
+# Measured on this machine: ~/Applications 60G · Application Support 32G ·
+# Caches 44G. Only the last was reachable, via `caches_system`.
+
+# IDE support data: per-version plugin sets, indexes and settings left behind by
+# every IDE version ever installed. Age-filtered, so a version you still open
+# keeps its data.
+[category.jetbrains_support]
+enabled = true
+kind = "dirs"
+age_days = 90
+paths = ["~/Library/Application Support/JetBrains"]
+
+# ⚠️ DISABLED BY DEFAULT, and it should stay that way unless you mean it.
+# `~/Applications` is where JetBrains Toolbox installs the IDEs themselves — 27
+# of them here, including two CLion versions. These are APPLICATIONS, not
+# caches: removing one is an uninstall, not a reclaim, and Toolbox will not
+# notice it happened. Enabled only as a deliberate act, which is the same
+# reasoning that keeps docker's anonymous volumes off.
+[category.jetbrains_apps]
+enabled = false
+kind = "dirs"
+age_days = 180
+paths = ["~/Applications"]
