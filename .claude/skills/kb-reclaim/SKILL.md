@@ -1,6 +1,6 @@
 ---
 name: kb-reclaim
-description: Find and reclaim large disk artifacts on this machine — container images and VM disks, local model weights, regenerable caches, superseded toolchain versions, stale installers. Use whenever the user asks what is eating disk, wants space freed, is short of room for a download, mentions old docker images/containers/volumes, leftover ollama or other model weights, a full Downloads folder, or asks how much space could be recovered. Reports by default and deletes only on an explicit --apply.
+description: Survey and reclaim disk space on this machine — docker images and VM disk images, local LLM weights (ollama and friends), regenerable caches (Library/Caches, .cache, bun, npm, Homebrew), superseded mise tool versions, and stale installers in Downloads. Reports by default; deletes only on an explicit --apply. Use this whenever the user asks what is eating their disk, wants space freed or cleaned up, says they are running low on space or out of room, needs room for a large download or model, mentions old or unused docker images/containers/volumes/build cache, leftover model weights, a bloated Downloads folder, or asks how much space could be recovered — and also before any multi-gigabyte download, to check whether it will fit.
 ---
 
 # kb-reclaim
@@ -44,68 +44,21 @@ all-or-nothing, so you could not keep bun's cache while dropping npm's.
 Every one can be disabled, re-scoped or re-thresholded in `reclaim.toml` without
 touching python. `--only` / `--skip` narrow a single run.
 
-## The three things that will bite you
+## Deep gotchas — read before changing how anything is measured
 
-### 0. A `dirs` category deletes ENTRIES, never the root — and this was a near-miss
+Four defects reached commits here with all gates green, and each left a rule in
+the code that will look arbitrary until you know why. **`references/gotchas.md`**
+has them in full; the one-line versions:
 
-The first version emitted the **configured root itself** as a finding and never
-read `age_days`, so `--apply` would have `rmtree`d the whole of
-`~/Library/Caches`, `~/.cache`, `~/.bun/install/cache` and `~/.npm/_cacache`
-— caches of running apps included — while every category's config advertised a
-30-day window. `_guard_path` permitted it because `rr in (resolved, *parents)`
-is true on equality. **17 tests and four gates were green over this**; they only
-ever asked "inside the root" vs "outside the root", never whether the boundary
-itself was excluded.
-
-Now: `_guard_path` refuses `target == root`, and `scan_dirs` emits per-entry
-findings filtered by `find -newermt <absolute timestamp>` — absolute because the
-relative form errors outright on this machine and silently matches nothing on
-BSD `find`, which would mark a live cache as stale. A staleness probe that
-**fails** returns "recent", never "safe to delete".
-
-**`whole_tree = true`** opts one category out of the age check, for
-content-addressed caches (`_cacache`) whose top-level directories every install
-touches — an age-filtered scan reports `0B` there forever. It is off by default
-and must be written per category: "delete regardless of age" is the behaviour
-that made the first version dangerous, so it is now a stated choice.
-
-### 1. A container disk image is SPARSE — never trust its apparent size
-
-This is not a footnote; it is the defect this module shipped with and the reason
-the sizing code looks the way it does. `Docker.raw` on this machine reports
-**`st_size` 1858.2G** while occupying **`st_blocks*512` 285.8G**, which is what
-`du` agrees with. Summing `st_size` produced a first live run claiming
-**2343.4G reclaimable on a 1.8TB disk** — arithmetically impossible, and stated
-with total confidence.
-
-So `reclaim._allocated` measures `st_blocks * 512` everywhere, and
-`tests/test_reclaim.py` pins it with a control arm that **skips** if the
-filesystem under test did not actually produce a sparse file. If you add a
-scanner, measure allocated bytes; `path.stat().st_size` is the wrong call.
-
-### 2. Pruning docker does NOT shrink the file macOS reports
-
-The engine's storage lives *inside* that one sparse image. `docker system prune`
-frees space **inside** it; the host file usually does not shrink. So the tool
-prints two numbers per engine and refuses to conflate them:
-
-- **`Images reclaimable`** etc. — from `docker system df`, what is free inside;
-- **`disk image on host`** — marked `(context, not counted)`, and deliberately
-  **excluded from the reclaimable total**, because those are the same bytes.
-
-After `--apply`, `_image_delta_line` re-measures and says plainly whether the
-file moved. If it did not, it says so and names the manual path (Docker Desktop
-→ Settings → Resources, or Troubleshoot → Clean/Purge data). **This tool does
-not rewrite a live VM disk** — there is no `docker` subcommand for it on macOS,
-and hand-rolling one is exactly what `use-tool-builtins.md` forbids.
-
-### 3. There may be more than one container engine
-
-Check before concluding. This machine had **Docker Desktop (286G)** *and* a
-dormant **colima VM (41G)** — and colima was not even runnable (`mise` had no
-version set for the shim), so 41G was sitting there from an abandoned setup.
-`docker context ls` is the probe; add one `[[category.docker.engines]]` block per
-engine you find.
+1. **A `dirs` category deletes ENTRIES, never the root.** The first version
+   emitted the configured root, so `--apply` would have `rmtree`d all of
+   `~/Library/Caches`. 17 tests were green over it.
+2. **A container disk image is SPARSE.** `Docker.raw` advertises 1858.2G while
+   occupying 285.8G. Measure allocated bytes; `du -sk` does it natively.
+3. **Pruning docker does not shrink that file on macOS.** The image is reported
+   as context and excluded from the total.
+4. **There may be more than one container engine.** This machine had Docker
+   Desktop *and* a dormant colima VM holding 41G.
 
 ## Safety, and how it is enforced
 
@@ -126,8 +79,20 @@ engine you find.
 
 ## Reading the report
 
-- A category with no hits prints `nothing found — scanned, not skipped`. That
-  distinction matters: a scanner that never ran is not a clean result.
+**Three states, kept distinct — this is the part to actually read.** Collapsing
+them is how every reporting defect in this tool happened:
+
+| line | means |
+|---|---|
+| `nothing found — scanned, not skipped` | the scan ran and the category is genuinely empty |
+| `COULD NOT CHECK — <reason>` | a path is missing, a binary is absent, a daemon is down. **Not a clean result** |
+| `nothing found in what COULD be checked` | both: part of the category was unreachable |
+
+A run with anything unreachable ends with `N thing(s) COULD NOT BE CHECKED … the
+total above is a floor, not the answer`. A headline number computed over an
+incomplete scan has to say so, or a typo in `reclaim.toml` reads exactly like an
+empty cache.
+
 - `--only` matching no category exits **2**. A filter that asked nothing is a
   malformed request, not an empty success.
 - Findings under `min_size_mb` are summed into the category total but not listed.
@@ -147,6 +112,7 @@ RAM, because routed experts stream from storage.
 
 ## See also
 
+- `references/gotchas.md` — the four defects that reached green commits.
 - `reclaim.toml` — the whole policy surface, commented.
 - `.claude/rules/use-tool-builtins.md` — why the docker path prunes natively and
   reports rather than inventing a compaction.

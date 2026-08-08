@@ -78,6 +78,25 @@ class Category:
         return self.min_size_mb * _MB
 
 
+@dataclass(frozen=True)
+class ScanResult:
+    """What a scanner found, AND what it could not ask.
+
+    The second half is the point. Every scanner used to `return []` when its
+    binary was absent, its daemon down, or its configured path missing — and
+    `_report` then printed "nothing found — scanned, not skipped", a line
+    asserting precisely the distinction that `return []` had destroyed. A typo'd
+    path in `reclaim.toml` was indistinguishable from a genuinely empty cache.
+
+    Three states, kept distinct on `kb_setup.currency`'s precedent: FOUND
+    (findings), UNAVAILABLE (`unavailable` reasons), and a real empty (neither).
+    """
+
+    findings: list[Finding] = field(default_factory=list)
+    #: One human-readable reason per thing that could not be asked.
+    unavailable: list[str] = field(default_factory=list)
+
+
 class ReclaimError(RuntimeError):
     """A configuration or safety violation — never a scan miss."""
 
@@ -219,7 +238,7 @@ def _run(argv: list[str], *, env_context: str | None = None) -> tuple[int, str]:
 # ─── scanners ────────────────────────────────────────────────────────────────
 
 
-def scan_docker(cat: Category, _repo_root: Path) -> list[Finding]:
+def scan_docker(cat: Category, _repo_root: Path) -> ScanResult:
     """Report each configured engine's reclaimable bytes and its disk-image size.
 
     Two numbers per engine, and they answer different questions: `docker system
@@ -228,13 +247,16 @@ def scan_docker(cat: Category, _repo_root: Path) -> list[Finding]:
     whole reason both are printed.
     """
     if not shutil.which("docker"):
-        return []
+        return ScanResult(unavailable=["`docker` is not on PATH"])
     out: list[Finding] = []
+    missing: list[str] = []
     for eng in cat.options.get("engines", []):
         ctx = eng.get("context", "")
         rc, raw = _run(["docker", "system", "df", "--format", "json"], env_context=ctx)
         if rc == 0 and raw:
             out.extend(_docker_df_findings(cat.name, ctx, raw))
+        else:
+            missing.append(f"context {ctx!r}: `docker system df` rc={rc} — daemon down?")
         img = _expand(eng.get("disk_image", ""))
         size = _dir_size(img)
         if size:
@@ -247,7 +269,9 @@ def scan_docker(cat: Category, _repo_root: Path) -> list[Finding]:
                     informational=True,
                 )
             )
-    return out
+        elif not img.exists():
+            missing.append(f"context {ctx!r}: disk image {img} does not exist")
+    return ScanResult(out, missing)
 
 
 def _docker_df_findings(cat_name: str, ctx: str, raw: str) -> list[Finding]:
@@ -285,13 +309,13 @@ def _parse_size(text: str) -> int:
     return 0
 
 
-def scan_ollama(cat: Category, _repo_root: Path) -> list[Finding]:
+def scan_ollama(cat: Category, _repo_root: Path) -> ScanResult:
     """Report ollama models, honouring the `keep` allowlist."""
     if not shutil.which("ollama"):
-        return []
+        return ScanResult(unavailable=["`ollama` is not on PATH"])
     rc, raw = _run(["ollama", "list"])
     if rc != 0:
-        return []
+        return ScanResult(unavailable=[f"`ollama list` rc={rc} — could not enumerate models"])
     keep = set(cat.options.get("keep", []))
     out: list[Finding] = []
     for line in raw.splitlines()[1:]:
@@ -310,10 +334,10 @@ def scan_ollama(cat: Category, _repo_root: Path) -> list[Finding]:
                 detail=modified or "no modified time reported",
             )
         )
-    return out
+    return ScanResult(out)
 
 
-def scan_dirs(cat: Category, _repo_root: Path) -> list[Finding]:
+def scan_dirs(cat: Category, _repo_root: Path) -> ScanResult:
     """Report ENTRIES INSIDE each configured cache root that are older than `age_days`.
 
     Two things this deliberately does not do, both of which it used to.
@@ -329,15 +353,17 @@ def scan_dirs(cat: Category, _repo_root: Path) -> list[Finding]:
     """
     cutoff = _age_stamp(cat.age_days)
     out: list[Finding] = []
+    missing: list[str] = []
     for raw in cat.options.get("paths", []):
         root = _expand(raw)
         if not root.is_dir():
+            missing.append(f"configured path does not exist: {root}")
             continue
         for entry in sorted(root.iterdir()):
             hit = _stale_entry(cat, entry, cutoff)
             if hit:
                 out.append(hit)
-    return out
+    return ScanResult(out, missing)
 
 
 def _stale_entry(cat: Category, entry: Path, cutoff: str) -> Finding | None:
@@ -402,20 +428,22 @@ def _age_stamp(age_days: int) -> str:
     return when.strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def scan_files(cat: Category, _repo_root: Path) -> list[Finding]:
+def scan_files(cat: Category, _repo_root: Path) -> ScanResult:
     """Report files matching the configured extensions, over size and age."""
     cutoff = _age_cutoff(cat.age_days)
     out: list[Finding] = []
     exts = tuple(cat.options.get("extensions", []))
+    missing: list[str] = []
     for raw in cat.options.get("paths", []):
         root = _expand(raw)
         if not root.is_dir():
+            missing.append(f"configured path does not exist: {root}")
             continue
         for p in root.iterdir():
             hit = _file_finding(cat, p, exts, cutoff)
             if hit:
                 out.append(hit)
-    return out
+    return ScanResult(out, missing)
 
 
 def _file_finding(cat: Category, p: Path, exts: tuple, cutoff: float) -> Finding | None:
@@ -438,18 +466,18 @@ def _file_finding(cat: Category, p: Path, exts: tuple, cutoff: float) -> Finding
     )
 
 
-def scan_mise_versions(cat: Category, _repo_root: Path) -> list[Finding]:
+def scan_mise_versions(cat: Category, _repo_root: Path) -> ScanResult:
     """Report installed mise tool versions that are neither pinned nor newest."""
     root = _expand(str(cat.options.get("root", "~/.local/share/mise/installs")))
     if not root.is_dir():
-        return []
+        return ScanResult(unavailable=[f"configured root does not exist: {root}"])
     keep_newest = int(cat.options.get("keep_newest", 1))
     pinned = _mise_pinned() if cat.options.get("keep_pinned", True) else set()
     out: list[Finding] = []
     for tool in sorted(root.iterdir()):
         if tool.is_dir():
             out.extend(_stale_versions(cat, tool, keep_newest, pinned))
-    return out
+    return ScanResult(out)
 
 
 def _stale_versions(cat: Category, tool: Path, keep_newest: int, pinned: set[str]) -> list[Finding]:
@@ -499,7 +527,7 @@ def _mise_pinned() -> set[str]:
     return pinned
 
 
-def scan_homebrew(cat: Category, _repo_root: Path) -> list[Finding]:
+def scan_homebrew(cat: Category, _repo_root: Path) -> ScanResult:
     """Ask `brew cleanup --dry-run` what it would free — do not walk paths.
 
     Homebrew earns its own kind rather than another cache path for one reason:
@@ -510,28 +538,30 @@ def scan_homebrew(cat: Category, _repo_root: Path) -> list[Finding]:
     The size is brew's own figure, so it stays right when brew's policy changes.
     """
     if not shutil.which("brew"):
-        return []
+        return ScanResult(unavailable=["`brew` is not on PATH"])
     argv = ["brew", "cleanup", "--dry-run", f"--prune={cat.age_days}"]
     if cat.options.get("scrub", False):
         argv.append("--scrub")
     rc, out = _run(argv)
     if rc != 0:
-        return []
+        return ScanResult(unavailable=[f"`brew cleanup --dry-run` rc={rc}"])
     size = _brew_freed_bytes(out)
     if size <= 0:
-        return []
-    return [
-        Finding(
-            category=cat.name,
-            label=f"brew cleanup --prune={cat.age_days}",
-            size_bytes=size,
-            detail=(
-                "brew's own estimate: stale downloads, superseded Cellar versions "
-                "and vendored ruby. Overlaps `caches_homebrew` on the cache portion "
-                "only — enable one or the other to avoid counting those bytes twice"
-            ),
-        )
-    ]
+        return ScanResult()
+    return ScanResult(
+        [
+            Finding(
+                category=cat.name,
+                label=f"brew cleanup --prune={cat.age_days}",
+                size_bytes=size,
+                detail=(
+                    "brew's own estimate: stale downloads, superseded Cellar versions "
+                    "and vendored ruby. Overlaps `caches_system` on the cache portion "
+                    "only — enable one or the other to avoid counting those bytes twice"
+                ),
+            )
+        ]
+    )
 
 
 #: brew's summary reads "...would free approximately 9.1GB of disk space." — the
@@ -593,19 +623,30 @@ def _age_cutoff(age_days: int) -> float:
     return _now() - age_days * 86400
 
 
-def plan(cats: list[Category], repo_root: Path) -> list[Finding]:
-    """Scan every enabled category. Read-only by construction — nothing mutates."""
+def plan(cats: list[Category], repo_root: Path) -> tuple[list[Finding], dict[str, list[str]]]:
+    """Scan every enabled category. Read-only by construction — nothing mutates.
+
+    Returns the findings AND a per-category map of what could not be asked, so
+    the reporter can keep UNAVAILABLE distinct from a real empty.
+    """
     out: list[Finding] = []
+    unavailable: dict[str, list[str]] = {}
     for cat in cats:
         scanner = _SCANNERS.get(cat.kind)
-        if not cat.enabled or scanner is None:
+        if not cat.enabled:
+            continue
+        if scanner is None:
+            unavailable[cat.name] = [f"no scanner for kind {cat.kind!r}"]
             continue
         # Printed BEFORE the scan, not after. Sizing a cache tree is the slow
         # part of this tool, and a scanner that announces itself only on
         # completion is indistinguishable from one that has hung.
         print(f"scanning {cat.name} ({cat.kind})…", flush=True)
-        out.extend(scanner(cat, repo_root))
-    return sorted(out, key=lambda f: f.size_bytes, reverse=True)
+        res = scanner(cat, repo_root)
+        out.extend(res.findings)
+        if res.unavailable:
+            unavailable[cat.name] = res.unavailable
+    return sorted(out, key=lambda f: f.size_bytes, reverse=True), unavailable
 
 
 # ─── apply ───────────────────────────────────────────────────────────────────
@@ -733,7 +774,9 @@ def apply_homebrew(cat: Category) -> list[str]:
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
 
-def _report(findings: list[Finding], cats: list[Category]) -> int:
+def _report(
+    findings: list[Finding], cats: list[Category], unavailable: dict[str, list[str]]
+) -> int:
     """Print the ranked plan. Returns the total reclaimable bytes."""
     by_cat: dict[str, list[Finding]] = {}
     for f in findings:
@@ -744,12 +787,17 @@ def _report(findings: list[Finding], cats: list[Category]) -> int:
         if not cat.enabled:
             print(f"\n{cat.name}: DISABLED in reclaim.toml")
             continue
+        blocked = unavailable.get(cat.name, [])
         sub = sum(f.size_bytes for f in hits if not f.informational)
         total += sub
         n_real = sum(1 for f in hits if not f.informational)
         print(f"\n{cat.name} ({cat.kind}) — {human(sub)} across {n_real} item(s)")
-        if not hits:
+        for reason in blocked:
+            print(f"  COULD NOT CHECK — {reason}")
+        if not hits and not blocked:
             print("  nothing found — scanned, not skipped")
+        elif not hits:
+            print("  nothing found in what COULD be checked — this is not a clean result")
         for f in hits[:_LIST_LIMIT]:
             tag = "  (context, not counted)" if f.informational else ""
             print(f"  {human(f.size_bytes):>7}  {f.label}  [{f.detail}]{tag}")
@@ -774,10 +822,16 @@ def main(argv: list[str], repo_root: Path) -> int:
     if only and not cats:
         print(f"reclaim: --only {sorted(only)} matched no category in {cfg_path}")
         return 2
-    findings = plan(cats, repo_root)
-    total = _report(findings, cats)
+    findings, unavailable = plan(cats, repo_root)
+    total = _report(findings, cats, unavailable)
     n_real = sum(1 for f in findings if not f.informational)
     print(f"\nreclaim: {human(total)} reclaimable across {n_real} finding(s)")
+    if unavailable:
+        n = sum(len(v) for v in unavailable.values())
+        print(
+            f"reclaim: {n} thing(s) COULD NOT BE CHECKED in "
+            f"{', '.join(sorted(unavailable))} — the total above is a floor, not the answer"
+        )
     if not apply_it:
         print("reclaim: DRY RUN — nothing was deleted. Re-run with `-- --apply` to reclaim.")
         return 0

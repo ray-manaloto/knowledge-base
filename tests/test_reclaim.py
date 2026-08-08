@@ -69,7 +69,7 @@ def test_informational_findings_are_never_summed_into_the_total(capsys):
         reclaim.Finding("t", "real", 100, "d"),
         reclaim.Finding("t", "image", 900, "d", informational=True),
     ]
-    total = reclaim._report(findings, [_cat()])
+    total = reclaim._report(findings, [_cat()], {})
     assert total == 100
     assert "context, not counted" in capsys.readouterr().out
 
@@ -198,7 +198,7 @@ def test_load_config_merges_defaults_into_each_category(tmp_path):
 def test_plan_skips_disabled_categories(tmp_path):
     """A disabled category contributes nothing — and is not silently an error."""
     cat = _cat(enabled=False, options={"paths": [str(tmp_path)]})
-    assert reclaim.plan([cat], tmp_path / "repo") == []
+    assert reclaim.plan([cat], tmp_path / "repo") == ([], {})
 
 
 def test_parse_size_handles_dockers_human_units():
@@ -248,7 +248,7 @@ def test_scan_dirs_never_emits_the_configured_root(tmp_path):
     root = tmp_path / "cache"
     (root / "old-entry").mkdir(parents=True)
     cat = _cat(kind="dirs", age_days=0, options={"paths": [str(root)]})
-    findings = reclaim.scan_dirs(cat, tmp_path / "repo")
+    findings = reclaim.scan_dirs(cat, tmp_path / "repo").findings
     assert all(f.path != root for f in findings), "scan_dirs offered the root for deletion"
 
 
@@ -260,7 +260,7 @@ def test_scan_dirs_skips_an_entry_touched_inside_the_age_window(tmp_path):
     (fresh / "live.bin").write_bytes(b"x" * 4096)
 
     cat = _cat(kind="dirs", age_days=30, min_size_mb=0, options={"paths": [str(root)]})
-    findings = reclaim.scan_dirs(cat, tmp_path / "repo")
+    findings = reclaim.scan_dirs(cat, tmp_path / "repo").findings
 
     assert findings == [], "a cache written seconds ago was offered for deletion"
 
@@ -372,7 +372,7 @@ def test_scan_ollama_does_not_offer_a_freshly_pulled_model(monkeypatch):
     monkeypatch.setattr(reclaim, "_run", lambda *_a, **_k: (0, listing))
     cat = _cat(kind="ollama", age_days=14, options={"keep": []})
 
-    labels = [f.label for f in reclaim.scan_ollama(cat, Path("/repo"))]
+    labels = [f.label for f in reclaim.scan_ollama(cat, Path("/repo")).findings]
 
     assert "fresh:latest" not in labels, "a model pulled 2 minutes ago was offered for deletion"
     assert "ancient:latest" in labels
@@ -386,7 +386,8 @@ def test_whole_tree_is_opt_in_and_never_targets_the_root(tmp_path):
     (entry / "blob").write_bytes(b"x" * 4096)  # fresh, so age would exclude it
 
     off = _cat(kind="dirs", age_days=30, min_size_mb=0, options={"paths": [str(root)]})
-    assert reclaim.scan_dirs(off, tmp_path / "repo") == [], "age check skipped without opt-in"
+    off_found = reclaim.scan_dirs(off, tmp_path / "repo").findings
+    assert off_found == [], "age check skipped without opt-in"
 
     on = _cat(
         kind="dirs",
@@ -394,6 +395,56 @@ def test_whole_tree_is_opt_in_and_never_targets_the_root(tmp_path):
         min_size_mb=0,
         options={"paths": [str(root)], "whole_tree": True},
     )
-    findings = reclaim.scan_dirs(on, tmp_path / "repo")
+    findings = reclaim.scan_dirs(on, tmp_path / "repo").findings
     assert [f.path for f in findings] == [entry]
     assert root not in [f.path for f in findings], "whole_tree offered the root itself"
+
+
+# ─── the third state: COULD NOT CHECK is not "nothing found" ─────────────────
+
+
+def test_a_missing_configured_path_is_unavailable_not_empty(tmp_path):
+    """A typo'd path must not be indistinguishable from a genuinely empty cache."""
+    cat = _cat(kind="dirs", options={"paths": [str(tmp_path / "nope")]})
+    res = reclaim.scan_dirs(cat, tmp_path / "repo")
+    assert res.findings == []
+    assert res.unavailable, "a non-existent path was reported as a clean empty scan"
+    assert "does not exist" in res.unavailable[0]
+
+
+def test_a_missing_binary_is_unavailable_not_empty(monkeypatch):
+    """`ollama` absent means the question was never asked, not answered no."""
+    monkeypatch.setattr(reclaim.shutil, "which", lambda _n: None)
+    res = reclaim.scan_ollama(_cat(kind="ollama"), Path("/repo"))
+    assert res.findings == []
+    assert res.unavailable == ["`ollama` is not on PATH"]
+
+
+def test_report_says_could_not_check_and_refuses_the_clean_wording(tmp_path, capsys):
+    """The two states must READ differently, not merely be tracked differently."""
+    cat = _cat(name="c", kind="dirs")
+    reclaim._report([], [cat], {"c": ["configured path does not exist: /nope"]})
+    out = capsys.readouterr().out
+    assert "COULD NOT CHECK" in out
+    assert "nothing found — scanned, not skipped" not in out, (
+        "an unchecked category still claimed a clean scan"
+    )
+
+
+def test_report_still_says_scanned_not_skipped_for_a_real_empty(capsys):
+    """Control arm: the clean wording must survive where it is TRUE."""
+    reclaim._report([], [_cat(name="c", kind="dirs")], {})
+    assert "nothing found — scanned, not skipped" in capsys.readouterr().out
+
+
+def test_main_warns_that_the_total_is_a_floor_when_something_was_unreachable(tmp_path, capsys):
+    """A headline number computed over an incomplete scan must say so."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "reclaim.toml").write_text(
+        "[defaults]\nage_days = 1\nmin_size_mb = 0\n\n"
+        f"[category.gone]\nenabled = true\nkind = 'dirs'\npaths = ['{tmp_path / 'nope'}']\n",
+        encoding="utf-8",
+    )
+    assert reclaim.main([], repo) == 0
+    assert "COULD NOT BE CHECKED" in capsys.readouterr().out
