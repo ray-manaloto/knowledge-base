@@ -324,10 +324,23 @@ DIRECTIVES: tuple[Rule, ...] = (
         # searched against the WHOLE command, so it must name a form that only
         # occurs when the thing is actually happening (cold lane, round 2).
         #
-        # What remains unexcused: an unrelated status read for a DIFFERENT
-        # pipeline in the same command. That is a false negative on an input
-        # nobody has written, and closing it would mean parsing the pipeline
-        # rather than matching it.
+        # WHAT REMAINS, stated precisely — the earlier wording ("a false
+        # negative on an input nobody has written") was too comfortable, and a
+        # cold lane said so. `unless` is now searched only FORWARD of each match
+        # (`scan`), so an exemption BEFORE a violation no longer excuses it. Two
+        # things still do:
+        #
+        #   1. `mise run lint | tail; mise run test | tail; echo ${pipestatus[1]}`
+        #      — two pipelines, one status read, both excused. Closing this means
+        #      parsing the pipeline rather than matching it.
+        #   2. the literal text appearing after a violation for some other
+        #      reason. Note this is narrower than it sounds: the `$` sigil is
+        #      required, so `grep 'pipestatus\[1\]' file.py` does NOT excuse
+        #      anything (control-armed), and a form that DOES expand has in fact
+        #      printed that pipeline's status.
+        #
+        # Recorded rather than fixed because this rule is advisory and always
+        # exits 0 — it narrows a report's numerator, it gates nothing.
         #
         # THE SPELLING IS `pipestatus[1]`, NOT `PIPESTATUS[0]`, and that is the
         # fourth correction to this one exemption rather than a fifth instance
@@ -506,11 +519,19 @@ def scan(rules: Iterable[Rule], command: str, session: str) -> Iterator[Finding]
     these two would hand back the cost the split was made to remove.
     """
     for rule in rules:
-        if rule.unless is not None and rule.unless.search(command):
-            continue
         if rule.also is not None and not rule.also.search(command):
             continue
         for match in rule.pattern.finditer(command):
+            # PER MATCH, and only from `match.end()` onward. A status read for
+            # THIS pipeline necessarily comes after it, so an exemption sitting
+            # earlier in the command cannot be about it — `echo ${pipestatus[1]};
+            # mise run lint | tail` used to buy the lint pipeline a full pass
+            # from a read of some previous pipeline's status. Whole-command
+            # `unless` is the shape behind all four of this rule's too-wide
+            # exemptions (cold lane, round 1, P2), and scoping it forward is the
+            # part of that class closable without parsing the pipeline.
+            if rule.unless is not None and rule.unless.search(command, match.end()):
+                continue
             excerpt = " ".join(match.group(0).split())[:110]
             yield Finding(rule=rule, session=session, excerpt=excerpt)
 

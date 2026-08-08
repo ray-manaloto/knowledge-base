@@ -112,6 +112,57 @@ def test_nothing_checkable_is_a_failure_not_a_quiet_zero(
     assert check.main(tmp_path, ["x.rs"]) == 2
 
 
+def test_a_directory_with_no_python_in_it_is_a_failure_not_a_clean_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The BLOCKING finding: three tools warn-and-exit-0, rendering as `rc=0 ok`.
+
+    ruff, `ruff format --check` and ty all answer "no Python files found" with a
+    **warning and exit 0** — they were handed nothing, and they report success
+    rather than skip. So forwarding a directory containing no `.py` files put
+    three `rc=0 ok` rows in the summary and returned 0 for a directory nobody
+    checked anything in.
+
+    That is the module's own thesis inverted: *"nothing to check" is a FAILURE,
+    not a quiet 0* — which held for a named `x.rs` (ruff exits non-zero on it)
+    and failed for the case a dev-loop user actually hits: a typo'd path, the
+    wrong directory, an empty scratch dir. (Cold lane, round 1.)
+
+    The stub returns 0 for everything ON PURPOSE — it reproduces the real tools'
+    behaviour, so the assertion cannot be satisfied by a tool happening to fail.
+    """
+    (tmp_path / "empty").mkdir()
+    (tmp_path / "empty" / "README.md").write_text("no python here\n", encoding="utf-8")
+    _stub_rcs(monkeypatch, {})
+
+    assert check.main(tmp_path, ["empty"]) == 2
+
+
+def test_a_directory_that_does_hold_python_still_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: the emptiness check must not stop real directories working.
+
+    Without this, "no directory is ever checkable" passes the test above and
+    breaks the task's most useful invocation.
+    """
+    (tmp_path / "pkg").mkdir()
+    _touch(tmp_path / "pkg" / "mod.py")
+    _stub_rcs(monkeypatch, {})
+
+    assert check.main(tmp_path, ["pkg"]) == 0
+
+
+def test_a_named_python_file_reaches_the_tools_even_if_absent(tmp_path: Path) -> None:
+    """A `.py` path is trusted WITHOUT a stat, and that is deliberate.
+
+    The tools exit non-zero for a file that is not there, and that non-zero is
+    the correct answer — `kb-check -- typo.py` must report FAIL, not SKIP.
+    Statting first would convert a real failure into "nothing to check".
+    """
+    assert check.holds_python(tmp_path, ["nonexistent.py"]) is True
+
+
 def test_no_paths_at_all_is_also_a_failure(tmp_path: Path) -> None:
     assert check.main(tmp_path, []) == 2
     assert check.main(tmp_path, ["--verbose"]) == 2
@@ -198,7 +249,23 @@ def test_a_directory_is_passed_through_untouched(tmp_path: Path) -> None:
     """
     (tmp_path / "python").mkdir()
 
-    assert check.python_paths(["python", "a.py", "notes.md"]) == ["python", "a.py"]
+    assert check.python_paths(tmp_path, ["python", "a.py", "notes.md"]) == ["python", "a.py"]
+
+
+def test_a_relative_directory_resolves_against_the_repo_not_the_cwd(tmp_path: Path) -> None:
+    """`python_paths` and `holds_python` must agree about what exists.
+
+    They briefly did not: one stat'd `Path(p)` against the process CWD, the
+    other resolved against `repo_root`. A directory genuinely holding `.py`
+    files was then present to one and absent to the other, and every tool came
+    back SKIP for a good argument. Invisible under `mise run`, which starts at
+    the repo root — which is exactly why it needs a test rather than a habit.
+    """
+    (tmp_path / "pkg").mkdir()
+    _touch(tmp_path / "pkg" / "mod.py")
+
+    assert check.python_paths(tmp_path, ["pkg"]) == ["pkg"]
+    assert check.holds_python(tmp_path, ["pkg"]) is True
 
 
 def test_a_tool_that_cannot_start_is_distinguishable_from_one_that_failed(

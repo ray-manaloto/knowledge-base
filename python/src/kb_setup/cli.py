@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
             "graph-counts [--by-source] [name...] | "
             "md-budget | skill-lint | "
             "skill-score [--write] [skill...] | skill-refresh | "
-            "handoff-check [path] | gates [task...] [--stop] | "
+            "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
             "session-state [--no-pr] | "
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
@@ -311,7 +311,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | "
         "skill-score [--write] [skill...] | "
-        "handoff-check [path] | gates [task...] [--stop] | "
+        "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "session-state [--no-pr] | cc | cc-doctor | "
         "eval [--live] [--slow] | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",

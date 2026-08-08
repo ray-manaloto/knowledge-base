@@ -81,14 +81,65 @@ class Outcome:
         return self.rc is None
 
 
-def python_paths(paths: list[str]) -> list[str]:
+def _resolve(repo_root: Path, path: str) -> Path:
+    """`path` as the tools will see it — relative paths against `repo_root`.
+
+    THE one resolution rule, and it exists because there were briefly two.
+    `python_paths` stat'd against the process CWD while `holds_python` resolved
+    against `repo_root`, so the pair disagreed whenever those differ: a
+    directory genuinely holding `.py` files was judged present by one and absent
+    by the other, and every tool came back SKIP for a perfectly good argument.
+    Caught by the control arm on the fix for the round-1 BLOCKING finding —
+    a fix introducing its own defect, which is why that arm was written.
+
+    Invisible in normal use, because a mise task runs from the repo root and the
+    two agree there. That is what makes it worth a named function rather than a
+    second inline `Path(p)`.
+    """
+    candidate = Path(path)
+    return candidate if candidate.is_absolute() else repo_root / candidate
+
+
+def python_paths(repo_root: Path, paths: list[str]) -> list[str]:
     """The `.py` members of `paths`, in the order given.
 
     A directory is passed through untouched — ruff, ty and pytest all walk one
     themselves, and expanding it here would mean reimplementing three different
     exclusion rules and getting at least one of them wrong.
+
+    The returned strings are the CALLER's spellings, not the resolved paths:
+    they go straight into argv, and the tools run with `cwd=repo_root`, so
+    rewriting them would only make the reported target list stop matching what
+    was typed.
     """
-    return [p for p in paths if p.endswith(".py") or Path(p).is_dir()]
+    return [p for p in paths if p.endswith(".py") or _resolve(repo_root, p).is_dir()]
+
+
+def holds_python(repo_root: Path, paths: list[str]) -> bool:
+    """Would the static tools actually be HANDED a `.py` file by `paths`?
+
+    The three tools answer "no Python here" with a **warning and exit 0**, not
+    with a failure — so forwarding a directory containing no `.py` files made
+    `kb-check` print three `rc=0 ok` rows and return 0 for a directory nobody
+    had checked anything in. That is this module's own thesis inverted one
+    function above where it is stated: *"nothing to check" is a FAILURE, not a
+    quiet 0*. It held for `x.rs` (ruff exits non-zero on a named non-Python
+    file) and failed for the case a dev-loop user actually hits — a typo'd path,
+    the wrong directory, an empty scratch dir. (Cold lane, round 1, BLOCKING.)
+
+    A `.py` path is trusted WITHOUT a stat: a named file that does not exist
+    must still reach the tools, because they exit non-zero for it and that
+    non-zero is the correct answer. Only directories are inspected, and only far
+    enough to answer "any at all" — `next(..., None)` stops at the first hit
+    rather than walking a large tree to build a list nothing reads.
+    """
+    for path in paths:
+        if path.endswith(".py"):
+            return True
+        candidate = _resolve(repo_root, path)
+        if candidate.is_dir() and next(candidate.rglob("*.py"), None) is not None:
+            return True
+    return False
 
 
 def sibling_test(repo_root: Path, path: str) -> str | None:
@@ -179,7 +230,10 @@ def run(repo_root: Path, paths: list[str]) -> list[Outcome]:
     learn ty has an opinion is how a fast check becomes three slow ones.
     """
     outcomes: list[Outcome] = []
-    sources = python_paths(paths)
+    # Both conditions: something `.py`-SHAPED was named, AND something `.py` is
+    # really there for the tools to read. The second is what stops three
+    # warn-and-exit-0 tools from rendering as `rc=0 ok` over an empty directory.
+    sources = python_paths(repo_root, paths) if holds_python(repo_root, paths) else []
     for tool in STATIC_TOOLS:
         rc = _run(repo_root, (*tool.argv, *sources)) if sources else None
         outcomes.append(Outcome(tool.name, rc, tuple(sources)))

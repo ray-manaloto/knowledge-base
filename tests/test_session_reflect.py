@@ -196,6 +196,30 @@ def test_the_wrong_pipestatus_index_is_not_an_exemption(tmp_path) -> None:
     assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
 
 
+def test_an_exemption_before_the_violation_does_not_excuse_it(tmp_path) -> None:
+    """A status read can only be about a pipeline that already ran.
+
+    `unless` was searched against the WHOLE command, so a read of some EARLIER
+    pipeline's status excused a later, entirely unchecked one. It is now
+    searched forward of each match, which is the part of the whole-command class
+    closable without parsing the pipeline. (Cold lane, round 1, P2.)
+    """
+    path = _transcript(
+        tmp_path, "mise run fmt | tail -1; echo ${pipestatus[1]}; mise run lint | tail -3"
+    )
+    assert "piped-rc" in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
+def test_the_zsh_unbraced_form_is_still_compliance(tmp_path) -> None:
+    """`$pipestatus[1]` without braces is valid zsh and reads the gate's status.
+
+    Genuine compliance with no test until now — found by probing the exemption
+    six ways rather than waiting to be told.
+    """
+    path = _transcript(tmp_path, "mise run lint | tail -3; echo $pipestatus[1]")
+    assert "piped-rc" not in _ids(sr.reflect(tmp_path, transcripts=[path]).violations)
+
+
 def test_merely_mentioning_pipestatus_is_not_an_exemption(tmp_path) -> None:
     """The word in prose bought a full exemption for a real violation."""
     path = _transcript(tmp_path, 'mise run lint | tail -5; echo "see pipestatus docs"')
