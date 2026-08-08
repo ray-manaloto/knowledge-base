@@ -183,3 +183,21 @@ def test_reflect_main_always_exits_zero(tmp_path, capsys) -> None:
     """
     assert sr.reflect_main(tmp_path) == 0
     assert "session-reflect:" in capsys.readouterr().out
+
+
+def test_quiet_prints_one_line_not_the_report(tmp_path, capsys) -> None:
+    """The SessionEnd hook declares `--quiet`.
+
+    A flag nothing implements is a broken hook, so this pins that it exists and
+    is actually terse.
+    """
+    assert sr.reflect_main(tmp_path, ["--quiet"]) == 0
+    out = capsys.readouterr().out
+    assert len(out.strip().splitlines()) == 1
+    assert "finding(s)" in out
+
+
+def test_without_quiet_the_full_report_prints(tmp_path, capsys) -> None:
+    """CONTROL ARM: the flag must actually change something."""
+    assert sr.reflect_main(tmp_path) == 0
+    assert "## Hand-rolled work" in capsys.readouterr().out

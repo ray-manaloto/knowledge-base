@@ -451,5 +451,17 @@ def reflect_main(root: Path, args: Sequence[str] = ()) -> int:
         index = rest.index("--sessions")
         if index + 1 < len(rest) and rest[index + 1].isdigit():
             limit = int(rest[index + 1])
-    print(render(reflect(root, limit=limit)))
+    report = reflect(root, limit=limit)
+    if "--quiet" in rest:
+        # SessionEnd shares a 1.5 s budget across hooks and its output competes
+        # with the audit's. One line naming the counts is enough to decide
+        # whether to run the task properly; the full report is one command away.
+        findings = len(report.owned) + len(report.violations) + len(report.unarmed)
+        wrappable = len(report.repeats) + len(report.runs)
+        print(
+            f"session-reflect: {findings} finding(s), {wrappable} wrapper lead(s) "
+            f"— `mise run kb-session-reflect` for the report"
+        )
+        return 0
+    print(render(report))
     return 0
