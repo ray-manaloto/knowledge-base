@@ -19,6 +19,25 @@ mise run kb-reclaim -- --only docker,ollama --apply
 mise run kb-reclaim -- --skip caches_system
 ```
 
+## ⚠️ Read the SIZES from `uv run`, not from `mise run`
+
+```bash
+uv run kb-setup reclaim          # same report, TRUSTWORTHY DIGITS
+```
+
+`mise run` redacts secrets by **literal substring**, and short secret values
+match ordinary digits — so every figure a `mise run` task prints can come back
+mangled. This tool exists to produce numbers you act on, which makes it one of
+the worst places for that.
+
+Found by the skill's own eval: an agent running this skill hit it unprompted and
+re-ran through `uv run` to get real figures. The skill had been telling it to
+read numbers the repo already knew were untrustworthy. `mise run` stays correct
+for *doing* the work (and for `--apply`); read the SIZES from `uv run`.
+
+```bash
+```
+
 Policy lives in **`reclaim.toml`** at the repo root; the engine is
 `kb_setup.reclaim`; the seam is the mise task (`zero-bash-logic.md`,
 `mise-tasks-only.md`). Adding a reclaimer is a scanner plus a config block —
@@ -37,6 +56,8 @@ Policy lives in **`reclaim.toml`** at the repo root; the engine is
 | `homebrew` | `homebrew` | `brew cleanup --prune`: stale downloads AND superseded Cellar versions |
 | `mise_installs` | `mise_versions` | superseded tool versions, keeping pinned + N newest |
 | `downloads` | `files` | installers/archives over a size and age threshold |
+| `jetbrains_support` | `dirs` | per-IDE-version plugins/indexes/settings left by old installs |
+| `jetbrains_apps` | `dirs` | **disabled by default** — Toolbox-installed IDEs; removing one is an *uninstall*, not a reclaim |
 
 One category per artifact type on purpose: a lumped `caches` block was
 all-or-nothing, so you could not keep bun's cache while dropping npm's.

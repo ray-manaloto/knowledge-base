@@ -154,3 +154,35 @@ age_days = 30
 min_size_mb = 200
 paths = ["~/Downloads"]
 extensions = [".dmg", ".pkg", ".zip", ".iso", ".tar.gz"]
+
+
+# ─── JetBrains ───────────────────────────────────────────────────────────────
+# Added 2026-08-07 after the skill's OWN EVAL found the gap: a baseline agent
+# working WITHOUT this tool surfaced ~136 GB of JetBrains data that no category
+# here could see, while the with-skill run saw "81 GB App Support" and had
+# nowhere to put it. That is what an eval is for, and it is the reason the
+# with-vs-without comparison is worth running rather than reasoning about.
+#
+# Measured on this machine: ~/Applications 60G · Application Support 32G ·
+# Caches 44G. Only the last was reachable, via `caches_system`.
+
+# IDE support data: per-version plugin sets, indexes and settings left behind by
+# every IDE version ever installed. Age-filtered, so a version you still open
+# keeps its data.
+[category.jetbrains_support]
+enabled = true
+kind = "dirs"
+age_days = 90
+paths = ["~/Library/Application Support/JetBrains"]
+
+# ⚠️ DISABLED BY DEFAULT, and it should stay that way unless you mean it.
+# `~/Applications` is where JetBrains Toolbox installs the IDEs themselves — 27
+# of them here, including two CLion versions. These are APPLICATIONS, not
+# caches: removing one is an uninstall, not a reclaim, and Toolbox will not
+# notice it happened. Enabled only as a deliberate act, which is the same
+# reasoning that keeps docker's anonymous volumes off.
+[category.jetbrains_apps]
+enabled = false
+kind = "dirs"
+age_days = 180
+paths = ["~/Applications"]

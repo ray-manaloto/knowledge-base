@@ -866,10 +866,40 @@ def _print_disk(label: str, before: int | None = None) -> int:
     """
     free = _free_bytes()
     if before is None:
-        print(f"disk: {human(free)} free {label}")
+        print(f"disk: {human(free)} free {label}{_snapshot_note()}")
     else:
         print(f"disk: {human(free)} free {label} — {human(free - before)} returned")
     return free
+
+
+def _snapshot_note() -> str:
+    """Warn when local APFS snapshots make 'free' larger than what you can use.
+
+    On APFS, `statvfs`-style free space counts PURGEABLE bytes — space held by
+    Time Machine local snapshots that macOS will reclaim under pressure, but that
+    a large download cannot simply take. So "you have 786G free" can be true and
+    still not answer "will a 372G checkpoint fit".
+
+    The skill's own eval found this: the BASELINE agent — working without this
+    tool — cross-checked `tmutil listlocalsnapshots /` before trusting the free
+    number, and the skill did not. On a tool whose headline use case is
+    "will this fit", that was the wrong thing to be missing.
+
+    Silent when there are none, and silent when `tmutil` cannot be reached: this
+    is a caveat on a number, not a gate.
+    """
+    if not shutil.which("tmutil"):
+        return ""
+    rc, out = _run(["tmutil", "listlocalsnapshots", "/"])
+    if rc != 0:
+        return ""
+    n = sum(1 for line in out.splitlines() if "com.apple.TimeMachine" in line)
+    if not n:
+        return ""
+    return (
+        f"  ⚠️ {n} local APFS snapshot(s) — some of that 'free' space is PURGEABLE, "
+        "not yours to take; `tmutil deletelocalsnapshots /` releases it"
+    )
 
 
 def main(argv: list[str], repo_root: Path) -> int:
