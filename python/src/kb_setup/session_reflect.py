@@ -298,7 +298,7 @@ DIRECTIVES: tuple[Rule, ...] = (
             rf"(?m){_CMD_POS}"
             rf"(?:mise run (?:{_GATE_TASKS})|hk |pytest|uv run (?:ruff|ty|pytest))"
             rf"{_SEG}\|\s*(?:tail|head)\b(?!{_SEG}\brc=)",
-            '<cmd> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log',
+            "mise run kb-check -- <paths>  (or kb-gates for the ship gates)",
             "Bash returns the LAST pipeline command's exit code, so a failed gate reports success.",
         ),
         # `${PIPESTATUS[0]}` is the one form that pipes a gate and STILL reads
@@ -324,11 +324,40 @@ DIRECTIVES: tuple[Rule, ...] = (
         # searched against the WHOLE command, so it must name a form that only
         # occurs when the thing is actually happening (cold lane, round 2).
         #
-        # What remains unexcused: an unrelated `${PIPESTATUS[0]}` for a DIFFERENT
-        # pipeline in the same command. That is a false negative on an input
-        # nobody has written, and closing it would mean parsing the pipeline
-        # rather than matching it.
-        unless=r"\$\{?PIPESTATUS\[0\]",
+        # WHAT REMAINS, stated precisely — the earlier wording ("a false
+        # negative on an input nobody has written") was too comfortable, and a
+        # cold lane said so. `unless` is now searched only FORWARD of each match
+        # (`scan`), so an exemption BEFORE a violation no longer excuses it. Two
+        # things still do:
+        #
+        #   1. `mise run lint | tail; mise run test | tail; echo ${pipestatus[1]}`
+        #      — two pipelines, one status read, both excused. Closing this means
+        #      parsing the pipeline rather than matching it.
+        #   2. the literal text appearing after a violation for some other
+        #      reason. Note this is narrower than it sounds: the `$` sigil is
+        #      required, so `grep 'pipestatus\[1\]' file.py` does NOT excuse
+        #      anything (control-armed), and a form that DOES expand has in fact
+        #      printed that pipeline's status.
+        #
+        # Recorded rather than fixed because this rule is advisory and always
+        # exits 0 — it narrows a report's numerator, it gates nothing.
+        #
+        # THE SPELLING IS `pipestatus[1]`, NOT `PIPESTATUS[0]`, and that is the
+        # fourth correction to this one exemption rather than a fifth instance
+        # of the same over-reach. `PIPESTATUS` is a **bash** array; this repo's
+        # shell is zsh, which spells it lowercase and indexes from 1. Armed both
+        # directions in zsh 5.9 (`BASH_VERSION=none`): `${PIPESTATUS[0]}` returns
+        # `''` for a FAILING gate and `''` for a PASSING one — it cannot
+        # discriminate, so a command writing it captured nothing while buying a
+        # full exemption. `${pipestatus[1]}` returns `1` and `0`.
+        #
+        # So the bash spelling is deliberately NOT excused here. Every transcript
+        # this module reads is zsh, where that form is inert by construction;
+        # excusing it would be excusing the absence of the thing being asked for.
+        # A bash user would be flagged for a compliant command — accepted,
+        # because the rule reports a rate of candidates rather than a verdict,
+        # and the safe direction for a false-green detector is to over-report.
+        unless=r"\$\{?pipestatus\[1\]",
     ),
 )
 """Standing directives whose compliance is a RATE, not a yes/no."""
@@ -472,6 +501,15 @@ def _reads_source(payload: dict[str, object]) -> bool:
 def scan(rules: Iterable[Rule], command: str, session: str) -> Iterator[Finding]:
     """Every rule in `rules` that `command` trips, with the matched bytes.
 
+    EVERY match, not the first. One `Finding` per command made the reported `xN`
+    a count of COMMANDS while reading as a count of violations, and the two are
+    not close: measured over the 2026-08-08 transcript, `piped-rc` reported x17
+    against **35** actual matches, with 10 of those 17 commands chaining more
+    than one piped gate (`ruff … | tail; ruff format … | tail; ty … | tail;
+    pytest … | tail` is one command and four discarded exit codes). A directive's
+    compliance is a RATE, and a rate whose numerator is silently deduplicated
+    per-command understates itself by whatever the chaining habit happens to be.
+
     The ORDER of the three checks is load-bearing, not tidiness. `also` and
     `unless` are cheap alternations; `pattern` is the expensive one, and the
     adversarial input for `mutation-harness` — many patch tokens, no run token —
@@ -481,12 +519,19 @@ def scan(rules: Iterable[Rule], command: str, session: str) -> Iterator[Finding]
     these two would hand back the cost the split was made to remove.
     """
     for rule in rules:
-        if rule.unless is not None and rule.unless.search(command):
-            continue
         if rule.also is not None and not rule.also.search(command):
             continue
-        match = rule.pattern.search(command)
-        if match:
+        for match in rule.pattern.finditer(command):
+            # PER MATCH, and only from `match.end()` onward. A status read for
+            # THIS pipeline necessarily comes after it, so an exemption sitting
+            # earlier in the command cannot be about it — `echo ${pipestatus[1]};
+            # mise run lint | tail` used to buy the lint pipeline a full pass
+            # from a read of some previous pipeline's status. Whole-command
+            # `unless` is the shape behind all four of this rule's too-wide
+            # exemptions (cold lane, round 1, P2), and scoping it forward is the
+            # part of that class closable without parsing the pipeline.
+            if rule.unless is not None and rule.unless.search(command, match.end()):
+                continue
             excerpt = " ".join(match.group(0).split())[:110]
             yield Finding(rule=rule, session=session, excerpt=excerpt)
 
@@ -595,6 +640,47 @@ def _section(title: str, lines: Sequence[str], empty: str) -> list[str]:
     return out
 
 
+EXCERPTS_PER_RULE = 3
+"""Offending commands SHOWN per directive, before the rest are counted only.
+
+Three rather than all of them because this section reports a rate and can run to
+dozens of rows; three rather than one because a single excerpt reads as *the*
+violation rather than a sample, and the question a reader actually has — "are
+these real, or is the rule over-firing?" — needs more than one data point to
+answer.
+"""
+
+
+def _violation_lines(violations: Sequence[Finding]) -> list[str]:
+    """One row per directive: the count, the remedy, and SOME OF THE BYTES.
+
+    The bytes are the part that was missing, and their absence had a measured
+    cost. Every other section of this report prints `f.excerpt`; this one printed
+    a bare `id xN -> remedy`, so a reader who doubted a count had nothing to
+    check it against. On 2026-08-08 that is exactly what happened: a handoff
+    recorded `piped-rc x17` with the guess that "several were the RECOMMENDED
+    form plus a read", and re-deriving the 17 commands showed **none** of them
+    were — the rule was right 17 times out of 17. A count nobody can drill into
+    does not get verified, it gets speculated about, and the speculation is what
+    the next session inherits.
+
+    A rate section is exactly where this bites hardest, because a rate is the
+    kind of number a reader is *entitled* to disbelieve.
+    """
+    grouped: dict[str, list[Finding]] = {}
+    for finding in violations:
+        grouped.setdefault(finding.rule.id, []).append(finding)
+
+    lines: list[str] = []
+    for rid, found in sorted(grouped.items(), key=lambda kv: -len(kv[1])):
+        lines.append(f"- `{rid}` x{len(found)} -> **{found[0].rule.remedy}**")
+        lines.extend(f"    {f.excerpt}" for f in found[:EXCERPTS_PER_RULE])
+        withheld = len(found) - EXCERPTS_PER_RULE
+        if withheld > 0:
+            lines.append(f"    … {withheld} more (raise EXCERPTS_PER_RULE to see them)")
+    return lines
+
+
 def render(report: Report) -> str:
     """The human-facing report. Leads, never verdicts — see the module docstring."""
     header = (
@@ -617,13 +703,9 @@ def render(report: Report) -> str:
         ],
         "nothing — every step went through its task",
     )
-    remedies = {f.rule.id: f.rule.remedy for f in report.violations}
     out += _section(
         "Standing-directive violations (a RATE, not a yes/no)",
-        [
-            f"- `{rid}` x{count} -> **{remedies[rid]}**"
-            for rid, count in Counter(f.rule.id for f in report.violations).most_common()
-        ],
+        _violation_lines(report.violations),
         "none observed",
     )
     unarmed_lines = [f"- `{f.rule.id}`: {f.excerpt}\n  _{f.rule.why}_" for f in report.unarmed]

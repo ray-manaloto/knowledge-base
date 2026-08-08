@@ -454,7 +454,30 @@ def replay_order(paths: list[Path]) -> list[Path]:
     sorts first (it can never supersede a dated one), and the filename breaks
     ties so the order stays total and deterministic.
     """
-    return sorted(paths, key=lambda p: (chunk_captured_at(p), p.name))
+    return sorted(paths, key=replay_key)
+
+
+def replay_key(path: Path) -> tuple[str, str]:
+    """The sort key `replay_order` orders by — exposed so callers cannot re-derive it.
+
+    `replay_order` takes bare paths, but the recomposition path in
+    `kb_setup.graph` carries `(chunk, root)` PAIRS and so cannot use it. For
+    the two months this key existed only inside the `sorted` call above, that
+    path did the only thing left to it: replayed in `manifest.chunks` order,
+    which is alphabetical — reintroducing, on `kb-watch`, the exact
+    naming-accident supersession this function's docstring says was fixed.
+
+    Measured on the 2026-08-08 `kb-watch` failure: `claude-code-docs-mirror`
+    (captured 07-30, 26 nodes) sorted after `claude-code-docs-2026-08-05-refresh`
+    (captured 08-05, 116 nodes) and superseded it — `hooks.md` 69 nodes to 5,
+    `skills.md` 47 to 15, net -90 — and only graphify's #479 shrink guard
+    refusing the write kept the regression off disk.
+
+    So this is a function rather than a lambda for one reason: a key that
+    cannot be named is a key that gets re-implemented, and the second
+    implementation is where the two paths diverge.
+    """
+    return (chunk_captured_at(path), path.name)
 
 
 def normalise_source_file(value: object) -> str | None:

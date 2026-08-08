@@ -798,13 +798,41 @@ def _replay_doc_chunks(
     and been entirely correct about nodes while the thing it was written to catch
     went by.
     """
+    _replay_pairs(repo_root, gpy, out, [(c, _derived_root(sources, c)) for c in chunk_paths])
+
+
+def _derived_root(sources: Path, chunk: Path) -> str:
+    """The `sources/<name>` root `build()` merges a globbed chunk under."""
+    return str((sources / chunk.stem.removesuffix("-docs")).resolve())
+
+
+def _replay_pairs(repo_root: Path, gpy: str, out: Path, pairs: list[tuple[Path, str]]) -> None:
+    """Replay `(chunk, root)` pairs in CAPTURE-DATE order, checking the arithmetic.
+
+    THE one replay loop. Both paths that exist call it — `build()`'s
+    :func:`_replay_doc_chunks`, which derives each root from the chunk stem, and
+    `refresh_self()`'s :func:`_recompose_into_temp`, which carries a recorded
+    root per chunk. They were separate loops until 2026-08-08, and the whole
+    cost of that is what this function's existence is for:
+
+    `build()`'s loop applied `chunks.replay_order` and threaded `--prior-<field>`;
+    the recomposition loop did neither. It replayed in `manifest.chunks` order —
+    alphabetical — so `kb-build` and `kb-watch` produced DIFFERENT graphs from
+    the same committed corpus, which is invariant 3's precise failure shape and
+    is the very defect `chunks.replay_order` was written to remove. It was fixed
+    on one path and left live on the other for as long as both existed. Every
+    `[merge]` line `kb-watch` ever printed said *prior node count unknown —
+    arithmetic NOT checked*, so #191's gate had never once fired there either.
+
+    Two fixes on one path and not its sibling is not two bugs; it is one missing
+    seam. Hence pairs rather than paths: the root is the only thing the two
+    callers genuinely disagree about, so it is the only thing they still supply.
+    """
     from kb_setup import chunks as _chunks
 
     counts_out = out.with_name(".merge-counts.tmp.json")
     prior: dict[str, int | None] = dict.fromkeys(_THREADED_COUNTS)
-    for chunk in _chunks.replay_order(chunk_paths):
-        name = chunk.stem.removesuffix("-docs")
-        root = str((sources / name).resolve())
+    for chunk, root in sorted(pairs, key=lambda pair: _chunks.replay_key(pair[0])):
         argv = [gpy, str(_MERGE_SCRIPT), str(chunk), root, str(out)]
         # Per field, not all-or-nothing: a handoff carrying `nodes` but not
         # `hyperedges` (or the reverse) must still check the half it can. The
@@ -939,8 +967,10 @@ def _recompose_into_temp(
         print(f"[kb-watch] composing graph.json from {len(inputs)} recorded input(s)")
         _merge_sources_into(repo_root, tmp_out, inputs)
         print(f"[kb-watch] replaying {len(replay)} doc extraction(s)")
-        for chunk, root in replay:
-            _run([gpy, str(_MERGE_SCRIPT), str(chunk), root, str(tmp_out)], repo_root)
+        # Through the SHARED loop, which is what puts these replays in capture
+        # order and checks each merge's arithmetic. Both properties were absent
+        # here until 2026-08-08 — see `_replay_pairs` for what that cost.
+        _replay_pairs(repo_root, gpy, tmp_out, replay)
         # Only NOW — immediately before the swap — does the REAL artifact's
         # identity actually change. Clearing the stamp any earlier would mark a
         # still-good graph unstamped for no reason (everything above wrote only

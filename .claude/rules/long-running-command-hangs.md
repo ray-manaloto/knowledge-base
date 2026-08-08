@@ -66,9 +66,26 @@ incident: unbounded wait + pipe-masked exit code.
 
 3. **Preserve real exit codes — never `cmd 2>&1 | tail -N` to capture.**
    Bash returns the *last* pipeline command's exit code (tail's `0`),
-   silently swallowing the upstream failure or kill. Redirect to a file
-   (`cmd > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`) and read the
-   file + the recorded `rc`. Trust file content, not a piped tail.
+   silently swallowing the upstream failure or kill.
+
+   **For a CHECK, the answer is a task, not a redirect: `mise run kb-check --
+   <paths>`** (ruff + format + ty + those paths' own tests, real exit codes) or
+   `mise run kb-gates` for the ship gates. Both are python holding a real
+   `returncode`, with nothing in between to discard it. The redirect form
+   (`cmd > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log`, then read the file)
+   remains correct for a command **no task owns** — a `git`, a `gh`, a one-off.
+
+   Two reasons the redirect stopped being the headline advice. It is shell
+   logic, recommended by the repo whose first invariant is `zero-bash-logic`;
+   and the escape hatch beside it did not work here at all — **`${PIPESTATUS[0]}`
+   is a BASH array**, while this shell is zsh, which spells it `pipestatus` and
+   indexes from **1**. Armed both directions in zsh 5.9: the bash form returns
+   `''` for a failing gate *and* a passing one, so it cannot discriminate. If
+   you must pipe, `${pipestatus[1]}`.
+
+   The habit is measurable and was measured: **35 gate invocations piped into
+   `head`/`tail` in one session** (2026-08-08), every one discarding the gate's
+   rc — because no task answered "are these two files clean?" until `kb-check`.
 
 4. **A stalled process is a hang — kill it, don't keep waiting.** A
    process sitting at 0% CPU with no children for minutes is wedged
