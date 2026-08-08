@@ -137,8 +137,8 @@ new = """    if False:
 id = "heredoc-body-read-as-commands"
 test = "test_allows_targeted_prose_and_piped_searches"
 file = "python/src/kb_setup/graph_first.py"
-old = """    parts = re.split(r"(\\|\\||&&|[;&|\\n])", HEREDOC.split(command, maxsplit=1)[0])"""
-new = """    parts = re.split(r"(\\|\\||&&|[;&|\\n])", command)"""
+old = """    body = HEREDOC.split(command, maxsplit=1)[0]"""
+new = """    body = command"""
 
 # Ray's scope in one line: ONE file is targeted work, not orientation.
 [[arm]]
@@ -182,3 +182,57 @@ old = """    if (
         return None"""
 new = """    if False:
         return None"""
+
+# --- ROUND 1 FIX ARMS: the four cold-lane findings against 599584a ------------
+#
+# Each reverts the fix to the code AS SHIPPED — the realistic break, since it is
+# literally what was there. `a-remedy-needs-its-own-arm`: a fix is the
+# least-reviewed code in the diff, and two of these four were introduced by the
+# same wrong idea (identify a path by POSITION), so a shared root cause gets two
+# independent arms rather than one.
+
+# P1. `rg --sort path decide` was ALLOWED: an unlisted value-flag shifted the
+# positional split, so the pattern was read as a path.
+[[arm]]
+id = "paths-identified-by-position-not-shape"
+test = "test_denies_a_broad_source_search_before_any_query"
+file = "python/src/kb_setup/graph_first.py"
+old = """        if _looks_like_a_path(word, cwd):
+            paths.append(word)
+    return paths"""
+new = """        paths.append(word)
+    return paths[1:]"""
+
+# P2, the same defect from the other side: `-e` consumes the pattern, so the
+# unconditional "drop the first positional" dropped the real file.
+[[arm]]
+id = "first-positional-dropped-as-the-pattern"
+test = "test_allows_targeted_prose_and_piped_searches"
+file = "python/src/kb_setup/graph_first.py"
+old = """        if _looks_like_a_path(word, cwd):
+            paths.append(word)
+    return paths"""
+new = """        paths.append(word)
+    return paths[1:]"""
+
+# P1. A negated glob names what a walk SKIPS, so the extension test answers it
+# backwards. `rg -g '!*.md' decide .` reaches every source file.
+[[arm]]
+id = "negated-glob-read-as-a-restriction"
+test = "test_denies_a_broad_source_search_before_any_query"
+file = "python/src/kb_setup/graph_first.py"
+old = """    if not values or any(v.startswith(("!", "^")) for v in values):
+        return False"""
+new = """    if not values:
+        return False"""
+
+# P2. A regex cannot see quoting, so `git commit -m "docs && rg decide"` split
+# into a segment that read as a search and was DENIED.
+[[arm]]
+id = "segments-split-without-quote-awareness"
+test = "test_allows_targeted_prose_and_piped_searches"
+file = "python/src/kb_setup/graph_first.py"
+old = """        elif ch in "'\\"":
+            quote = ch"""
+new = """        elif False:
+            quote = ch"""

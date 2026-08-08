@@ -171,6 +171,16 @@ GRAPH_FIRST_FIXTURES: tuple[evals.GuardFixture, ...] = (
     _D('grep -rn "hook_guard" python/', _DENY, "recursive grep over source"),
     _D("git grep decide", _DENY, "git grep walks the worktree with no -r"),
     _D('ls -la && rg "decide" python/', _DENY, "a later segment still counts"),
+    _D(
+        "rg --sort path decide",
+        _DENY,
+        "P1, cold lane: an unlisted value-flag made a repo-wide search look targeted",
+    ),
+    _D(
+        "rg -g '!*.md' decide .",
+        _DENY,
+        "P1, cold lane: a NEGATED glob reaches every source file",
+    ),
     # --- must ALLOW: everything that is not orientation
     _D(
         'rg "decide" python/src/kb_setup/hook_guard.py',
@@ -195,6 +205,16 @@ GRAPH_FIRST_FIXTURES: tuple[evals.GuardFixture, ...] = (
         'echo "run rg decide python/ to find it"',
         _ALLOW,
         "text ABOUT a search — the direction every measured guard defect came from",
+    ),
+    _D(
+        'git commit -m "docs && rg decide"',
+        _ALLOW,
+        "P2, cold lane: a regex cannot see quoting, so a commit read as a search",
+    ),
+    _D(
+        "rg -e decide python/src/kb_setup/hook_guard.py",
+        _ALLOW,
+        "P2, cold lane: `-e` ate the pattern, so the real file was dropped as one",
     ),
     _D("ls -la", _ALLOW, "an unrelated command is untouched"),
 )

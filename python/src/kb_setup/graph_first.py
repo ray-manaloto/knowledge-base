@@ -162,15 +162,44 @@ def _segments(command: str) -> list[tuple[str, bool]]:
     guard exists to encourage. That is the same shape as the `_last_arg`
     redirect defect in `session_reflect`, which reported two properly-armed
     probes as UNARMED because each sent its output to its own log.
+
+    The split is QUOTE-AWARE, walked character by character rather than done with
+    `re.split`. A regex cannot see quoting, so `git commit -m "docs && rg decide"`
+    — an ordinary commit — split into a segment reading `rg decide` and was
+    DENIED (cold lane, P2). That is the same class as every other measured defect
+    in this repo's guards: text ABOUT a search read as a search.
     """
-    parts = re.split(r"(\|\||&&|[;&|\n])", HEREDOC.split(command, maxsplit=1)[0])
+    body = HEREDOC.split(command, maxsplit=1)[0]
     out: list[tuple[str, bool]] = []
-    piped = False
-    for i in range(0, len(parts), 2):
-        out.append((parts[i], piped))
-        sep = parts[i + 1] if i + 1 < len(parts) else ""
-        piped = sep == "|"
+    piped, quote, start, i = False, "", 0, 0
+    while i < len(body):
+        ch = body[i]
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "'\"":
+            quote = ch
+        elif (sep := _separator_at(body, i)) is not None:
+            out.append((body[start:i], piped))
+            piped = sep == "|"
+            i += len(sep)
+            start = i
+            continue
+        i += 1
+    out.append((body[start:], piped))
     return out
+
+
+def _separator_at(body: str, i: int) -> str | None:
+    """The shell separator starting at `body[i]`, longest first, else None.
+
+    Longest-first matters: `&&` and `||` must be recognised before the single
+    `&`/`|`, or a `&&` would be read as a pipe and the following segment wrongly
+    treated as reading stdin — which is an ALLOW, the dangerous direction.
+    """
+    for sep in ("||", "&&", ";", "&", "|", "\n"):
+        if body.startswith(sep, i):
+            return sep
+    return None
 
 
 def _words(segment: str) -> list[str]:
@@ -194,6 +223,14 @@ def _restricted_to_prose(words: list[str]) -> bool:
     source extension — `rg TODO -g '*.md'` cannot reach a `.py` file, so it is not
     orientation. An unrecognised restriction returns False (deny stays possible),
     because a filter this cannot read is not a filter this can trust.
+
+    A NEGATED glob is the case that made that last sentence load-bearing.
+    `rg -g '!*.md' decide .` names markdown and reaches every source file in the
+    repo — the exact inverse of the positive form, and graded identically to it
+    until the cold lane ran one (P1). The extension test asks "does this value
+    mention source?", which a negation answers backwards, so a leading `!`
+    disqualifies the whole restriction set rather than being parsed: an
+    exclusion tells you what a walk SKIPS, never what it cannot reach.
     """
     values = [
         words[i + 1]
@@ -203,7 +240,7 @@ def _restricted_to_prose(words: list[str]) -> bool:
     values += [
         w.split("=", 1)[1] for w in words if "=" in w and w.split("=", 1)[0] in _RESTRICT_FLAGS
     ]
-    if not values:
+    if not values or any(v.startswith(("!", "^")) for v in values):
         return False
     return not any(ext.lstrip(".") in v or ext in v for v in values for ext in _SOURCE_EXT)
 
@@ -229,17 +266,37 @@ def _is_prose_target(target: str, cwd: Path) -> bool:
     return bool(path.suffix) and path.suffix not in _SOURCE_EXT
 
 
-def _paths_of(words: list[str]) -> list[str]:
-    """The positional PATH arguments of a search command.
+def _looks_like_a_path(word: str, cwd: Path) -> bool:
+    """Is this argument a PATH rather than the search pattern or a flag's value?
 
-    Word 0 is the searcher and the first bare positional is the PATTERN, so paths
-    are everything positional after it. Flags that take a value are skipped by
-    consuming the next word — getting this wrong would read a flag's value as a
-    path, which is the direction that produces a false ALLOW, so the value-taking
-    flags are enumerated rather than guessed.
+    By SHAPE, not by position — and that is the whole fix for two cold-lane
+    findings that were one defect seen from opposite sides (P1 and P2).
+
+    The previous version identified paths positionally: skip flags, then drop the
+    first bare word as the pattern. That cannot be made correct by enumeration,
+    because it needs a complete list of every flag that takes a value. `rg --sort
+    path decide` — a pathless, repo-wide search — read `path` as the pattern and
+    `decide` as a single-file target, and was ALLOWED; and `rg -e decide <file>`
+    had its pattern eaten by `-e`, so the real file was dropped as "the pattern"
+    and a legitimate single-file search was DENIED. One list, two opposite
+    failures, both of which return the moment someone uses a flag nobody listed.
+
+    A separator or an existing entry answers the question without a list: search
+    patterns rarely contain `/`, and a target that exists is a target.
+    """
+    return "/" in word or word in {".", ".."} or (cwd / word).exists()
+
+
+def _paths_of(words: list[str], cwd: Path) -> list[str]:
+    """The PATH arguments of a search command; empty means it walks the whole tree.
+
+    Flag VALUES are still skipped where the flag is known to take one, so
+    `-g 'src/*.py'` cannot be mistaken for a target. That list is now a
+    refinement rather than the mechanism — an unlisted flag costs precision here,
+    where it used to cost the guard entirely.
     """
     value_flags = {*_RESTRICT_FLAGS, "-m", "--max-count", "-A", "-B", "-C", "-e", "--regexp"}
-    positional: list[str] = []
+    paths: list[str] = []
     skip = False
     for word in words[1:]:
         if skip:
@@ -248,8 +305,9 @@ def _paths_of(words: list[str]) -> list[str]:
         if word.startswith("-"):
             skip = word in value_flags
             continue
-        positional.append(word)
-    return positional[1:]  # drop the pattern
+        if _looks_like_a_path(word, cwd):
+            paths.append(word)
+    return paths
 
 
 def _is_single_file(target: str, cwd: Path) -> bool:
@@ -286,7 +344,7 @@ def _searches_the_tree(segment: str, cwd: Path, *, piped: bool) -> str | None:
     )
     if not recursive or _restricted_to_prose(words):
         return None
-    paths = _paths_of(words)
+    paths = _paths_of(words, cwd)
     if paths and all(_is_single_file(p, cwd) or _is_prose_target(p, cwd) for p in paths):
         return None
     pattern = next((w for w in rest if not w.startswith("-")), "")

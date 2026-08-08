@@ -27,6 +27,11 @@ DENY_COMMANDS = [
     'ls -la && rg "decide" python/',  # a searcher in a later segment still counts
     'rg "decide" python/src tests/',  # several tree targets
     'rg -g "*.py" decide',  # a restriction that still reaches source
+    # --- the two P1 FALSE NEGATIVES the cold lane executed against 599584a.
+    # Both defeated the guard outright, and both came from identifying a path by
+    # POSITION rather than by shape. See `_looks_like_a_path`.
+    "rg --sort path decide",  # an unlisted value-flag ate the repo-wide-ness
+    "rg -g '!*.md' decide .",  # a NEGATED glob reaches every source file
 ]
 
 # Never denied — the control arm.
@@ -52,6 +57,13 @@ ALLOW_COMMANDS = [
     'echo "run rg decide python/ to find it"',
     'git commit -m "guard: deny `rg decide python/` before a graph query"',
     "cat > /tmp/x.sh <<'EOF'\nrg decide python/\nEOF",
+    # --- the two P2 FALSE POSITIVES the cold lane executed against 599584a.
+    # A regex cannot see quoting, so an ordinary commit split into a segment that
+    # read as a search; and `-e` ate the pattern, so the real file was dropped as
+    # "the pattern" and a single-file search was denied against this module's own
+    # stated invariant.
+    'git commit -m "docs && rg decide"',
+    "rg -e decide python/src/kb_setup/hook_guard.py",
     # Not searchers at all.
     "ls -la",
     "mise run lint",
