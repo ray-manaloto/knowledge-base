@@ -312,8 +312,13 @@ def detect_scripts(command: str) -> Iterator[tuple[str, str]]:
             yield "inline", body
 
 
-def _tool_uses(path: Path) -> Iterator[tuple[str, dict[str, object]]]:
+def tool_uses(path: Path) -> Iterator[tuple[str, dict[str, object]]]:
     """Yield ``(tool_name, tool_input)`` for every tool call in one transcript.
+
+    PUBLIC because :mod:`kb_setup.session_reflect` reads the same stream to ask a
+    different question. One reader, two callers — duplicating this walker would
+    mean two places to fix when the transcript format moves, and the defensive
+    handling below is exactly the part that would drift.
 
     Defensive by design: a transcript is an append-only log written by another
     process, so a truncated final line is normal rather than exceptional and
@@ -405,7 +410,7 @@ def scripts_in(
     """Every ad-hoc script authored in one transcript, in the order written."""
     session = path.stem
     found: list[Script] = []
-    for name, payload in _tool_uses(path):
+    for name, payload in tool_uses(path):
         bodies: list[tuple[str, str]] = []
         if name == "Bash":
             command = payload.get("command")

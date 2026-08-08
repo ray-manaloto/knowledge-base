@@ -35,7 +35,8 @@ def main(argv: list[str] | None = None) -> int:
             "affected <symbol> [--depth N] | insights [--top N] | serve | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
-            "brain [record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
+            "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
+            "arms <spec.toml> [--dry-run] | "
             "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
             "graph-counts [--by-source] [name...] | "
             "md-budget | skill-lint | "
@@ -175,7 +176,7 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
 #: `reclaim` is advisory in the same sense — it gates nothing — but it is the one
 #: member that CAN delete, and only behind an explicit `--apply`. Grouped here
 #: because its default path (report, rc 0, no mutation) is identical to the others'.
-_ADVISORY = frozenset({"distill", "arms", "reclaim", "graph-counts"})
+_ADVISORY = frozenset({"distill", "session-reflect", "arms", "reclaim", "graph-counts"})
 
 
 def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
@@ -184,6 +185,10 @@ def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import distill
 
         return distill.distill_main(repo_root, rest)
+    if cmd == "session-reflect":
+        from kb_setup import session_reflect
+
+        return session_reflect.reflect_main(repo_root, rest)
     if cmd == "reclaim":
         from kb_setup import reclaim
 

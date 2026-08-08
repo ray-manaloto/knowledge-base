@@ -325,6 +325,25 @@ description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --
 # block. See `.claude/skills/kb-reclaim/SKILL.md`.
 run = "uv run kb-setup reclaim {{arg(name='args', var=true, default='')}}"
 
+[tasks.kb-session-reflect]
+description = "What did THIS round do by hand that a task already owns? (advisory)"
+# The complement to `kb-distill`, not a duplicate of it. distill is a FREQUENCY
+# miner: it groups ad-hoc scripts across 50 sessions on their import signature,
+# so it answers "was a program written twice?". This asks "what did this ROUND
+# do by hand?" — which frequency mining structurally cannot see, because a step
+# done once in one session has no frequency to mine.
+#
+# The gap is measured, not assumed: distill's largest group is 149 hand-written
+# mutation harnesses across 21 sessions, every one a fresh scratchpad, and
+# `kb-arms` has existed to replace them since #160.
+#
+# Both read the same transcripts through ONE reader — `distill.tool_uses`, made
+# public for this caller — so the format is parsed in a single place.
+#
+# Advisory by construction: always exits 0 and gates nothing. An un-automated
+# step is a statement about future cost, not a failure.
+run = "uv run kb-setup session-reflect {{arg(name='args', var=true, default='')}}"
+
 [tasks.kb-distill]
 description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
 # The PRODUCING half of Ray's directive; `kb-skill-lint` is the policing half.

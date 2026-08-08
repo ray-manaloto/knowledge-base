@@ -113,6 +113,7 @@ mise run kb-remember -- --question "<what this round asked>" \
 mise run kb-reflect                       # aggregate -> reflections/LESSONS.md
 mise run kb-goal-outcome -- <pair> --result <r> [--turns N]   # if a /goal ran
 mise run kb-distill                       # did this round hand-write a tool twice?
+mise run kb-session-reflect               # what did it do by hand that a task owns?
 ```
 
 `kb-remember` is what makes the corpus compound: a lesson that lives only in a
@@ -140,6 +141,20 @@ The measured backdrop: 785 ad-hoc scripts across 40 sessions, of which
 `python/src/kb_setup` (patch a source file, run tests, restore) is the largest
 group — i.e. the mutation harness, hand-written five times and still tracked as
 open in #160.
+
+**`kb-session-reflect` is the fourth, and it asks what distill cannot.** distill
+is a FREQUENCY miner — it groups scripts across 50 sessions by import signature,
+so it answers *was a program written twice?* A step done by hand ONCE, in one
+session, has no frequency to mine and is invisible to it: a directive violated
+at a rate, a probe that answered without asking, a run of adjacent tasks wanting
+one wrapper. That gap has a number on it — distill's largest group is now **149**
+hand-written mutation harnesses across 21 sessions, every one a fresh scratchpad,
+while `kb-arms` has existed to replace them since #160.
+
+Both read the same transcripts through one reader (`distill.tool_uses`), and
+both are advisory. Read `.claude/skills/kb-session-reflect/SKILL.md` when a
+finding looks worth turning into a `skill -> task -> module` triple; it carries
+the rule for which of those three layers a lead actually earns.
 
 ## 3. Documentation sync — make the docs match what happened
 
