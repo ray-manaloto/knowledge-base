@@ -44,7 +44,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from kb_setup import brain
@@ -91,6 +91,22 @@ class Rule:
     is worse than no detector, because following the advice makes the report
     louder.
     """
+    also: re.Pattern[str] | None = None
+    """A SECOND requirement, searched independently against the whole command.
+
+    The mirror of `unless`, and it exists for a measured reason rather than for
+    symmetry. A rule meaning "A appears, and later so does B" is naturally
+    written `A.*?B` under DOTALL — which makes the engine retry the lazy gap out
+    to end-of-string from EVERY `A` start position, O(k·n) on a command with
+    many `A`s and no `B`. `mutation-harness` was exactly that shape, and a long
+    transcript line is all it takes to stall an advisory report (cold lane,
+    2026-08-08). Two independent linear searches answer the same question in
+    O(n) and cost one field.
+
+    The ORDER of A-then-B is given up by the split, deliberately: a command that
+    runs `pytest` before it patches a file is still a hand-rolled harness, so
+    ordering was never part of what the rule meant.
+    """
 
 
 @dataclass(frozen=True)
@@ -119,28 +135,41 @@ class Report:
     counts_armed: int = 0
 
 
-def _rule(rid: str, pattern: str, remedy: str, why: str, unless: str | None = None) -> Rule:
-    return Rule(
-        id=rid,
-        pattern=re.compile(pattern),
-        remedy=remedy,
-        why=why,
+def _rule(rid: str, pattern: str, remedy: str, why: str) -> Rule:
+    """The four fields EVERY rule has. Guards are attached with `_guard`.
+
+    Split rather than grown to six parameters: `unless` and `also` are each used
+    by one rule out of eight, so carrying them through every call site would put
+    two `None`s in six rows to spare two rows a wrapper.
+    """
+    return Rule(id=rid, pattern=re.compile(pattern), remedy=remedy, why=why)
+
+
+def _guard(rule: Rule, *, unless: str | None = None, also: str | None = None) -> Rule:
+    """`rule` with an exemption and/or a second requirement compiled onto it."""
+    return replace(
+        rule,
         unless=re.compile(unless) if unless else None,
+        also=re.compile(also) if also else None,
     )
 
 
 OWNED: tuple[Rule, ...] = (
-    _rule(
-        "mutation-harness",
-        r"""(?sx)
-        (?:read_text|\.replace\(|write_text)     # a source file being patched
-        .*?
-        (?:pytest|subprocess\.run|rc=)           # ...then something run over it
-        """,
-        "mise run kb-arms -- <spec.toml>",
-        "distill's largest group: 149 hand-written harnesses across 21 sessions. "
-        "A scratchpad harness loses the __pycache__ mitigation, which can credit "
-        "an arm with a death the mutation never caused.",
+    _guard(
+        _rule(
+            "mutation-harness",
+            # A source file being patched. The "...and then something is RUN over
+            # it" half lives in `also`, not in a `.*?` gap here: see Rule.also —
+            # the spanning form backtracked to end-of-string from every
+            # `write_text` in a long command and could stall the report it exists
+            # to produce.
+            r"(?:read_text|\.replace\(|write_text)",
+            "mise run kb-arms -- <spec.toml>",
+            "distill's largest group: 149 hand-written harnesses across 21 sessions. "
+            "A scratchpad harness loses the __pycache__ mitigation, which can credit "
+            "an arm with a death the mutation never caused.",
+        ),
+        also=r"pytest|subprocess\.run|rc=",
     ),
     _rule(
         "graph-counts",
@@ -166,6 +195,24 @@ OWNED: tuple[Rule, ...] = (
 )
 """Work an existing task already owns. The remedy is the point of the row."""
 
+_SEG = r"(?:[^|\n;&]|&(?!&))*"
+"""Bytes inside ONE simple command — never across `;`, `&&`, `||` or a pipe.
+
+A single `&` IS allowed, and that exception is the whole reason this is not the
+obvious `[^|\\n;&]*`: `2>&1` is the most common thing to appear between a gate
+and its pipe, so excluding `&` outright would stop `mise run lint 2>&1 | tail`
+— the canonical violation — from matching at all. `&(?!&)` keeps the redirect
+and still refuses the separator.
+"""
+
+_GATE_TASKS = "lint|lint-docs|test|fmt|eval|brain-audit|kb-gates"
+"""The `mise run` tasks whose exit code is EVIDENCE, so losing it is the defect.
+
+Deliberately a list rather than `mise run \\S+`: most tasks here are reads
+(`kb-query`, `kb-session-state`), and piping a read into `head` is a display
+bound on output already in hand, not a discarded gate.
+"""
+
 DIRECTIVES: tuple[Rule, ...] = (
     _rule(
         "bare-interpreter",
@@ -177,24 +224,55 @@ DIRECTIVES: tuple[Rule, ...] = (
     ),
     _rule(
         "relative-cd",
-        r"(?m)(?:^|[;&|]\s*)cd\s+(?!/)[^\s;&|]+",
+        # `["']?[/~$]` — not just a literal leading `/`. `cd ~`, `cd "$HOME/repo"`
+        # and `cd $(git rev-parse --show-toplevel)` all resolve to an ABSOLUTE
+        # path after expansion, and flagging them inflated the reported rate with
+        # commands that were already compliant (cold lane, 2026-08-08). What the
+        # directive is actually about is a target relative to a cwd that persists
+        # across Bash calls, and none of those three is one.
+        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?[/~$])[^\s;&|]+",
         "git -C <path> …, or an absolute path",
         "cwd persists across Bash calls; two relative cds once made "
         "`gh issue view` return a different repository's PR.",
     ),
-    _rule(
-        "piped-rc",
-        # ONLY a gate on the left-hand side. The first draft matched any
-        # `| head`/`| tail` and fired 111 times in one session — every display
-        # pipe over a log file. A rule at that volume is noise, and noise is
-        # what teaches a reader to skip the section that holds the real one.
-        # The directive is about losing a GATE's exit code, so the left side
-        # must be something whose rc means anything.
-        r"\b(?:mise run|hk |pytest|uv run (?:ruff|ty|pytest))[^|\n]*"
-        r"\|\s*(?:tail|head)\b(?![^|\n]*\brc=)",
-        '<cmd> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log',
-        "Bash returns the LAST pipeline command's exit code, so a failed gate reports success.",
-        r"\brc=\$\?",
+    _guard(
+        _rule(
+            "piped-rc",
+            # ONLY a gate on the left-hand side. The first draft matched any
+            # `| head`/`| tail` and fired 111 times in one session — every
+            # display pipe over a log file. A rule at that volume is noise, and
+            # noise is what teaches a reader to skip the section that holds the
+            # real one. The directive is about losing a GATE's exit code, so the
+            # left side must be something whose rc means anything.
+            #
+            # Three separate precision fixes, all from one cold-lane finding:
+            #
+            # 1. The gate must sit at a COMMAND POSITION. A bare `\bpytest\b`
+            #    matched the word anywhere, so `rg pytest /tmp/log | head` — a
+            #    grep FOR the string, whose rc means nothing — was reported as a
+            #    lost gate.
+            # 2. `mise run` is narrowed to the tasks that ARE gates. `mise run
+            #    kb-query -- "…" | head -20` is a browse; its rc is not evidence
+            #    and flagging it says the directive applies where it does not.
+            # 3. `_SEG` refuses to cross a command separator in BOTH the gap and
+            #    the lookahead. The old `[^|\n]*` crossed `;`, which produced a
+            #    matched pair of OPPOSITE errors: `mise run lint > log; echo
+            #    "rc=$?" | tail` (the remedy) FIRED because the gap ran past the
+            #    `;` to the pipe, and `mise run lint | tail; echo "rc=$?"` (the
+            #    real violation) was SUPPRESSED because the lookahead ran past
+            #    the `;` to an `rc=` that is `tail`'s status, not the gate's.
+            rf"(?m)(?:^|[;&|]\s*)"
+            rf"(?:mise run (?:{_GATE_TASKS})|hk |pytest|uv run (?:ruff|ty|pytest))"
+            rf"{_SEG}\|\s*(?:tail|head)\b(?!{_SEG}\brc=)",
+            '<cmd> > /tmp/out.log 2>&1; echo "rc=$?" >> /tmp/out.log',
+            "Bash returns the LAST pipeline command's exit code, so a failed gate reports success.",
+        ),
+        # `${PIPESTATUS[0]}` is the one form that pipes a gate and STILL reads
+        # the gate's own status, so it is compliance rather than a violation.
+        # It replaces a `\brc=\$\?` exemption that was checked against the whole
+        # command and therefore excused fix 3's false negative all over again —
+        # the very defect the tightened lookahead exists to catch.
+        unless=r"\bPIPESTATUS\b",
     ),
 )
 """Standing directives whose compliance is a RATE, not a yes/no."""
@@ -218,13 +296,38 @@ _MISE_RUN = re.compile(r"\bmise run ([a-z0-9][\w-]*)")
 _KB_SETUP = re.compile(r"\buv run kb-setup ([a-z][\w-]*)")
 _GRAPHIFY = re.compile(r"\bgraphify (?:query|explain|path|god-nodes)\b|\bkb-query\b")
 _SOURCE_READ = re.compile(r"\.(?:py|pkl|toml|js|ts)$")
-_COUNT = re.compile(r"\bgrep\s+-[A-Za-z]*c")
-"""A counting grep. Armed only when the SAME command counts a second term.
+_COUNT = re.compile(r"\bgrep\s+-[A-Za-z]*c[A-Za-z]*((?:[^\n;&|]|&(?!&))*)")
+"""A counting grep, capturing the ARGUMENTS of that one invocation.
 
-Armed-ness cannot be decided per-command by a pattern, which is why this is
-a rate rather than a Rule: one `grep -c` is a probe, two in one command is a
-probe plus its control. Reporting one row per count produced pure noise on
-the first run — the excerpt was literally `grep -c` every time."""
+Armed-ness cannot be decided per-command by a pattern, which is why this is a
+rate rather than a Rule: one `grep -c` is a probe, two over the same corpus is
+a probe plus its control. Reporting one row per count produced pure noise on
+the first run — the excerpt was literally `grep -c` every time.
+
+The arguments are captured because COUNTING the invocations is not the same
+question. `grep -c missing a; grep -c unrelated b` is two counts and two
+matches, and the first version credited it as one validated probe — two
+independently-unanswered negatives reported as one armed one, which is the
+exact failure this whole section exists to name (cold lane, 2026-08-08).
+"""
+
+
+def _armed(command: str) -> bool:
+    """Do two of this command's counting greps search the SAME corpus?
+
+    That shared target is what makes the second grep a control rather than a
+    second question: a term known to be present, counted the same way, over the
+    same bytes. Different targets are two probes, and two probes do not arm each
+    other however many there are.
+
+    Approximated by the LAST argument, which is where a path sits in ordinary
+    `grep -c <term> <path>` usage. It cannot see a grep reading stdin, and it
+    would be fooled by a trailing flag — both under-report (a stdin pair is
+    called unarmed), which is the safe direction for a rule whose whole subject
+    is claiming an answer you did not get.
+    """
+    targets = [args.split()[-1] for args in _COUNT.findall(command) if args.split()]
+    return len(targets) >= MIN_RUN and any(targets.count(t) >= MIN_RUN for t in targets)
 
 
 def _normalise(command: str) -> str:
@@ -260,14 +363,37 @@ def commands_in(path: Path) -> Iterator[str]:
 
 
 def _reads_source(payload: dict[str, object]) -> bool:
-    target = payload.get("file_path") or payload.get("pattern") or ""
-    return isinstance(target, str) and bool(_SOURCE_READ.search(target))
+    """Did this Read/Grep record go at SOURCE, rather than at prose or a log?
+
+    All three keys, in specificity order. `path` was the missing one and it is
+    the one a Grep actually carries: `{"pattern": "needle", "path": "…/cli.py"}`
+    has no `file_path`, so the old chain fell through to the PATTERN and asked
+    whether the search term looked like a filename. Every targeted grep of a
+    module therefore went uncounted, understating `graph_skipped` — the half of
+    the graph-first ratio that is supposed to be the uncomfortable one.
+    """
+    for key in ("file_path", "path", "pattern"):
+        target = payload.get(key)
+        if isinstance(target, str) and _SOURCE_READ.search(target):
+            return True
+    return False
 
 
 def scan(rules: Iterable[Rule], command: str, session: str) -> Iterator[Finding]:
-    """Every rule in `rules` that `command` trips, with the matched bytes."""
+    """Every rule in `rules` that `command` trips, with the matched bytes.
+
+    The ORDER of the three checks is load-bearing, not tidiness. `also` and
+    `unless` are cheap alternations; `pattern` is the expensive one, and the
+    adversarial input for `mutation-harness` — many patch tokens, no run token —
+    is exactly the input `also` rejects. Measured with the old spanning pattern
+    restored: 398 ms executing it directly against that command, 0.28 ms through
+    this function, because the pattern is never reached. Moving `pattern` above
+    these two would hand back the cost the split was made to remove.
+    """
     for rule in rules:
         if rule.unless is not None and rule.unless.search(command):
+            continue
+        if rule.also is not None and not rule.also.search(command):
             continue
         match = rule.pattern.search(command)
         if match:
@@ -336,10 +462,9 @@ def _scan_one(path: Path, report: Report) -> None:
         report.violations.extend(scan(DIRECTIVES, command, session))
         report.unarmed.extend(scan(UNARMED, command, session))
         report.graph_queries += len(_GRAPHIFY.findall(command))
-        found = len(_COUNT.findall(command))
-        if found:
+        if _COUNT.search(command):
             report.counts += 1
-            report.counts_armed += 1 if found >= MIN_RUN else 0
+            report.counts_armed += 1 if _armed(command) else 0
 
     shapes = Counter(_normalise(c) for c in commands)
     report.repeats.extend(

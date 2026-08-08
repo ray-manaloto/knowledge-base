@@ -1,0 +1,148 @@
+# Revert arms for every fix made against the cold review of `ce2903a`
+# (7 findings: 6xP2, 1xP3).
+#
+# Each row REVERTS one fix to what shipped, and the row's named test must go
+# RED. A fix whose own test still passes without it is decoration
+# (`mutation-arms-are-a-floor-not-a-ceiling`).
+#
+# This batch matters more than most, because finding 6 WAS "the tests cannot
+# fail": the annotated-tag work shipped with three tests that stayed green when
+# `tag_object` was dropped entirely. Arm `widened-compare-drops-the-tag-object`
+# below is that exact regression, run against the replacement tests.
+
+suites = [
+  "tests/test_session_reflect.py",
+  "tests/test_currency_sync.py",
+  "tests/test_currency_apply.py",
+  "tests/test_manifest_add.py",
+]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/session_reflect.py"
+old = "MIN_RUN = 2"
+new = "MIN_RUN = 2  # inert control edit"
+
+# --- finding 1: the quadratic mutation-harness regex -------------------------
+
+# The `also` split is what makes the rule two linear searches. Without the
+# wiring in `scan`, the pattern alone matches a bare `write_text`.
+[[arm]]
+id = "also-not-consulted"
+test = "test_an_ordinary_file_edit_is_not_a_harness"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        if rule.also is not None and not rule.also.search(command):
+            continue'''
+new = '''        if False:
+            continue'''
+
+# NO ARM for restoring the spanning pattern itself, and the measurement is the
+# reason rather than the absence of one. That arm was WRITTEN and it SURVIVED;
+# probing the survivor showed the mutant is never executed — `scan` consults
+# `also` before `pattern`, and the adversarial command (many patches, no run
+# token) fails `also`. Executing the restored pattern directly against those
+# bytes costs 398 ms; the same mutant through `scan` costs 0.28 ms.
+#
+# So `test_many_patches_and_no_test_run_finish_promptly` has no single-line
+# mutant, and shipping one that is predicted to survive is the shape that gets
+# read as confirmation rather than as a test. The short-circuit IS the fix, and
+# `also-not-consulted` above is its arm.
+
+# --- finding 2: tag_prefix dead on the APPLY path ----------------------------
+
+[[arm]]
+id = "apply-drops-the-prefix"
+test = "test_apply_resolves_a_tag_carrying_the_declared_prefix"
+file = "python/src/kb_setup/currency/apply.py"
+old = '''            manifest_obj.url, verdict.latest, prefix=spec.tag_prefix'''
+new = '''            manifest_obj.url, verdict.latest'''
+
+[[arm]]
+id = "resolve-tag-ignores-the-prefix"
+test = "test_resolve_tag_finds_a_prefixed_tag_when_given_the_prefix"
+file = "python/src/kb_setup/manifest.py"
+old = '''    ordered = ([f"{prefix}{version}"] if prefix else []) + [f"v{version}", version]'''
+new = '''    ordered = [f"v{version}", version]'''
+
+# --- finding 3: piped-rc, one false negative and two false positives ---------
+
+# The gap and the lookahead crossing `;` again. Suppresses the real violation
+# on a `rc=$?` that belongs to `tail`.
+[[arm]]
+id = "seg-crosses-command-separators"
+test = "test_an_rc_captured_after_the_pipe_is_still_a_violation"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''_SEG = r"(?:[^|\n;&]|&(?!&))*"'''
+new = '''_SEG = r"[^|\n]*"'''
+
+# The gate no longer has to sit at a command position, so `rg pytest …` matches.
+#
+# The indentation here is EXACT (12 spaces, inside `_guard(_rule(...))`). It was
+# written at 8 and still "would apply", because a shorter leading-whitespace run
+# matches as a substring at an offset — which happens to preserve indentation
+# here and would silently corrupt it in the other direction. An anchor that is
+# right by arithmetic rather than by construction is one refactor from a
+# syntax error scored as a DEATH.
+[[arm]]
+id = "gate-matches-mid-command"
+test = "test_grepping_for_the_word_pytest_is_not_a_lost_gate"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''            rf"(?m)(?:^|[;&|]\s*)"'''
+new = '''            rf"(?m)"'''
+
+# `mise run <anything>` again, so a read-only browse is reported as a lost gate.
+[[arm]]
+id = "mise-run-not-narrowed-to-gates"
+test = "test_piping_a_read_only_task_into_head_is_a_browse"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''_GATE_TASKS = "lint|lint-docs|test|fmt|eval|brain-audit|kb-gates"'''
+new = '''_GATE_TASKS = r"\S+"'''
+
+# --- finding 4: counting greps armed by OCCURRENCE, not relatedness ----------
+
+[[arm]]
+id = "armed-counts-occurrences-again"
+test = "test_two_counts_over_different_corpora_do_not_arm_each_other"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    targets = [args.split()[-1] for args in _COUNT.findall(command) if args.split()]
+    return len(targets) >= MIN_RUN and any(targets.count(t) >= MIN_RUN for t in targets)'''
+new = '''    return len(_COUNT.findall(command)) >= MIN_RUN'''
+
+# --- finding 5: _reads_source never looked at `path` -------------------------
+
+[[arm]]
+id = "reads-source-ignores-path"
+test = "test_a_grep_carrying_a_path_counts_as_a_source_read"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''    for key in ("file_path", "path", "pattern"):'''
+new = '''    for key in ("file_path", "pattern"):'''
+
+# --- finding 6: the annotated-tag tests could not fail -----------------------
+
+# THE regression the review named: drop `tag_object` and every test in that
+# diff stayed green. Against the replacement fixture it must not.
+[[arm]]
+id = "widened-compare-drops-the-tag-object"
+test = "test_an_annotated_tags_tag_object_sha_is_accepted"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''    if commit not in {resolved, tag_object}:'''
+new = '''    if commit != resolved:'''
+
+# The fixture's own arm: a LIGHTWEIGHT tag has one identity, so a fixture built
+# without `-a` cannot tell a widened check from a narrow one.
+[[arm]]
+id = "fixture-tag-is-lightweight-again"
+test = "test_the_fixture_annotated_tag_really_has_two_identities"
+file = "tests/test_currency_sync.py"
+old = '''    _git(root, "tag", *(["-a", "-m", f"release {ref}"] if annotated else []), ref)'''
+new = '''    _git(root, "tag", ref)'''
+
+# --- finding 7: relative-cd flagged shell-expanded absolutes -----------------
+
+[[arm]]
+id = "relative-cd-checks-literal-slash-only"
+test = "test_a_shell_expanded_absolute_cd_is_not_a_violation"
+file = "python/src/kb_setup/session_reflect.py"
+old = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?![\"']?[/~$])[^\s;&|]+",'''
+new = '''        r"(?m)(?:^|[;&|]\s*)cd\s+(?!/)[^\s;&|]+",'''

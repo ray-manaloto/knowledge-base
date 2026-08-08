@@ -213,7 +213,14 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     manifest_obj: mf.Manifest | None = None
     if spec.manifest:
         manifest_obj = mf.load(repo_root / spec.manifest)
-        manifest_ref, manifest_commit = mf.resolve_tag(manifest_obj.url, verdict.latest)
+        # `prefix=` is the half of #245 that did NOT land the first time. Without
+        # it this call knows only `v<version>` and `<version>`, so an authorized
+        # apply for codex (tagged `rust-v0.147.0`) raised "no tag found" and
+        # aborted the whole bump — while `currency.toml` carried a comment saying
+        # the prefix was wired in, because the SYNC half of it was.
+        manifest_ref, manifest_commit = mf.resolve_tag(
+            manifest_obj.url, verdict.latest, prefix=spec.tag_prefix
+        )
         changed.append(spec.manifest)
 
     # Past this point nothing raises, so the two writes are effectively atomic.

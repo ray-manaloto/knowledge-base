@@ -100,16 +100,41 @@ def write_commit(m: Manifest, commit: str) -> Manifest:
     return replace(m, commit=commit)
 
 
-def resolve_tag(url: str, version: str) -> tuple[str, str]:
+def _tag_candidates(version: str, prefix: str) -> tuple[str, ...]:
+    """The refs to try for `version`, most specific first, each named once.
+
+    De-duplicated because a `tag_prefix = "v"` would otherwise spend a second
+    network round trip re-asking a question already answered, and then print a
+    "tried" list naming the same ref twice — which reads as a bug in the caller.
+    """
+    ordered = ([f"{prefix}{version}"] if prefix else []) + [f"v{version}", version]
+    return tuple(dict.fromkeys(ordered))
+
+
+def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     """Resolve a release version to its (ref, commit) via `git ls-remote --tags`.
 
-    Tries `v<version>` then the bare `<version>` — projects tag both ways. Raises
-    if NEITHER tag exists at the remote, so the currency engine can never pin a
-    manifest to a version that was published to PyPI but tagged nowhere in git
-    (the mirror of graphify's v1.0.0-tagged-not-on-PyPI trap). `--refs` strips the
-    `^{}` dereference line so a peeled annotated tag yields one clean SHA.
+    Tries the caller's `prefix` first when given, then `v<version>`, then the
+    bare `<version>` — projects tag all three ways. Raises if NONE exists at the
+    remote, so the currency engine can never pin a manifest to a version that was
+    published to PyPI but tagged nowhere in git (the mirror of graphify's
+    v1.0.0-tagged-not-on-PyPI trap). `--refs` strips the `^{}` dereference line so
+    a peeled annotated tag yields one clean SHA.
+
+    `prefix` exists because the two halves of #245 were fixed in different
+    places and only one of them landed: `ToolSpec.tag_prefix` taught the *sync*
+    check to strip `rust-v` before comparing versions, while this function — the
+    one an authorized auto-apply actually calls — still knew only the two
+    unprefixed candidates. So the reporting half stopped lying about codex and
+    the acting half would still have aborted the bump, under a comment claiming
+    it was fixed (cold lane, 2026-08-08).
+
+    The v-prefixed and bare candidates are kept as FALLBACKS rather than
+    replaced, so a stale or wrong `tag_prefix` degrades to today's behaviour
+    instead of turning a resolvable tag into a hard failure.
     """
-    for ref in (f"v{version}", version):
+    candidates = _tag_candidates(version, prefix)
+    for ref in candidates:
         try:
             out = subprocess.run(
                 ["git", "ls-remote", "--tags", "--refs", url, ref],
@@ -126,7 +151,11 @@ def resolve_tag(url: str, version: str) -> tuple[str, str]:
             raise RuntimeError(f"git ls-remote failed for {url} @ {ref}: {e}") from e
         if out:
             return ref, out.split()[0]
-    raise RuntimeError(f"no tag {version!r} (or v{version}) found at {url}")
+    # Name EVERY candidate actually tried. The old wording hard-coded two, so a
+    # prefixed miss would have reported that `rust-v` was never attempted when it
+    # was — a failure message that misdescribes its own probe sends the reader to
+    # add config that is already there.
+    raise RuntimeError(f"no tag found at {url}; tried {list(candidates)}")
 
 
 def write_pin(m: Manifest, *, ref: str, commit: str) -> Manifest:

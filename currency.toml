@@ -1280,16 +1280,25 @@ version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # an assertion that something was wrong when it was right. One is silence about
 # a question; the other is a wrong answer to it. Only the second had to go.
 #
-# PARTLY FIXED 2026-08-08 — and the part that is NOT fixed is stated first,
-# because this comment said "BOTH ARE FIXED" for one commit and the cold lane
-# caught it. `tag_prefix` reaches exactly ONE call site, `sync.py`'s manifest-ref
-# compare. It does NOT reach `apply.py`, which calls `manifest.resolve_tag()`
-# without it — and `resolve_tag` takes no prefix parameter at all, so it still
-# tries only `v<version>` and `<version>`. An auto-apply for codex would still
-# abort. Tracked in #245, which stays OPEN for that half.
+# FIXED 2026-08-08, in TWO commits, and the history is kept because it is the
+# lesson: this comment claimed "BOTH ARE FIXED" while only the reporting half
+# was, the cold lane caught it, and the correction then had to say "PARTLY"
+# for a round. `tag_prefix` reached exactly ONE call site — `sync.py`'s
+# manifest-ref compare — so the check stopped lying about codex while an
+# authorized auto-apply would still have aborted on `no tag found`.
 #
-# WHAT IS FIXED, armed and measured: the engine learned `tag_prefix` (#245) for
-# the ref compare, and
+# The acting half now lands too: `manifest.resolve_tag` takes `prefix=` and
+# tries `<prefix><version>` FIRST, falling back to `v<version>` and the bare
+# form so a stale prefix degrades rather than turning a hit into a miss, and
+# `apply.py` passes `spec.tag_prefix`. Armed both ways against a fake remote
+# holding only `rust-v0.9.26`: the bump resolves with the prefix and aborts
+# without it, leaving mise.toml byte-identical.
+#
+# THE GENERALISABLE PART: a config key can be read by the reporting path and by
+# nothing that ACTS. Wiring one call site is not wiring the feature, and the
+# comment describing it is the least reliable evidence that it is done.
+#
+# WHAT WAS FIXED EARLIER, armed and measured:
 # `_check_manifest_commit` now accepts EITHER identity of an annotated tag
 # (#246), because `ls-remote` records the tag OBJECT while `git rev-list` peels
 # to the commit and both name the same tree.
@@ -1303,5 +1312,12 @@ version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # The first attempt at #246 did NOT work and the arm is why: `rev-list` peels
 # for both `<ref>` and `<ref>^{}`, so it compared peeled against peeled and
 # still reported drift. `rev-parse` is what returns the tag object.
+#
+# That arm was MANUAL, on a clone this repo does not carry, and the cold lane's
+# sharpest finding was that the tests shipped beside it could not fail: all
+# three used manifests with no clone, reached the `resolved is None` SKIP, and
+# stayed green when `tag_object` was dropped entirely. `_clone_at(…,
+# annotated=True)` now builds a real annotated tag in `tmp_path`, and that same
+# regression is a mutation arm that DIES.
 tag_prefix = "rust-v"
 manifest = "sources/codex.manifest"
