@@ -88,6 +88,61 @@ missed it, is a **third** architecture — a handler *stack* rather than a
 processor pipeline or an owned-sink system. It was not evaluated here; it is in
 the graph, and it is the obvious thing to compare against before this is settled.
 
+## `logbook` — the third architecture, now evaluated
+
+Listed above as unevaluated; done here, because it is the candidate this repo's
+own sweep missed and the dotfiles session supplied (§2.6j).
+
+**The contrast is structural and citable, not a matter of taste.**
+
+`logbook` ships an entire transport layer. `src/logbook/queues.py` defines
+**14 classes**:
+
+```
+RedisHandler            MessageQueueHandler      ZeroMQHandler
+ThreadController        SubscriberBase           MessageQueueSubscriber
+ZeroMQSubscriber        MultiProcessingHandler   MultiProcessingSubscriber
+ExecnetChannelHandler   ExecnetChannelSubscriber TWHThreadController
+ThreadedWrapperHandler  GroupMember
+```
+
+`structlog` has **no equivalent module at all**. Its package is `processors.py`,
+`stdlib.py`, `dev.py`, `contextvars.py`, `tracebacks.py`, `testing.py` — every
+one of them event-shaping or integration. That is D20's framing correction
+confirmed by structure rather than by assertion: **structlog is an event layer,
+full stop**, and logbook is a complete system that owns its own transport.
+
+`ThreadedWrapperHandler` (`queues.py:668`, degree 15) is logbook's answer to R7's
+offload — the direct counterpart of stdlib's `QueueListener`.
+
+### The R12 consequence, which is the part that matters here
+
+Under `mise run test`'s `-n auto`, **every pytest worker is a separate process**.
+logbook ships `MultiProcessingHandler` / `MultiProcessingSubscriber` as a
+purpose-built pair for exactly that topology. stdlib can do it too — a
+`QueueHandler` over a `multiprocessing.Queue` — but that is an assembly, not a
+provided component.
+
+So the trade is not "logbook has more features". It is:
+
+| | structlog + stdlib | logbook |
+|---|---|---|
+| event layer | structlog processors | logbook's own |
+| sink layer | **stdlib handlers** — a `Formatter` subclass in `kb_setup` | logbook handler stack |
+| thread offload | `QueueListener` (measured above) | `ThreadedWrapperHandler` |
+| **process** offload | assemble from `QueueHandler` + `multiprocessing.Queue` | **`MultiProcessingHandler`/`Subscriber`, provided** |
+| who owns report rendering | this repo | the library |
+
+Under §2.5's ruling the last row is decisive, and it points at structlog+stdlib:
+the sink renders **product**, so rendering belongs in `kb_setup` where it is
+reviewed like any other module. The R12 row points the other way, and is the
+strongest argument logbook has.
+
+**Not measured:** whether `MultiProcessingHandler` actually behaves correctly
+under `pytest-xdist`'s specific worker model. That is a probe, not a read, and it
+should be run before the R12 row is given any weight — this section establishes
+that the component exists and is aimed at the right problem, nothing more.
+
 ## What this does NOT establish
 
 - **It does not choose the wire format.** R7's "modern efficient message formats"
