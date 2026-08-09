@@ -226,6 +226,96 @@ commit `593ec549`, which may be ahead of that release; if a future round finds
 `Path` support has landed upstream, this finding expires and the manifest is
 where to check.
 
+---
+
+# R11 finding #3, resolved: `--preset` is a bundle, not a pin
+
+**The claim:** *"`--preset` is NOT a reproducibility pin — it renames every field
+to snake_case with wire aliases and drops `from __future__ import annotations`,
+i.e. it changes the generated models' public API."*
+
+## Verdict: **CONFIRMED in every particular** — and it under-sells its own point
+
+The flag's own help text invites the misreading their finding corrects:
+
+> `--preset` — Apply an immutable built-in option preset. Preset names include
+> the target Python version so generated syntax is pinned.
+
+## Evidence — one camelCase schema, with and without
+
+**Without `--preset`:**
+
+```python
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+
+class Widget(BaseModel):
+    widgetName: str
+    maxItemCount: int | None = None
+```
+
+**With `--preset practical-py314-20260619`:**
+
+```python
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Widget(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    widget_name: Annotated[str, Field(alias='widgetName')]
+    max_item_count: Annotated[int | None, Field(alias='maxItemCount')] = None
+```
+
+Every element of the claim holds: fields renamed to snake_case, wire aliases
+added, `from __future__ import annotations` gone. `model.widgetName` becomes
+`model.widget_name` — a breaking change to every consumer.
+
+## The refinement: it is a BUNDLE, and one of its parts IS reproducibility
+
+`preset.py`'s `_STANDARD_20260619_OPTION_GROUPS` sets, among others:
+
+```python
+use_annotated=True
+disable_timestamp=True
+snake_case_field=True
+```
+
+Two of those are independent concerns fused into one flag:
+
+- **`disable_timestamp=True` is a genuine reproducibility control.** Without it,
+  the generated header carries `#   timestamp: 2026-08-09T22:04:06+00:00`, so
+  **every regeneration produces a different file** and a diff is never clean.
+  This is visible in the two outputs above — the preset run has no timestamp
+  line.
+- **`snake_case_field=True` is the API break.**
+
+**And `--disable-timestamp` exists as a standalone flag.** So the actionable
+conclusion is sharper than either "use `--preset` to pin" or "`--preset` is not a
+pin":
+
+> For reproducibility, use **`--disable-timestamp`**. Reach for `--preset` only
+> if you also want its naming policy, and treat adopting or changing a preset as
+> a **breaking change to the generated API**, not a version bump.
+
+That distinction is not visible from the flag's help text, and it is not in the
+dotfiles finding either — their conclusion (do not treat `--preset` as a pin) is
+right, but stopping there loses the fact that the thing you actually wanted is
+one flag away.
+
+## What was NOT checked
+
+Whether the two preset families (`standard-*` vs `practical-*`) differ in the
+API-affecting options specifically. `_PRACTICAL_20260619_EXTRA_OPTION_GROUPS`
+adds to the standard set, and only `practical-py314` was run. A round that wants
+`standard-*` should re-run the comparison rather than assume it inherits this
+result.
+
 ## GitHub repos touched
 
 - [koxudaxi/datamodel-code-generator](https://github.com/koxudaxi/datamodel-code-generator)
