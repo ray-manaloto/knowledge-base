@@ -159,15 +159,45 @@ tree-sitter and no ty-LSP work. Ruff also ships the `LOG` and `G` rule families
 for logging correctness. Per `use-tool-builtins.md`, the built-in is the answer
 until proven insufficient.
 
-### 2.5 The open design question, stated so it is not decided by accident
+### 2.5 The design question — ANSWERED 2026-08-09
 
 That suppression comment names the real tension: **most of the 414 sites are the
 product, not diagnostics.** `kb-check`'s summary table, `kb-gates`' report,
 `kb-session-reflect`'s report and `kb-currency`'s run log are read by humans and
 in places parsed by machines. R3 appears to anticipate exactly this — the
-question put to Ray, and **not yet answered**, is whether the intent is *one
-structured event stream with a human-rendering stdout sink* rather than
-*reports become log lines*.
+question put to Ray was whether the intent is *one structured event stream with
+a human-rendering stdout sink* rather than *reports become log lines*.
+
+**Ray ruled: ONE EVENT STREAM, with a human-rendering stdout sink.** Every
+report becomes structured events; a dedicated sink renders them as the tables
+that are read today. This is R3 read as its author intended rather than as an
+escape hatch, and it is the larger of the two options — it changes how all 414
+sites are written, not just the diagnostic ones.
+
+**What the ruling buys, and why it is worth that cost.** The alternative
+(*reports stay reports, only diagnostics get logged*) would have been a far
+smaller diff, and it was rejected for a reason this round measured rather than
+predicted:
+
+- **R9 becomes a query instead of a read.** "Did this run emit anything at
+  WARNING or above?" is answerable only if every stream is events. This round
+  produced the case for it: `kb-build` exited **0**, printed *0 dangling, 0
+  malformed*, and buried **1,024** node-loss warnings in the same stdout (§5.1).
+  Under a split design that build's report would still have been product, and
+  the warnings still unqueryable.
+- **R12 becomes expressible.** Under `-n auto` every worker writes to one
+  stdout, so a table and a warning interleave into text with no worker
+  attribution. An event carries a worker field; a `print` cannot (§2.6g).
+- **R4 stops needing an exemption for the product.** The split design would have
+  required a `per-file-ignores` escape hatch for the whole report layer — which
+  works (the dotfiles session verified it) but scopes the ban to the minority of
+  sites, leaving the majority exactly as they are today.
+
+**What this ruling does NOT decide**, stated so the next round does not read
+more into it than was said: it does not name the library (§2.6f, still open),
+it does not choose the wire format, and it does not say whether the stdout sink
+renders from the event dict directly or through an intermediate report model.
+Those are R1/R6/R7 questions, and they are now answerable from the graph.
 
 ### 2.6 What the GRAPH says about §2 — asked properly, and control-armed
 
