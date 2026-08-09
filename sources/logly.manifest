@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R8 candidate: Rust-powered logging for Python. R10 PASS, last commit 2026-08-07. Maturity caveat: PyPI 0.2.2, 379 stars. Found only after re-sorting the GitHub search by stars - sort=updated buried it under hobby repos.
+url = https://github.com/muhammad-fiaz/logly
+ref = main
+commit = 5d3f95de278ba52a255eb7927a6dcfae9ae08454
+kind = code

@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R1/R2/R3 candidate: structured logging with processors and renderers. Section 2 program, docs/directives-2026-08-08.md. Pinned at HEAD as screened on 2026-08-09 (R10 last commit 2026-08-06) - these are research candidates evaluated for currency, not tools this repo runs, so the pin captures the state R10 screened rather than tracking an installed version.
+url = https://github.com/hynek/structlog
+ref = main
+commit = ab24a2678ca68f3115d71e55eb9dbf12d9d2dea7
+kind = code

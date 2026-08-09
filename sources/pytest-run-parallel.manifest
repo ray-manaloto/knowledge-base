@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R12: thread-parallel pytest for free-threaded Python, the newer axis xdist does not cover. R10 PASS, last commit 2026-08-04. Note it lives under Quansight-Labs, not pytest-dev - the pytest-dev guess 404s.
+url = https://github.com/Quansight-Labs/pytest-run-parallel
+ref = main
+commit = 19980341b87116b2ce1633c6fdc5e222a66d91a3
+kind = code

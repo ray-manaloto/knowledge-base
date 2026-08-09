@@ -155,6 +155,60 @@ def _guard(rule: Rule, *, unless: str | None = None, also: str | None = None) ->
     )
 
 
+_GAP = 200
+"""Max characters a rule's `A…B` gap may span. NEVER write `.*` in a rule.
+
+An unbounded gap between two required tokens is **quadratic**: the engine
+re-expands it from every `A` start position, so a command with many `A`s and no
+`B` — the ordinary worst case, not a contrived one — costs O(k·n). `Rule.also`
+removes the gap entirely and is the better fix where A-then-B ORDER does not
+matter. Where it does, bound the gap: backtracking then costs at most `_GAP`
+per start, which is linear in the command length.
+
+Measured 2026-08-09 on a single-line command of k `A` tokens and no `B`
+(`uv run python -c`, one process, same machine, back-to-back):
+
+| pattern | k=800 | k=1600 | k=3200 | ratio per doubling |
+|---|---|---|---|---|
+| `manifest-pin` unbounded | 7.97 ms | 31.40 ms | 129.25 ms | 3.9-4.1x — **O(n^2)** |
+| `manifest-pin` bounded | 1.16 ms | 2.34 ms | 4.99 ms | 2.0-2.1x — linear |
+| `gate-by-hand` unbounded | 5.76 ms | 23.04 ms | 91.77 ms | 4.0x — **O(n^2)** |
+| `gate-by-hand` bounded | 1.23 ms | 2.39 ms | 4.66 ms | 1.9-2.0x — linear |
+
+**2x input for 4x cost is the signature**, and it is what the ratio column is
+for: an absolute millisecond figure ages with the machine, a scaling exponent
+does not. Both bounded forms were checked to match and reject exactly what the
+unbounded ones did on realistic commands before the bound was applied.
+
+**Every figure above is per PATTERN, and the label is load-bearing.** The
+`unbounded` rows are the code as it stood BEFORE 2026-08-09; the `bounded` rows
+are what ships. Stating that explicitly because the inline comment on
+`gate-by-hand` carried the unbounded numbers for two revisions while sitting
+beside the bounded pattern, where they read as its cost and said the opposite of
+the truth. A cold review caught it by reproducing the pattern from this file's
+own constants — the cheapest possible refutation, and one nothing else here
+would have run.
+
+**The classification does not depend on the regime**, which is the natural next
+doubt and was measured rather than argued. Sweeping `gate-by-hand` over
+k=100/200/400/800/1600/3200 (median of 15 reps, one process):
+
+| form | ratio per doubling, across the whole sweep |
+|---|---|
+| unbounded | 3.56x, 3.74x, 3.81x, 4.10x, 3.89x — quadratic throughout |
+| bounded | 2.05x, 2.04x, 2.02x, 2.02x, 2.00x — linear throughout |
+
+So the bound is not merely an optimisation that arrives once `n` exceeds
+`_GAP`; the bounded form is linear at every size measured, including the
+smallest.
+
+`test_no_rule_carries_an_unbounded_gap` enforces this over EVERY rule, so a new
+`.*` cannot be added without the suite going red. That test replaced a
+wall-clock assertion which flaked under `-n auto` (73.9 ms against a 50 ms
+bound) — a timing proxy cannot survive parallel execution, and the property it
+was proxying for is checkable directly.
+"""
+
 OWNED: tuple[Rule, ...] = (
     _guard(
         _rule(
@@ -181,14 +235,27 @@ OWNED: tuple[Rule, ...] = (
     ),
     _rule(
         "manifest-pin",
-        r"git ls-remote --tags.*sources/|sed -i.*sources/\S+\.manifest",
+        # `.{0,_GAP}?` and not `.*?` — see _GAP. Unbounded here was O(n²) on a
+        # command with many `git ls-remote --tags` and no `sources/`.
+        rf"git ls-remote --tags.{{0,{_GAP}}}?sources/"
+        rf"|sed -i.{{0,{_GAP}}}?sources/\S+\.manifest",
         "uv run kb-setup manifest-add / the currency engine's apply",
         "hand-resolving a tag and sed-ing it in skips the v-prefix and "
         "annotated-tag handling the module already carries.",
     ),
     _rule(
         "gate-by-hand",
-        r"\buv run (?:ruff|ty|pytest)\b.*&&.*\buv run (?:ruff|ty|pytest)\b",
+        # Two gaps. Only the FIRST could ever go quadratic — the blowup factor
+        # is the number of START positions for the leading token, and gap 2
+        # expands once per start. Both are bounded anyway: the cheap one is not
+        # worth reasoning about twice, and an unbounded gap beside a bounded one
+        # invites a future edit to "match the style" in the wrong direction.
+        # Costs are in `_GAP`, which states them per PATTERN — do not restate a
+        # figure here; a number next to a pattern reads as that pattern's cost,
+        # and the unbounded form's numbers sat here for two revisions saying
+        # exactly the opposite of what the line below them does.
+        rf"\buv run (?:ruff|ty|pytest)\b.{{0,{_GAP}}}?&&"
+        rf".{{0,{_GAP}}}?\buv run (?:ruff|ty|pytest)\b",
         "mise run kb-gates",
         "kb-gates records each result to .agent/kb/gates/gates-<sha>.json, so a "
         "later claim about them has a surviving artifact.",

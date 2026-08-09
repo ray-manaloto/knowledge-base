@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R6: the named source of truth for generated models. R10 PASS, last commit 2026-08-06. Note the dotfiles session found it silently drops unevaluatedProperties false for msgspec output - refuting or confirming that is R11 work and needs this source in the graph.
+url = https://github.com/koxudaxi/datamodel-code-generator
+ref = main
+commit = 56dff6a10802ce1a9a65b857fcd85ea0aa581af0
+kind = code

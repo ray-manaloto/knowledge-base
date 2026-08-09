@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R7 candidate: C-backed serialisation and Struct models. R10 PASS, last commit 2026-07-20. Also the target of the datamodel-code-generator extra-fields gap the dotfiles session reported.
+url = https://github.com/jcrist/msgspec
+ref = main
+commit = 593ec549a99cf3928f1763f92798fe444d3e5c03
+kind = code

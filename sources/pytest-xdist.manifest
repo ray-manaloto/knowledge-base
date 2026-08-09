@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R12: the established process-parallel pytest plugin. R10 PASS, last commit 2026-08-03.
+url = https://github.com/pytest-dev/pytest-xdist
+ref = master
+commit = 1fd9ce70c082c25f7ea3a12d7b3b8bc4ae400ecd
+kind = code

@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R1 candidate: single-sink-API logging. R10 SCREEN FAIL as measured 2026-08-09 (last commit 2026-06-13, 57 days) - ingested anyway on Ray's ruling so the graph can answer why-not, with R10 applied at recommendation time.
+url = https://github.com/Delgan/loguru
+ref = master
+commit = 2a17be730e111cf874d0bf967c4c5da15b7e4670
+kind = code
