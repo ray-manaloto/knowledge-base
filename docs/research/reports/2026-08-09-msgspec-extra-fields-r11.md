@@ -134,6 +134,98 @@ Two probes in this investigation returned answers I nearly believed:
    `command not found` and produced a *uniform* failure across every case. A
    negative identical in all arms is one broken probe, not N results.
 
+---
+
+# R11 finding #2, resolved: `msgspec` and `pathlib.Path`
+
+**The claim:** *"msgspec has NO `pathlib.Path` support in either direction —
+needs a `dec_hook` AND an `enc_hook`, and they are **not global**, so they thread
+through every call site. `kb_setup` is `Path`-saturated, so this is a direct cost
+against R7."*
+
+## Verdict
+
+| part | verdict |
+|---|---|
+| no `Path` support in either direction | **CONFIRMED** |
+| needs both a `dec_hook` and an `enc_hook` | **CONFIRMED** |
+| *"not global, so they thread through every call site"* | **REFUTED as stated** — see below |
+| `kb_setup` is `Path`-saturated | **CONFIRMED, and now measured** |
+
+## Evidence — both directions, control-armed
+
+`msgspec 0.21.1`:
+
+```
+encode: FAILS -> TypeError: Encoding objects of type PosixPath is unsupported
+decode: FAILS -> ValidationError: Expected `Path`, got `str` - at `$.p`
+control (datetime): b'{"d":"2026-08-09T00:00:00"}'
+```
+
+The `datetime` control matters: msgspec's built-in type coverage is real, so the
+`Path` failure is a specific absence rather than "msgspec only does primitives".
+
+## Why "threads through every call site" is not the right cost
+
+The hooks are **per-`Encoder`/`Decoder` instance**, and one module-level pair
+carries them indefinitely:
+
+```
+shared Encoder : b'{"p":"/tmp/x"}'
+shared Decoder : M(p=PosixPath('/tmp/x'))
+reused again   : M(p=PosixPath('/a/b'))
+```
+
+So the cost is a **convention with one seam** — construct the encoder/decoder
+once, use them everywhere — not per-call-site churn. In a repo whose entire
+style is "logic in a module, a seam in config", that is the shape it already has
+everywhere else.
+
+**But the trap their wording was pointing at is real, and the control names it:**
+
+```
+bare msgspec.json.encode: FAILS -> Encoding objects of type PosixPath is unsupported
+```
+
+The module-level convenience functions `msgspec.json.encode` / `.decode` do
+**not** pick up the hooks. They are the obvious thing to reach for, and they fail
+at runtime on any model with a `Path` field. So the requirement is a *discipline*
+— never call the convenience functions — which is exactly the class of rule this
+repo machine-enforces rather than documents (`TID251` banned-api would cover it,
+the same mechanism §2.6j records for R4).
+
+**One genuine per-type cost remains:** a typed `Decoder` is constructed
+`Decoder(M, dec_hook=…)`, i.e. **one decoder per target model type**. An encoder
+is universal; decoders are not. With N generated models that is N decoders, which
+is a factory, not a hand-written list — but it is not zero.
+
+## The `Path` tax in THIS repo, measured
+
+The dotfiles session asked for this figure specifically. Measured 2026-08-09
+over `python/src/kb_setup/`:
+
+| | count |
+|---|---|
+| modules importing `pathlib` | **54 of 62** (87%) |
+| `Path`-typed annotations (params, returns, containers) | **523** |
+| control — `complex` annotations, same probe shape | **0** |
+| control — `str` annotations, same probe shape | **813** |
+
+Both controls are stated because a bare "523" is unreadable: the zero proves the
+probe can return nothing, and the 813 gives the scale — **`Path` is 64% as
+common as `str` in this codebase.** That is the R7 cost, and it is large enough
+that "one shared encoder plus a decoder factory" is a materially different
+proposition from "thread hooks through 523 sites". The refutation above is
+therefore load-bearing, not a quibble.
+
+## Version caveat
+
+Tested against `msgspec 0.21.1` — the **installable** version from PyPI, which
+is the currency doctrine's "installable truth". `sources/msgspec.manifest` pins
+commit `593ec549`, which may be ahead of that release; if a future round finds
+`Path` support has landed upstream, this finding expires and the manifest is
+where to check.
+
 ## GitHub repos touched
 
 - [koxudaxi/datamodel-code-generator](https://github.com/koxudaxi/datamodel-code-generator)
