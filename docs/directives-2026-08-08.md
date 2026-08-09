@@ -159,15 +159,45 @@ tree-sitter and no ty-LSP work. Ruff also ships the `LOG` and `G` rule families
 for logging correctness. Per `use-tool-builtins.md`, the built-in is the answer
 until proven insufficient.
 
-### 2.5 The open design question, stated so it is not decided by accident
+### 2.5 The design question — ANSWERED 2026-08-09
 
 That suppression comment names the real tension: **most of the 414 sites are the
 product, not diagnostics.** `kb-check`'s summary table, `kb-gates`' report,
 `kb-session-reflect`'s report and `kb-currency`'s run log are read by humans and
 in places parsed by machines. R3 appears to anticipate exactly this — the
-question put to Ray, and **not yet answered**, is whether the intent is *one
-structured event stream with a human-rendering stdout sink* rather than
-*reports become log lines*.
+question put to Ray was whether the intent is *one structured event stream with
+a human-rendering stdout sink* rather than *reports become log lines*.
+
+**Ray ruled: ONE EVENT STREAM, with a human-rendering stdout sink.** Every
+report becomes structured events; a dedicated sink renders them as the tables
+that are read today. This is R3 read as its author intended rather than as an
+escape hatch, and it is the larger of the two options — it changes how all 414
+sites are written, not just the diagnostic ones.
+
+**What the ruling buys, and why it is worth that cost.** The alternative
+(*reports stay reports, only diagnostics get logged*) would have been a far
+smaller diff, and it was rejected for a reason this round measured rather than
+predicted:
+
+- **R9 becomes a query instead of a read.** "Did this run emit anything at
+  WARNING or above?" is answerable only if every stream is events. This round
+  produced the case for it: `kb-build` exited **0**, printed *0 dangling, 0
+  malformed*, and buried **1,024** node-loss warnings in the same stdout (§5.1).
+  Under a split design that build's report would still have been product, and
+  the warnings still unqueryable.
+- **R12 becomes expressible.** Under `-n auto` every worker writes to one
+  stdout, so a table and a warning interleave into text with no worker
+  attribution. An event carries a worker field; a `print` cannot (§2.6g).
+- **R4 stops needing an exemption for the product.** The split design would have
+  required a `per-file-ignores` escape hatch for the whole report layer — which
+  works (the dotfiles session verified it) but scopes the ban to the minority of
+  sites, leaving the majority exactly as they are today.
+
+**What this ruling does NOT decide**, stated so the next round does not read
+more into it than was said: it does not name the library (§2.6f, still open),
+it does not choose the wire format, and it does not say whether the stdout sink
+renders from the event dict directly or through an intermediate report model.
+Those are R1/R6/R7 questions, and they are now answerable from the graph.
 
 ### 2.6 What the GRAPH says about §2 — asked properly, and control-armed
 
@@ -586,7 +616,44 @@ inputs, which is the property that makes the ingestion worth doing at all.
 **425,989 nodes / 1,009,524 links / 122 hyperedges, 0 dangling, 0 malformed**,
 stamped `graphify 0.9.36`. Baseline before this round was 359,069 nodes.
 
-Twelve sources, all `kind = code`, all free of LLM cost:
+Twelve sources, all `kind = code`, all free of LLM cost. **These are per-source
+figures and they do NOT sum to the aggregate delta — and the residual is NOT
+fully explained.** Stated that way because two cold-review rounds were needed to
+get here, and the intermediate answer was worse than the admission.
+
+| | |
+|---|---|
+| sum of the twelve rows below | **66,821** |
+| stated aggregate delta (425,989 − 359,069) | **66,920** |
+| **unexplained residual** | **99** |
+
+**What is verified.** Every one of the twelve per-source counts is an exact quote
+of that source's `wrote …/graph.json: N nodes` line, and the aggregate is the
+`composition:` line `kb-build` printed. Each number is right; it is the
+*relationship between them* that does not close.
+
+**What was WRONG in the first attempt to explain it**, kept because the error is
+more instructive than the correction. It offered deduplication as the mechanism —
+43 events removing 2,997 nodes. That is **causally backwards**: every dedup line
+occurs *during a source's own extraction pass, immediately before that source's
+count is printed* (log line 356 dedups 331 nodes; line 357 writes
+`datamodel-code-generator … 39520 nodes`), so the table's figures are **already
+post-dedup**. And **zero** dedup events occur during the merge phase — control
+armed, the same grep finds 43 in the log overall. Dedup cannot be a shrinkage
+*between* the table and the aggregate, because it has already happened.
+
+**The most likely remaining cause, explicitly NOT verified:** the `359,069`
+baseline is an **inherited number** — it comes from the previous round's handoff,
+measured on a different tree on a different day, and the self-graph is
+re-extracted every build. A residual of that origin is expected. But no log for
+that build was consulted, so this is a hypothesis, not a finding
+(`probes-need-a-control-arm.md` rule 6 — an inherited number arrives with no
+control arm attached, and repeating it converts someone else's unverified note
+into your own).
+
+**So: do not reconcile the aggregate against this table.** Reconcile it against
+`kb-build`'s own `composition:` output, which is what asserts `0 dangling, 0
+malformed` — and treat the 99 as open.
 
 | source | nodes | | source | nodes |
 |---|---:|---|---|---:|
