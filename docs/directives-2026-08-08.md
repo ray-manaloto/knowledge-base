@@ -616,24 +616,44 @@ inputs, which is the property that makes the ingestion worth doing at all.
 **425,989 nodes / 1,009,524 links / 122 hyperedges, 0 dangling, 0 malformed**,
 stamped `graphify 0.9.36`. Baseline before this round was 359,069 nodes.
 
-Twelve sources, all `kind = code`, all free of LLM cost. **These are per-source,
-PRE-MERGE counts and they do NOT sum to the aggregate** — a cold review computed
-the sum and found a 99-node gap, which is a real observation about the table's
-shape rather than an error in any single figure. Three things intervene between
-the twelve extractions and the merged graph:
+Twelve sources, all `kind = code`, all free of LLM cost. **These are per-source
+figures and they do NOT sum to the aggregate delta — and the residual is NOT
+fully explained.** Stated that way because two cold-review rounds were needed to
+get here, and the intermediate answer was worse than the admission.
 
-- **Deduplication.** The build logged **43** dedup events removing **2,997**
-  nodes in total (`[graphify] Deduplicated N node(s)`), so the aggregate is
-  strictly less than the sum of its inputs.
-- **Doc-chunk replay adds nodes no source contributes** — `+51`, `+10`, `+20`,
-  `+223` and so on, from the 25 committed extraction chunks.
-- **The self-graph is re-extracted each build**, and this round changed
-  `python/src/kb_setup/` and `tests/`, so the repo's own node count differs
-  between the two builds.
+| | |
+|---|---|
+| sum of the twelve rows below | **66,821** |
+| stated aggregate delta (425,989 − 359,069) | **66,920** |
+| **unexplained residual** | **99** |
 
-The aggregate below is the measured composition line, not a derived total. Do not
-reconcile it against this table; reconcile it against `kb-build`'s own
-`composition:` output, which is what asserts `0 dangling, 0 malformed`.
+**What is verified.** Every one of the twelve per-source counts is an exact quote
+of that source's `wrote …/graph.json: N nodes` line, and the aggregate is the
+`composition:` line `kb-build` printed. Each number is right; it is the
+*relationship between them* that does not close.
+
+**What was WRONG in the first attempt to explain it**, kept because the error is
+more instructive than the correction. It offered deduplication as the mechanism —
+43 events removing 2,997 nodes. That is **causally backwards**: every dedup line
+occurs *during a source's own extraction pass, immediately before that source's
+count is printed* (log line 356 dedups 331 nodes; line 357 writes
+`datamodel-code-generator … 39520 nodes`), so the table's figures are **already
+post-dedup**. And **zero** dedup events occur during the merge phase — control
+armed, the same grep finds 43 in the log overall. Dedup cannot be a shrinkage
+*between* the table and the aggregate, because it has already happened.
+
+**The most likely remaining cause, explicitly NOT verified:** the `359,069`
+baseline is an **inherited number** — it comes from the previous round's handoff,
+measured on a different tree on a different day, and the self-graph is
+re-extracted every build. A residual of that origin is expected. But no log for
+that build was consulted, so this is a hypothesis, not a finding
+(`probes-need-a-control-arm.md` rule 6 — an inherited number arrives with no
+control arm attached, and repeating it converts someone else's unverified note
+into your own).
+
+**So: do not reconcile the aggregate against this table.** Reconcile it against
+`kb-build`'s own `composition:` output, which is what asserts `0 dangling, 0
+malformed` — and treat the 99 as open.
 
 | source | nodes | | source | nodes |
 |---|---:|---|---|---:|
