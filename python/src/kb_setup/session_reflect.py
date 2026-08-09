@@ -180,6 +180,28 @@ for: an absolute millisecond figure ages with the machine, a scaling exponent
 does not. Both bounded forms were checked to match and reject exactly what the
 unbounded ones did on realistic commands before the bound was applied.
 
+**Every figure above is per PATTERN, and the label is load-bearing.** The
+`unbounded` rows are the code as it stood BEFORE 2026-08-09; the `bounded` rows
+are what ships. Stating that explicitly because the inline comment on
+`gate-by-hand` carried the unbounded numbers for two revisions while sitting
+beside the bounded pattern, where they read as its cost and said the opposite of
+the truth. A cold review caught it by reproducing the pattern from this file's
+own constants — the cheapest possible refutation, and one nothing else here
+would have run.
+
+**The classification does not depend on the regime**, which is the natural next
+doubt and was measured rather than argued. Sweeping `gate-by-hand` over
+k=100/200/400/800/1600/3200 (median of 15 reps, one process):
+
+| form | ratio per doubling, across the whole sweep |
+|---|---|
+| unbounded | 3.56x, 3.74x, 3.81x, 4.10x, 3.89x — quadratic throughout |
+| bounded | 2.05x, 2.04x, 2.02x, 2.02x, 2.00x — linear throughout |
+
+So the bound is not merely an optimisation that arrives once `n` exceeds
+`_GAP`; the bounded form is linear at every size measured, including the
+smallest.
+
 `test_no_rule_carries_an_unbounded_gap` enforces this over EVERY rule, so a new
 `.*` cannot be added without the suite going red. That test replaced a
 wall-clock assertion which flaked under `-n auto` (73.9 ms against a 50 ms
@@ -223,13 +245,15 @@ OWNED: tuple[Rule, ...] = (
     ),
     _rule(
         "gate-by-hand",
-        # Two gaps, but only the FIRST can go quadratic, and both are bounded
-        # because the cheap one is not worth reasoning about twice. The blowup
-        # factor is the number of START positions for the leading token, so:
-        # many `uv run ruff` and no `&&` costs 5.82 -> 23.08 ms at k=800/1600,
-        # 4.0x — quadratic; one `uv run ruff` then `&&` then k non-matching
-        # tokens costs 0.21 -> 0.43 ms, 2.0x — linear, because gap 2 expands
-        # once per start and there is only one start. Measured 2026-08-09.
+        # Two gaps. Only the FIRST could ever go quadratic — the blowup factor
+        # is the number of START positions for the leading token, and gap 2
+        # expands once per start. Both are bounded anyway: the cheap one is not
+        # worth reasoning about twice, and an unbounded gap beside a bounded one
+        # invites a future edit to "match the style" in the wrong direction.
+        # Costs are in `_GAP`, which states them per PATTERN — do not restate a
+        # figure here; a number next to a pattern reads as that pattern's cost,
+        # and the unbounded form's numbers sat here for two revisions saying
+        # exactly the opposite of what the line below them does.
         rf"\buv run (?:ruff|ty|pytest)\b.{{0,{_GAP}}}?&&"
         rf".{{0,{_GAP}}}?\buv run (?:ruff|ty|pytest)\b",
         "mise run kb-gates",
