@@ -514,10 +514,12 @@ a winner without a third route:
 | `picologging` | release 0.9.3, 2023-09-29 | latest release 0.9.4, 2024-09-13 | unresolved |
 | `structlog` | "repo pushed 2026-08-06" | last commit 2026-08-06 | agree — but `pushed_at` is the wrong instrument (§2.6h) and agrees here by luck |
 
-**Also ingested: `pydantic`** (R10 PASS, last commit 2026-08-09). It appears 42
-times in the ledger and is `datamodel-code-generator`'s default output target, so
-R6 is not answerable without it. **Not ingested: `spdlog-python`** — unmaintained
-~2 years, and the ledger already documents the dead end.
+**Also screened, from the ledger's 42 mentions of it: `pydantic`** — R10 **PASS**
+(last commit 2026-08-09), and `datamodel-code-generator`'s default output target,
+so R6 is not fully answerable without it. It is **screened but NOT ingested as
+`kind = code`**; §2.6k rules on why and defers it to the docs mirror. **Not
+screened further: `spdlog-python`** — unmaintained ~2 years, and the ledger
+already documents the dead end.
 
 ### 2.6k The ingestion SHAPE — `kind = code` now, `kind = docs` for the winners
 

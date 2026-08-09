@@ -223,8 +223,13 @@ OWNED: tuple[Rule, ...] = (
     ),
     _rule(
         "gate-by-hand",
-        # Two bounded gaps, same reason as above and worse without it: a command
-        # of many `uv run ruff` and no `&&` re-expanded BOTH gaps from every start.
+        # Two gaps, but only the FIRST can go quadratic, and both are bounded
+        # because the cheap one is not worth reasoning about twice. The blowup
+        # factor is the number of START positions for the leading token, so:
+        # many `uv run ruff` and no `&&` costs 5.82 -> 23.08 ms at k=800/1600,
+        # 4.0x — quadratic; one `uv run ruff` then `&&` then k non-matching
+        # tokens costs 0.21 -> 0.43 ms, 2.0x — linear, because gap 2 expands
+        # once per start and there is only one start. Measured 2026-08-09.
         rf"\buv run (?:ruff|ty|pytest)\b.{{0,{_GAP}}}?&&"
         rf".{{0,{_GAP}}}?\buv run (?:ruff|ty|pytest)\b",
         "mise run kb-gates",
