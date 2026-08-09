@@ -616,7 +616,24 @@ inputs, which is the property that makes the ingestion worth doing at all.
 **425,989 nodes / 1,009,524 links / 122 hyperedges, 0 dangling, 0 malformed**,
 stamped `graphify 0.9.36`. Baseline before this round was 359,069 nodes.
 
-Twelve sources, all `kind = code`, all free of LLM cost:
+Twelve sources, all `kind = code`, all free of LLM cost. **These are per-source,
+PRE-MERGE counts and they do NOT sum to the aggregate** — a cold review computed
+the sum and found a 99-node gap, which is a real observation about the table's
+shape rather than an error in any single figure. Three things intervene between
+the twelve extractions and the merged graph:
+
+- **Deduplication.** The build logged **43** dedup events removing **2,997**
+  nodes in total (`[graphify] Deduplicated N node(s)`), so the aggregate is
+  strictly less than the sum of its inputs.
+- **Doc-chunk replay adds nodes no source contributes** — `+51`, `+10`, `+20`,
+  `+223` and so on, from the 25 committed extraction chunks.
+- **The self-graph is re-extracted each build**, and this round changed
+  `python/src/kb_setup/` and `tests/`, so the repo's own node count differs
+  between the two builds.
+
+The aggregate below is the measured composition line, not a derived total. Do not
+reconcile it against this table; reconcile it against `kb-build`'s own
+`composition:` output, which is what asserts `0 dangling, 0 malformed`.
 
 | source | nodes | | source | nodes |
 |---|---:|---|---|---:|
