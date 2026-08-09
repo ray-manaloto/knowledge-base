@@ -3,6 +3,20 @@
 **Status: the architectural program in §2 is NOT built. It is recorded here so
 it cannot be lost.** §1 shipped. §3 are findings that outlive the round.
 
+**Addendum 2026-08-09 (session `-h`), the ingestion round §2.7 called for.**
+Six sections were added and **nothing was removed or reworded** — §2.6g **R12**
+(parallel pytest), Ray's twelfth requirement, which until now existed only in
+auto-memory and a gitignored session handoff · §2.6h the **R10 screening
+results** and the instrument that produced them · §2.6i **R8's ruling** ·
+§2.6j **R11**, the dotfiles ledger read and answered · §2.6k the ingestion
+**shape** · §2.6l the **verification**. §5 was updated to match and §5.1 lists
+what closed.
+
+**Thirteen candidates were screened; twelve are now `sources/*.manifest`**
+(`pydantic` is deliberately deferred to a docs mirror, §2.6k). §2's remaining
+questions are therefore graph-answerable with citations rather than
+recollection-answerable — which was the entire point of ingesting first.
+
 Written because Ray asked that nothing from this session be lost:
 
 ```text
@@ -292,6 +306,336 @@ Naming one from recollection would be the inherited-number failure
 current sources, per `research-doc-sources.md` and
 `tool-currency-and-native-first.md`.
 
+### 2.6g R12 — parallel pytest is part of the same program
+
+Ray, at this session's clear-prep, naming a fifth ingestion group alongside the
+four derived from R1–R11:
+
+```text
+parallel python pytest and related sources
+```
+
+- **R12** — **parallel `pytest` execution** and its surrounding sources are in
+  scope for §2, not a separate concern.
+
+Recorded here on 2026-08-09, one round later than the rest: it was Ray's own
+addition at clear-prep and until now lived only in auto-memory and the session
+handoff. It is R-numbered because it is a requirement of equal standing, not a
+note — the handoff called it "a TWELFTH requirement" explicitly.
+
+**Why it belongs with R1–R11 rather than beside them.** Test parallelism and
+structured logging collide at exactly one point: *output*. Under `xdist` every
+worker is a separate process writing to the same stdout, so today's 414 direct
+`print` sites (§2.2) do not merely become untidy — they interleave, and R9's
+"review the logs for warnings/errors that might be silently skipped" becomes
+unanswerable, because there is no longer a single ordered stream to review. A
+structured event stream with a worker identifier on every record is what makes
+parallel test output greppable at all. R12 is therefore a **constraint on R1/R3's
+sink design**, not a follow-on task.
+
+Two axes exist and they are not substitutes, which is why both were ingested:
+
+| axis | source | covers |
+|---|---|---|
+| process-parallel | `pytest-dev/pytest-xdist` | the established `-n auto` path; separate processes, separate stdout |
+| thread-parallel | `Quansight-Labs/pytest-run-parallel` | free-threaded Python; shared process, so thread-safety of any logging handler is live |
+
+`pytest-run-parallel` lives under **`Quansight-Labs`**, not `pytest-dev` — the
+natural guess 404s.
+
+**R12 stopped being theoretical during this very round.** `mise run kb-gates`
+failed on a test asserting `elapsed < 0.05`, which measured **73.9 ms** because
+`mise run test` runs `-n auto` — twelve workers competing for CPU — and then
+passed 3 of 3 reruns. The test was **not in this branch's diff**. Two readings
+were available and both were wrong: *transient, retry* (it recurs at roughly one
+run in five) and *widen the bound* (which keeps a proxy that parallelism has
+already invalidated).
+
+The third reading is R12's whole point: **a wall-clock assertion does not
+survive parallel execution**, because it measures scheduling noise and reports
+it as the property it names. Ray's ruling was to assert the property directly.
+Doing so surfaced the actual defect — the quadratic `A.*B` shape fixed on one
+rule the day before was **still live on two others**, at ~4.0x cost per input
+doubling. Full evidence and the arms in
+`docs/research/reports/2026-08-09-unbounded-gap-arms.toml`.
+
+So R12 does not merely *interact* with R1/R3's sink design; it changes what a
+test is allowed to assert. Any check whose subject is time, ordering, or a
+shared stream is measuring the scheduler once `-n auto` is on.
+
+### 2.6h R10 applied — the screening results
+
+Measured **2026-08-09**, recorded with the date because R10 has a shelf life by
+construction (§2.6d).
+
+**Control arms ran before any negative was believed**: `python/cpython` →
+`2026-08-09` and a nonexistent repo → HTTP 404. The probe discriminates.
+
+**The instrument is the last commit on the DEFAULT BRANCH** —
+`gh api repos/<o>/<r>/commits?per_page=1`. Two other routes were tried and are
+*wrong instruments*, which §2.6e predicted for a different reason:
+
+- **`pushed_at` counts any branch.** For `picologging` it reads `2026-04-24`
+  while the last commit on `main` is `2025-06-17` — ten months of apparent life
+  that never reached the default branch.
+- **Release date is not commit date.** The dotfiles session screened
+  `picologging` on its release; PyPI and the GitHub releases API answer only
+  that question. (Their figure was `2023-09-29`, this probe's latest release is
+  `0.9.4 / 2024-09-13` — a disagreement recorded rather than resolved, because
+  picologging fails R10 by all three routes and the verdict does not turn on it.)
+
+| candidate | last commit | R10 | role |
+|---|---|---|---|
+| `pytest-dev/pytest` | 2026-08-09 | PASS | R12 base |
+| `muhammad-fiaz/logly` | 2026-08-07 | PASS | R8 |
+| `hynek/structlog` | 2026-08-06 | PASS | R1/R2/R3 |
+| `koxudaxi/datamodel-code-generator` | 2026-08-06 | PASS | R6 |
+| `Quansight-Labs/pytest-run-parallel` | 2026-08-04 | PASS | R12 |
+| `pytest-dev/pytest-xdist` | 2026-08-03 | PASS | R12 |
+| `jcrist/msgspec` | 2026-07-20 | PASS | R7 |
+| `Indosaram/logxide` | 2026-07-14 | PASS (26d) | R8 |
+| `Delgan/loguru` | 2026-06-13 | **FAIL** (57d) | R1 |
+| `ijl/orjson` | 2026-05-06 | **FAIL** (95d) | R7/R8 |
+| `microsoft/picologging` | 2025-06-17 | **FAIL** (14mo) | R1/R8 |
+
+**Ray's ruling on the three failures: ingest them anyway, screen at
+recommendation time.** `kind = code` extraction is free, so keeping a rejected
+candidate in the graph costs nothing and makes "why not loguru?" a citable query
+instead of an assertion. R10 stays a screen on the *recommendation*, with each
+date stated so the judgement is checkable rather than asserted. This is the
+literal reading of "say commits within the last month" as a stated threshold
+(§2.6d) rather than a hard constant.
+
+### 2.6i R8's answer is thin on the logging side — RULED ON
+
+The search that produced this nearly returned the opposite answer, and the
+reason is worth more than the result.
+
+**A first search sorted by `sort=updated` returned only ★0–2 hobby repos**, and
+so did its control arm under the same sort. Re-sorted by **stars**, the identical
+query surfaced the real candidates immediately. `sort=` is a display bound, and
+`probes-need-a-control-arm.md` rule 3 is exact about what that does: it turns
+*absent* into *unreachable*. A report of "no Rust/C++-backed Python logging
+library qualifies" was one step away and would have been false.
+
+What actually exists:
+
+| candidate | evidence | verdict |
+|---|---|---|
+| `muhammad-fiaz/logly` | ★379, MIT, PyPI **0.2.2**, commit 2026-08-07 | live, immature |
+| `Indosaram/logxide` | ★35, "13x faster, stdlib-compatible", commit 2026-07-14 | live, very small |
+| `microsoft/picologging` | C++, the mature-looking option | **dead** (§2.6h) |
+| `vorner/pyo3-log` | ★83 | **not a candidate** — a Rust crate bridging pyo3 native extensions *into* Python's logging; the opposite direction |
+
+**Ray's ruling: split R1 from R7.** R8 ("may be Rust/C++ if more efficient") is
+satisfiable on the **serialisation** side — `msgspec` is C-backed and `orjson` is
+Rust-backed, both mature — and is **not** satisfiable on the **logging-framework**
+side, where the only live native options are a v0.2.2 library and a ★35 one. A
+repo that gates on reproducibility does not put its output layer on either.
+
+This does not reject them; it sets the burden. Should R1's evaluation later want
+a native backend, `logly`/`logxide` are ingested and comparable — but the
+default answer to R8 is *native serialisation behind a pure-Python event model*.
+
+### 2.6j R11 — the dotfiles ledger, read; what survives and what does not
+
+§2.6e required reading the parallel session's ledger and then **refuting** it,
+not ratifying it. It was read on 2026-08-09
+(`~/dev/github/ray-manaloto/dotfiles/.agent/requirements-devcontainer-gcc162.md`,
+88 KB). The full refutation of their R5/R6/R7 findings is PR 2's work; recorded
+here is only what **changed this round's ingestion**.
+
+**Their D19 reaches the same R8 verdict as §2.6i — "no Rust/C++ logging core" —
+by a different route.** They screened PyPI release dates and reasoned from a
+throughput ceiling; §2.6i screened GitHub commit dates and reasoned from
+maturity. Independent agreement on a negative is the strongest form available,
+so R8's ruling is now carried by two routes rather than one.
+
+**Three things do not survive unchanged.**
+
+1. **Their candidate list is incomplete, and the reason is structural.** They
+   swept `picologging`, `spdlog-python`, `tracing-py`, `pyo3-log`,
+   `rust-logging`, `pyspdlog` — the last two 404. They never surfaced **`logly`**
+   or **`logxide`** (§2.6i). Their route was per-package PyPI lookups, which
+   §2.6e itself prescribes as the fix for PyPI's blind full-text search — but a
+   per-package lookup **can only find names you already guessed**. A GitHub
+   repository search sorted by stars finds names you did not. The two probes have
+   different blind spots and the ledger only ran one. Conclusion unchanged,
+   evidence base widened.
+
+2. **Their deciding reason is a dotfiles-specific condition and does not
+   transfer here.** Verbatim: *"the throughput ceiling is a subprocess round-trip
+   to a Node CLI — thousands of records per build, not millions per second."*
+   That is a fact about **their** workload. This repo's expensive path is a
+   359,069-node graph build running a 12-worker AST extraction, not a Node CLI.
+   R8's answer is the same in both repos, but here it rests on **maturity**
+   (v0.2.2, ★35) and not on their throughput argument. Carried without its
+   condition, that sentence would be a correctly-sourced fact applied to a repo
+   it was never true of — `verify-before-advancing.md` § *carry a fact's
+   CONDITION*, which is exactly the failure that rule tabulates.
+
+3. **`logbook` — they found it, this session's sweep missed it.** 1.10.1,
+   released 2026-08-05; their note calls it *"alive, real handler-stack model —
+   under-considered"*. Independently R10 **PASS** on the commit instrument (last
+   commit 2026-08-05). **Ingested.** This is the ledger paying for itself, and it
+   is the honest direction of the exchange: R11 was written expecting this
+   session to correct theirs, and the first correction went the other way.
+
+**One convergence worth recording:** both sessions independently ruled
+`pyo3-log` out as *the opposite direction* — a Rust crate routing Rust records
+**into** Python's logging. Two routes, same verdict, neither derived from the
+other.
+
+**What their D20 asserts, carried forward for PR 2 to test:** `structlog` +
+stdlib `ProcessorFormatter` + `QueueHandler`/`QueueListener`, with the framing
+correction that *"structlog vs loguru is NOT the axis"* — structlog is an event
+layer, loguru is a complete system with its own sinks, and **stdlib already owns
+the sink layer**. If that holds, it answers R1, R3 and R7's offload at once
+(`QueueListener` *is* the logging thread). It is now testable here: structlog,
+loguru and logbook are all in the graph.
+
+**And their R4 mechanism is better than §2.4's.** Not merely deleting `T201`:
+ruff's **`TID251` banned-api** table, already enabled by `select = ["ALL"]` and
+currently banning nothing, given teeth by a config table — no new binary, no
+second linter, no homegrown AST. With a `per-file-ignores` escape hatch for the
+one sink module, which is reviewable in a diff unlike a `# noqa` that
+`no_lint_skip` rejects anyway. They flag the same limit this repo's `hook_guard`
+has: it is a **redirect guard, not a sandbox** — `getattr(sys, "stdout")`,
+`os.write(1, …)` and `os.fdopen(1)` get through — and recommend banning
+`os.write`/`os.fdopen` too.
+
+**Instrument disagreements, logged and deliberately not resolved** — none of
+them moves a verdict, and recording the disagreement is worth more than picking
+a winner without a third route:
+
+| library | ledger's figure | this session's | why they differ |
+|---|---|---|---|
+| `loguru` | release 0.7.3, 2024-12-06, 265 open issues | last commit 2026-06-13 | release vs commit — both say slow |
+| `picologging` | release 0.9.3, 2023-09-29 | latest release 0.9.4, 2024-09-13 | unresolved |
+| `structlog` | "repo pushed 2026-08-06" | last commit 2026-08-06 | agree — but `pushed_at` is the wrong instrument (§2.6h) and agrees here by luck |
+
+**Also ingested: `pydantic`** (R10 PASS, last commit 2026-08-09). It appears 42
+times in the ledger and is `datamodel-code-generator`'s default output target, so
+R6 is not answerable without it. **Not ingested: `spdlog-python`** — unmaintained
+~2 years, and the ledger already documents the dead end.
+
+### 2.6k The ingestion SHAPE — `kind = code` now, `kind = docs` for the winners
+
+`sources/REGISTRY.md` already carried the warning that governs this, written for
+
+# 81 and hit head-on here
+
+> Do not pin them `kind = code` — that AST-extracts the *source* and skips every
+> `.md`, so it misses the docs entirely while adding ruff's 176MB and uv's 183MB
+> of AST to a graph already crowding prose out of the query budget (#12).
+
+**Measured against it (GitHub `size`, 2026-08-09):** eleven of the thirteen
+candidates are ≤ 18 MB, `pytest` is 41 MB — and **`pydantic` is 430 MB, 2.3× the
+`ruff` (185 MB) that warning is about.**
+
+One instrument caveat, recorded because the comparison would otherwise be
+misread: GitHub's `size` field counts full history, while manifests clone
+`--depth 1`. Calibrating it against clones already on disk shows it does not
+merely overstate — it *understates* the eventual footprint, because
+`sources/<name>/` also holds that source's own `graphify-out/` (graphify: 9 MB
+reported → 202 MB on disk, 22×). So the field predicts disk badly in both
+directions and is used here **only for the relative comparison**, one instrument
+applied consistently. The registry's actual concern was never disk anyway: it is
+**AST nodes crowding prose out of the query budget**.
+
+**Ray's rulings:**
+
+1. **`pydantic` is not ingested as `kind = code`.** The load-bearing reason is
+   **relevance, not size**: R6 asks what `datamodel-code-generator` *emits*, not
+   how pydantic validates internally, so its validator AST buys no R6 answer.
+   It is deferred to the docs mirror below. `pytest` stays `kind = code`: its
+   plugin/hook *source* is precisely the R12 question.
+
+   ⚠️ **The size argument is stated second because this round's own numbers
+   weakened it.** Once extracted, repo size predicted AST bulk **backwards**:
+
+   | source | repo size | nodes | nodes/MB |
+   |---|---|---|---|
+   | `datamodel-code-generator` | 18 MB | 39,520 | **2,196** |
+   | `pytest` | 41 MB | 8,887 | **217** |
+
+   A 10× spread — pytest's bulk is fixtures and docs, the generator's is
+   generated-model test expectations. So "430 MB" is a **weak** predictor of what
+   pydantic would have cost the query budget, and anyone revisiting this should
+   revisit it on the relevance argument, or measure the extraction directly
+   rather than re-deriving it from the size field. Recorded rather than quietly
+   dropped: the tidy version of this ruling would cite the 430 MB and never
+   mention that the same batch refuted the instrument.
+2. **`kind = docs` mirrors come in a later PR, for the winners only.** Most of
+   R1–R12 are documentation questions — how sinks compose, what a processor
+   pipeline is, how `QueueListener` offloads — and `kind = code` skips every
+   `.md` by design, so the AST layer answers *what exists* and not *how it is
+   meant to be used*. But prose extraction is the **only LLM path in this
+   corpus**. Paying it for thirteen candidates when most will be screened out
+   inverts the cost. So: the free AST layer for all twelve now; prose mirrors for
+   the three or four that survive R1/R7, once they are chosen.
+
+This keeps PR 1 entirely free of LLM cost and fully reproducible from committed
+inputs, which is the property that makes the ingestion worth doing at all.
+
+### 2.6l Verification — the corpus now answers §2, control-armed
+
+`mise run kb-build` from committed inputs, rc **0**:
+**425,989 nodes / 1,009,524 links / 122 hyperedges, 0 dangling, 0 malformed**,
+stamped `graphify 0.9.36`. Baseline before this round was 359,069 nodes.
+
+Twelve sources, all `kind = code`, all free of LLM cost:
+
+| source | nodes | | source | nodes |
+|---|---:|---|---|---:|
+| `datamodel-code-generator` | 39,520 | | `logbook` | 1,290 |
+| `pytest` | 8,887 | | `pytest-xdist` | 843 |
+| `orjson` | 3,649 | | `picologging` | 666 |
+| `logly` | 3,397 | | `pytest-run-parallel` | 162 |
+| `msgspec` | 3,061 | | `loguru` | 1,638 |
+| `structlog` | 1,943 | | `logxide` | 1,765 |
+
+**Control arms first, so the positives mean something:**
+
+| probe | result |
+|---|---|
+| `graphify explain "replay_order"` — known present *before* this round | resolves, `chunks.py:L436` |
+| `graphify explain "ZzzNonexistentSymbolXyz123"` | `No node matching … found.` |
+
+The probe discriminates in both directions. Then the questions §2.6 recorded as
+**unanswerable** on 2026-08-08:
+
+| requirement | probe | result |
+|---|---|---|
+| R1 | `explain "BoundLogger"` | 3 nodes — `structlog/_generic.py`, `stdlib.py`, `twisted.py` |
+| R7 | `explain "Struct"` | 4 nodes incl. `datamodel_code_generator/model/msgspec.py` |
+| R12 | `explain "DSession"` | `pytest-xdist::src_xdist_dsession_dsession`, `dsession.py:L32`, degree 42 |
+
+**§2.6b's lesson, re-armed rather than re-learned.** The same R1 question asked
+through `kb-query --prose --idf` returns **nothing** — correctly. These sources
+are `kind = code`, so they live on the AST layer, and `--prose` is the graph
+*minus* every `_origin=ast` node. A reader who verifies this ingestion with
+`--prose` will conclude it failed. **Prose layer for what the documents say;
+`explain`/`path`/`god-nodes` for what a repo does.**
+
+**And R11's refutation target is now reachable.** The dotfiles session cited
+`model/msgspec.py:127` as holding the `extra_fields → forbid` mapping that is
+never reached. That file is now in the corpus, and line 127 reads exactly:
+
+```python
+("extra_fields", "forbid"): ("forbid_unknown_fields", True),
+```
+
+So their citation is confirmed as *pointing at real code they read* — the
+mapping exists. Whether it is unreachable is PR 2's question, and it is now
+answerable here from a pinned source rather than by trusting their transcript.
+
+**One probe caveat worth carrying:** `graphify explain` matches on **labels, not
+ids**. Passing a full node id (`datamodel-code-generator::src_…_struct`) returns
+`No node matching … found`, which reads identically to a genuine absence. That
+is a spelling bound in the sense of `probes-need-a-control-arm.md` rule 3 — if
+an `explain` comes back empty, check you passed a *name*.
+
 ### 2.7 Sequencing — RULED ON by Ray
 
 Ray chose **"Finish: review, ship, land"** for this round, and **"ingest the
@@ -302,7 +646,7 @@ candidates as sources"** for §2's research. So:
 2. **§2 is the next round, and it STARTS WITH INGESTION**, not with edits and
    not with a web search. The candidates' docs and repos become
    `sources/*.manifest`; `kb-build` AST-extracts them for free (no LLM); then
-   R1–R11 are answered from the graph with citations. That is the only form in
+   R1–R12 are answered from the graph with citations. That is the only form in
    which the answer survives the session — and it is this repo's own thesis
    (query-first, ingest on a miss), applied to itself.
 3. Screening is **R10** (commits within the last month) before merit.
@@ -421,8 +765,40 @@ Remedy now points at **`mise run kb-check -- <paths>`**, new this round.
 
 ## 5. Deferred, with nothing lost
 
-- **#251** — derive the gate lists instead of hand-maintaining them. Was this
-  round's planned work; displaced by the `kb-watch` defect, on Ray's call.
-- **§2 in full** — the logging / SDK / codegen program.
+- **#251** — derive the gate lists instead of hand-maintaining them. Was the
+  2026-08-08 round's planned work; displaced by the `kb-watch` defect, on Ray's
+  call, and displaced again by this ingestion round.
+- **§2's remaining questions** — R1–R12 are now *answerable* (§2.6l) but are not
+  yet *answered*. That is the next PR: the decision document, with citations
+  into the twelve ingested sources, and R11's independent refutation of the
+  dotfiles ledger's three `datamodel-codegen`/msgspec findings.
+- **The `kind = docs` mirrors** — for the 3–4 libraries that survive R1/R7, plus
+  `pydantic` (§2.6k). Prose extraction is the only LLM path in this corpus, so
+  it is spent after the screening, not before.
+- **R4's enforcement lands LAST.** Deleting `T201` from `pyproject.toml`'s
+  ignore list — or better, the `TID251` banned-api table the dotfiles session
+  found (§2.6j) — bans direct writes in one config change. But only once a
+  logging layer exists: applied first, it turns 414 call sites into an
+  unfixable-in-place lint failure.
 - **§3.1** — deep extraction, and the relation-vocabulary drift.
 - **§3.3** — the empty `chunk_roots`.
+
+### 5.1 What this addendum closed
+
+- **R12 is recorded** (§2.6g). It existed only in auto-memory and a gitignored
+  session handoff, which is one `git clean -xdf` from gone.
+- **R10 is applied, with dates** (§2.6h) — and the *instrument* is now named,
+  which matters more than the dates, since they expire in a month.
+- **R8 is ruled on** (§2.6i), from two independent routes.
+- **R11's ledger is read** (§2.6j), with one correction accepted *from* it
+  (`logbook`) and one of its arguments identified as non-transferable.
+- **The corpus covers §2** (§2.6l), verified in both directions.
+
+**A measurement this round produced that belongs to no requirement:** applying
+**R9** to this round's own `kb-build` found **1,024 nodes silently lost** to
+node-id collisions in a run that exited **0** and reported *0 dangling, 0
+malformed* on the same line. All Swift, all from `sources/turbo-fieldfare/`;
+no Python source affected. Filed on **#231** with its control arms. R9 was the
+one requirement that could be exercised without building anything, and the first
+time it was pointed at a real log it found real loss — which is the strongest
+argument in this document for the rest of the program.

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import re
-import time
 from pathlib import Path
 
 from kb_setup import session_reflect as sr
@@ -75,36 +74,79 @@ def test_running_a_test_without_patching_anything_is_not_a_harness(tmp_path) -> 
     assert "mutation-harness" not in _ids(sr.reflect(tmp_path, transcripts=[path]).owned)
 
 
-def test_many_patches_and_no_test_run_finish_promptly(tmp_path) -> None:
-    """The spanning `A.*?B` form was QUADRATIC, and this is its shape.
+def test_many_patches_and_no_test_run_are_not_a_harness(tmp_path) -> None:
+    """CORRECTNESS on the adversarial input: many patches, no run token.
 
-    Under DOTALL the lazy gap was re-expanded to end-of-string from every
-    `write_text` start, so a command with many patch tokens and no run token —
-    the worst case, and an ordinary one — cost O(k·n). Measured on the old
-    pattern: 5.98 ms at k=200 rising to 395 ms at k=1600, an 8x input for a 66x
-    cost. The split form is two linear searches: 0.049 ms to 0.270 ms.
-
-    Timed rather than merely correct, because correctness never regressed —
-    only the cost did, and a cost regression in an ADVISORY report is invisible
-    until it stalls a session's last command.
-
-    UNARMED, deliberately and with the measurement to say so. Restoring the
-    spanning pattern leaves this test GREEN, because `scan` consults `also`
-    first and this command fails it — 398 ms executing that pattern directly
-    against these bytes, 0.28 ms through `scan`. No single-line mutation makes
-    this go red: the fix is the short-circuit, and its arm is
-    `also-not-consulted`. Naming that here rather than shipping a
-    predicted-survivor arm, which is the shape that gets read as confirmation.
+    This is the shape that made the old spanning pattern quadratic, kept here as
+    the behavioural half. The COST half is now
+    `test_no_rule_carries_an_unbounded_gap`, which asserts the property directly
+    instead of timing a proxy for it.
     """
     command = "; ".join(f"p{n}.write_text(chunk_{n})" for n in range(1600))
-    start = time.perf_counter()
     report = sr.reflect(tmp_path, transcripts=[_transcript(tmp_path, command)])
-    elapsed = time.perf_counter() - start
     assert "mutation-harness" not in _ids(report.owned)
-    # Two orders of magnitude of headroom over the measured 0.27 ms, and still
-    # ~10x under the 395 ms the old pattern spent — a bound loose enough not to
-    # flake on a loaded machine and tight enough that the old form fails it.
-    assert elapsed < 0.05, f"took {elapsed * 1000:.1f} ms — the spanning form is back"
+
+
+_DOT_QUANTIFIER = re.compile(r"(?<!\\)\.(\*|\+|\{\s*\d*\s*,\s*(\d*)\s*\})")
+"""An unescaped `.` followed by a quantifier, capturing any upper bound."""
+
+
+def _unbounded_gaps(pattern: str) -> list[str]:
+    """Every `.`-quantifier in `pattern` with no finite upper bound."""
+    bad = []
+    for m in _DOT_QUANTIFIER.finditer(pattern):
+        quant, upper = m.group(1), m.group(2)
+        if quant in {"*", "+"} or not upper:  # `.*`, `.+`, `.{2,}`
+            bad.append(m.group(0))
+    return bad
+
+
+def test_no_rule_carries_an_unbounded_gap() -> None:
+    """THE property the old wall-clock assertion was a proxy for.
+
+    A rule written `A.*?B` is quadratic: the engine re-expands the gap from
+    every `A` start, so a command with many `A`s and no `B` costs O(k·n). That
+    is not a contrived input — it is an ordinary long command line. See `_GAP`
+    for the measurement (2x input -> 4x cost, unbounded; 2x, bounded).
+
+    Asserted structurally rather than by timing, because the previous form
+    measured **wall-clock under `-n auto`** and flaked at 73.9 ms against a
+    50 ms bound while 11 sibling workers competed for CPU. A timing proxy cannot
+    survive parallel execution; the property can, and it is also STRICTLY
+    STRONGER — it covers every rule and every future rule, where the timed
+    version guarded one.
+
+    Finding the flake is what found the defect: `mutation-harness` had been
+    fixed, and `manifest-pin` and `gate-by-hand` still carried the same shape.
+    A finding is a sample of a class.
+    """
+    offenders = [
+        (rule.id, field_name, gaps)
+        for registry in (sr.OWNED, sr.DIRECTIVES, sr.UNARMED)
+        for rule in registry
+        for field_name in ("pattern", "unless", "also")
+        if (compiled := getattr(rule, field_name)) is not None
+        and (gaps := _unbounded_gaps(compiled.pattern))
+    ]
+    assert not offenders, (
+        f"unbounded gap(s) in {offenders} — use Rule.also when A-then-B order "
+        f"does not matter, or bound the gap with .{{0,{sr._GAP}}}? when it does"
+    )
+
+
+def test_the_unbounded_gap_detector_can_fire() -> None:
+    """CONTROL ARM: the check above must be able to return the other answer.
+
+    A property test that has only ever passed is not a check. These are the
+    exact strings the two live rules carried before 2026-08-09.
+    """
+    assert _unbounded_gaps(r"git ls-remote --tags.*sources/") == [".*"]
+    assert _unbounded_gaps(r"\buv run ruff\b.*&&.*\buv run ty\b") == [".*", ".*"]
+    assert _unbounded_gaps(r"A.+B") == [".+"]
+    assert _unbounded_gaps(r"A.{2,}B") == [".{2,}"]
+    # ...and must NOT fire on the bounded form, or every rule is an offender.
+    assert _unbounded_gaps(r"A.{0,200}?B") == []
+    assert _unbounded_gaps(r"\S+ and a literal \. and [a-z]*") == []
 
 
 # --- DIRECTIVES: compliance is a rate ----------------------------------------

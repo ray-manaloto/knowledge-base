@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R1/R8 candidate: C++-backed drop-in for stdlib logging. R10 SCREEN FAIL, and by every route: last commit on main 2025-06-17, latest release 0.9.4 2024-09-13. Note pushed_at reads 2026-04-24 because it counts any branch - that is not a commit to main. Ingested so the dead-end is citable.
+url = https://github.com/microsoft/picologging
+ref = main
+commit = deaee6e435d58d0bc1b9dc5635fe29062a44cb1e
+kind = code

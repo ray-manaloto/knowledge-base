@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R8 candidate: Rust-powered stdlib-compatible logging, claims 13x. R10 PASS, last commit 2026-07-14 (26 days, near the threshold). 35 stars.
+url = https://github.com/Indosaram/logxide
+ref = main
+commit = 136f7a4c3bc593488cd1e2c62bd74956265533d6
+kind = code

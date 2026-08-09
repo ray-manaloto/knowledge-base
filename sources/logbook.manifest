@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R1/R3 candidate surfaced by the parallel dotfiles session, missed by my own sweep. Handler-stack model. R10 PASS, last commit 2026-08-05. Their ledger calls it under-considered.
+url = https://github.com/getlogbook/logbook
+ref = main
+commit = d3d6972c64fc555e3428a60f18ffb19cdb9395c1
+kind = code

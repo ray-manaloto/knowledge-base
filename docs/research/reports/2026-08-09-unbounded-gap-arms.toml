@@ -1,0 +1,84 @@
+# Mutation arms for the unbounded-gap property test (session_reflect rules).
+#
+# The defect these arms guard: a rule written `A.*B` is QUADRATIC. The engine
+# re-expands the unbounded gap from every `A` start position, so a command with
+# many `A`s and no `B` — an ordinary long command line, not a contrived input —
+# costs O(k*n).
+#
+# HOW IT WAS FOUND, because the route matters more than the fix: the gate failed
+# on `test_many_patches_and_no_test_run_finish_promptly`, a WALL-CLOCK assertion
+# (`elapsed < 0.05`) that measured 73.9 ms under `mise run test`'s `-n auto`
+# while 11 sibling workers competed for CPU. Investigating that flake — not
+# reading the rules — surfaced two rules still carrying the shape that had
+# already been fixed on a third (`mutation-harness`, 2026-08-08). A finding is a
+# sample of a class.
+#
+# Measured 2026-08-09, single-line command of k `A` tokens and no `B`:
+#
+#   manifest-pin unbounded   7.97 / 31.40 / 129.25 ms at k=800/1600/3200  -> 4.0x
+#   manifest-pin bounded     1.16 /  2.34 /   4.99 ms                     -> 2.0x
+#   gate-by-hand unbounded   5.76 / 23.04 /  91.77 ms                     -> 4.0x
+#   gate-by-hand bounded     1.23 /  2.39 /   4.66 ms                     -> 2.0x
+#
+# 2x input for 4x cost is the O(n^2) signature. The RATIO is the durable figure;
+# the millisecond columns age with the machine.
+#
+# WHAT THESE ARMS CANNOT MEASURE, stated because a clean sweep is a statement
+# about the TESTS and never about the premise:
+#
+#   * whether `_GAP = 200` is the right bound. It is large enough for every
+#     realistic command checked (8 positives/negatives, old vs new, identical
+#     verdicts) and small enough to keep backtracking linear — but no arm here
+#     re-establishes it. A rule needing a 300-character gap would silently stop
+#     matching and every arm below would still pass.
+#   * whether the DOT is the only dangerous construct. `[^\n]*` and `[\s\S]*`
+#     are equally unbounded and the detector does not look for them. It was
+#     scoped to `.`-quantifiers because that is the shape both live defects and
+#     the 2026-08-08 one actually had; a wider net was not measured, so it was
+#     not claimed.
+#   * whether these rules FIRE correctly on a real transcript. The arms below
+#     assert only the structural property and the detector's own liveness.
+
+suites = ["tests/test_session_reflect.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/session_reflect.py"
+old = "_GAP = 200"
+new = "_GAP = 200  # inert control edit"
+
+# --- the two live defects, reintroduced exactly -------------------------------
+
+# The realistic break: a future edit "simplifying" the bound back to `.*?`,
+# which is what this rule carried from its introduction until 2026-08-09.
+[[arm]]
+id = "manifest-pin-gap-unbounded"
+test = "test_no_rule_carries_an_unbounded_gap"
+file = "python/src/kb_setup/session_reflect.py"
+old = '        rf"git ls-remote --tags.{{0,{_GAP}}}?sources/"'
+new = '        r"git ls-remote --tags.*?sources/"'
+
+# The second live instance. Armed SEPARATELY from the first rather than trusting
+# one to cover both: the property test iterates registries, and an iteration bug
+# that visited only the first rule would pass the arm above while leaving this
+# one undetected.
+[[arm]]
+id = "gate-by-hand-gap-unbounded"
+test = "test_no_rule_carries_an_unbounded_gap"
+file = "python/src/kb_setup/session_reflect.py"
+old = '        rf".{{0,{_GAP}}}?\buv run (?:ruff|ty|pytest)\b",'
+new = '        r".*?\buv run (?:ruff|ty|pytest)\b",'
+
+# --- the detector itself ------------------------------------------------------
+
+# THE arm that matters most, because it is the one whose absence would make
+# every arm above meaningless: a detector that can never report an offender
+# makes `test_no_rule_carries_an_unbounded_gap` pass unconditionally. The
+# realistic break is dropping the accumulate, not renaming the function.
+[[arm]]
+id = "detector-never-reports"
+test = "test_the_unbounded_gap_detector_can_fire"
+file = "tests/test_session_reflect.py"
+old = "            bad.append(m.group(0))"
+new = "            pass"

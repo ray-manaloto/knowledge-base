@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# R12 (Ray's twelfth requirement: parallel python pytest and related sources). The base framework. R10 PASS, last commit 2026-08-09.
+url = https://github.com/pytest-dev/pytest
+ref = main
+commit = 006884bac1cff49d2e2908c20fbbb0f0bc8e671b
+kind = code
