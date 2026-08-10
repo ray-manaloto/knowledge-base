@@ -506,6 +506,53 @@ becoming a valid `Ok`. That is the mutation `ok-guard-back-to-a-blacklist` arms.
 **Arms: 10/10 died, 1/1 control held, restored rc=0.** The remaining conversion
 of ~165 sites is a separate tranche and is NOT done.
 
+## 9. The conversion tranche — the recipe, and where it stopped
+
+**Converted so far: `check` (tranche 1) and `lint_checks` (this one). ~28
+command modules remain.** Stated as a count of modules rather than of sites,
+because the site figure is what the conversion itself invalidates.
+
+### The recipe, in the shape both converted modules use
+
+`ruff`'s two-function split (`crates/ruff/src/lib.rs:128` / `main.rs`):
+
+```python
+def check_<verb>(...) -> Result[T]:   # returns, never raises, PRINTS NOTHING
+    ...
+    return Ok(value, rc=Rc.FINDINGS if found else Rc.OK)
+
+def <verb>(...) -> int:               # renders, then converts
+    result = check_<verb>(...)
+    if isinstance(result, Ok) and result.value:
+        ...print...
+    return exit_code(result)
+```
+
+Four rules that are not obvious from the shape:
+
+1. **Findings are `Ok`.** A gate that ran and found something did its job.
+   `Err` is only "could not run" — and several modules have *no* such case, so
+   their boundary legitimately never returns `Err`.
+2. **The `int`-returning wrapper stays.** `cli.py` and every pre-existing
+   exit-code assertion are the regression arm; converting them in the same
+   change removes the only thing proving the split changed no behaviour.
+3. **The boundary prints nothing**, and there is a test asserting that. It is
+   the property that makes the split worth anything — a boundary that prints
+   cannot be re-rendered by §2.5's stdout sink.
+4. **Do not touch the 8 quantity-returners** (§8c).
+
+### Three traps this tranche hit, all of which cost a cycle
+
+- **`ty` catches the annotation you guessed.** `check_no_lint_skip` was
+  annotated `Result[list[tuple[str, int, str]]]`; the hits carry `Path`.
+- **`TC002`**: a `pytest` import used only in an annotation must move into a
+  `TYPE_CHECKING` block, which requires `from __future__ import annotations`
+  in that test file.
+- **Never write a suppression marker as a literal in a test.** `tests/test_lint_checks.py`
+  concatenates (`"no" + "qa"`) precisely so `no_lint_skip` does not flag the
+  repo itself. A generated test that planted the literal would have broken the
+  gate it was testing.
+
 ## GitHub repos touched
 
 - [anthropics/anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) — read `src/anthropic/_exceptions.py`; the primary Python-SDK error-surface data point. **Not in `sources/`** — candidate for `REGISTRY.md`.
