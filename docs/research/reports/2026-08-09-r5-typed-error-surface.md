@@ -753,6 +753,69 @@ mutant that could never die. The sweep output renders them identically, so the
 diagnosis has to be a separate step — and the cheap form of that step is asking
 whether the mutated expression and the original can *ever* disagree.
 
+### 9f. #270 closed (2026-08-10) — the one commit that moves an exit code on purpose
+
+Every conversion tranche is behaviour-preserving by rule, precisely so the
+pre-existing exit-code assertions stay a valid regression arm. This commit spends
+that arm deliberately, in two places and nowhere else — which is why Ray ruled it
+a separate commit rather than folding it into tranche 4, and why its arms live in
+their own spec (`2026-08-10-r5-270-arms.toml`).
+
+| module | case | was | now |
+|---|---|---|---|
+| `md_budget` | `report.counted == 0` | `Ok(rc=OK)` | `Err(rc=NOT_RUN)` |
+| `distill` | no transcripts scanned | `Ok(rc=OK)` | `Err(rc=NOT_RUN)` |
+
+`skill_lint` already drew it this way; these two were the structurally identical
+cases reporting success. `distill`'s was the sharpest, because it *printed* the
+contradiction — "the detector did not run. This is not a clean result" — while
+returning 0, so it was visible to every operator and invisible to every test.
+
+**Three things this cost that the ticket did not name.**
+
+**1. `mise.toml`'s task comment said "ALWAYS rc 0".** A comment left contradicting
+its own code is how the next reader is misled, so it was rewritten in the same
+commit. The distinction it now draws is the real one: a *lead* still exits 0 —
+that is what "never a gate" protects — but a run that examined nothing stops
+claiming it examined nothing successfully.
+
+**2. Three CLI tests broke, and they were a finding rather than a chore.**
+`test_cli_dispatches_distill` and both `--limit` / `--min-scripts` fallback cases
+stubbed `project_transcripts` to `[]`, using the never-ran case as a convenient
+fixture while testing *dispatch* and *flag fallback*. They were given real
+transcripts rather than re-pinned to 127: asserting dispatch by observing a
+refusal is weaker than what they were written to check, and "did not raise"
+demonstrated on a run that never read a flag cannot distinguish a working
+fallback from an early exit. A test that fails when an unrelated behaviour
+changes is usually testing through the wrong fixture.
+
+**3. The over-correction is worse than the bug, so each new assertion ships with
+a control arm.** `Err(rc=NOT_RUN)` returned *unconditionally* satisfies both new
+tests — and would take the `md_size_budget` gate permanently red in **two** repos
+and make an analyser documented as "never a gate" fail every run that found
+something. `md-budget-always-refuses` and `distill-always-refuses` exist to prove
+those controls can fail.
+
+**Blast radius, checked rather than reasoned about.** dotfiles' `hk.pkl` does run
+`uv run --project python kb-setup md-budget`, so the concern was real. It pins
+this package by SHA (`46a3e7d8…` at the time of writing), so the change reaches
+it only when that pin advances; and measured there on 2026-08-10, dotfiles counts
+**57** instruction files against this repo's 32. `counted == 0` cannot arise in
+either repo under normal operation — which is the point, not a reason to skip the
+check: the change exists so that if a walk ever silently matches nothing, it says
+so instead of reporting clean.
+
+**Arms: 4/4 died, 1/1 control held, restored OK.** `--dry-run` caught a
+non-unique anchor before the sweep — `if not report.scanned:` also appears in
+`distill.render` — reporting *pattern is not unique* rather than mutating the
+wrong occurrence. Fourth recorded instance of a spec anchor needing re-derivation.
+
+**Still open: the FOURTH instance.** `goal.main` with no input (§9d) checks
+nothing and returns 0. It is deliberately NOT closed here — `kb-goal-check` is
+advisory by ruling, so a `NOT_RUN` there is a separate decision about an advisory
+command rather than a consequence of this one. Pinned as
+`test_goal_no_input_is_the_documented_divergence`.
+
 ## GitHub repos touched
 
 - [anthropics/anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) — read `src/anthropic/_exceptions.py`; the primary Python-SDK error-surface data point. **Not in `sources/`** — candidate for `REGISTRY.md`.

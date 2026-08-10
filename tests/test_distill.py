@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import cli, distill
-from kb_setup.result import Ok, Rc, exit_code
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 
 def _transcript(tmp_path, name, commands, writes=()) -> Path:
@@ -330,9 +330,21 @@ def test_a_truncated_transcript_line_does_not_abort_the_scan(tmp_path):
 
 
 def test_cli_dispatches_distill(monkeypatch, tmp_path, capsys):
-    """The level PR #220's mutation happened at — a library-only test cannot see this."""
+    """The level PR #220's mutation happened at — a library-only test cannot see this.
+
+    The stub returns a REAL transcript, not ``[]``. It returned ``[]`` until
+    #270, which was a convenient fixture rather than a considered one: this test
+    is about DISPATCH, and it was demonstrating it through the one input that
+    means the detector never ran. When #270 made that input non-zero the test
+    failed, correctly, and the fix is to test dispatch on a run that happened —
+    not to re-pin it against `Rc.NOT_RUN`, which would assert dispatch by
+    observing a refusal.
+    """
+    path = _transcript(
+        tmp_path, "dispatch", [_heredoc("import json\nPath('sources/extractions/a.json')")]
+    )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(distill.brain, "project_transcripts", lambda *_a, **_k: [])
+    monkeypatch.setattr(distill.brain, "project_transcripts", lambda *_a, **_k: [path])
     assert cli.main(["distill"]) == 0
     assert "distill:" in capsys.readouterr().out
 
@@ -349,8 +361,18 @@ def test_cli_passes_min_scripts_through(monkeypatch, tmp_path, capsys):
 
 @pytest.mark.parametrize("flag", ["--limit", "--min-scripts"])
 def test_a_non_numeric_flag_falls_back_rather_than_raising(flag, monkeypatch, tmp_path, capsys):
+    """A garbage flag value falls back to the default instead of raising.
+
+    Same #270 correction as `test_cli_dispatches_distill`: the stub returned
+    `[]`, so "did not raise" was being demonstrated on a run that never looked
+    at a transcript — which cannot distinguish a working fallback from a
+    detector that exited before the flag mattered.
+    """
+    path = _transcript(
+        tmp_path, "fallback", [_heredoc("import json\nPath('sources/extractions/a.json')")]
+    )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(distill.brain, "project_transcripts", lambda *_a, **_k: [])
+    monkeypatch.setattr(distill.brain, "project_transcripts", lambda *_a, **_k: [path])
     assert cli.main(["distill", flag, "not-a-number"]) == 0
     assert "distill:" in capsys.readouterr().out
 
@@ -440,27 +462,50 @@ def test_distill_a_one_off_session_proposes_nothing_and_is_ok(tmp_path, monkeypa
     assert "nothing to propose" in result.value
 
 
-def test_distill_no_transcripts_at_all_is_the_documented_divergence(tmp_path, monkeypatch):
-    """Zero transcripts reports `Rc.OK` while SAYING the detector did not run.
+def test_distill_no_transcripts_at_all_is_not_a_clean_result(tmp_path, monkeypatch):
+    """Zero transcripts is `Rc.NOT_RUN` — #270, closed 2026-08-10.
 
-    Pinned, not endorsed — and this module states the contradiction in its own
-    output: *"NO TRANSCRIPTS FOUND — the detector did not run. This is not a
-    clean result."* By this repo's doctrine that is `Rc.NOT_RUN`, which is
-    exactly what `skill_lint` returns for the structurally identical case.
+    This test is the record of a deliberate reversal. It was
+    `test_distill_no_transcripts_at_all_is_the_documented_divergence` and
+    asserted `Rc.OK`, pinning the sharpest of the three #270 instances: this
+    module *printed* "NO TRANSCRIPTS FOUND — the detector did not run. This is
+    not a clean result" and returned success in the same breath. The
+    contradiction was on stdout in front of every operator and invisible to
+    every test, because a test asserting rc 0 gets rc 0.
 
-    It stays `OK` because the R5 conversion is behaviour-preserving by rule, so
-    the pre-existing exit-code assertions remain a valid regression arm. The
-    third module with this shape (`md_budget`'s `counted == 0` is the other),
-    which is why it is being filed as one gap rather than fixed three times in
-    a conversion nobody would review as a behaviour change.
+    It was left diverging through the R5 conversion tranches on purpose — a
+    conversion's only regression arm is the pre-existing exit-code assertions.
+    Pinning it as a failing-on-purpose assertion is what made closing it a
+    visible edit rather than a silent behaviour change inside a refactor.
     """
     _with_transcripts(monkeypatch, [])
 
     result = distill.check_distill(tmp_path)
 
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "did not run" in result.message
+
+
+def test_distill_a_lead_still_exits_zero(tmp_path, monkeypatch):
+    """CONTROL ARM: `kb-distill` is still never a gate — only NO-TRANSCRIPTS moved.
+
+    Without this, the assertion above is satisfied by a boundary that returns
+    `Err` unconditionally, which would make an advisory analyser fail every run
+    that found something — the exact outcome the "never a gate" decision rules
+    out, passing its own test while doing it.
+    """
+    path = _transcript(
+        tmp_path,
+        "oneoff-control",
+        [_heredoc("import json\nPath('sources/extractions/a.json')")],
+    )
+    _with_transcripts(monkeypatch, [path])
+
+    result = distill.check_distill(tmp_path)
+
     assert isinstance(result, Ok)
     assert result.rc is Rc.OK
-    assert "did not run" in result.value
 
 
 def test_distill_boundary_prints_nothing(tmp_path, monkeypatch, capsys):

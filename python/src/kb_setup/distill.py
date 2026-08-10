@@ -62,7 +62,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import brain
-from kb_setup.result import Ok, Result, exit_code
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -574,6 +574,20 @@ def check_distill(root: Path, args: Sequence[str] = ()) -> Result[str]:
     would make `kb-distill` fail a build the first time someone wired it into
     one — which is exactly the outcome the "never a gate" decision rules out.
     So the leads travel in the VALUE, and the rc stays `OK`.
+
+    **NO TRANSCRIPTS is the exception, and it is `Err(rc=Rc.NOT_RUN)`** (#270,
+    closed 2026-08-10). It is not the advisory case above: the detector never
+    ran, so there is nothing advisory to report. This module was the sharpest of
+    the three #270 instances because it already *said so on stdout* — "the
+    detector did not run. This is not a clean result" — while returning success,
+    so the contradiction was visible to every operator and invisible to every
+    test. `Rc.NOT_RUN` is the code the message was already describing.
+
+    That does not make `kb-distill` a gate. A LEAD still exits 0, which is the
+    thing "never a gate" protects; what changes is that a run which examined
+    nothing stops claiming it examined nothing successfully. `mise.toml`'s task
+    comment was corrected in the same commit — it said "ALWAYS rc 0", and a
+    comment left contradicting its own code is how the next reader is misled.
     """
     rest = list(args)
     report = distill(
@@ -584,15 +598,19 @@ def check_distill(root: Path, args: Sequence[str] = ()) -> Result[str]:
             min_scripts=_int_flag(rest, "--min-scripts", DEFAULT_POLICY.min_scripts),
         ),
     )
+    if not report.scanned:
+        return Err(render(report).strip(), rc=Rc.NOT_RUN)
     return Ok(render(report))
 
 
 def distill_main(root: Path, args: Sequence[str] = ()) -> int:
-    """CLI entry: print the proposal. Always rc 0 — a lead is not a failure.
+    """CLI entry: print the proposal. rc 0 for a lead; `Rc.NOT_RUN` if nothing was scanned.
 
     Deliberately never a gate. An undistilled probe is a signal about future
     cost, and a check that fails the build over it would be argued past within a
-    round; `mise run kb-currency` is the same call for the same reason.
+    round; `mise run kb-currency` is the same call for the same reason. That is
+    a statement about LEADS, which still exit 0 — it was never a promise that a
+    run examining no transcripts would also report success (#270).
 
     Kept returning ``int``: ``cli.py`` and this module's existing exit-code
     assertions are the regression arm for the ``Result`` split.
