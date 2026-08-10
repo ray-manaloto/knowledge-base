@@ -69,6 +69,7 @@ from pathlib import Path
 from typing import TypeIs
 
 from kb_setup import atomic, resolve, review
+from kb_setup.result import Rc
 
 #: Where a run's record lands. Listed in `agent-artifact-conventions.md`, which
 #: forbids directories that are not.
@@ -89,7 +90,12 @@ _GIT_TIMEOUT = 30
 #: the same way it spells "lint found something". The values follow the shell's
 #: own conventions so they read without a legend.
 _RC_TIMEOUT = 124
-_RC_COULD_NOT_RUN = 127
+_RC_COULD_NOT_RUN = Rc.NOT_RUN
+#: ^ was a second `= 127`, identical in value and rationale to
+#: `check.RC_COULD_NOT_RUN`. §2 R5's fourth member is where that meaning lives
+#: now; `Rc` is an `IntEnum`, so this is still exactly 127. `_RC_TIMEOUT` stays
+#: a literal — 124 is `timeout(1)`'s convention and a DIFFERENT state (the gate
+#: started and was killed), which `Rc` does not model.
 
 #: Characters of a commit shown in a report. Public because `kb_setup.handoff`
 #: renders the same commits when it checks a claim against a record: two copies

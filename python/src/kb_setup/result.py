@@ -7,10 +7,15 @@ ints, not ad-hoc rcs)"*. The screening behind this module is
 `docs/research/reports/2026-08-09-r5-typed-error-surface.md`; the two facts that
 shaped the code are worth carrying here rather than only there:
 
-1. **The vocabulary already existed, undeclared.** `0` / `1` / `2` were returned
-   from **175** sites across `kb_setup` with a consistent meaning that was
-   written down only in prose (`CLAUDE.md`: *"rc 2 on a malformed request"*).
-   `Rc` names it; it does not invent it.
+1. **The vocabulary already existed, undeclared — and NOT consistent.** `0`/`1`/`2`
+   were returned from most of `kb_setup`'s commands with meanings written down
+   only in prose, and the prose contradicted itself: `.claude/rules/mise-tasks-only.md`
+   documented "a glob matching nothing" as **1** for `skill_lint` and "a skill
+   name matching nothing" as **2** for `kb-skill-score`, in the same file.
+   `Rc` names the vocabulary and `NOT_RUN` reconciles that case; neither
+   invents one. (No site count is given here on purpose — the sweep converting
+   those sites is what makes any figure stale, and `check.py`'s docstring
+   carried exactly that kind of rotting number until a cold lane caught it.)
 2. **`Err` is for "the tool broke", not "the tool found something".** This is
    the distinction the integers could not carry, and the reason the change is
    worth making at all. Today `return 1` means both *found lint errors* and
@@ -59,7 +64,7 @@ class Rc(IntEnum):
     rewrite.
 
     The three meanings are `ruff`'s (`Success` / `Failure` / `Error`), which is
-    what this repo's 175 existing sites already meant. Note `uv` uses the same
+    what most of this repo's existing sites already meant. Note `uv` uses the same
     three integers with the *inverse* emphasis (its `Failure` is bad user input,
     its `Error` is an unexpected failure) — which is the argument for naming
     them: two tools by one vendor, three shared integers, different meanings,
@@ -76,12 +81,41 @@ class Rc(IntEnum):
     """
 
     BAD_REQUEST = 2
-    """Could not run: the request was malformed, or nothing was actually checked.
+    """Could not run: the request itself was malformed.
 
-    The second half matters as much as the first — `kb-check -- src/x.rs` must
-    not read as "x.rs is clean". A gate that never asked the question is not a
-    pass (`.claude/rules/probes-need-a-control-arm.md`).
+    Bad arguments, an unknown subcommand, a flag with no value. The caller can
+    fix this by asking differently.
     """
+
+    NOT_RUN = 127
+    """The request was fine and the question was still never asked.
+
+    A glob that matched nothing, a tool binary that would not start, an empty
+    worklist. Distinct from `BAD_REQUEST` (you asked wrong) and from `FINDINGS`
+    (we looked and found something) — **"we did not look" is a third state**,
+    and collapsing it into either is how a gate reports clean without checking
+    anything (`.claude/rules/probes-need-a-control-arm.md`).
+
+    **127 is not invented here.** The repo already chose it for exactly this
+    meaning, twice: `check.RC_COULD_NOT_RUN` and `gates._RC_COULD_NOT_RUN`, both
+    `= 127`, both documented as *"distinct from any tool's own failure rc, so
+    'broken' never reads as 'failed'"*. Both now alias this member, so the
+    constant is defined once. It matches the shell's own `command not found`
+    convention, and nothing in `kb_setup` branches on a specific non-zero code
+    (every check is `!= 0`), so adopting it changed no consumer.
+
+    **Why a fourth member existed to be added.** `.claude/rules/mise-tasks-only.md`
+    documented this one case *both ways*: "a glob matching nothing exits **1**"
+    for `skill_lint`, and "**rc 2** on a malformed request, e.g. a skill name
+    matching nothing" for `kb-skill-score` — same failure, opposite codes, same
+    file. `check.py` independently chose 2, and `distill` returns a string
+    because it is advisory. Ray ruled the fourth member on 2026-08-09 rather
+    than forcing that case into a code that misdescribes it.
+    """
+
+
+_RAN = frozenset({Rc.OK, Rc.FINDINGS})
+"""The codes that mean the command actually ran. Everything else is an `Err`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,12 +130,17 @@ class Ok[T]:
     rc: Rc = Rc.OK
 
     def __post_init__(self) -> None:
-        """Reject an `Ok` that claims the command could not run."""
-        if self.rc is Rc.BAD_REQUEST:
+        """Reject an `Ok` that claims the command did not run.
+
+        Closed rather than a blacklist: only the two codes that mean "it ran"
+        are admissible, so a member added later is rejected by default instead
+        of silently becoming a valid `Ok`. `NOT_RUN` was exactly that member.
+        """
+        if self.rc not in _RAN:
             msg = (
-                "Ok(rc=Rc.BAD_REQUEST) is not representable: BAD_REQUEST means "
-                "the command could not run, which is an Err. Use "
-                "Err(message) instead."
+                f"Ok(rc=Rc.{self.rc.name}) is not representable: it means the "
+                f"command did not run, which is an Err. Use Err(message) — or "
+                f"Err(message, rc=Rc.{self.rc.name}) to keep the code."
             )
             raise ValueError(msg)
 

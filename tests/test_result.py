@@ -217,3 +217,64 @@ def test_a_real_subprocess_code_round_trips() -> None:
     """End to end, no mock: child exits 42, `External` carries 42 out."""
     done = subprocess.run([sys.executable, "-c", "raise SystemExit(42)"], check=False)
     assert exit_code(External(done.returncode)) == 42
+
+
+# --------------------------------------------------------------------------
+# Rc.NOT_RUN — the fourth member (Ray's ruling, 2026-08-09)
+# --------------------------------------------------------------------------
+
+
+def test_not_run_reuses_the_value_the_repo_already_chose() -> None:
+    """127, not an invented code — and the two old constants now alias it.
+
+    `check.RC_COULD_NOT_RUN` and `gates._RC_COULD_NOT_RUN` were both a literal
+    127 with the same written rationale. If this drifts, the dedup silently
+    un-dedups and two spellings of one meaning are back.
+    """
+    from kb_setup import check as check_mod
+    from kb_setup import gates as gates_mod
+
+    assert Rc.NOT_RUN == 127
+    assert check_mod.RC_COULD_NOT_RUN is Rc.NOT_RUN
+    assert gates_mod._RC_COULD_NOT_RUN is Rc.NOT_RUN
+
+
+def test_not_run_is_distinct_from_the_codes_that_misdescribe_it() -> None:
+    """The whole reason it exists: 1 and 2 are both WRONG for "we did not look"."""
+    assert Rc.NOT_RUN not in (Rc.OK, Rc.FINDINGS, Rc.BAD_REQUEST)
+
+
+def test_ok_rejects_not_run() -> None:
+    """FAIL direction: an `Ok` cannot claim the command did not run."""
+    with pytest.raises(ValueError, match="not representable"):
+        Ok("anything", rc=Rc.NOT_RUN)
+
+
+def test_err_accepts_not_run_and_exit_code_carries_it() -> None:
+    """ARM: NOT_RUN is a legitimate Err code, and reaches the process intact."""
+    err = Err("the glob matched nothing", rc=Rc.NOT_RUN)
+
+    assert err.rc is Rc.NOT_RUN
+    assert exit_code(err) == 127
+
+
+def test_the_ok_guard_is_closed_not_a_blacklist() -> None:
+    """Every Rc member is either admissible in `Ok` or rejected — none silently OK.
+
+    The guard was `is Rc.BAD_REQUEST` (a blacklist) until NOT_RUN was added, at
+    which point a blacklist would have let `Ok(rc=NOT_RUN)` through. This asserts
+    the property rather than the two current members, so a FIFTH member added
+    later is rejected by default instead of quietly becoming a valid `Ok`.
+    """
+    admissible, rejected = [], []
+    for member in Rc:
+        try:
+            Ok(None, rc=member)
+        except ValueError:
+            rejected.append(member)
+        else:
+            admissible.append(member)
+
+    assert admissible == [Rc.OK, Rc.FINDINGS]
+    assert set(rejected) == set(Rc) - {Rc.OK, Rc.FINDINGS}
+    assert rejected, "no member was rejected — the guard is not discriminating"

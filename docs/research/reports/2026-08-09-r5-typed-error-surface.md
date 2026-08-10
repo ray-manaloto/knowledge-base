@@ -433,6 +433,79 @@ this skill was rewritten to remove (#67: 2.93M tokens, one real defect, change
 reverted). Verification for the fix is the local gates, recorded below and in the
 fix-round report.
 
+## 8. The sweep's audit — three claims above are FALSIFIED
+
+Written after the fact, deliberately left contradicting the sections above
+rather than editing them into agreement: what §1 and §4 claimed, and what
+auditing the sites actually found, is itself the finding.
+
+### 8a. "175 call sites already agree" — **false**
+
+§1 said the convention was consistent and merely undeclared.
+`.claude/rules/mise-tasks-only.md` documents it **both ways**:
+
+| line | tool | "matched nothing" exits |
+|---|---|---:|
+| 72 | `skill_lint` | **1** |
+| 31 | `kb-skill-score` | **2** |
+
+`check.py` independently chose **2**; `distill` returns a **string** (advisory,
+always exits 0). One failure, three spellings, two of them documented in one
+file. So the sweep is a **reconciliation**, not a rename — and every
+disagreement is a behaviour change to a live gate, not something to fold into a
+mechanical pass.
+
+**Ray ruled a fourth member** on 2026-08-09 rather than force the case into a
+code that misdescribes it: `Rc.NOT_RUN`. Neither `1` ("we looked and found
+something" — we did not look) nor `2` ("you asked wrong" — the request was
+fine).
+
+**Its value was not invented.** The repo had already chosen `127` for exactly
+this meaning, twice — `check.RC_COULD_NOT_RUN` and `gates._RC_COULD_NOT_RUN`,
+both documented *"distinct from any tool's own failure rc, so 'broken' never
+reads as 'failed'"*. Both now alias the member, so the constant is defined once.
+Probed before adopting: no bare rc other than `0`/`1`/`2` is in use, and
+**nothing in `kb_setup` branches on a specific non-zero code** (every check is
+`!= 0`), so no consumer changed. `gates._RC_TIMEOUT = 124` stays a literal — a
+gate that *started and was killed* is a different state, which `Rc` does not
+model.
+
+### 8b. "22 `raise SystemExit(<str>)` sites" — **19**
+
+Three of the 22 are `raise SystemExit(main())` / `SystemExit(run())` — the
+canonical `__main__` conversion, and **exactly** the `From<ExitStatus> for
+ExitCode` boundary §4 argues for. Converting them would break the pattern. The
+19 that remain split further: **6 at a command boundary** (`build()`,
+`refresh_self()`, `generate()`) which convert to `Err` cleanly, and **13 in deep
+helpers returning real values** (`_verified_ledger_chunks() -> list[...]`,
+`derive_for() -> ProseStats`) which cannot without changing their contracts.
+For those the defect is not that they raise — it is that `SystemExit` inherits
+`BaseException`, so no consumer can catch a `kb_setup` failure at all.
+
+### 8c. "the 174 rc sites" — **173, and 8 are not exit codes**
+
+Two independent routes now agree at **173** (anchored grep; AST walk to the
+enclosing function). Getting them to agree required fixing a defect in the AST
+probe: **`bool` subclasses `int` in Python**, so `isinstance(v.value, int)`
+matched every `return True`/`False` and reported 228. The grep disagreeing is
+what surfaced it — a cross-check, not a re-read.
+
+And **8 sites in 6 functions are not exit codes at all** — `_dir_size()`,
+`_node_count()`, `_parse_size()`, `_brew_freed_bytes()`, `_as_int()`,
+`line_count()`. Their `0` is zero-of-a-quantity. Renaming those to `Rc.OK`
+would be a byte count asserting success. This is the "counted, not audited"
+caveat in §6 paying off literally.
+
+### What this tranche shipped
+
+`Rc.NOT_RUN`, the two-constant dedup, the `skill_lint` reconciliation and the
+amended rule line — plus a **closed** `Ok` guard (`rc not in _RAN`) replacing
+the blacklist, so a fifth member is rejected by default rather than silently
+becoming a valid `Ok`. That is the mutation `ok-guard-back-to-a-blacklist` arms.
+
+**Arms: 10/10 died, 1/1 control held, restored rc=0.** The remaining conversion
+of ~165 sites is a separate tranche and is NOT done.
+
 ## GitHub repos touched
 
 - [anthropics/anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) — read `src/anthropic/_exceptions.py`; the primary Python-SDK error-surface data point. **Not in `sources/`** — candidate for `REGISTRY.md`.

@@ -30,12 +30,18 @@ from pathlib import Path
 
 from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
-RC_COULD_NOT_RUN = 127
+RC_COULD_NOT_RUN = Rc.NOT_RUN
 """Distinct from any tool's own failure rc, so "broken" never reads as "failed".
 
 The same separation `gates._invoke` makes and for the same reason: a reader
 deciding what to fix needs to know whether the tool disagreed with the code or
 never started.
+
+Now an alias for `Rc.NOT_RUN` rather than a second `= 127`. This constant and
+`gates._RC_COULD_NOT_RUN` were the same value with the same rationale written
+out twice; §2 R5's fourth member is where that meaning lives. The name is kept
+because it reads correctly at the call site and `tests/test_check.py` asserts on
+it — and `Rc` is an `IntEnum`, so the value is still exactly `127`.
 """
 
 TESTS_DIR = "tests"

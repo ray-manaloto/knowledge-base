@@ -69,7 +69,7 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    `.claude/skills/*/SKILL.md`, only inside ```` ```bash ````-class fences
    (prose *describing* a tool is not an instruction), and the
    installer-generated `.claude/skills/graphify/**` is excluded on
-   `md_budget`'s precedent. A glob matching nothing exits **1**, not 0 — a gate
+   `md_budget`'s precedent. A glob matching nothing exits **`Rc.NOT_RUN` (127)**, not 0 — a gate
    that never asked the question is not a pass.
 2b. **The SAME hook also denies a broad source search before any graph query**
    (`kb_setup.graph_first`, #253) — a second directive, one entry point, so
