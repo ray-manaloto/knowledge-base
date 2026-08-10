@@ -1,0 +1,100 @@
+# Mutation arms for #270 — "a gate that never asked the question is not a pass".
+#
+# WHY THIS IS A SEPARATE SPEC FROM THE TRANCHE SWEEPS. #270 is the one change in
+# this whole R5 programme that DELIBERATELY MOVES AN EXIT CODE. Every conversion
+# tranche is behaviour-preserving by rule, precisely so the pre-existing
+# exit-code assertions stay a valid regression arm; this commit spends that arm
+# on purpose, in two places, and nowhere else. Keeping its arms in their own file
+# is what makes that scope legible later — a reviewer reading
+# `2026-08-10-r5-tranche4-arms.toml` should not have to work out which rows are
+# refactor-safety and which are a behaviour change.
+#
+# WHAT A CLEAN SWEEP HERE WOULD AND WOULD NOT MEAN. It says the two new
+# assertions can fail. It does NOT establish:
+#
+#   * that `counted == 0` or "no transcripts" can actually ARISE in either repo.
+#     Measured 2026-08-10 and they cannot under normal operation — this repo
+#     counts 32 instruction files, dotfiles counts 57 — which is the point: the
+#     change exists so that if the walk ever silently matches nothing, it says so
+#     instead of reporting clean. An arm cannot measure a case's frequency.
+#   * that the `md_budget` change is safe in dotfiles. That was checked
+#     separately (its `hk.pkl` runs `kb-setup md-budget`, it pins this package by
+#     SHA, and it counts 57), not by any arm here.
+#   * that the FOURTH instance found in tranche 4 — `goal.main` with no input —
+#     is closed. It is not; it is still pinned as
+#     `test_goal_no_input_is_the_documented_divergence`, deliberately, because
+#     `kb-goal-check` is advisory by ruling and a NOT_RUN there is a separate
+#     decision rather than a consequence of this one.
+#
+# EVERY ARM IS THE REALISTIC BREAK, and for this change the realistic break is
+# the REVERT: someone hits a red `md_size_budget` in a repo with no markdown, or
+# a red `kb-distill` in a fresh clone, and deletes the guard clause to make it
+# stop. That is exactly the edit each arm below performs.
+
+suites = ["tests/test_md_budget.py", "tests/test_distill.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/md_budget.py"
+old = "    report = check(root, exclude=exclude)"
+new = "    report = check(root, exclude=exclude)  # inert control edit"
+
+# The revert: a budget walk that matched nothing reports clean again. This is
+# the `md_size_budget` hk step in BOTH repos going green over a gate that never
+# ran, which is the false green `probes-need-a-control-arm.md` exists for.
+[[arm]]
+id = "md-budget-nothing-counted-reports-clean-again"
+test = "test_md_budget_counted_zero_is_not_a_pass"
+file = "python/src/kb_setup/md_budget.py"
+old = """    if report.counted == 0:
+        return Err(
+            "NO INSTRUCTION FILES MATCHED — the budget gate did not run. "
+            "Check the walk before reading this as clean.",
+            rc=Rc.NOT_RUN,
+        )
+"""
+new = ""
+
+# The revert, in the module that PRINTS the contradiction. `kb-distill` reports
+# success while its own stdout says "the detector did not run. This is not a
+# clean result" — the state #270 was filed over.
+[[arm]]
+id = "distill-no-transcripts-reports-clean-again"
+test = "test_distill_no_transcripts_at_all_is_not_a_clean_result"
+file = "python/src/kb_setup/distill.py"
+old = """    if not report.scanned:
+        return Err(render(report).strip(), rc=Rc.NOT_RUN)
+"""
+new = ""
+
+# --------------------------------------------------------------------------
+# The OVER-CORRECTION, which is the direction a fix like this actually fails
+#
+# Both arms above are satisfied by a boundary that returns `Err(NOT_RUN)`
+# unconditionally — and that failure mode is worse than the bug: it takes the
+# `md_size_budget` gate permanently red in two repos, and makes an analyser
+# documented as "never a gate" fail every run that found something. Each new
+# assertion therefore ships with a control-arm test, and these two arms are what
+# prove those controls can fail.
+# --------------------------------------------------------------------------
+
+[[arm]]
+id = "md-budget-always-refuses"
+test = "test_md_budget_a_populated_tree_still_reports_ok"
+file = "python/src/kb_setup/md_budget.py"
+old = "    if report.counted == 0:"
+new = "    if True:"
+
+# Anchored on BOTH lines: `if not report.scanned:` also appears in `render`,
+# which is the other place this module asks the same question. A one-line anchor
+# reported `pattern is not unique` rather than mutating the wrong one — the
+# `--dry-run` doing its job before the sweep, for the fourth recorded time.
+[[arm]]
+id = "distill-always-refuses"
+test = "test_distill_a_lead_still_exits_zero"
+file = "python/src/kb_setup/distill.py"
+old = """    if not report.scanned:
+        return Err(render(report).strip(), rc=Rc.NOT_RUN)"""
+new = """    if True:
+        return Err(render(report).strip(), rc=Rc.NOT_RUN)"""

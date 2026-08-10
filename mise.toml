@@ -376,8 +376,13 @@ description = "Propose skill/task/module candidates from this session's throwawa
 # step — writing a throwaway script and running it — rather than mining command
 # frequency, which was measured over 60 real transcripts and REFUTED (git and
 # grep top every threshold). Evidence: `.agent/kb/reports/agents/distill-detection-probe.md`.
-# ALWAYS rc 0 and never a gate: an undistilled probe is a signal about future
-# cost, not a build failure. `-- --limit N --min-scripts N` to vary the bounds.
+# NEVER A GATE, and it is in none: an undistilled probe is a signal about future
+# cost, not a build failure. A LEAD exits 0 — that is the part "never a gate"
+# protects. This comment read "ALWAYS rc 0" until #270, which was a promise the
+# code stopped keeping in the one case that matters: NO TRANSCRIPTS FOUND now
+# exits `Rc.NOT_RUN` (127), because the detector did not run and the module was
+# already PRINTING "this is not a clean result" while returning success.
+# `-- --limit N --min-scripts N` to vary the bounds.
 run = "uv run kb-setup distill"
 
 [tasks.kb-arms]

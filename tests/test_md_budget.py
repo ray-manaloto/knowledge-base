@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import md_budget
-from kb_setup.result import Ok, Rc, exit_code
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pytest
@@ -424,23 +424,44 @@ def test_md_budget_int_wrapper_is_exit_code_of_boundary(tmp_path: Path) -> None:
     assert md_budget.md_budget_main(root) == exit_code(md_budget.check_md_budget(root))
 
 
-def test_md_budget_counted_zero_is_the_documented_divergence(tmp_path: Path) -> None:
-    """A tree with NO instruction file reports `Rc.OK` — and that is a known gap.
+def test_md_budget_counted_zero_is_not_a_pass(tmp_path: Path) -> None:
+    """A tree with NO instruction file is `Rc.NOT_RUN` — #270, closed 2026-08-10.
 
-    Pinned, not endorsed. `skill_lint` returns `Rc.NOT_RUN` for the structurally
-    identical case (the walk matched nothing, so the gate never asked the
-    question), and by this repo's own doctrine that is the correct answer here
-    too. It is left as `OK` because the R5 conversion is behaviour-preserving by
-    rule, so the pre-existing exit-code assertions stay a valid regression arm.
+    This test is the record of a deliberate reversal. It was
+    `test_md_budget_counted_zero_is_the_documented_divergence` and asserted
+    `Rc.OK`, pinning a gap rather than endorsing it: the walk matched nothing,
+    so the gate never asked its question, and by
+    `probes-need-a-control-arm.md` that was never a pass. `skill_lint` had
+    always returned `Rc.NOT_RUN` for the structurally identical case.
 
-    This test exists so the divergence is a RECORDED fact with a name rather
-    than an unnoticed one, and so that closing it is a deliberate edit to a
-    failing assertion instead of a silent behaviour change nobody reviews.
+    It was left diverging through the R5 conversion tranches on purpose — a
+    conversion's only regression arm is the pre-existing exit-code assertions,
+    so moving an rc inside the commit that restructures the function deletes
+    the evidence the restructure was safe. Pinning it as a failing-on-purpose
+    assertion is what made closing it a visible edit rather than a silent
+    behaviour change riding inside a refactor.
     """
     root = _git_repo(tmp_path)
 
     result = md_budget.check_md_budget(root)
 
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "did not run" in result.message
+
+
+def test_md_budget_a_populated_tree_still_reports_ok(tmp_path: Path) -> None:
+    """CONTROL ARM for the test above: `counted == 0` is what triggers the `Err`.
+
+    Without this, the new assertion is satisfied by a boundary that returns
+    `Err(NOT_RUN)` unconditionally — which would take the whole `md_size_budget`
+    gate permanently red in BOTH repos and pass its own test while doing it.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "# small\n")
+
+    result = md_budget.check_md_budget(root)
+
     assert isinstance(result, Ok)
-    assert result.value.counted == 0
+    assert result.value.counted > 0
     assert result.rc is Rc.OK

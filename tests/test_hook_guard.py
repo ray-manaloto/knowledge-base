@@ -10,9 +10,11 @@ import io
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
-from kb_setup.hook_guard import decide, run
+from kb_setup.hook_guard import check_hook_call, decide, run
+from kb_setup.result import Ok, Rc, exit_code
 
 # (command, expected_task_substring) — must be DENIED, reason names the task.
 DENY = [
@@ -212,3 +214,104 @@ def test_the_arms_harness_is_unaffected_without_needing_an_exemption() -> None:
         check=False,
     )
     assert proc.returncode == 0, f"the arms harness invocation broke: {proc.stderr[-400:]}"
+
+
+# --- §2 R5 tranche 4: the `Result` boundary ---------------------------------
+#
+# Every exit-code assertion above is unchanged — this hook returns 0 on EVERY
+# path by design, which is precisely why no int-returning test in this file can
+# tell an allow from a deny. That distinction now lives in the type.
+
+
+def test_hook_guard_boundary_returns_the_deny_reason(tmp_path: Path) -> None:
+    """A denial is a VALUE now, reachable without stdin and a JSON envelope."""
+    payload = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "graphify extract ."},
+            "cwd": str(tmp_path),
+            "session_id": "s1",
+        }
+    )
+
+    result = check_hook_call(payload)
+
+    assert isinstance(result, Ok)
+    assert result.value is not None
+    assert "kb-build" in result.value
+
+
+def test_hook_guard_boundary_allow_is_ok_none(tmp_path: Path) -> None:
+    """CONTROL ARM: `Ok` carries None for an allowed call, so the test above discriminates."""
+    payload = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "mise run kb-build"},
+            "cwd": str(tmp_path),
+            "session_id": "s2",
+        }
+    )
+
+    result = check_hook_call(payload)
+
+    assert isinstance(result, Ok)
+    assert result.value is None
+
+
+def test_hook_guard_rc_is_always_ok_because_the_verdict_is_not_the_exit_code() -> None:
+    """The deliberate departure from recipe rule 1, asserted so it stays a CHOICE.
+
+    A PreToolUse hook's verdict travels in the JSON on stdout; its exit code only
+    says whether the hook itself survived, and this guard is documented to fail
+    OPEN. Returning `Rc.FINDINGS` for a denial would make `exit_code` hand back 1
+    — which in this protocol means the hook crashed. No existing test in this
+    file would notice, because they all assert 0 and would still get 0 from the
+    `run()` wrapper only if it stopped funnelling through `exit_code`.
+    """
+    denied = check_hook_call(
+        json.dumps({"tool_name": "Bash", "tool_input": {"command": "graphify extract ."}})
+    )
+    allowed = check_hook_call(json.dumps({"tool_name": "Read", "tool_input": {}}))
+
+    assert isinstance(denied, Ok)
+    assert isinstance(allowed, Ok)
+    # CONTROL ARM: the two inputs really do differ in verdict, so the shared rc
+    # is the protocol's choice and not the guard failing to decide.
+    assert denied.value is not None
+    assert allowed.value is None
+    assert denied.rc is Rc.OK
+    assert allowed.rc is Rc.OK
+
+
+def test_hook_guard_boundary_prints_nothing(capsys: pytest.CaptureFixture[str]) -> None:
+    """Rendering the deny JSON belongs to `run`; the boundary only returns.
+
+    Armed on the DENY path — an allowed call printing nothing would also be true
+    of a boundary that merely forgot to emit its refusals.
+    """
+    check_hook_call(
+        json.dumps({"tool_name": "Bash", "tool_input": {"command": "graphify extract ."}})
+    )
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_hook_guard_malformed_payload_still_fails_open(capsys: pytest.CaptureFixture[str]) -> None:
+    """Unparsable stdin is an ALLOW, not an Err — the fail-open contract, typed."""
+    result = check_hook_call("{not json")
+
+    assert isinstance(result, Ok)
+    assert result.value is None
+    assert capsys.readouterr().out == ""
+
+
+def test_hook_guard_int_wrapper_is_exit_code_of_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The equivalence that makes the split safe — catches a renderer computing its own rc."""
+    raw = json.dumps({"tool_name": "Bash", "tool_input": {"command": "graphify extract ."}})
+    monkeypatch.setattr(sys, "stdin", io.StringIO(raw))
+
+    assert run() == exit_code(check_hook_call(raw))

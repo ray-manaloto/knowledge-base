@@ -135,6 +135,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
@@ -741,6 +743,50 @@ def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
     reports UNKNOWN rather than judging this process's PATH. Non-zero on any
     FAIL; UNKNOWN never fails the run.
     """
+    result = check_doctor(repo_root, argv)
+    # Narrowed on `Ok`, not against `Err`: `Result` has a THIRD variant, and
+    # `External` carries no `.value`. ty catches the negative form.
+    if not isinstance(result, Ok):
+        print(f"[cc-doctor] {result.message}", file=sys.stderr)
+        return exit_code(result)
+
+    results = result.value
+    mark = {OK: "✔", FAIL: "✗", UNKNOWN: "?"}
+    for c in results:
+        print(f"  {mark[c.status]} {c.name}: {c.detail}")
+    failed = [c for c in results if c.status == FAIL]
+    if failed:
+        print(
+            f"\n[cc-doctor] {len(failed)} FAILED. `mise run cc-fresh` relaunches on a "
+            f"clean tmux server; that is the usual fix for a PATH problem.",
+            file=sys.stderr,
+        )
+        return exit_code(result)
+    unknown = sum(c.status == UNKNOWN for c in results)
+    print(f"\n[cc-doctor] no failures ({unknown} not verifiable from here — check them in-session)")
+    return exit_code(result)
+
+
+def check_doctor(repo_root: Path, argv: Sequence[str]) -> Result[list[Check]]:
+    """The boundary (§2 R5): every doctor check, or why the request was refused.
+
+    Returns rather than raises, and prints nothing — :func:`doctor_main`
+    renders. Same split as ``skill_lint.check_skill_lint``/``skill_lint_main``,
+    which is ``ruff``'s ``pub fn run(..) -> Result<ExitStatus>``
+    (``crates/ruff/src/lib.rs:128``).
+
+    The three outcomes the vocabulary separates here:
+
+    * *Ran, nothing failed* — ``Ok(checks)``. UNKNOWN rows are present in the
+      value and deliberately do not move the code: a check that could not be
+      answered from here is not a failure, and flattening it into one is the
+      false-red twin of the false-green this repo's doctrine is about.
+    * *Ran, something FAILED* — ``Ok(checks, rc=Rc.FINDINGS)``. The doctor did
+      its job; a broken environment is a finding.
+    * *Never ran* — an unknown argument or a missing ``--sibling``.
+      ``Err(reason, rc=Rc.BAD_REQUEST)``, the 2 this command already returned,
+      now carrying its reason in the type rather than only on stderr.
+    """
     sibling: Path | None = None
     explicit_path: str | None = None
     args = list(argv)
@@ -755,11 +801,9 @@ def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
                 repo_root = Path(args[i + 1])
             i += 2
             continue
-        print(f"[cc-doctor] unknown argument {args[i]!r}", file=sys.stderr)
-        return 2
+        return Err(f"unknown argument {args[i]!r}", rc=Rc.BAD_REQUEST)
     if sibling is None:
-        print("[cc-doctor] --sibling <path> is required", file=sys.stderr)
-        return 2
+        return Err("--sibling <path> is required", rc=Rc.BAD_REQUEST)
 
     results = doctor(
         repo_root.resolve(),
@@ -771,20 +815,8 @@ def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
         path=explicit_path if explicit_path is not None else session_path(os.environ),
         probes=Probes(which=_which, version_of=_version_of),
     )
-    mark = {OK: "✔", FAIL: "✗", UNKNOWN: "?"}
-    for c in results:
-        print(f"  {mark[c.status]} {c.name}: {c.detail}")
-    failed = [c for c in results if c.status == FAIL]
-    if failed:
-        print(
-            f"\n[cc-doctor] {len(failed)} FAILED. `mise run cc-fresh` relaunches on a "
-            f"clean tmux server; that is the usual fix for a PATH problem.",
-            file=sys.stderr,
-        )
-        return 1
-    unknown = sum(c.status == UNKNOWN for c in results)
-    print(f"\n[cc-doctor] no failures ({unknown} not verifiable from here — check them in-session)")
-    return 0
+    failed = any(c.status == FAIL for c in results)
+    return Ok(results, rc=Rc.FINDINGS if failed else Rc.OK)
 
 
 def cc_main(repo_root: Path, argv: Sequence[str]) -> int:

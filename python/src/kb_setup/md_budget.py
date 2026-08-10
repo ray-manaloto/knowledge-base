@@ -73,7 +73,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from kb_setup.result import Ok, Rc, Result, exit_code
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 # --- Budgets -----------------------------------------------------------------
 
@@ -433,17 +433,35 @@ def check_md_budget(
     every tracked instruction file, and it found three of them too long — that
     is the gate succeeding. ``Err`` is "could not run".
 
-    A KNOWN GAP, recorded rather than silently fixed: ``report.counted == 0``
-    means the walk matched no instruction file at all, which is a gate that
-    never asked the question and by this repo's own doctrine is not a pass
-    (``probes-need-a-control-arm.md``). It is reported here as ``Rc.OK``
-    because that is what the pre-R5 code returned, and rule 2 of the recipe
-    keeps this conversion behaviour-preserving so the existing exit-code
-    assertions stay a valid regression arm. ``skill_lint`` has the same case
-    and DOES return ``Rc.NOT_RUN`` for it — the divergence is real and is
-    filed, not designed.
+    **A walk that matched nothing is ``Err(rc=Rc.NOT_RUN)``, not a pass** (#270,
+    closed 2026-08-10). ``report.counted == 0`` means the gate never asked its
+    question, which by ``probes-need-a-control-arm.md`` is a third state — not
+    ``FINDINGS`` (we did not look) and not ``BAD_REQUEST`` (the request was
+    fine). ``skill_lint`` already drew it that way; this module and ``distill``
+    returned ``Rc.OK`` for the structurally identical case.
+
+    It was left diverging through tranches 1-4 on purpose: a conversion's only
+    regression arm is the pre-existing exit-code assertions, so changing an rc
+    inside the commit that restructures the function deletes the evidence the
+    restructure was safe. The divergence was pinned by a failing-on-purpose test
+    instead, and this change is the deliberate edit to that assertion.
+
+    **The blast radius, checked before landing rather than reasoned about.**
+    This function IS the ``md_size_budget`` hk step, and dotfiles runs the same
+    one via ``uv run --project python kb-setup md-budget`` (its ``hk.pkl``). It
+    pins this package by SHA, so the new code reaches it only when that pin
+    advances; and measured there on 2026-08-10, dotfiles counts **57**
+    instruction files. ``counted == 0`` cannot arise in either repo under normal
+    operation — and if it ever did, that is precisely the silent no-op this
+    change exists to surface.
     """
     report = check(root, exclude=exclude)
+    if report.counted == 0:
+        return Err(
+            "NO INSTRUCTION FILES MATCHED — the budget gate did not run. "
+            "Check the walk before reading this as clean.",
+            rc=Rc.NOT_RUN,
+        )
     return Ok(report, rc=Rc.FINDINGS if report.violations else Rc.OK)
 
 
