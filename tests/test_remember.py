@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 
 from kb_setup.remember import (
     check_memory_lessons,
+    check_mode,
     check_remember,
+    main,
     render_audit,
 )
 from kb_setup.result import Err, Ok, Rc, external_from_returncode
@@ -34,7 +36,7 @@ def _memory(path: Path, name: str, *, outcome: str, correction: str | None = Non
 
 def test_corrected_without_a_correction_is_refused() -> None:
     """The defect that motivated the module: 21 of 32 corrections had no lesson."""
-    result = check_remember(["--question", "Q", "--outcome", "corrected"])
+    result = check_remember(["--question", "Q", "--answer", "A", "--outcome", "corrected"])
     assert isinstance(result, Err)
     assert result.rc is Rc.BAD_REQUEST
     assert "--correction" in result.message
@@ -42,7 +44,9 @@ def test_corrected_without_a_correction_is_refused() -> None:
 
 def test_corrected_with_a_whitespace_correction_is_refused() -> None:
     """A blank string renders exactly as an absent one — so it is refused too."""
-    result = check_remember(["--question", "Q", "--outcome", "corrected", "--correction", "   "])
+    result = check_remember(
+        ["--question", "Q", "--answer", "A", "--outcome", "corrected", "--correction", "   "]
+    )
     assert isinstance(result, Err)
     assert result.rc is Rc.BAD_REQUEST
 
@@ -50,7 +54,16 @@ def test_corrected_with_a_whitespace_correction_is_refused() -> None:
 def test_corrected_with_a_correction_is_accepted() -> None:
     """CONTROL ARM: the same request with a lesson must pass, or the gate is a wall."""
     result = check_remember(
-        ["--question", "Q", "--outcome", "corrected", "--correction", "the real answer"]
+        [
+            "--question",
+            "Q",
+            "--answer",
+            "A",
+            "--outcome",
+            "corrected",
+            "--correction",
+            "the real answer",
+        ]
     )
     assert isinstance(result, Ok)
     assert result.value.correction == "the real answer"
@@ -61,7 +74,16 @@ def test_correction_file_is_read(tmp_path: Path) -> None:
     lesson = tmp_path / "lesson.md"
     lesson.write_text("line one\nline two", encoding="utf-8")
     result = check_remember(
-        ["--question", "Q", "--outcome", "corrected", "--correction-file", str(lesson)]
+        [
+            "--question",
+            "Q",
+            "--answer",
+            "A",
+            "--outcome",
+            "corrected",
+            "--correction-file",
+            str(lesson),
+        ]
     )
     assert isinstance(result, Ok)
     assert result.value.correction == "line one\nline two"
@@ -125,7 +147,16 @@ def test_missing_correction_file_is_bad_request(tmp_path: Path) -> None:
 def test_argv_is_a_list_so_no_shell_runs() -> None:
     """Backticks in a lesson must be recorded, not executed (this has happened)."""
     result = check_remember(
-        ["--question", "Q", "--outcome", "corrected", "--correction", "use `ls` here"]
+        [
+            "--question",
+            "Q",
+            "--answer",
+            "A",
+            "--outcome",
+            "corrected",
+            "--correction",
+            "use `ls` here",
+        ]
     )
     assert isinstance(result, Ok)
     argv = result.value.argv("graphify")
@@ -136,7 +167,7 @@ def test_argv_is_a_list_so_no_shell_runs() -> None:
 def test_memory_dir_passes_through(tmp_path: Path) -> None:
     """The write path must be exercisable without writing to the corpus."""
     scratch = str(tmp_path / "scratch")
-    result = check_remember(["--question", "Q", "--memory-dir", scratch])
+    result = check_remember(["--question", "Q", "--answer", "A", "--memory-dir", scratch])
     assert isinstance(result, Ok)
     argv = result.value.argv("graphify")
     assert argv[argv.index("--memory-dir") + 1] == scratch
@@ -147,6 +178,92 @@ def test_remember_boundary_prints_nothing(capsys: pytest.CaptureFixture[str]) ->
     check_remember(["--question", "Q", "--outcome", "corrected"])
     check_remember(["--question", "Q", "--outcome", "useful"])
     assert capsys.readouterr().out == ""
+
+
+def test_answer_is_required() -> None:
+    """An answer is required, matching what `save-result` itself demands.
+
+    This gate did not require one, so a request valid HERE died downstream in a
+    raw argparse dump from graphify with our own message never printed. Found by
+    the CONTROL ARM of the cold lane's finding, not by the finding.
+    """
+    result = check_remember(["--question", "Q"])
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "--answer" in result.message
+
+
+def test_blank_answer_is_refused() -> None:
+    result = check_remember(["--question", "Q", "--answer", "   "])
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+
+
+# --- mode dispatch: --audit must not swallow a record request -------------------
+
+
+def test_audit_combined_with_a_record_request_is_refused() -> None:
+    """The cold lane's finding: `if "--audit" in args` is a membership test.
+
+    A typo or scripted call carrying both flags had its RECORD REQUEST silently
+    discarded — the audit printed, the rc was the audit's, and nothing was
+    written or warned about. Reproduced live before this fix.
+    """
+    bad = check_mode(["--question", "Q", "--answer", "A", "--outcome", "corrected", "--audit"])
+    assert bad is not None
+    assert bad.rc is Rc.BAD_REQUEST
+    assert "--question" in bad.message
+
+
+def test_audit_alone_is_allowed() -> None:
+    """CONTROL ARM: the refusal must not make `--audit` itself unusable."""
+    assert check_mode(["--audit"]) is None
+
+
+def test_a_record_request_alone_is_allowed() -> None:
+    """CONTROL ARM, the other direction."""
+    assert check_mode(["--question", "Q", "--answer", "A"]) is None
+
+
+def test_every_record_flag_triggers_the_refusal() -> None:
+    """One flag was enough to find the bug; the class is what must be closed."""
+    for flag, value in (
+        ("--question", "Q"),
+        ("--answer", "A"),
+        ("--outcome", "useful"),
+        ("--correction", "C"),
+    ):
+        assert check_mode([flag, value, "--audit"]) is not None, flag
+
+
+def test_main_refuses_the_mixed_request_and_writes_nothing(tmp_path: Path) -> None:
+    """Through `main`, which is where the loss actually happened.
+
+    Every pre-existing test called `check_remember`/`check_memory_lessons`
+    directly, so none of them could ever have seen a dispatch defect.
+    """
+    lesson = tmp_path / "lesson.md"
+    lesson.write_text("a lesson that must not be lost", encoding="utf-8")
+    memories = tmp_path / "mem"
+    memories.mkdir()
+    rc = main(
+        tmp_path,
+        [
+            "--question",
+            "Q",
+            "--answer",
+            "A",
+            "--outcome",
+            "corrected",
+            "--correction-file",
+            str(lesson),
+            "--memory-dir",
+            str(memories),
+            "--audit",
+        ],
+    )
+    assert rc == Rc.BAD_REQUEST
+    assert list(memories.iterdir()) == [], "the record request was silently dropped"
 
 
 # --- the audit ----------------------------------------------------------------

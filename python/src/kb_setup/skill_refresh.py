@@ -77,13 +77,22 @@ def refresh(repo_root: Path | None = None) -> int:
             "[skill-refresh] the installer wanted this, and it was reverted:",
         )
         # `end=""` had no newline of its own because the delta carries them.
-        # `emit` always renders one line, so the trailing newline is stripped
-        # here rather than the sink learning about `end=` — the sink renders
-        # events, and "this string already ends in a newline" is a property of
-        # THIS caller's payload, not of event rendering.
+        # `emit` always renders one line, so ONE trailing newline is removed here
+        # rather than the sink learning about `end=` — the sink renders events,
+        # and "this string already ends in a newline" is a property of THIS
+        # caller's payload, not of event rendering.
+        #
+        # `removesuffix`, not `rstrip("\n")`: rstrip removes ALL trailing
+        # newlines, so a delta ending in a blank line would silently lose it and
+        # print differently from the `print(..., end="")` it replaces. The
+        # producer is `git diff`, which conventionally emits exactly one — but
+        # "conventionally" is not a guarantee, and the precise call costs nothing.
+        # (Cold lane raised this as low-confidence and unverified; it is right
+        # that the edge case is hard to reach, and right that the loose call had
+        # no reason to be loose.)
         events.say(
             "skill_refresh.repair_delta",
-            result.repair_delta.rstrip("\n"),
+            result.repair_delta.removesuffix("\n"),
             delta=result.repair_delta,
         )
     if not result.ran:

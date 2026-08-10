@@ -181,6 +181,22 @@ def check_remember(argv: Sequence[str]) -> Result[RememberRequest]:
     if isinstance(correction, Err):
         return correction
 
+    if not (answer or "").strip():
+        # `save-result` REQUIRES an answer, and this gate did not — so a request
+        # that passed validation here died downstream in a raw argparse dump from
+        # graphify, with our own message never printed.
+        #
+        # Found by the CONTROL ARM of the cold lane's finding, not by the finding:
+        # the control ran the same request without `--audit` and failed for a
+        # different reason entirely. My original live arm passed `--answer "yes"`,
+        # which is exactly why it never surfaced — an arm that supplies the field
+        # cannot discover that the field is unchecked.
+        return Err(
+            "--answer or --answer-file is required: a memory with a question and "
+            "no answer records that something was asked and nothing was learned.",
+            rc=Rc.BAD_REQUEST,
+        )
+
     if opts.outcome == _OBLIGES_LESSON and not (correction or "").strip():
         return Err(
             "--outcome corrected requires --correction or --correction-file: "
@@ -281,10 +297,49 @@ def audit_main(repo_root: Path) -> int:
     return exit_code(result)
 
 
+#: Flags that mean "record something". Any of these alongside `--audit` is a
+#: request for two different things at once, and is refused rather than resolved.
+_RECORD_FLAGS = frozenset(
+    {"--question", "--answer", "--answer-file", "--correction", "--correction-file", "--outcome"}
+)
+
+_AUDIT_FLAG = "--audit"
+
+
+def check_mode(argv: Sequence[str]) -> Err | None:
+    """Refuse a request that asks to record AND to audit. `None` when unambiguous.
+
+    **This closes a silent loss found by the cold lane, and it is the module's own
+    defect one call frame up.** `main` used to branch on `if "--audit" in args` —
+    a membership test over the whole argv, not "is this the only thing asked for".
+    A typo or a scripted call that carried both flags had its RECORD REQUEST
+    silently discarded: the audit printed, the exit code was the audit's, and
+    nothing was written or warned about. Reproduced live before fixing (rc=1, zero
+    memories written), then again with `--audit` removed as the control.
+
+    A module whose whole purpose is refusing to lose a lesson must not lose one
+    in its own dispatch.
+    """
+    args = list(argv)
+    if _AUDIT_FLAG not in args:
+        return None
+    if also := sorted(_RECORD_FLAGS.intersection(args)):
+        return Err(
+            f"{_AUDIT_FLAG} reports on existing memories and records nothing; it "
+            f"cannot be combined with {', '.join(also)}. Run them separately — "
+            f"otherwise the record request is silently dropped.",
+            rc=Rc.BAD_REQUEST,
+        )
+    return None
+
+
 def main(repo_root: Path, argv: Sequence[str] = ()) -> int:
     """Record one Q&A outcome to work memory. Renders, then converts."""
     args = list(argv)
-    if "--audit" in args:
+    if bad := check_mode(args):
+        print(f"[remember] refusing — {bad.message}")
+        return exit_code(bad)
+    if _AUDIT_FLAG in args:
         return audit_main(repo_root)
 
     result = check_remember(args)
