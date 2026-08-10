@@ -637,13 +637,28 @@ def main(args: list[str], repo_root: Path) -> int:
     assertions are the regression arm proving the ``Result`` split changed no
     behaviour.
 
-    **The no-input branch is a fourth instance of #270's divergence.** Nothing
-    was checked, so by ``probes-need-a-control-arm.md`` this is "the gate did not
-    run" — `Rc.NOT_RUN` — and it returns 0 like the other three. It is left
-    returning 0 for the same reason they were: a conversion's regression arm IS
-    the pre-existing exit-code assertions. Pinned by
-    ``test_goal_no_input_is_the_documented_divergence`` so closing it is a
-    deliberate edit to a failing assertion.
+    **The no-input branch is a fourth instance of #270's divergence, and it is
+    SCOPED OUT of #270 rather than pending behind it.** Nothing was checked, so
+    by ``probes-need-a-control-arm.md`` this is "the gate did not run" —
+    `Rc.NOT_RUN` — and it returns 0 anyway.
+
+    The reason is this command, not the conversion. #270 closed the same case in
+    ``md_budget`` and ``distill`` because both are *gates*: a gate reporting clean
+    over a walk that matched nothing is a false green. ``kb-goal-check`` is
+    advisory by ruling — :func:`render` prints "always exits 0; read the report,
+    not the rc" — so making it exit 127 is a decision about whether an advisory
+    command may ever be non-zero, which is a different question and one nobody has
+    asked.
+
+    This paragraph first said the branch was left at 0 "for the same reason the
+    other three were" — a conversion's regression arm being the pre-existing
+    exit-code assertions. That was true when written and false by the next commit,
+    which closed two of the three. The cold lane caught it: a justification that
+    points at sibling cases goes stale the moment a sibling moves, so it now
+    states the reason that belongs to THIS command.
+
+    Pinned by ``test_goal_no_input_is_the_documented_divergence``, so reopening it
+    is a deliberate edit to a failing assertion.
     """
     if args and args[0] == "--text":
         text, path, is_pair = " ".join(args[1:]), None, False

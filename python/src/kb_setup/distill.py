@@ -561,7 +561,20 @@ def _int_flag(rest: list[str], name: str, default: int) -> int:
 
 
 def check_distill(root: Path, args: Sequence[str] = ()) -> Result[str]:
-    """The boundary (§2 R5): the rendered proposal. Always `Ok(text, rc=Rc.OK)`.
+    """The boundary (§2 R5): the rendered proposal, or `Err` when nothing was scanned.
+
+    `Ok(text, rc=Rc.OK)` for every run that examined a transcript, whether or not
+    it found a lead; `Err(text, rc=Rc.NOT_RUN)` only when there was no transcript
+    to examine.
+
+    This opening line said "Always `Ok(text, rc=Rc.OK)`" until #270 made that
+    false — the paragraph below it was added in the same commit and contradicted
+    it directly. Caught by the cold lane, and worth recording rather than quietly
+    correcting: a docstring's first line is its OLDEST claim, so it is the part an
+    editor adding a paragraph is least likely to re-read, and the part every
+    reader sees first. In THIS module the irony is load-bearing — #270 was filed
+    because `distill` printed a contradiction on stdout, and the fix for it
+    shipped one in the docstring.
 
     Returns rather than raises, and prints nothing — :func:`distill_main`
     renders. Same split as ``check.check``/``check.main``.
