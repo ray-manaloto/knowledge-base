@@ -174,17 +174,79 @@ class EventQueueHandler(logging.handlers.QueueHandler):
         return record
 
 
-def _handler(stream: IO[str], formatter: logging.Formatter) -> logging.Handler:
-    """A stream handler wired to `formatter` through structlog's bridge.
+class _StdStreamHandler(logging.StreamHandler):
+    """A stream handler that resolves `sys.stdout`/`sys.stderr` AT EMIT TIME.
+
+    **Not a nicety — the default sink is unusable without it.** A plain
+    `StreamHandler(sys.stdout)` captures the stream object when it is
+    constructed. The default handlers are attached once, lazily, to a
+    process-global logger, so the very first `emit` in a process pins whatever
+    `sys.stdout` was at that moment for the rest of the run.
+
+    Under pytest that is fatal and confusing: `capsys` replaces `sys.stdout` per
+    test, so every later test's output goes to the FIRST test's buffer and every
+    later assertion sees an empty capture. Three `launch` tests failed this way
+    with their output plainly visible in the log capture — which reads as "the
+    sink is broken" rather than "the sink is writing somewhere else".
+
+    The same trap exists outside tests wherever `sys.stdout` is rebound
+    (`contextlib.redirect_stdout`, a REPL, a wrapper script).
+    """
+
+    def __init__(self, name: str) -> None:
+        super().__init__()
+        self._stream_name = name
+
+    @property
+    def stream(self) -> IO[str]:
+        """The CURRENT `sys.stdout`/`sys.stderr`, looked up per record."""
+        return getattr(sys, self._stream_name)
+
+    @stream.setter
+    def stream(self, _value: IO[str]) -> None:
+        """Ignore `StreamHandler.__init__`'s assignment; the property decides."""
+
+
+#: Marks a handler as one of OURS. `events._ensure_sink` looks for this rather
+#: than for "any handler at all" — see :func:`is_sink` for why that distinction
+#: is load-bearing.
+_SINK_MARKER = "_kb_setup_sink"
+
+
+def is_sink(handler: logging.Handler) -> bool:
+    """Whether `handler` is one of this module's, rather than someone else's.
+
+    **"The logger has handlers" is NOT "a sink is attached", and reading it that
+    way cost four failing tests.** pytest's logging plugin attaches its own
+    `LogCaptureHandler` to any logger it captures — which, because
+    `events.configure()` sets this logger to DEBUG, is this one. A lazy sink
+    guarded on `if logger.handlers` therefore saw pytest's listeners, concluded
+    output was already handled, and attached nothing: every converted boundary
+    went silent, with its lines plainly visible in pytest's *log* capture and
+    absent from stdout.
+
+    That is a probe that could only answer one way. Marking our own handlers
+    makes the question answerable: *is one of MINE attached?*
+    """
+    return getattr(handler, _SINK_MARKER, False) is True
+
+
+def _wire(handler: logging.Handler, formatter: logging.Formatter) -> logging.Handler:
+    """Wire `formatter` onto `handler` through structlog's bridge.
 
     `ProcessorFormatter` is the bridge D20 verified is first-class rather than
     an escape hatch (degree 37, in structlog's `JSONRenderer` community). It is
     what lets an event produced by the processor pipeline be rendered by a
     stdlib `Formatter` — which is the entire architecture in one line.
     """
-    handler = logging.StreamHandler(stream)
     handler.setFormatter(structlog.stdlib.ProcessorFormatter(processors=[_render_with(formatter)]))
+    setattr(handler, _SINK_MARKER, True)
     return handler
+
+
+def _handler(stream: IO[str], formatter: logging.Formatter) -> logging.Handler:
+    """A handler on an explicit, fixed stream (a test buffer, or the JSONL file)."""
+    return _wire(logging.StreamHandler(stream), formatter)
 
 
 def _render_with(formatter: logging.Formatter) -> Processor:
@@ -205,6 +267,54 @@ def _render_with(formatter: logging.Formatter) -> Processor:
         return formatter.format(shim)
 
     return render
+
+
+class _MaxLevel(logging.Filter):
+    """Admit only records strictly below `ceiling` — the stdout half of the split."""
+
+    def __init__(self, ceiling: int) -> None:
+        super().__init__()
+        self._ceiling = ceiling
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """True when this record belongs on the lower stream."""
+        return record.levelno < self._ceiling
+
+
+def default_handlers() -> list[logging.Handler]:
+    """The stdout/stderr pair an unconfigured caller gets — `print` parity.
+
+    Public because `events._ensure_sink` attaches it lazily: an `emit` must
+    write something without any setup, exactly as the `print` it replaced did.
+    """
+    return _human_handlers(None)
+
+
+def _human_handlers(stream: IO[str] | None) -> list[logging.Handler]:
+    """The human sink, split across stdout and stderr the way the old code was.
+
+    **This split is behaviour preservation, not a feature.** Before the
+    conversion, every refusal and diagnostic in `kb_setup` was a
+    `print(..., file=sys.stderr)` while reports and tables went to stdout. If
+    every event now landed on stdout, a caller redirecting the two streams
+    separately would silently see different output — a behaviour change smuggled
+    inside a refactor, which is what recipe rule 2 exists to prevent.
+
+    So the mapping is: **WARNING and above to stderr, everything else to
+    stdout**. That is also the ordinary convention, which is why it costs
+    nothing to adopt — but the reason it is here is the old streams.
+
+    An explicit `stream` (a test buffer) takes BOTH halves, so a test can assert
+    on one string without caring which stream a line would have used in
+    production.
+    """
+    if stream is not None:
+        return [_handler(stream, HumanSink())]
+    out = _wire(_StdStreamHandler("stdout"), HumanSink())
+    out.addFilter(_MaxLevel(logging.WARNING))
+    err = _wire(_StdStreamHandler("stderr"), HumanSink())
+    err.setLevel(logging.WARNING)
+    return [out, err]
 
 
 @contextlib.contextmanager
@@ -229,9 +339,7 @@ def stdout_sink(
     """
     logger = logging.getLogger(LOGGER_NAME)
     with contextlib.ExitStack() as stack:
-        handlers: list[logging.Handler] = [
-            _handler(stream if stream is not None else sys.stdout, HumanSink())
-        ]
+        handlers: list[logging.Handler] = _human_handlers(stream)
         if jsonl_path is not None:
             opened = stack.enter_context(Path(jsonl_path).open("a", encoding="utf-8"))
             handlers.append(_handler(opened, JsonlSink()))

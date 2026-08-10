@@ -181,6 +181,41 @@ def configure(*, tally: Tally | None = None) -> Tally:
     return counter
 
 
+def _ensure_sink() -> None:
+    """Attach the default stdout/stderr sink if the caller attached none.
+
+    **This is what makes the conversion safe, and it was learned the hard way.**
+    An `emit` with no handler on the logger writes NOTHING — so replacing a
+    `print` in a function that a test (or another module) calls directly would
+    turn it silent, while `cli.main` kept working because it attaches the sink
+    itself. Four `launch` tests failed exactly this way on the first run.
+
+    `print` needs no setup, so neither may `emit`: the default is attached
+    lazily on first use, and `stdout_sink` still swaps in its own for the
+    duration of a block. The check is "has no handlers" rather than a flag, so a
+    caller that HAS configured something is never overridden.
+    """
+    if not structlog.is_configured():
+        # Without this the event never reaches ProcessorFormatter and the sink
+        # is handed a bare string — the handler would be attached and the
+        # rendering still wrong. Both halves or neither.
+        configure()
+    # Deferred import: `sinks` imports this module, and the alternative to a
+    # local import is moving handler construction in here — which would put the
+    # sink layer inside the event layer and lose the separation that made
+    # structlog the right choice in the first place.
+    from kb_setup import sinks
+
+    logger = logging.getLogger(LOGGER_NAME)
+    # `is_sink`, not `if logger.handlers` — pytest attaches its own capture
+    # handlers to this logger, and treating those as "output is handled" made
+    # every converted boundary silent under test. See `sinks.is_sink`.
+    if any(sinks.is_sink(h) for h in logger.handlers):
+        return
+    logger.handlers = [*logger.handlers, *sinks.default_handlers()]
+    logger.propagate = False
+
+
 def emit(event: str, text: str, *, level: Level = Level.INFO, **fields: object) -> None:
     """Emit one event: a machine name, the human line, and named fields.
 
@@ -189,6 +224,7 @@ def emit(event: str, text: str, *, level: Level = Level.INFO, **fields: object) 
     event with no fields is a log line with extra steps, and one with no text
     silently changes a report.
     """
+    _ensure_sink()
     logger = structlog.get_logger(LOGGER_NAME)
     worker = worker_id()
     if worker is not None:

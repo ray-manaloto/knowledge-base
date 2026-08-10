@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import pytest
 from kb_setup import events
 from kb_setup.events import Level, Tally, configure, emit, fail, say, warn
-from kb_setup.sinks import EventQueueHandler, HumanSink, JsonlSink, stdout_sink
+from kb_setup.sinks import EventQueueHandler, HumanSink, JsonlSink, is_sink, stdout_sink
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -262,6 +262,112 @@ def test_handlers_are_restored_after_an_exception() -> None:
     with pytest.raises(RuntimeError):
         _boom()
     assert logger.handlers == before
+
+
+# --- stream split: behaviour preservation, not a feature -----------------------
+
+
+def test_warnings_go_to_stderr_and_reports_to_stdout(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The stream split must match what the old code did.
+
+    Before the conversion, refusals were `print(..., file=sys.stderr)` and
+    tables were stdout. A caller redirecting the two separately must see the
+    same split afterwards.
+    """
+    with stdout_sink(offload=False):
+        say("gate.pass", "  lint         PASS")
+        warn("gate.fail", "something a verification pass must see")
+    captured = capsys.readouterr()
+    assert "lint         PASS" in captured.out
+    assert "lint         PASS" not in captured.err
+    assert "must see" in captured.err
+    assert "must see" not in captured.out
+
+
+def test_an_explicit_stream_takes_both_halves() -> None:
+    """A test buffer gets everything, so assertions need not know the split."""
+    buf = _buf()
+    with stdout_sink(stream=buf, offload=False):
+        say("a", "info line")
+        warn("b", "warning line")
+    assert "info line" in buf.getvalue()
+    assert "warning line" in buf.getvalue()
+
+
+# --- print parity: emit must need no setup, and must follow a swapped stream ---
+
+
+def test_emit_writes_with_no_sink_attached(capsys: pytest.CaptureFixture[str]) -> None:
+    """`print` needs no setup, so neither may `emit`.
+
+    Without the lazy default, replacing a `print` in a function called directly
+    (rather than through `cli.main`) turns it SILENT. Four launch tests failed
+    exactly this way.
+    """
+    logger = logging.getLogger(events.LOGGER_NAME)
+    previous, logger.handlers = logger.handlers, []
+    try:
+        say("bare", "no sink was attached")
+    finally:
+        logger.handlers = previous
+    assert "no sink was attached" in capsys.readouterr().out
+
+
+def test_default_sink_follows_a_swapped_stdout(capsys: pytest.CaptureFixture[str]) -> None:
+    """The handler must resolve `sys.stdout` per record, not at attach time.
+
+    A `StreamHandler(sys.stdout)` pins the stream it was built with. Because the
+    default handlers are attached once to a process-global logger, that would
+    send every later test's output into the FIRST test's buffer — visible in the
+    log capture, absent from every assertion. This asserts across two separate
+    captures, which is the only way to see it.
+    """
+    logger = logging.getLogger(events.LOGGER_NAME)
+    previous, logger.handlers = logger.handlers, []
+    try:
+        say("first", "capture one")
+        first = capsys.readouterr().out
+        say("second", "capture two")
+        second = capsys.readouterr().out
+    finally:
+        logger.handlers = previous
+    assert "capture one" in first
+    assert "capture two" in second, "the handler pinned the first capture's stream"
+    assert "capture two" not in first
+
+
+def test_someone_elses_handler_does_not_count_as_a_sink(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A foreign handler must not suppress the lazy sink.
+
+    pytest attaches its own LogCaptureHandler to this logger. Guarding the lazy
+    sink on `if logger.handlers` therefore saw a listener, concluded output was
+    handled, and attached nothing — four launch tests went silent with their
+    lines visible only in the log capture. A foreign handler must not suppress
+    the sink.
+    """
+    logger = logging.getLogger(events.LOGGER_NAME)
+    foreign = logging.StreamHandler(io.StringIO())
+    replacement: list[logging.Handler] = [foreign]
+    previous, logger.handlers = logger.handlers, replacement
+    try:
+        assert not is_sink(foreign), "CONTROL: a foreign handler is not one of ours"
+        say("guarded", "this must still reach stdout")
+    finally:
+        logger.handlers = previous
+    assert "this must still reach stdout" in capsys.readouterr().out
+
+
+def test_our_own_handler_does_count(capsys: pytest.CaptureFixture[str]) -> None:
+    """CONTROL ARM: an attached sink must NOT be duplicated."""
+    buf = _buf()
+    with stdout_sink(stream=buf, offload=False):
+        say("once", "exactly one copy")
+    assert buf.getvalue().count("exactly one copy") == 1
+    assert "exactly one copy" not in capsys.readouterr().out
 
 
 # --- R12: worker attribution ---------------------------------------------------

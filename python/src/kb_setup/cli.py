@@ -7,6 +7,7 @@ Thin dispatch; logic lives in kb_setup.graph. Invoked by the mise tasks
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -24,7 +25,32 @@ _ASSEMBLE_MIN_ARGS = 2  # <name> + at least one <chunk.json>
 _GRAPH_WRITERS = frozenset({"build", "watch", "merge", "label", "artifacts"})
 
 
+#: Opt-in path for the JSONL event sink. Set it and every event this run emits
+#: is also written as one JSON object per line — R9's queryable surface, on
+#: demand. Off by default so ordinary runs write exactly what they write today.
+_JSONL_ENV = "KB_EVENTS_JSONL"
+
+
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch a kb-setup subcommand under §2.5's stdout sink.
+
+    **This is the ONE place the sink is attached**, and it has to be here rather
+    than inside each command: a converted boundary emits events instead of
+    printing, so a command reached with no sink attached would run correctly and
+    say nothing. Wrapping the dispatch means every entry point gets it once.
+
+    The sink renders each event's `text` verbatim, so what a task prints is
+    unchanged by the conversion — which is exactly the property that keeps the
+    existing assertions about task output a regression arm.
+    """
+    from kb_setup import events, sinks
+
+    events.configure()
+    with sinks.stdout_sink(jsonl_path=os.environ.get(_JSONL_ENV) or None):
+        return _run(argv)
+
+
+def _run(argv: list[str] | None = None) -> int:
     """Dispatch a kb-setup subcommand; returns the process exit code."""
     args = sys.argv[1:] if argv is None else argv
     repo_root = Path.cwd()
