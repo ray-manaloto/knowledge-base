@@ -19,6 +19,7 @@ from pathlib import Path
 
 from conftest import handoff_lead as _lead
 from kb_setup import citations, gates, handoff
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 _MISE = "[tasks.kb-build]\nrun = 'true'\n[tasks.lint]\nrun = 'true'\n"
 
@@ -1053,3 +1054,93 @@ def test_an_unrelated_file_inside_the_report_directory_is_not_a_match(tmp_path: 
     root = _repo(tmp_path, {f"{_REPORTS}/review-checklist-for-spec.md": "unrelated\n"})
     (f,) = _fails(handoff.check(root, "see `review-abc1234…-spec:draft.md`\n"))
     assert "nothing matches" in f.detail
+
+
+# --------------------------------------------------------------------------
+# The `check_handoff` boundary (§2 R5)
+# --------------------------------------------------------------------------
+#
+# `main` returns an int and the tests above assert 0/1/2 on it. What none of
+# them can see is which KIND of outcome produced the code: this is the one
+# converted module that reaches all three `Rc` codes, and a bare int cannot
+# distinguish "the checker ran and contradicted a claim" from "the checker
+# could not find anything to check".
+
+
+def test_handoff_a_contradicted_claim_is_ok_with_findings(tmp_path: Path):
+    """A FAIL is the checker DOING ITS JOB, so it is `Ok(rc=FINDINGS)`, not `Err`.
+
+    `docs/a.md` is in the fixture on purpose: without a real `docs/` entry the
+    citation is UNVERIFIABLE ("may name another repo") and exits 0, which is
+    what the first draft of this test asserted FINDINGS against. Same fixture
+    requirement as `test_a_citation_about_this_repo_that_is_wrong_still_fails`.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n", "h.md": "see `docs/nope.md`\n"})
+
+    result = handoff.check_handoff([str(root / "h.md")], root)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.FINDINGS
+    assert [f.claim for f in result.value.findings if f.verdict is handoff.Verdict.FAIL] == [
+        "docs/nope.md"
+    ]
+
+
+def test_handoff_a_clean_handoff_is_ok_with_rc_ok(tmp_path: Path):
+    """CONTROL ARM: `Ok` is reachable with BOTH rcs, so the test above discriminates."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n", "h.md": "see `docs/a.md`\n"})
+
+    result = handoff.check_handoff([str(root / "h.md")], root)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+
+
+def test_handoff_a_missing_target_is_a_bad_request(tmp_path: Path):
+    """A named path that is not a file is the CALLER's error — `Rc.BAD_REQUEST`.
+
+    Distinct from `skill_lint`'s `Rc.NOT_RUN` for a glob matching nothing: there
+    the request was fine and the gate still never looked; here the request
+    itself cannot be honoured and the caller fixes it by asking differently.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+
+    result = handoff.check_handoff([str(root / "nope.md")], root)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "no such file" in result.message
+
+
+def test_handoff_no_handoff_at_all_is_a_bad_request(tmp_path: Path):
+    """The other BAD_REQUEST route: no argument, and nothing under .agent/plans/."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n"})
+
+    result = handoff.check_handoff([], root)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+
+
+def test_handoff_boundary_prints_nothing(tmp_path: Path, capsys):
+    """Rendering belongs to `main`; the boundary only returns.
+
+    Armed on the FINDINGS path — a boundary that merely forgot to print its
+    failures would pass a clean-input version of this test.
+    """
+    root = _repo(tmp_path, {"docs/a.md": "x\n", "h.md": "see `docs/nope.md`\n"})
+
+    handoff.check_handoff([str(root / "h.md")], root)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_handoff_int_wrapper_is_exit_code_of_boundary(tmp_path: Path):
+    """The equivalence that makes the split safe, on all three outcomes."""
+    root = _repo(tmp_path, {"docs/a.md": "x\n", "ok.md": "see `docs/a.md`\n"})
+    (root / "bad.md").write_text("see `docs/nope.md`\n", encoding="utf-8")
+
+    for args in ([str(root / "ok.md")], [str(root / "bad.md")], [str(root / "gone.md")]):
+        assert handoff.main(args, root) == exit_code(handoff.check_handoff(args, root))

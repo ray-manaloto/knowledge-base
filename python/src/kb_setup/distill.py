@@ -56,11 +56,13 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import brain
+from kb_setup.result import Ok, Result, exit_code
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -558,12 +560,20 @@ def _int_flag(rest: list[str], name: str, default: int) -> int:
     return default
 
 
-def distill_main(root: Path, args: Sequence[str] = ()) -> int:
-    """CLI entry: print the proposal. Always rc 0 — a lead is not a failure.
+def check_distill(root: Path, args: Sequence[str] = ()) -> Result[str]:
+    """The boundary (§2 R5): the rendered proposal. Always `Ok(text, rc=Rc.OK)`.
 
-    Deliberately never a gate. An undistilled probe is a signal about future
-    cost, and a check that fails the build over it would be argued past within a
-    round; `mise run kb-currency` is the same call for the same reason.
+    Returns rather than raises, and prints nothing — :func:`distill_main`
+    renders. Same split as ``check.check``/``check.main``.
+
+    **It never returns `Rc.FINDINGS`, deliberately — and that is the one place
+    this conversion is genuinely informative rather than mechanical.** This
+    command DOES find things; finding a twice-written probe shape is its whole
+    job. But `Rc.FINDINGS` is a code a caller can gate on, and this analyser is
+    advisory by explicit design (see below). Returning `FINDINGS` for a lead
+    would make `kb-distill` fail a build the first time someone wired it into
+    one — which is exactly the outcome the "never a gate" decision rules out.
+    So the leads travel in the VALUE, and the rc stays `OK`.
     """
     rest = list(args)
     report = distill(
@@ -574,5 +584,22 @@ def distill_main(root: Path, args: Sequence[str] = ()) -> int:
             min_scripts=_int_flag(rest, "--min-scripts", DEFAULT_POLICY.min_scripts),
         ),
     )
-    print(render(report), end="")
-    return 0
+    return Ok(render(report))
+
+
+def distill_main(root: Path, args: Sequence[str] = ()) -> int:
+    """CLI entry: print the proposal. Always rc 0 — a lead is not a failure.
+
+    Deliberately never a gate. An undistilled probe is a signal about future
+    cost, and a check that fails the build over it would be argued past within a
+    round; `mise run kb-currency` is the same call for the same reason.
+
+    Kept returning ``int``: ``cli.py`` and this module's existing exit-code
+    assertions are the regression arm for the ``Result`` split.
+    """
+    result = check_distill(root, args)
+    if not isinstance(result, Ok):
+        print(f"kb-distill: {result.message}", file=sys.stderr)
+        return exit_code(result)
+    print(result.value, end="")
+    return exit_code(result)

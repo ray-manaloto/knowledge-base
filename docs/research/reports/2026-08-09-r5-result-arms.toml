@@ -157,9 +157,18 @@ new = "RC_COULD_NOT_RUN = 127"
 
 # skill_lint reverts to the bare 1 -- the exact pre-reconciliation behaviour,
 # and the one the rule file used to document.
+#
+# RE-DERIVED 2026-08-10. The anchor was `        return Rc.NOT_RUN`, which the
+# tranche-3 conversion deleted when `skill_lint_main` was split into
+# `check_skill_lint` + a renderer: the code is now an `Err(..., rc=Rc.NOT_RUN)`
+# returned from the boundary. `kb-arms --dry-run` reported PROBE BROKEN rather
+# than silently passing, which is the whole reason that mode exists — the arm
+# would otherwise have sat here reading as green coverage it no longer had.
+# `Rc.FINDINGS` is the realistic regression now: it is the 1 the rule file used
+# to document, and it is one token from the correct value.
 [[arm]]
 id = "skill-lint-back-to-bare-one"
 test = "test_no_skills_matched_is_a_skip_not_a_pass"
 file = "python/src/kb_setup/skill_lint.py"
-old = "        return Rc.NOT_RUN"
-new = "        return 1"
+old = "            rc=Rc.NOT_RUN,"
+new = "            rc=Rc.FINDINGS,"

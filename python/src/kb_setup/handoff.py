@@ -53,6 +53,7 @@ from enum import Enum
 from pathlib import Path
 
 from kb_setup import citations, gates, resolve, review
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 #: The checks a `` `path` (absent) `` marker can be written on. A gate claim
 #: cannot, which is why `render` scopes its hint to these rather than to any
@@ -757,12 +758,35 @@ def check_for_branch(repo_root: Path, branch: str | None) -> BranchHandoff:
     )
 
 
-def main(args: list[str], repo_root: Path) -> int:
-    """`kb-handoff-check [<path>]` — 1 on a contradicted claim, 2 on a bad request.
+@dataclass(frozen=True)
+class Checked:
+    """One completed `kb-handoff-check` run: what was checked, and what it found.
 
-    Exit 1 covers every FAIL, and a gate claim the record CONTRADICTS is one of
-    them — it is not a citation, so "1 on a broken citation" understated it from
-    #147 until #157. AMBIGUOUS and UNVERIFIABLE are reported at exit 0.
+    A named pair rather than a bare tuple because both halves are rendered and
+    a positional `(findings, source)` reads identically to `(source, findings)`
+    at the call site.
+    """
+
+    findings: tuple[Finding, ...]
+    source: str
+
+
+def check_handoff(args: list[str], repo_root: Path) -> Result[Checked]:
+    """The boundary (§2 R5): resolve the target handoff and check it.
+
+    Returns rather than raises, and prints nothing — :func:`main` renders. Same
+    split as ``check.check``/``check.main``, which is ``ruff``'s
+    ``pub fn run(..) -> Result<ExitStatus>`` (``crates/ruff/src/lib.rs:128``).
+
+    The three outcomes map cleanly, and this module is the one that exercises
+    all three ``Rc`` codes the conversion uses:
+
+    * a named path that is not a file, or no handoff to find — the request
+      cannot be honoured, so ``Err(..., rc=Rc.BAD_REQUEST)``;
+    * a handoff with a FAIL — the checker ran and CONTRADICTED a claim, which
+      is the gate doing its job: ``Ok(checked, rc=Rc.FINDINGS)``;
+    * anything else, including AMBIGUOUS and UNVERIFIABLE findings, which are
+      reported at ``Rc.OK`` exactly as before.
     """
     positional = [a for a in args if not a.startswith("-")]
     if positional:
@@ -770,16 +794,11 @@ def main(args: list[str], repo_root: Path) -> int:
         if not target.is_absolute():
             target = repo_root / target
         if not target.is_file():
-            print(f"kb-handoff-check: no such file: {positional[0]}", file=sys.stderr)
-            return 2
+            return Err(f"no such file: {positional[0]}")
     else:
         found = newest_handoff(repo_root)
         if found is None:
-            print(
-                "kb-handoff-check: no handoff found under .agent/plans/ — pass a path explicitly",
-                file=sys.stderr,
-            )
-            return 2
+            return Err("no handoff found under .agent/plans/ — pass a path explicitly")
         target = found
 
     findings = check(repo_root, target.read_text(encoding="utf-8", errors="replace"))
@@ -787,5 +806,26 @@ def main(args: list[str], repo_root: Path) -> int:
         shown = str(target.relative_to(repo_root))
     except ValueError:
         shown = str(target)
-    print(render(findings, source=shown))
-    return 1 if any(f.verdict is Verdict.FAIL for f in findings) else 0
+    failed = any(f.verdict is Verdict.FAIL for f in findings)
+    return Ok(
+        Checked(tuple(findings), shown),
+        rc=Rc.FINDINGS if failed else Rc.OK,
+    )
+
+
+def main(args: list[str], repo_root: Path) -> int:
+    """`kb-handoff-check [<path>]` — 1 on a contradicted claim, 2 on a bad request.
+
+    Exit 1 covers every FAIL, and a gate claim the record CONTRADICTS is one of
+    them — it is not a citation, so "1 on a broken citation" understated it from
+    #147 until #157. AMBIGUOUS and UNVERIFIABLE are reported at exit 0.
+
+    Kept returning ``int``: ``cli.py``, ``kb-ship`` and this module's existing
+    exit-code assertions are the regression arm for the ``Result`` split.
+    """
+    result = check_handoff(args, repo_root)
+    if not isinstance(result, Ok):
+        print(f"kb-handoff-check: {result.message}", file=sys.stderr)
+        return exit_code(result)
+    print(render(list(result.value.findings), source=result.value.source))
+    return exit_code(result)

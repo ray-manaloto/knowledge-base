@@ -73,6 +73,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from kb_setup.result import Ok, Rc, Result, exit_code
+
 # --- Budgets -----------------------------------------------------------------
 
 # The one documented figure ("target under 200 lines per CLAUDE.md file").
@@ -417,9 +419,50 @@ def check(root: Path, *, exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES) -
     return report
 
 
+def check_md_budget(
+    root: Path, *, exclude: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES
+) -> Result[Report]:
+    """The boundary (§2 R5): the budget report, and whether it is a finding.
+
+    Returns rather than raises, and prints nothing — :func:`md_budget_main`
+    renders. Same two-function split as ``check.check``/``check.main`` and
+    ``lint_checks.check_no_lint_skip``, which is ``ruff``'s
+    ``pub fn run(..) -> Result<ExitStatus>`` (``crates/ruff/src/lib.rs:128``).
+
+    **Over-budget files are ``Ok``, not ``Err``.** This gate ran, it measured
+    every tracked instruction file, and it found three of them too long — that
+    is the gate succeeding. ``Err`` is "could not run".
+
+    A KNOWN GAP, recorded rather than silently fixed: ``report.counted == 0``
+    means the walk matched no instruction file at all, which is a gate that
+    never asked the question and by this repo's own doctrine is not a pass
+    (``probes-need-a-control-arm.md``). It is reported here as ``Rc.OK``
+    because that is what the pre-R5 code returned, and rule 2 of the recipe
+    keeps this conversion behaviour-preserving so the existing exit-code
+    assertions stay a valid regression arm. ``skill_lint`` has the same case
+    and DOES return ``Rc.NOT_RUN`` for it — the divergence is real and is
+    filed, not designed.
+    """
+    report = check(root, exclude=exclude)
+    return Ok(report, rc=Rc.FINDINGS if report.violations else Rc.OK)
+
+
 def md_budget_main(root: Path) -> int:
-    """Entry point for ``kb-setup md-budget`` (and dotfiles' ``md-budget``)."""
-    report = check(root)
+    """Entry point for ``kb-setup md-budget`` (and dotfiles' ``md-budget``).
+
+    Kept returning ``int``: ``cli.py``, the ``md_size_budget`` hk step and this
+    module's existing exit-code assertions are the regression arm proving the
+    ``Result`` split changed no behaviour.
+    """
+    result = check_md_budget(root)
+    # Narrowed on `Ok` rather than against `Err`: `Result` has a third variant
+    # (`External`), so a negative test would leave a union ty rejects. This
+    # boundary has no failure case today — the branch is the renderer honouring
+    # the declared type, not a claim that one exists.
+    if not isinstance(result, Ok):
+        sys.stderr.write(f"md-budget: {result.message}\n")
+        return exit_code(result)
+    report = result.value
     for v in report.violations:
         sys.stderr.write(f"{v.path}: {v.message}\n")
     # The number that actually matters, surfaced every run: bytes paid at
@@ -429,4 +472,4 @@ def md_budget_main(root: Path) -> int:
         f"eager context ~{report.eager_bytes} bytes "
         f"(~{report.eager_bytes // 4} tokens) every session\n"
     )
-    return 1 if report.violations else 0
+    return exit_code(result)

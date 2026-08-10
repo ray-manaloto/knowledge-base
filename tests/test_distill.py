@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import cli, distill
+from kb_setup.result import Ok, Rc, exit_code
 
 
 def _transcript(tmp_path, name, commands, writes=()) -> Path:
@@ -368,3 +369,112 @@ def test_distill_is_never_a_gate(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(distill.brain, "project_transcripts", lambda *_a, **_k: [path])
     assert cli.main(["distill"]) == 0
     assert "candidate(s)" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# The `check_distill` boundary (§2 R5)
+# --------------------------------------------------------------------------
+#
+# This is the module where the conversion is genuinely informative rather than
+# mechanical. `distill` FINDS things — that is its entire job — and it still
+# must never return `Rc.FINDINGS`, because that is a code a caller can gate on
+# and #219 rules this analyser advisory. The leads travel in the VALUE.
+#
+# No int assertion can see that: `distill_main` returned a literal 0 before and
+# an `exit_code` of 0 after, whatever the report said.
+
+
+def _with_transcripts(monkeypatch, paths) -> None:
+    """Point the boundary's transcript discovery at a fixture, not the real machine."""
+    monkeypatch.setattr(distill.brain, "transcripts_base", lambda: Path("/nonexistent"))
+    # `**_kw` rather than a named `limit`: the caller passes it as a KEYWORD, so a
+    # positional-looking stub raises TypeError and the test fails for a reason
+    # that has nothing to do with what it is measuring.
+    monkeypatch.setattr(distill.brain, "project_transcripts", lambda _base, _root, **_kw: paths)
+
+
+def test_distill_a_proposal_is_ok_with_rc_ok_not_findings(tmp_path, monkeypatch):
+    """The load-bearing arm: it FOUND something and the rc is still OK.
+
+    If someone "improves" this to `Rc.FINDINGS` because a candidate was found,
+    `kb-distill` starts failing any build it is wired into — the exact outcome
+    #219's never-a-gate decision rules out. Every pre-existing assertion in this
+    file stays green through that change; only this test notices.
+    """
+    path = _transcript(
+        tmp_path,
+        "repeat",
+        [_heredoc("import json\nPath('graphify-out/graph.json')")] * 3,
+    )
+    _with_transcripts(monkeypatch, [path])
+
+    result = distill.check_distill(tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert result.rc is not Rc.FINDINGS
+
+
+def test_distill_a_one_off_session_proposes_nothing_and_is_ok(tmp_path, monkeypatch):
+    """CONTROL ARM: the test above is not merely observing "this boundary is always OK".
+
+    Same rc, DIFFERENT rendered text — three probes that each ask a different
+    question, so the detector ran and correctly found nothing. Without this
+    contrast the test above could not tell a real proposal from an empty one.
+    """
+    path = _transcript(
+        tmp_path,
+        "oneoff",
+        [
+            _heredoc("import json\nPath('sources/extractions/a.json')"),
+            _heredoc("import ast\nPath('docs/research/b.md')"),
+            _heredoc("import csv\nPath('mise.toml')"),
+        ],
+    )
+    _with_transcripts(monkeypatch, [path])
+
+    result = distill.check_distill(tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert "nothing to propose" in result.value
+
+
+def test_distill_no_transcripts_at_all_is_the_documented_divergence(tmp_path, monkeypatch):
+    """Zero transcripts reports `Rc.OK` while SAYING the detector did not run.
+
+    Pinned, not endorsed — and this module states the contradiction in its own
+    output: *"NO TRANSCRIPTS FOUND — the detector did not run. This is not a
+    clean result."* By this repo's doctrine that is `Rc.NOT_RUN`, which is
+    exactly what `skill_lint` returns for the structurally identical case.
+
+    It stays `OK` because the R5 conversion is behaviour-preserving by rule, so
+    the pre-existing exit-code assertions remain a valid regression arm. The
+    third module with this shape (`md_budget`'s `counted == 0` is the other),
+    which is why it is being filed as one gap rather than fixed three times in
+    a conversion nobody would review as a behaviour change.
+    """
+    _with_transcripts(monkeypatch, [])
+
+    result = distill.check_distill(tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert "did not run" in result.value
+
+
+def test_distill_boundary_prints_nothing(tmp_path, monkeypatch, capsys):
+    """Rendering belongs to `distill_main`; the boundary returns the text."""
+    _with_transcripts(monkeypatch, [])
+
+    distill.check_distill(tmp_path)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_distill_int_wrapper_is_exit_code_of_boundary(tmp_path, monkeypatch):
+    """The equivalence that makes the split safe."""
+    _with_transcripts(monkeypatch, [])
+    assert distill.distill_main(tmp_path) == exit_code(distill.check_distill(tmp_path))

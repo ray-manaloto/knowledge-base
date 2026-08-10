@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import hook_guard
-from kb_setup.result import Rc
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Iterator
@@ -162,29 +162,56 @@ def check(
     return Report(tuple(findings), tuple(scanned))
 
 
-def skill_lint_main(root: Path) -> int:
-    """CLI entry: print the report, `Rc.FINDINGS` on a finding, `Rc.NOT_RUN` on none scanned."""
+def check_skill_lint(root: Path) -> Result[Report]:
+    """The boundary (§2 R5): the lint report, or `Err` when the gate never ran.
+
+    Returns rather than raises, and prints nothing — :func:`skill_lint_main`
+    renders. Same split as ``check.check``/``check.main``, which is ``ruff``'s
+    ``pub fn run(..) -> Result<ExitStatus>`` (``crates/ruff/src/lib.rs:128``).
+
+    **This is the first converted module with a real `Err`**, and it is worth
+    saying why, because the two non-zero cases here look alike and are not:
+
+    * *Findings* — a SKILL.md instructs a command a mise task owns. The gate
+      ran and did its job, so this is ``Ok(report, rc=Rc.FINDINGS)``.
+    * *Nothing scanned* — the glob matched no skill at all. The gate never
+      asked the question, which by ``probes-need-a-control-arm.md`` is not a
+      pass and is not a finding either. That is ``Err(..., rc=Rc.NOT_RUN)``,
+      and it is precisely the case the fourth ``Rc`` member was ruled for:
+      neither 1 ("we looked and found something" — we did not look) nor 2
+      ("you asked wrong" — the request was fine).
+
+    The integer is unchanged in both cases, so hk fails this step exactly as
+    before; what the split adds is that a caller can now tell the two apart
+    without re-deriving the meaning of a bare non-zero int.
+    """
     report = check(root)
     if not report.scanned:
-        # A glob that matches nothing is not a pass — it is a gate that never
-        # asked the question (`verify-before-advancing.md`: 0 files is a SKIP).
-        #
-        # This returned a bare `1` until §2 R5, and `mise-tasks-only.md` said so
-        # ("a glob matching nothing exits 1, not 0") — while the SAME rule file
-        # said `kb-skill-score` exits **2** for "a skill name matching nothing",
-        # and `check.py` independently chose 2 for "nothing was checked". One
-        # failure, three spellings, two of them documented.
-        #
-        # `Rc.NOT_RUN` is the reconciliation Ray ruled: neither 1 ("we looked and
-        # found something" — false, we did not look) nor 2 ("you asked wrong" —
-        # false, the request was fine). Still non-zero, and nothing in the repo
-        # branches on a specific non-zero code, so hk fails this step exactly as
-        # before.
-        print(
-            f"skill-lint: NO SKILLS MATCHED {DEFAULT_SKILL_GLOB!r} — "
-            "the gate did not run. Check the glob before reading this as clean."
+        return Err(
+            f"NO SKILLS MATCHED {DEFAULT_SKILL_GLOB!r} — the gate did not run. "
+            "Check the glob before reading this as clean.",
+            rc=Rc.NOT_RUN,
         )
-        return Rc.NOT_RUN
+    return Ok(report, rc=Rc.FINDINGS if report.failed else Rc.OK)
+
+
+def skill_lint_main(root: Path) -> int:
+    """CLI entry: print the report, `Rc.FINDINGS` on a finding, `Rc.NOT_RUN` on none scanned.
+
+    Kept returning ``int``: ``cli.py``, the ``skill_lint`` hk step and this
+    module's existing exit-code assertions are the regression arm proving the
+    ``Result`` split changed no behaviour.
+    """
+    result = check_skill_lint(root)
+    # Narrowed on `Ok`, not on `Err`: the declared return is `Result[Report]`,
+    # whose third variant is `External`. Testing for `Err` leaves `Ok | External`
+    # and `External` carries no `.value` — ty catches it, and narrowing the
+    # POSITIVE way keeps the renderer correct if this boundary ever grows a
+    # passthrough variant.
+    if not isinstance(result, Ok):
+        print(f"skill-lint: {result.message}")
+        return exit_code(result)
+    report = result.value
     for f in report.findings:
         print(f"skill-lint: {f.path}:{f.line}: {f.command}")
         print(f"            {f.remedy}")
@@ -195,9 +222,9 @@ def skill_lint_main(root: Path) -> int:
             "A SKILL.md instructs a command a mise task already owns; skills call "
             "mise tasks that wrap the python library (#128)."
         )
-        return 1
-    print(
-        f"skill-lint: {n} skill(s) checked; "
-        "every instructed command is a mise task or allowed read-only"
-    )
-    return 0
+    else:
+        print(
+            f"skill-lint: {n} skill(s) checked; "
+            "every instructed command is a mise task or allowed read-only"
+        )
+    return exit_code(result)

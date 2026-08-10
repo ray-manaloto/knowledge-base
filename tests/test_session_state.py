@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import session_state
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 
 def _no_pr(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -665,3 +666,83 @@ def test_main_accepts_the_no_pr_flag(
     )
 
     assert session_state.main(["--no-pr"], tmp_path) == 0
+
+
+# --------------------------------------------------------------------------
+# The `check_session_state` boundary (§2 R5)
+# --------------------------------------------------------------------------
+#
+# The int assertions above pin 0 and 2. What they cannot see is that this
+# command has NO findings state at all — a snapshot reports and has no opinion
+# to fail on — so every non-zero here is a request that could not be honoured.
+# A future edit making a dirty tree return `Rc.FINDINGS` would keep every
+# existing assertion green and quietly turn the task into a gate.
+
+
+def test_session_state_a_snapshot_is_ok_and_never_findings(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Even a DIRTY tree is `Rc.OK` — you take a snapshot when there is something to say."""
+    _no_pr(monkeypatch)
+    (tmp_path / "dirty.txt").write_text("x\n", encoding="utf-8")
+
+    result = session_state.check_session_state([], tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert result.rc is not Rc.FINDINGS
+    assert "branch" in result.value
+
+
+def test_session_state_an_unknown_flag_is_a_bad_request(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """CONTROL ARM for the test above: a non-OK outcome IS reachable here."""
+    result = session_state.check_session_state(["--nope"], tmp_path)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "--nope" in result.message
+
+
+def test_session_state_a_positional_is_a_bad_request(
+    git: Callable[..., str], tmp_path: Path
+) -> None:
+    """The second refusal route, armed separately — it was once silently ignored."""
+    result = session_state.check_session_state(["bogus"], tmp_path)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "bogus" in result.message
+
+
+def test_session_state_boundary_prints_nothing(
+    git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Rendering belongs to `main`; the boundary returns the text instead.
+
+    This module is the clearest case for the property: the snapshot's whole
+    value is being pasted somewhere, and a boundary that printed it could not
+    be re-rendered by a caller wanting a different transport.
+    """
+    _no_pr(monkeypatch)
+
+    session_state.check_session_state([], tmp_path)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_session_state_int_wrapper_is_exit_code_of_boundary(
+    git: Callable[..., str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The equivalence that makes the split safe, on both outcomes."""
+    _no_pr(monkeypatch)
+    for args in ([], ["--nope"]):
+        assert session_state.main(args, tmp_path) == exit_code(
+            session_state.check_session_state(args, tmp_path)
+        )
