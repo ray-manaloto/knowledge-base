@@ -832,8 +832,25 @@ command rather than a consequence of this one. Pinned as
 **All six boundaries §9b and §9d deferred are converted** — `launch`
 (`cc_main`/`doctor_main`), `graph_counts`, `insights`, `skill_refresh`,
 `graphify_ops`, `pr` (`ship_main`/`land_main`). PR #273. This closes the
-deferred set; what remains are the ~23 dispatched boundaries never blocked on
-anything.
+deferred set; what remains are the dispatched boundaries that were never blocked
+on anything.
+
+**The "~35" denominator this report has used since §9 is WRONG, and a cold lane
+caught it while checking a status table built on it (2026-08-10).** `cli.py`
+dispatches **44** distinct commands, not ~35, and **13 of 62 modules** import
+`kb_setup.result`. Two corrections follow from that:
+
+- every `N of ~35` above — including §9's own "eight are now converted" framing
+  and §9d's "12 of ~35" — understates the remaining work by roughly a quarter.
+  They are left in place as the record of what was believed at the time; this
+  note is the correction, because rewriting them would erase the fact that four
+  tranches were planned against a denominator nobody re-derived.
+- **`goal.outcome_main` and `evals` are NOT converted**, though `goal.main` is.
+  §9d recorded `goal` as converted, which is true of one of that module's two
+  boundaries and was read as both.
+
+`probes-need-a-control-arm.md` rule 6: an inherited number is not a measurement.
+This one was inherited four times inside one report.
 
 The unblocking work was §2.5's stdout sink, not more conversion — every one of
 the six printed progressively, so recipe rule 3 ("the boundary prints nothing")
