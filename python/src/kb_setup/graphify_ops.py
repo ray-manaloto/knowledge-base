@@ -15,12 +15,11 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import prose, stamps
+from kb_setup import events, prose, stamps
 from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
 
 if TYPE_CHECKING:
@@ -63,12 +62,17 @@ def _committed_chunks(repo_root: Path) -> list[Path]:
     except OSError, ValueError:
         ledger = None
     if ledger is None:
-        print(
+        # WARNING, and it was ALREADY on stderr — so the level matches the
+        # stream the old code chose, and nothing moves. This is the shape R9 is
+        # about: a gate that continues with reduced coverage and says so in a
+        # line nobody greps. `coverage_reduced` is now a field.
+        events.warn(
+            "merge.ledger_unreadable",
             "[kb-merge] WARNING: the recomposition ledger is unreadable, so the "
             "collision check can only see committed chunks. A chunk merged from "
             "outside sources/extractions/ is INVISIBLE to it right now. "
             "`mise run kb-build` regenerates the ledger.",
-            file=sys.stderr,
+            coverage_reduced=True,
         )
         return paths
     known = {p.resolve() for p in paths}
@@ -113,11 +117,24 @@ def _self_remerge(repo_root: Path, chunk_path: Path) -> bool:
 
 def _refuse(chunk_name: str, what: str, issues: list[str]) -> int:
     """Print a bounded refusal and return the rc `kb-merge` exits with."""
-    print(f"[kb-merge] {chunk_name} {what} — refusing:", file=sys.stderr)
+    events.fail(
+        "merge.refused",
+        f"[kb-merge] {chunk_name} {what} — refusing:",
+        chunk=chunk_name,
+        reason=what,
+        issues=len(issues),
+    )
     for i in issues[:_MAX_SHOWN_ISSUES]:
-        print(f"  {i}", file=sys.stderr)
+        events.fail("merge.issue", f"  {i}", chunk=chunk_name, issue=i)
     if len(issues) > _MAX_SHOWN_ISSUES:
-        print(f"  … and {len(issues) - _MAX_SHOWN_ISSUES} more", file=sys.stderr)
+        # The display bound, as a field. A refusal listing 10 of 400 issues
+        # reads as a 10-issue problem unless the bound travels with it.
+        events.fail(
+            "merge.issues_truncated",
+            f"  … and {len(issues) - _MAX_SHOWN_ISSUES} more",
+            shown=_MAX_SHOWN_ISSUES,
+            omitted=len(issues) - _MAX_SHOWN_ISSUES,
+        )
     return 2
 
 
@@ -206,7 +223,7 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     """
     chunk_path = Path(chunk)
     if not chunk_path.is_file():
-        print(f"[kb-merge] no such chunk: {chunk}", file=sys.stderr)
+        events.fail("merge.no_chunk", f"[kb-merge] no such chunk: {chunk}", chunk=str(chunk))
         return 2
 
     # BOTH gates BEFORE MERGING — schema, then cross-chunk ownership. See
@@ -249,7 +266,10 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
     if _self_remerge(repo_root, chunk_path):
         cmd.append("--self-remerge")
 
-    print(f"  $ {' '.join(cmd)}")
+    # The echoed command, BEFORE the subprocess runs — this is the progressive
+    # print that made `merge_chunk` undeferrable under recipe rule 3, and the
+    # operator wants it first because the merge is the slow part.
+    events.say("merge.command", f"  $ {' '.join(cmd)}", argv=list(cmd))
     rc = subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
     _record_counts(repo_root, out, counts_out, tag="kb-merge")
     if rc != 0:
@@ -278,12 +298,13 @@ def merge_chunk(repo_root: Path, chunk: str, root: str | None = None) -> int:
         # just failed to extend — the same silent-discard this whole ledger
         # exists to prevent, arriving through its own write path instead of
         # through recomposition. Same shape as `_derive_prose`'s own gate.
-        print(
+        events.fail(
+            "merge.ledger_write_failed",
             f"[kb-merge] the chunk merged and the prose graph was re-derived, but "
             f"recording it in the recomposition ledger failed: {exc}\n"
             f"[kb-merge] a future `mise run kb-watch` will not replay this chunk "
             f"unless it is re-merged.",
-            file=sys.stderr,
+            error=str(exc),
         )
         return 1
     # LAST, and only on the fully-successful path (#181). `_merge_docs.py` is the
@@ -340,11 +361,13 @@ def _derive_prose(repo_root: Path, *, tag: str, did: str) -> int:
     try:
         stats = prose.derive_for(repo_root)
     except (OSError, ValueError, SystemExit) as exc:
-        print(
+        events.fail(
+            "prose.derive_failed",
             f"[{tag}] {did}, but the prose graph could not be re-derived: "
             f"{exc}\n[{tag}] `kb-query --prose` has no corpus until "
             f"`mise run kb-prose` (or `mise run kb-build`) succeeds.",
-            file=sys.stderr,
+            tag=tag,
+            error=str(exc),
         )
         return 1
     # The prose derivation is the ONE parse of `graph.json` that happens after
@@ -417,10 +440,10 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     # False, so the genuinely-absent case still refuses.
     exe = graphify_exe(repo_root)
     if not Path(exe).is_file():
-        print(
+        events.fail(
+            "label.no_graphify",
             "[kb-label] graphify not found — neither `mise which graphify` nor PATH "
             "resolved it. Run `mise install`.",
-            file=sys.stderr,
         )
         return 2
 
@@ -437,7 +460,7 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
         base.append("--missing-only")
 
     def _run(cmd: list[str], why: str) -> int:
-        print(f"  $ {' '.join(cmd)}   # {why}")
+        events.say("label.command", f"  $ {' '.join(cmd)}   # {why}", argv=list(cmd), why=why)
         return subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
 
     if not claude_cli:
@@ -455,9 +478,13 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
     )
     if rc == 0:
         return _labelled(repo_root, rc, views_before)
-    print(
+    # WARNING rather than ERROR: the run CONTINUES on the fallback, which is the
+    # exact shape R9 names — a degraded path taken silently. It was already on
+    # stderr, so nothing moves.
+    events.warn(
+        "label.claude_cli_failed",
         "[kb-label] claude-cli backend failed (#2076) — deterministic no-LLM fallback.",
-        file=sys.stderr,
+        fallback="deterministic",
     )
     return _labelled(repo_root, _run(base, "deterministic fallback"), views_before)
 
@@ -564,18 +591,19 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
     wants_idf = IDF_FLAG in args
     attached = [a for a in rest if a.startswith(ATTACHED_GRAPH)]
     if attached:
-        print(
+        events.fail(
+            "query.attached_graph_form",
             f"[kb-query] graphify does not support the attached form "
             f"({attached[0]}) — it ignores the argument and answers from the "
             f"cwd-relative default instead. Use `--graph <path>`, or --prose.",
-            file=sys.stderr,
+            argument=attached[0],
         )
         return 2
     if wants_prose and GRAPH_FLAG in rest:
-        print(
+        events.fail(
+            "query.conflicting_corpora",
             f"[kb-query] {PROSE_FLAG} and --graph both given — they name different "
             f"corpora and there is no sensible winner. Pass one.",
-            file=sys.stderr,
         )
         return 2
     if wants_idf:
@@ -584,7 +612,11 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
         graph = prose.prose_graph_path(repo_root) if wants_prose else _full_graph(repo_root)
         if not graph.is_file():
             missing = "mise run kb-prose" if wants_prose else "mise run kb-build"
-            print(f"[kb-query] no graph at {graph} — run `{missing}` first", file=sys.stderr)
+            events.fail(
+                "query.no_graph",
+                f"[kb-query] no graph at {graph} — run `{missing}` first",
+                graph=str(graph),
+            )
             return 2
         rest = [*rest, "--graph", str(graph)]
     return subprocess.run(
@@ -625,26 +657,28 @@ def affected(repo_root: Path, args: Sequence[str]) -> int:
     the shape a cold review flagged; the fix is to make them agree.
     """
     if not args:
-        print(
+        events.fail(
+            "affected.usage",
             '[kb-affected] usage: mise run kb-affected -- "<symbol>" [--depth N] [--relation R]...',
-            file=sys.stderr,
         )
         return 2
     if attached := [a for a in args if a.startswith(ATTACHED_GRAPH)]:
-        print(
+        events.fail(
+            "affected.attached_graph_form",
             f"[kb-affected] graphify does not support the attached form "
             f"({attached[0]}) — it ignores the argument and answers from the "
             f"cwd-relative default instead. Use `--graph <path>`.",
-            file=sys.stderr,
+            argument=attached[0],
         )
         return 2
     rest = list(args)
     if GRAPH_FLAG not in rest:
         graph = _full_graph(repo_root)
         if not graph.is_file():
-            print(
+            events.fail(
+                "affected.no_graph",
                 f"[kb-affected] no graph at {graph} — run `mise run kb-build` first",
-                file=sys.stderr,
+                graph=str(graph),
             )
             return 2
         rest = [*rest, GRAPH_FLAG, str(graph)]
@@ -723,7 +757,7 @@ def _idf_query(repo_root: Path, rest: Sequence[str]) -> int:
 
     parsed = _parse_idf_args(rest)
     if isinstance(parsed, str):
-        print(f"[kb-query] {parsed}", file=sys.stderr)
+        events.fail("query.bad_args", f"[kb-query] {parsed}", detail=parsed)
         return 2
 
     explicit = parsed.graph is not None
@@ -733,26 +767,55 @@ def _idf_query(repo_root: Path, rest: Sequence[str]) -> int:
         # passed their own --graph to run `kb-prose` names a command that would
         # not produce the file they asked for.
         fix = "check the path" if explicit else "run `mise run kb-prose` first"
-        print(f"[kb-query] no graph at {graph} — {fix}", file=sys.stderr)
+        events.fail("query.no_graph", f"[kb-query] no graph at {graph} — {fix}", graph=str(graph))
         return 2
     try:
         index = lexical.load_index(graph)
     except (OSError, ValueError) as exc:
-        print(f"[kb-query] could not index {graph}: {exc}", file=sys.stderr)
+        events.fail(
+            "query.index_failed",
+            f"[kb-query] could not index {graph}: {exc}",
+            graph=str(graph),
+            error=str(exc),
+        )
         return 1
 
     hits = lexical.search(index, parsed.question)
-    print(f"[kb-query] {IDF_FLAG}: {index.size:,} indexed node(s) from {graph.name}")
+    events.say(
+        "query.idf_header",
+        f"[kb-query] {IDF_FLAG}: {index.size:,} indexed node(s) from {graph.name}",
+        indexed=index.size,
+        graph=graph.name,
+    )
     if not hits:
-        print(
+        # `truncated=False` is the machine-readable half of a sentence this repo
+        # wrote deliberately: an empty result that IS an answer, versus one that
+        # is a display bound. `probes-need-a-control-arm.md` is about telling
+        # those apart, and a field says it where prose only asserts it.
+        events.say(
+            "query.no_hits",
             f"[kb-query] no node shares a term with {parsed.question!r} — that is a "
-            f"real empty result, not a truncated one."
+            f"real empty result, not a truncated one.",
+            hits=0,
+            truncated=False,
         )
         return 0
     for rank, hit in enumerate(hits[: parsed.top], start=1):
-        print(f"{rank:>3}  {hit.score:6.2f}  {hit.label}  [src={hit.source_file}]")
+        events.say(
+            "query.hit",
+            f"{rank:>3}  {hit.score:6.2f}  {hit.label}  [src={hit.source_file}]",
+            rank=rank,
+            score=round(hit.score, 2),
+            label=hit.label,
+            source_file=hit.source_file,
+        )
     if len(hits) > parsed.top:
-        print(f"     … {len(hits) - parsed.top:,} more scoring above zero (raise {_IDF_TOP})")
+        events.say(
+            "query.hits_truncated",
+            f"     … {len(hits) - parsed.top:,} more scoring above zero (raise {_IDF_TOP})",
+            shown=parsed.top,
+            omitted=len(hits) - parsed.top,
+        )
     return 0
 
 
@@ -765,7 +828,11 @@ def transcribe(repo_root: Path, audio: str) -> int:
     """
     audio_path = Path(audio)
     if not audio_path.is_file():
-        print(f"[kb-transcribe] no such audio file: {audio}", file=sys.stderr)
+        events.fail(
+            "transcribe.no_audio",
+            f"[kb-transcribe] no such audio file: {audio}",
+            audio=str(audio),
+        )
         return 2
     gpy = graphify_python(repo_root)
     code = (
@@ -774,5 +841,9 @@ def transcribe(repo_root: Path, audio: str) -> int:
         f"p = transcribe(Path({str(audio_path)!r}), output_dir=Path({str(audio_path.parent)!r}))\n"
         "print('[kb-transcribe] transcript ->', p)\n"
     )
-    print(f"  $ {gpy} -c '<graphify.transcribe.transcribe {audio_path.name}>'")
+    events.say(
+        "transcribe.command",
+        f"  $ {gpy} -c '<graphify.transcribe.transcribe {audio_path.name}>'",
+        audio=audio_path.name,
+    )
     return subprocess.run([gpy, "-c", code], cwd=repo_root, env=clean_env(), check=False).returncode

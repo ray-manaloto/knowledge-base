@@ -50,6 +50,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from kb_setup import events
+
 _GIT_TIMEOUT = 120
 _GH_TIMEOUT = 120
 # `_GATE_TIMEOUT` moved to `kb_setup.gates` with the runner it bounded (#146).
@@ -134,10 +136,10 @@ def run_gates(repo_root: Path) -> bool:
     # sequence has one owner now and this function keeps only the policy.
     gate_run, summary = gates.run_and_record(repo_root, gates.GATE_TASKS, stop_on_failure=True)
     if gate_run is None:
-        print(f"ship: refusing — {summary}")
+        events.say("ship.gates_unrunnable", f"ship: refusing — {summary}", refused=True)
         return False
 
-    print(summary)
+    events.say("ship.gates", summary, all_passed=gate_run.all_passed)
     return gate_run.all_passed
 
 
@@ -266,7 +268,12 @@ def _ship_preflight(repo_root: Path) -> str | None:
     """Return the branch to ship, or None (having explained why) if it must not."""
     branch = current_branch(repo_root)
     if not branch or branch == "main":
-        print(f"ship: refusing — on '{branch or 'unknown'}'; create a branch first")
+        events.say(
+            "ship.refused_branch",
+            f"ship: refusing — on '{branch or 'unknown'}'; create a branch first",
+            branch=branch,
+            refused=True,
+        )
         return None
     # `git rev-parse --abbrev-ref HEAD` returns the literal string "HEAD" when
     # detached, so a paused bisect, a stopped rebase, or a `git checkout <sha>`
@@ -280,10 +287,18 @@ def _ship_preflight(repo_root: Path) -> str | None:
     # protection, so it is explicit now. Found by the cold and silent-failure
     # lanes on the very commit that introduced the refspec.
     if branch == "HEAD":
-        print("ship: refusing — detached HEAD; check out a branch first")
+        events.say(
+            "ship.refused_detached",
+            "ship: refusing — detached HEAD; check out a branch first",
+            refused=True,
+        )
         return None
     if not working_tree_clean(repo_root):
-        print("ship: refusing — working tree is dirty; commit or stash first")
+        events.say(
+            "ship.refused_dirty",
+            "ship: refusing — working tree is dirty; commit or stash first",
+            refused=True,
+        )
         return None
     return branch
 
@@ -321,30 +336,49 @@ def _open_or_update_pr(repo_root: Path, branch: str, title: str | None) -> int:
     if rc == 0:
         number, state = _pr_number_and_state(out)
         if number is None:
-            print(f"ship: could not read the branch's PR state (rc=0)\n{out.strip()[:300]}")
+            events.say(
+                "ship.pr_state_unreadable",
+                f"ship: could not read the branch's PR state (rc=0)\n{out.strip()[:300]}",
+                rc=0,
+            )
             return 1
         if state == "OPEN":
-            print(f"ship: OK — PR #{number} updated, gates green")
+            events.say(
+                "ship.pr_updated",
+                f"ship: OK — PR #{number} updated, gates green",
+                pr=number,
+            )
             return 0
         # MERGED or CLOSED is not something to "update" — the commits just pushed
         # need a new PR. Say which, so this does not look like a lost PR.
-        print(f"ship: branch's PR #{number} is {state}; opening a new one")
+        events.say(
+            "ship.pr_superseded",
+            f"ship: branch's PR #{number} is {state}; opening a new one",
+            pr=number,
+            state=state,
+        )
     # rc != 0 is either "no PR yet" (create one) or "could not ask" (stop). Only
     # the literal gh phrase means the former; any other failure — auth expiry,
     # network, rate limit — is an unanswered question, and falling through to
     # `gh pr create` would turn it into a second PR.
     elif "no pull requests found" not in out.lower():
-        print(f"ship: could not read the branch's PR state (rc={rc})\n{out.strip()[:300]}")
+        events.say(
+            "ship.pr_state_unreadable",
+            f"ship: could not read the branch's PR state (rc={rc})\n{out.strip()[:300]}",
+            rc=rc,
+        )
         return 1
 
     create = ["gh", "pr", "create", "--base", "main", "--head", branch]
     create += ["--title", title, "--body", ""] if title else ["--fill"]
     rc, out = _run(create, cwd=repo_root, timeout=_GH_TIMEOUT)
     if rc != 0:
-        print(f"ship: PR create failed\n{out}")
+        events.say("ship.pr_create_failed", f"ship: PR create failed\n{out}", rc=rc)
         return 1
-    print(out.strip())
-    print("ship: OK — PR open, gates green")
+    # `gh pr create` prints the PR URL and nothing else; it is the one line a
+    # human actually wants from a ship, so it is carried as a field too.
+    events.say("ship.pr_url", out.strip(), url=out.strip())
+    events.say("ship.ok", "ship: OK — PR open, gates green")
     return 0
 
 
@@ -374,11 +408,27 @@ def _handoff_holds(repo_root: Path, branch: str) -> bool:
     from kb_setup import handoff
 
     result = handoff.check_for_branch(repo_root, branch)
-    print(f"==> handoff: {result.summary}")
+    # `coverage` as a field is the row that matters most here: SKIPPED is not a
+    # pass, and until now that distinction lived only inside a rendered summary
+    # string a reader had to parse by eye.
+    events.say(
+        "ship.handoff",
+        f"==> handoff: {result.summary}",
+        coverage=result.coverage.name,
+        source=str(result.source),
+    )
     if result.coverage is not handoff.Coverage.BROKEN:
         return True
-    print(handoff.render(list(result.findings), source=result.source))
-    print("ship: refusing — the handoff for this branch cites something that is not there")
+    events.say(
+        "ship.handoff_findings",
+        handoff.render(list(result.findings), source=result.source),
+        findings=len(list(result.findings)),
+    )
+    events.say(
+        "ship.refused_handoff",
+        "ship: refusing — the handoff for this branch cites something that is not there",
+        refused=True,
+    )
     return False
 
 
@@ -398,11 +448,21 @@ def _validated_sha_for_push(repo_root: Path, branch: str) -> str | None:
 
     sha = review.head_sha(repo_root)
     if current_branch(repo_root) != branch:
-        print(f"ship: refusing — branch changed during the gates (was '{branch}')")
+        events.say(
+            "ship.refused_branch_moved",
+            f"ship: refusing — branch changed during the gates (was '{branch}')",
+            expected=branch,
+            refused=True,
+        )
         return None
     ok, summary = review.receipt_state(repo_root, sha, require_base=review.DEFAULT_BASE_REF)
     if not ok:
-        print(f"ship: refusing — HEAD moved since the review ({summary})")
+        events.say(
+            "ship.refused_head_moved",
+            f"ship: refusing — HEAD moved since the review ({summary})",
+            sha=sha,
+            refused=True,
+        )
         return None
     return sha
 
@@ -428,16 +488,20 @@ def _pre_push_checks(repo_root: Path, branch: str) -> bool:
     ok, summary = review.receipt_state(
         repo_root, review.head_sha(repo_root), require_base=review.DEFAULT_BASE_REF
     )
-    print(f"==> review: {summary}")
+    events.say("ship.review", f"==> review: {summary}", reviewed=ok)
     if not ok:
-        print("ship: refusing — not pushing an unreviewed commit")
+        events.say(
+            "ship.refused_unreviewed",
+            "ship: refusing — not pushing an unreviewed commit",
+            refused=True,
+        )
         return False
 
     if not _handoff_holds(repo_root, branch):
         return False
 
     if not run_gates(repo_root):
-        print("ship: gates failed — not pushing")
+        events.say("ship.refused_gates", "ship: gates failed — not pushing", refused=True)
         return False
     return True
 
@@ -467,7 +531,7 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
     # the pushed commit the same object by construction.
     rc, out = _run(["git", "push", "origin", f"{sha}:refs/heads/{branch}"], cwd=repo_root)
     if rc != 0:
-        print(f"ship: push failed\n{out}")
+        events.say("ship.push_failed", f"ship: push failed\n{out}", rc=rc, sha=sha, branch=branch)
         return 1
 
     # `-u` cannot set tracking from a raw-SHA refspec — probed both arms: the
@@ -481,10 +545,14 @@ def ship_main(repo_root: Path, *, title: str | None = None) -> int:
         cwd=repo_root,
     )
     if rc_upstream != 0:
-        print(
+        events.say(
+            "ship.upstream_unset",
             f"ship: pushed {sha[:12]}, but could not set upstream tracking "
             f"(non-fatal; run `git branch -u origin/{branch}`): "
-            f"{out_upstream.strip()[:200]}"
+            f"{out_upstream.strip()[:200]}",
+            sha=sha,
+            branch=branch,
+            fatal=False,
         )
 
     return _open_or_update_pr(repo_root, branch, title)
@@ -508,17 +576,33 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     # Wait for a TERMINAL state, never for quota. Advisory checks still cannot
     # block the merge — but a verdict that arrives ten seconds later was never
     # read, and reading it is free.
-    print(f"==> waiting for terminal check state: {await_terminal(pr_number)}")
+    # THE line §9d named as the cost of deferring this conversion: `kb-land`
+    # would have gone silent through its entire check-wait. It stays first, and
+    # it stays progressive.
+    events.say(
+        "land.await",
+        f"==> waiting for terminal check state: {await_terminal(pr_number)}",
+        pr=pr_number,
+    )
 
     green, summary = checks_state(pr_number)
-    print(f"==> checks: {summary}")
+    events.say("land.checks", f"==> checks: {summary}", pr=pr_number, green=green)
     if not green:
-        print(f"land: refusing — PR #{pr_number} is not green")
+        events.say(
+            "land.refused_not_green",
+            f"land: refusing — PR #{pr_number} is not green",
+            pr=pr_number,
+            refused=True,
+        )
         return 1
 
     oid = pr_head_oid(pr_number)
     if not oid:
-        print(f"land: could not read head SHA for PR #{pr_number}")
+        events.say(
+            "land.no_head_sha",
+            f"land: could not read head SHA for PR #{pr_number}",
+            pr=pr_number,
+        )
         return 1
 
     # The PR head — not local HEAD. `ship` guards what IT pushes; a commit
@@ -540,15 +624,24 @@ def land_main(repo_root: Path, pr_number: int) -> int:
     # the kind of untrue claim this module exists to refuse. Found by the cold
     # lane; the standards and spec lanes found the asymmetry and rated it lower.
     reviewed, detail = review.receipt_state(repo_root, oid, require_base=review.DEFAULT_BASE_REF)
-    print(f"==> review: {detail}")
+    events.say("land.review", f"==> review: {detail}", pr=pr_number, reviewed=reviewed, sha=oid)
     if not reviewed:
-        print(
+        events.say(
+            "land.refused_unreviewed",
             f"land: refusing — PR #{pr_number}'s head is unreviewed. Run the "
-            f"`kb-review` skill against it, or land from the machine that did."
+            f"`kb-review` skill against it, or land from the machine that did.",
+            pr=pr_number,
+            sha=oid,
+            refused=True,
         )
         return 1
 
-    print(f"==> merging PR #{pr_number} pinned to {oid[:12]}")
+    events.say(
+        "land.merging",
+        f"==> merging PR #{pr_number} pinned to {oid[:12]}",
+        pr=pr_number,
+        sha=oid,
+    )
 
     rc, out = _run(
         [
@@ -565,14 +658,35 @@ def land_main(repo_root: Path, pr_number: int) -> int:
         timeout=_GH_TIMEOUT,
     )
     if rc != 0:
-        print(f"land: merge failed (head may have moved since the check)\n{out}")
+        events.say(
+            "land.merge_failed",
+            f"land: merge failed (head may have moved since the check)\n{out}",
+            pr=pr_number,
+            sha=oid,
+            rc=rc,
+        )
         return 1
 
     for cmd in (["git", "checkout", "main"], ["git", "pull", "--ff-only"]):
         rc, out = _run(cmd, cwd=repo_root)
         if rc != 0:
-            print(f"land: merged, but local sync failed at `{' '.join(cmd)}`\n{out}")
+            # `merged=True` is the field that matters: the PR IS on main and only
+            # the local sync failed, so a reader of the rc alone would draw the
+            # opposite conclusion from the one the text states.
+            events.say(
+                "land.sync_failed",
+                f"land: merged, but local sync failed at `{' '.join(cmd)}`\n{out}",
+                pr=pr_number,
+                merged=True,
+                argv=list(cmd),
+                rc=rc,
+            )
             return 1
 
-    print(f"land: OK — PR #{pr_number} merged, main synced")
+    events.say(
+        "land.ok",
+        f"land: OK — PR #{pr_number} merged, main synced",
+        pr=pr_number,
+        sha=oid,
+    )
     return 0

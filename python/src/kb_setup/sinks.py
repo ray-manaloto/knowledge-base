@@ -61,6 +61,13 @@ if TYPE_CHECKING:
 #: the rendering itself or stdlib bookkeeping the line already conveys.
 _NOT_FIELDS = frozenset({TEXT_KEY, EVENT_KEY, "level", "logger", "timestamp"})
 
+#: structlog's own bookkeeping keys, which ride along in the event dict and are
+#: not part of the event. `_record` is a whole `LogRecord` repr and `.._from_
+#: structlog` is a routing flag; serialising either into the JSONL sink makes
+#: every row several times larger and leaks an absolute path into an artifact
+#: meant to be read and diffed. Caught by running a real command, not by a test.
+_INTERNAL_KEYS = frozenset({"_record", "_from_structlog"})
+
 
 class HumanSink(logging.Formatter):
     """Render one event as the line a person reads.
@@ -124,7 +131,7 @@ def _event_dict(record: logging.LogRecord) -> dict[str, object]:
     """
     payload = getattr(record, "msg", None)
     if isinstance(payload, dict):
-        return dict(payload)
+        return {k: v for k, v in payload.items() if k not in _INTERNAL_KEYS}
     return {EVENT_KEY: record.name, TEXT_KEY: record.getMessage()}
 
 
@@ -168,6 +175,19 @@ class EventQueueHandler(logging.handlers.QueueHandler):
     exactly the thing that must be revisited — which is why it is a named class
     with this docstring rather than a lambda.
     """
+
+    def __init__(self, pending: queue.Queue[logging.LogRecord]) -> None:
+        """Wrap `pending`, marking this handler as one of ours."""
+        super().__init__(pending)
+        # MARKED, and this line is load-bearing. `events._ensure_sink` asks
+        # "is one of my handlers attached?" — and with `offload=True` the ONLY
+        # handler on the logger is this one, with the real sinks living behind
+        # the QueueListener. Unmarked, the lazy default fired on the first emit
+        # and appended a SECOND pair, so every line printed twice: once through
+        # the queue and once directly. Every unit test missed it, because they
+        # either passed an explicit `stream` or ran `offload=False`; it took
+        # running a real converted command to see it.
+        setattr(self, _SINK_MARKER, True)
 
     def prepare(self, record: logging.LogRecord) -> logging.LogRecord:
         """Hand the record on untouched, event dict and all."""

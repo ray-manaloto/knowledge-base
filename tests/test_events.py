@@ -370,6 +370,39 @@ def test_our_own_handler_does_count(capsys: pytest.CaptureFixture[str]) -> None:
     assert "exactly one copy" not in capsys.readouterr().out
 
 
+def test_offload_does_not_double_every_line(capsys: pytest.CaptureFixture[str]) -> None:
+    """The defect that only a REAL command showed: every line printed twice.
+
+    With `offload=True` the only handler on the logger is the queue handler,
+    with the real sinks behind the listener. If that handler is not marked as
+    ours, the lazy default fires on the first emit and appends a SECOND pair —
+    so the event goes out through the queue AND directly.
+
+    Every unit test missed it, because they all pass an explicit `stream` or run
+    `offload=False`. This one uses the default path, which is the only place the
+    bug lives.
+    """
+    with stdout_sink(offload=True):
+        say("once", "this line must appear exactly once")
+    assert capsys.readouterr().out.count("this line must appear exactly once") == 1
+
+
+def test_jsonl_omits_structlog_internals(tmp_path: Path) -> None:
+    """`_record` is a whole LogRecord repr, complete with an absolute path.
+
+    Serialising it makes every JSONL row several times larger and leaks a
+    machine-local path into an artifact meant to be read and diffed.
+    """
+    path = tmp_path / "events.jsonl"
+    buf = _buf()
+    with stdout_sink(stream=buf, jsonl_path=path, offload=False):
+        say("clean", "no internals please", count=1)
+    row = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert "_record" not in row
+    assert "_from_structlog" not in row
+    assert row["count"] == 1, "CONTROL: a real field must survive the filter"
+
+
 # --- R12: worker attribution ---------------------------------------------------
 
 
