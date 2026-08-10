@@ -18,7 +18,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | `graphify query "…"` | `mise run kb-query -- "<question>"` (add `--prose` for a question about the DOCUMENTS) |
 | `graphify query --graph …/graph-prose.json` | `mise run kb-query -- "<question>" --prose` |
 | `graphify cluster` / `label` | `mise run kb-label` |
-| `graphify save-result` | `mise run kb-remember -- --question Q --answer A --outcome useful` |
+| `graphify save-result` | `mise run kb-remember -- --question Q --answer-file A.md --outcome useful` — now a `kb_setup` module, not a bare seam: it REFUSES `--outcome corrected` with no `--correction`/`--correction-file`, because that field is the only thing `reflect` renders and **21 of 32** recorded corrections reached `LESSONS.md` empty. `-- --audit` names the survivors |
 | `graphify reflect` | `mise run kb-reflect` |
 | the bundled interpreter / `_merge_docs.py` | `mise run kb-merge -- <chunk>` |
 | `graphify transcribe` | `mise run kb-transcribe -- <audio>` |

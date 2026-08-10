@@ -42,7 +42,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import atomic
+from kb_setup import atomic, events
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -117,7 +117,24 @@ def record(repo_root: Path, graph_path: Path, counts: Mapping[str, object], *, t
     try:
         atomic.write_text(ledger_path(repo_root), json.dumps(payload, indent=2) + "\n")
     except OSError as e:
-        print(f"[{tag}] WARNING: could not record graph counts: {e}")
+        # INFO, even though the text says WARNING — and that mismatch is a
+        # DELIBERATE divergence this conversion declines to close, on tranche
+        # 3's precedent (#270). Raising it to `events.warn` would do two things
+        # a conversion must not: move the line from stdout to stderr (the sink
+        # routes WARNING+ there, matching the old `file=sys.stderr` split), and
+        # double the prefix into "WARNING: [tag] WARNING: …".
+        #
+        # Both are fixable; neither is fixable *silently inside a refactor*,
+        # because the pre-existing assertions about this output are the only
+        # evidence the conversion changed nothing. The `level` field is where
+        # this should end up, and the text should lose its hand-written prefix
+        # at the same time — one deliberate edit, reviewed as one.
+        events.say(
+            "graph_counts.record_failed",
+            f"[{tag}] WARNING: could not record graph counts: {e}",
+            tag=tag,
+            error=str(e),
+        )
 
 
 def read(repo_root: Path, graph_path: Path) -> dict[str, int] | None:
@@ -164,17 +181,30 @@ def report(repo_root: Path, argv: list[str] | None = None) -> int:
     args = argv or []
     graph_path = repo_root / "graphify-out" / "graph.json"
     if not graph_path.is_file():
-        print(f"graph-counts: no graph at {graph_path} — run `mise run kb-build`")
+        # `say`, not `fail`, for the same reason as the divergence above: this
+        # was a stdout `print`, and the sink routes ERROR to stderr. The rule
+        # this conversion follows throughout is mechanical — INFO wherever the
+        # original wrote to stdout, warn/fail only where it passed
+        # `file=sys.stderr` — so the streams a caller sees are unchanged.
+        events.say(
+            "graph_counts.no_graph",
+            f"graph-counts: no graph at {graph_path} — run `mise run kb-build`",
+            graph_path=str(graph_path),
+        )
         return 2
 
     data = json.loads(graph_path.read_text(encoding="utf-8"))
     nodes = data.get("nodes") or []
     links = data.get("links") or data.get("edges") or []
     hyper = data.get("hyperedges") or []
-    print(f"nodes       {len(nodes):>9,}")
-    print(f"links       {len(links):>9,}")
-    print(f"hyperedges  {len(hyper):>9,}")
-    print(f"keys        {sorted(data)}")
+    # One event per row, each carrying its count as a FIELD. This is the report
+    # that exists because 125 hand-written probes read the counts by hand and one
+    # shipped a false "ZERO edges" finding; a queryable `count` is what makes the
+    # next such claim checkable instead of retyped.
+    events.say("graph_counts.nodes", f"nodes       {len(nodes):>9,}", count=len(nodes))
+    events.say("graph_counts.links", f"links       {len(links):>9,}", count=len(links))
+    events.say("graph_counts.hyperedges", f"hyperedges  {len(hyper):>9,}", count=len(hyper))
+    events.say("graph_counts.keys", f"keys        {sorted(data)}", keys=sorted(data))
     if "--by-source" in args:
         _print_by_source(nodes, args)
     return 0
@@ -195,6 +225,6 @@ def _print_by_source(nodes: list, args: list[str]) -> None:
         counts[node_id.split("::", maxsplit=1)[0] if "::" in node_id else "(no prefix)"] += 1
     wanted = [a for a in args if not a.startswith("--")]
     rows = [(k, counts.get(k, 0)) for k in wanted] if wanted else counts.most_common(20)
-    print()
+    events.say("graph_counts.by_source_header", "")
     for name, n in rows:
-        print(f"  {name:<28} {n:>8,}")
+        events.say("graph_counts.by_source", f"  {name:<28} {n:>8,}", source=name, count=n)

@@ -18,11 +18,17 @@ unfollowable — name the file.
 `.agent/notepad.md` is scratch and gitignored. The knowledge graph's
 work-memory is committed and is what makes the corpus self-improving:
 
-- `mise run kb-remember -- --question "Q" --answer "A" --outcome useful`
+- `mise run kb-remember -- --question "Q" --answer-file A.md --outcome useful`
   records the outcome of an ingestion or query into `graphify-out/memory/`
   (the ONE committed subdirectory of an otherwise derived tree).
 - `mise run kb-reflect` aggregates that memory into `reflections/LESSONS.md`
   plus the learning overlay.
+- **`--outcome corrected` REQUIRES `--correction-file`**, and `kb-remember`
+  refuses without it. `reflect` renders that field and nothing else into the
+  Corrections section, so a correction recorded without one reaches
+  `LESSONS.md` as a question followed by an empty arrow — which is how **21 of
+  32** past corrections got there. `mise run kb-remember -- --audit` names any
+  that still are.
 
 **Both, every time.** The notepad carries the running condensed finding for
 *this* session; `kb-remember` carries the durable lesson for every future

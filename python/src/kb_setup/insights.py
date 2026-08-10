@@ -50,6 +50,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import events
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -524,35 +526,76 @@ def _parse_top(argv: list[str]) -> int | None:
 
 def _print_audit(a: Audit) -> None:
     """The live section — computed from graph.json (via `_scan`), so never stale."""
-    print(f"\n## Provenance audit — {a.total:,} edges (computed live from {_GRAPH})")
+    events.say(
+        "insights.audit_header",
+        f"\n## Provenance audit — {a.total:,} edges (computed live from {_GRAPH})",
+        edges=a.total,
+    )
     for tier in ("EXTRACTED", "INFERRED", "AMBIGUOUS"):
-        print(f"  {tier:<12}{a.by_tier.get(tier, 0):>12,}  {a.pct(tier):5.1f}%")
+        events.say(
+            "insights.audit_tier",
+            f"  {tier:<12}{a.by_tier.get(tier, 0):>12,}  {a.pct(tier):5.1f}%",
+            tier=tier,
+            count=a.by_tier.get(tier, 0),
+            pct=round(a.pct(tier), 1),
+        )
     for tier in sorted(set(a.by_tier) - {"EXTRACTED", "INFERRED", "AMBIGUOUS"}):
-        print(f"  {tier:<12}{a.by_tier[tier]:>12,}  {a.pct(tier):5.1f}%   <- unexpected tier")
+        # An UNEXPECTED tier is the one row here that is a finding rather than a
+        # report — but it stays INFO, because it was a stdout `print` and the
+        # sink routes WARNING+ to stderr. `unexpected=True` is what a later pass
+        # filters on; see the divergence note in `graph_counts.record_failed`.
+        events.say(
+            "insights.audit_tier",
+            f"  {tier:<12}{a.by_tier[tier]:>12,}  {a.pct(tier):5.1f}%   <- unexpected tier",
+            tier=tier,
+            count=a.by_tier[tier],
+            pct=round(a.pct(tier), 1),
+            unexpected=True,
+        )
     if not a.by_tier.get("AMBIGUOUS"):
-        print(
+        events.say(
+            "insights.audit_ambiguous_note",
             "  note: AMBIGUOUS is 0 BY OUR CONSTRUCTION, not by accident — "
             "`chunks.py` rejects the tier and the extraction prompt never offers "
             "it. graphify weights AMBIGUOUS highest in `surprising_connections` "
             "and drives one whole `suggest_questions` generator from it, so that "
-            "generator is dead code here (#168)."
+            "generator is dead code here (#168).",
         )
 
 
 def _print_composition(comp: Composition) -> None:
     """Multi-source community spans + ast/semantic edge crossings (#175, #167)."""
-    print(
+    events.say(
+        "insights.spans_header",
         f"\n## Multi-source community spans — {len(comp.spanning):,} of "
-        f"{comp.total_communities:,} communities span more than one source"
+        f"{comp.total_communities:,} communities span more than one source",
+        spanning=len(comp.spanning),
+        communities=comp.total_communities,
     )
     for span in comp.spanning[:_MAX_SPAN_EXAMPLES]:
-        print(f"  community {span.community}: {{{', '.join(span.tags)}}}")
+        events.say(
+            "insights.span",
+            f"  community {span.community}: {{{', '.join(span.tags)}}}",
+            community=span.community,
+            tags=list(span.tags),
+        )
     if len(comp.spanning) > _MAX_SPAN_EXAMPLES:
-        print(f"  … +{len(comp.spanning) - _MAX_SPAN_EXAMPLES:,} more")
+        # A DISPLAY BOUND, and it is emitted as a field rather than only as
+        # prose: `.claude/rules/probes-need-a-control-arm.md` rule 3 is about
+        # exactly this — a truncated list read as a complete one.
+        events.say(
+            "insights.span_truncated",
+            f"  … +{len(comp.spanning) - _MAX_SPAN_EXAMPLES:,} more",
+            shown=_MAX_SPAN_EXAMPLES,
+            omitted=len(comp.spanning) - _MAX_SPAN_EXAMPLES,
+        )
 
-    print(
+    events.say(
+        "insights.cross_origin",
         f"\n## Cross-origin edges — {comp.cross_origin_edges:,} of "
-        f"{comp.total_edges:,} edges cross ast/semantic"
+        f"{comp.total_edges:,} edges cross ast/semantic",
+        cross_origin=comp.cross_origin_edges,
+        total=comp.total_edges,
     )
 
 
@@ -561,14 +604,20 @@ def _print_size(check: SizeCheck) -> None:
     verdict = "OVER" if check.over_cap else "under"
     mib = check.size_bytes / (1024 * 1024)
     cap_mib = check.cap_bytes / (1024 * 1024)
-    print(
+    events.say(
+        "insights.size",
         f"\n## Size vs cap — {check.size_bytes:,} bytes ({mib:,.1f} MiB), "
-        f"{verdict} graphify's default {cap_mib:,.0f} MiB cap ({check.ratio:.2f}x)"
+        f"{verdict} graphify's default {cap_mib:,.0f} MiB cap ({check.ratio:.2f}x)",
+        size_bytes=check.size_bytes,
+        cap_bytes=check.cap_bytes,
+        ratio=round(check.ratio, 2),
+        over_cap=check.over_cap,
     )
-    print(
+    events.say(
+        "insights.size_note",
         "  note: this repo's mise env raises the EFFECTIVE cap to 1 GiB "
         "(GRAPHIFY_MAX_GRAPH_BYTES in mise.toml) — the DEFAULT is reported here "
-        "because it is what an env-less graphify invocation enforces."
+        "because it is what an env-less graphify invocation enforces.",
     )
 
 
@@ -577,26 +626,58 @@ def _print_sidecar(sidecar: Path, *, top: int, stale: str) -> None:
     data = json.loads(sidecar.read_text(encoding="utf-8"))
 
     surprises = data.get("surprises") or []
-    print(f"\n## Surprising connections — {len(surprises)} computed{stale}")
+    events.say(
+        "insights.surprises_header",
+        f"\n## Surprising connections — {len(surprises)} computed{stale}",
+        count=len(surprises),
+        shown=min(top, len(surprises)),
+        stale=bool(stale),
+    )
     for s in surprises[:top]:
-        print(
+        events.say(
+            "insights.surprise",
             f"  {s.get('source')} --{s.get('relation')}--> "
-            f"{s.get('target')}  [{s.get('confidence')}]"
+            f"{s.get('target')}  [{s.get('confidence')}]",
+            source=s.get("source"),
+            relation=s.get("relation"),
+            target=s.get("target"),
+            confidence=s.get("confidence"),
         )
         if files := s.get("source_files"):
-            print(f"      {' -> '.join(files)}")
+            events.say("insights.surprise_files", f"      {' -> '.join(files)}", files=list(files))
         if why := s.get("why"):
-            print(f"      why: {why}")
+            events.say("insights.surprise_why", f"      why: {why}", why=why)
 
     questions = data.get("questions") or []
-    print(f"\n## Suggested questions — {len(questions)} computed{stale}")
+    events.say(
+        "insights.questions_header",
+        f"\n## Suggested questions — {len(questions)} computed{stale}",
+        count=len(questions),
+        shown=min(top, len(questions)),
+        stale=bool(stale),
+    )
     for q in questions[:top]:
-        print(f"  [{q.get('type')}] {_clamp(q.get('question') or '')}")
+        events.say(
+            "insights.question",
+            f"  [{q.get('type')}] {_clamp(q.get('question') or '')}",
+            kind=q.get("type"),
+        )
 
     gods = data.get("gods") or []
-    print(f"\n## God nodes — {len(gods)} computed{stale}")
+    events.say(
+        "insights.gods_header",
+        f"\n## God nodes — {len(gods)} computed{stale}",
+        count=len(gods),
+        shown=min(top, len(gods)),
+        stale=bool(stale),
+    )
     for g in gods[:top]:
-        print(f"  {g.get('degree'):>6,}  {g.get('label')}")
+        events.say(
+            "insights.god",
+            f"  {g.get('degree'):>6,}  {g.get('label')}",
+            degree=g.get("degree"),
+            label=g.get("label"),
+        )
 
 
 def report(repo_root: Path, args: list[str] | None = None) -> int:
@@ -611,17 +692,22 @@ def report(repo_root: Path, args: list[str] | None = None) -> int:
     """
     top = _parse_top(list(args or []))
     if top is None:
-        print("[kb-insights] --top needs a positive integer", flush=True)
+        events.say("insights.bad_top", "[kb-insights] --top needs a positive integer")
         return 2
 
     out = repo_root / "graphify-out"
     graph = out / _GRAPH
     if not graph.is_file():
-        print(f"[kb-insights] no {_GRAPH} — run `mise run kb-build` first")
+        events.say(
+            "insights.no_graph", f"[kb-insights] no {_GRAPH} — run `mise run kb-build` first"
+        )
         return 2
 
     fresh, note = _freshness(repo_root)
-    print(f"[kb-insights] {note}")
+    # `fresh` as a field is the point of this row: a STALE report is the one
+    # thing a reader of these numbers must know, and until now it existed only
+    # inside a rendered string.
+    events.say("insights.freshness", f"[kb-insights] {note}", fresh=fresh)
     audit, comp = _scan(graph)
     _print_audit(audit)
     _print_composition(comp)

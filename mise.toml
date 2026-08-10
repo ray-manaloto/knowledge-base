@@ -633,10 +633,18 @@ run = "uv run kb-setup ensure-deps"
 
 # --- self-learning loop (work memory) — record outcomes, aggregate lessons ---
 [tasks.kb-remember]
-description = 'Record a Q&A outcome to work memory: mise run kb-remember -- --question "Q" --answer "A" --nodes N1 N2 --outcome useful|dead_end|corrected'
+description = 'Record a Q&A outcome to work memory: mise run kb-remember -- --question "Q" --answer-file A.md [--outcome useful|dead_end|corrected --correction-file C.md] [--nodes N1 N2]; --audit reports corrections missing their lesson'
 # Appends to graphify-out/memory/ (git-tracked — authored knowledge). The
 # kb-curator skill runs this on every ingestion so the corpus self-improves.
-run = "graphify save-result"
+#
+# Goes through kb_setup.remember rather than straight at `graphify save-result`
+# because THIS DESCRIPTION WAS THE BUG. It listed --question/--answer/--nodes/
+# --outcome and never mentioned --correction, which `graphify reflect` is the
+# sole consumer of: 21 of 32 recorded corrections carry no lesson, and each
+# renders in reflections/LESSONS.md as a question followed by an empty arrow.
+# The module REFUSES `--outcome corrected` with no correction text, because a
+# directive this repo only wrote down was complied with 0 times in 19.
+run = "uv run kb-setup remember"
 
 [tasks.kb-reflect]
 description = "Aggregate work-memory outcomes into reflections/LESSONS.md + the .graphify_learning.json overlay (deterministic, no LLM)"

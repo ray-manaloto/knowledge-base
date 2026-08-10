@@ -129,13 +129,13 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup.result import Err, Ok, Rc, Result, exit_code
+from kb_setup import events
+from kb_setup.result import Err, Ok, Rc, Result, exit_code, external_from_returncode
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -747,23 +747,41 @@ def doctor_main(repo_root: Path, argv: Sequence[str]) -> int:
     # Narrowed on `Ok`, not against `Err`: `Result` has a THIRD variant, and
     # `External` carries no `.value`. ty catches the negative form.
     if not isinstance(result, Ok):
-        print(f"[cc-doctor] {result.message}", file=sys.stderr)
+        events.fail("cc_doctor.refused", f"[cc-doctor] {result.message}")
         return exit_code(result)
 
     results = result.value
     mark = {OK: "✔", FAIL: "✗", UNKNOWN: "?"}
     for c in results:
-        print(f"  {mark[c.status]} {c.name}: {c.detail}")
+        # INFO even for a FAILING check, deliberately. These lines are the
+        # TABLE — product — and they went to stdout before the conversion. The
+        # sink routes WARNING+ to stderr (matching what the old code did with
+        # `file=sys.stderr`), so raising a failing row's level here would move it
+        # between streams: a behaviour change smuggled inside a refactor, which
+        # is exactly what recipe rule 2 forbids. R9 still sees the run, because
+        # `cc_doctor.failures` below is an ERROR and the `status` field is on
+        # every row.
+        events.say(
+            "cc_doctor.check",
+            f"  {mark[c.status]} {c.name}: {c.detail}",
+            check=c.name,
+            status=c.status,
+        )
     failed = [c for c in results if c.status == FAIL]
     if failed:
-        print(
+        events.fail(
+            "cc_doctor.failures",
             f"\n[cc-doctor] {len(failed)} FAILED. `mise run cc-fresh` relaunches on a "
             f"clean tmux server; that is the usual fix for a PATH problem.",
-            file=sys.stderr,
+            failed=len(failed),
         )
         return exit_code(result)
     unknown = sum(c.status == UNKNOWN for c in results)
-    print(f"\n[cc-doctor] no failures ({unknown} not verifiable from here — check them in-session)")
+    events.say(
+        "cc_doctor.ok",
+        f"\n[cc-doctor] no failures ({unknown} not verifiable from here — check them in-session)",
+        unknown=unknown,
+    )
     return exit_code(result)
 
 
@@ -820,7 +838,31 @@ def check_doctor(repo_root: Path, argv: Sequence[str]) -> Result[list[Check]]:
 
 
 def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
-    """`kb-setup cc --sibling <path> [--session <name>]`. Execs on success."""
+    """`kb-setup cc --sibling <path> [--session <name>]`. Renders, then converts.
+
+    **This is the first real `External` in the codebase**, and converting it
+    turned a reasoned claim into a measured one. The old last line was
+    `return subprocess.run(...).returncode`, handing a raw `subprocess`
+    returncode straight to `sys.exit`. For a child killed by a signal that
+    returncode is negative, and the exit status it produces is two's-complement
+    nonsense:
+
+    | child died of | returncode | reported BEFORE | POSIX convention |
+    |---|---:|---:|---:|
+    | SIGINT (Ctrl-C) | -2 | **254** | 130 |
+    | SIGKILL | -9 | **247** | 137 |
+    | SIGTERM | -15 | **241** | 143 |
+
+    Measured, not assumed. The dangerous part is that 254/247/241 are all
+    *plausible* application exit codes, so nothing ever flagged them — a
+    Ctrl-C'd session reported 254 and read as a program that chose to fail.
+    `external_from_returncode` states the conversion once (`result.py`), and
+    every row above now reports the number a shell would.
+
+    Progressive output goes through §2.5's event stream: this function prints
+    between the preflight, the tmux kill and the child launch, which is exactly
+    why it could not be converted under recipe rule 3 until the sink existed.
+    """
     args = list(argv)
     sibling: Path | None = None
     session: str | None = None
@@ -839,21 +881,21 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
                 session = args[i + 1]
             i += 2
             continue
-        print(f"[cc] unknown argument {args[i]!r}", file=sys.stderr)
+        events.fail("cc.bad_argument", f"[cc] unknown argument {args[i]!r}", argument=args[i])
         return 2
     if sibling is None:
-        print("[cc] --sibling <path> is required", file=sys.stderr)
+        events.fail("cc.no_sibling", "[cc] --sibling <path> is required")
         return 2
     repo_root = repo_root.resolve()
     session = session or repo_root.name
 
     in_tmux = bool(os.environ.get("TMUX"))
     if fresh and in_tmux:
-        print(
+        events.fail(
+            "cc.fresh_inside_tmux",
             "[cc] --fresh kills the tmux server, and you are inside it — that "
             "would kill this process before it could relaunch. Run it from a "
             "plain terminal instead.",
-            file=sys.stderr,
         )
         return 2
 
@@ -865,13 +907,17 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         need_tmux=not in_tmux,
     )
     if not checked.ok:
-        print("[cc] refusing to launch — the environment would lie:", file=sys.stderr)
+        events.fail(
+            "cc.preflight_failed",
+            "[cc] refusing to launch — the environment would lie:",
+            problems=list(checked.problems),
+        )
         for problem in checked.problems:
-            print(f"  ✗ {problem}", file=sys.stderr)
-        print(
+            events.fail("cc.preflight_problem", f"  ✗ {problem}", problem=problem)
+        events.fail(
+            "cc.preflight_hint",
             "\n[cc] the usual cause is a tmux server started before the current "
             "pin: `tmux kill-server`, then run this from a fresh terminal.",
-            file=sys.stderr,
         )
         return 1
 
@@ -899,7 +945,10 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         # No server running is the desired state, not an error, so a non-zero
         # exit from kill-server is ignored.
         subprocess.run([binaries.tmux, "kill-server"], check=False, capture_output=True, timeout=60)
-        print("[cc] --fresh: tmux server killed; the new session starts from this shell's env")
+        events.say(
+            "cc.fresh_killed",
+            "[cc] --fresh: tmux server killed; the new session starts from this shell's env",
+        )
 
     argv_out = launch_argv(
         repo_root,
@@ -908,8 +957,13 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
         in_tmux=in_tmux,
         binaries=binaries,
     )
-    print(f"[cc] preflight OK — rooted in {repo_root.name}, --add-dir {sibling.name}")
-    print(f"[cc] {teammate_note(repo_root, in_tmux=in_tmux)}")
+    events.say(
+        "cc.preflight_ok",
+        f"[cc] preflight OK — rooted in {repo_root.name}, --add-dir {sibling.name}",
+        root=repo_root.name,
+        sibling=sibling.name,
+    )
+    events.say("cc.teammates", f"[cc] {teammate_note(repo_root, in_tmux=in_tmux)}", in_tmux=in_tmux)
     # A CHILD, not `os.execvp`. Two reasons, and the second is the one that bit:
     #   * exec replaces the process image, so anything still buffered in stdout is
     #     LOST — observed on the first live run, where the OK line vanished and
@@ -928,4 +982,10 @@ def cc_main(repo_root: Path, argv: Sequence[str]) -> int:
     # measured, which is precisely how the `get_env(name='PATH')` mistake happened
     # (see `session_path`). Strip it here only with a measurement in hand.
     env = {**os.environ, "PATH": checked.path}
-    return subprocess.run(argv_out, env=env, check=False).returncode
+    completed = subprocess.run(argv_out, env=env, check=False)
+    # THE conversion this module's docstring table is about. `.returncode` is
+    # negative for a signal-killed child, and handing that to `sys.exit`
+    # two's-complements it into a plausible-looking lie (Ctrl-C -> 254).
+    # `External` is uv's variant: the child's verdict, passed through as the
+    # child's, with the signal case converted once and named.
+    return exit_code(external_from_returncode(completed.returncode))

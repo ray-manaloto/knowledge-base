@@ -32,7 +32,7 @@ from __future__ import annotations
 from pathlib import Path
 from subprocess import run
 
-from kb_setup import graphify_env
+from kb_setup import events, graphify_env
 
 # `from subprocess import run` rather than `import subprocess`, so a test
 # monkeypatching this module's `run` patches THIS module and not
@@ -59,28 +59,63 @@ def refresh(repo_root: Path | None = None) -> int:
 
     spec = next((s for s in config.load(root) if s.name == _TOOL), None)
     if spec is None:
-        print(f"[skill-refresh] currency.toml declares no [tool.{_TOOL}] — nothing to refresh")
+        events.say(
+            "skill_refresh.no_tool",
+            f"[skill-refresh] currency.toml declares no [tool.{_TOOL}] — nothing to refresh",
+            tool=_TOOL,
+        )
         return 2
 
     result = skill.refresh(root, spec)
-    print(f"[skill-refresh] {result.note}")
+    events.say("skill_refresh.result", f"[skill-refresh] {result.note}", ran=result.ran)
     # The bytes, not just the filenames. Reverting an installer change with only
     # its path recorded is how a future graphify that legitimately adds a hook
     # gets it discarded without trace (cold lane on 5204e57, F8).
     if result.repair_delta:
-        print("[skill-refresh] the installer wanted this, and it was reverted:")
-        print(result.repair_delta, end="")
+        events.say(
+            "skill_refresh.reverted",
+            "[skill-refresh] the installer wanted this, and it was reverted:",
+        )
+        # `end=""` had no newline of its own because the delta carries them.
+        # `emit` always renders one line, so ONE trailing newline is removed here
+        # rather than the sink learning about `end=` — the sink renders events,
+        # and "this string already ends in a newline" is a property of THIS
+        # caller's payload, not of event rendering.
+        #
+        # `removesuffix`, not `rstrip("\n")`: rstrip removes ALL trailing
+        # newlines, so a delta ending in a blank line would silently lose it and
+        # print differently from the `print(..., end="")` it replaces. The
+        # producer is `git diff`, which conventionally emits exactly one — but
+        # "conventionally" is not a guarantee, and the precise call costs nothing.
+        # (Cold lane raised this as low-confidence and unverified; it is right
+        # that the edge case is hard to reach, and right that the loose call had
+        # no reason to be loose.)
+        events.say(
+            "skill_refresh.repair_delta",
+            result.repair_delta.removesuffix("\n"),
+            delta=result.repair_delta,
+        )
     if not result.ran:
         return 1
 
-    # After the addenda, so their bytes are formatted too.
-    print("[skill-refresh] mise run fmt")
+    # After the addenda, so their bytes are formatted too. This is the
+    # print -> subprocess -> print shape that recipe rule 3 could not absorb
+    # before the sink existed: the operator must see "fmt" START, because it is
+    # the slow step.
+    events.say("skill_refresh.fmt", "[skill-refresh] mise run fmt")
     fmt = run(["mise", "run", "fmt"], cwd=root, check=False)
     if fmt.returncode != 0:
-        print(f"[skill-refresh] fmt FAILED rc={fmt.returncode} — skill files may not lint")
+        events.say(
+            "skill_refresh.fmt_failed",
+            f"[skill-refresh] fmt FAILED rc={fmt.returncode} — skill files may not lint",
+            rc=fmt.returncode,
+        )
         return fmt.returncode
 
-    print("[skill-refresh] review `git diff .claude/` before committing")
+    events.say(
+        "skill_refresh.review",
+        "[skill-refresh] review `git diff .claude/` before committing",
+    )
     # TWO conditions fail an otherwise-successful refresh, and the line above is
     # why both must: it tells the operator to go commit.
     #
