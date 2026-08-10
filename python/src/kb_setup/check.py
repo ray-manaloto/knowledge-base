@@ -28,6 +28,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
+
 RC_COULD_NOT_RUN = 127
 """Distinct from any tool's own failure rc, so "broken" never reads as "failed".
 
@@ -307,22 +309,59 @@ def render(outcomes: list[Outcome]) -> str:
     return "\n".join(lines)
 
 
-def main(repo_root: Path, args: list[str]) -> int:
-    """Non-zero if any tool failed, or if nothing could be checked at all.
+def check(repo_root: Path, args: list[str]) -> Result[list[Outcome]]:
+    """The command boundary (§2 R5) — errors are RETURNED, never raised.
 
-    "Nothing to check" is a FAILURE and not a quiet 0. A check that was handed
-    an argument it did not understand and exits green is the same false-green
-    this module exists to remove, one layer up — `kb-check -- src/x.rs` must not
-    read as "x.rs is clean".
+    Ray ruled the `Result` reading of R5 on 2026-08-09, and this is the first
+    command converted to it. The shape is `ruff`'s `pub fn run(…) ->
+    Result<ExitStatus>` (pinned `0.16.2`, `crates/ruff/src/lib.rs:128`), and the
+    distinction it buys is the one this function most needed:
+
+    - **A run that FOUND something is `Ok`**, carrying `Rc.FINDINGS`. A checker
+      that reports three violations did its job.
+    - **`Err` is reserved for "could not run"** — a malformed request, or a
+      request that checked nothing.
+
+    Before this, both were `return 1` / `return 2` with the meaning living only
+    in a docstring, so a caller could not tell "your code is dirty" from "your
+    invocation was wrong" without reading the source.
+
+    "Nothing to check" stays a FAILURE and not a quiet 0, for the reason it
+    always was: a check handed an argument it did not understand and exiting
+    green is the same false-green this module exists to remove, one layer up —
+    `kb-check -- src/x.rs` must not read as "x.rs is clean". It is now an `Err`,
+    which says so in the type.
+
+    Prints nothing: rendering belongs to the caller (`main`), which is also
+    where §2.5's human-rendering sink will land.
     """
     paths = [a for a in args if not a.startswith("-")]
     if not paths:
-        print("kb-check: pass one or more paths, e.g. `mise run kb-check -- <file.py>`")
-        return 2
+        return Err("kb-check: pass one or more paths, e.g. `mise run kb-check -- <file.py>`")
 
     outcomes = run(repo_root, paths)
-    print(render(outcomes))
     ran = [o for o in outcomes if not o.skipped]
     if not ran:
-        return 2
-    return 1 if any(not o.passed for o in ran) else 0
+        # `render` already carries the "nothing was checked" line, so the Err
+        # message is the same text the previous `print` emitted — the exit code
+        # and the operator-visible output are both unchanged by this refactor.
+        return Err(render(outcomes))
+
+    failed = any(not o.passed for o in ran)
+    return Ok(outcomes, rc=Rc.FINDINGS if failed else Rc.OK)
+
+
+def main(repo_root: Path, args: list[str]) -> int:
+    """Thin conversion from `Result` to a process exit code, and the only print.
+
+    Kept returning `int` deliberately: `cli.py` and the eight existing exit-code
+    assertions in `tests/test_check.py` are the regression arm for the `Result`
+    refactor — every observable code must be byte-identical to before.
+    """
+    result = check(repo_root, args)
+    match result:
+        case Ok(outcomes, _):
+            print(render(outcomes))
+        case Err(message, _):
+            print(message)
+    return exit_code(result)
