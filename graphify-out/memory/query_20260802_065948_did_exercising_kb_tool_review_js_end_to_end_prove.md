@@ -4,6 +4,7 @@ date: "2026-08-02T06:59:48.601738+00:00"
 question: "Did exercising kb-tool-review.js end-to-end prove the harness, and what did it cost?"
 contributor: "graphify"
 outcome: "corrected"
+correction: "'31 agents, 0 errors' is not a proven harness. The run cost 4,589,913 subagent tokens over 46 minutes and wrote NOTHING to docs/research/reports/. Three compounding defects: a workflow script has NO filesystem access, so the script's reportDir was only ever interpolated into agent prompts; the researchers were pointed solely at gitignored .agent/; and the return omitted the unverified and reports:[] fields its own header documented, so a 16,249-char synthesis existed only in the run result. Its own invocation example said name: — the #13 stale-cache trap in documentation form. 'Committed is not proven' was exactly right, and the incremental-write rule is the only reason any researcher output survived at all."
 ---
 
 # Q: Did exercising kb-tool-review.js end-to-end prove the harness, and what did it cost?
@@ -15,3 +16,4 @@ It ran: 31 agents, 0 errors, 4,589,913 subagent tokens, 46 min, 10 verified / 16
 ## Outcome
 
 - Signal: corrected
+- Correction: '31 agents, 0 errors' is not a proven harness. The run cost 4,589,913 subagent tokens over 46 minutes and wrote NOTHING to docs/research/reports/. Three compounding defects: a workflow script has NO filesystem access, so the script's reportDir was only ever interpolated into agent prompts; the researchers were pointed solely at gitignored .agent/; and the return omitted the unverified and reports:[] fields its own header documented, so a 16,249-char synthesis existed only in the run result. Its own invocation example said name: — the #13 stale-cache trap in documentation form. 'Committed is not proven' was exactly right, and the incremental-write rule is the only reason any researcher output survived at all.
