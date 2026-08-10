@@ -61,6 +61,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from kb_setup import atomic
+from kb_setup.result import Err, Ok, Result, exit_code
 
 #: Where `plugin-eval` can legitimately be found, best-provenance first.
 #:
@@ -666,41 +667,71 @@ def parse_request(argv: list[str], repo_root: Path) -> tuple[list[Path], bool]:
     return targets, write
 
 
-def main(argv: list[str], repo_root: Path) -> int:
-    """`mise run kb-skill-score [--write] [-- <skill>...]`.
+@dataclass(frozen=True)
+class ScoreRun:
+    """One completed scoring run, rendered but not yet printed.
 
-    Returns 0 for every measurement outcome, including "nothing here could
-    measure anything" — advisory means a score never fails a caller's gate. It
-    returns **2** for a malformed request, the same split `currency.run` draws
-    for an unknown `--tool`. Three shapes count as malformed: an unrecognised
-    flag, a skill name that matches nothing, and a `--write` that cannot record
-    a complete table.
+    ``notice`` is the stderr preamble (which scorer ran, or why nothing could
+    be measured); ``table`` is the stdout report and is empty when there was
+    nothing to score. ``results``/``scorer``/``previous`` are carried so that
+    :func:`record_baseline` can write without re-scoring.
+    """
+
+    notice: str
+    table: str = ""
+    scorer: Scorer | None = None
+    results: tuple[SkillScore, ...] = ()
+    previous: Baseline | None = None
+    write_requested: bool = False
+
+
+def check_skill_score(argv: list[str], repo_root: Path) -> Result[ScoreRun]:
+    """The boundary (§2 R5): score every requested skill and render the table.
+
+    Returns rather than raises, and prints nothing — :func:`main` renders. Same
+    split as ``check.check``/``check.main``.
+
+    **Every measurement outcome is `Ok(rc=Rc.OK)`, including "nothing here
+    could measure anything".** Advisory means a score never fails a caller's
+    gate, so this boundary has no ``Rc.FINDINGS`` case at all — a low score is
+    a number in the table, not a verdict. The only ``Err`` is a malformed
+    request: an unrecognised flag or a skill name matching nothing.
+
+    THAT ``Err`` IS ONE OF THE TWO CONTRADICTIONS R5 EXISTS TO RECONCILE.
+    ``.claude/rules/mise-tasks-only.md`` documented "a skill name matching
+    nothing" as **rc 2** here while documenting the structurally identical "a
+    glob matching nothing" as **rc 1** for ``skill_lint``, in the same file.
+    Naming them settles it and shows they were never the same case: this one
+    really is ``BAD_REQUEST`` (you named a skill that does not exist — ask
+    differently), while ``skill_lint``'s is ``NOT_RUN`` (the request was fine
+    and the gate still never looked). Two members, two meanings, and the prose
+    can no longer disagree with itself because neither figure is written down
+    in prose any more.
+
+    **Writing the baseline is deliberately NOT part of this boundary** — see
+    :func:`record_baseline`.
     """
     try:
         targets, write = parse_request(argv, repo_root)
     except BadRequestError as exc:
-        print(f"[skill-score] {exc}", file=sys.stderr)
-        return 2
+        return Err(str(exc))
     if not targets:
-        print(f"[skill-score] no skill directories under {_SKILLS_DIR}", file=sys.stderr)
-        return 0
+        return Ok(ScoreRun(f"no skill directories under {_SKILLS_DIR}"))
 
     scorer = resolve_scorer(repo_root)
     if scorer is None:
-        print(
-            "[skill-score] NOT VERIFIABLE HERE — no plugin-eval checkout found.\n"
-            "  Looked for: "
-            + ", ".join(raw for _, raw in _PLUGIN_ROOTS)
-            + "\n  The pinned clone appears after `mise run kb-build`; the marketplace copy\n"
-            "  appears once `plugin-eval@claude-code-workflows` is installed and trusted.",
-            file=sys.stderr,
+        return Ok(
+            ScoreRun(
+                "NOT VERIFIABLE HERE — no plugin-eval checkout found.\n"
+                "  Looked for: "
+                + ", ".join(raw for _, raw in _PLUGIN_ROOTS)
+                + "\n  The pinned clone appears after `mise run kb-build`; the marketplace copy\n"
+                "  appears once `plugin-eval@claude-code-workflows` is installed and trusted."
+            )
         )
-        return 0
     if shutil.which("uv") is None:
-        print("[skill-score] NOT VERIFIABLE HERE — `uv` is not on PATH.", file=sys.stderr)
-        return 0
+        return Ok(ScoreRun("NOT VERIFIABLE HERE — `uv` is not on PATH."))
 
-    print(f"[skill-score] scored by {scorer.label()}", file=sys.stderr)
     vendored = vendored_names(repo_root)
     results: list[SkillScore] = []
     for target in targets:
@@ -718,20 +749,73 @@ def main(argv: list[str], repo_root: Path) -> int:
                 )
             )
     previous = load_baseline(repo_root)
-    print(_render(scorer, results, baseline=previous))
-    if write:
-        try:
-            path = write_baseline(repo_root, scorer, results, previous=previous)
-        except (ValueError, OSError) as exc:
-            # The table above still printed, so the reader sees WHICH skill failed
-            # and why. What they do not get is a baseline missing that skill's
-            # history — one transient timeout would otherwise erase a score
-            # silently and report it as `new` on the next run.
-            #
-            # OSError is caught alongside it because the writes really can fail
-            # (full disk, read-only checkout) and an uncaught traceback out of an
-            # advisory task is a worse report than a named rc 2.
-            print(f"[skill-score] baseline not written — {exc}", file=sys.stderr)
-            return 2
-        print(f"\n[skill-score] baseline written to {path.relative_to(repo_root)}")
-    return 0
+    return Ok(
+        ScoreRun(
+            notice=f"scored by {scorer.label()}",
+            table=_render(scorer, results, baseline=previous),
+            scorer=scorer,
+            results=tuple(results),
+            previous=previous,
+            write_requested=write,
+        )
+    )
+
+
+def record_baseline(repo_root: Path, run: ScoreRun) -> Result[Path]:
+    """The `--write` half of the boundary, kept SEPARATE from the scoring half.
+
+    Two boundaries rather than one, because the pre-R5 code printed the score
+    table and THEN returned 2 when the write failed — a partial success the
+    ``Result`` vocabulary refuses to flatten. ``Err`` carries a message, not a
+    table, and ``Ok(rc=Rc.BAD_REQUEST)`` is unrepresentable on purpose. So the
+    caller renders the table from the first boundary, then asks for the write,
+    and the failed write is an honest ``Err`` of its own rather than an rc that
+    silently claims the whole run failed.
+
+    ``OSError`` is caught alongside ``ValueError`` because the writes really
+    can fail (full disk, read-only checkout) and an uncaught traceback out of
+    an advisory task is a worse report than a named failure.
+    """
+    if run.scorer is None:
+        return Err("nothing was scored, so there is no baseline to write")
+    try:
+        path = write_baseline(repo_root, run.scorer, list(run.results), previous=run.previous)
+    except (ValueError, OSError) as exc:
+        # The table has already printed, so the reader sees WHICH skill failed
+        # and why. What they do not get is a baseline missing that skill's
+        # history — one transient timeout would otherwise erase a score
+        # silently and report it as `new` on the next run.
+        return Err(f"baseline not written — {exc}")
+    return Ok(path)
+
+
+def main(argv: list[str], repo_root: Path) -> int:
+    """`mise run kb-skill-score [--write] [-- <skill>...]`.
+
+    Returns 0 for every measurement outcome, including "nothing here could
+    measure anything" — advisory means a score never fails a caller's gate. It
+    returns **2** for a malformed request, the same split `currency.run` draws
+    for an unknown `--tool`. Three shapes count as malformed: an unrecognised
+    flag, a skill name that matches nothing, and a `--write` that cannot record
+    a complete table.
+
+    Kept returning ``int``: ``cli.py`` and this module's existing exit-code
+    assertions are the regression arm for the ``Result`` split.
+    """
+    result = check_skill_score(argv, repo_root)
+    if not isinstance(result, Ok):
+        print(f"[skill-score] {result.message}", file=sys.stderr)
+        return exit_code(result)
+    run = result.value
+    print(f"[skill-score] {run.notice}", file=sys.stderr)
+    if not run.table:
+        return exit_code(result)
+    print(run.table)
+    if not run.write_requested:
+        return exit_code(result)
+    written = record_baseline(repo_root, run)
+    if not isinstance(written, Ok):
+        print(f"[skill-score] {written.message}", file=sys.stderr)
+        return exit_code(written)
+    print(f"\n[skill-score] baseline written to {written.value.relative_to(repo_root)}")
+    return exit_code(written)

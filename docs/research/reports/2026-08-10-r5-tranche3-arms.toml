@@ -1,0 +1,193 @@
+# Mutation arms for §2 R5 tranche 3 — the six newly converted boundaries.
+#
+# WHY THESE EXIST AND NOT JUST THE SUITE. Every boundary test in this tranche
+# was written by the same session, in the same turn, as the code it covers —
+# the shape `.claude/rules/probes-need-a-control-arm.md` rule 2 names as
+# least-reviewed. A test written alongside its own change routinely cannot
+# fail, and no reading of it can tell you so. These arms revert the code and
+# check the suite goes red NAMING the right test.
+#
+# WHAT A CLEAN SWEEP HERE WOULD AND WOULD NOT MEAN. It is a statement about the
+# TESTS, never about the premise. Specifically it does NOT establish:
+#
+#   * that the six converted modules are the right six, or that the remaining
+#     ~29 boundaries convert the same way. Three of them (`graph_counts`,
+#     `insights`, and the `graphify_ops` family) are a DIFFERENT shape — they
+#     print progressively as they compute rather than rendering once at the
+#     end — and no arm below says anything about them.
+#   * that the three `Rc.OK`-for-a-gate-that-never-ran divergences recorded in
+#     this tranche are acceptable. They are pinned as tests precisely so that
+#     closing them is a deliberate edit to a failing assertion.
+#   * that any command needs `External`. Still none does.
+#
+# EVERY ARM IS A REALISTIC BREAK. The recurring temptation in this conversion
+# is "simplify the conditional" — a reviewer sees `rc=Rc.FINDINGS if x else
+# Rc.OK` and shortens it. That is the mutation used throughout, rather than a
+# renamed symbol (which leaves the original as a substring and proves nothing).
+
+suites = [
+  "tests/test_md_budget.py",
+  "tests/test_skill_lint.py",
+  "tests/test_handoff.py",
+  "tests/test_session_state.py",
+  "tests/test_distill.py",
+  "tests/test_skill_eval.py",
+]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/md_budget.py"
+old = "    report = check(root, exclude=exclude)"
+new = "    report = check(root, exclude=exclude)  # inert control edit"
+
+# --------------------------------------------------------------------------
+# "Findings are Ok" — the one sentence R5 carries, per module
+# --------------------------------------------------------------------------
+
+# An over-budget tree reports clean. `md_size_budget` goes permanently green
+# and the eager-context gate stops gating.
+[[arm]]
+id = "md-budget-findings-report-as-clean"
+test = "test_md_budget_violations_are_ok_not_err"
+file = "python/src/kb_setup/md_budget.py"
+old = "    return Ok(report, rc=Rc.FINDINGS if report.violations else Rc.OK)"
+new = "    return Ok(report)"
+
+# A SKILL.md instructing a mise-owned command reports clean — #128's gate,
+# disabled by one deleted conditional.
+[[arm]]
+id = "skill-lint-findings-report-as-clean"
+test = "test_skill_lint_findings_are_ok_not_err"
+file = "python/src/kb_setup/skill_lint.py"
+old = "    return Ok(report, rc=Rc.FINDINGS if report.failed else Rc.OK)"
+new = "    return Ok(report)"
+
+# A CONTRADICTED gate claim in a handoff reports clean. This is the #147/#157
+# behaviour — "1 covers every FAIL" — reverted at the new layer.
+[[arm]]
+id = "handoff-findings-report-as-clean"
+test = "test_handoff_a_contradicted_claim_is_ok_with_findings"
+file = "python/src/kb_setup/handoff.py"
+old = """        rc=Rc.FINDINGS if failed else Rc.OK,"""
+new = """        rc=Rc.OK,"""
+
+# --------------------------------------------------------------------------
+# ...and its inverse: an ADVISORY command must never claim findings
+# --------------------------------------------------------------------------
+#
+# The opposite direction, and the one no int-returning test can see at all:
+# both of these commands returned a literal 0 before and an `exit_code` of 0
+# after, whatever they found. Wiring either into a gate is a one-token edit.
+
+# `kb-distill` starts failing every build it is wired into, over a LEAD.
+[[arm]]
+id = "distill-claims-findings"
+test = "test_distill_a_proposal_is_ok_with_rc_ok_not_findings"
+file = "python/src/kb_setup/distill.py"
+old = "    return Ok(render(report))"
+new = "    return Ok(render(report), rc=Rc.FINDINGS)"
+
+# A dirty tree makes the SNAPSHOT fail — useless exactly when it is wanted.
+[[arm]]
+id = "session-state-claims-findings"
+test = "test_session_state_a_snapshot_is_ok_and_never_findings"
+file = "python/src/kb_setup/session_state.py"
+old = '    return Ok(render(gather(repo_root, with_pr="--no-pr" not in args)))'
+new = '    return Ok(render(gather(repo_root, with_pr="--no-pr" not in args)), rc=Rc.FINDINGS)'
+
+# --------------------------------------------------------------------------
+# "We did not look" and "you asked wrong" — the two Err routes
+# --------------------------------------------------------------------------
+
+# The nothing-scanned guard is deleted, so an empty glob returns `Ok` with no
+# findings: a gate that never asked the question, reporting a pass. Deleting
+# the guard is the realistic break — someone "simplifying" a boundary whose
+# early return looks redundant next to the `report.failed` conditional below it.
+[[arm]]
+id = "skill-lint-never-ran-reports-a-pass"
+test = "test_skill_lint_nothing_scanned_is_an_err"
+file = "python/src/kb_setup/skill_lint.py"
+old = "    if not report.scanned:"
+new = "    if False:"
+
+# A named path that does not exist is scored as a clean handoff instead of a
+# refused request.
+[[arm]]
+id = "handoff-missing-target-is-not-refused"
+test = "test_handoff_a_missing_target_is_a_bad_request"
+file = "python/src/kb_setup/handoff.py"
+old = "        if not target.is_file():"
+new = "        if False:"
+
+# `kb-session-state bogus` runs a normal snapshot having ignored the argument —
+# the exact defect the standards lane found in the pre-R5 code, reintroduced.
+[[arm]]
+id = "session-state-ignores-a-positional"
+test = "test_session_state_a_positional_is_a_bad_request"
+file = "python/src/kb_setup/session_state.py"
+old = "    if positional:"
+new = "    if False:"
+
+# A typo'd skill name is laundered into an ordinary measurement outcome, so
+# `kb-skill-score reeal` exits 0 having scored nothing.
+[[arm]]
+id = "skill-score-typo-is-laundered"
+test = "test_skill_score_a_typod_name_is_a_bad_request"
+file = "python/src/kb_setup/skill_eval.py"
+old = "        return Err(str(exc))"
+new = "        return Ok(ScoreRun(str(exc)))"
+
+# --------------------------------------------------------------------------
+# The boundary prints nothing — the property that makes the split worth having
+# --------------------------------------------------------------------------
+#
+# A boundary that prints cannot be re-rendered by a caller wanting a different
+# transport, which is exactly where §2.5's stdout sink lands. The realistic
+# break is a debug print left behind, not a redesign.
+
+[[arm]]
+id = "md-budget-boundary-leaks-output"
+test = "test_md_budget_boundary_prints_nothing"
+file = "python/src/kb_setup/md_budget.py"
+old = """    report = check(root, exclude=exclude)
+    return Ok("""
+new = """    report = check(root, exclude=exclude)
+    print(f"md-budget: {len(report.violations)} violations")
+    return Ok("""
+
+[[arm]]
+id = "session-state-boundary-leaks-output"
+test = "test_session_state_boundary_prints_nothing"
+file = "python/src/kb_setup/session_state.py"
+old = '    return Ok(render(gather(repo_root, with_pr="--no-pr" not in args)))'
+new = """    text = render(gather(repo_root, with_pr="--no-pr" not in args))
+    print(text)
+    return Ok(text)"""
+
+# --------------------------------------------------------------------------
+# The single conversion, per renderer
+# --------------------------------------------------------------------------
+#
+# `exit_code` exists so "what does rc 2 mean" has one answer. A renderer that
+# computes its own code re-forks that, and every pre-existing int assertion in
+# these suites can stay green while it does — they assert the VALUE, and a
+# hard-coded 0 is a valid value for the cases they happen to cover.
+
+[[arm]]
+id = "handoff-renderer-forks-the-exit-code"
+test = "test_handoff_int_wrapper_is_exit_code_of_boundary"
+file = "python/src/kb_setup/handoff.py"
+old = """    print(render(list(result.value.findings), source=result.value.source))
+    return exit_code(result)"""
+new = """    print(render(list(result.value.findings), source=result.value.source))
+    return 0"""
+
+[[arm]]
+id = "skill-lint-renderer-forks-the-exit-code"
+test = "test_skill_lint_int_wrapper_is_exit_code_of_boundary"
+file = "python/src/kb_setup/skill_lint.py"
+old = """        print(f"skill-lint: {result.message}")
+        return exit_code(result)"""
+new = """        print(f"skill-lint: {result.message}")
+        return 1"""

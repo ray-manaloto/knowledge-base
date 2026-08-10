@@ -60,6 +60,10 @@ times.** `0` / `1` / `2` are not arbitrary here:
 So R5 is not introducing a taxonomy. It is **naming one that 175 call sites
 already agree on and that no reader can discover without grepping.**
 
+> ⚠️ **The "already agree" half of that sentence is FALSE — see §8a.** It is left
+> standing rather than edited because the claim, and how it survived into a
+> shipped PR, is itself the finding. The count is also 173, not 175 (§8c).
+
 ---
 
 ## 2. What real tools do — screened against pinned or SHA-recorded source
@@ -377,9 +381,12 @@ pass, it would have been asserting something the module never claims.
 
 ### Not done, and deliberately
 
-- **The remaining 174 rc sites and 22 `raise SystemExit(<string>)` sites.** One
-  command is the proving slice, not the migration. The sweep should be its own
-  change with its own review.
+- **The remaining rc sites and message-raising `SystemExit` sites.** One command
+  is the proving slice, not the migration. The sweep should be its own change
+  with its own review. (This bullet said "174 rc sites and 22 `raise
+  SystemExit`" until the audit; both were wrong — §8b and §8c. The live counts
+  are tracked in §9, by MODULE rather than by site, because converting sites is
+  what makes a site count stale.)
 - **No command returns an `External` yet.** The variant exists on Ray's ruling
   and is armed, but the commands that wrap a *single* subprocess — where a
   passthrough is the right answer — are part of the un-done sweep. Until one
@@ -505,6 +512,150 @@ becoming a valid `Ok`. That is the mutation `ok-guard-back-to-a-blacklist` arms.
 
 **Arms: 10/10 died, 1/1 control held, restored rc=0.** The remaining conversion
 of ~165 sites is a separate tranche and is NOT done.
+
+## 9. The conversion tranche — the recipe, and where it stopped
+
+**Converted so far: `check` (tranche 1), `lint_checks` (tranche 2), and
+`md_budget` / `skill_lint` / `handoff` / `session_state` / `distill` /
+`skill_eval` (tranche 3, 2026-08-10).** Stated as a count of modules rather
+than of sites, because the site figure is what the conversion itself
+invalidates.
+
+**The denominator was re-derived in tranche 3 and the old one was wrong in a
+way worth recording.** An AST walk over `python/src/kb_setup/**` finds **95**
+functions annotated `-> int` (control arm: 0 unannotated of 887 total, so the
+walk is not silently skipping anything). That is *not* the conversion surface:
+most are quantity-returners — `_dir_size`, `citations.line_of`, `lexical.size`,
+the five `evals` counters — and §8c's "8 dangerous rows" are a subset of that
+larger population, not the whole of it. The real surface is **the ~35 functions
+`cli.py` dispatches to**. Eight are now converted.
+
+### The recipe, in the shape both converted modules use
+
+`ruff`'s two-function split (`crates/ruff/src/lib.rs:128` / `main.rs`):
+
+```python
+def check_<verb>(...) -> Result[T]:   # returns, never raises, PRINTS NOTHING
+    ...
+    return Ok(value, rc=Rc.FINDINGS if found else Rc.OK)
+
+def <verb>(...) -> int:               # renders, then converts
+    result = check_<verb>(...)
+    if isinstance(result, Ok) and result.value:
+        ...print...
+    return exit_code(result)
+```
+
+Four rules that are not obvious from the shape:
+
+1. **Findings are `Ok`.** A gate that ran and found something did its job.
+   `Err` is only "could not run" — and several modules have *no* such case, so
+   their boundary legitimately never returns `Err`.
+2. **The `int`-returning wrapper stays.** `cli.py` and every pre-existing
+   exit-code assertion are the regression arm; converting them in the same
+   change removes the only thing proving the split changed no behaviour.
+3. **The boundary prints nothing**, and there is a test asserting that. It is
+   the property that makes the split worth anything — a boundary that prints
+   cannot be re-rendered by §2.5's stdout sink.
+4. **Do not touch the 8 quantity-returners** (§8c).
+
+### Three traps this tranche hit, all of which cost a cycle
+
+- **`ty` catches the annotation you guessed.** `check_no_lint_skip` was
+  annotated `Result[list[tuple[str, int, str]]]`; the hits carry `Path`.
+- **`TC002`**: a `pytest` import used only in an annotation must move into a
+  `TYPE_CHECKING` block, which requires `from __future__ import annotations`
+  in that test file.
+- **Never write a suppression marker as a literal in a test.** `tests/test_lint_checks.py`
+  concatenates (`"no" + "qa"`) precisely so `no_lint_skip` does not flag the
+  repo itself. A generated test that planted the literal would have broken the
+  gate it was testing.
+
+### 9a. Tranche 3 (2026-08-10) — what six more modules taught
+
+Six converted in one pass, all six mechanical against the recipe above. The
+value was not in the mechanics; it was in three things the recipe did not
+predict.
+
+**1. Most of the split already existed.** `md_budget`, `skill_lint` and
+`handoff` each already had a pure `check() -> Report` walker plus an
+int-returning renderer. R5 typed the seam between them rather than inventing
+one, which is why six modules fit in one tranche where two had filled the last.
+
+**2. The "gate that never asked" divergence is in THREE places, and one module
+says so in its own output.** All three return `Rc.OK` for a walk that matched
+nothing:
+
+| module | the never-asked case | what it returns | what it says |
+|---|---|---|---|
+| `skill_lint` | glob matched no skill | **`Err(rc=NOT_RUN)`** | "the gate did not run" |
+| `md_budget` | `report.counted == 0` | `Ok(rc=OK)` | *(silent)* |
+| `distill` | no transcripts found | `Ok(rc=OK)` | **"the detector did not run. This is not a clean result"** |
+
+`distill`'s row is the sharp one: the module *prints* that it did not run and
+still reports success, so the contradiction is already visible on stdout and
+was invisible to every test. By this repo's own doctrine
+(`probes-need-a-control-arm.md`) all three are `Rc.NOT_RUN`.
+
+**They were NOT changed**, because rule 2 of the recipe keeps a conversion
+behaviour-preserving so the pre-existing exit-code assertions stay a valid
+regression arm. Each is pinned instead by a test named
+`*_is_the_documented_divergence`, so closing it later is a deliberate edit to a
+failing assertion rather than a silent behaviour change riding inside a
+refactor nobody reviews as one. **Filed as one gap, not fixed three times: #270.**
+
+**3. One module needed TWO boundaries, and the type is why.** `skill_eval`
+printed its score table and *then* returned 2 when `--write` failed — a partial
+success the vocabulary refuses to flatten: `Err` carries a message rather than a
+table, and `Ok(rc=BAD_REQUEST)` is unrepresentable by construction. So scoring
+and recording are separate boundaries (`check_skill_score` / `record_baseline`)
+and the failed write is an honest `Err` of its own. This is the first case where
+the closed `Ok` guard *changed a design* rather than merely validating one.
+
+**A behaviour change worth stating rather than burying.** `skill_eval`'s
+`[skill-score] scored by <X>` stderr line now prints *after* the scoring
+subprocesses instead of before, because the boundary may not print. Content and
+every exit code are unchanged; what is lost is a start-of-work signal on a slow
+multi-skill run. That is rule 3 doing exactly what it says, and the progress
+line is the kind of thing §2.5's event stream is for.
+
+**Two more traps, both cheap and both repeatable:**
+
+- **Narrow on `Ok`, never against `Err`.** `Result` has a *third* variant, so
+  `if isinstance(result, Err)` leaves `Ok | External` and `External` has no
+  `.value`. `ty` catches it; the positive narrow is also what keeps a renderer
+  correct if its boundary later grows a passthrough.
+- **A same-named test in two files can mis-target an arm.** Tranche 3's first
+  draft added a second `test_findings_are_ok_not_err` (the other is in
+  `tests/test_check.py`, and an existing arm targets it by name). Boundary tests
+  are now module-prefixed — `test_skill_lint_findings_are_ok_not_err` — so an
+  arm's `test =` cannot match the wrong module's test.
+
+### 9b. What tranche 3 did NOT convert, and why it is a different shape
+
+`graph_counts.report`, `insights.report`, and the `graphify_ops` family print
+**progressively as they compute** rather than rendering once at the end. The
+two-function split does not fit them without first restructuring their
+rendering into a returned string — real work, and precisely the work §2.5's
+stdout sink needs, so it belongs in that tranche rather than smuggled into this
+one. They are named here so "not converted" reads as a decision rather than an
+omission.
+
+### 9c. The arms, and the one they caught
+
+`docs/research/reports/2026-08-10-r5-tranche3-arms.toml` — **13/13 died, 1/1
+control held, restored OK**, every arm naming its own test. The two that no
+int-returning test could ever have caught are the *inverse* pair:
+`distill-claims-findings` and `session-state-claims-findings` mutate an
+advisory command into a gate, and both returned `0` before and after.
+
+**`--dry-run` caught a stale anchor before the sweep ran.** The tranche-2 spec's
+`skill-lint-back-to-bare-one` arm anchored on `        return Rc.NOT_RUN`, a
+line this tranche's split deleted. It reported `PROBE BROKEN - a refactor moved
+it` rather than passing; left alone it would have sat in the spec reading as
+coverage it no longer had. Re-derived in the same change. This is the third
+recorded instance of a refactor invalidating a mutation spec — `--dry-run`
+after *any* edit to converted code is not optional.
 
 ## GitHub repos touched
 

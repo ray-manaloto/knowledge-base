@@ -16,8 +16,13 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kb_setup import md_budget
+from kb_setup.result import Ok, Rc, exit_code
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    import pytest
 
 _REPO = Path(__file__).parent.parent.absolute()
 
@@ -348,3 +353,94 @@ def test_eager_total_is_reported() -> None:
     report = md_budget.check(_REPO)
     assert report.eager_bytes > 0
     assert report.counted > 0
+
+
+# --------------------------------------------------------------------------
+# The `check_md_budget` boundary (§2 R5)
+# --------------------------------------------------------------------------
+#
+# `md_budget_main` returns an int; the tests above assert `check`'s violations
+# directly. Neither can see whether an over-budget tree is reported as a gate
+# that SUCCEEDED and found something (`Ok`) or one that FAILED (`Err`) — the
+# distinction the whole R5 change exists to make, and one that leaves every
+# pre-existing assertion green either way.
+
+
+def test_md_budget_violations_are_ok_not_err(tmp_path: Path) -> None:
+    """An over-budget file is this gate DOING ITS JOB, so it is `Ok(rc=FINDINGS)`."""
+    root = _git_repo(tmp_path)
+    _commit(root, ".claude/rules/big.md", "\n".join(f"l{i}" for i in range(250)))
+
+    result = md_budget.check_md_budget(root)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.FINDINGS
+    assert any("big.md" in v.path for v in result.value.violations)
+
+
+def test_md_budget_clean_tree_is_ok_with_rc_ok(tmp_path: Path) -> None:
+    """CONTROL ARM: `Ok` is reachable with BOTH rcs, so the test above discriminates."""
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "@AGENTS.md\n")
+    _commit(root, "AGENTS.md", "# Small\n")
+
+    result = md_budget.check_md_budget(root)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert result.value.violations == []
+
+
+def test_md_budget_boundary_prints_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Rendering belongs to `md_budget_main`; the boundary only returns.
+
+    Armed on the VIOLATING tree specifically — a boundary that merely forgot to
+    print its failures would pass the clean-tree version of this test.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, ".claude/rules/big.md", "\n".join(f"l{i}" for i in range(250)))
+
+    md_budget.check_md_budget(root)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_md_budget_int_wrapper_is_exit_code_of_boundary(tmp_path: Path) -> None:
+    """The equivalence that makes the split safe, on both outcomes.
+
+    Catches a renderer that computes its own rc instead of funnelling through
+    `exit_code` — the single-conversion property `result.exit_code` guarantees.
+    """
+    root = _git_repo(tmp_path)
+    _commit(root, "CLAUDE.md", "@AGENTS.md\n")
+    _commit(root, "AGENTS.md", "# Small\n")
+    assert md_budget.md_budget_main(root) == exit_code(md_budget.check_md_budget(root))
+
+    _commit(root, ".claude/rules/big.md", "\n".join(f"l{i}" for i in range(250)))
+    assert md_budget.md_budget_main(root) == exit_code(md_budget.check_md_budget(root))
+
+
+def test_md_budget_counted_zero_is_the_documented_divergence(tmp_path: Path) -> None:
+    """A tree with NO instruction file reports `Rc.OK` — and that is a known gap.
+
+    Pinned, not endorsed. `skill_lint` returns `Rc.NOT_RUN` for the structurally
+    identical case (the walk matched nothing, so the gate never asked the
+    question), and by this repo's own doctrine that is the correct answer here
+    too. It is left as `OK` because the R5 conversion is behaviour-preserving by
+    rule, so the pre-existing exit-code assertions stay a valid regression arm.
+
+    This test exists so the divergence is a RECORDED fact with a name rather
+    than an unnoticed one, and so that closing it is a deliberate edit to a
+    failing assertion instead of a silent behaviour change nobody reviews.
+    """
+    root = _git_repo(tmp_path)
+
+    result = md_budget.check_md_budget(root)
+
+    assert isinstance(result, Ok)
+    assert result.value.counted == 0
+    assert result.rc is Rc.OK

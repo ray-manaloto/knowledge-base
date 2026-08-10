@@ -25,7 +25,12 @@ from kb_setup.result import Err, External, Ok, Rc, Result, exit_code
 
 
 def test_rc_values_are_the_existing_convention() -> None:
-    """0/1/2 are not free to change: 175 call sites and every mise task read them."""
+    """0/1/2 are not free to change: the whole CLI surface and every mise task read them.
+
+    No site count here on purpose — the R5 conversion is what makes any such
+    figure stale, and a rotting number in a docstring is what the cold lane
+    caught in `check.py` (see the report's §7).
+    """
     assert (Rc.OK, Rc.FINDINGS, Rc.BAD_REQUEST) == (0, 1, 2)
 
 

@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import skill_eval
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 _REPO = Path(__file__).parent.parent.absolute()
 
@@ -686,3 +687,131 @@ def test_main_is_advisory_even_with_no_scorer(tmp_path: Path, monkeypatch):
     """Advisory means advisory: a missing scorer must not fail a caller's gate."""
     monkeypatch.setattr(skill_eval, "_PLUGIN_ROOTS", (("pinned-clone", "nowhere"),))
     assert skill_eval.main([], tmp_path) == 0
+
+
+# --------------------------------------------------------------------------
+# The `check_skill_score` / `record_baseline` boundaries (§2 R5)
+# --------------------------------------------------------------------------
+#
+# The int assertions above pin 0 and 2. What they cannot see is that this
+# command has NO findings state — a low score is a number in the table, never a
+# verdict — so every non-zero is a malformed request or a failed write. That is
+# the property "advisory" means, and it is invisible to a test that only reads
+# an int.
+
+
+def test_skill_score_a_typod_name_is_a_bad_request(tmp_path: Path):
+    """The `Err` that reconciles one of the two contradictions R5 exists to settle.
+
+    `mise-tasks-only.md` documented this as rc 2 while documenting `skill_lint`'s
+    structurally-similar "matched nothing" as rc 1, in the same file. Named, the
+    two turn out to be genuinely different cases — this one really is
+    BAD_REQUEST (you named a skill that does not exist).
+    """
+    _skills(tmp_path, "real")
+
+    result = skill_eval.check_skill_score(["reeal"], tmp_path)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "reeal" in result.message
+
+
+def test_skill_score_an_empty_corpus_is_ok_not_an_error(tmp_path: Path):
+    """CONTROL ARM: absence is a different answer from a typo, and stays `Ok`."""
+    (tmp_path / ".claude" / "skills").mkdir(parents=True)
+
+    result = skill_eval.check_skill_score([], tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert "no skill directories" in result.value.notice
+
+
+def test_skill_score_a_real_score_is_ok_and_never_findings(tmp_path: Path, monkeypatch):
+    """A LOW score is advisory data, not a verdict — `Rc.OK`, never `Rc.FINDINGS`.
+
+    If someone wires a threshold in here, `kb-skill-score` starts failing gates
+    over a shape metric that this repo's own docs call advisory. Every existing
+    int assertion stays green through that change.
+    """
+    _skills(tmp_path, "real")
+    monkeypatch.setattr(
+        skill_eval,
+        "resolve_scorer",
+        lambda _: skill_eval.Scorer(
+            root=Path("/x"), origin="marketplace", version="0.1.0", code_id="c1"
+        ),
+    )
+    monkeypatch.setattr(
+        skill_eval,
+        "score_one",
+        lambda *_a, **_kw: skill_eval.SkillScore(name="real", score=3.0),
+    )
+
+    result = skill_eval.check_skill_score([], tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert result.rc is not Rc.FINDINGS
+    assert result.value.table
+
+
+def test_skill_score_a_failed_write_is_its_own_err(tmp_path: Path, monkeypatch):
+    """Why this is TWO boundaries and not one.
+
+    The pre-R5 code printed the score table and THEN returned 2 — a partial
+    success the `Result` vocabulary refuses to flatten, since `Err` carries a
+    message rather than a table and `Ok(rc=BAD_REQUEST)` is unrepresentable on
+    purpose. So the scoring half still succeeds here and only the write fails.
+    """
+    _skills(tmp_path, "real")
+    monkeypatch.setattr(
+        skill_eval,
+        "resolve_scorer",
+        lambda _: skill_eval.Scorer(
+            root=Path("/x"), origin="marketplace", version="0.1.0", code_id="c1"
+        ),
+    )
+    monkeypatch.setattr(
+        skill_eval,
+        "score_one",
+        lambda *_a, **_kw: skill_eval.SkillScore(name="real", score=60.0),
+    )
+    monkeypatch.setattr(
+        skill_eval,
+        "write_baseline",
+        lambda *_a, **_kw: (_ for _ in ()).throw(OSError("read-only fs")),
+    )
+
+    scored = skill_eval.check_skill_score(["--write"], tmp_path)
+    assert isinstance(scored, Ok), "the SCORING half succeeded; only the write failed"
+    assert scored.value.table
+
+    written = skill_eval.record_baseline(tmp_path, scored.value)
+    assert isinstance(written, Err)
+    assert "read-only fs" in written.message
+
+
+def test_skill_score_boundary_prints_nothing(tmp_path: Path, capsys):
+    """Rendering belongs to `main`; the boundary returns the notice and the table.
+
+    Armed on the Err path — a boundary that merely forgot to print its table
+    would pass a happy-path version of this test.
+    """
+    _skills(tmp_path, "real")
+
+    skill_eval.check_skill_score(["reeal"], tmp_path)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_skill_score_int_wrapper_is_exit_code_of_boundary(tmp_path: Path):
+    """The equivalence that makes the split safe, on both outcomes."""
+    _skills(tmp_path, "real")
+    for argv in (["reeal"], ["--dry-run"]):
+        assert skill_eval.main(argv, tmp_path) == exit_code(
+            skill_eval.check_skill_score(argv, tmp_path)
+        )

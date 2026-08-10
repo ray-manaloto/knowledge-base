@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import cli, hook_guard, skill_lint
-from kb_setup.result import Rc
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 _BAD = """# bad
 ```bash
@@ -200,3 +200,90 @@ def test_the_real_repo_passes() -> None:
     report = skill_lint.check(root)
     assert report.scanned, "glob matched no skills — the gate did not run"
     assert not report.failed, [f"{f.path}:{f.line} {f.command}" for f in report.findings]
+
+
+# --------------------------------------------------------------------------
+# The `check_skill_lint` boundary (§2 R5)
+# --------------------------------------------------------------------------
+#
+# `skill_lint_main` returns an int and is asserted above; those assertions are
+# the regression arm proving the Result split changed no exit code. What is NEW
+# is that the two non-zero outcomes are now DIFFERENT TYPES — findings are an
+# `Ok` carrying the report, "nothing scanned" is an `Err`. No int-returning test
+# can fail if that distinction is lost, because both were 127/1 before and are
+# 127/1 after.
+
+
+def test_skill_lint_findings_are_ok_not_err(tmp_path: Path) -> None:
+    """A gate that ran and found something SUCCEEDED — the one sentence R5 carries.
+
+    If someone "simplifies" this to an `Err`, every pre-existing exit-code
+    assertion in this file stays green. Only this test notices.
+    """
+    _skill(tmp_path, "bad", _BAD)
+
+    result = skill_lint.check_skill_lint(tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.FINDINGS
+    assert [f.command for f in result.value.findings] == [
+        "graphify extract .",
+        'graphify query "what does this cover?"',
+    ]
+
+
+def test_skill_lint_clean_tree_is_ok_with_rc_ok(tmp_path: Path) -> None:
+    """CONTROL ARM: `Ok` is reachable with BOTH rcs, so the test above discriminates."""
+    _skill(tmp_path, "good", _GOOD)
+
+    result = skill_lint.check_skill_lint(tmp_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+
+
+def test_skill_lint_nothing_scanned_is_an_err(tmp_path: Path) -> None:
+    """A gate that never looked is a THIRD state, and the type now says so.
+
+    The int has been 127 since §2 R5 and `test_no_skills_matched_is_a_skip_not_a_pass`
+    pins it. What that test cannot see is whether 127 arrived as an `Ok` — which
+    would assert the gate ran — or as an `Err`, which is the truth.
+    """
+    result = skill_lint.check_skill_lint(tmp_path)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "did not run" in result.message
+
+
+def test_skill_lint_boundary_prints_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Rendering belongs to `skill_lint_main`; the boundary only returns.
+
+    Armed on the FINDINGS path specifically — the clean path printing nothing
+    would be true of a boundary that only forgot to print its failures.
+    """
+    _skill(tmp_path, "bad", _BAD)
+
+    skill_lint.check_skill_lint(tmp_path)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_skill_lint_int_wrapper_is_exit_code_of_boundary(tmp_path: Path) -> None:
+    """The equivalence that makes the split safe, asserted on all three outcomes.
+
+    This is the arm that would catch a renderer which computes its own rc
+    instead of funnelling through `exit_code` — the single-conversion property
+    `result.exit_code` exists to guarantee.
+    """
+    assert skill_lint.skill_lint_main(tmp_path) == exit_code(skill_lint.check_skill_lint(tmp_path))
+
+    _skill(tmp_path, "good", _GOOD)
+    assert skill_lint.skill_lint_main(tmp_path) == exit_code(skill_lint.check_skill_lint(tmp_path))
+
+    _skill(tmp_path, "bad", _BAD)
+    assert skill_lint.skill_lint_main(tmp_path) == exit_code(skill_lint.check_skill_lint(tmp_path))

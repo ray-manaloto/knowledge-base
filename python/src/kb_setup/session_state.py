@@ -59,6 +59,7 @@ from enum import Enum
 from pathlib import Path
 
 from kb_setup import gates
+from kb_setup.result import Err, Ok, Result, exit_code
 
 #: Bound on the git reads. Short: these are cheap metadata queries, and a wedged
 #: one must not become the reason the session has no snapshot at all.
@@ -595,21 +596,23 @@ def render(snapshot: Snapshot) -> str:
 _FLAGS = frozenset({"--no-pr"})
 
 
-def main(args: list[str], repo_root: Path) -> int:
-    """`kb-session-state [--no-pr]` — 0 always, 2 on a request that cannot be honoured.
+def check_session_state(args: list[str], repo_root: Path) -> Result[str]:
+    """The boundary (§2 R5): the rendered snapshot, or why it could not be taken.
 
-    It never exits non-zero for what it FINDS. A snapshot reports; an rc that
-    tracked cleanliness would make the task useless exactly when it is wanted,
-    since you take a snapshot precisely when there is something to say.
+    Returns rather than raises, and prints nothing — :func:`main` renders. Same
+    split as ``check.check``/``check.main`` (``ruff``'s
+    ``pub fn run(..) -> Result<ExitStatus>``, ``crates/ruff/src/lib.rs:128``).
+
+    **This boundary never returns `Rc.FINDINGS`, and that is the design.** A
+    snapshot reports; it has no opinion to fail on. Every outcome is either
+    ``Ok(text)`` or an ``Err(rc=Rc.BAD_REQUEST)`` for a request that cannot be
+    honoured — which is exactly the split the docstring below already claimed
+    in prose and the ints could not express, since a bare ``2`` here was
+    indistinguishable from ``check.py``'s ``2`` for "nothing was checked".
     """
     unknown = [a for a in args if a.startswith("-") and a not in _FLAGS]
     if unknown:
-        print(
-            f"kb-session-state: unknown flag(s) {', '.join(unknown)} "
-            f"(accepted: {', '.join(sorted(_FLAGS))})",
-            file=sys.stderr,
-        )
-        return 2
+        return Err(f"unknown flag(s) {', '.join(unknown)} (accepted: {', '.join(sorted(_FLAGS))})")
     # POSITIONALS ARE REFUSED TOO. This command takes none, so anything here is
     # a mistake — a mistyped flag that lost its dashes, or a path the caller
     # thought was accepted. Ignoring them exited 0 on `session-state bogus`
@@ -618,11 +621,26 @@ def main(args: list[str], repo_root: Path) -> int:
     # ignore positionals because it TAKES them (gate names). (Standards lane.)
     positional = [a for a in args if not a.startswith("-")]
     if positional:
-        print(
-            f"kb-session-state: takes no positional argument(s), got "
-            f"{', '.join(positional)} (accepted: {', '.join(sorted(_FLAGS))})",
-            file=sys.stderr,
+        return Err(
+            f"takes no positional argument(s), got {', '.join(positional)} "
+            f"(accepted: {', '.join(sorted(_FLAGS))})"
         )
-        return 2
-    print(render(gather(repo_root, with_pr="--no-pr" not in args)))
-    return 0
+    return Ok(render(gather(repo_root, with_pr="--no-pr" not in args)))
+
+
+def main(args: list[str], repo_root: Path) -> int:
+    """`kb-session-state [--no-pr]` — 0 always, 2 on a request that cannot be honoured.
+
+    It never exits non-zero for what it FINDS. A snapshot reports; an rc that
+    tracked cleanliness would make the task useless exactly when it is wanted,
+    since you take a snapshot precisely when there is something to say.
+
+    Kept returning ``int``: ``cli.py`` and this module's existing exit-code
+    assertions are the regression arm for the ``Result`` split.
+    """
+    result = check_session_state(args, repo_root)
+    if not isinstance(result, Ok):
+        print(f"kb-session-state: {result.message}", file=sys.stderr)
+        return exit_code(result)
+    print(result.value)
+    return exit_code(result)
