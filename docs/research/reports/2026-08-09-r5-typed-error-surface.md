@@ -826,3 +826,112 @@ command rather than a consequence of this one. Pinned as
 - [astral-sh/uv](https://github.com/astral-sh/uv) — `ExitStatus` enum incl. `External(u8)`; already pinned at `sources/uv.manifest` (0.12.3).
 - [koxudaxi/datamodel-code-generator](https://github.com/koxudaxi/datamodel-code-generator) — `model/enum.py`, `arguments.py`; already pinned at `sources/datamodel-code-generator.manifest`.
 - [googleapis/python-api-core](https://github.com/googleapis/python-api-core) — attempted (the grpc `StatusCode`→exception mapping would have been the strongest enum precedent); the default branch clone contained only `LICENSE`/`README.rst`/`SECURITY.md`, so **nothing was read and no claim rests on it**. The package moved into the `google-cloud-python` monorepo. Left unscreened.
+
+### 9g. Tranche 5 (2026-08-10) — the sink, and the six that needed it
+
+**All six boundaries §9b and §9d deferred are converted** — `launch`
+(`cc_main`/`doctor_main`), `graph_counts`, `insights`, `skill_refresh`,
+`graphify_ops`, `pr` (`ship_main`/`land_main`). PR #273. This closes the
+deferred set; what remains are the dispatched boundaries that were never blocked
+on anything.
+
+**The "~35" denominator this report has used since §9 is WRONG, and a cold lane
+caught it while checking a status table built on it (2026-08-10).** `cli.py`
+dispatches **44** distinct commands, not ~35, and **13 of 62 modules** import
+`kb_setup.result`. Two corrections follow from that:
+
+- every `N of ~35` above — including §9's own "eight are now converted" framing
+  and §9d's "12 of ~35" — understates the remaining work by roughly a quarter.
+  They are left in place as the record of what was believed at the time; this
+  note is the correction, because rewriting them would erase the fact that four
+  tranches were planned against a denominator nobody re-derived.
+- **`goal.outcome_main` and `evals` are NOT converted**, though `goal.main` is.
+  §9d recorded `goal` as converted, which is true of one of that module's two
+  boundaries and was read as both.
+
+`probes-need-a-control-arm.md` rule 6: an inherited number is not a measurement.
+This one was inherited four times inside one report.
+
+The unblocking work was §2.5's stdout sink, not more conversion — every one of
+the six printed progressively, so recipe rule 3 ("the boundary prints nothing")
+could not be met until events existed to print into.
+
+**The conversion rule, stated once because it is what makes the tranche
+checkable:** INFO wherever the original wrote to stdout, `warn`/`fail` ONLY
+where it passed `file=sys.stderr`. The sink routes WARNING+ to stderr, so
+choosing a level by its "natural" meaning would silently move lines between
+streams — a behaviour change smuggled inside a refactor, which is the thing
+recipe rule 2 exists to prevent. `pr.py` has zero stderr sites, so all 32 of its
+conversions are `say` and nothing moves.
+
+**`External` gets its first real user, and §9d's reasoned claim becomes
+measured.** `launch.cc_main` returned a child's raw returncode:
+
+| child died of | returncode | reported BEFORE | now |
+|---|---:|---:|---:|
+| SIGINT (Ctrl-C) | −2 | **254** | 130 |
+| SIGKILL | −9 | **247** | 137 |
+| SIGTERM | −15 | **241** | 143 |
+
+Two's-complement truncation, exactly as `External.__post_init__`'s docstring
+predicted. The dangerous part is that all three are *plausible* application exit
+codes, so nothing ever flagged them — a Ctrl-C'd session read as a program that
+chose to fail. `result.external_from_returncode` states the conversion once.
+
+**One divergence declared rather than closed**, on §9a's #270 precedent:
+`graph_counts.record_failed` emits at INFO while its text says "WARNING:".
+Raising it would move the line to stderr AND double the prefix into
+`WARNING: [tag] WARNING: …`. Both are fixable; neither is fixable *silently
+inside a refactor*, because the pre-existing assertions about that output are the
+only evidence the conversion changed nothing.
+
+### 9h. What the tranche's defects say about where to look
+
+Seven defects, and **none came from reading the diff** — five from a test going
+red while building, two from an end-to-end arm after everything was green.
+
+1. an `emit` with no sink attached writes **nothing**, so converting a function a
+   test calls directly turns it silent while `cli.main` keeps working;
+2. *"the logger has handlers"* is **not** *"a sink is attached"* — pytest's own
+   `LogCaptureHandler` satisfied the lazy guard, a probe that could only answer
+   one way;
+3. a `StreamHandler` pins `sys.stdout` at construction, so on a process-global
+   logger every later test's output went to the **first** test's buffer;
+4. stdlib's `QueueHandler.prepare()` **stringifies** `record.msg` by design, so
+   the listener hands `ProcessorFormatter` a `str` and the render raises *inside*
+   the logging machinery — which swallows handler errors, making the symptom
+   silently missing output;
+5. teardown order — flushing before the listener drains writes nothing and looks
+   correct on stdout.
+
+**The two that only an end-to-end arm found**, after 30 green unit tests: every
+line printed **twice**, and structlog internals leaked into the JSONL. Every test
+passed an explicit `stream=` or ran `offload=False`, so all 30 were blind to the
+**default path** — the only place either bug lived, and the only configuration a
+user gets. That is the inverse of a test failing to own its environment: these
+owned it too thoroughly.
+
+### 9i. The review, and the finding that was inside the fix
+
+Two rounds, `cold:codex`, 2 findings, 0 blocking.
+
+Round 1 found `main` branching on `if "--audit" in args` — a membership test over
+argv — silently discarding a record request. **Round 2 found the same bug still
+reachable through `--question=Q`**, because the fix matched flag STRINGS.
+
+The durable answer was not handling one more spelling. It was that **a decision
+about what was asked for must come from the PARSED request, never from raw
+tokens**: argparse already knows about `=`, prefix abbreviation and everything
+else that would otherwise be re-implemented one discovered form at a time. The
+test written to cover "the class, not just one flag" had used only the
+two-token form, which is exactly why it could not see it.
+
+A third defect surfaced from the CONTROL ARM of round 1's finding rather than
+from the finding: `save-result` requires an answer and `check_remember` did not,
+so a request valid at our gate died downstream in a raw argparse dump. The
+original live arm had passed `--answer "yes"` — **an arm that supplies the field
+cannot discover that the field is unchecked.**
+
+**Still open from this tranche:** a malformed argv escapes the `Result` contract
+entirely, because `argparse.error()` calls `sys.exit(2)`. The exit code is
+coincidentally correct, which is why it is written down rather than left.

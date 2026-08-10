@@ -1,7 +1,44 @@
 # Ray's directives and this session's findings — 2026-08-08 (session `-g`)
 
-**Status: the architectural program in §2 is NOT built. It is recorded here so
-it cannot be lost.** §1 shipped. §3 are findings that outlive the round.
+**Status (updated 2026-08-10): §2 is PARTLY BUILT — the line below said "NOT
+built" and stopped being true on 2026-08-09.** §1 shipped. §3 are findings that
+outlive the round.
+
+| requirement | state |
+|---|---|
+| **R5** — SDK error codes | **PARTLY BUILT** (PRs #267/#269/#271/#272/#273) — `kb_setup.result` exists; **13 of the 50 top-level `kb_setup` modules import it**, and `cli.py` dispatches **44** distinct commands. Known-unconverted boundaries include `goal.outcome_main` and `evals` |
+| **R1/R3/R7** — async structured logging via sinks, dedicated stdout sink, thread offload | **BUILT** (PR #273) — `kb_setup.events` + `kb_setup.sinks`; §2.5 below |
+| **R9** — find warnings nobody greps | **MECHANISM EXISTS** — `events.Tally.above(WARNING)` + the JSONL sink; not yet wired into any gate |
+| **R8** — native option | **RULED** (§2.6i): no, for the logging framework |
+| **R12** — parallel pytest | events carry a `worker` field; the xdist transport probe is closed (§2.5) |
+| **R2/R4** — no direct writes, machine-enforced | **NOT BUILT.** Most dispatched boundaries still `print`; R4 lands last |
+| **R6** — `datamodel-code-generator` | **NOT BUILT**, and still never used here (§2.3) |
+| **R10/R11** — screening, refutation | done (§2.6h, §2.6j) |
+
+> **The counts above are deliberately coarse, and the reason is a defect this
+> table shipped in its first draft.** It originally read *"18 of ~35 dispatched
+> boundaries converted"* and *"~23 still print"*, and a cold lane found neither
+> reconciled: the denominator **~35 was inherited from §9 of the R5 report and
+> never re-derived** (`cli.py` dispatches **44**), and the numerator
+> double-counted `launch`, which tranche 4 had already converted. It also
+> surfaced that `goal.outcome_main` and `evals` are NOT converted, though
+> `goal.main` is — so "goal is done" was true of one of that module's two
+> boundaries.
+>
+> Two figures are stated here because they are cheap to re-derive on demand
+> (`grep -l 'from kb_setup.result import' python/src/kb_setup/*.py`, and the
+> `cmd ==` branches in `cli.py`). A precise converted-boundary count is not,
+> which is exactly why the first version of it was wrong — see
+> `probes-need-a-control-arm.md` rule 6 on inherited numbers, and rule 8 on a
+> table drifting from its generator.
+>
+> **And the correction's FIRST draft repeated the same defect.** It said "13 of
+> 62 modules" — inheriting **62** from §2.2's `38 of 62` while in the very act
+> of correcting an inherited `~35`. Measured: **50** top-level `.py` files, or
+> **66** counting the `currency/` subpackage; §2.2's 62 matches neither and was
+> itself never re-derived. Hence "**top-level**" in the row above: a count
+> without its definition is the same defect one level down, and this one
+> survived two passes because both were plausible.
 
 **Addendum 2026-08-09 (session `-h`), the ingestion round §2.7 called for.**
 Six sections were added and **nothing was removed or reworded** — §2.6g **R12**
@@ -159,7 +196,28 @@ tree-sitter and no ty-LSP work. Ruff also ships the `LOG` and `G` rule families
 for logging correctness. Per `use-tool-builtins.md`, the built-in is the answer
 until proven insufficient.
 
-### 2.5 The design question — ANSWERED 2026-08-09
+### 2.5 The design question — ANSWERED 2026-08-09, **BUILT 2026-08-10 (PR #273)**
+
+> **Status.** The sink exists: `kb_setup.events` (structlog event layer) +
+> `kb_setup.sinks` (`HumanSink`/`JsonlSink`, stdlib `QueueListener` offload,
+> WARNING+ routed to stderr). All six boundaries deferred by §9b/§9d are
+> converted — `launch`, `graph_counts`, `insights`, `skill_refresh`,
+> `graphify_ops`, `pr`. `cli.main` is the one attach point; `KB_EVENTS_JSONL`
+> opts a run into the JSONL sink.
+>
+> **The library question this section left open is now decided and documented**,
+> not defaulted: `docs/research/reports/2026-08-10-logging-library-selection.md`
+> evaluates all six ingested candidates on this ruling's own axis — *whoever
+> owns the sink layer owns the shape of every report this repo prints*. Before
+> it, three of the six had no verdict at all, so structlog had not won anything;
+> it was the only one tried. It also **refutes logbook's one winning row by
+> measurement** (`MultiProcessingHandler` collects 0 records under
+> pytest-xdist), which closes §2.6j's outstanding probe.
+>
+> **The wire format and the intermediate-model question remain open**, as this
+> section always said. `text` rides on every event as the CURRENT rendering,
+> which is what makes each conversion behaviour-preserving; the fields are the
+> event's meaning.
 
 That suppression comment names the real tension: **most of the 414 sites are the
 product, not diagnostics.** `kb-check`'s summary table, `kb-gates`' report,
