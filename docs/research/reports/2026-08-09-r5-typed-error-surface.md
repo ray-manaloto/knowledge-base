@@ -329,10 +329,12 @@ def check(...) -> Result[list[Outcome]]:   # boundary; returns, never raises, ne
 def main(...) -> int:                      # renders, then `return exit_code(result)`
 ```
 
-**`main` deliberately still returns `int`.** The eight pre-existing exit-code
-assertions in `tests/test_check.py` are the regression arm: every observable
-exit code is byte-identical after the refactor, which is what makes the change
-safe to repeat across the other commands.
+**`main` deliberately still returns `int`.** Every pre-existing
+`assert check.main(...)` in `tests/test_check.py` is the regression arm: each
+observable exit code is byte-identical after the refactor, which is what makes
+the change safe to repeat across the other commands.
+
+*(This sentence said "the eight" until the cold lane counted 7 — see §7.)*
 
 ### What the conversion actually bought, in one assertion
 
@@ -383,6 +385,53 @@ pass, it would have been asserting something the module never claims.
   passthrough is the right answer — are part of the un-done sweep. Until one
   does, the claim "flattening loses information" remains reasoned, not measured.
 - **No `kb-remember` / `kb-reflect` yet** — the round is not closed.
+
+## 7. Cold review — 1 finding, and it was an unarmed count
+
+One lane (`fable-orchestrator:codex-reviewer`, OpenAI family — this diff was
+Claude-written), reviewed cold against `origin/main...e846827`, scope excluding
+`docs/research/**`. **1 finding, LOW, 0 blocking.** Report:
+`.agent/kb/review/reports/review-e846827-cold.md`.
+
+The finding: `check.py`'s `main` docstring claimed *"the eight existing
+exit-code assertions"*. **There are seven.**
+
+Verified before accepting it — a reader finding is a lead, not a fact — and it
+is confirmed. The cause is worth more than the correction:
+
+```
+grep -n "main(" tests/test_check.py        -> 10 lines   <- what I counted
+grep -c "assert check\.main(" …            ->  7         <- the actual thing
+the three impostors: _touch(tmp_path / "x.rs", "fn main() {}\n")
+```
+
+Three of the hit-lines are a **Rust** `fn main() {}` inside a fixture string. I
+counted grep hit-lines from a loose pattern and never armed it — in a change
+whose own report has a §5 table about arming counting greps, and in a repo whose
+last round measured its armed-grep rate at **9.5%**. Awareness did not produce
+compliance; a different reader did.
+
+Armed on the re-count: strict pattern → 7, a known-present sibling
+(`check.check(`) → 6, a bogus token → 0. The probe discriminates.
+
+**Fixed structurally, not correctively** — the docstring now names the *thing*
+(*"every pre-existing `assert check.main(...)`"*) and carries **no figure at
+all**, because a count there is invalidated by the next commit that adds a test.
+Same remedy the previous round applied to a regex comment.
+
+**What the lane verified by execution** (its own report, condensed): full suite
+green, `ty` + `ruff` clean on all four touched files, the `Result`→exit-code
+mapping traced by hand against pre-refactor behaviour and matching, `cli.py:234`
+confirmed the only external caller of `check.main`/`check.check`, and all four
+`result.py` guards confirmed to have paired accept/reject tests executed in both
+directions.
+
+**Round 2 was not run, deliberately.** The bound is two rounds; the finding was
+LOW, non-blocking, and the fix is prose inside a docstring with no behaviour to
+re-review. Spending a second cold lane on a comment edit is the disproportion
+this skill was rewritten to remove (#67: 2.93M tokens, one real defect, change
+reverted). Verification for the fix is the local gates, recorded below and in the
+fix-round report.
 
 ## GitHub repos touched
 

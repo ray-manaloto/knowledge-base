@@ -354,9 +354,18 @@ def check(repo_root: Path, args: list[str]) -> Result[list[Outcome]]:
 def main(repo_root: Path, args: list[str]) -> int:
     """Thin conversion from `Result` to a process exit code, and the only print.
 
-    Kept returning `int` deliberately: `cli.py` and the eight existing exit-code
-    assertions in `tests/test_check.py` are the regression arm for the `Result`
-    refactor — every observable code must be byte-identical to before.
+    Kept returning `int` deliberately: `cli.py` and every pre-existing
+    `assert check.main(...)` in `tests/test_check.py` are the regression arm for
+    the `Result` refactor — each observable code must be byte-identical to
+    before.
+
+    That sentence carried a COUNT ("the eight existing…") until the cold lane
+    caught it at 7. The miscount came from reading `grep -n "main("` hit-lines,
+    three of which are `_touch(… "fn main() {}")` — a **Rust** fixture string.
+    It is now stated without a figure, which is the structural fix rather than
+    the corrective one: a number here goes stale the next time anyone adds a
+    test, and `md-size-budgets`/`probes-need-a-control-arm` both say a figure
+    invalidated by the very commit that writes it should be a mechanism instead.
     """
     result = check(repo_root, args)
     match result:
