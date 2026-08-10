@@ -31,6 +31,21 @@ remember is the second kind. Here it is a refusal: `--outcome corrected` without
 a stated lesson is `BAD_REQUEST`, which is the same rule `Err` already enforces
 one layer down — *an unexplained outcome is the defect R9 names*.
 
+**ONE KNOWN DIVERGENCE from the `Result` contract, declared rather than fixed.**
+`check_remember` and `check_mode` are documented as returning rather than
+raising, and for every case they decide, they do. But a MALFORMED argv — a flag
+whose value is missing, e.g. `--question --audit` — is rejected by `argparse`
+itself, and `argparse.error()` calls `sys.exit(2)`. So that class exits from
+inside the parser, printing argparse's usage instead of one of this module's
+messages, and never reaches the `Result` vocabulary at all.
+
+The exit code is coincidentally right (2 is `Rc.BAD_REQUEST`), which is exactly
+why it is worth writing down: a divergence that produces the correct number is
+one nobody notices. Closing it means giving the parser an `exit_on_error=False`
+or overriding `error()`, which changes behaviour for every flag at once — a
+deliberate edit, not something to smuggle into a fix round. Found while writing
+a control arm for `wants_audit`, not by either review lane.
+
 **`--correction-file` exists here and not upstream, deliberately.** Prose passed
 inline to a CLI through a shell has executed its own backticks into this corpus
 before. Every argument here reaches `graphify` through `subprocess.run` with an
@@ -136,6 +151,33 @@ def _text_of(inline: str | None, path_str: str | None, *, flag: str) -> str | Er
     return path.read_text(encoding="utf-8")
 
 
+#: The parsed fields that mean "record something". Read off the NAMESPACE, never
+#: off argv — see :func:`check_mode` for the bug that distinction cost.
+_RECORD_FIELDS = ("question", "answer", "answer_file", "correction", "correction_file", "outcome")
+
+
+def _parser() -> argparse.ArgumentParser:
+    """The ONE argv parser for this command, `--audit` included.
+
+    One parser rather than two, because the mode decision and the request
+    validation must agree about what was asked for. When they were separate —
+    `check_mode` matching flag STRINGS in argv while `check_remember` parsed —
+    they disagreed about `--question=Q`, and the disagreement was the bug.
+    """
+    parser = argparse.ArgumentParser(prog="kb-remember", add_help=False)
+    parser.add_argument("--question")
+    parser.add_argument("--answer")
+    parser.add_argument("--answer-file", dest="answer_file")
+    parser.add_argument("--correction")
+    parser.add_argument("--correction-file", dest="correction_file")
+    parser.add_argument("--type", dest="query_type", default="query")
+    parser.add_argument("--outcome", default=None)
+    parser.add_argument("--nodes", nargs="*", default=[])
+    parser.add_argument("--memory-dir", dest="memory_dir", default=None)
+    parser.add_argument("--audit", action="store_true")
+    return parser
+
+
 def _validate_flags(opts: argparse.Namespace, unknown: list[str]) -> Err | None:
     """The flag-shape checks that do not need any file read. `None` when clean."""
     if unknown:
@@ -158,17 +200,7 @@ def check_remember(argv: Sequence[str]) -> Result[RememberRequest]:
     wrong without recording the replacement produces a `LESSONS.md` line that
     names a question and answers nothing.
     """
-    parser = argparse.ArgumentParser(prog="kb-remember", add_help=False)
-    parser.add_argument("--question")
-    parser.add_argument("--answer")
-    parser.add_argument("--answer-file", dest="answer_file")
-    parser.add_argument("--correction")
-    parser.add_argument("--correction-file", dest="correction_file")
-    parser.add_argument("--type", dest="query_type", default="query")
-    parser.add_argument("--outcome", default=None)
-    parser.add_argument("--nodes", nargs="*", default=[])
-    parser.add_argument("--memory-dir", dest="memory_dir", default=None)
-    opts, unknown = parser.parse_known_args(list(argv))
+    opts, unknown = _parser().parse_known_args(list(argv))
 
     bad = _validate_flags(opts, unknown)
     if bad is not None:
@@ -298,35 +330,46 @@ def audit_main(repo_root: Path) -> int:
 
 
 #: Flags that mean "record something". Any of these alongside `--audit` is a
-#: request for two different things at once, and is refused rather than resolved.
-_RECORD_FLAGS = frozenset(
-    {"--question", "--answer", "--answer-file", "--correction", "--correction-file", "--outcome"}
-)
-
-_AUDIT_FLAG = "--audit"
+def wants_audit(argv: Sequence[str]) -> bool:
+    """Whether this invocation asked for the audit, by PARSING rather than matching."""
+    return bool(_parser().parse_known_args(list(argv))[0].audit)
 
 
 def check_mode(argv: Sequence[str]) -> Err | None:
     """Refuse a request that asks to record AND to audit. `None` when unambiguous.
 
-    **This closes a silent loss found by the cold lane, and it is the module's own
-    defect one call frame up.** `main` used to branch on `if "--audit" in args` —
-    a membership test over the whole argv, not "is this the only thing asked for".
-    A typo or a scripted call that carried both flags had its RECORD REQUEST
-    silently discarded: the audit printed, the exit code was the audit's, and
-    nothing was written or warned about. Reproduced live before fixing (rc=1, zero
-    memories written), then again with `--audit` removed as the control.
+    **This closes a silent loss the cold lane found TWICE, one layer apart, and
+    the second time it was in the fix for the first.** Round 1: `main` branched on
+    `if "--audit" in args` — a membership test over the whole argv, not "is this
+    the only thing asked for" — so a call carrying both flags had its RECORD
+    REQUEST silently discarded, the audit printing and exiting with the audit's
+    code. Round 2: the fix for that matched flag STRINGS against argv, so
+    `--question=Q --audit` — argparse's own `=`-joined syntax — sailed straight
+    through and was discarded exactly as before.
 
-    A module whose whole purpose is refusing to lose a lesson must not lose one
-    in its own dispatch.
+    Both reproduced live before fixing, each with the other form as its control.
+
+    The lesson is not "handle `=` too". It is that **a decision about what was
+    asked for must be made from the PARSED request, never from the raw tokens** —
+    argparse already knows about `=`, prefix abbreviation and everything else this
+    would otherwise have to re-implement one discovered form at a time. So the
+    mode and the request now come from one parser, and `_RECORD_FIELDS` names
+    namespace attributes rather than spellings.
+
+    A module whose whole purpose is refusing to lose a lesson lost one in its own
+    dispatch twice; this is the shape that stops it happening a third time.
     """
-    args = list(argv)
-    if _AUDIT_FLAG not in args:
+    opts = _parser().parse_known_args(list(argv))[0]
+    if not opts.audit:
         return None
-    if also := sorted(_RECORD_FLAGS.intersection(args)):
+    supplied = sorted(
+        name for name in _RECORD_FIELDS if getattr(opts, name, None) not in (None, "", [])
+    )
+    if supplied:
+        pretty = ", ".join(f"--{name.replace('_', '-')}" for name in supplied)
         return Err(
-            f"{_AUDIT_FLAG} reports on existing memories and records nothing; it "
-            f"cannot be combined with {', '.join(also)}. Run them separately — "
+            f"--audit reports on existing memories and records nothing; it "
+            f"cannot be combined with {pretty}. Run them separately — "
             f"otherwise the record request is silently dropped.",
             rc=Rc.BAD_REQUEST,
         )
@@ -339,7 +382,7 @@ def main(repo_root: Path, argv: Sequence[str] = ()) -> int:
     if bad := check_mode(args):
         print(f"[remember] refusing — {bad.message}")
         return exit_code(bad)
-    if _AUDIT_FLAG in args:
+    if wants_audit(args):
         return audit_main(repo_root)
 
     result = check_remember(args)

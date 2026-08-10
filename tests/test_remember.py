@@ -11,6 +11,7 @@ from kb_setup.remember import (
     check_remember,
     main,
     render_audit,
+    wants_audit,
 )
 from kb_setup.result import Err, Ok, Rc, external_from_returncode
 
@@ -225,15 +226,64 @@ def test_a_record_request_alone_is_allowed() -> None:
     assert check_mode(["--question", "Q", "--answer", "A"]) is None
 
 
-def test_every_record_flag_triggers_the_refusal() -> None:
-    """One flag was enough to find the bug; the class is what must be closed."""
+def test_every_record_flag_triggers_the_refusal(tmp_path: Path) -> None:
+    """One flag was enough to find the bug; the class is what must be closed.
+
+    BOTH argv spellings, and that is the point. Round 2 of the review found that
+    the first fix matched flag STRINGS, so `--question=Q --audit` — argparse's
+    own `=`-joined syntax — bypassed it entirely and the record was discarded
+    exactly as before. This test previously used only the two-token form, which
+    is precisely why it could not see it.
+    """
+    somewhere = str(tmp_path / "x.md")
     for flag, value in (
         ("--question", "Q"),
         ("--answer", "A"),
+        ("--answer-file", somewhere),
         ("--outcome", "useful"),
         ("--correction", "C"),
+        ("--correction-file", somewhere),
     ):
-        assert check_mode([flag, value, "--audit"]) is not None, flag
+        assert check_mode([flag, value, "--audit"]) is not None, f"space form: {flag}"
+        assert check_mode([f"{flag}={value}", "--audit"]) is not None, f"= form: {flag}"
+
+
+def test_the_equals_joined_form_is_refused_through_main(tmp_path: Path) -> None:
+    """Round 2's finding, end to end.
+
+    Verified live before the fix: `--question=Q … --audit` exited 1 (the audit's
+    code) having written nothing, with no error — the round-1 bug reachable
+    through a different spelling of the same request.
+    """
+    lesson = tmp_path / "lesson.md"
+    lesson.write_text("a lesson that must not vanish", encoding="utf-8")
+    memories = tmp_path / "mem"
+    memories.mkdir()
+    rc = main(
+        tmp_path,
+        [
+            "--question=Q",
+            "--answer=A",
+            "--outcome=corrected",
+            f"--correction-file={lesson}",
+            f"--memory-dir={memories}",
+            "--audit",
+        ],
+    )
+    assert rc == Rc.BAD_REQUEST
+    assert list(memories.iterdir()) == [], "the =-joined record request was dropped"
+
+
+def test_wants_audit_parses_rather_than_matches() -> None:
+    """The structural fix: mode comes from the PARSED request, not from tokens."""
+    assert wants_audit(["--audit"]) is True
+    assert wants_audit(["--question", "Q"]) is False
+    # CONTROL: the flag text appearing as a VALUE is not the flag. Written in the
+    # `=` form on purpose — `["--question", "--audit"]` makes argparse treat
+    # `--audit` as the next flag, leaving `--question` without a value, and
+    # argparse then calls sys.exit rather than returning (see the module
+    # docstring's note on that divergence).
+    assert wants_audit(["--question=--audit"]) is False
 
 
 def test_main_refuses_the_mixed_request_and_writes_nothing(tmp_path: Path) -> None:
