@@ -26,6 +26,7 @@ from typing import Never
 
 import pytest
 from kb_setup import atomic, gates, pr
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 _MISE = "mise.toml"
 
@@ -1439,3 +1440,115 @@ def test_an_unexpected_error_in_one_gate_does_not_discard_the_others(monkeypatch
     rows = _rows(_written(root)[0])
     assert [rows[t]["rc"] for t in ("lint", "test", "eval")] == [0, 0, 0]
     assert rows["brain-audit"]["rc"] is None
+
+
+# --- §2 R5 tranche 4: the `Result` boundary ---------------------------------
+#
+# Every exit-code assertion above is unchanged and is the regression arm proving
+# the split changed no behaviour. What is NEW is that this module's three
+# outcomes are now three TYPES. `kb-gates` already drew the 0/1/2 split by hand;
+# no int-returning test can see whether a 2 arrived as a refusal-to-run or as a
+# claim about the gates, because both are the integer 2.
+
+
+def test_gates_boundary_failing_gate_is_ok_with_rc_findings(tmp_path: Path, monkeypatch) -> None:
+    """A gate that ran and FAILED is a finding, not a broken tool — recipe rule 1.
+
+    If someone "simplifies" this to an `Err`, every exit-code assertion in this
+    file stays green: `exit_code(Err(rc=FINDINGS))` is unrepresentable, but
+    `Err(msg)` defaults to 2 and the pre-existing tests assert 1 — so only the
+    rc would move, and only on the failure path. This asserts the TYPE.
+    """
+    root = _repo(tmp_path)
+    _pin_sha(monkeypatch)
+    _stub(monkeypatch)
+
+    result = gates.check_gates(list(_TASKS), root)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.FINDINGS
+    gate_run, _summary = result.value
+    assert not gate_run.all_passed
+
+
+def test_gates_boundary_all_passing_is_ok_with_rc_ok(tmp_path: Path, monkeypatch) -> None:
+    """CONTROL ARM: `Ok` is reachable with BOTH rcs, so the test above discriminates."""
+    root = _repo(tmp_path)
+    _pin_sha(monkeypatch)
+    _stub(monkeypatch, failing="nothing-fails")
+
+    result = gates.check_gates(list(_TASKS), root)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    gate_run, _summary = result.value
+    assert gate_run.all_passed
+
+
+def test_gates_boundary_unknown_flag_is_an_err_not_a_verdict(tmp_path: Path, monkeypatch) -> None:
+    """Refusing to run is a THIRD state, and the type now says so.
+
+    The int has been 2 all along and `main`'s tests pin it. What they cannot see
+    is whether that 2 arrived as an `Ok` — which would assert the gates ran and
+    reported something — or as an `Err`, which is the truth. A `--stop-on-failure`
+    typo must never read as a gate verdict.
+    """
+    calls = _never_runs(monkeypatch)
+    root = _repo(tmp_path)
+
+    result = gates.check_gates(["--stop-on-failure"], root)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "--stop-on-failure" in result.message
+    assert _mise(calls) == []
+
+
+def test_gates_boundary_undeclared_gate_is_an_err(tmp_path: Path, monkeypatch) -> None:
+    """The other never-ran route: a task `mise.toml` does not declare."""
+    root = _repo(tmp_path, tasks=("alpha",))
+    _pin_sha(monkeypatch)
+    _never_runs(monkeypatch)
+
+    result = gates.check_gates(["nope"], root)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "nope" in result.message
+
+
+def test_gates_boundary_returns_its_summary_rather_than_printing_it(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """The REPORT is returned; only the gates' own live output may reach the terminal.
+
+    This is the carve-out `check_gates` documents, asserted rather than asserted
+    away: the summary — the thing `main` prints — must not appear on stdout when
+    only the boundary has run. Armed on the FAILING path, since a passing run
+    printing no summary would also be true of a boundary that merely forgot to
+    report failures.
+    """
+    root = _repo(tmp_path)
+    _pin_sha(monkeypatch)
+    _stub(monkeypatch)
+
+    result = gates.check_gates(list(_TASKS), root)
+    captured = capsys.readouterr()
+
+    assert isinstance(result, Ok)
+    _, summary = result.value
+    assert summary
+    assert summary not in captured.out
+    assert summary not in captured.err
+
+
+def test_gates_int_wrapper_is_exit_code_of_boundary(tmp_path: Path, monkeypatch) -> None:
+    """The equivalence that makes the split safe — catches a renderer computing its own rc."""
+    root = _repo(tmp_path)
+    _pin_sha(monkeypatch)
+    _stub(monkeypatch)
+
+    rc_main = gates.main(list(_TASKS), root)
+    rc_boundary = exit_code(gates.check_gates(list(_TASKS), root))
+
+    assert rc_main == rc_boundary == int(Rc.FINDINGS)

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import launch
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 _SHIM = "/home/u/.local/share/mise/shims/graphify"
 _INSTALL = "/home/u/.local/share/mise/installs/pipx-graphifyy/0.9.25/bin/graphify"
@@ -890,3 +891,130 @@ def test_a_corrupt_settings_file_reports_disabled_rather_than_raising(
     d.mkdir()
     (d / "settings.json").write_text("{not json", encoding="utf-8")
     assert "DISABLED" in launch.teammate_note(tmp_path, in_tmux=False)
+
+
+# --- §2 R5 tranche 4: the `Result` boundary ---------------------------------
+#
+# Every exit-code assertion above is unchanged and is the regression arm proving
+# the split changed no behaviour. What is NEW is that "a FAILED check" and "the
+# request was refused" are now different TYPES — both were non-zero ints before,
+# and `doctor_main`'s 1-vs-2 split is invisible to a test asserting `rc != 0`.
+
+
+def _boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    task_path: str,
+    session: str | None,
+    extra_argv: list[str] | None = None,
+) -> Result[list[launch.Check]]:
+    """`check_doctor` driven exactly the way `_run_doctor_main` drives the renderer."""
+    repo = _pinned_repo(tmp_path)
+    sibling = tmp_path / "sibling"
+    sibling.mkdir(exist_ok=True)
+    monkeypatch.setenv("PATH", task_path)
+    monkeypatch.setenv("CLAUDE_PID", "4242")
+    monkeypatch.setattr(launch, "_env_path_of", lambda _pid: session)
+    return launch.check_doctor(repo, ["--sibling", str(sibling), *(extra_argv or [])])
+
+
+def test_doctor_boundary_a_failed_check_is_ok_with_rc_findings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A doctor that ran and found a broken environment SUCCEEDED — recipe rule 1.
+
+    If someone "simplifies" this to an `Err`, `test_doctor_main_still_fails_when_
+    the_session_itself_is_dirty` stays green only by accident: `Err` defaults to
+    rc 2 and that test asserts 1, so the failure would be a changed integer on
+    one path. This asserts the TYPE, which is the thing the integer cannot say.
+    """
+    _, task_path = _shim_and_install(tmp_path)
+
+    result = _boundary(tmp_path, monkeypatch, task_path=task_path, session=task_path)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.FINDINGS
+    assert any(c.status == launch.FAIL for c in result.value)
+
+
+def test_doctor_boundary_clean_session_is_ok_with_rc_ok(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CONTROL ARM: `Ok` is reachable with BOTH rcs, so the test above discriminates."""
+    session, task_path = _shim_and_install(tmp_path)
+
+    result = _boundary(tmp_path, monkeypatch, task_path=task_path, session=session)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+
+
+def test_doctor_boundary_unknown_rows_do_not_become_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unreadable session is "not checked", and the rc must not call it broken.
+
+    This is the false-RED twin of the false-green this repo's doctrine is about,
+    and the split makes it checkable: the UNKNOWN rows are IN the returned value
+    while the rc stays `OK`, so a caller can see both facts without one erasing
+    the other.
+    """
+    _, task_path = _shim_and_install(tmp_path)
+
+    result = _boundary(tmp_path, monkeypatch, task_path=task_path, session=None)
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+    assert any(c.status == launch.UNKNOWN for c in result.value)
+
+
+def test_doctor_boundary_a_bad_request_is_an_err(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refusing to run is a THIRD state, and the type now says so.
+
+    The int has been 2 all along. What no test could see is whether that 2
+    arrived as an `Ok` — asserting the doctor ran and reported something — or as
+    an `Err`, which is the truth. A typo'd flag is not an environment verdict.
+    """
+    _, task_path = _shim_and_install(tmp_path)
+
+    result = _boundary(
+        tmp_path, monkeypatch, task_path=task_path, session=None, extra_argv=["--nope"]
+    )
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "--nope" in result.message
+
+
+def test_doctor_boundary_prints_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Rendering belongs to `doctor_main`; the boundary only returns.
+
+    Armed on the FAILING path — a clean run printing nothing would also be true
+    of a boundary that merely forgot to report its failures.
+    """
+    _, task_path = _shim_and_install(tmp_path)
+
+    _boundary(tmp_path, monkeypatch, task_path=task_path, session=task_path)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_doctor_int_wrapper_is_exit_code_of_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The equivalence that makes the split safe — catches a renderer computing its own rc."""
+    _, task_path = _shim_and_install(tmp_path)
+
+    rc_main = _run_doctor_main(tmp_path, monkeypatch, task_path=task_path, session=task_path)
+    rc_boundary = exit_code(
+        _boundary(tmp_path, monkeypatch, task_path=task_path, session=task_path)
+    )
+
+    assert rc_main == rc_boundary == int(Rc.FINDINGS)

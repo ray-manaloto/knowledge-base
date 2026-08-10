@@ -69,7 +69,7 @@ from pathlib import Path
 from typing import TypeIs
 
 from kb_setup import atomic, resolve, review
-from kb_setup.result import Rc
+from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 #: Where a run's record lands. Listed in `agent-artifact-conventions.md`, which
 #: forbids directories that are not.
@@ -938,6 +938,51 @@ def run_and_record(
 _FLAGS = frozenset({"--stop"})
 
 
+def check_gates(args: list[str], repo_root: Path) -> Result[tuple[GateRun, str]]:
+    """The boundary (§2 R5): the gate run and its summary, or why it was refused.
+
+    Returns rather than raises — :func:`main` renders. Same split as
+    ``skill_lint.check_skill_lint``/``skill_lint_main``, which is ``ruff``'s
+    ``pub fn run(..) -> Result<ExitStatus>`` (``crates/ruff/src/lib.rs:128``).
+
+    This module is the recipe's cleanest fit so far, because the three outcomes
+    it already drew by hand are exactly the three the vocabulary names:
+
+    * *A run happened and every gate passed* — ``Ok((run, summary))``.
+    * *A run happened and a gate failed* — ``Ok((run, summary), rc=Rc.FINDINGS)``.
+      The gates did their job; a failing gate is a finding, not a broken tool.
+      This is recipe rule 1 in the case it was written for.
+    * *Nothing ran* — an unknown flag, an undeclared gate, an unreadable HEAD.
+      ``Err(reason, rc=Rc.BAD_REQUEST)``, which is the 2 this command already
+      reserved, now carrying its reason in the type instead of only on stderr.
+
+    **One carve-out, stated rather than glossed.** Rule 3 says a boundary prints
+    nothing, and this one does print — :func:`_run_one` writes a ``==> gate:``
+    line and each gate's own stdio is inherited, so a 57-second run stays legible
+    while it happens (criterion 8). That output is *the gates'*, not this
+    module's report: the report is the summary, and the summary is returned. A
+    boundary that buffered the live output to satisfy the letter of rule 3 would
+    turn every gate run silent, which is the trade §2.5's stdout sink exists to
+    make properly rather than as a side effect of a conversion.
+    """
+    unknown_flags = [a for a in args if a.startswith("-") and a not in _FLAGS]
+    if unknown_flags:
+        return Err(
+            f"unknown flag(s) {', '.join(unknown_flags)} (accepted: {', '.join(sorted(_FLAGS))})",
+            rc=Rc.BAD_REQUEST,
+        )
+
+    tasks = tuple(a for a in args if not a.startswith("-")) or GATE_TASKS
+    gate_run, summary = run_and_record(repo_root, tasks, stop_on_failure="--stop" in args)
+    if gate_run is None:
+        return Err(summary, rc=Rc.BAD_REQUEST)
+
+    # A gate that never ran counts as not passed. Under the default flag none can
+    # be unrun, but `--stop` makes it reachable, and a `--stop` run that exited 0
+    # having skipped half the list would be the false green in person.
+    return Ok((gate_run, summary), rc=Rc.OK if gate_run.all_passed else Rc.FINDINGS)
+
+
 def main(args: list[str], repo_root: Path) -> int:
     """`kb-gates [<task>...] [--stop]` — 1 if any gate failed, 2 on a bad request.
 
@@ -945,24 +990,17 @@ def main(args: list[str], repo_root: Path) -> int:
     gate this repo does not declare, or a HEAD that cannot be read — the same
     split `kb-handoff-check` and `kb-skill-score` draw. It matters here because 1
     is a claim about the gates, and refusing to run them is not that claim.
+
+    Kept returning ``int``: ``cli.py``, the `kb-gates` mise task and this
+    module's existing exit-code assertions are the regression arm proving the
+    ``Result`` split changed no behaviour.
     """
-    unknown_flags = [a for a in args if a.startswith("-") and a not in _FLAGS]
-    if unknown_flags:
-        print(
-            f"kb-gates: unknown flag(s) {', '.join(unknown_flags)} "
-            f"(accepted: {', '.join(sorted(_FLAGS))})",
-            file=sys.stderr,
-        )
-        return 2
-
-    tasks = tuple(a for a in args if not a.startswith("-")) or GATE_TASKS
-    gate_run, summary = run_and_record(repo_root, tasks, stop_on_failure="--stop" in args)
-    if gate_run is None:
-        print(f"kb-gates: {summary}", file=sys.stderr)
-        return 2
-
+    result = check_gates(args, repo_root)
+    # Narrowed on `Ok`, not against `Err`: `Result` has a THIRD variant, and
+    # `External` carries no `.value`. ty catches the negative form.
+    if not isinstance(result, Ok):
+        print(f"kb-gates: {result.message}", file=sys.stderr)
+        return exit_code(result)
+    _, summary = result.value
     print(summary)
-    # A gate that never ran counts as not passed. Under the default flag none can
-    # be unrun, but `--stop` makes it reachable, and a `--stop` run that exited 0
-    # having skipped half the list would be the false green in person.
-    return 0 if gate_run.all_passed else 1
+    return exit_code(result)

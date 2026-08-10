@@ -20,6 +20,7 @@ from pathlib import Path
 
 from kb_setup import goal
 from kb_setup.goal import Verdict
+from kb_setup.result import Ok, Rc, exit_code
 
 # A minimal goal that passes every mechanical check. Each test mutates ONE thing.
 _GOOD = """GOAL: Establish why the thing does the thing. Current pain: `foo.py:12`
@@ -353,3 +354,80 @@ def test_the_index_row_is_flipped(tmp_path: Path) -> None:
         runner=lambda _r, _a: 0,
     )
     assert "| achieved |" in index.read_text(encoding="utf-8")
+
+
+# --- §2 R5 tranche 4: the `Result` boundary ---------------------------------
+#
+# Every exit-code assertion above is unchanged and is the regression arm proving
+# the split changed no behaviour. What is NEW is that the findings now cross the
+# boundary as a typed value, and that `main`'s advisory-always-0 contract is a
+# RENDERER decision rather than something baked into the checker.
+
+
+def test_goal_boundary_returns_ok_with_findings() -> None:
+    """The boundary hands back the findings themselves, not an integer verdict."""
+    result = goal.check_goal_target("# nothing", None, is_pair=False)
+
+    assert isinstance(result, Ok)
+    assert result.value
+    assert any(f.verdict is Verdict.FAIL for f in result.value)
+
+
+def test_goal_boundary_is_advisory_so_findings_are_not_rc_findings() -> None:
+    """The one place this module departs from recipe rule 1, asserted so it is a CHOICE.
+
+    `kb-goal-check` is advisory by ruling — `render` prints "always exits 0; read
+    the report, not the rc". Returning `Rc.FINDINGS` here would make `exit_code`
+    hand back 1 and silently promote an advisory report to a gate. If someone
+    "fixes" the boundary to look like `skill_lint`'s, every int-returning test in
+    this file stays green and only this one notices.
+    """
+    failing = goal.check_goal_target("# nothing", None, is_pair=False)
+    clean = goal.check_goal_target(_GOOD, None, is_pair=False)
+
+    assert isinstance(failing, Ok)
+    assert isinstance(clean, Ok)
+    # CONTROL ARM: the two inputs really do differ in what they FOUND, so the
+    # shared rc is the module's choice rather than the checker failing to look.
+    assert sum(f.verdict is Verdict.FAIL for f in failing.value) > sum(
+        f.verdict is Verdict.FAIL for f in clean.value
+    )
+    assert failing.rc is Rc.OK
+    assert clean.rc is Rc.OK
+
+
+def test_goal_boundary_prints_nothing(capsys) -> None:
+    """Rendering belongs to `main`; the boundary only returns.
+
+    Armed on the FINDINGS path — a clean input printing nothing would also be
+    true of a boundary that merely forgot to print its failures.
+    """
+    goal.check_goal_target("# nothing", None, is_pair=False)
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_goal_no_input_is_the_documented_divergence(monkeypatch) -> None:
+    """A run that checked NOTHING exits 0 — #270's shape, in a fourth place.
+
+    `main` with no args and a tty stdin prints usage and returns 0. Nothing was
+    checked, so by `probes-need-a-control-arm.md` this is `Rc.NOT_RUN`, exactly
+    like `skill_lint`'s empty glob. It is left at 0 because a conversion's
+    regression arm IS the pre-existing exit-code assertions; closing it is a
+    deliberate edit to this assertion, which is the point of pinning it.
+    """
+    monkeypatch.setattr(goal.sys.stdin, "isatty", lambda: True)
+
+    assert goal.main([], Path.cwd()) == int(Rc.OK)
+
+
+def test_goal_int_wrapper_is_exit_code_of_boundary(tmp_path: Path) -> None:
+    """The equivalence that makes the split safe — catches a renderer computing its own rc."""
+    doc = tmp_path / "x-goal.md"
+    doc.write_text("# nothing", encoding="utf-8")
+
+    assert goal.main([str(doc)], tmp_path) == exit_code(
+        goal.check_goal_target(doc.read_text(encoding="utf-8"), doc, is_pair=True)
+    )

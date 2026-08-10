@@ -1,0 +1,204 @@
+# Mutation arms for §2 R5 tranche 4 — the four newly converted boundaries.
+#
+# WHY THESE EXIST AND NOT JUST THE SUITE. Every boundary test in this tranche
+# was written by the same session, in the same turn, as the code it covers —
+# the shape `.claude/rules/probes-need-a-control-arm.md` rule 2 names as
+# least-reviewed. A test written alongside its own change routinely cannot
+# fail, and no reading of it can tell you so. These arms revert the code and
+# check the suite goes red NAMING the right test.
+#
+# WHAT A CLEAN SWEEP HERE WOULD AND WOULD NOT MEAN. It is a statement about the
+# TESTS, never about the premise. Specifically it does NOT establish:
+#
+#   * that these four were the right four. Ray's tranche-4 ruling named EIGHT
+#     boundaries; measurement against recipe rule 3 found only four are
+#     render-once, and the other four — `pr.ship_main`, `pr.land_main`,
+#     `skill_refresh.refresh`, `launch.cc_main` — print progressively between
+#     subprocess and network calls, the same shape as the already-deferred
+#     `graphify_ops` family. Ray re-ruled on the measurement (2026-08-10):
+#     convert the four that fit, defer the four that do not. No arm below says
+#     anything about the deferred four.
+#   * that `gates.check_gates` satisfies rule 3. It does NOT, deliberately: the
+#     gates' own live stdio and the `==> gate:` line still reach the terminal,
+#     because buffering them turns a 57-second run silent (#146 criterion 8).
+#     What is asserted is narrower and is the checkable part — the SUMMARY, the
+#     thing `main` prints, does not escape the boundary. `arm
+#     gates-summary-printed-in-the-boundary` is the arm on exactly that.
+#   * that the `Rc.OK`-for-a-gate-that-never-ran divergence is acceptable. This
+#     tranche found a FOURTH instance (`goal.main` with no input) and pinned it
+#     rather than fixing it, same as the three in #270.
+#   * that any command needs `External`. Still none does — and `launch.cc_main`,
+#     which returns a child's raw returncode and would be the first real user,
+#     is in the deferred set.
+#
+# EVERY ARM IS A REALISTIC BREAK. The recurring temptation in this conversion is
+# "simplify the conditional" — a reviewer sees `rc=Rc.FINDINGS if x else Rc.OK`
+# and shortens it — and, new in this tranche, "make the odd one out consistent":
+# `hook_guard` and `goal` deliberately never return `Rc.FINDINGS`, so the
+# realistic break is a tidy-up that makes them match the other modules. Both are
+# armed below. A renamed symbol is never used: it leaves the original as a
+# substring and proves nothing.
+
+suites = [
+  "tests/test_goal.py",
+  "tests/test_hook_guard.py",
+  "tests/test_gates.py",
+  "tests/test_launch.py",
+]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/gates.py"
+old = "    tasks = tuple(a for a in args if not a.startswith(\"-\")) or GATE_TASKS"
+new = "    tasks = tuple(a for a in args if not a.startswith(\"-\")) or GATE_TASKS  # inert control edit"
+
+# --------------------------------------------------------------------------
+# "Findings are Ok, and a refusal is Err" — per module
+# --------------------------------------------------------------------------
+
+# A failing gate reports clean. `kb-gates` goes permanently green and `kb-ship`
+# stops gating, which is the single most expensive break available here.
+[[arm]]
+id = "gates-failing-gate-reports-as-clean"
+test = "test_gates_boundary_failing_gate_is_ok_with_rc_findings"
+file = "python/src/kb_setup/gates.py"
+old = "    return Ok((gate_run, summary), rc=Rc.OK if gate_run.all_passed else Rc.FINDINGS)"
+new = "    return Ok((gate_run, summary))"
+
+# A broken environment reports clean. `cc-doctor` stops catching the stale-PATH
+# skew it exists for.
+[[arm]]
+id = "doctor-failed-check-reports-as-clean"
+test = "test_doctor_boundary_a_failed_check_is_ok_with_rc_findings"
+file = "python/src/kb_setup/launch.py"
+old = "    return Ok(results, rc=Rc.FINDINGS if failed else Rc.OK)"
+new = "    return Ok(results)"
+
+# An UNKNOWN row becomes a failure — the FALSE-RED twin, and the realistic break
+# is a reviewer "tightening" the check that only FAIL counts.
+[[arm]]
+id = "doctor-unknown-counts-as-a-failure"
+test = "test_doctor_boundary_unknown_rows_do_not_become_a_failure"
+file = "python/src/kb_setup/launch.py"
+old = "    failed = any(c.status == FAIL for c in results)"
+new = "    failed = any(c.status != OK for c in results)"
+
+# --------------------------------------------------------------------------
+# "A refusal to run is an Err, not a verdict" — the 2 that no int test can see
+# --------------------------------------------------------------------------
+
+# A typo'd flag stops being refused and silently takes the opposite position of
+# the one flag this command has. This is `_FLAGS`' own documented failure mode,
+# reverted at the new layer.
+[[arm]]
+id = "gates-unknown-flag-stops-being-refused"
+test = "test_gates_boundary_unknown_flag_is_an_err_not_a_verdict"
+file = "python/src/kb_setup/gates.py"
+old = "    unknown_flags = [a for a in args if a.startswith(\"-\") and a not in _FLAGS]"
+new = "    unknown_flags = []"
+
+# An undeclared gate stops being refused, so `kb-gates -- nope` reports a
+# verdict about gates that never ran.
+[[arm]]
+id = "gates-undeclared-gate-reports-a-verdict"
+test = "test_gates_boundary_undeclared_gate_is_an_err"
+file = "python/src/kb_setup/gates.py"
+old = "        return Err(summary, rc=Rc.BAD_REQUEST)"
+new = "        return Ok((GateRun((), \"\", None), summary))"
+
+# A bad argument to `cc-doctor` reports as an environment verdict instead of a
+# refusal — the same class, in the module where the request parsing is longest.
+[[arm]]
+id = "doctor-bad-request-becomes-a-verdict"
+test = "test_doctor_boundary_a_bad_request_is_an_err"
+file = "python/src/kb_setup/launch.py"
+old = "        return Err(f\"unknown argument {args[i]!r}\", rc=Rc.BAD_REQUEST)"
+new = "        return Ok([])"
+
+# --------------------------------------------------------------------------
+# The two DELIBERATE departures from recipe rule 1
+#
+# Both modules are the odd ones out, so the realistic break is a tidy-up that
+# makes them consistent with the other ten converted boundaries. Neither
+# mutation is caught by any pre-existing exit-code assertion: `hook_guard`'s
+# tests all assert 0 and `goal`'s all assert 0, and both mutations only change
+# what the BOUNDARY returns.
+# --------------------------------------------------------------------------
+
+# A PreToolUse denial starts exiting 1 — which in that protocol means the hook
+# CRASHED, not that it denied. The guard is documented to fail open.
+[[arm]]
+id = "hook-guard-denial-becomes-a-nonzero-exit"
+test = "test_hook_guard_rc_is_always_ok_because_the_verdict_is_not_the_exit_code"
+file = "python/src/kb_setup/hook_guard.py"
+old = "        if reason:\n            return Ok(reason)"
+new = "        if reason:\n            return Ok(reason, rc=Rc.FINDINGS)"
+
+# `kb-goal-check` stops being advisory and becomes a gate — one word, and the
+# skill's own output ("always exits 0; read the report, not the rc") becomes a
+# lie without any test in that file noticing.
+[[arm]]
+id = "goal-advisory-becomes-a-gate"
+test = "test_goal_boundary_is_advisory_so_findings_are_not_rc_findings"
+file = "python/src/kb_setup/goal.py"
+old = "    return Ok(check_goal(text, path))"
+new = "    findings = check_goal(text, path)\n    return Ok(findings, rc=Rc.FINDINGS if findings else Rc.OK)"
+
+# --------------------------------------------------------------------------
+# Rule 3 — the boundary does not render
+# --------------------------------------------------------------------------
+
+# The boundary prints the summary itself, so `main` would double-print and
+# §2.5's stdout sink could never re-render it. This is the arm on the ONE part
+# of rule 3 `check_gates` does claim.
+[[arm]]
+id = "gates-summary-printed-in-the-boundary"
+test = "test_gates_boundary_returns_its_summary_rather_than_printing_it"
+file = "python/src/kb_setup/gates.py"
+old = "    return Ok((gate_run, summary), rc=Rc.OK if gate_run.all_passed else Rc.FINDINGS)"
+new = "    print(summary)\n    return Ok((gate_run, summary), rc=Rc.OK if gate_run.all_passed else Rc.FINDINGS)"
+
+# The same break in the module where the renderer is longest.
+[[arm]]
+id = "doctor-boundary-renders"
+test = "test_doctor_boundary_prints_nothing"
+file = "python/src/kb_setup/launch.py"
+old = "    failed = any(c.status == FAIL for c in results)"
+new = "    for c in results:\n        print(c.detail)\n    failed = any(c.status == FAIL for c in results)"
+
+# --------------------------------------------------------------------------
+# The single-conversion property
+#
+# THE FIRST VERSION OF THIS ARM SURVIVED, AND THE SURVIVOR WAS AN INERT MUTANT
+# rather than a coverage gap — worth recording, because the two look identical
+# in the sweep output and only one is a defect.
+#
+# It replaced `return exit_code(result)` with `return 0 if gate_run.all_passed
+# else 1`, meaning to catch a renderer that computes its own rc instead of
+# funnelling through the single documented conversion. No test can kill that,
+# and no test written later could either: `Rc.OK` IS 0 and `Rc.FINDINGS` IS 1,
+# so the hand-rolled mapping is extensionally equal to `exit_code` on the whole
+# `Ok` branch. Proved rather than argued, both arms::
+#
+#     all_passed=True   original=0  mutated=0  agree=True
+#     all_passed=False  original=1  mutated=1  agree=True
+#
+# So "funnels through `exit_code`" is, in `gates.main` as it stands today, an
+# UNOBSERVABLE property — real, worth keeping, and not something a mutation arm
+# can measure. Claiming otherwise is the failure `.claude/rules/probes-need-a-
+# control-arm.md` rule 9 names: an arm whose id promises more than it can see.
+#
+# What replaces it is a break that IS observable and IS realistic — a renderer
+# quietly made advisory, which is a live temptation for a task that people run
+# constantly and want to stop failing. The id names that, and nothing more.
+# --------------------------------------------------------------------------
+
+# `kb-gates` reports success whatever the gates said. This is the false green in
+# person, and it is what `kb-ship` rests on.
+[[arm]]
+id = "gates-renderer-drops-the-findings-rc"
+test = "test_gates_int_wrapper_is_exit_code_of_boundary"
+file = "python/src/kb_setup/gates.py"
+old = "    _, summary = result.value\n    print(summary)\n    return exit_code(result)"
+new = "    _, summary = result.value\n    print(summary)\n    return 0"

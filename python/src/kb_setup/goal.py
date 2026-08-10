@@ -32,6 +32,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from kb_setup.result import Ok, Rc, Result, exit_code
+
 #: The cap `/goal` enforces on the objective text. Both Claude Code and Codex
 #: refuse longer input and tell you to put the detail in a file — which is what
 #: the rider is. Ceccarelli's corpus runs 3,929-4,112; past ~4,100 the goal is
@@ -600,8 +602,49 @@ def _flip_index_row(repo_root: Path, name: str, result: str) -> bool:
     return changed
 
 
+def check_goal_target(text: str, path: Path | None, *, is_pair: bool) -> Result[list[Finding]]:
+    """The boundary (§2 R5): the findings for one goal, rider, or pair.
+
+    Returns rather than raises, and prints nothing — :func:`main` renders. Same
+    split as ``skill_lint.check_skill_lint``/``skill_lint_main``, which is
+    ``ruff``'s ``pub fn run(..) -> Result<ExitStatus>`` (``crates/ruff/src/lib.rs:128``).
+
+    **This boundary deliberately never returns `Rc.FINDINGS`, and that is the
+    one place it departs from the recipe's rule 1.** `kb-goal-check` is advisory
+    by ruling — "read the report, not the rc", stated in :func:`render`'s own
+    output — so the command makes no exit-code claim about what it found. `rc` is
+    a claim about the *process*; the FAIL count is in the returned value, which
+    is where a caller reads it without an integer having to carry it. Returning
+    `FINDINGS` here would make `exit_code` hand back 1 and turn an advisory
+    report into a gate, which is a behaviour change and not this tranche's job.
+
+    Argument resolution stays in :func:`main` above this call, the same way
+    ``gates.main`` refuses an unknown flag before reaching its boundary: a
+    request that named nothing to check is a question about the *request*, not a
+    result the checker produced.
+    """
+    if is_pair and path is not None:
+        return Ok(check_pair(path))
+    if path is not None and path.name.endswith("-rider.md"):
+        return Ok(check_rider(text, path))
+    return Ok(check_goal(text, path))
+
+
 def main(args: list[str], repo_root: Path) -> int:
-    """`kb-goal-check` — always returns 0; this is advisory, never a gate."""
+    """`kb-goal-check` — always returns 0; this is advisory, never a gate.
+
+    Kept returning ``int``: ``cli.py`` and this module's existing exit-code
+    assertions are the regression arm proving the ``Result`` split changed no
+    behaviour.
+
+    **The no-input branch is a fourth instance of #270's divergence.** Nothing
+    was checked, so by ``probes-need-a-control-arm.md`` this is "the gate did not
+    run" — `Rc.NOT_RUN` — and it returns 0 like the other three. It is left
+    returning 0 for the same reason they were: a conversion's regression arm IS
+    the pre-existing exit-code assertions. Pinned by
+    ``test_goal_no_input_is_the_documented_divergence`` so closing it is a
+    deliberate edit to a failing assertion.
+    """
     if args and args[0] == "--text":
         text, path, is_pair = " ".join(args[1:]), None, False
     elif args:
@@ -613,17 +656,16 @@ def main(args: list[str], repo_root: Path) -> int:
             "kb-goal-check: pass a goal/rider path, a pair prefix, "
             "--text <goal text>, or pipe on stdin"
         )
-        return 0
+        return int(Rc.OK)
 
-    if is_pair and path is not None:
-        findings = check_pair(path)
-    elif path is not None and path.name.endswith("-rider.md"):
-        findings = check_rider(text, path)
-    else:
-        findings = check_goal(text, path)
-
-    print(render(findings))
-    return 0
+    result = check_goal_target(text, path, is_pair=is_pair)
+    # Narrowed on `Ok`, not against `Err`: `Result` has a THIRD variant, and
+    # `External` carries no `.value`. ty catches the negative form.
+    if not isinstance(result, Ok):
+        print(f"kb-goal-check: {result.message}")
+        return exit_code(result)
+    print(render(result.value))
+    return exit_code(result)
 
 
 def outcome_main(args: list[str], repo_root: Path) -> int:

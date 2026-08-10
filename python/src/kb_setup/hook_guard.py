@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 from kb_setup import graph_first
+from kb_setup.result import Ok, Result, exit_code
 
 # Command position: start of string or just after a shell separator, tolerating
 # an `env`/`VAR=x` prefix so `FOO=1 graphify add …` cannot slip past (it did
@@ -244,31 +245,61 @@ def _bare_python(command: str) -> str | None:
     return _REASON_BARE_PY.format(exe=m.group(1))
 
 
-def run() -> int:
-    """PreToolUse entry. Reads the tool call on stdin; denies hand-run graphify.
+def check_hook_call(raw: str) -> Result[str | None]:
+    """The boundary (§2 R5): the denial reason for one PreToolUse payload, or None.
 
-    Fails OPEN (exit 0, no output = allow) on any parse/internal error.
+    Returns rather than raises, and prints nothing — :func:`run` renders the
+    deny JSON. Same split as ``skill_lint.check_skill_lint``/``skill_lint_main``.
+
+    **This is the one converted boundary whose `rc` carries no information, and
+    the reason is the protocol rather than an oversight.** A PreToolUse hook's
+    verdict travels in the JSON it writes to *stdout*; its exit code is only
+    "did the hook itself survive", and this guard is documented to fail OPEN —
+    every path returns 0, including the ones that deny. So a denial is
+    `Ok(reason)` at `Rc.OK`, not `Rc.FINDINGS`: returning FINDINGS would make
+    :func:`exit_code` hand back 1, which in this protocol means the hook crashed
+    and would change how Claude Code treats the call.
+
+    What the split buys where the integer bought nothing: a caller — the
+    ``skill_lint`` gate is already one, via :func:`decide` — can now ask this
+    module for a verdict without going through stdin and a JSON envelope, and
+    the three ways a payload can produce "allow" (not our tool, nothing matched,
+    an internal error we swallowed) stay distinguishable at the type level
+    instead of collapsing into one `return 0`.
     """
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        payload = json.loads(raw or "{}")
     except json.JSONDecodeError, ValueError:
-        return 0
+        return Ok(None)
     tool_name = payload.get("tool_name")
     if tool_name not in {"Bash", "Grep"}:
-        return 0
+        return Ok(None)
     tool_input = payload.get("tool_input") or {}
     if tool_name == "Bash":
         reason = _graphify_redirect(tool_input)
         if reason:
-            _deny(reason)
-            return 0
+            return Ok(reason)
     try:
-        reason = _graph_first(payload, tool_name, tool_input)
+        return Ok(_graph_first(payload, tool_name, tool_input))
     except Exception:
-        return 0
-    if reason:
-        _deny(reason)
-    return 0
+        return Ok(None)
+
+
+def run() -> int:
+    """PreToolUse entry. Reads the tool call on stdin; denies hand-run graphify.
+
+    Fails OPEN (exit 0, no output = allow) on any parse/internal error.
+
+    Kept returning ``int``: ``.claude/settings.json`` invokes this as a hook and
+    this module's existing exit-code assertions are the regression arm proving
+    the ``Result`` split changed no behaviour.
+    """
+    result = check_hook_call(sys.stdin.read())
+    # Narrowed on `Ok`, not against `Err`: `Result` has a THIRD variant, and
+    # `External` carries no `.value`. ty catches the negative form.
+    if isinstance(result, Ok) and result.value:
+        _deny(result.value)
+    return exit_code(result)
 
 
 def _graphify_redirect(tool_input: dict) -> str | None:

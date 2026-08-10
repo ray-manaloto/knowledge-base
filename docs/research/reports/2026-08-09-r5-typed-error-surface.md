@@ -515,11 +515,11 @@ of ~165 sites is a separate tranche and is NOT done.
 
 ## 9. The conversion tranche — the recipe, and where it stopped
 
-**Converted so far: `check` (tranche 1), `lint_checks` (tranche 2), and
+**Converted so far: `check` (tranche 1), `lint_checks` (tranche 2),
 `md_budget` / `skill_lint` / `handoff` / `session_state` / `distill` /
-`skill_eval` (tranche 3, 2026-08-10).** Stated as a count of modules rather
-than of sites, because the site figure is what the conversion itself
-invalidates.
+`skill_eval` (tranche 3, 2026-08-10), and `goal` / `hook_guard` / `gates` /
+`launch` (tranche 4, 2026-08-10).** Stated as a count of modules rather than of
+sites, because the site figure is what the conversion itself invalidates.
 
 **The denominator was re-derived in tranche 3 and the old one was wrong in a
 way worth recording.** An AST walk over `python/src/kb_setup/**` finds **95**
@@ -656,6 +656,102 @@ it` rather than passing; left alone it would have sat in the spec reading as
 coverage it no longer had. Re-derived in the same change. This is the third
 recorded instance of a refactor invalidating a mutation spec — `--dry-run`
 after *any* edit to converted code is not optional.
+
+### 9d. Tranche 4 (2026-08-10) — the ruling that half the list did not fit
+
+Ray's tranche-4 ruling named **eight** boundaries: `goal.main` /
+`goal.outcome_main`, `skill_refresh.refresh`, `hook_guard.run`, `gates.main`,
+`launch.cc_main` / `launch.doctor_main`, `pr.ship_main` / `pr.land_main`. Measured
+against recipe rule 3 before converting any of them, **only four are
+render-once**. The other four print progressively between subprocess and network
+calls — `pr.land_main` writes four `==>` lines interleaved with await / checks /
+receipt / merge; `pr.ship_main` prints between push, upstream and PR-open;
+`skill_refresh.refresh` prints, runs `fmt`, prints; `cc_main` prints, kills the
+tmux server, prints, then execs a child. That is the same shape as the
+`graphify_ops` family §9b already deferred, arrived at from the other direction.
+
+Re-ruled on the measurement rather than on the list: **convert the four that fit,
+defer the four that do not.** The deferred four join §9b's set as §2.5 stdout-sink
+work. The cost of doing otherwise was specific and was what made this worth
+asking about rather than deciding quietly — splitting `pr` under rule 3 would make
+`kb-land` silent for the whole check-wait and `kb-ship` silent through the push,
+on the two tasks this repo runs most.
+
+**Converted: `goal` / `hook_guard` / `gates` / `launch`. That is 12 of ~35.**
+
+**Three things the tranche taught that the recipe did not predict.**
+
+**1. Two boundaries deliberately never return `Rc.FINDINGS`, and neither is an
+oversight.** This is the first departure from recipe rule 1, and it happened
+twice in four modules:
+
+| module | why a findings-bearing run is still `Rc.OK` |
+|---|---|
+| `hook_guard` | a PreToolUse hook's verdict travels in its **stdout JSON**; the exit code only says whether the hook survived, and this guard is documented to fail OPEN. `Rc.FINDINGS` would make `exit_code` return 1, which in that protocol means *the hook crashed*. |
+| `goal` | `kb-goal-check` is advisory by ruling — `render` prints "always exits 0; read the report, not the rc". `Rc.FINDINGS` would silently promote an advisory report to a gate. |
+
+Both are pinned by a test carrying a control arm proving the two inputs really do
+differ in what they found, so the shared `rc` reads as a choice rather than as a
+checker that failed to look. Both are also armed: the realistic break is a
+reviewer making the odd ones out *consistent* with the other ten boundaries.
+
+**2. `gates.check_gates` needed a stated carve-out from rule 3, and stating it is
+the point.** The boundary does print: `_run_one` writes a `==> gate:` line and
+each gate's own stdio is inherited, so a 57-second run stays legible while it
+happens (#146 criterion 8). Buffering that to satisfy the letter of rule 3 would
+turn every gate run silent. What is asserted instead is the checkable part — the
+**summary**, the thing `main` prints, does not escape the boundary — and there is
+an arm on exactly that. A carve-out named and armed is a different object from
+one nobody wrote down.
+
+**3. `gates` is the recipe's cleanest fit so far**, because the three outcomes it
+already drew by hand are the three the vocabulary names: gates ran and passed
+(`Ok`), gates ran and one failed (`Ok`/`FINDINGS`), and *nothing ran* — an unknown
+flag, an undeclared gate, an unreadable HEAD — which was already reserved as 2 and
+is now `Err`/`BAD_REQUEST` carrying its reason in the type instead of only on
+stderr.
+
+**A fourth instance of #270's divergence was found and pinned, not fixed.**
+`goal.main` with no argument and a tty stdin prints usage and returns 0, having
+checked nothing. Same shape as `md_budget`'s `counted == 0` and `distill`'s
+no-transcripts. Pinned as `test_goal_no_input_is_the_documented_divergence` for
+the same reason the other three were: a conversion's regression arm IS the
+pre-existing exit-code assertions.
+
+### 9e. The arms — 11/11 died, and the survivor that taught the most
+
+`docs/research/reports/2026-08-10-r5-tranche4-arms.toml` — **11/11 died, 1/1
+control held, restored OK**, every arm naming its own test.
+
+It took two runs, and the first run's single survivor is the finding worth
+carrying. The arm meant to prove `gates.main` funnels through `exit_code`
+replaced `return exit_code(result)` with `return 0 if gate_run.all_passed else 1`
+and **survived**. The reflex reading is "the test is weak". The measurement says
+otherwise — both arms, run rather than argued:
+
+```text
+all_passed=True   original=0  mutated=0  agree=True
+all_passed=False  original=1  mutated=1  agree=True
+```
+
+`Rc.OK` **is** 0 and `Rc.FINDINGS` **is** 1, so the hand-rolled mapping is
+*extensionally equal* to `exit_code` across the whole `Ok` branch. That is an
+**inert mutant**, not a coverage gap: no test could kill it, and none written
+later could either.
+
+The consequence is the durable part. "Funnels through the single documented
+conversion" is, in `gates.main` as it stands today, an **unobservable property** —
+genuinely worth keeping, and not something a mutation arm can measure. Leaving
+the arm in place would have been an id promising more than it can see
+(`probes-need-a-control-arm.md` rule 9). It was replaced with a break that is both
+observable and realistic — the renderer quietly made advisory (`return 0`), the
+live temptation for a task people run constantly and want to stop failing — and
+renamed `gates-renderer-drops-the-findings-rc` so the id names what it measures.
+
+**Two survivor classes now have worked examples in this repo**: a real gap, and a
+mutant that could never die. The sweep output renders them identically, so the
+diagnosis has to be a separate step — and the cheap form of that step is asking
+whether the mutated expression and the original can *ever* disagree.
 
 ## GitHub repos touched
 
