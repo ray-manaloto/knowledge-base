@@ -60,6 +60,10 @@ times.** `0` / `1` / `2` are not arbitrary here:
 So R5 is not introducing a taxonomy. It is **naming one that 175 call sites
 already agree on and that no reader can discover without grepping.**
 
+> ⚠️ **The "already agree" half of that sentence is FALSE — see §8a.** It is left
+> standing rather than edited because the claim, and how it survived into a
+> shipped PR, is itself the finding. The count is also 173, not 175 (§8c).
+
 ---
 
 ## 2. What real tools do — screened against pinned or SHA-recorded source
@@ -377,9 +381,12 @@ pass, it would have been asserting something the module never claims.
 
 ### Not done, and deliberately
 
-- **The remaining 174 rc sites and 22 `raise SystemExit(<string>)` sites.** One
-  command is the proving slice, not the migration. The sweep should be its own
-  change with its own review.
+- **The remaining rc sites and message-raising `SystemExit` sites.** One command
+  is the proving slice, not the migration. The sweep should be its own change
+  with its own review. (This bullet said "174 rc sites and 22 `raise
+  SystemExit`" until the audit; both were wrong — §8b and §8c. The live counts
+  are tracked in §9, by MODULE rather than by site, because converting sites is
+  what makes a site count stale.)
 - **No command returns an `External` yet.** The variant exists on Ray's ruling
   and is armed, but the commands that wrap a *single* subprocess — where a
   passthrough is the right answer — are part of the un-done sweep. Until one
