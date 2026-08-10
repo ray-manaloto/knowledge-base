@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import check
+from kb_setup.result import Err, Ok, Rc, exit_code
 
 if TYPE_CHECKING:
     import pytest
@@ -394,3 +395,88 @@ def test_format_is_checked_never_applied(tmp_path: Path, monkeypatch: pytest.Mon
 
     formatter = next(argv for argv in seen if "format" in argv)
     assert "--check" in formatter
+
+
+# --------------------------------------------------------------------------
+# The `check()` boundary (§2 R5) — what the bare integers could NOT express
+# --------------------------------------------------------------------------
+#
+# `main` returns an int and is covered above; those assertions are the
+# regression arm proving the Result refactor changed no observable exit code.
+# The arms below test the thing that is genuinely NEW: the two states that were
+# both `return 2` are now different types, and the state that was `return 1` is
+# now an `Ok`. None of the pre-existing tests can fail if that distinction is
+# lost, because an int cannot carry it.
+
+
+def test_findings_are_ok_not_err(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """THE point of the change: a run that FOUND something still RAN.
+
+    Before, this was `return 1` — indistinguishable in type from a failure to
+    run. If someone "simplifies" this back to an `Err`, this is the only test
+    that notices; `main` still returns 1 either way.
+    """
+    _touch(tmp_path / "a.py")
+    _stub_rcs(monkeypatch, {"ty": 1})
+
+    result = check.check(tmp_path, ["a.py"])
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.FINDINGS
+    # Mirror the filter `check()` itself applies. `passed` is also False for a
+    # SKIPPED tool (here: pytest, because `a.py` has no sibling test), so
+    # filtering on `passed` alone would assert something this module never
+    # claims — a skip is not a failure.
+    failed = [o.tool for o in result.value if not o.skipped and not o.passed]
+    assert failed == ["ty"]
+
+
+def test_a_clean_run_is_ok_with_rc_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CONTROL ARM for the test above — `Ok` is reachable with BOTH rcs."""
+    _touch(tmp_path / "a.py")
+    _stub_rcs(monkeypatch, {})
+
+    result = check.check(tmp_path, ["a.py"])
+
+    assert isinstance(result, Ok)
+    assert result.rc is Rc.OK
+
+
+def test_no_paths_is_err(tmp_path: Path) -> None:
+    """A malformed request cannot run, so it is an `Err`."""
+    result = check.check(tmp_path, [])
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "pass one or more paths" in result.message
+
+
+def test_nothing_checked_is_err_and_says_so(tmp_path: Path) -> None:
+    """The false-green this module exists to remove, now carried in the TYPE.
+
+    `kb-check -- x.rs` checked nothing. It was `return 2`, the same integer a
+    malformed request returned; it is now an `Err` whose message states the
+    reason, which is what makes it greppable per R9.
+    """
+    _touch(tmp_path / "x.rs", "fn main() {}\n")
+
+    result = check.check(tmp_path, ["x.rs"])
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.BAD_REQUEST
+    assert "nothing was checked" in result.message
+
+
+def test_the_two_former_rc_2_cases_are_now_distinguishable(tmp_path: Path) -> None:
+    """Both were `return 2`. They are still exit code 2 — and now tell apart.
+
+    This is the whole justification for the refactor stated as one assertion:
+    same observable exit code, different in-process value.
+    """
+    _touch(tmp_path / "x.rs", "fn main() {}\n")
+
+    malformed = check.check(tmp_path, [])
+    nothing_ran = check.check(tmp_path, ["x.rs"])
+
+    assert exit_code(malformed) == exit_code(nothing_ran) == 2
+    assert malformed != nothing_ran

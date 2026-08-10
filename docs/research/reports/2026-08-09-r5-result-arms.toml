@@ -1,0 +1,127 @@
+# Mutation arms for §2 R5 — the `Result` / `Rc` typed error surface.
+#
+# WHY THESE EXIST AND NOT JUST THE SUITE. Every test in `tests/test_result.py`
+# and the five new ones in `tests/test_check.py` were written by the same
+# session, in the same turn, as the code they cover. That is the exact shape
+# `.claude/rules/probes-need-a-control-arm.md` rule 2 names as least-reviewed:
+# a test written alongside its own fix routinely cannot fail, and no reading of
+# it can tell you so. These arms revert the code and check the suite goes red
+# *naming the right test*.
+#
+# WHAT A CLEAN SWEEP HERE WOULD AND WOULD NOT MEAN. It is a statement about the
+# TESTS, never about the premise. Specifically it does NOT establish:
+#
+#   * that the `Result` reading is the right answer to R5. Ray ruled it on
+#     2026-08-09 over my recommendation; the evidence for and against is in
+#     `2026-08-09-r5-typed-error-surface.md`, and no arm below re-opens it.
+#   * that the passthrough is USED anywhere. `External` exists and is armed
+#     (Ray ruled it in on 2026-08-09, after `uv`'s `External(u8)`), but no
+#     command returns one yet: `check.py` aggregates four tools and forms its
+#     own verdict, which is `Ok`, not a passthrough. So these arms prove the
+#     variant behaves; they do not prove any caller needed it. The commands that
+#     wrap a SINGLE subprocess are where that gets settled, and they are part of
+#     the un-done 174-site sweep.
+#   * that the other 174 `return 0/1/2` sites mean what `check.py`'s four meant.
+#     They were COUNTED, not audited. `check.py` is one converted command.
+#
+# The `restored` row at the end is the one that catches a harness that mutated
+# and failed to put the file back.
+
+suites = ["tests/test_result.py", "tests/test_check.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/result.py"
+old = "    OK = 0"
+new = "    OK = 0  # inert control edit"
+
+# --------------------------------------------------------------------------
+# The distinction the whole change exists to make
+# --------------------------------------------------------------------------
+
+# A run that FOUND something reports clean. This is the false-green `check.py`
+# was written to remove, reintroduced at the new layer: `main` would return 0
+# for a failing `ty`. The realistic break — someone drops the conditional while
+# "simplifying" — not a renamed symbol.
+[[arm]]
+id = "findings-report-as-clean"
+test = "test_findings_are_ok_not_err"
+file = "python/src/kb_setup/check.py"
+old = "    return Ok(outcomes, rc=Rc.FINDINGS if failed else Rc.OK)"
+new = "    return Ok(outcomes)"
+
+# "Nothing was checked" becomes a success. `kb-check -- x.rs` would read as
+# "x.rs is clean" — the precise false-green in this module's own docstring.
+[[arm]]
+id = "nothing-checked-reports-ok"
+test = "test_nothing_checked_is_err_and_says_so"
+file = "python/src/kb_setup/check.py"
+old = "        return Err(render(outcomes))"
+new = "        return Ok(outcomes)"
+
+# --------------------------------------------------------------------------
+# The type's own guards
+# --------------------------------------------------------------------------
+
+# The representability guard on `Ok` is deleted, so an `Ok` can claim the
+# command could not run. Deleting the raise is the realistic break; renaming
+# `Rc.BAD_REQUEST` would not be, and would leave the original as a substring.
+[[arm]]
+id = "ok-accepts-bad-request"
+test = "test_ok_rejects_bad_request"
+file = "python/src/kb_setup/result.py"
+old = """        if self.rc is Rc.BAD_REQUEST:
+            msg = ("""
+new = """        if False:
+            msg = ("""
+
+# An `Err` with no stated reason is accepted — R9's defect (a non-zero rc whose
+# cause is somewhere nobody greps) recreated inside the type meant to prevent it.
+[[arm]]
+id = "err-accepts-silence"
+test = "test_err_rejects_an_unexplained_failure"
+file = "python/src/kb_setup/result.py"
+old = """        if not self.message.strip():
+            msg = ("""
+new = """        if False:
+            msg = ("""
+
+# --------------------------------------------------------------------------
+# The single conversion
+# --------------------------------------------------------------------------
+
+# Every command exits 0 regardless of its Result. One line, and every gate in
+# the repo goes permanently green — the highest-blast-radius edit in the module,
+# which is why it gets its own arm rather than riding on the others.
+[[arm]]
+id = "exit-code-always-zero"
+test = "test_exit_code_maps_every_representable_state"
+file = "python/src/kb_setup/result.py"
+old = "    return int(result.rc)"
+new = "    return 0"
+
+# --------------------------------------------------------------------------
+# External — the passthrough variant (added on Ray's ruling, 2026-08-09)
+# --------------------------------------------------------------------------
+
+# The passthrough is deleted and every foreign code collapses back into our
+# three. `External` has no `rc`, so this is also the arm proving `exit_code`
+# actually branches rather than happening to work.
+[[arm]]
+id = "exit-code-drops-the-passthrough"
+test = "test_external_passes_the_code_through_unchanged"
+file = "python/src/kb_setup/result.py"
+old = """    if isinstance(result, External):
+        return result.code
+    return int(result.rc)"""
+new = "    return int(result.rc)"
+
+# The range guard goes, so a signal returncode (-9) passes through and exits
+# 247 after truncation — a plausible-looking code that means nothing.
+[[arm]]
+id = "external-accepts-a-signal"
+test = "test_external_rejects_a_signal_returncode"
+file = "python/src/kb_setup/result.py"
+old = "        if not 0 <= self.code <= _MAX_EXIT_CODE:"
+new = "        if False:"
