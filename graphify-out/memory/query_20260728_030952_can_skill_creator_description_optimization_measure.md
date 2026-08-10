@@ -4,6 +4,7 @@ date: "2026-07-28T03:09:52.886643+00:00"
 question: "Can skill-creator description-optimization measure a skill already installed in the same repo?"
 contributor: "graphify"
 outcome: "corrected"
+correction: "A recall/precision scoreboard from skill-creator's run_eval is not a measurement of the skill when the real skill is installed in the same repo. run_eval clones the candidate into .claude/commands/SKILL-skill-HASH.md and then checks whether THAT clone name appears in the Skill call — but the model triggers the installed skill instead, so the check is always False, recall reads 0% and the 100% precision is free (nothing can fire, so every should-not-trigger query passes). Measure against a copy of the repo with the skill directory removed. Three harness traps ride along: stderr=DEVNULL makes a crashed subprocess indistinguishable from a non-trigger; the subprocess performs the WHOLE TASK so a correct-but-slow trigger times out as a miss (it wrote a real goal+rider pair as a side effect); and find_project_root walks up from CWD, so cd-ing into the plugin directory resolves the root to HOME and writes into ~/.claude — use PYTHONPATH and keep cwd in the repo."
 ---
 
 # Q: Can skill-creator description-optimization measure a skill already installed in the same repo?
@@ -15,3 +16,4 @@ No, and it fails SILENTLY behind a plausible scoreboard. run_eval clones the can
 ## Outcome
 
 - Signal: corrected
+- Correction: A recall/precision scoreboard from skill-creator's run_eval is not a measurement of the skill when the real skill is installed in the same repo. run_eval clones the candidate into .claude/commands/SKILL-skill-HASH.md and then checks whether THAT clone name appears in the Skill call — but the model triggers the installed skill instead, so the check is always False, recall reads 0% and the 100% precision is free (nothing can fire, so every should-not-trigger query passes). Measure against a copy of the repo with the skill directory removed. Three harness traps ride along: stderr=DEVNULL makes a crashed subprocess indistinguishable from a non-trigger; the subprocess performs the WHOLE TASK so a correct-but-slow trigger times out as a miss (it wrote a real goal+rider pair as a side effect); and find_project_root walks up from CWD, so cd-ing into the plugin directory resolves the root to HOME and writes into ~/.claude — use PYTHONPATH and keep cwd in the repo.

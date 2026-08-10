@@ -4,6 +4,7 @@ date: "2026-08-04T17:36:34.180374+00:00"
 question: "Why did the #147 work-memory commit miss its PR, and what is the actual ordering rule?"
 contributor: "graphify"
 outcome: "corrected"
+correction: "The rule is BEFORE kb-ship, not before kb-land — and I misread my own correct memory entry saying so while doing it again on PR #156. kb-ship is what PUSHES, so the PR head is fixed the moment ship runs and anything committed afterwards is not in the PR no matter how long you wait to land. Running kb-remember after ship but before land FEELS safe because the merge has not happened; it is not. Recovery is worse than it looks because kb-land SQUASH-merges: the reviewed SHA stops being an ancestor of main, and review.EXEMPT_PATHS — the mechanism that exists so a round can commit its own graphify-out/memory/** under an ancestor's receipt — needs that ancestry, so landing a stranded file costs a fresh review round for one prose file. The order is: review -> receipt -> kb-remember + kb-reflect -> commit what they wrote -> kb-ship -> kb-land, with NO safe window after ship. If a commit is stranded, put a branch on it immediately (git branch <name> <sha>, the reflog expires) and carry it into the next round's branch. Generalisable shape: when a rule names a specific STEP, the step is the load-bearing part, not the phase — 'before shipping' and 'before landing' read as the same intent and are one irreversible action apart."
 ---
 
 # Q: Why did the #147 work-memory commit miss its PR, and what is the actual ordering rule?
@@ -43,3 +44,4 @@ the same intent and are one irreversible action apart.
 ## Outcome
 
 - Signal: corrected
+- Correction: The rule is BEFORE kb-ship, not before kb-land — and I misread my own correct memory entry saying so while doing it again on PR #156. kb-ship is what PUSHES, so the PR head is fixed the moment ship runs. Recovery is worse than it looks because kb-land SQUASH-merges: the reviewed SHA stops being an ancestor, and review.EXEMPT_PATHS needs that ancestry. The order is review -> receipt -> kb-remember + kb-reflect -> commit -> kb-ship -> kb-land, with NO safe window after ship. When a rule names a specific STEP, the step is the load-bearing part, not the phase.
