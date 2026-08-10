@@ -27,7 +27,11 @@
 # The `restored` row at the end is the one that catches a harness that mutated
 # and failed to put the file back.
 
-suites = ["tests/test_result.py", "tests/test_check.py"]
+suites = [
+  "tests/test_result.py",
+  "tests/test_check.py",
+  "tests/test_skill_lint.py",
+]
 
 [[arm]]
 id = "control"
@@ -71,7 +75,7 @@ new = "        return Ok(outcomes)"
 id = "ok-accepts-bad-request"
 test = "test_ok_rejects_bad_request"
 file = "python/src/kb_setup/result.py"
-old = """        if self.rc is Rc.BAD_REQUEST:
+old = """        if self.rc not in _RAN:
             msg = ("""
 new = """        if False:
             msg = ("""
@@ -125,3 +129,37 @@ test = "test_external_rejects_a_signal_returncode"
 file = "python/src/kb_setup/result.py"
 old = "        if not 0 <= self.code <= _MAX_EXIT_CODE:"
 new = "        if False:"
+
+
+# --------------------------------------------------------------------------
+# Rc.NOT_RUN — the fourth member (Ray's ruling, 2026-08-09)
+# --------------------------------------------------------------------------
+
+# The guard reverts to a BLACKLIST. This is the realistic regression, not a
+# hypothetical: it is literally what the code said before NOT_RUN existed, and
+# a blacklist silently admits every member added after it.
+[[arm]]
+id = "ok-guard-back-to-a-blacklist"
+test = "test_ok_rejects_not_run"
+file = "python/src/kb_setup/result.py"
+old = "        if self.rc not in _RAN:"
+new = "        if self.rc is Rc.BAD_REQUEST:"
+
+# The dedup un-dedups: check.py goes back to its own literal 127. Value-equal,
+# so a test asserting `== 127` would NOT catch it -- which is why the test
+# asserts identity with Rc.NOT_RUN.
+[[arm]]
+id = "rc-could-not-run-relitteralised"
+test = "test_not_run_reuses_the_value_the_repo_already_chose"
+file = "python/src/kb_setup/check.py"
+old = "RC_COULD_NOT_RUN = Rc.NOT_RUN"
+new = "RC_COULD_NOT_RUN = 127"
+
+# skill_lint reverts to the bare 1 -- the exact pre-reconciliation behaviour,
+# and the one the rule file used to document.
+[[arm]]
+id = "skill-lint-back-to-bare-one"
+test = "test_no_skills_matched_is_a_skip_not_a_pass"
+file = "python/src/kb_setup/skill_lint.py"
+old = "        return Rc.NOT_RUN"
+new = "        return 1"

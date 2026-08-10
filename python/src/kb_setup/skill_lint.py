@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import hook_guard
+from kb_setup.result import Rc
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Iterator
@@ -162,16 +163,28 @@ def check(
 
 
 def skill_lint_main(root: Path) -> int:
-    """CLI entry: print the report, return 1 on any finding."""
+    """CLI entry: print the report, `Rc.FINDINGS` on a finding, `Rc.NOT_RUN` on none scanned."""
     report = check(root)
     if not report.scanned:
         # A glob that matches nothing is not a pass — it is a gate that never
         # asked the question (`verify-before-advancing.md`: 0 files is a SKIP).
+        #
+        # This returned a bare `1` until §2 R5, and `mise-tasks-only.md` said so
+        # ("a glob matching nothing exits 1, not 0") — while the SAME rule file
+        # said `kb-skill-score` exits **2** for "a skill name matching nothing",
+        # and `check.py` independently chose 2 for "nothing was checked". One
+        # failure, three spellings, two of them documented.
+        #
+        # `Rc.NOT_RUN` is the reconciliation Ray ruled: neither 1 ("we looked and
+        # found something" — false, we did not look) nor 2 ("you asked wrong" —
+        # false, the request was fine). Still non-zero, and nothing in the repo
+        # branches on a specific non-zero code, so hk fails this step exactly as
+        # before.
         print(
             f"skill-lint: NO SKILLS MATCHED {DEFAULT_SKILL_GLOB!r} — "
             "the gate did not run. Check the glob before reading this as clean."
         )
-        return 1
+        return Rc.NOT_RUN
     for f in report.findings:
         print(f"skill-lint: {f.path}:{f.line}: {f.command}")
         print(f"            {f.remedy}")

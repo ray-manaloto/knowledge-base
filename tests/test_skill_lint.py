@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import cli, hook_guard, skill_lint
+from kb_setup.result import Rc
 
 _BAD = """# bad
 ```bash
@@ -100,8 +101,21 @@ def test_no_skills_matched_is_a_skip_not_a_pass(tmp_path: Path) -> None:
 
     This is `verify-before-advancing.md`'s rule applied to this gate itself, and
     it is the arm that #214 (md-budget's index-only scope) showed is worth having.
+
+    The code changed from a bare `1` to `Rc.NOT_RUN` in §2 R5. The assertion the
+    test's NAME makes — not a pass — is unchanged and still checked below; what
+    was wrong before is that `1` also means "we looked and found something",
+    which is the opposite of what happened.
     """
-    assert skill_lint.skill_lint_main(tmp_path) == 1
+    rc = skill_lint.skill_lint_main(tmp_path)
+
+    assert rc == Rc.NOT_RUN
+    # The name's claim, asserted separately so a future change to NOT_RUN's
+    # value cannot make this test silently stop checking "not a pass".
+    assert rc != Rc.OK
+    # ...and not the two codes that would MISDESCRIBE it: we did not look
+    # (so not FINDINGS), and the request was fine (so not BAD_REQUEST).
+    assert rc not in (Rc.FINDINGS, Rc.BAD_REQUEST)
 
 
 def test_decide_is_injectable_so_the_walker_is_reusable(tmp_path: Path) -> None:
