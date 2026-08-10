@@ -75,7 +75,11 @@ _REDIRECT: dict[str, str] = {
     "merge-graphs": "mise run kb-build   (or mise run kb-merge -- <chunk> for a doc chunk)",
     "clone": "mise run kb-build   (add a sources/<name>.manifest first)",
     "query": 'mise run kb-query -- "<question>"',
-    "save-result": 'mise run kb-remember -- --question "Q" --answer "A" --outcome useful',
+    "save-result": (
+        'mise run kb-remember -- --question "Q" --answer-file A.md --outcome useful'
+        "   (--outcome corrected also needs --correction-file C.md, or the lesson "
+        "renders empty in LESSONS.md)"
+    ),
     "reflect": "mise run kb-reflect",
     "add-watch": "NOT ALLOWED — never `graphify watch`",
     "watch": "NOT ALLOWED in this repo (do-not: graphify --watch / hook install)",

@@ -43,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
             "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
             "session-state [--no-pr] | "
+            "remember --question Q [--answer A|--answer-file F] "
+            "[--outcome useful|dead_end|corrected] "
+            "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
@@ -202,6 +205,43 @@ def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
     return arms.main(rest, repo_root)
 
 
+def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
+    """Dispatch the round-record commands; ``None`` when ``cmd`` is not one.
+
+    Grouped for the same reason :func:`_dispatch_lint` was, and stated here
+    because the ceiling is doing its job again rather than being suppressed:
+    adding `remember` pushed `_dispatch_ops` to 52 statements against ruff's
+    limit of 50.
+
+    These five share a shape the rest of the ops family does not — each one
+    reads or writes the RECORD OF A ROUND rather than acting on the graph or
+    the tree: what this branch handed off, what state the session is in, what
+    the goal was and how it went, and what was learned. `remember` is the newest
+    member and the reason the group exists.
+    """
+    if cmd == "handoff-check":
+        from kb_setup import handoff
+
+        return handoff.main(rest, repo_root)
+    if cmd == "session-state":
+        from kb_setup import session_state
+
+        return session_state.main(rest, repo_root)
+    if cmd == "remember":
+        from kb_setup import remember
+
+        return remember.main(repo_root, rest)
+    if cmd == "goal-check":
+        from kb_setup import goal
+
+        return goal.main(rest, repo_root)
+    if cmd == "goal-outcome":
+        from kb_setup import goal
+
+        return goal.outcome_main(rest, repo_root)
+    return None
+
+
 def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     """Dispatch the operational subcommands (hooks, brain, ship/land, currency, chunks)."""
     if cmd == "hookguard":
@@ -217,10 +257,9 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     lint_rc = _dispatch_lint(repo_root, cmd)
     if lint_rc is not None:
         return lint_rc
-    if cmd == "handoff-check":
-        from kb_setup import handoff
-
-        return handoff.main(rest, repo_root)
+    record_rc = _dispatch_record(repo_root, cmd, rest)
+    if record_rc is not None:
+        return record_rc
     if cmd == "gates":
         from kb_setup import gates
 
@@ -232,18 +271,6 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         # a gate — it writes no `.agent/kb/gates/` record, because a per-file
         # check is not evidence about a commit.
         return check.main(repo_root, rest)
-    if cmd == "session-state":
-        from kb_setup import session_state
-
-        return session_state.main(rest, repo_root)
-    if cmd == "goal-check":
-        from kb_setup import goal
-
-        return goal.main(rest, repo_root)
-    if cmd == "goal-outcome":
-        from kb_setup import goal
-
-        return goal.outcome_main(rest, repo_root)
     if cmd == "skill-score":
         from kb_setup import skill_eval
 
@@ -312,7 +339,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "md-budget | skill-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
-        "session-state [--no-pr] | cc | cc-doctor | "
+        "session-state [--no-pr] | remember [--audit] | cc | cc-doctor | "
         "eval [--live] [--slow] | "
         "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,

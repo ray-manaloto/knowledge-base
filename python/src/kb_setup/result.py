@@ -214,6 +214,34 @@ type Result[T] = Ok[T] | Err | External
 """What a `kb_setup` command hands back across the boundary."""
 
 
+_SIGNAL_EXIT_BASE = 128
+"""POSIX shells report a signal-killed child as `128 + N`. See below."""
+
+
+def external_from_returncode(returncode: int, message: str = "") -> External:
+    """Convert a `subprocess` returncode into an `External`, signals included.
+
+    `External.__post_init__` refuses a negative code on purpose, and its
+    docstring says why: a negative `subprocess` returncode is not an exit code
+    at all, it is `-N` for "killed by signal N". Passing it through would wrap
+    to nonsense (`-9` truncates to 247), and `abs()` would claim the child
+    exited 9 when nothing did.
+
+    So the conversion is stated once, here, rather than improvised at each
+    call site: **signal N becomes `128 + N`**, which is what every POSIX shell
+    reports for the same event and therefore what a caller reading the rc
+    already expects. `SIGKILL` (9) is 137; `SIGTERM` (15) is 143.
+
+    A signal number wide enough to overflow the byte is clamped rather than
+    wrapped — losing precision loudly beats reporting a different signal.
+    """
+    if returncode < 0:
+        code = min(_SIGNAL_EXIT_BASE - returncode, _MAX_EXIT_CODE)
+        signal_note = f"killed by signal {-returncode}"
+        return External(code=code, message=message or signal_note)
+    return External(code=min(returncode, _MAX_EXIT_CODE), message=message)
+
+
 def exit_code[T](result: Result[T]) -> int:
     """The single `Result` -> process-exit-code conversion.
 

@@ -109,8 +109,15 @@ So close the loop while the branch is still unmerged:
 
 ```bash
 mise run kb-remember -- --question "<what this round asked>" \
-                       --answer "<what was actually learned>" --outcome useful
+                       --answer-file .agent/round-answer.md --outcome useful
+# A round that OVERTURNED a belief is `corrected`, and then the lesson is
+# REQUIRED — kb-remember refuses without it, because `graphify reflect` renders
+# only this field and 21 of 32 past corrections reached LESSONS.md empty:
+mise run kb-remember -- --question "<the belief that was wrong>" \
+                       --answer-file .agent/round-answer.md --outcome corrected \
+                       --correction-file .agent/round-lesson.md
 mise run kb-reflect                       # aggregate -> reflections/LESSONS.md
+mise run kb-remember -- --audit           # any correction still missing its lesson?
 mise run kb-goal-outcome -- <pair> --result <r> [--turns N]   # if a /goal ran
 mise run kb-distill                       # did this round hand-write a tool twice?
 mise run kb-session-reflect               # what did it do by hand that a task owns?
