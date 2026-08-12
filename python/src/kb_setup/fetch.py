@@ -292,23 +292,42 @@ def _verify_source_page(
     return problems
 
 
-def verify_page_receipt(repo_root: Path, receipt: Path) -> tuple[str, ...]:
+def _receipt_tool(receipt: Path) -> tuple[str, dict[str, object]] | str:
+    """Load a page receipt and return its currency-tool identity plus contents."""
+    try:
+        parsed = tomllib.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return f"{receipt}: unreadable receipt ({exc})"
+    raw = {str(key): value for key, value in parsed.items()}
+    tool = raw.get("tool")
+    if not isinstance(tool, str) or not tool:
+        return f"{receipt}: tool must name a currency.toml tool"
+    return tool, raw
+
+
+def verify_page_receipt(
+    repo_root: Path,
+    receipt: Path,
+    *,
+    required_urls: tuple[str, ...],
+) -> tuple[str, ...]:
     """Verify every lossless offline page named by a ``*.pages.toml`` receipt.
 
     The receipt is a source manifest, not an extraction claim: this checks exact
     bytes/provenance while leaving semantic coverage to the Graphify build and
     extraction receipts. Unknown or malformed rows fail closed.
     """
-    try:
-        raw = tomllib.loads(receipt.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return (f"{receipt}: unreadable receipt ({exc})",)
+    loaded = _receipt_tool(receipt)
+    if isinstance(loaded, str):
+        return (loaded,)
+    _tool, raw = loaded
     pages = raw.get("page")
     if not isinstance(pages, list) or not pages:
         return (f"{receipt}: page must be a non-empty array",)
 
     problems: list[str] = []
     seen: set[str] = set()
+    receipt_urls: set[str] = set()
     for index, item in enumerate(pages, start=1):
         fields = _page_fields(receipt, index, item)
         if isinstance(fields, str):
@@ -319,8 +338,42 @@ def verify_page_receipt(repo_root: Path, receipt: Path) -> tuple[str, ...]:
             problems.append(f"{receipt}: duplicate stem {stem!r}")
             continue
         seen.add(stem)
+        url = fields[1]
+        if url in receipt_urls:
+            problems.append(f"{receipt}: duplicate url {url!r}")
+            continue
+        receipt_urls.add(url)
         problems.extend(_verify_source_page(repo_root, receipt, fields))
+    required = set(required_urls)
+    problems.extend(
+        f"{receipt}: required url missing from receipt: {url}"
+        for url in sorted(required - receipt_urls)
+    )
+    problems.extend(
+        f"{receipt}: receipt url is not required by currency.toml: {url}"
+        for url in sorted(receipt_urls - required)
+    )
     return tuple(problems)
+
+
+def _required_urls(repo_root: Path, receipt: Path) -> tuple[str, ...] | str:
+    """Resolve a receipt's independent required URL set from currency.toml."""
+    loaded = _receipt_tool(receipt)
+    if isinstance(loaded, str):
+        return loaded
+    tool, _raw = loaded
+    from kb_setup.currency import config
+
+    try:
+        specs = config.load(repo_root)
+    except (OSError, TypeError, ValueError, tomllib.TOMLDecodeError) as exc:
+        return f"{receipt}: cannot load currency.toml ({exc})"
+    spec = next((candidate for candidate in specs if candidate.name == tool), None)
+    if spec is None:
+        return f"{receipt}: currency.toml has no [tool.{tool}]"
+    if not spec.docs_watch:
+        return f"{receipt}: [tool.{tool}] docs_watch must be non-empty"
+    return spec.docs_watch
 
 
 def fetch_verify_main(repo_root: Path, receipts: list[Path]) -> int:
@@ -328,9 +381,13 @@ def fetch_verify_main(repo_root: Path, receipts: list[Path]) -> int:
     if not receipts:
         print("kb-setup fetch-verify <sources/*.pages.toml>")
         return 2
-    problems = tuple(
-        problem for receipt in receipts for problem in verify_page_receipt(repo_root, receipt)
-    )
+    problems: list[str] = []
+    for receipt in receipts:
+        required_urls = _required_urls(repo_root, receipt)
+        if isinstance(required_urls, str):
+            problems.append(required_urls)
+            continue
+        problems.extend(verify_page_receipt(repo_root, receipt, required_urls=required_urls))
     for problem in problems:
         print(f"[kb-fetch-verify] FAIL: {problem}")
     if problems:

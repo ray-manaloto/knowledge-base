@@ -14,6 +14,7 @@
 # the llms index loses 69% and the CLI page loses 15% at the URL-path cap.
 
 source = "https://docs.doppler.com/llms.txt"
+tool = "doppler"
 captured_at = "2026-08-12"
 version = "3.76.1"
 manifest = "sources/doppler.manifest"

@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import fetch
+from kb_setup.currency import config as currency_config
 
 FIXTURE = Path(__file__).parent / "fixtures" / "reference-sample.md"
 RAW = FIXTURE.read_text(encoding="utf-8")
@@ -219,7 +220,10 @@ def test_doppler_offline_docs_match_the_committed_receipt() -> None:
     """The real offline source set is complete and byte-attested."""
     repo_root = Path(__file__).parent.parent
     receipt = repo_root / "sources" / "doppler-docs.pages.toml"
-    assert fetch.verify_page_receipt(repo_root, receipt) == ()
+    required_urls = next(
+        spec.docs_watch for spec in currency_config.load(repo_root) if spec.name == "doppler"
+    )
+    assert fetch.verify_page_receipt(repo_root, receipt, required_urls=required_urls) == ()
 
 
 def test_page_receipt_rejects_a_tampered_body(tmp_path: Path) -> None:
@@ -229,6 +233,7 @@ def test_page_receipt_rejects_a_tampered_body(tmp_path: Path) -> None:
     digest = fetch.content_hash("original body")
     receipt = sources / "docs.pages.toml"
     receipt.write_text(
+        'tool = "fixture"\n'
         "[[page]]\n"
         'stem = "doc"\n'
         'url = "https://example.com/doc"\n'
@@ -237,8 +242,57 @@ def test_page_receipt_rejects_a_tampered_body(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     source.write_text(source.read_text(encoding="utf-8") + "tampered", encoding="utf-8")
-    problems = fetch.verify_page_receipt(tmp_path, receipt)
+    problems = fetch.verify_page_receipt(
+        tmp_path, receipt, required_urls=("https://example.com/doc",)
+    )
     assert any("body hash mismatch" in problem for problem in problems)
+
+
+def test_page_receipt_rejects_required_page_and_row_deleted_together(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Hostile arm: the independent currency set observes a coordinated omission."""
+    sources = tmp_path / "sources"
+    first_url = "https://example.com/first"
+    second_url = "https://example.com/second"
+    first = fetch.write_source(sources, "first", "first body", url=first_url)
+    second = fetch.write_source(sources, "second", "second body", url=second_url)
+    first_hash = fetch.content_hash("first body")
+    second_hash = fetch.content_hash("second body")
+    receipt = sources / "docs.pages.toml"
+    receipt.write_text(
+        'tool = "fixture"\n'
+        "[[page]]\n"
+        'stem = "first"\n'
+        f'url = "{first_url}"\n'
+        f'content_sha256 = "{first_hash}"\n'
+        "content_chars = 10\n"
+        "[[page]]\n"
+        'stem = "second"\n'
+        f'url = "{second_url}"\n'
+        f'content_sha256 = "{second_hash}"\n'
+        "content_chars = 11\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "currency.toml").write_text(
+        f'[tool.fixture]\nmise_key = "fixture"\ndocs_watch = ["{first_url}", "{second_url}"]\n',
+        encoding="utf-8",
+    )
+
+    second.unlink()
+    receipt.write_text(
+        'tool = "fixture"\n'
+        "[[page]]\n"
+        'stem = "first"\n'
+        f'url = "{first_url}"\n'
+        f'content_sha256 = "{first_hash}"\n'
+        "content_chars = 10\n",
+        encoding="utf-8",
+    )
+
+    assert fetch.fetch_verify_main(tmp_path, [receipt]) == 1
+    assert f"required url missing from receipt: {second_url}" in capsys.readouterr().out
+    assert first.is_file()
 
 
 # --------------------------------------------------------------------------
