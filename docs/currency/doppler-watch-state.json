@@ -1,0 +1,8 @@
+{
+  "local:devcontainer-secret-file-lifecycle": {
+    "comments": 0,
+    "state": "local",
+    "title": "Doppler 3.76.0 added fallback-file caching for every mounted format.\nThe devcontainer design must keep fallback behavior explicit: prefer an\nephemeral `doppler run --mount` source feeding the devcontainer CLI's native\n`--secrets-file` boundary, scrub `DOPPLER_TOKEN` before the container process,\nand never persist a plaintext env file. This remains tracked until the broader\nlifecycle-scoped secret-delivery architecture is implemented and verified.",
+    "updated_at": ""
+  }
+}

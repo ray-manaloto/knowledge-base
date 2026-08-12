@@ -1,0 +1,86 @@
+# Official Doppler documentation captured losslessly for offline Graphify use.
+#
+# These files were fetched only through `mise run kb-fetch`, which preserves the
+# complete authored Markdown and emits a deterministic SHA-256/character-count
+# witness. The bodies are committed beside this receipt because the user requires
+# an offline source. They are REGISTERED inputs for the next scoped semantic
+# extraction; this receipt does not claim that their nodes already exist in
+# graphify-out/graph.json.
+#
+# Re-fetch one page with:
+#   mise run kb-fetch -- <url> --stem <stem>
+# Then update this receipt only after its front-matter hash and content_chars
+# agree with the newly written body. Never use `graphify add <url>` for these:
+# the llms index loses 69% and the CLI page loses 15% at the URL-path cap.
+
+source = "https://docs.doppler.com/llms.txt"
+captured_at = "2026-08-12"
+version = "3.76.1"
+manifest = "sources/doppler.manifest"
+semantic_status = "pending"
+
+[[page]]
+stem = "doppler-llms-index"
+url = "https://docs.doppler.com/llms.txt"
+content_sha256 = "0e5a3ff187faebc648334963f6e2c0499b20f0172b9b9df491fd66ee20ee8889"
+content_chars = 38448
+
+[[page]]
+stem = "doppler-cli"
+url = "https://docs.doppler.com/docs/cli.md"
+content_sha256 = "730226438fcb59d61f02f7a1e8f0910fee3e6a7ba1174c986cae269fcb26a275"
+content_chars = 14098
+
+[[page]]
+stem = "doppler-accessing-secrets"
+url = "https://docs.doppler.com/docs/accessing-secrets.md"
+content_sha256 = "004128de15bdd4099a670e346386600e69b09b4edca73a50008a32bbadf1f628"
+content_chars = 10423
+
+[[page]]
+stem = "doppler-service-tokens"
+url = "https://docs.doppler.com/docs/service-tokens.md"
+content_sha256 = "c7234b21036367c7696112a28f3cd65325b981b206818c6c94c08bf4c2b97d6e"
+content_chars = 6464
+
+[[page]]
+stem = "doppler-automatic-fallbacks"
+url = "https://docs.doppler.com/docs/automatic-fallbacks.md"
+content_sha256 = "010a90fa8d7f043bdb58a402ba11a96e0c42c166ca127210f0ffa35eec4b83b1"
+content_chars = 5400
+
+[[page]]
+stem = "doppler-installation-docker"
+url = "https://docs.doppler.com/docs/installation-docker.md"
+content_sha256 = "8fcc39e0b8c81aad8e834ea48b9c41c45455b479fd65fe587dc84d89ff29bbc2"
+content_chars = 1537
+
+[[page]]
+stem = "doppler-dockerfile"
+url = "https://docs.doppler.com/docs/dockerfile.md"
+content_sha256 = "2144f0676382f06fe011caf3091f0c070be21811efec21704a175e1f1d46ff08"
+content_chars = 8510
+
+[[page]]
+stem = "doppler-docker-container-env-vars"
+url = "https://docs.doppler.com/docs/docker-container-env-vars.md"
+content_sha256 = "d8740a9a10ce590a94562bd8655681a1516c93c8cd79af2cc0a5ea766000fb83"
+content_chars = 1722
+
+[[page]]
+stem = "doppler-docker-compose"
+url = "https://docs.doppler.com/docs/docker-compose.md"
+content_sha256 = "f214ddf9bed95edca31a5d09cf8d9c94ad5ab193727277d0ca58ab2f42510313"
+content_chars = 8899
+
+[[page]]
+stem = "doppler-docker-high-availability"
+url = "https://docs.doppler.com/docs/docker-high-availability.md"
+content_sha256 = "38a55ab545ecdb1a6e5c764ecf8a55080d7a79aabccb00d127a5922ce8095215"
+content_chars = 4358
+
+[[page]]
+stem = "doppler-high-availability"
+url = "https://docs.doppler.com/docs/high-availability.md"
+content_sha256 = "210bc46a68ae89a5cccf1175ee6ed9c639ae71ff913b7ea1a53930e214e92040"
+content_chars = 5503

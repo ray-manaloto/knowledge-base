@@ -215,6 +215,32 @@ def test_write_source_is_repeatable(tmp_path: Path) -> None:
     assert first == second
 
 
+def test_doppler_offline_docs_match_the_committed_receipt() -> None:
+    """The real offline source set is complete and byte-attested."""
+    repo_root = Path(__file__).parent.parent
+    receipt = repo_root / "sources" / "doppler-docs.pages.toml"
+    assert fetch.verify_page_receipt(repo_root, receipt) == ()
+
+
+def test_page_receipt_rejects_a_tampered_body(tmp_path: Path) -> None:
+    """Mutation arm: matching metadata cannot hide changed offline bytes."""
+    sources = tmp_path / "sources"
+    source = fetch.write_source(sources, "doc", "original body", url="https://example.com/doc")
+    digest = fetch.content_hash("original body")
+    receipt = sources / "docs.pages.toml"
+    receipt.write_text(
+        "[[page]]\n"
+        'stem = "doc"\n'
+        'url = "https://example.com/doc"\n'
+        f'content_sha256 = "{digest}"\n'
+        "content_chars = 13\n",
+        encoding="utf-8",
+    )
+    source.write_text(source.read_text(encoding="utf-8") + "tampered", encoding="utf-8")
+    problems = fetch.verify_page_receipt(tmp_path, receipt)
+    assert any("body hash mismatch" in problem for problem in problems)
+
+
 # --------------------------------------------------------------------------
 # upstream-source preference (the fetch strategy that wins where it applies)
 # --------------------------------------------------------------------------

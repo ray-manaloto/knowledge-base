@@ -1,0 +1,2 @@
+# Lossless upstream documentation snapshots preserve source whitespace bytes.
+/sources/doppler-*.md whitespace=-blank-at-eol

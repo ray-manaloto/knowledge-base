@@ -351,6 +351,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         return _validate_chunks(rest)
     if cmd == "fetch":
         return _fetch(repo_root, rest)
+    if cmd == "fetch-verify":
+        from kb_setup import fetch as fetch_mod
+
+        return fetch_mod.fetch_verify_main(repo_root, [Path(arg) for arg in rest])
 
     print(
         f"kb-setup: unknown command {cmd!r} "
@@ -367,7 +371,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "session-state [--no-pr] | remember [--audit] | cc | cc-doctor | "
         "eval [--live] [--slow] | "
-        "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
+        "validate-chunks <chunk...> | fetch-verify <pages.toml...> | "
+        "ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,
     )
     return 2

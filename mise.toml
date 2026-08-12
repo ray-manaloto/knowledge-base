@@ -71,6 +71,11 @@ gitleaks = "8.30.1"
 # This repo pins what fnox it EXPECTS; it does not touch `~/.config/fnox`, so
 # `do-not.md` #11 is not engaged. Bump alongside the global one.
 fnox = "1.32.0"
+# Doppler is the runtime secret-delivery boundary used by the devcontainer and
+# CI/CD workflows. Keep this exact pin aligned with `[tool.doppler]` and
+# `sources/doppler.manifest`; credentials/config remain user-owned and are not
+# stored in this repository.
+doppler = "3.76.1"
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
 # (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
@@ -599,6 +604,10 @@ description = 'Losslessly fetch a URL into sources/: mise run kb-fetch -- <url> 
 # writes a file, and reports the verbatim-token roundtrip verdict. Hand the
 # resulting file to `graphify add <file>`, whose slicing is lossless.
 run = "uv run --extra fetch kb-setup fetch"
+
+[tasks.kb-fetch-verify]
+description = 'Verify offline page bytes against receipts: mise run kb-fetch-verify -- <sources/*.pages.toml>'
+run = "uv run kb-setup fetch-verify"
 
 [tasks.kb-merge]
 description = 'Merge one host-agent extraction chunk into the graph: mise run kb-merge -- <chunk.json> [source_root]'
