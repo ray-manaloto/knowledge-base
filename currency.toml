@@ -1128,6 +1128,39 @@ knowledge-base #74 (`env="exec"` silently emptying env-var credentials) —
 `exec --replace` is a new process-replacement MODE, not a fix to that path, so
 #74 stays open. **The global fnox bump is still owed** and is Ray's to make."""
 
+# ---------------------------------------------------------------------------
+# Doppler — runtime secret delivery for devcontainers and CI/CD
+# ---------------------------------------------------------------------------
+[tool.doppler]
+mise_key = "doppler"
+binary = "doppler"
+github = "DopplerHQ/cli"
+manifest = "sources/doppler.manifest"
+version_pattern = '^v?(\d+\.\d+\.\d+)'
+docs_watch = [
+  "https://docs.doppler.com/llms.txt",
+  "https://docs.doppler.com/docs/cli.md",
+  "https://docs.doppler.com/docs/accessing-secrets.md",
+  "https://docs.doppler.com/docs/service-tokens.md",
+  "https://docs.doppler.com/docs/automatic-fallbacks.md",
+  "https://docs.doppler.com/docs/installation-docker.md",
+  "https://docs.doppler.com/docs/dockerfile.md",
+  "https://docs.doppler.com/docs/docker-container-env-vars.md",
+  "https://docs.doppler.com/docs/docker-compose.md",
+  "https://docs.doppler.com/docs/docker-high-availability.md",
+  "https://docs.doppler.com/docs/high-availability.md",
+]
+
+[[tool.doppler.watch]]
+kind = "local"
+ref = "devcontainer-secret-file-lifecycle"
+note = """Doppler 3.76.0 added fallback-file caching for every mounted format.
+The devcontainer design must keep fallback behavior explicit: prefer an
+ephemeral `doppler run --mount` source feeding the devcontainer CLI's native
+`--secrets-file` boundary, scrub `DOPPLER_TOKEN` before the container process,
+and never persist a plaintext env file. This remains tracked until the broader
+lifecycle-scoped secret-delivery architecture is implemented and verified."""
+
 [tool.skillopt]
 # SkillOpt (microsoft/SkillOpt) — INGESTED, not installed, which is why this is the
 # first `source_only` entry. Two distinct things ship from that one repo:
