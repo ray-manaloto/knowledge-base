@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/fetch-receipt.schema.json",
+  "title": "FetchReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "provider",
+    "provider_version",
+    "source",
+    "revision",
+    "license_id",
+    "license_path",
+    "destination_sha256",
+    "bytes_total",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "status": {"enum": ["planned", "complete", "failed"]},
+    "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+    "provider_version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+    },
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "license_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$"
+    },
+    "license_path": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "destination_sha256": {"$ref": "#/$defs/Sha256"},
+    "bytes_total": {"type": "integer", "minimum": 0},
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/FetchReceiptFile"}
+    }
+  },
+  "$defs": {
+    "Sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "FetchReceiptFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/Sha256"}
+      }
+    }
+  }
+}
