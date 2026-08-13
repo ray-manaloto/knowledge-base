@@ -13,6 +13,7 @@ auto-detected Gemini/OpenAI key.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -462,7 +463,30 @@ def label(repo_root: Path, *, missing_only: bool = False, claude_cli: bool = Fal
 
     def _run(cmd: list[str], why: str) -> int:
         events.say("label.command", f"  $ {' '.join(cmd)}   # {why}", argv=list(cmd), why=why)
-        return subprocess.run(cmd, cwd=repo_root, env=clean_env(), check=False).returncode
+        result = subprocess.run(
+            cmd,
+            cwd=repo_root,
+            env=clean_env(),
+            check=False,
+            capture_output=True,
+        )
+        if result.stdout:
+            sys.stdout.buffer.write(result.stdout)
+            sys.stdout.buffer.flush()
+        if result.stderr:
+            sys.stderr.buffer.write(result.stderr)
+            sys.stderr.buffer.flush()
+        if result.returncode != 0:
+            return result.returncode
+        if result.stderr:
+            digest = hashlib.sha256(result.stderr).hexdigest()
+            events.fail(
+                "label.stderr",
+                "[kb-label] refusing warning-bearing Graphify success "
+                f"(stderr_bytes={len(result.stderr)}, stderr_sha256={digest})",
+            )
+            return 3
+        return 0
 
     if not claude_cli:
         # No --backend + GEMINI/GOOGLE stripped -> auto-detect finds nothing ->

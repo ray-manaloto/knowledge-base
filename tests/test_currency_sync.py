@@ -506,7 +506,7 @@ def test_build_stamp_records_the_version_that_ran_not_the_pin(tmp_path, monkeypa
     from kb_setup import graph
 
     root = _repo(tmp_path)
-    monkeypatch.setattr(sync, "observed_version", lambda _: "")
+    monkeypatch.setattr(graph, "_strict_graphify_version", lambda _root: "")
     graph._stamp_build(root)
 
     stamp = sync.read_stamp(root, _spec(root))
@@ -526,7 +526,7 @@ def test_build_stamp_records_a_stale_binary_honestly(tmp_path, monkeypatch) -> N
     from kb_setup import graph
 
     root = _repo(tmp_path)
-    monkeypatch.setattr(sync, "observed_version", lambda _: "0.9.23")
+    monkeypatch.setattr(graph, "_strict_graphify_version", lambda _root: "0.9.23")
     graph._stamp_build(root)
 
     assert sync.read_stamp(root, _spec(root))["version"] == "0.9.23"

@@ -72,6 +72,7 @@ def _build_with(monkeypatch, tmp_path: Path, kind: str) -> list[str]:
     asked: list[str] = []
     _manifest(tmp_path, kind=kind)
     monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
+    monkeypatch.setattr(graph, "_required_input_fingerprints", lambda _root: {})
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph, "_detect_preflight", lambda _manifests: None)
 

@@ -76,6 +76,7 @@ def _run_build(monkeypatch, tmp_path: Path, run=None, assert_composition=None) -
     suite in `tests/test_graph_checks.py`; this file is about the merge shape.
     """
     calls: list[list[str]] = []
+    monkeypatch.setattr(graph, "_required_input_fingerprints", lambda _root: {})
     # TWO manifests deliberately. `_merge_sources_into` COPIES a lone input —
     # `merge-graphs` requires two paths — so a single-manifest fixture shells out
     # to nothing and the control arm below would fail at HEAD for a reason that
@@ -98,7 +99,7 @@ def _run_build(monkeypatch, tmp_path: Path, run=None, assert_composition=None) -
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph, "_detect_preflight", lambda _manifests: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
-    monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
+    monkeypatch.setattr(graph, "_finalize_build_receipts", lambda _root, _inputs: None)
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
     monkeypatch.setattr(
         graph.graph_checks, "assert_composition", assert_composition or (lambda _path, **_kw: None)
