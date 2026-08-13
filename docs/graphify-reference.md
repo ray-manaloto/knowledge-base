@@ -1,7 +1,8 @@
 # graphify — expert operational reference
 
-Distilled from mastering graphify v8 (source `e32c9f4`, pip `graphifyy` 0.9.24 in
-source / **0.9.23** installed) by building this KB from its own source. Authoritative
+Originally distilled from graphify v8 (source `e32c9f4`) and compatibility-reviewed
+through Graphify **0.9.42** (source `7fe58b0`, locked `graphifyy` 0.9.42) against this
+repository's public SDK contract and release changes. Authoritative
 sources: `sources/graphify/` (README, ARCHITECTURE.md, docs/, pyproject.toml, tests),
 the CLI (`graphify --help`), and this repo's own graph. **For command syntax, the
 README's Full Command Reference is authoritative; this doc is the mental model.**
@@ -129,7 +130,9 @@ it (`kb-ensure-deps`). Choosing 3.14 = Louvain + a scipy inject; 3.12 = both nat
 
 ## Install / scoping (project-only invariants)
 
-- `graphify install --project` = writes only `./.claude/**` + `./CLAUDE.md`. **Never**
+- `graphify install --project` defaults to Claude and writes `./.claude/**` plus
+  `./CLAUDE.md`. Platform-specific installs may also rewrite platform instructions
+  and hooks, so they must run through this repository's reviewed repair transaction. **Never**
   bare `graphify install` (mutates `~/.claude`), never `extract --global` / `global
   add` (shared mutable machine state). `--strict` install blocks the first raw read
   → redirects to `graphify query` (toggle `GRAPHIFY_HOOK_STRICT`).

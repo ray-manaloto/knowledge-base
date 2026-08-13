@@ -8,7 +8,7 @@ from enum import StrEnum
 
 import msgspec
 
-APPROVED_METADATA_ZERO_NODE_WARNING = "approved-metadata-zero-node-graphify-0941"
+APPROVED_METADATA_ZERO_NODE_WARNING = "approved-reviewed-metadata-zero-node"
 
 
 class GraphifyOperation(StrEnum):

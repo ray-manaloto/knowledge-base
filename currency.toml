@@ -181,7 +181,13 @@ STILL PRESENT on 0.9.36, structurally, against the INSTALLED
 constant x0, `def label_communities` x1, and zero schema/response_format on the
 label path. Control: a bogus symbol x0 in the same file, and the x2 above is
 what proves the command finds things. The 42-batch probe was NOT run — it needs
-an LLM backend, and graphify's is Claude-only-and-broken here (#2076)."""
+an LLM backend, and graphify's is Claude-only-and-broken here (#2076).
+
+RE-PROBED 2026-08-13 for 0.9.42 using the pinned source diff. `llm.py` changed
+only for POSIX `source_file` normalization. Counts remain
+`_EXTRACTION_JSON_SCHEMA` x2, `def label_communities` x1, label-side schema x0.
+No label-touching line moved, so the backend-dependent 42-batch probe remains
+unwarranted. The gap is STILL PRESENT."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -277,7 +283,11 @@ owed when `graphify/serve.py` moves. It did not — `gh api compare
 v0.9.35...v0.9.36` lists **0** files matching `serve`, against a control of 4
 matching `dedup|cli` on the same compare, so the filter discriminates and the
 zero is an absence. (Read this item's OPENING sentence with its version
-condition attached; it describes 0.9.30, not today.)"""
+condition attached; it describes 0.9.30, not today.)
+
+RE-PROBED 2026-08-13 for 0.9.42. Both `mcp` and `all` extras still declare
+`mcp>=1,<3`; neither `graphify/serve.py` nor the MCP tests changed from 0.9.41.
+Per the recorded method, no live server probe is owed. Remains RESOLVED."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -352,7 +362,12 @@ entry — this build advanced SEVEN manifests (claude-code four releases, mise
 three, hk, uv, graphify, ruff, agent-harness-docs), and claude-code alone
 carries data-only `.json`. The count is a function of how many data-only `.json`
 files are cloned, so the honest reading is unattributable rather than either
-"regression" or "fine". STILL PRESENT."""
+"regression" or "fine". STILL PRESENT.
+
+RE-PROBE 2026-08-13 for 0.9.42 remains UNKNOWN. The strict preflight refused
+59 sources before extraction and deliberately wrote no aggregate graph, so no
+same-source-set zero-node warning inventory exists. Do not infer resolution
+from the release notes; repeat after the source-classification debt is fixed."""
 
 # 2484/2485: the two hyperedge issues THIS repo filed (merge-graphs loss;
 # nested-slot read gap). Fixed in 0.9.34 — verified on the installed binary
