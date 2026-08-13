@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
 import pytest
+from kb_setup import source_groups
 from kb_setup.generated.source_groups import (
     Capability,
     EvidenceStage,
@@ -251,6 +253,83 @@ def test_public_check_rejects_incomplete_registry_membership(
 
     assert check_main(tmp_path, [str(registry)]) == 1
     assert "registry membership differs" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("mutation", ["ghost-repo", "nonexistent-path", "aaaa-sha"])
+def test_public_check_rejects_registry_and_baseline_co_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mutation: str,
+) -> None:
+    registry = _copy_reviewed_registry(tmp_path)
+    baseline_path = registry.with_name("graphify-ecosystem.baseline.json")
+    registry_text = registry.read_text(encoding="utf-8")
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    reviewed = baseline["sources"][0]
+    original_repo = "program-context-protocol/program-context-protocol"
+    original_commit = "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23"
+    original_path = "src/pcp/coupling.py"
+
+    if mutation == "ghost-repo":
+        ghost = "ghost-owner/ghost-repository"
+        registry_text = registry_text.replace(original_repo, ghost)
+        reviewed["repo_id"] = ghost
+        reviewed["canonical_url"] = f"https://github.com/{ghost}"
+    elif mutation == "nonexistent-path":
+        nonexistent = "does/not/exist.py"
+        registry_text = registry_text.replace(original_path, nonexistent)
+        reviewed["capability_evidence"][1]["path"] = nonexistent
+    else:
+        false_commit = "a" * 40
+        registry_text = registry_text.replace(original_commit, false_commit)
+        reviewed["reviewed_commit"] = false_commit
+        for evidence in reviewed["capability_evidence"]:
+            evidence["commit"] = false_commit
+
+    registry.write_text(registry_text, encoding="utf-8")
+    baseline_path.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
+
+    def fake_remote(url: str, _source_id: str) -> bytes:
+        if mutation == "ghost-repo":
+            raise SourceGroupValidationError("remote authority: ghost repository")
+        repository_url = f"https://api.github.com/repos/{original_repo}"
+        if url == repository_url:
+            return json.dumps(
+                {
+                    "full_name": original_repo,
+                    "html_url": f"https://github.com/{original_repo}",
+                    "default_branch": "main",
+                    "fork": False,
+                    "archived": False,
+                }
+            ).encode()
+        if mutation == "aaaa-sha":
+            raise SourceGroupValidationError("remote authority: unknown commit")
+        if url.endswith("/commits/" + original_commit):
+            return json.dumps({"sha": original_commit}).encode()
+        raise SourceGroupValidationError("remote authority: nonexistent evidence path")
+
+    monkeypatch.setattr(source_groups, "_fetch_remote", fake_remote)
+
+    assert check_main(tmp_path, [str(registry)]) == 1
+    assert "remote authority" in capsys.readouterr().err
+
+
+def test_public_check_fails_closed_when_remote_authority_is_offline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    registry = _copy_reviewed_registry(tmp_path)
+
+    def offline(_url: str, _source_id: str) -> bytes:
+        raise SourceGroupValidationError("remote authority unavailable: offline")
+
+    monkeypatch.setattr(source_groups, "_fetch_remote", offline)
+
+    assert check_main(tmp_path, [str(registry)]) == 1
+    assert "remote authority unavailable: offline" in capsys.readouterr().err
 
 
 def test_rejects_duplicate_source_ids() -> None:

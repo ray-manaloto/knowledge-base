@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import sys
 import tomllib
+import urllib.parse
 from collections.abc import Hashable, Sequence
+from hashlib import sha256
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 
 import msgspec
@@ -31,6 +35,7 @@ from kb_setup.generated.source_groups import (
 
 DEFAULT_SOURCE_GROUP_PATH = Path("sources/groups/graphify-ecosystem.toml")
 DEFAULT_SOURCE_GROUP_BASELINE = Path("sources/groups/graphify-ecosystem.baseline.json")
+_REMOTE_TIMEOUT_SECONDS = 10.0
 
 
 class SourceGroupValidationError(ValueError):
@@ -116,6 +121,7 @@ def check_main(repo_root: Path, args: Sequence[str]) -> int:
         if not baseline.is_absolute():
             baseline = repo_root / baseline
         validate_reviewed_baseline(config, baseline)
+        validate_remote_authority(config, baseline)
     except (OSError, SourceGroupValidationError) as exc:
         print(f"source-groups-check: FAIL: {exc}", file=sys.stderr)
         return 1
@@ -159,6 +165,130 @@ def validate_reviewed_baseline(config: SourceGroupConfig, path: Path) -> None:
         )
     for source_id, source in actual.items():
         _validate_reviewed_source(source, expected[source_id])
+
+
+def validate_remote_authority(config: SourceGroupConfig, baseline_path: Path) -> None:
+    """Verify local review claims against GitHub repository and Git object identities."""
+    try:
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SourceGroupValidationError(f"reviewed baseline unavailable: {exc}") from exc
+    raw_sources = baseline.get("sources")
+    if not isinstance(raw_sources, list):
+        raise SourceGroupValidationError("reviewed baseline has no source list")
+    reviewed = {str(item.get("source_id")): item for item in raw_sources if isinstance(item, dict)}
+    for source in config.sources:
+        _validate_remote_source(source, reviewed[source.source_id])
+
+
+def _validate_remote_source(source: SourceRecord, reviewed: dict[str, object]) -> None:
+    repo_id = source.repository.repo_id
+    encoded_repo = "/".join(urllib.parse.quote(part, safe="") for part in repo_id.split("/"))
+    repository = _fetch_json(f"https://api.github.com/repos/{encoded_repo}", source.source_id)
+    _validate_remote_identity(source, repository)
+
+    commit = source.repository.reviewed_commit
+    if commit is None:
+        raise SourceGroupValidationError(f"{source.source_id}: reviewed commit is required")
+    remote_commit = _fetch_json(
+        f"https://api.github.com/repos/{encoded_repo}/commits/{commit}", source.source_id
+    )
+    if remote_commit.get("sha") != commit:
+        raise SourceGroupValidationError(
+            f"{source.source_id}: reviewed commit is not authoritative"
+        )
+
+    _validate_remote_evidence(source, reviewed, encoded_repo, commit)
+
+
+def _validate_remote_identity(source: SourceRecord, repository: dict[str, object]) -> None:
+    repo_id = source.repository.repo_id
+    remote_identity = repository.get("full_name")
+    remote_url = repository.get("html_url")
+    if not isinstance(remote_identity, str) or remote_identity.casefold() != repo_id.casefold():
+        raise SourceGroupValidationError(f"{source.source_id}: remote repository identity mismatch")
+    if (
+        not isinstance(remote_url, str)
+        or remote_url.rstrip("/").casefold()
+        != source.repository.canonical_url.rstrip("/").casefold()
+    ):
+        raise SourceGroupValidationError(f"{source.source_id}: remote canonical URL mismatch")
+    if repository.get("default_branch") != source.repository.default_branch:
+        raise SourceGroupValidationError(f"{source.source_id}: remote default branch mismatch")
+    if repository.get("fork") is not source.repository.is_fork:
+        raise SourceGroupValidationError(f"{source.source_id}: remote fork identity mismatch")
+    if repository.get("archived") is not source.repository.is_archived:
+        raise SourceGroupValidationError(f"{source.source_id}: remote archive identity mismatch")
+
+
+def _validate_remote_evidence(
+    source: SourceRecord,
+    reviewed: dict[str, object],
+    encoded_repo: str,
+    commit: str,
+) -> None:
+    evidence_by_path = reviewed.get("capability_evidence")
+    if not isinstance(evidence_by_path, list):
+        raise SourceGroupValidationError(f"{source.source_id}: reviewed evidence is invalid")
+    for evidence in evidence_by_path:
+        if not isinstance(evidence, dict):
+            raise SourceGroupValidationError(f"{source.source_id}: reviewed evidence is invalid")
+        path = evidence.get("path")
+        expected_hash = evidence.get("content_sha256")
+        if not isinstance(path, str) or not isinstance(expected_hash, str):
+            raise SourceGroupValidationError(f"{source.source_id}: reviewed evidence is invalid")
+        encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
+        content = _fetch_remote(
+            f"https://raw.githubusercontent.com/{encoded_repo}/{commit}/{encoded_path}",
+            source.source_id,
+        )
+        if sha256(content).hexdigest() != expected_hash:
+            raise SourceGroupValidationError(
+                f"{source.source_id}: evidence content differs from reviewed Git blob"
+            )
+
+
+def _fetch_json(url: str, source_id: str) -> dict[str, object]:
+    try:
+        payload = json.loads(_fetch_remote(url, source_id))
+    except json.JSONDecodeError as exc:
+        raise SourceGroupValidationError(
+            f"{source_id}: remote authority returned invalid JSON"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise SourceGroupValidationError(f"{source_id}: remote authority returned invalid JSON")
+    return payload
+
+
+def _fetch_remote(url: str, source_id: str) -> bytes:
+    parsed = urllib.parse.urlsplit(url)
+    allowed_hosts = frozenset({"api.github.com", "raw.githubusercontent.com"})
+    if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
+        raise SourceGroupValidationError(f"{source_id}: remote authority URL is not permitted")
+    target = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+    connection = http.client.HTTPSConnection(parsed.hostname, timeout=_REMOTE_TIMEOUT_SECONDS)
+    try:
+        connection.request(
+            "GET",
+            target,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "kb-source-groups/1",
+            },
+        )
+        response = connection.getresponse()
+        body = response.read()
+    except (OSError, http.client.HTTPException) as exc:
+        raise SourceGroupValidationError(
+            f"{source_id}: remote authority unavailable for {url}: {exc}"
+        ) from exc
+    finally:
+        connection.close()
+    if response.status != HTTPStatus.OK:
+        raise SourceGroupValidationError(
+            f"{source_id}: remote authority returned HTTP {response.status} for {url}"
+        )
+    return body
 
 
 def _validate_reviewed_source(source: SourceRecord, expected: dict[str, object]) -> None:
