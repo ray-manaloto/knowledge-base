@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -89,11 +90,53 @@ def _ensure_clone(m: mf.Manifest) -> None:
     if have.returncode != 0:
         print(f"  fetching {m.name} @ {m.commit[:10]} (not in local clone)")
         subprocess.run(
-            ["git", "-C", str(d), "fetch", "--quiet", "origin", m.ref],
+            ["git", "-C", str(d), "fetch", "--quiet", "--no-tags", "origin", m.commit],
             check=True,
             timeout=600,
         )
-    subprocess.run(["git", "-C", str(d), "checkout", "--quiet", m.commit], check=True, timeout=120)
+    # The pin may be either a commit object or an annotated-tag object. Both
+    # legitimately peel to one commit/tree, so verification is against the
+    # peeled identities while checkout still names the exact manifest object.
+    expected_commit = _rev_parse(d, f"{m.commit}^{{commit}}")
+    expected_tree = _rev_parse(d, f"{m.commit}^{{tree}}")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(d),
+            "-c",
+            "advice.detachedHead=false",
+            "checkout",
+            "--quiet",
+            "--detach",
+            m.commit,
+        ],
+        check=True,
+        timeout=120,
+    )
+    actual_commit = _rev_parse(d, "HEAD^{commit}")
+    actual_tree = _rev_parse(d, "HEAD^{tree}")
+    if (actual_commit, actual_tree) != (expected_commit, expected_tree):
+        raise RuntimeError(
+            f"{m.name}: checkout did not produce the pinned commit/tree "
+            f"({actual_commit[:12]}/{actual_tree[:12]} != "
+            f"{expected_commit[:12]}/{expected_tree[:12]})"
+        )
+
+
+def _rev_parse(clone_dir: Path, revision: str) -> str:
+    """Resolve one required Git object identity; unknown is an error, never a pass."""
+    proc = subprocess.run(
+        ["git", "-C", str(clone_dir), "rev-parse", "--verify", revision],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    identity = proc.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40,64}", identity):
+        raise RuntimeError(f"git returned an invalid object identity for {revision!r}")
+    return identity
 
 
 def _extract_code(repo_root: Path, name: str) -> bool:
