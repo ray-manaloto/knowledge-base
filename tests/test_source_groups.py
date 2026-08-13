@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -290,27 +291,24 @@ def test_public_check_rejects_registry_and_baseline_co_mutation(
     registry.write_text(registry_text, encoding="utf-8")
     baseline_path.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
 
-    def fake_remote(url: str, _source_id: str) -> bytes:
+    def fake_remote(endpoint: str, _source_id: str) -> dict[str, object]:
         if mutation == "ghost-repo":
             raise SourceGroupValidationError("remote authority: ghost repository")
-        repository_url = f"https://api.github.com/repos/{original_repo}"
-        if url == repository_url:
-            return json.dumps(
-                {
-                    "full_name": original_repo,
-                    "html_url": f"https://github.com/{original_repo}",
-                    "default_branch": "main",
-                    "fork": False,
-                    "archived": False,
-                }
-            ).encode()
+        if endpoint == f"repos/{original_repo}":
+            return {
+                "full_name": original_repo,
+                "html_url": f"https://github.com/{original_repo}",
+                "default_branch": "main",
+                "fork": False,
+                "archived": False,
+            }
         if mutation == "aaaa-sha":
             raise SourceGroupValidationError("remote authority: unknown commit")
-        if url.endswith("/commits/" + original_commit):
-            return json.dumps({"sha": original_commit}).encode()
+        if endpoint == f"repos/{original_repo}/commits/{original_commit}":
+            return {"sha": original_commit}
         raise SourceGroupValidationError("remote authority: nonexistent evidence path")
 
-    monkeypatch.setattr(source_groups, "_fetch_remote", fake_remote)
+    monkeypatch.setattr(source_groups, "_gh_api", fake_remote)
 
     assert check_main(tmp_path, [str(registry)]) == 1
     assert "remote authority" in capsys.readouterr().err
@@ -323,13 +321,66 @@ def test_public_check_fails_closed_when_remote_authority_is_offline(
 ) -> None:
     registry = _copy_reviewed_registry(tmp_path)
 
-    def offline(_url: str, _source_id: str) -> bytes:
+    def offline(_endpoint: str, _source_id: str) -> dict[str, object]:
         raise SourceGroupValidationError("remote authority unavailable: offline")
 
-    monkeypatch.setattr(source_groups, "_fetch_remote", offline)
+    monkeypatch.setattr(source_groups, "_gh_api", offline)
 
     assert check_main(tmp_path, [str(registry)]) == 1
     assert "remote authority unavailable: offline" in capsys.readouterr().err
+
+
+def test_github_authority_uses_exact_fnox_gh_boundary_and_scrubs_ambient_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    for name in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"):
+        monkeypatch.setenv(name, f"stale-{name}")
+    monkeypatch.setenv("__MISE_DIFF", "serialized-secret-state")
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout='{"sha":"abc"}', stderr="")
+
+    monkeypatch.setattr(source_groups.subprocess, "run", fake_run)
+
+    assert source_groups._gh_api("repos/owner/repo/commits/abc", "source") == {"sha": "abc"}
+    assert calls[0][0] == [
+        "fnox",
+        "exec",
+        "--non-interactive",
+        "--",
+        "gh",
+        "api",
+        "repos/owner/repo/commits/abc",
+    ]
+    assert calls[0][1]["timeout"] == 10.0
+    environment = calls[0][1]["env"]
+    assert isinstance(environment, dict)
+    ambient_github_names = set(source_groups._AMBIENT_GITHUB_TOKEN_ENV)
+    assert not ambient_github_names & set(environment)
+    assert "__MISE_DIFF" not in environment
+
+
+def test_github_authority_retains_stderr_receipt_without_serializing_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_marker = "redaction-control-value"
+    monkeypatch.setattr(
+        source_groups.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(
+            command, 1, stdout='{"message":"failed"}', stderr=f"auth failed: {private_marker}"
+        ),
+    )
+
+    with pytest.raises(SourceGroupValidationError) as caught:
+        source_groups._gh_api("repos/owner/repo", "source")
+
+    message = str(caught.value)
+    assert "stderr-bytes=" in message
+    assert "stderr-sha256=" in message
+    assert private_marker not in message
 
 
 def test_rejects_duplicate_source_ids() -> None:

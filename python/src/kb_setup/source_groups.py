@@ -3,15 +3,16 @@
 
 from __future__ import annotations
 
-import http.client
+import base64
 import json
+import os
 import re
+import subprocess
 import sys
 import tomllib
 import urllib.parse
 from collections.abc import Hashable, Sequence
 from hashlib import sha256
-from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 
 import msgspec
@@ -36,6 +37,9 @@ from kb_setup.generated.source_groups import (
 DEFAULT_SOURCE_GROUP_PATH = Path("sources/groups/graphify-ecosystem.toml")
 DEFAULT_SOURCE_GROUP_BASELINE = Path("sources/groups/graphify-ecosystem.baseline.json")
 _REMOTE_TIMEOUT_SECONDS = 10.0
+_AMBIENT_GITHUB_TOKEN_ENV = frozenset(
+    {"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
+)
 
 
 class SourceGroupValidationError(ValueError):
@@ -184,15 +188,13 @@ def validate_remote_authority(config: SourceGroupConfig, baseline_path: Path) ->
 def _validate_remote_source(source: SourceRecord, reviewed: dict[str, object]) -> None:
     repo_id = source.repository.repo_id
     encoded_repo = "/".join(urllib.parse.quote(part, safe="") for part in repo_id.split("/"))
-    repository = _fetch_json(f"https://api.github.com/repos/{encoded_repo}", source.source_id)
+    repository = _gh_api(f"repos/{encoded_repo}", source.source_id)
     _validate_remote_identity(source, repository)
 
     commit = source.repository.reviewed_commit
     if commit is None:
         raise SourceGroupValidationError(f"{source.source_id}: reviewed commit is required")
-    remote_commit = _fetch_json(
-        f"https://api.github.com/repos/{encoded_repo}/commits/{commit}", source.source_id
-    )
+    remote_commit = _gh_api(f"repos/{encoded_repo}/commits/{commit}", source.source_id)
     if remote_commit.get("sha") != commit:
         raise SourceGroupValidationError(
             f"{source.source_id}: reviewed commit is not authoritative"
@@ -238,57 +240,80 @@ def _validate_remote_evidence(
         if not isinstance(path, str) or not isinstance(expected_hash, str):
             raise SourceGroupValidationError(f"{source.source_id}: reviewed evidence is invalid")
         encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
-        content = _fetch_remote(
-            f"https://raw.githubusercontent.com/{encoded_repo}/{commit}/{encoded_path}",
+        encoded_commit = urllib.parse.quote(commit, safe="")
+        content_response = _gh_api(
+            f"repos/{encoded_repo}/contents/{encoded_path}?ref={encoded_commit}",
             source.source_id,
         )
+        content = _decode_github_content(content_response, source.source_id, path)
         if sha256(content).hexdigest() != expected_hash:
             raise SourceGroupValidationError(
                 f"{source.source_id}: evidence content differs from reviewed Git blob"
             )
 
 
-def _fetch_json(url: str, source_id: str) -> dict[str, object]:
+def _decode_github_content(payload: dict[str, object], source_id: str, path: str) -> bytes:
+    encoded = payload.get("content")
+    if payload.get("encoding") != "base64" or not isinstance(encoded, str):
+        raise SourceGroupValidationError(
+            f"{source_id}: GitHub contents response is incomplete for {path}"
+        )
     try:
-        payload = json.loads(_fetch_remote(url, source_id))
+        return base64.b64decode("".join(encoded.splitlines()), validate=True)
+    except ValueError as exc:
+        raise SourceGroupValidationError(
+            f"{source_id}: GitHub contents response is invalid for {path}"
+        ) from exc
+
+
+def _gh_api(endpoint: str, source_id: str) -> dict[str, object]:
+    if endpoint.startswith(("/", "http:", "https:")):
+        raise SourceGroupValidationError(f"{source_id}: GitHub API endpoint is not permitted")
+    command = ["fnox", "exec", "--non-interactive", "--", "gh", "api", endpoint]
+    try:
+        proc = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_REMOTE_TIMEOUT_SECONDS,
+            env=_github_env(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SourceGroupValidationError(
+            f"{source_id}: GitHub authority command unavailable: {type(exc).__name__}"
+        ) from exc
+    stderr_receipt = _stream_receipt(proc.stderr or "")
+    if proc.returncode != 0:
+        raise SourceGroupValidationError(
+            f"{source_id}: GitHub authority failed rc={proc.returncode}; {stderr_receipt}"
+        )
+    if (proc.stderr or "").strip():
+        raise SourceGroupValidationError(
+            f"{source_id}: GitHub authority emitted stderr; {stderr_receipt}"
+        )
+    try:
+        payload = json.loads(proc.stdout or "")
     except json.JSONDecodeError as exc:
         raise SourceGroupValidationError(
-            f"{source_id}: remote authority returned invalid JSON"
+            f"{source_id}: GitHub authority returned invalid JSON"
         ) from exc
     if not isinstance(payload, dict):
-        raise SourceGroupValidationError(f"{source_id}: remote authority returned invalid JSON")
+        raise SourceGroupValidationError(f"{source_id}: GitHub authority returned invalid JSON")
     return payload
 
 
-def _fetch_remote(url: str, source_id: str) -> bytes:
-    parsed = urllib.parse.urlsplit(url)
-    allowed_hosts = frozenset({"api.github.com", "raw.githubusercontent.com"})
-    if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
-        raise SourceGroupValidationError(f"{source_id}: remote authority URL is not permitted")
-    target = parsed.path + (f"?{parsed.query}" if parsed.query else "")
-    connection = http.client.HTTPSConnection(parsed.hostname, timeout=_REMOTE_TIMEOUT_SECONDS)
-    try:
-        connection.request(
-            "GET",
-            target,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "User-Agent": "kb-source-groups/1",
-            },
-        )
-        response = connection.getresponse()
-        body = response.read()
-    except (OSError, http.client.HTTPException) as exc:
-        raise SourceGroupValidationError(
-            f"{source_id}: remote authority unavailable for {url}: {exc}"
-        ) from exc
-    finally:
-        connection.close()
-    if response.status != HTTPStatus.OK:
-        raise SourceGroupValidationError(
-            f"{source_id}: remote authority returned HTTP {response.status} for {url}"
-        )
-    return body
+def _github_env() -> dict[str, str]:
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in _AMBIENT_GITHUB_TOKEN_ENV and not key.startswith("__MISE_")
+    }
+
+
+def _stream_receipt(stream: str) -> str:
+    encoded = stream.encode("utf-8")
+    return f"stderr-bytes={len(encoded)} stderr-sha256={sha256(encoded).hexdigest()}"
 
 
 def _validate_reviewed_source(source: SourceRecord, expected: dict[str, object]) -> None:
