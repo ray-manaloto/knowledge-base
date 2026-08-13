@@ -526,6 +526,10 @@ run = "uv run kb-setup query"
 description = "Fail closed unless locked Graphify CLI and reviewed public SDK signatures agree"
 run = "uv run kb-setup graphify-contract"
 
+[tasks.kb-skillopt-contract]
+description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
+run = "uv run kb-setup skillopt-contract"
+
 [tasks.kb-source-groups-check]
 description = "Validate the typed Graphify ecosystem source registry"
 usage = '''

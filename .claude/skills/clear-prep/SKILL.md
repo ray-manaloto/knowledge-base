@@ -357,11 +357,9 @@ This repo can measure its own skills, so use that rather than taste:
   over the description, so it rewards the literal words "proactively" and
   "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague
   description is not. For this skill the dimension is inert (see the banner).
-- `/skillopt-sleep` (SkillOpt-Sleep, enabled project-scope) is the offline
-  consolidation layer: it mines past sessions and stages **bounded** edits to
-  memory and skills behind a held-out validation gate. Nothing changes until you
-  run `/skillopt-sleep adopt`, and that review is not optional — an unreviewed
-  self-edit is how a skill drifts away from what the repo actually does.
+- SkillOpt's mutable marketplace plugin is disabled while its immutable
+  provenance/API contract is established. `/skillopt-sleep` is intentionally
+  unavailable until a later project-local adapter preserves explicit adoption.
 - The durable record of how a round went is `mise run kb-remember` (step 2), not
   a comment in this file.
 

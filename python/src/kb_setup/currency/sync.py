@@ -146,7 +146,12 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
     both forms are live in these repos, so both are read here.
     """
     if spec.python_package:
-        return _python_project_pin(repo_root, spec.python_package, spec.python_project_dir)
+        return _python_project_pin(
+            repo_root,
+            spec.python_package,
+            spec.python_project_dir,
+            github=spec.github,
+        )
     entry = _tools_table(repo_root).get(spec.mise_key)
     if isinstance(entry, str):
         return entry, ()
@@ -159,7 +164,7 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
 
 
 def _python_project_pin(
-    repo_root: Path, package: str, project_dir: str = ""
+    repo_root: Path, package: str, project_dir: str = "", *, github: str = ""
 ) -> tuple[str, tuple[str, ...]]:
     """Read one exact PEP 508 dependency from the project's exported runtime set."""
     relative = Path(project_dir or ".")
@@ -172,15 +177,29 @@ def _python_project_pin(
     except OSError, tomllib.TOMLDecodeError:
         return "", ()
     dependencies = project.get("dependencies", []) if isinstance(project, dict) else []
-    pattern = re.compile(
+    version_pattern = re.compile(
         rf"{re.escape(package)}(?:\[([^]]+)\])?==([0-9]+(?:\.[0-9]+)+)",
         re.IGNORECASE,
     )
+    vcs_pattern = re.compile(
+        rf"{re.escape(package)}(?:\[([^]]+)\])?\s*@\s*"
+        r"git\+https://github\.com/([^@\s]+)@([0-9a-f]{40})",
+        re.IGNORECASE,
+    )
+    matches: list[tuple[str, tuple[str, ...]]] = []
     for requirement in dependencies if isinstance(dependencies, list) else []:
-        match = pattern.fullmatch(str(requirement))
-        if match:
-            extras = tuple(part.strip() for part in (match.group(1) or "").split(",") if part)
-            return match.group(2), extras
+        version_match = version_pattern.fullmatch(str(requirement))
+        vcs_match = vcs_pattern.fullmatch(str(requirement))
+        if version_match:
+            extras = tuple(
+                part.strip() for part in (version_match.group(1) or "").split(",") if part
+            )
+            matches.append((version_match.group(2), extras))
+        elif vcs_match and (not github or vcs_match.group(2).lower() == github.lower()):
+            extras = tuple(part.strip() for part in (vcs_match.group(1) or "").split(",") if part)
+            matches.append((vcs_match.group(3), extras))
+    if len(matches) == 1:
+        return matches[0]
     return "", ()
 
 
@@ -865,6 +884,19 @@ def _check_python_resolution(
     executable = repo_root / (spec.python_project_dir or ".") / ".venv" / "bin" / spec.binary
     if not executable.is_file():
         return Finding("resolution", DRIFT, f"{executable} is missing; run `mise deps`"), ""
+    if re.fullmatch(r"[0-9a-f]{40}", pinned):
+        observed = _installed_direct_url_commit(repo_root, spec)
+        if observed != pinned:
+            return (
+                Finding(
+                    "resolution",
+                    DRIFT,
+                    f"{spec.python_package} direct_url records {observed or 'UNKNOWN'} "
+                    f"but pyproject pins {pinned}",
+                ),
+                observed,
+            )
+        return Finding("resolution", OK, f"locked uv environment runs {pinned[:12]}"), observed
     observed = observed_version(str(executable), spec.version_pattern)
     if observed != pinned:
         return (
@@ -876,6 +908,24 @@ def _check_python_resolution(
             observed,
         )
     return Finding("resolution", OK, f"locked uv environment runs {observed}"), observed
+
+
+def _installed_direct_url_commit(repo_root: Path, spec: ToolSpec) -> str:
+    """Read the VCS commit recorded by the installed distribution."""
+    venv = repo_root / (spec.python_project_dir or ".") / ".venv"
+    normalized = spec.python_package.replace("-", "_")
+    pattern = f"lib/python*/site-packages/{normalized}-*.dist-info/direct_url.json"
+    for direct_url in sorted(venv.glob(pattern)):
+        try:
+            payload = json.loads(direct_url.read_text(encoding="utf-8"))
+        except OSError, json.JSONDecodeError:
+            continue
+        vcs_info = payload.get("vcs_info", {})
+        if isinstance(vcs_info, dict):
+            commit = str(vcs_info.get("commit_id") or "")
+            if re.fullmatch(r"[0-9a-f]{40}", commit):
+                return commit
+    return ""
 
 
 def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
@@ -1159,6 +1209,15 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     ref = manifest_ref(repo_root, spec)
     if not ref:
         return Finding("manifest", DRIFT, f"{spec.manifest} has no readable `ref =` line")
+    if re.fullmatch(r"[0-9a-f]{40}", pinned):
+        commit = _manifest_field(repo_root, spec, "commit")
+        if commit != pinned:
+            return Finding(
+                "manifest",
+                DRIFT,
+                f"{spec.manifest} commits {commit or 'UNKNOWN'} but pyproject pins {pinned}",
+            )
+        return _check_source_clone(repo_root, spec, pinned)
     # `rust-v0.147.0` -> `0.147.0`. Strip the project's declared prefix BEFORE
     # the `v`, or a `rust-v` tag compares literally against an installed
     # `0.147.0` and reports drift on a manifest pinned exactly right (#245).

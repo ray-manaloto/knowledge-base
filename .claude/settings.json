@@ -75,7 +75,6 @@
     "claude-md-management@claude-plugins-official": true,
     "mise@brentmitchell25": true,
     "plugin-eval@claude-code-workflows": true,
-    "skillopt-sleep@skillopt-sleep": true,
     "codex@openai-codex": true
   },
   "extraKnownMarketplaces": {
@@ -107,16 +106,6 @@
       "source": {
         "source": "github",
         "repo": "wshobson/agents"
-      }
-    },
-    "skillopt-sleep": {
-      "source": {
-        "source": "github",
-        "repo": "microsoft/SkillOpt",
-        "path": "plugins/claude-code/.claude-plugin/marketplace.json",
-        "sparsePaths": [
-          "plugins/claude-code"
-        ]
       }
     }
   },
