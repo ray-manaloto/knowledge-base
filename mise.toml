@@ -569,8 +569,8 @@ arg "<provider>" help="Reviewed provider adapter name"
 arg "<source>" help="Credential-free owner/repository identifier"
 arg "<revision>" help="Full immutable 40-character revision"
 arg "<destination>" help="Project-local artifact destination"
-arg "[receipt]" help="Optional receipt path"
 arg "[mode]" help="Plan by default; apply explicitly transfers" choices "plan" "apply"
+arg "[receipt]" help="Optional receipt path"
 '''
 run = '''
 uv run kb-setup artifact-download --provider ${usage_provider?} --source ${usage_source?} --revision ${usage_revision?} --destination ${usage_destination?}{% if usage.receipt is string and usage.receipt != '' %} --receipt {{ usage.receipt | quote }}{% endif %}{% if usage.mode == "apply" %} --apply{% endif %}

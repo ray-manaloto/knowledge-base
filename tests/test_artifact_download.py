@@ -115,6 +115,37 @@ def test_apply_stages_then_replaces_corrupt_existing_tree(tmp_path: Path) -> Non
     assert not list(tmp_path.glob(".artifact.*"))
 
 
+def test_apply_replaces_preexisting_regular_file_destination(tmp_path: Path) -> None:
+    options = _options(tmp_path, apply=True)
+    options.destination.write_bytes(b"corrupt regular file\n")
+
+    assert artifact_download.download(options, provider=FakeProvider()) == 0
+
+    assert options.destination.is_dir()
+    assert (options.destination / "weights/model.bin").read_bytes() == PAYLOAD
+    assert not (tmp_path / ".artifact.previous").exists()
+
+
+def test_receipt_failure_restores_preexisting_regular_file_destination(
+    tmp_path: Path, monkeypatch
+) -> None:
+    options = _options(tmp_path, apply=True)
+    options.destination.write_bytes(b"prior regular file\n")
+    real_atomic = artifact_download._atomic_receipt
+
+    def fail_complete(path: Path, payload: dict[str, object]) -> None:
+        if payload["status"] == "complete":
+            raise OSError("simulated complete receipt failure")
+        real_atomic(path, payload)
+
+    monkeypatch.setattr(artifact_download, "_atomic_receipt", fail_complete)
+    with pytest.raises(OSError, match="complete receipt"):
+        artifact_download.download(options, provider=FakeProvider())
+
+    assert options.destination.read_bytes() == b"prior regular file\n"
+    assert not (tmp_path / ".artifact.previous").exists()
+
+
 @pytest.mark.parametrize(
     ("source", "revision"),
     [
@@ -357,6 +388,30 @@ def test_provider_exception_is_redacted_and_preserves_completed_receipt(tmp_path
     assert not list(tmp_path.glob(".artifact.download-*"))
 
 
+@pytest.mark.parametrize("control_flow", [KeyboardInterrupt, SystemExit])
+def test_control_flow_after_publish_rolls_back_before_reraise(
+    tmp_path: Path, monkeypatch, control_flow: type[BaseException]
+) -> None:
+    options = _options(tmp_path, apply=True)
+    options.destination.mkdir()
+    prior = options.destination / "prior.bin"
+    prior.write_bytes(b"prior artifact\n")
+    real_atomic = artifact_download._atomic_receipt
+
+    def interrupt_complete(path: Path, payload: dict[str, object]) -> None:
+        if payload["status"] == "complete":
+            raise control_flow()
+        real_atomic(path, payload)
+
+    monkeypatch.setattr(artifact_download, "_atomic_receipt", interrupt_complete)
+    with pytest.raises(control_flow):
+        artifact_download.download(options, provider=FakeProvider())
+
+    assert prior.read_bytes() == b"prior artifact\n"
+    assert not (options.destination / "weights/model.bin").exists()
+    assert not (tmp_path / ".artifact.previous").exists()
+
+
 def test_destination_identity_distinguishes_same_named_paths(tmp_path: Path) -> None:
     first = replace(_options(tmp_path), destination_identity="models/one/artifact")
     second = replace(_options(tmp_path), destination_identity="models/two/artifact")
@@ -484,14 +539,70 @@ def test_provider_cannot_escape_project_output_boundary(
     assert not outside.exists()
 
 
-def test_receipt_cannot_replace_a_reviewed_payload(tmp_path: Path) -> None:
+@pytest.mark.parametrize("receipt_relative", ["weights/model.bin", "weights"])
+def test_receipt_cannot_replace_a_reviewed_payload(tmp_path: Path, receipt_relative: str) -> None:
     options = replace(
         _options(tmp_path),
-        receipt=tmp_path / "artifact" / "weights" / "model.bin",
+        receipt=tmp_path / "artifact" / receipt_relative,
     )
     with pytest.raises(ArtifactError, match="collides"):
         artifact_download.download(options, provider=FakeProvider())
     assert not options.destination.exists()
+
+
+@pytest.mark.parametrize("relation", ["equal", "ancestor"])
+def test_receipt_and_destination_must_be_disjoint(tmp_path: Path, relation: str) -> None:
+    destination = tmp_path / "artifacts" / "model"
+    receipt = destination if relation == "equal" else tmp_path / "artifacts"
+    options = replace(_options(tmp_path), destination=destination, receipt=receipt)
+
+    with pytest.raises(ArtifactError, match="artifact destination"):
+        artifact_download.download(options, provider=FakeProvider())
+
+    assert not destination.exists()
+    assert not receipt.exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "length"),
+    [("provider", 65), ("provider_version", 129)],
+)
+def test_provider_identifiers_match_receipt_schema_bounds(
+    tmp_path: Path, field: str, length: int
+) -> None:
+    class LongVersionProvider(FakeProvider):
+        def version(self) -> str:
+            """Return an identifier beyond the receipt schema bound."""
+            return "a" * length
+
+    provider = FakeProvider() if field == "provider" else LongVersionProvider()
+    options = _options(tmp_path)
+    if field == "provider":
+        provider.name = "a" * length
+        options = replace(options, provider=provider.name)
+
+    with pytest.raises(ArtifactError, match="provider"):
+        artifact_download.download(options, provider=provider)
+
+    assert not (options.receipt or Path()).exists()
+
+
+def test_provider_schema_boundary_lengths_are_accepted(tmp_path: Path) -> None:
+    class BoundaryProvider(FakeProvider):
+        name = "p" * 64
+
+        def version(self) -> str:
+            """Return the exact maximum schema length."""
+            return "v" * 128
+
+    provider = BoundaryProvider()
+    provider.value = replace(provider.value, provider=provider.name)
+    options = replace(_options(tmp_path), provider=provider.name)
+
+    assert artifact_download.download(options, provider=provider) == 0
+    receipt = _receipt(options.receipt or Path())
+    assert len(receipt.provider) == 64
+    assert len(receipt.provider_version) == 128
 
 
 def test_receipt_json_has_canonical_order_and_no_unknown_fields(tmp_path: Path) -> None:

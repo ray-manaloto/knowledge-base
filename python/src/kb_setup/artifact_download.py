@@ -19,7 +19,8 @@ _COMMIT = re.compile(r"[0-9a-f]{40}\Z")
 _SOURCE = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\Z")
 _DEFAULT_MAX_BYTES = 1 << 40
 _CHUNK = 8 * 1024 * 1024
-_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}\Z")
+_PROVIDER_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}\Z")
+_PROVIDER_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}\Z")
 _LICENSE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]{0,63}\Z")
 
 
@@ -184,6 +185,34 @@ def _require_absent_backup(backup: Path) -> None:
         raise ArtifactError("stale receipt recovery state exists")
 
 
+def _remove_path(path: Path) -> None:
+    """Remove exactly one known artifact path regardless of its file type."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def _validate_receipt_path(destination: Path, receipt: Path, plan: DownloadPlan) -> None:
+    """Require a normalized receipt path disjoint from output roots and payloads."""
+    normalized_destination = destination.resolve()
+    normalized_receipt = receipt.resolve()
+    if (
+        normalized_receipt == normalized_destination
+        or normalized_receipt in normalized_destination.parents
+    ):
+        raise ArtifactError("receipt path collides with the artifact destination")
+    try:
+        receipt_relative = normalized_receipt.relative_to(normalized_destination)
+    except ValueError:
+        return
+    if any(
+        receipt_relative == Path(item.path) or receipt_relative in Path(item.path).parents
+        for item in plan.files
+    ):
+        raise ArtifactError("receipt path collides with the reviewed artifact inventory")
+
+
 def _receipt(options: DownloadOptions, plan: DownloadPlan, status: str) -> dict[str, object]:
     if options.destination_identity is None:
         raise ArtifactError("project-relative destination identity is required")
@@ -243,8 +272,7 @@ def _publish_download(destination: Path, staging: Path) -> Path | None:
         finally:
             os.close(descriptor)
     except OSError:
-        if destination.exists():
-            shutil.rmtree(destination)
+        _remove_path(destination)
         if had_destination and backup.exists():
             backup.replace(destination)
         raise
@@ -252,15 +280,14 @@ def _publish_download(destination: Path, staging: Path) -> Path | None:
 
 
 def _rollback_download(destination: Path, backup: Path | None) -> None:
-    if destination.exists():
-        shutil.rmtree(destination)
+    _remove_path(destination)
     if backup is not None and backup.exists():
         backup.replace(destination)
 
 
 def _finish_download(backup: Path | None) -> None:
     if backup is not None and backup.exists():
-        shutil.rmtree(backup)
+        _remove_path(backup)
 
 
 def _apply(
@@ -289,10 +316,10 @@ def _apply(
         _atomic_receipt(receipt, {**planned, "status": "complete"})
     except BaseException as error:
         shutil.rmtree(staging, ignore_errors=True)
-        if isinstance(error, (KeyboardInterrupt, SystemExit)):
-            raise
         if published:
             _rollback_download(options.destination, backup)
+        if isinstance(error, (KeyboardInterrupt, SystemExit)):
+            raise
         _atomic_receipt(attempt_receipt, {**planned, "status": "failed"})
         raise
     _finish_download(backup)
@@ -305,20 +332,15 @@ def download(options: DownloadOptions, *, provider: Provider) -> int:
         raise ArtifactError("revision must be a full immutable commit")
     if not _SOURCE.fullmatch(options.source):
         raise ArtifactError("source must be a credential-free repository identifier")
-    if not _TOKEN.fullmatch(options.provider):
+    if not _PROVIDER_ID.fullmatch(options.provider):
         raise ArtifactError("provider identifier is invalid")
     if options.max_bytes < 0:
         raise ArtifactError("maximum byte limit is invalid")
     plan, provider_version = _provider_plan(options, provider)
     receipt = options.receipt or options.destination / ".artifact-receipt.json"
-    try:
-        receipt_relative = receipt.relative_to(options.destination).as_posix()
-    except ValueError:
-        receipt_relative = ""
-    if receipt_relative in {item.path for item in plan.files}:
-        raise ArtifactError("receipt path collides with the reviewed artifact inventory")
+    _validate_receipt_path(options.destination, receipt, plan)
     planned = _receipt(options, plan, "planned")
-    if not _TOKEN.fullmatch(provider_version):
+    if not _PROVIDER_VERSION.fullmatch(provider_version):
         raise ArtifactError("provider version is invalid")
     planned["provider_version"] = provider_version
     if not options.apply:

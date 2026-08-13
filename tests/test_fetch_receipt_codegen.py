@@ -38,4 +38,6 @@ def test_paired_skills_are_exact_and_route_only_through_mise() -> None:
     text = agents.read_text(encoding="utf-8")
     assert "mise run kb-artifact-download" in text
     assert "no provider adapter" in text
+    assert "destination [plan|apply] [receipt]" in text
+    assert "requires `--apply`" not in text
     assert "hf-xet" not in text.lower()
