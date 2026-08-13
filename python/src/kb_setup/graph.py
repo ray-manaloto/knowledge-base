@@ -28,7 +28,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import atomic, graph_checks, graphify_ops
+from kb_setup import atomic, graph_checks, graphify_health, graphify_ops
 from kb_setup import manifest as mf
 from kb_setup.graphify_env import (
     assert_pinned_graphify,
@@ -53,6 +53,33 @@ _REVIEWED_UNCLASSIFIED_METADATA = (
     "COPYING",
     "COPYING.md",
     "COPYING.txt",
+)
+
+_EXPECTED_METADATA_ONLY = (
+    graphify_health.ExpectedMetadataOnly(
+        source_name="10x-Team",
+        relative_path=".claude-plugin/marketplace.json",
+        content_sha256="c90e241178951c4457dc98de02e33abf86de04ec3a98b012cacff8334c83ca70",
+        skipped_disposition="data json (not a config/manifest)",
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="10x-Team",
+        relative_path=".claude-plugin/plugin.json",
+        content_sha256="033d0f42d41ae76ffb008b559feaf5f4038f85a1c034f4c60432edcafa6d5d11",
+        skipped_disposition="data json (not a config/manifest)",
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="10x-Team",
+        relative_path=".cursor-plugin/plugin.json",
+        content_sha256="f06e9e3dbf4d14fa987823811363b1a03f155e94c7df9877c498e26fad159813",
+        skipped_disposition="data json (not a config/manifest)",
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="10x-Team",
+        relative_path="gemini-extension.json",
+        content_sha256="a2dff2cfbac3d49bbe87501ccb93460b8f3e8a4c0d39787fd4d933cea2318608",
+        skipped_disposition="data json (not a config/manifest)",
+    ),
 )
 
 # The tool whose artifacts `kb-build` produces. Named explicitly so a
@@ -192,6 +219,13 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     raw_nodes = data.get("nodes", [])
     if isinstance(raw_nodes, list):
         nodes = raw_nodes
+    inventory = tuple(item for item in _EXPECTED_METADATA_ONLY if item.source_name == name)
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        source_root,
+        name,
+        proc.stderr or "",
+        inventory,
+    )
     receipt = graphify_health.assess(
         graphify_health.GraphifyOperation.EXTRACT,
         graphify_health.GraphifyEvidence(
@@ -199,6 +233,7 @@ def _extract_code(repo_root: Path, name: str) -> bool:
             returncode=proc.returncode,
             stdout=proc.stdout or "",
             stderr=proc.stderr or "",
+            approved_classifications=approved,
             detected_sources=1,
             extracted_sources=1 if nodes else 0,
             zero_node_sources=0 if nodes else 1,

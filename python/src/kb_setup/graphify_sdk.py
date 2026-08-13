@@ -25,9 +25,12 @@ from graphify.build import build, build_from_json, build_merge
 from graphify.detect import detect, detect_incremental
 from graphify.export import prune_dangling_edges, to_json
 from graphify.extract import collect_files, extract
+from graphify.extractors.json_config import extract_json
 from graphify.reflect import build_learning_overlay, reflect
 
 from kb_setup.graphify_health import (
+    APPROVED_METADATA_ZERO_NODE_WARNING,
+    ExpectedMetadataOnly,
     GraphifyEvidence,
     GraphifyOperation,
     GraphifyReceipt,
@@ -84,6 +87,11 @@ _PUBLIC_SYMBOLS = (
         "parallel: 'bool' = True, max_workers: 'int | None' = None, resolution_context_nodes: "
         "'list[dict] | None' = None, resolution_context_edges: 'list[dict] | None' = None) -> "
         "'dict'",
+    ),
+    PublicSymbol(
+        "graphify.extractors.json_config.extract_json",
+        extract_json,
+        "(path: 'Path') -> 'dict'",
     ),
     PublicSymbol(
         "graphify.detect.detect",
@@ -339,3 +347,47 @@ def _relative_paths(root: Path, paths: object) -> tuple[str, ...]:
         except ValueError:
             relative.append(str(path))
     return tuple(relative)
+
+
+def approve_metadata_zero_node_warning(
+    root: Path,
+    source_name: str,
+    stderr: str,
+    inventory: tuple[ExpectedMetadataOnly, ...],
+) -> tuple[str, ...]:
+    """Approve only the exact 0.9.41 warning backed by reviewed path/bytes/disposition."""
+    if not inventory or any(item.source_name != source_name for item in inventory):
+        return ()
+    valid = True
+    for item in inventory:
+        path = root / item.relative_path
+        try:
+            content_hash = _sha256_file(path)
+        except OSError:
+            valid = False
+            break
+        if content_hash != item.content_sha256:
+            valid = False
+            break
+        result = extract_json(path)
+        if result.get("error") or result.get("nodes") or result.get("edges"):
+            valid = False
+            break
+        if result.get("skipped") != item.skipped_disposition:
+            valid = False
+            break
+    names = ", ".join(Path(item.relative_path).name for item in inventory)
+    expected = (
+        f"  warning: {len(inventory)} source file(s) produced zero nodes and are absent "
+        f"from the graph: {names}. A re-run will retry them (empties are no longer "
+        "cached); if it persists, please report the file(s) (#1666).\n"
+    )
+    if not valid or stderr != expected:
+        return ()
+    return (APPROVED_METADATA_ZERO_NODE_WARNING,)
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()

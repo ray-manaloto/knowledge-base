@@ -8,6 +8,8 @@ from enum import StrEnum
 
 import msgspec
 
+APPROVED_METADATA_ZERO_NODE_WARNING = "approved-metadata-zero-node-graphify-0941"
+
 
 class GraphifyOperation(StrEnum):
     """Graphify lifecycle operations covered by the shared health contract."""
@@ -46,6 +48,7 @@ class GraphifyReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     unclassified_paths: tuple[str, ...] = ()
     zero_node_paths: tuple[str, ...] = ()
     timed_out: bool = False
+    approved_classifications: tuple[str, ...] = ()
     mode: str | None = None
     expected_artifacts: tuple[str, ...] = ()
     produced_artifacts: tuple[str, ...] = ()
@@ -59,6 +62,15 @@ class SourceCoveragePolicy(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     required_paths: tuple[str, ...] = ()
     optional_unclassified_paths: tuple[str, ...] = ()
     optional_zero_node_paths: tuple[str, ...] = ()
+
+
+class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Reviewed file whose exact bytes intentionally produce no graph nodes."""
+
+    source_name: str
+    relative_path: str
+    content_sha256: str
+    skipped_disposition: str
 
 
 class IncompleteGraphifyOperationError(RuntimeError):
@@ -81,6 +93,7 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     zero_node_paths: tuple[str, ...] = ()
     coverage_policy: SourceCoveragePolicy | None = None
     timed_out: bool = False
+    approved_classifications: tuple[str, ...] = ()
     mode: str | None = None
     deep_required: bool = False
     reflection_expected: bool = False
@@ -97,7 +110,9 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
         reasons.append("evidence-missing")
     if evidence.timed_out:
         reasons.append("timeout")
-    if evidence.stderr.strip():
+    if evidence.stderr.strip() and (
+        evidence.approved_classifications != (APPROVED_METADATA_ZERO_NODE_WARNING,)
+    ):
         reasons.append("stderr")
     if "truncated" in f"{evidence.stdout}\n{evidence.stderr}".casefold():
         reasons.append("truncated")
@@ -184,6 +199,7 @@ def assess(
         unclassified_paths=_bounded_paths(evidence.unclassified_paths),
         zero_node_paths=_bounded_paths(evidence.zero_node_paths),
         timed_out=evidence.timed_out,
+        approved_classifications=evidence.approved_classifications,
         mode=evidence.mode,
         expected_artifacts=evidence.expected_artifacts,
         produced_artifacts=evidence.produced_artifacts,

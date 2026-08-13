@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 from kb_setup.graphify_health import (
+    APPROVED_METADATA_ZERO_NODE_WARNING,
     GraphifyEvidence,
     GraphifyOperation,
     GraphifyState,
@@ -29,6 +30,21 @@ def test_success_with_stderr_is_incomplete(stderr: str) -> None:
     )
     assert receipt.state is GraphifyState.INCOMPLETE
     assert "stderr" in receipt.reasons
+
+
+def test_approved_metadata_warning_is_retained_with_classification() -> None:
+    warning = "upstream zero-node warning"
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr=warning,
+            approved_classifications=(APPROVED_METADATA_ZERO_NODE_WARNING,),
+        ),
+    )
+    assert receipt.state is GraphifyState.COMPLETE
+    assert receipt.stderr == warning
+    assert receipt.approved_classifications == (APPROVED_METADATA_ZERO_NODE_WARNING,)
 
 
 def test_extract_refuses_unclassified_zero_node_and_partial_coverage() -> None:

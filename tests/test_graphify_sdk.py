@@ -9,7 +9,11 @@ from pathlib import Path
 import networkx as nx
 import pytest
 from kb_setup import graphify_sdk
-from kb_setup.graphify_health import IncompleteGraphifyOperationError, SourceCoveragePolicy
+from kb_setup.graphify_health import (
+    ExpectedMetadataOnly,
+    IncompleteGraphifyOperationError,
+    SourceCoveragePolicy,
+)
 
 
 def test_graphify_0941_public_sdk_contract_is_current() -> None:
@@ -179,3 +183,85 @@ def test_checked_artifact_blocks_missing_output(
     monkeypatch.setattr(graphify_sdk, "to_json", lambda *_a, **_k: True)
     with pytest.raises(IncompleteGraphifyOperationError, match="artifacts-partial"):
         graphify_sdk.artifact_checked(nx.Graph(), {}, tmp_path / "graph.json")
+
+
+_SKIPPED = "data json (not a config/manifest)"
+_WARNING = (
+    "  warning: 1 source file(s) produced zero nodes and are absent from the graph: "
+    "plugin.json. A re-run will retry them (empties are no longer cached); if it persists, "
+    "please report the file(s) (#1666).\n"
+)
+
+
+def _metadata_inventory(
+    path: Path, *, digest: str | None = None
+) -> tuple[ExpectedMetadataOnly, ...]:
+    import hashlib
+
+    return (
+        ExpectedMetadataOnly(
+            source_name="reviewed-source",
+            relative_path="plugin.json",
+            content_sha256=digest or hashlib.sha256(path.read_bytes()).hexdigest(),
+            skipped_disposition=_SKIPPED,
+        ),
+    )
+
+
+def test_exact_reviewed_metadata_skip_approves_and_retains_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "plugin.json"
+    path.write_text('{"name":"metadata"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        graphify_sdk,
+        "extract_json",
+        lambda _path: {"nodes": [], "edges": [], "skipped": _SKIPPED},
+    )
+
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        tmp_path, "reviewed-source", _WARNING, _metadata_inventory(path)
+    )
+
+    assert approved == ("approved-metadata-zero-node-graphify-0941",)
+
+
+@pytest.mark.parametrize(
+    "mutation", ["hash", "disposition", "missing-disposition", "error", "stderr", "source", "path"]
+)
+def test_metadata_skip_mutations_do_not_approve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    path = tmp_path / "plugin.json"
+    path.write_text('{"name":"metadata"}\n', encoding="utf-8")
+    disposition = "unexpected" if mutation == "disposition" else _SKIPPED
+    extraction: dict[str, object] = {"nodes": [], "edges": [], "skipped": disposition}
+    if mutation == "missing-disposition":
+        extraction.pop("skipped")
+    if mutation == "error":
+        extraction["error"] = "parser failed"
+    monkeypatch.setattr(
+        graphify_sdk,
+        "extract_json",
+        lambda _path: extraction,
+    )
+    digest = "0" * 64 if mutation == "hash" else None
+    inventory = _metadata_inventory(path, digest=digest)
+    if mutation == "path":
+        inventory = (
+            ExpectedMetadataOnly(
+                source_name="reviewed-source",
+                relative_path="missing.json",
+                content_sha256=inventory[0].content_sha256,
+                skipped_disposition=_SKIPPED,
+            ),
+        )
+
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        tmp_path,
+        "other-source" if mutation == "source" else "reviewed-source",
+        _WARNING + ("unexpected stderr\n" if mutation == "stderr" else ""),
+        inventory,
+    )
+
+    assert approved == ()
