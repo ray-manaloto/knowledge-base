@@ -255,6 +255,48 @@ def test_github_source_with_no_stable_releases_fails_closed(monkeypatch) -> None
     assert err
 
 
+def test_declared_tag_prefix_selects_only_that_release_family(monkeypatch) -> None:
+    monkeypatch.setattr(
+        upstream,
+        "_gh_api_list",
+        lambda _p: (
+            [
+                {"tag_name": "rust-v0.147.0", "draft": False, "prerelease": False},
+                {"tag_name": "v99.0.0", "draft": False, "prerelease": False},
+            ],
+            "",
+        ),
+    )
+    assert upstream.github_versions("openai/codex", tag_prefix="rust-v") == (
+        "0.147.0",
+        ("0.147.0",),
+        "",
+    )
+
+
+def test_prefixed_multi_release_notes_keep_each_format_verdict_separate(monkeypatch) -> None:
+    monkeypatch.setattr(
+        upstream,
+        "github_versions",
+        lambda _repo, *, tag_prefix: (
+            "1.2.0",
+            ("1.1.0", "1.2.0"),
+            "" if tag_prefix == "rust-v" else "wrong prefix",
+        ),
+    )
+
+    def release(_repo: str, version: str, *, tag_prefix: str) -> tuple[str, str, str]:
+        body = "## Added\n\n- safe feature" if version == "1.1.0" else "opaque prose"
+        return f"{tag_prefix}{version}", body, ""
+
+    monkeypatch.setattr(upstream, "release_for_tag", release)
+    status = upstream.probe(pypi="", github="openai/codex", current="1.0.0", tag_prefix="rust-v")
+    assert status.feature_highlights == ("safe feature",)
+    assert status.feature_scan_unrecognised is True
+    assert "## 1.1.0" in status.notes
+    assert "## 1.2.0" in status.notes
+
+
 def test_pypi_wins_when_both_sources_are_declared(monkeypatch) -> None:
     """Mise installs from PyPI, so a GitHub-only version can never be pinned."""
     monkeypatch.setattr(upstream, "_pypi_json", lambda _p: (_PYPI_PAYLOAD, ""))

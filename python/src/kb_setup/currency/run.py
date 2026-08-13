@@ -213,7 +213,12 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     # afford the one `mise where` subprocess the extras probe needs when the
     # binary resolves through a shim. The hook path stays subprocess-free.
     status = sync.check_sync(repo_root, spec, deep=True)
-    up = upstream.probe(pypi=spec.pypi, github=spec.github, current=status.pinned)
+    up = upstream.probe(
+        pypi=spec.pypi,
+        github=spec.github,
+        current=status.pinned,
+        tag_prefix=spec.tag_prefix,
+    )
     observations = issues.observe_all(spec)
     report_root = repo_root / report.REPORT_DIR
     previous = issues.load_previous(report_root, spec.name)
@@ -505,7 +510,12 @@ def stamp(repo_root: Path, *, tool: str, version: str, source_ref: str = "") -> 
     # neither an explicit --version nor the binary can supply a version, refuse
     # rather than stamp an unverified one (a manual stamp has not just rebuilt, so
     # writing an empty stamp would only clobber a good one).
-    resolved = version or sync.observed_version(spec.binary)
+    if version:
+        resolved = version
+    elif spec.version_args == ("--version",):
+        resolved = sync.observed_version(spec.binary)
+    else:
+        resolved = sync.observed_version(spec.binary, spec.version_pattern, spec.version_args)
     if not resolved:
         print(
             f"[currency] cannot determine a version to stamp for {tool} — pass "

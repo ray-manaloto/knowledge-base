@@ -159,6 +159,9 @@ class ToolSpec:
     # `2026.7.15 macos-arm64 (2026-07-27)`, whose last field is the build DATE.
     # That silently produced `observed_version("mise") == "(2026-07-27)"`.
     version_pattern: str = ""
+    # Most tools expose `--version`; ffmpeg is the live counterexample (`-version`).
+    # Keeping argv declarative avoids tool-name branches in the shared engine.
+    version_args: tuple[str, ...] = ("--version",)
     os: tuple[str, ...] = ()
     watch: tuple[WatchItem, ...] = ()
     # Documentation pages whose CONTENT is the interface, fingerprinted so a
@@ -296,6 +299,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         expected=_str("expected"),
         source_only=bool(table.get("source_only", False)),
         version_pattern=_str("version_pattern"),
+        version_args=_tuple("version_args") or ("--version",),
         os=_tuple("os"),
         watch=_watch_items(table.get("watch")),
         docs_watch=_tuple("docs_watch"),

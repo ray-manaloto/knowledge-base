@@ -71,6 +71,8 @@ gate lives at that entry point instead.
 
 from __future__ import annotations
 
+import hashlib
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -110,6 +112,14 @@ _TIMEOUT = 300
 #: returns without formatting, so a plain auto-applied bump produced a
 #: lint-failing commit (cold lane on 5204e57, F3).
 _STAMP_SUFFIX = ".graphify_version"
+
+
+def transaction_paths(repo_root: Path, spec: ToolSpec) -> tuple[Path, ...]:
+    """Every repository path a declared installer may mutate or repair."""
+    paths = [repo_root / path for path in _REPAIR]
+    if spec.skill_dir:
+        paths.append(repo_root / spec.skill_dir)
+    return tuple(dict.fromkeys(paths))
 
 
 @dataclass(frozen=True)
@@ -200,7 +210,17 @@ class SkillResult:
     #: only honest thing to do is name the files — a caller who commits after
     #: reading a cheerful note picks the damage up with the bump.
     unrepaired: tuple[str, ...] = ()
+    process_warning: bool = False
+    diagnostic_bytes: int = 0
+    diagnostic_sha256: str = ""
     note: str = ""
+
+
+def _process_diagnostics(stdout: str, stderr: str) -> tuple[bool, int, str]:
+    """Return warning presence plus body-free diagnostics for a child process."""
+    raw = stdout.encode() + b"\0" + stderr.encode()
+    warning = bool(stderr) or re.search(r"\bwarn(?:ing)?\b", stdout, re.IGNORECASE) is not None
+    return warning, len(raw) - 1, hashlib.sha256(raw).hexdigest()
 
 
 def _git(repo_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -390,6 +410,9 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         timeout=_TIMEOUT,
         env=clean_env(),
     )
+    process_warning, diagnostic_bytes, diagnostic_sha256 = _process_diagnostics(
+        proc.stdout, proc.stderr
+    )
     if proc.returncode != 0:
         # REPAIR ON THE FAILURE PATH TOO. The pre-flight above proved the tree
         # started clean, so anything dirty in `_REPAIR` now was written by this
@@ -412,7 +435,6 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         # the one loss this whole mechanism exists to catch survived on the one
         # path it did not cover (cold lane on 5204e57, F5).
         f_applied, f_lost = _apply_addenda(repo_root, spec.skill_dir)
-        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]
         return SkillResult(
             ran=False,
             repaired=reverted,
@@ -420,8 +442,12 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
             repair_delta=delta,
             addenda=f_applied,
             lost_addenda=f_lost,
+            process_warning=process_warning,
+            diagnostic_bytes=diagnostic_bytes,
+            diagnostic_sha256=diagnostic_sha256,
             note=(
-                f"installer failed (rc={proc.returncode}): {' / '.join(tail)}"
+                f"installer failed (rc={proc.returncode}; bytes={diagnostic_bytes}; "
+                f"sha256={diagnostic_sha256})"
                 + (f". Reverted {', '.join(reverted)}" if reverted else "")
                 + (f". ⚠ STILL DIRTY, fix before committing: {', '.join(still)}" if still else "")
                 + (f". ⚠ LOCAL ADDENDUM LOST: {', '.join(f_lost)}" if f_lost else "")
@@ -449,6 +475,9 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         repair_delta=delta,
         addenda=applied,
         lost_addenda=lost,
+        process_warning=process_warning,
+        diagnostic_bytes=diagnostic_bytes,
+        diagnostic_sha256=diagnostic_sha256,
         note=(
             f"skill refreshed; {len(changed)} file(s) changed"
             + (f"; re-applied local addenda to {', '.join(applied)}" if applied else "")

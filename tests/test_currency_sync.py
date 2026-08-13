@@ -76,6 +76,15 @@ def test_reads_bare_string_pin(tmp_path) -> None:
     assert extras == ()
 
 
+def test_config_round_trips_nonstandard_version_args(tmp_path) -> None:
+    root = _repo(tmp_path)
+    (root / "currency.toml").write_text(
+        '[tool.ffmpeg]\nmise_key = "conda:ffmpeg"\nversion_args = ["-version"]\n',
+        encoding="utf-8",
+    )
+    assert _spec(root).version_args == ("-version",)
+
+
 def test_reads_exact_python_project_pin_and_extras(tmp_path) -> None:
     root = _repo(tmp_path)
     (root / "pyproject.toml").write_text(

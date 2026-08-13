@@ -781,6 +781,10 @@ description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency
 # never serve as a CI gate. Read docs/currency/, not the rc.
 run = "uv run kb-setup currency run"
 
+[tasks.kb-tool-sync]
+description = "Lock, install, and verify one eligible reviewed mise-only tool pin"
+run = "uv run kb-setup tool-sync"
+
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
 [tasks.kb-review-receipt]
 description = 'Record that the kb-review skill reviewed HEAD: mise run kb-review-receipt -- --lanes L[,L...] --blocking N [--skipped lane:reason,...] [--findings N] [--fixed-point REF]'
