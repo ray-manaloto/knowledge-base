@@ -313,24 +313,7 @@ _CENSUS_MAX_STDERR_LENGTH = 2000
 _CENSUS_MAX_SOURCE_LENGTH = 120
 _CENSUS_MAX_RECEIPT_BYTES = 8 * 1024 * 1024
 _CENSUS_OUTPUT_ARG_COUNT = 2
-_SNAPSHOT_MAX_MEMBER_BYTES = 2 * 1024 * 1024 * 1024
-_SNAPSHOT_MAX_TOTAL_BYTES = 8 * 1024 * 1024 * 1024
 _SNAPSHOT_MAX_PATH_LENGTH = 4096
-_SNAPSHOT_MAX_MEMBERS = 100_000
-_LS_TREE_FIELD_COUNT = 4
-_ASCII_CONTROL_BOUND = 32
-
-
-class UnsafeSnapshotError(RuntimeError):
-    """A Git tree cannot be safely materialized for detection."""
-
-
-@dataclass(frozen=True)
-class _TreeEntry:
-    mode: str
-    object_id: str
-    size: int
-    path: str
 
 
 def _bounded_identity(value: str, limit: int) -> str:
@@ -549,25 +532,62 @@ def _verify_source_provenance(manifest: mf.Manifest) -> SourceGitProvenance:
 def _create_source_snapshot(
     manifest: mf.Manifest, provenance: SourceGitProvenance, destination: Path
 ) -> SourceGitProvenance:
-    """Materialize the verified commit without consulting the mutable worktree."""
-    index_path = destination.with_suffix(".index")
+    """Create an independent disposable clone at the exact verified commit."""
     try:
-        entries = _validated_tree_entries(manifest.clone_dir, provenance.resolved_commit)
-        _materialize_tree(
-            manifest.clone_dir,
-            provenance,
-            index_path,
-            destination,
-            entries,
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--quiet",
+                "--no-checkout",
+                "--no-hardlinks",
+                "--no-tags",
+                "--",
+                str(manifest.clone_dir),
+                str(destination),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=600,
         )
-    except UnsafeSnapshotError as exc:
-        shutil.rmtree(destination, ignore_errors=True)
-        return msgspec.structs.replace(
-            provenance,
-            failure_category="unsafe-snapshot",
-            detail=_bounded_identity(str(exc), _CENSUS_MAX_STDERR_LENGTH),
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(destination),
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "origin",
+                provenance.resolved_commit,
+            ],
+            check=True,
+            capture_output=True,
+            timeout=600,
         )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "advice.detachedHead=false",
+                "-C",
+                str(destination),
+                "checkout",
+                "--quiet",
+                "--detach",
+                provenance.resolved_commit,
+            ],
+            check=True,
+            capture_output=True,
+            timeout=600,
+        )
+        _assert_disposable_clone_identity(destination, provenance)
+    except (
+        OSError,
+        RuntimeError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+    ) as exc:
         shutil.rmtree(destination, ignore_errors=True)
         return msgspec.structs.replace(
             provenance,
@@ -577,122 +597,33 @@ def _create_source_snapshot(
                 _CENSUS_MAX_STDERR_LENGTH,
             ),
         )
-    finally:
-        index_path.unlink(missing_ok=True)
     return provenance
 
 
-def _validated_tree_entries(clone_dir: Path, commit: str) -> tuple[_TreeEntry, ...]:
-    proc = subprocess.run(
-        ["git", "-C", str(clone_dir), "ls-tree", "-r", "-z", "-l", commit],
-        check=True,
+def _assert_disposable_clone_identity(clone_dir: Path, provenance: SourceGitProvenance) -> None:
+    """Fail unless a disposable clone remains exact, detached, and clean."""
+    head = _rev_parse(clone_dir, "HEAD^{commit}")
+    tree = _rev_parse(clone_dir, "HEAD^{tree}")
+    symbolic = subprocess.run(
+        ["git", "-C", str(clone_dir), "symbolic-ref", "-q", "HEAD"],
+        check=False,
         capture_output=True,
-        timeout=300,
+        timeout=60,
     )
-    records = proc.stdout.split(b"\0")
-    if records and not records[-1]:
-        records.pop()
-    if len(records) > _SNAPSHOT_MAX_MEMBERS:
-        raise UnsafeSnapshotError("tree exceeds the snapshot member-count bound")
-    total_size = 0
-    entries: list[_TreeEntry] = []
-    for record in records:
-        metadata, separator, raw_path = record.partition(b"\t")
-        fields = metadata.split()
-        if not separator or len(fields) != _LS_TREE_FIELD_COUNT:
-            raise UnsafeSnapshotError("tree contains an invalid ls-tree record")
-        mode, object_type, object_id, raw_size = (field.decode("ascii") for field in fields)
-        try:
-            path = raw_path.decode("utf-8")
-            size = int(raw_size)
-        except (UnicodeDecodeError, ValueError) as exc:
-            raise UnsafeSnapshotError("tree path or blob size is invalid") from exc
-        parts = Path(path).parts
-        if (
-            not path
-            or path.startswith("/")
-            or ".." in parts
-            or ".git" in parts
-            or any(ord(character) < _ASCII_CONTROL_BOUND for character in path)
-            or len(path) > _SNAPSHOT_MAX_PATH_LENGTH
-        ):
-            raise UnsafeSnapshotError("tree contains an unsafe relative path")
-        if object_type != "blob" or mode not in {"100644", "100755"}:
-            raise UnsafeSnapshotError("tree contains a symlink, submodule, or unsupported mode")
-        if size > _SNAPSHOT_MAX_MEMBER_BYTES:
-            raise UnsafeSnapshotError("tree blob exceeds the snapshot size bound")
-        total_size += size
-        if total_size > _SNAPSHOT_MAX_TOTAL_BYTES:
-            raise UnsafeSnapshotError("tree exceeds the snapshot total-size bound")
-        entries.append(_TreeEntry(mode, object_id, size, path))
-    return tuple(entries)
-
-
-def _materialize_tree(
-    clone_dir: Path,
-    provenance: SourceGitProvenance,
-    index_path: Path,
-    destination: Path,
-    entries: tuple[_TreeEntry, ...],
-) -> None:
-    environment = os.environ.copy()
-    environment["GIT_INDEX_FILE"] = str(index_path)
-    subprocess.run(
-        ["git", "-C", str(clone_dir), "read-tree", provenance.resolved_commit],
-        check=True,
-        capture_output=True,
-        env=environment,
-        timeout=300,
-    )
-    written = subprocess.run(
-        ["git", "-C", str(clone_dir), "write-tree"],
+    status = subprocess.run(
+        ["git", "-C", str(clone_dir), "status", "--porcelain=v1", "--untracked-files=all"],
         check=True,
         capture_output=True,
         text=True,
-        env=environment,
         timeout=60,
-    ).stdout.strip()
-    if written != provenance.tree_digest:
-        raise UnsafeSnapshotError("temporary index tree does not match the verified tree")
-    destination.mkdir(parents=True, exist_ok=False)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(clone_dir),
-            "checkout-index",
-            "--all",
-            f"--prefix={destination}{os.sep}",
-        ],
-        check=True,
-        capture_output=True,
-        env=environment,
-        timeout=600,
-    )
-    _verify_materialized_tree(clone_dir, destination, entries)
-
-
-def _verify_materialized_tree(
-    clone_dir: Path, destination: Path, entries: tuple[_TreeEntry, ...]
-) -> None:
-    actual_paths = sorted(
-        str(path.relative_to(destination)) for path in destination.rglob("*") if path.is_file()
-    )
-    expected_paths = [entry.path for entry in entries]
-    if actual_paths != expected_paths:
-        raise UnsafeSnapshotError("materialized path inventory does not match the verified tree")
-    for entry in entries:
-        path = destination / entry.path
-        actual_id = subprocess.run(
-            ["git", "-C", str(clone_dir), "hash-object", str(path)],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        ).stdout.strip()
-        executable = bool(path.stat().st_mode & 0o111)
-        if actual_id != entry.object_id or executable != (entry.mode == "100755"):
-            raise UnsafeSnapshotError("materialized content or mode does not match the tree")
+    ).stdout
+    if (
+        head != provenance.resolved_commit
+        or tree != provenance.tree_digest
+        or symbolic.returncode == 0
+        or status
+    ):
+        raise RuntimeError("disposable clone identity, detached state, or cleanliness changed")
 
 
 def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
@@ -776,9 +707,9 @@ def _detection_census_from_snapshots(
         )
     integrity_errors: tuple[str, ...] = ()
     if jobs:
-        bound, integrity_errors = _bind_detection_receipts(
-            jobs, _run_detection_census_receipts(jobs), verified
-        )
+        received = _run_detection_census_receipts(jobs)
+        received = _require_post_detection_clone_identity(jobs, received, verified)
+        bound, integrity_errors = _bind_detection_receipts(jobs, received, verified)
         sources.extend(bound)
     sources.sort(key=lambda receipt: receipt.source)
     status_counts = Counter(receipt.status for receipt in sources)
@@ -799,6 +730,30 @@ def _detection_census_from_snapshots(
     if len(msgspec.json.encode(census)) > _CENSUS_MAX_RECEIPT_BYTES:
         raise ValueError("detection census receipt exceeds the aggregate size bound")
     return census
+
+
+def _require_post_detection_clone_identity(
+    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]],
+    received: list[SourceCensusReceipt],
+    verified: dict[str, SourceGitProvenance],
+) -> list[SourceCensusReceipt]:
+    """Replace detector output if its disposable clone changed during detection."""
+    replacements: dict[str, SourceCensusReceipt] = {}
+    for name, root, _policy in jobs:
+        provenance = verified[name]
+        try:
+            _assert_disposable_clone_identity(root, provenance)
+        except OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
+            replacements[name] = SourceCensusReceipt(
+                source=name,
+                kind="code",
+                status="provenance-failed",
+                categories=("snapshot-drift",),
+                stderr="disposable clone identity or cleanliness changed during detection",
+            )
+    if not replacements:
+        return received
+    return [row for row in received if row.source not in replacements] + list(replacements.values())
 
 
 def _bind_detection_receipts(
