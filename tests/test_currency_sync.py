@@ -137,6 +137,32 @@ def test_python_package_owner_refuses_project_path_escape(tmp_path) -> None:
     assert sync.pinned_version(root, spec) == ("", ())
 
 
+def test_python_resolution_and_extra_probes_use_the_nested_environment(tmp_path) -> None:
+    root = _repo(tmp_path)
+    site = root / "python" / ".venv" / "lib" / "python3.14" / "site-packages"
+    site.mkdir(parents=True)
+    executable = root / "python" / ".venv" / "bin" / "graphify"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("", encoding="utf-8")
+    spec = config.ToolSpec(
+        name="graphify",
+        python_package="graphifyy",
+        python_project_dir="python",
+        binary="graphify",
+    )
+
+    assert (
+        sync.install_site_packages(
+            spec.binary,
+            spec.mise_key,
+            deep=False,
+            repo_root=root / "python",
+            python_package=spec.python_package,
+        )
+        == site
+    )
+
+
 def test_missing_pin_is_drift_not_a_crash(tmp_path) -> None:
     root = _repo(tmp_path, pin='hk = "1.52.0"')
     status = sync.check_sync(root, _spec(root))

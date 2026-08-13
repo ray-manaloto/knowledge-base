@@ -268,11 +268,18 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         value = table.get(key, [])
         return tuple(str(v) for v in value) if isinstance(value, list) else ()
 
+    project_dir = _str("python_project_dir")
+    project_path = Path(project_dir or ".")
+    if project_path.is_absolute() or ".." in project_path.parts:
+        raise ValueError(
+            f"{CONFIG_NAME}: [tool.{name}] python_project_dir must stay inside the repository"
+        )
+
     return ToolSpec(
         name=name,
         mise_key=_str("mise_key"),
         python_package=_str("python_package"),
-        python_project_dir=_str("python_project_dir"),
+        python_project_dir=project_dir,
         binary=_str("binary") or name,
         pypi=_str("pypi"),
         github=_str("github"),
