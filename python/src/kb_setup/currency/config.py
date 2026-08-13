@@ -63,6 +63,7 @@ class ToolSpec:
     name: str
     mise_key: str = ""
     python_package: str = ""
+    python_project_dir: str = ""
     binary: str = ""
     pypi: str = ""
     github: str = ""
@@ -271,6 +272,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         name=name,
         mise_key=_str("mise_key"),
         python_package=_str("python_package"),
+        python_project_dir=_str("python_project_dir"),
         binary=_str("binary") or name,
         pypi=_str("pypi"),
         github=_str("github"),

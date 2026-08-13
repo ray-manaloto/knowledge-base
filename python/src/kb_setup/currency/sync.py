@@ -146,7 +146,7 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
     both forms are live in these repos, so both are read here.
     """
     if spec.python_package:
-        return _python_project_pin(repo_root, spec.python_package)
+        return _python_project_pin(repo_root, spec.python_package, spec.python_project_dir)
     entry = _tools_table(repo_root).get(spec.mise_key)
     if isinstance(entry, str):
         return entry, ()
@@ -158,10 +158,16 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
     return "", ()
 
 
-def _python_project_pin(repo_root: Path, package: str) -> tuple[str, tuple[str, ...]]:
+def _python_project_pin(
+    repo_root: Path, package: str, project_dir: str = ""
+) -> tuple[str, tuple[str, ...]]:
     """Read one exact PEP 508 dependency from the project's exported runtime set."""
+    relative = Path(project_dir or ".")
+    if relative.is_absolute() or ".." in relative.parts:
+        return "", ()
+    pyproject = repo_root / relative / "pyproject.toml"
     try:
-        with (repo_root / "pyproject.toml").open("rb") as handle:
+        with pyproject.open("rb") as handle:
             project = tomllib.load(handle).get("project", {})
     except OSError, tomllib.TOMLDecodeError:
         return "", ()
