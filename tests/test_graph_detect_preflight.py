@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import io
 import subprocess
-import tarfile
 from pathlib import Path
 
 import msgspec
@@ -582,57 +580,80 @@ def test_census_accepts_annotated_tag_object_pin(
     assert receipt.tree_digest
 
 
-def test_census_reports_archive_failure_without_running_detector(
+def test_census_reports_snapshot_failure_without_running_detector(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     manifest = _real_manifest(tmp_path)
 
-    def fail_archive(_clone: Path, _commit: str, _archive: Path) -> None:
-        raise subprocess.CalledProcessError(1, ["git", "archive"])
+    def fail_snapshot(_clone: Path, _commit: str) -> tuple[graph._TreeEntry, ...]:
+        raise subprocess.CalledProcessError(1, ["git", "ls-tree"])
 
-    monkeypatch.setattr(graph, "_write_git_archive", fail_archive)
+    monkeypatch.setattr(graph, "_validated_tree_entries", fail_snapshot)
     monkeypatch.setattr(
         graph,
         "_run_detection_census_receipts",
-        lambda _jobs: pytest.fail("failed archive reached detector"),
+        lambda _jobs: pytest.fail("failed snapshot reached detector"),
     )
 
     receipt = graph.detection_census([manifest]).sources[0]
 
     assert receipt.status == "provenance-failed"
-    assert receipt.categories == ("archive-failed",)
+    assert receipt.categories == ("snapshot-failed",)
     assert receipt.resolved_commit == manifest.commit
 
 
-@pytest.mark.parametrize("hostile", ["traversal", "symlink"])
-def test_safe_archive_rejects_traversal_and_links(tmp_path: Path, hostile: str) -> None:
-    archive_path = tmp_path / "hostile.tar"
-    with tarfile.open(archive_path, "w") as archive:
-        if hostile == "traversal":
-            info = tarfile.TarInfo("../escape")
-            info.size = 1
-            archive.addfile(info, io.BytesIO(b"x"))
-        else:
-            info = tarfile.TarInfo("link")
-            info.type = tarfile.SYMTYPE
-            info.linkname = "../escape"
-            archive.addfile(info)
-    destination = tmp_path / "snapshot"
-    destination.mkdir()
+@pytest.mark.parametrize(("mode", "path"), [("100644", "../escape"), ("120000", "link")])
+def test_tree_preflight_rejects_traversal_and_links(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, path: str
+) -> None:
+    output = f"{mode} blob {'a' * 40} 1\t{path}\0".encode()
+    monkeypatch.setattr(
+        graph.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, stdout=output),
+    )
 
-    with pytest.raises(graph.UnsafeArchiveError):
-        graph._safe_extract_git_archive(archive_path, destination)
+    with pytest.raises(graph.UnsafeSnapshotError):
+        graph._validated_tree_entries(tmp_path, "a" * 40)
 
-    assert not (tmp_path / "escape").exists()
+
+def test_tree_preflight_rejects_member_and_blob_bounds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = f"100644 blob {'a' * 40} 1\tf\0".encode()
+    oversized_blob = f"100644 blob {'a' * 40} {graph._SNAPSHOT_MAX_MEMBER_BYTES + 1}\tf\0".encode()
+    outputs = [record * (graph._SNAPSHOT_MAX_MEMBERS + 1), oversized_blob]
+    monkeypatch.setattr(
+        graph.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, stdout=outputs.pop(0)),
+    )
+
+    with pytest.raises(graph.UnsafeSnapshotError, match="member-count"):
+        graph._validated_tree_entries(tmp_path, "a" * 40)
+    with pytest.raises(graph.UnsafeSnapshotError, match="blob exceeds"):
+        graph._validated_tree_entries(tmp_path, "a" * 40)
 
 
 def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> None:
     manifest = _real_manifest(tmp_path)
+    (manifest.clone_dir / ".gitattributes").write_text(
+        "hidden.txt export-ignore\nsubst.txt export-subst\n", encoding="utf-8"
+    )
+    (manifest.clone_dir / "hidden.txt").write_text("must remain\n", encoding="utf-8")
+    (manifest.clone_dir / "subst.txt").write_text("$Format:%H$\n", encoding="utf-8")
+    executable = manifest.clone_dir / "tool"
+    executable.write_text("#!/bin/sh\n", encoding="utf-8")
+    executable.chmod(0o755)
     (manifest.clone_dir / ".gitignore").write_text("ignored/\n", encoding="utf-8")
     ignored = manifest.clone_dir / "ignored"
     ignored.mkdir()
     (ignored / "secret.txt").write_text("tracked but ignored\n", encoding="utf-8")
-    subprocess.run(["git", "add", ".gitignore"], cwd=manifest.clone_dir, check=True)
+    subprocess.run(
+        ["git", "add", ".gitignore", ".gitattributes", "hidden.txt", "subst.txt", "tool"],
+        cwd=manifest.clone_dir,
+        check=True,
+    )
     subprocess.run(["git", "add", "-f", "ignored/secret.txt"], cwd=manifest.clone_dir, check=True)
     subprocess.run(
         [
@@ -677,7 +698,11 @@ def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> No
 
     assert result.failure_category == ""
     assert not (snapshot / ".git").exists()
+    assert (snapshot / "hidden.txt").read_text(encoding="utf-8") == "must remain\n"
+    assert (snapshot / "subst.txt").read_text(encoding="utf-8") == "$Format:%H$\n"
+    assert (snapshot / "tool").stat().st_mode & 0o111
     assert any(Path(path).name == "ignored" for path in detected["ignored"])
+    assert not snapshot.with_suffix(".index").exists()
     after = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
         cwd=manifest.clone_dir,

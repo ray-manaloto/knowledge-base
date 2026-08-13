@@ -25,7 +25,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 import time
 from collections import Counter, deque
@@ -317,10 +316,21 @@ _CENSUS_OUTPUT_ARG_COUNT = 2
 _SNAPSHOT_MAX_MEMBER_BYTES = 2 * 1024 * 1024 * 1024
 _SNAPSHOT_MAX_TOTAL_BYTES = 8 * 1024 * 1024 * 1024
 _SNAPSHOT_MAX_PATH_LENGTH = 4096
+_SNAPSHOT_MAX_MEMBERS = 100_000
+_LS_TREE_FIELD_COUNT = 4
+_ASCII_CONTROL_BOUND = 32
 
 
-class UnsafeArchiveError(RuntimeError):
-    """A Git archive cannot be safely materialized for detection."""
+class UnsafeSnapshotError(RuntimeError):
+    """A Git tree cannot be safely materialized for detection."""
+
+
+@dataclass(frozen=True)
+class _TreeEntry:
+    mode: str
+    object_id: str
+    size: int
+    path: str
 
 
 def _bounded_identity(value: str, limit: int) -> str:
@@ -540,121 +550,149 @@ def _create_source_snapshot(
     manifest: mf.Manifest, provenance: SourceGitProvenance, destination: Path
 ) -> SourceGitProvenance:
     """Materialize the verified commit without consulting the mutable worktree."""
-    archive_path = destination.with_suffix(".tar")
-    destination.mkdir(parents=True, exist_ok=False)
+    index_path = destination.with_suffix(".index")
     try:
-        _write_git_archive(manifest.clone_dir, provenance.resolved_commit, archive_path)
-        _verify_archive_commit(archive_path, provenance.resolved_commit)
-        _safe_extract_git_archive(archive_path, destination)
-    except UnsafeArchiveError as exc:
+        entries = _validated_tree_entries(manifest.clone_dir, provenance.resolved_commit)
+        _materialize_tree(
+            manifest.clone_dir,
+            provenance,
+            index_path,
+            destination,
+            entries,
+        )
+    except UnsafeSnapshotError as exc:
         shutil.rmtree(destination, ignore_errors=True)
         return msgspec.structs.replace(
             provenance,
-            failure_category="unsafe-archive",
+            failure_category="unsafe-snapshot",
             detail=_bounded_identity(str(exc), _CENSUS_MAX_STDERR_LENGTH),
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         shutil.rmtree(destination, ignore_errors=True)
         return msgspec.structs.replace(
             provenance,
-            failure_category="archive-failed",
+            failure_category="snapshot-failed",
             detail=_bounded_identity(
-                f"{type(exc).__name__}: immutable Git archive failed",
+                f"{type(exc).__name__}: immutable Git tree materialization failed",
                 _CENSUS_MAX_STDERR_LENGTH,
             ),
         )
     finally:
-        archive_path.unlink(missing_ok=True)
+        index_path.unlink(missing_ok=True)
     return provenance
 
 
-def _write_git_archive(clone_dir: Path, commit: str, archive_path: Path) -> None:
+def _validated_tree_entries(clone_dir: Path, commit: str) -> tuple[_TreeEntry, ...]:
+    proc = subprocess.run(
+        ["git", "-C", str(clone_dir), "ls-tree", "-r", "-z", "-l", commit],
+        check=True,
+        capture_output=True,
+        timeout=300,
+    )
+    records = proc.stdout.split(b"\0")
+    if records and not records[-1]:
+        records.pop()
+    if len(records) > _SNAPSHOT_MAX_MEMBERS:
+        raise UnsafeSnapshotError("tree exceeds the snapshot member-count bound")
+    total_size = 0
+    entries: list[_TreeEntry] = []
+    for record in records:
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.split()
+        if not separator or len(fields) != _LS_TREE_FIELD_COUNT:
+            raise UnsafeSnapshotError("tree contains an invalid ls-tree record")
+        mode, object_type, object_id, raw_size = (field.decode("ascii") for field in fields)
+        try:
+            path = raw_path.decode("utf-8")
+            size = int(raw_size)
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise UnsafeSnapshotError("tree path or blob size is invalid") from exc
+        parts = Path(path).parts
+        if (
+            not path
+            or path.startswith("/")
+            or ".." in parts
+            or ".git" in parts
+            or any(ord(character) < _ASCII_CONTROL_BOUND for character in path)
+            or len(path) > _SNAPSHOT_MAX_PATH_LENGTH
+        ):
+            raise UnsafeSnapshotError("tree contains an unsafe relative path")
+        if object_type != "blob" or mode not in {"100644", "100755"}:
+            raise UnsafeSnapshotError("tree contains a symlink, submodule, or unsupported mode")
+        if size > _SNAPSHOT_MAX_MEMBER_BYTES:
+            raise UnsafeSnapshotError("tree blob exceeds the snapshot size bound")
+        total_size += size
+        if total_size > _SNAPSHOT_MAX_TOTAL_BYTES:
+            raise UnsafeSnapshotError("tree exceeds the snapshot total-size bound")
+        entries.append(_TreeEntry(mode, object_id, size, path))
+    return tuple(entries)
+
+
+def _materialize_tree(
+    clone_dir: Path,
+    provenance: SourceGitProvenance,
+    index_path: Path,
+    destination: Path,
+    entries: tuple[_TreeEntry, ...],
+) -> None:
+    environment = os.environ.copy()
+    environment["GIT_INDEX_FILE"] = str(index_path)
+    subprocess.run(
+        ["git", "-C", str(clone_dir), "read-tree", provenance.resolved_commit],
+        check=True,
+        capture_output=True,
+        env=environment,
+        timeout=300,
+    )
+    written = subprocess.run(
+        ["git", "-C", str(clone_dir), "write-tree"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=60,
+    ).stdout.strip()
+    if written != provenance.tree_digest:
+        raise UnsafeSnapshotError("temporary index tree does not match the verified tree")
+    destination.mkdir(parents=True, exist_ok=False)
     subprocess.run(
         [
             "git",
             "-C",
             str(clone_dir),
-            "archive",
-            "--format=tar",
-            f"--output={archive_path}",
-            commit,
+            "checkout-index",
+            "--all",
+            f"--prefix={destination}{os.sep}",
         ],
         check=True,
         capture_output=True,
-        timeout=300,
+        env=environment,
+        timeout=600,
     )
+    _verify_materialized_tree(clone_dir, destination, entries)
 
 
-def _verify_archive_commit(archive_path: Path, expected_commit: str) -> None:
-    with archive_path.open("rb") as archive:
-        proc = subprocess.run(
-            ["git", "get-tar-commit-id"],
-            stdin=archive,
-            check=False,
+def _verify_materialized_tree(
+    clone_dir: Path, destination: Path, entries: tuple[_TreeEntry, ...]
+) -> None:
+    actual_paths = sorted(
+        str(path.relative_to(destination)) for path in destination.rglob("*") if path.is_file()
+    )
+    expected_paths = [entry.path for entry in entries]
+    if actual_paths != expected_paths:
+        raise UnsafeSnapshotError("materialized path inventory does not match the verified tree")
+    for entry in entries:
+        path = destination / entry.path
+        actual_id = subprocess.run(
+            ["git", "-C", str(clone_dir), "hash-object", str(path)],
+            check=True,
             capture_output=True,
             text=True,
             timeout=60,
-        )
-    actual_commit = proc.stdout.strip()
-    if proc.returncode or actual_commit != expected_commit:
-        raise UnsafeArchiveError("archive commit identity does not match the verified pin")
-
-
-def _safe_extract_git_archive(archive_path: Path, destination: Path) -> None:
-    """Extract only bounded relative directories and regular files, never links."""
-    with tarfile.open(archive_path, mode="r:") as archive:
-        members = archive.getmembers()
-        _validate_archive_members(members)
-        _extract_archive_members(archive, members, destination)
-
-
-def _validate_archive_members(members: list[tarfile.TarInfo]) -> None:
-    total_size = 0
-    names: set[str] = set()
-    for member in members:
-        name = member.name.rstrip("/")
-        parts = Path(name).parts
-        if (
-            not name
-            or name.startswith("/")
-            or ".." in parts
-            or ".git" in parts
-            or "\x00" in name
-            or len(name) > _SNAPSHOT_MAX_PATH_LENGTH
-        ):
-            raise UnsafeArchiveError("archive contains an unsafe relative path")
-        if name in names:
-            raise UnsafeArchiveError("archive contains a duplicate path")
-        names.add(name)
-        if not (member.isdir() or member.isreg()):
-            raise UnsafeArchiveError("archive contains a link or non-regular entry")
-        if member.size > _SNAPSHOT_MAX_MEMBER_BYTES:
-            raise UnsafeArchiveError("archive member exceeds the snapshot size bound")
-        total_size += member.size
-        if total_size > _SNAPSHOT_MAX_TOTAL_BYTES:
-            raise UnsafeArchiveError("archive exceeds the snapshot total-size bound")
-
-
-def _extract_archive_members(
-    archive: tarfile.TarFile, members: list[tarfile.TarInfo], destination: Path
-) -> None:
-    resolved_destination = destination.resolve()
-    for member in members:
-        target = destination / member.name.rstrip("/")
-        if os.path.commonpath((resolved_destination, target.parent.resolve())) != str(
-            resolved_destination
-        ):
-            raise UnsafeArchiveError("archive target escapes the snapshot root")
-        if member.isdir():
-            target.mkdir(parents=True, exist_ok=True)
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        source = archive.extractfile(member)
-        if source is None:
-            raise UnsafeArchiveError("archive regular file has no readable content")
-        with source, target.open("xb") as output:
-            shutil.copyfileobj(source, output, length=1024 * 1024)
-        target.chmod(0o755 if member.mode & 0o111 else 0o644)
+        ).stdout.strip()
+        executable = bool(path.stat().st_mode & 0o111)
+        if actual_id != entry.object_id or executable != (entry.mode == "100755"):
+            raise UnsafeSnapshotError("materialized content or mode does not match the tree")
 
 
 def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
