@@ -76,6 +76,7 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
             "graphify-contract | ecosystem-discovery-plan [alternative...] | "
+            "detect-census [--output .agent/<path>.json] | "
             "source-groups-check [path] | "
             "ensure-deps | version"
         )
@@ -292,6 +293,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import hook_guard
 
         return hook_guard.run()
+    if cmd == "detect-census":
+        from kb_setup import graph
+
+        return graph.detection_census_main(repo_root, rest)
     if cmd == "brain":
         from kb_setup import brain
 

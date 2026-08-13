@@ -200,6 +200,24 @@ def detect_checked(
     timeout_seconds: float = 30.0,
 ) -> tuple[dict, GraphifyReceipt]:
     """Run public detection and refuse warnings or undeclared coverage gaps."""
+    result, receipt = observe_detect(
+        root,
+        source_name=source_name,
+        coverage_policy=coverage_policy,
+        timeout_seconds=timeout_seconds,
+    )
+    require_complete(receipt)
+    return result, receipt
+
+
+def observe_detect(
+    root: Path,
+    *,
+    source_name: str | None = None,
+    coverage_policy: SourceCoveragePolicy | None = None,
+    timeout_seconds: float = 30.0,
+) -> tuple[dict, GraphifyReceipt]:
+    """Run public detection and return typed evidence without authorizing mutation."""
     try:
         stream = io.StringIO()
         with warnings.catch_warnings(record=True) as caught, redirect_stderr(stream):
@@ -215,7 +233,6 @@ def detect_checked(
                 timed_out=True,
             ),
         )
-        require_complete(receipt)
         return {}, receipt
     warning_text = "\n".join(
         part
@@ -237,7 +254,6 @@ def detect_checked(
             coverage_policy=coverage_policy,
         ),
     )
-    require_complete(receipt)
     return result, receipt
 
 

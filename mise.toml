@@ -463,6 +463,10 @@ description = "Reproduce graph.json from committed inputs (manifests + doc extra
 # correctness, so a speedup measurement cannot answer it.
 run = "uv run kb-setup build"
 
+[tasks.kb-detect-census]
+description = "Emit a read-only complete-source Graphify detection receipt"
+run = "uv run kb-setup detect-census"
+
 [tasks.kb-update]
 description = "Advance a source to latest upstream + incrementally re-extract: mise run kb-update -- <name>"
 # Bumps the manifest SHA to upstream HEAD, re-clones, `graphify update` (incremental

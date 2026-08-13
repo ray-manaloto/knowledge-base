@@ -33,6 +33,8 @@ from multiprocessing.process import BaseProcess
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
+import msgspec
+
 from kb_setup import atomic, graph_checks, graphify_health, graphify_ops
 from kb_setup import manifest as mf
 from kb_setup.graphify_env import (
@@ -47,9 +49,44 @@ if TYPE_CHECKING:
 
 
 class _ResultQueue(Protocol):
-    def put(self, item: tuple[str, str]) -> None: ...
+    def put(self, item: object) -> None: ...
 
-    def get_nowait(self) -> tuple[str, str]: ...
+    def get_nowait(self) -> object: ...
+
+
+class SourcePathEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Bounded identity and content evidence for one detector path."""
+
+    path: str
+    sha256: str | None = None
+    size: int | None = None
+    file_type: str = "regular"
+
+
+class SourceCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Read-only detector outcome for one immutable source pin."""
+
+    source: str
+    kind: str
+    status: str
+    source_commit: str = ""
+    categories: tuple[str, ...] = ()
+    detected_count: int | None = None
+    unclassified_count: int = 0
+    ignored_count: int = 0
+    unclassified: tuple[SourcePathEvidence, ...] = ()
+    ignored: tuple[SourcePathEvidence, ...] = ()
+    stderr: str = ""
+
+
+class DetectionCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Deterministic complete-corpus receipt; never authorizes graph mutation."""
+
+    schema_version: int = 1
+    total_sources: int = 0
+    status_counts: tuple[tuple[str, int], ...] = ()
+    category_counts: tuple[tuple[str, int], ...] = ()
+    sources: tuple[SourceCensusReceipt, ...] = ()
 
 
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
@@ -253,9 +290,13 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     return True
 
 
-_DETECT_WORKERS = 4
-_DETECT_SOURCE_TIMEOUT_SECONDS = 30.0
-_DETECT_GLOBAL_TIMEOUT_SECONDS = 600.0
+_DETECT_WORKERS = 1
+_DETECT_SOURCE_TIMEOUT_SECONDS = 120.0
+_DETECT_GLOBAL_TIMEOUT_SECONDS = 900.0
+_CENSUS_MAX_PATHS_PER_CLASS = 4096
+_CENSUS_MAX_PATH_LENGTH = 240
+_CENSUS_MAX_STDERR_LENGTH = 2000
+_CENSUS_OUTPUT_ARG_COUNT = 2
 
 
 def _detect_worker(
@@ -268,13 +309,13 @@ def _detect_worker(
     from kb_setup import graphify_sdk
 
     try:
-        graphify_sdk.detect_checked(
+        result, receipt = graphify_sdk.observe_detect(
             root,
             source_name=source_name,
             coverage_policy=policy,
             timeout_seconds=_DETECT_SOURCE_TIMEOUT_SECONDS,
         )
-        result = (source_name, "")
+        result_queue.put(_source_census_receipt(root, source_name, result, receipt))
     except (
         OSError,
         RuntimeError,
@@ -283,18 +324,224 @@ def _detect_worker(
         graphify_health.IncompleteGraphifyOperationError,
     ) as exc:
         detail = " ".join(str(exc).split())[:900]
-        result = (source_name, f"{type(exc).__name__}: {detail}")
-    result_queue.put(result)
+        result_queue.put(
+            SourceCensusReceipt(
+                source=source_name,
+                kind="code",
+                status="error",
+                categories=("detector-error",),
+                stderr=f"{type(exc).__name__}: {detail}",
+            )
+        )
+
+
+def _source_census_receipt(
+    root: Path,
+    source_name: str,
+    result: dict,
+    receipt: graphify_health.GraphifyReceipt,
+) -> SourceCensusReceipt:
+    unclassified_paths = graphify_sdk_paths(root, result.get("unclassified", []))
+    ignored_paths = graphify_sdk_paths(root, result.get("ignored", []))
+    return SourceCensusReceipt(
+        source=source_name,
+        kind="code",
+        status=receipt.state.value,
+        categories=tuple(sorted(receipt.reasons)),
+        detected_count=receipt.detected_sources,
+        unclassified_count=len(unclassified_paths),
+        ignored_count=len(ignored_paths),
+        unclassified=tuple(
+            _source_path_evidence(root, path)
+            for path in unclassified_paths[:_CENSUS_MAX_PATHS_PER_CLASS]
+        ),
+        ignored=tuple(
+            _source_path_evidence(root, path)
+            for path in ignored_paths[:_CENSUS_MAX_PATHS_PER_CLASS]
+        ),
+        stderr=" ".join(receipt.stderr.split())[:_CENSUS_MAX_STDERR_LENGTH],
+    )
+
+
+def graphify_sdk_paths(root: Path, paths: object) -> tuple[str, ...]:
+    """Normalize detector paths without importing Graphify in the parent process."""
+    if not isinstance(paths, list):
+        return ()
+    absolute_root = root.resolve()
+    normalized: list[str] = []
+    for raw in paths:
+        path = Path(str(raw))
+        absolute_path = path if path.is_absolute() else (root / path).resolve()
+        try:
+            relative = str(absolute_path.relative_to(absolute_root))
+        except ValueError:
+            relative = str(path)
+        normalized.append(relative[:_CENSUS_MAX_PATH_LENGTH])
+    return tuple(sorted(set(normalized)))
+
+
+def _source_path_evidence(root: Path, relative_path: str) -> SourcePathEvidence:
+    path = root / relative_path
+    try:
+        resolved_root = root.resolve()
+        resolved_path = path.resolve(strict=True)
+        if os.path.commonpath((resolved_root, resolved_path)) != str(resolved_root):
+            return SourcePathEvidence(path=relative_path, file_type="out-of-root")
+        if path.is_symlink():
+            return SourcePathEvidence(path=relative_path, file_type="symlink")
+        if path.is_dir():
+            return _git_tree_evidence(root, relative_path)
+        if not path.is_file():
+            return SourcePathEvidence(path=relative_path, file_type="non-regular")
+        content = path.read_bytes()
+    except OSError:
+        return SourcePathEvidence(path=relative_path, file_type="unreadable")
+    return SourcePathEvidence(
+        path=relative_path,
+        sha256=hashlib.sha256(content).hexdigest(),
+        size=len(content),
+    )
+
+
+def _git_tree_evidence(root: Path, relative_path: str) -> SourcePathEvidence:
+    tree = subprocess.run(
+        ["git", "ls-tree", "-r", "HEAD", "--", relative_path],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if tree.returncode or not tree.stdout:
+        return SourcePathEvidence(path=relative_path, file_type="directory-unhashed")
+    return SourcePathEvidence(
+        path=relative_path,
+        sha256=hashlib.sha256(tree.stdout).hexdigest(),
+        size=len(tree.stdout),
+        file_type="git-tree",
+    )
 
 
 def _run_detection_census(
     jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]],
 ) -> list[tuple[str, str]]:
+    receipts = _run_detection_census_receipts(jobs)
+    return sorted(
+        (receipt.source, _source_census_failure_detail(receipt))
+        for receipt in receipts
+        if receipt.status != graphify_health.GraphifyState.COMPLETE.value
+    )
+
+
+def _source_census_failure_detail(receipt: SourceCensusReceipt) -> str:
+    if receipt.status == "timed-out":
+        return f"TimeoutError: {receipt.stderr}"
+    categories = ", ".join(receipt.categories) or receipt.status
+    evidence: list[str] = []
+    if receipt.unclassified:
+        evidence.append(f"unclassified={[item.path for item in receipt.unclassified[:12]]!r}")
+    if receipt.ignored:
+        evidence.append(f"ignored={[item.path for item in receipt.ignored[:12]]!r}")
+    if receipt.stderr:
+        evidence.append(f"stderr={receipt.stderr[:240]}")
+    suffix = f"; {'; '.join(evidence)}" if evidence else ""
+    return (
+        "IncompleteGraphifyOperationError: Graphify detect failed closed "
+        f"({receipt.status}): {categories}{suffix}"
+    )
+
+
+def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
+    """Return a read-only, deterministic receipt for every configured source."""
+    from kb_setup import graphify_sdk
+
+    sources: list[SourceCensusReceipt] = []
+    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]] = []
+    for manifest in sorted(manifests, key=lambda item: item.name):
+        if manifest.kind == "docs":
+            sources.append(
+                SourceCensusReceipt(
+                    source=manifest.name,
+                    kind="docs",
+                    status="skipped-docs",
+                    source_commit=manifest.commit,
+                )
+            )
+            continue
+        root = manifest.clone_dir
+        if not (root / ".git").is_dir():
+            sources.append(
+                SourceCensusReceipt(
+                    source=manifest.name,
+                    kind="code",
+                    status="missing-clone",
+                    source_commit=manifest.commit,
+                    categories=("missing-clone",),
+                )
+            )
+            continue
+        reviewed = tuple(
+            item for item in _EXPECTED_UNCLASSIFIED if item.source_name == manifest.name
+        )
+        jobs.append(
+            (
+                manifest.name,
+                root,
+                graphify_sdk.source_detection_policy(root, manifest.name, reviewed),
+            )
+        )
+    commits = {manifest.name: manifest.commit for manifest in manifests}
+    sources.extend(
+        msgspec.structs.replace(receipt, source_commit=commits[receipt.source])
+        for receipt in _run_detection_census_receipts(jobs)
+    )
+    sources.sort(key=lambda receipt: receipt.source)
+    status_counts = Counter(receipt.status for receipt in sources)
+    category_counts = Counter(category for receipt in sources for category in receipt.categories)
+    return DetectionCensusReceipt(
+        total_sources=len(sources),
+        status_counts=tuple(sorted(status_counts.items())),
+        category_counts=tuple(sorted(category_counts.items())),
+        sources=tuple(sources),
+    )
+
+
+def write_detection_census(repo_root: Path, output: Path, receipt: DetectionCensusReceipt) -> Path:
+    """Persist a diagnostic only below ignored ``.agent/``; never graphify-out."""
+    destination = output if output.is_absolute() else repo_root / output
+    agent_root = (repo_root / ".agent").resolve()
+    resolved_parent = destination.parent.resolve()
+    if os.path.commonpath((agent_root, resolved_parent)) != str(agent_root):
+        raise ValueError("detect census output must be under .agent/")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    encoded = msgspec.json.encode(receipt).decode() + "\n"
+    atomic.write_text(destination, encoded)
+    return destination
+
+
+def detection_census_main(repo_root: Path, args: list[str]) -> int:
+    """CLI boundary for the complete-corpus read-only JSON census."""
+    output: Path | None = None
+    if args:
+        if len(args) != _CENSUS_OUTPUT_ARG_COUNT or args[0] != "--output":
+            raise ValueError("detect-census accepts only --output .agent/<path>.json")
+        output = Path(args[1])
+    receipt = detection_census(mf.load_all(repo_root / "sources"))
+    encoded = msgspec.json.encode(receipt).decode()
+    if output is None:
+        print(encoded)
+    else:
+        destination = write_detection_census(repo_root, output, receipt)
+        print(destination.relative_to(repo_root))
+    return 0
+
+
+def _run_detection_census_receipts(
+    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]],
+) -> list[SourceCensusReceipt]:
     """Run at most four detector children with hard per-source/global deadlines."""
     context = multiprocessing.get_context("spawn")
     pending = deque(jobs)
     active: dict[BaseProcess, tuple[str, float, _ResultQueue]] = {}
-    failures: list[tuple[str, str]] = []
+    receipts: list[SourceCensusReceipt] = []
     started = time.monotonic()
     while pending or active:
         while pending and len(active) < _DETECT_WORKERS:
@@ -304,18 +551,27 @@ def _run_detection_census(
             process.start()
             active[process] = (name, time.monotonic(), cast("_ResultQueue", queue))
         global_expired = time.monotonic() - started > _DETECT_GLOBAL_TIMEOUT_SECONDS
-        _reap_detection_processes(active, failures, global_expired=global_expired)
+        _reap_detection_processes(active, receipts, global_expired=global_expired)
         if global_expired:
-            failures.extend((name, "TimeoutError: detect global deadline") for name, *_ in pending)
+            receipts.extend(
+                SourceCensusReceipt(
+                    source=name,
+                    kind="code",
+                    status="timed-out",
+                    categories=("timeout",),
+                    stderr="detect global deadline",
+                )
+                for name, *_ in pending
+            )
             pending.clear()
         if active:
             time.sleep(0.02)
-    return sorted(failures)
+    return sorted(receipts, key=lambda receipt: receipt.source)
 
 
 def _reap_detection_processes(
     active: dict[BaseProcess, tuple[str, float, _ResultQueue]],
-    failures: list[tuple[str, str]],
+    receipts: list[SourceCensusReceipt],
     *,
     global_expired: bool,
 ) -> None:
@@ -329,16 +585,40 @@ def _reap_detection_processes(
                 process.kill()
                 process.join(timeout=2)
             label = "global deadline" if global_expired else "source timeout"
-            failures.append((name, f"TimeoutError: detect {label}"))
+            receipts.append(
+                SourceCensusReceipt(
+                    source=name,
+                    kind="code",
+                    status="timed-out",
+                    categories=("timeout",),
+                    stderr=f"detect {label}",
+                )
+            )
             del active[process]
         elif not process.is_alive():
             process.join(timeout=2)
             try:
-                result_name, detail = result_queue.get_nowait()
+                result = result_queue.get_nowait()
             except queue_module.Empty:
-                result_name, detail = name, "RuntimeError: detector child returned no receipt"
-            if detail:
-                failures.append((result_name, detail))
+                result = SourceCensusReceipt(
+                    source=name,
+                    kind="code",
+                    status="error",
+                    categories=("detector-error",),
+                    stderr="detector child returned no receipt",
+                )
+            if isinstance(result, SourceCensusReceipt):
+                receipts.append(result)
+            else:
+                receipts.append(
+                    SourceCensusReceipt(
+                        source=name,
+                        kind="code",
+                        status="error",
+                        categories=("detector-error",),
+                        stderr="detector child returned invalid receipt",
+                    )
+                )
             del active[process]
 
 

@@ -12,6 +12,7 @@ from kb_setup import graphify_sdk
 from kb_setup.graphify_health import (
     ExpectedMetadataOnly,
     ExpectedUnclassifiedFile,
+    GraphifyState,
     IncompleteGraphifyOperationError,
     SourceCoveragePolicy,
 )
@@ -143,6 +144,24 @@ def test_checked_detect_rejects_unknown_code_like_file_with_source_and_bounded_p
     assert "unknown-0.codeish" in message
     assert "unknown-29.codeish" not in message
     assert len(message) < 1200
+
+
+def test_observe_detect_retains_incomplete_receipt_without_raising(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unknown = tmp_path / "unknown.codeish"
+    unknown.write_text("code\n", encoding="utf-8")
+    monkeypatch.setattr(
+        graphify_sdk,
+        "detect",
+        lambda _root: {"total_files": 1, "unclassified": [str(unknown)]},
+    )
+
+    result, receipt = graphify_sdk.observe_detect(tmp_path, source_name="source")
+
+    assert result["unclassified"] == [str(unknown)]
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert receipt.unclassified_paths == ("unknown.codeish",)
 
 
 def test_checked_detect_timeout_fails_typed(
