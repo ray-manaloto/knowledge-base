@@ -42,6 +42,19 @@ if TYPE_CHECKING:
 
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 
+# Graphify 0.9.41 intentionally does not classify these root-level repository
+# control/license files as source. This is an exact metadata allowlist, not an
+# extension or directory wildcard: an unknown code-like file still fails.
+_REVIEWED_UNCLASSIFIED_METADATA = (
+    ".gitignore",
+    "LICENSE",
+    "LICENSE.md",
+    "LICENSE.txt",
+    "COPYING",
+    "COPYING.md",
+    "COPYING.txt",
+)
+
 # The tool whose artifacts `kb-build` produces. Named explicitly so a
 # multi-tool currency.toml cannot silently stamp the wrong tool.
 _STAMPED_TOOL = "graphify"
@@ -150,7 +163,13 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     from kb_setup import graphify_health, graphify_sdk
 
     source_root = repo_root / "sources" / name
-    graphify_sdk.detect_checked(source_root)
+    graphify_sdk.detect_checked(
+        source_root,
+        source_name=name,
+        coverage_policy=graphify_health.SourceCoveragePolicy(
+            optional_unclassified_paths=_REVIEWED_UNCLASSIFIED_METADATA
+        ),
+    )
     print(f"  $ graphify extract sources/{name} --code-only --force")
     proc = subprocess.run(
         [graphify_exe(repo_root), "extract", f"sources/{name}", "--code-only", "--force"],

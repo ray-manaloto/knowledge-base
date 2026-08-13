@@ -13,6 +13,7 @@ writer runs.
 from __future__ import annotations
 
 import inspect
+import signal
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -181,18 +182,34 @@ def contract_main(repo_root: Path) -> int:
 def detect_checked(
     root: Path,
     *,
+    source_name: str | None = None,
     coverage_policy: SourceCoveragePolicy | None = None,
+    timeout_seconds: float = 30.0,
 ) -> tuple[dict, GraphifyReceipt]:
     """Run public detection and refuse warnings or undeclared coverage gaps."""
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = detect(root)
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = _detect_with_timeout(root, timeout_seconds)
+    except TimeoutError:
+        receipt = assess(
+            GraphifyOperation.DETECT,
+            GraphifyEvidence(
+                observed=True,
+                source_name=source_name,
+                returncode=124,
+                timed_out=True,
+            ),
+        )
+        require_complete(receipt)
+        return {}, receipt
     warning_text = "\n".join(str(item.message) for item in caught)
     unclassified = tuple(_relative_paths(root, result.get("unclassified", [])))
     receipt = assess(
         GraphifyOperation.DETECT,
         GraphifyEvidence(
             observed=True,
+            source_name=source_name,
             stderr=warning_text,
             detected_sources=int(result.get("total_files", 0)) + len(unclassified),
             unclassified_files=len(unclassified),
@@ -202,6 +219,27 @@ def detect_checked(
     )
     require_complete(receipt)
     return result, receipt
+
+
+def _detect_with_timeout(root: Path, timeout_seconds: float) -> dict:
+    """Bound the synchronous public detector without changing its reviewed API."""
+    if timeout_seconds <= 0:
+        raise ValueError("detect timeout must be positive")
+
+    def timeout_handler(_signum: int, _frame: object) -> None:
+        raise TimeoutError("Graphify detect timed out")
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    try:
+        return detect(root)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        if previous_timer[0] > 0:
+            signal.setitimer(signal.ITIMER_REAL, *previous_timer)
 
 
 def extract_checked(paths: list[Path], *, root: Path) -> tuple[dict, GraphifyReceipt]:

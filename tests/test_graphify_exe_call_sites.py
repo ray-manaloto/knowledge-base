@@ -64,7 +64,7 @@ def test_extract_code_runs_the_resolved_binary(
     subgraph.parent.mkdir(parents=True)
     subgraph.write_text('{"nodes": [{"id": "one"}], "links": []}', encoding="utf-8")
     monkeypatch.setattr(graph, "graphify_exe", lambda _root: exe)
-    monkeypatch.setattr(graphify_sdk, "detect_checked", lambda _root: ({}, object()))
+    monkeypatch.setattr(graphify_sdk, "detect_checked", lambda _root, **_kwargs: ({}, object()))
     monkeypatch.setattr(graph.subprocess, "run", rec)
 
     graph._extract_code(tmp_path, "somesource")

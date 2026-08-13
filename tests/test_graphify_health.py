@@ -91,6 +91,23 @@ def test_required_unsupported_source_is_never_silently_ignored() -> None:
     assert "required-source-unclassified" in receipt.reasons
 
 
+def test_receipt_retains_bounded_source_qualified_paths() -> None:
+    paths = tuple(f"deep/path/{index}-{'x' * 200}.unknown" for index in range(30))
+    receipt = assess(
+        GraphifyOperation.DETECT,
+        GraphifyEvidence(
+            observed=True,
+            source_name="hostile-source",
+            unclassified_files=len(paths),
+            unclassified_paths=paths,
+        ),
+    )
+
+    assert receipt.source_name == "hostile-source"
+    assert len(receipt.unclassified_paths) == 12
+    assert all(len(path) <= 160 for path in receipt.unclassified_paths)
+
+
 def test_deep_reflection_artifact_and_scope_expectations_fail_closed() -> None:
     receipt = assess(
         GraphifyOperation.BUILD,

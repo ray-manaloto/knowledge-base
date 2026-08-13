@@ -36,12 +36,16 @@ class GraphifyReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     state: GraphifyState
     returncode: int
     reasons: tuple[str, ...]
+    source_name: str | None = None
     stdout: str = ""
     stderr: str = ""
     detected_sources: int | None = None
     extracted_sources: int | None = None
     unclassified_files: int = 0
     zero_node_sources: int = 0
+    unclassified_paths: tuple[str, ...] = ()
+    zero_node_paths: tuple[str, ...] = ()
+    timed_out: bool = False
     mode: str | None = None
     expected_artifacts: tuple[str, ...] = ()
     produced_artifacts: tuple[str, ...] = ()
@@ -65,6 +69,7 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Raw observations to classify for one Graphify operation."""
 
     observed: bool = False
+    source_name: str | None = None
     returncode: int = 0
     stdout: str = ""
     stderr: str = ""
@@ -75,6 +80,7 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     unclassified_paths: tuple[str, ...] = ()
     zero_node_paths: tuple[str, ...] = ()
     coverage_policy: SourceCoveragePolicy | None = None
+    timed_out: bool = False
     mode: str | None = None
     deep_required: bool = False
     reflection_expected: bool = False
@@ -89,6 +95,8 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
     if not evidence.observed:
         reasons.append("evidence-missing")
+    if evidence.timed_out:
+        reasons.append("timeout")
     if evidence.stderr.strip():
         reasons.append("stderr")
     if "truncated" in f"{evidence.stdout}\n{evidence.stderr}".casefold():
@@ -166,12 +174,16 @@ def assess(
         state=state,
         returncode=evidence.returncode,
         reasons=tuple(dict.fromkeys(reasons)),
+        source_name=evidence.source_name,
         stdout=evidence.stdout,
         stderr=evidence.stderr,
         detected_sources=evidence.detected_sources,
         extracted_sources=evidence.extracted_sources,
         unclassified_files=evidence.unclassified_files,
         zero_node_sources=evidence.zero_node_sources,
+        unclassified_paths=_bounded_paths(evidence.unclassified_paths),
+        zero_node_paths=_bounded_paths(evidence.zero_node_paths),
+        timed_out=evidence.timed_out,
         mode=evidence.mode,
         expected_artifacts=evidence.expected_artifacts,
         produced_artifacts=evidence.produced_artifacts,
@@ -184,7 +196,21 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
     """Return a complete receipt or raise with its retained integrity reasons."""
     if receipt.state is not GraphifyState.COMPLETE:
         detail = ", ".join(receipt.reasons) or "unknown integrity failure"
+        evidence: list[str] = []
+        if receipt.source_name:
+            evidence.append(f"source={receipt.source_name[:80]}")
+        if receipt.unclassified_paths:
+            evidence.append(f"unclassified={list(receipt.unclassified_paths)!r}")
+        if receipt.zero_node_paths:
+            evidence.append(f"zero_nodes={list(receipt.zero_node_paths)!r}")
+        suffix = f"; {'; '.join(evidence)}" if evidence else ""
         raise IncompleteGraphifyOperationError(
-            f"Graphify {receipt.operation.value} failed closed ({receipt.state.value}): {detail}"
+            f"Graphify {receipt.operation.value} failed closed "
+            f"({receipt.state.value}): {detail}{suffix}"
         )
     return receipt
+
+
+def _bounded_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    """Retain enough path evidence to diagnose scope without unbounded exceptions."""
+    return tuple(path[:160] for path in paths[:12])

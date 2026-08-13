@@ -74,6 +74,71 @@ def test_checked_detect_blocks_required_unclassified_source(
         )
 
 
+def test_checked_detect_allows_only_reviewed_root_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ignored = [tmp_path / ".gitignore", tmp_path / "LICENSE"]
+    monkeypatch.setattr(
+        graphify_sdk,
+        "detect",
+        lambda _root: {"total_files": 2, "unclassified": [str(path) for path in ignored]},
+    )
+
+    _result, receipt = graphify_sdk.detect_checked(
+        tmp_path,
+        source_name="10x-Team",
+        coverage_policy=SourceCoveragePolicy(optional_unclassified_paths=(".gitignore", "LICENSE")),
+    )
+
+    assert receipt.source_name == "10x-Team"
+    assert receipt.unclassified_paths == (".gitignore", "LICENSE")
+
+
+def test_checked_detect_rejects_unknown_code_like_file_with_source_and_bounded_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unknown = [tmp_path / f"unknown-{index}.codeish" for index in range(30)]
+    monkeypatch.setattr(
+        graphify_sdk,
+        "detect",
+        lambda _root: {"total_files": 30, "unclassified": [str(path) for path in unknown]},
+    )
+
+    with pytest.raises(IncompleteGraphifyOperationError) as caught:
+        graphify_sdk.detect_checked(
+            tmp_path,
+            source_name="hostile-source",
+            coverage_policy=SourceCoveragePolicy(
+                optional_unclassified_paths=(".gitignore", "LICENSE")
+            ),
+        )
+
+    message = str(caught.value)
+    assert "source=hostile-source" in message
+    assert "unknown-0.codeish" in message
+    assert "unknown-29.codeish" not in message
+    assert len(message) < 1200
+
+
+def test_checked_detect_timeout_fails_typed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    def hangs(_root: Path) -> dict[str, object]:
+        time.sleep(1)
+        return {"total_files": 0, "unclassified": []}
+
+    monkeypatch.setattr(graphify_sdk, "detect", hangs)
+
+    with pytest.raises(IncompleteGraphifyOperationError) as caught:
+        graphify_sdk.detect_checked(tmp_path, source_name="slow-source", timeout_seconds=0.01)
+
+    message = str(caught.value)
+    assert "source=slow-source" in message
+    assert "timeout" in message
+
+
 def test_checked_extract_blocks_zero_node_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
