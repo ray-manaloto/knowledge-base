@@ -73,6 +73,7 @@ def _build_with(monkeypatch, tmp_path: Path, kind: str) -> list[str]:
     _manifest(tmp_path, kind=kind)
     monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
+    monkeypatch.setattr(graph, "_detect_preflight", lambda _manifests: None)
 
     def fake_extract(_root: Path, name: str) -> bool:
         asked.append(name)

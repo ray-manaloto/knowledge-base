@@ -61,7 +61,8 @@ class ToolSpec:
     """
 
     name: str
-    mise_key: str
+    mise_key: str = ""
+    python_package: str = ""
     binary: str = ""
     pypi: str = ""
     github: str = ""
@@ -240,10 +241,17 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
     # tool manages itself, compare the binary against the reviewed version".
     # Demanding `mise_key` from a self-managed tool would force a fake pin
     # pointing at a `[tools]` entry that must not exist.
-    if "mise_key" not in table and not table.get("expected") and not table.get("source_only"):
+    owners = bool(table.get("mise_key")) + bool(table.get("python_package"))
+    if owners > 1:
+        raise ValueError(
+            f"{CONFIG_NAME}: [tool.{name}] must have one dependency owner, not both "
+            "'mise_key' and 'python_package'"
+        )
+    if not owners and not table.get("expected") and not table.get("source_only"):
         raise ValueError(
             f"{CONFIG_NAME}: [tool.{name}] needs one of 'mise_key' (mise-managed), "
-            f"'expected' (self-managed) or 'source_only' (ingested, not installed)"
+            f"'python_package' (pyproject/uv-managed), 'expected' (self-managed) or "
+            "'source_only' (ingested, not installed)"
         )
     if table.get("source_only") and not table.get("manifest"):
         # A source-only tool with no manifest has nothing whatsoever to check, and
@@ -262,6 +270,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
     return ToolSpec(
         name=name,
         mise_key=_str("mise_key"),
+        python_package=_str("python_package"),
         binary=_str("binary") or name,
         pypi=_str("pypi"),
         github=_str("github"),

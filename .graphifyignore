@@ -1,0 +1,8 @@
+.agent/
+.venv/
+graphify-out/
+raw/
+sources/*/
+!sources/extractions/
+!sources/groups/
+!sources/media/

@@ -10,9 +10,9 @@
 # `sources/dotfiles.manifest` reverted.
 
 [tool.graphify]
-# The mise pin this tool is installed from. Both the bare-string and table forms
-# of a pin are read, because both are in use across these repos.
-mise_key = "pipx:graphifyy"
+# Graphify is an exported runtime dependency owned by pyproject.toml + uv.lock.
+# mise only runs the locked uv sync provider; it does not install Graphify.
+python_package = "graphifyy"
 binary = "graphify"
 # mise's pipx backend installs from PyPI, so PyPI — not the newest GitHub tag —
 # is the installable truth. On 2026-07-23 v1.0.0 was tagged on GitHub while PyPI
@@ -48,7 +48,7 @@ skill_dir = ".claude/skills/graphify"
 # That is the same stale-install-dir-ahead-of-the-shims defect this whole currency
 # engine was written for (`sync.py`'s module docstring), reached through the one
 # path `graphify_env.graphify_exe` cannot cover: an argv in a config file.
-skill_install = ["mise", "exec", "--", "graphify", "install", "--project"]
+skill_install = ["uv", "run", "graphify", "install", "--project"]
 # graphify stamps no version into its own output (`export.to_json()` writes only
 # `built_at_commit`), so the build task writes this sidecar instead — otherwise
 # "which version built this graph?" is unanswerable from the artifact.

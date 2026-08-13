@@ -1,0 +1,235 @@
+{
+  "group_id": "graphify-ecosystem",
+  "schema_version": 1,
+  "sources": [
+    {
+      "canonical_url": "https://github.com/program-context-protocol/program-context-protocol",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23",
+          "content_sha256": "b5b944c6a4d1a92aea1837f9e41dd9a4f9e4550fad990638683f752a9bb42c12",
+          "path": "pyproject.toml"
+        },
+        {
+          "capability": "CODEBASE_UNDERSTANDING",
+          "commit": "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23",
+          "content_sha256": "faf012c8a02c3bd25c825b81ca0d113102b16ea7ecfc843c65197fd12f655c73",
+          "path": "src/pcp/coupling.py"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "program-context-protocol/program-context-protocol",
+      "reviewed_commit": "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23",
+      "source_id": "program-context-protocol"
+    },
+    {
+      "canonical_url": "https://github.com/akashgit/remote-factory",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "akashgit/remote-factory",
+      "reviewed_commit": "48306939007c213d7d1614ea20f324e4931e6021",
+      "source_id": "remote-factory"
+    },
+    {
+      "canonical_url": "https://github.com/KBVE/kbve",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "KBVE/kbve",
+      "reviewed_commit": "811ab4fec4c3594e2cf04f0022d6e479491be716",
+      "source_id": "kbve"
+    },
+    {
+      "canonical_url": "https://github.com/denys-kniaziev/code-quest",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "denys-kniaziev/code-quest",
+      "reviewed_commit": "f130f549a56eb3638a2013c7e7d87e1197d9d6e6",
+      "source_id": "code-quest"
+    },
+    {
+      "canonical_url": "https://github.com/joel1031/sysmap",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "joel1031/sysmap",
+      "reviewed_commit": "3cd173a0db0627c70c7d6460feb3d29f7cad345f",
+      "source_id": "sysmap"
+    },
+    {
+      "canonical_url": "https://github.com/ehfazrezwan/neuralscape",
+      "capability_evidence": [],
+      "ref": "dev",
+      "repo_id": "ehfazrezwan/neuralscape",
+      "reviewed_commit": "106e749eda029c422a4437ad45c220e87b5f3ee4",
+      "source_id": "neuralscape"
+    },
+    {
+      "canonical_url": "https://github.com/KimYx0207/Meta_Kim",
+      "capability_evidence": [
+        {
+          "capability": "CODEBASE_UNDERSTANDING",
+          "commit": "e11b594f8c15df5da0ace4954098618ab1a55b15",
+          "content_sha256": "c1a7c8f651a77f14d31b593b2fcdf5d22544f171d1cd9970046bf72b3a2dab7b",
+          "path": "scripts/run-capability-gap-orchestration.mjs"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "KimYx0207/Meta_Kim",
+      "reviewed_commit": "e11b594f8c15df5da0ace4954098618ab1a55b15",
+      "source_id": "meta-kim"
+    },
+    {
+      "canonical_url": "https://github.com/sagargupta2001/ReAuth",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "12a84359ca91f3a0d68ea65deeaec36fd8e428a8",
+          "content_sha256": "b418a930c1cdd43644e1caf370b74dafeee0543537e6980b4c9177799a044f52",
+          "path": "scripts/validate_docs.py"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "sagargupta2001/ReAuth",
+      "reviewed_commit": "12a84359ca91f3a0d68ea65deeaec36fd8e428a8",
+      "source_id": "reauth"
+    },
+    {
+      "canonical_url": "https://github.com/alo-exp/silver-bullet",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "a0c5c3407d0f57006532c24e05cb5859430e2692",
+          "content_sha256": "2e9690379fa1b834ea22b49c2bb12f2f3dabc4d86d959a361404bfb5e721950b",
+          "path": "templates/silver-bullet.config.json.default"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "alo-exp/silver-bullet",
+      "reviewed_commit": "a0c5c3407d0f57006532c24e05cb5859430e2692",
+      "source_id": "silver-bullet"
+    },
+    {
+      "canonical_url": "https://github.com/Datarails/mcp-outlet",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "3fc98f7d2e27f443fd226d72496ec1ca4550ec02",
+          "content_sha256": "ca5d9ab842f00acd5734f2a12f5e2d92712811571d9796d63cc25ec790664846",
+          "path": ".github/workflows/graphify-update.yml"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "Datarails/mcp-outlet",
+      "reviewed_commit": "3fc98f7d2e27f443fd226d72496ec1ca4550ec02",
+      "source_id": "mcp-outlet"
+    },
+    {
+      "canonical_url": "https://github.com/NVIDIA-NeMo/DataDesigner",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "NVIDIA-NeMo/DataDesigner",
+      "reviewed_commit": "27acf141170eceb1e8242c132d56b49107462fce",
+      "source_id": "nvidia-data-designer"
+    },
+    {
+      "canonical_url": "https://github.com/Cap-go/capgo.app",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "Cap-go/capgo.app",
+      "reviewed_commit": "7bdd102d3c6d1bf32ba423f551f37e983f38eaf1",
+      "source_id": "capgo"
+    },
+    {
+      "canonical_url": "https://github.com/Kastaldy/motor-de-expansao",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "Kastaldy/motor-de-expansao",
+      "reviewed_commit": "5255e4f68c07b167afa88ac47a63d4a29ba52c28",
+      "source_id": "motor-de-expansao"
+    },
+    {
+      "canonical_url": "https://github.com/CERTCC/Vultron",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "CERTCC/Vultron",
+      "reviewed_commit": "61b836858ba85fe1cbe2b99ffd25f1e7b4a50af0",
+      "source_id": "vultron"
+    },
+    {
+      "canonical_url": "https://github.com/geldois/osint-engine",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "geldois/osint-engine",
+      "reviewed_commit": "0f89639d47b77a5dab7a43cef237d334ab45387d",
+      "source_id": "osint-engine"
+    },
+    {
+      "canonical_url": "https://github.com/felipefrizzo/dotfiles",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "b26fa972413e0476a461b887523171d283e2afbf",
+          "content_sha256": "418331abca43c0aa54a32f4cc15a71eb19ba36dd6bfc490dbcc24f1a8a561a54",
+          "path": "setup.sh"
+        }
+      ],
+      "ref": "master",
+      "repo_id": "felipefrizzo/dotfiles",
+      "reviewed_commit": "b26fa972413e0476a461b887523171d283e2afbf",
+      "source_id": "felipefrizzo-dotfiles"
+    },
+    {
+      "canonical_url": "https://github.com/rap77/prosell-sass",
+      "capability_evidence": [],
+      "ref": "main",
+      "repo_id": "rap77/prosell-sass",
+      "reviewed_commit": "717a6f8abe9e968c510501b328231c56a498ba57",
+      "source_id": "prosell-sass"
+    },
+    {
+      "canonical_url": "https://github.com/STAIxBWLB/maru",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "d92dc7ee677cb6b7abc818e1539ec404978f21f2",
+          "content_sha256": "2a0184e8801b01cbf1a9a1e3a32cd42303cb1342f0f1ef6881ce62d04554e89f",
+          "path": "src-tauri/skills-bootstrap/envs/default/pyproject.toml"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "STAIxBWLB/maru",
+      "reviewed_commit": "d92dc7ee677cb6b7abc818e1539ec404978f21f2",
+      "source_id": "maru"
+    },
+    {
+      "canonical_url": "https://github.com/JZKK720/cubecloud-skills-bundle-kit",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "b8a1431c3f8ed19fe1af2d69f0e13406daf02729",
+          "content_sha256": "885297c433bafc389a22f1dab5cfe4a4d88e0e4b048df3654860d0892021c70d",
+          "path": "setup/setup-global-skills.ps1"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "JZKK720/cubecloud-skills-bundle-kit",
+      "reviewed_commit": "b8a1431c3f8ed19fe1af2d69f0e13406daf02729",
+      "source_id": "cubecloud-skills"
+    },
+    {
+      "canonical_url": "https://github.com/dsh971/Josu",
+      "capability_evidence": [
+        {
+          "capability": "PROJECT_SETUP",
+          "commit": "3c8b8d6c3221196ef57184a71c088e70258e0dbf",
+          "content_sha256": "be32a26e126829ff70fe2b8ce155bd38da04df9e72cb2ec4fe0139d2d99f10d9",
+          "path": "pyproject.toml"
+        }
+      ],
+      "ref": "main",
+      "repo_id": "dsh971/Josu",
+      "reviewed_commit": "3c8b8d6c3221196ef57184a71c088e70258e0dbf",
+      "source_id": "josu"
+    }
+  ]
+}

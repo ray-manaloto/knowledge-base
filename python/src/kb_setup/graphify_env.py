@@ -1,23 +1,14 @@
 # Copyright (c) 2026 Raymond Manaloto
-"""Locate graphify's bundled interpreter.
-
-graphify installs as a pipx tool with its OWN venv python (it can `import
-graphify`); the KB repo's uv python cannot. Code that calls graphify's Python API
-(e.g. build_merge) must run under this interpreter, not uv's.
-"""
+"""Resolve the Graphify CLI and SDK from the repository's locked uv environment."""
 
 from __future__ import annotations
 
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
-
-#: One-shot latches for warnings that would otherwise repeat per call.
-_WARNED: set[str] = set()
 
 # Env vars graphify's `detect_backend()` keys off, in its priority order:
 #   gemini -> kimi -> claude -> openai -> deepseek -> azure -> bedrock -> ollama.
@@ -113,96 +104,25 @@ def clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 
 def graphify_exe(repo_root: Path | None = None) -> str:
-    """The graphify binary to invoke — resolved through mise, never by PATH order.
-
-    WHY NOT A BARE ``"graphify"``. PATH ordering inside a live session is not ours
-    to control, and the launcher's cleaning does not necessarily reach it.
-    Measured 2026-07-27 with a three-way sentinel probe (#40): tmux hands a new
-    pane the **client's** PATH and discards ``new-session -e PATH=…`` — the
-    injected value is stored in the session environment (``show-environment``
-    confirms it) but is not what the pane's process gets. Control arms: ``-e
-    FOOBAR=…`` in the same pane arrived intact, so ``-e`` is not broken in
-    general, only overridden for PATH; and the probe's command was ``/bin/sh -c``,
-    which sources no profile, so the login shell is not the re-adder either.
-
-    The consequence is concrete: a frozen ``mise/installs/<tool>/<ver>/bin`` entry
-    can sit ahead of the shims *inside* a session that passed preflight, and
-    :func:`kb_setup.graph.build` stamps the corpus with the **pinned** version
-    regardless of which binary actually ran. A graph built by one version and
-    stamped another is unfalsifiable afterwards — the one failure this repo
-    cannot absorb.
-
-    ``mise which`` answers from mise's config for ``repo_root``, so it follows the
-    pin by construction and is indifferent to where an entry sits on PATH. The
-    ``shutil.which`` fallback keeps a mise-less machine working; it restores the
-    old PATH-ordered behaviour, which is worse but never worse than failing.
-    """
+    """Return the uv-synced Graphify executable, never a global or mise pipx copy."""
     root = repo_root or Path.cwd()
-    try:
-        # NOT clean_env(), on purpose. This is the one subprocess here that is
-        # mise itself, and `__MISE_DIFF` is mise's own session state — it reverses
-        # the diff to recover the pristine env. Hiding that from mise changes what
-        # mise resolves (the same mechanism that made `{{ get_env(name='PATH') }}`
-        # launder away every install dir; see `session_path` in launch.py). It
-        # also writes nothing: stdout is captured and used as a path, never logged
-        # into the corpus, which is the exposure clean_env() exists to close.
-        out = subprocess.run(
-            ["mise", "which", "graphify"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30,
-            cwd=root,
-        )
-    except OSError, subprocess.SubprocessError:
-        pass
-    else:
-        # `or ""`: a CompletedProcess carries stdout=None whenever the call was not
-        # capturing, so this must not assume a string. Reached in practice by any
-        # caller that patches subprocess.run for its own reasons.
-        resolved = (out.stdout or "").strip()
-        if resolved and Path(resolved).is_file():
-            return resolved
-    # Not an error — a machine without mise still has a working graphify on PATH
-    # — but it IS a downgrade to the behaviour this function exists to replace,
-    # so it says so. Silence here would make the degradation invisible in a build
-    # log, which is the same "could not check, rendered as fine" collapse the
-    # currency engine refuses to make. Warned once per process: the artifact path
-    # resolves per output and would otherwise print eight times.
-    # A set that is MUTATED rather than a flag that is rebound: rebinding a
-    # module global would need a `global` statement, and silencing the resulting
-    # lint would need an inline suppression, which this repo rejects outright.
-    fallback = shutil.which("graphify")
-    if "fallback" not in _WARNED:
-        _WARNED.add("fallback")
-        print(
-            f"[graphify] WARNING: `mise which graphify` gave no answer; falling back to "
-            f"{fallback or 'the bare name `graphify`'} resolved through PATH. That does "
-            f"NOT follow this repo's pin — run `mise run cc-doctor`.",
-            file=sys.stderr,
-        )
-    return fallback or "graphify"
+    candidate = root / ".venv" / "bin" / "graphify"
+    return str(candidate)
 
 
 def pinned_graphify_version(repo_root: Path | None = None) -> str:
-    """The version `mise.toml` pins for `pipx:graphifyy`, or `""` when unpinned.
-
-    Reads the file directly rather than importing the currency engine: this is
-    one key in one table, and coupling the env module to `currency.config`'s
-    ToolSpec loading for it would invert the layering (currency depends on this
-    module's resolution helpers, not the other way around).
-    """
+    """Return the exact ``graphifyy[all]`` project requirement, or ``""``."""
     root = repo_root or Path.cwd()
     try:
-        with (root / "mise.toml").open("rb") as fh:
+        with (root / "pyproject.toml").open("rb") as fh:
             data = tomllib.load(fh)
     except OSError, tomllib.TOMLDecodeError:
         return ""
-    entry = (data.get("tools") or {}).get("pipx:graphifyy")
-    if isinstance(entry, str):
-        return entry
-    if isinstance(entry, dict):
-        return str(entry.get("version") or "")
+    dependencies = (data.get("project") or {}).get("dependencies") or []
+    for requirement in dependencies:
+        match = re.fullmatch(r"graphifyy\[all\]==([0-9]+(?:\.[0-9]+)+)", str(requirement))
+        if match:
+            return match.group(1)
     return ""
 
 
@@ -241,32 +161,31 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     for a WRITER it is destroyed data, so the writer tasks call this and
     refuse (`SystemExit`) on a mismatch, naming both versions and the remedy.
 
-    Either side being unreadable is reported LOUDLY and not treated as a
-    mismatch: an unpinned repo has nothing to enforce, and an exe that cannot
-    answer `--version` will fail its real invocation with a better message
-    than this gate could synthesize. "Could not compare" is printed as itself
-    — never collapsed into either "current" or "drifted" (the currency
-    engine's DRIFT/SKIP/OK discipline, applied here).
+    Either side being unreadable is a refusal. UNKNOWN cannot authorize an
+    operation over the graph.
     """
     root = repo_root or Path.cwd()
     exe = graphify_exe(root)
     pinned = pinned_graphify_version(root)
     running = running_graphify_version(exe)
     if not pinned or not running:
-        print(
-            f"[graphify] version gate could not compare (pin={pinned or 'UNKNOWN'}, "
-            f"running={running or 'UNKNOWN'}, exe={exe}) — proceeding unverified",
-            file=sys.stderr,
+        raise SystemExit(
+            f"[graphify] REFUSING an unverified Graphify operation "
+            f"(pin={pinned or 'UNKNOWN'}, running={running or 'UNKNOWN'}, exe={exe}). "
+            "Run `mise deps` to restore the locked uv environment."
         )
         return
     if pinned != running:
         raise SystemExit(
             f"[graphify] REFUSING to write the graph with graphify {running} ({exe}) "
-            f"while mise.toml pins {pinned}. A stale binary rewriting graph.json is "
+            f"while pyproject.toml pins {pinned}. A stale binary rewriting graph.json is "
             f"how hyperedges were silently destroyed pre-0.9.34, and the carry that "
-            f"masked it is retired. Run `mise install`, then retry; "
+            f"masked it is retired. Run `mise deps`, then retry; "
             f"`mise run kb-currency-check` shows what is stale."
         )
+    from kb_setup.graphify_sdk import assert_public_sdk
+
+    assert_public_sdk(pinned)
 
 
 def _imports_graphify(py: Path) -> bool:
@@ -282,52 +201,15 @@ def _imports_graphify(py: Path) -> bool:
 
 
 def graphify_python(repo_root: Path | None = None) -> str:
-    """Return a path to an interpreter that can ``import graphify``.
-
-    Resolution order: the marker graphify writes (``graphify-out/.graphify_python``),
-    then ``mise where pipx:graphifyy`` → ``**/bin/python``, then the ``graphify``
-    binary's sibling. Raises if none can import graphify.
-    """
+    """Return the uv-synced interpreter after proving it imports Graphify."""
     root = repo_root or Path.cwd()
-
-    marker = root / "graphify-out" / ".graphify_python"
-    if marker.is_file():
-        cand = Path(marker.read_text(encoding="utf-8").strip())
-        if cand.is_file() and _imports_graphify(cand):
-            return str(cand)
-
-    try:
-        out = subprocess.run(
-            ["mise", "where", "pipx:graphifyy"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30,
-            # cwd=root, not the process cwd: `mise where` answers for the config
-            # it finds from the CWD, so without this the function silently
-            # ignored the repo_root it was handed and could return a DIFFERENT
-            # version's interpreter than the caller asked about. Measured: from
-            # the repo it answers 0.9.26, from /tmp it answers 0.9.28. That lands
-            # on corpus-WRITING paths (kb-merge's build_merge, kb-build's doc
-            # replay), so it is not cosmetic.
-            cwd=root,
-        )
-        base = Path(out.stdout.strip())
-        for cand in sorted(base.glob("**/bin/python")):
-            if _imports_graphify(cand):
-                return str(cand)
-    except OSError, subprocess.SubprocessError:
-        pass
-
-    exe = shutil.which("graphify")
-    if exe:
-        cand = Path(exe).resolve().parent / "python"
-        if cand.is_file() and _imports_graphify(cand):
-            return str(cand)
-
-    raise RuntimeError(
-        "could not locate graphify's bundled interpreter — is `graphify` installed (mise install)?"
-    )
+    candidate = root / ".venv" / "bin" / "python"
+    if candidate.is_file() and _imports_graphify(candidate):
+        return str(candidate)
+    running = Path(sys.executable)
+    if _imports_graphify(running):
+        return str(running)
+    raise RuntimeError("locked Graphify SDK is unavailable — run `mise deps`")
 
 
 # Runtime deps some graphify outputs need that its packaging does NOT pull on

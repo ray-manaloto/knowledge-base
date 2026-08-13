@@ -64,6 +64,7 @@ def _build(monkeypatch, tmp_path: Path) -> list[list[str]]:
 
     monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
+    monkeypatch.setattr(graph, "_detect_preflight", lambda _manifests: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
     # `graphify_ops.label` and `graph_checks.assert_composition` both run

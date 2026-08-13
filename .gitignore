@@ -100,6 +100,9 @@ graphify-out/.merge-counts.tmp.json
 # deterministically re-fetched ARE vendored under sources/media/.
 sources/*/
 !sources/extractions/
+!sources/groups/
+!sources/groups/*.toml
+!sources/groups/*.baseline.json
 !sources/media/
 !sources/.gitkeep
 sources/media/*.m4a       # audio — the transcript is the committed artifact

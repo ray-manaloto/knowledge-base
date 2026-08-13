@@ -1,0 +1,1157 @@
+# Generated from the reviewed Graphify ecosystem census; edit through the typed
+# source-group workflow. Registry membership is metadata only: no source below
+# is admitted to Graphify ingestion, deep extraction, reflection, or artifacts.
+schema_version = 1
+group_id = "graphify-ecosystem"
+generated_at_ns = 1786577308303273000
+
+[[sources]]
+source_id = "program-context-protocol"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "DECLARED"
+path = "pyproject.toml"
+commit = "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23"
+observed_at_ns = 1786577308303273000
+summary = "Declares the Graphify package in the reviewed project environment."
+
+[[sources.capability_evidence]]
+capability = "CODEBASE_UNDERSTANDING"
+stage = "CONFIGURED"
+path = "src/pcp/coupling.py"
+commit = "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23"
+observed_at_ns = 1786577308303273000
+summary = "Uses Graphify-derived coupling data as project navigation input."
+
+[sources.repository]
+repo_id = "program-context-protocol/program-context-protocol"
+canonical_url = "https://github.com/program-context-protocol/program-context-protocol"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["pyproject.toml","src/pcp/coupling.py"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "remote-factory"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "akashgit/remote-factory"
+canonical_url = "https://github.com/akashgit/remote-factory"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "48306939007c213d7d1614ea20f324e4931e6021"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "kbve"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "KBVE/kbve"
+canonical_url = "https://github.com/KBVE/kbve"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "811ab4fec4c3594e2cf04f0022d6e479491be716"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "code-quest"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "denys-kniaziev/code-quest"
+canonical_url = "https://github.com/denys-kniaziev/code-quest"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "f130f549a56eb3638a2013c7e7d87e1197d9d6e6"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "sysmap"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "joel1031/sysmap"
+canonical_url = "https://github.com/joel1031/sysmap"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "3cd173a0db0627c70c7d6460feb3d29f7cad345f"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "neuralscape"
+role = "EXPERIMENTAL_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "ehfazrezwan/neuralscape"
+canonical_url = "https://github.com/ehfazrezwan/neuralscape"
+ref = "dev"
+default_branch = "dev"
+reviewed_commit = "106e749eda029c422a4437ad45c220e87b5f3ee4"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = false
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "meta-kim"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+
+[[sources.capability_evidence]]
+capability = "CODEBASE_UNDERSTANDING"
+stage = "CONFIGURED"
+path = "scripts/run-capability-gap-orchestration.mjs"
+commit = "e11b594f8c15df5da0ace4954098618ab1a55b15"
+observed_at_ns = 1786577308303273000
+summary = "Treats the graph as a navigation index and injects bounded source-authoritative slices."
+
+[sources.repository]
+repo_id = "KimYx0207/Meta_Kim"
+canonical_url = "https://github.com/KimYx0207/Meta_Kim"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "e11b594f8c15df5da0ace4954098618ab1a55b15"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["scripts/run-capability-gap-orchestration.mjs"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "reauth"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "CONFIGURED"
+path = "scripts/validate_docs.py"
+commit = "12a84359ca91f3a0d68ea65deeaec36fd8e428a8"
+observed_at_ns = 1786577308303273000
+summary = "Mechanically requires documented query, explain, path, update, and stale handling commands."
+
+[sources.repository]
+repo_id = "sagargupta2001/ReAuth"
+canonical_url = "https://github.com/sagargupta2001/ReAuth"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "12a84359ca91f3a0d68ea65deeaec36fd8e428a8"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["scripts/validate_docs.py"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = false
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "silver-bullet"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "CONFIGURED"
+path = "templates/silver-bullet.config.json.default"
+commit = "a0c5c3407d0f57006532c24e05cb5859430e2692"
+observed_at_ns = 1786577308303273000
+summary = "Records project-scoped Graphify installation commands for multiple agent harnesses."
+
+[sources.repository]
+repo_id = "alo-exp/silver-bullet"
+canonical_url = "https://github.com/alo-exp/silver-bullet"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "a0c5c3407d0f57006532c24e05cb5859430e2692"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["templates/silver-bullet.config.json.default"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = false
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "mcp-outlet"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "CONFIGURED"
+path = ".github/workflows/graphify-update.yml"
+commit = "3fc98f7d2e27f443fd226d72496ec1ca4550ec02"
+observed_at_ns = 1786577308303273000
+summary = "CI installs Graphify with parser extras after a missing parser caused a near-empty graph."
+
+[sources.repository]
+repo_id = "Datarails/mcp-outlet"
+canonical_url = "https://github.com/Datarails/mcp-outlet"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "3fc98f7d2e27f443fd226d72496ec1ca4550ec02"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = [".github/workflows/graphify-update.yml"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "nvidia-data-designer"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "NVIDIA-NeMo/DataDesigner"
+canonical_url = "https://github.com/NVIDIA-NeMo/DataDesigner"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "27acf141170eceb1e8242c132d56b49107462fce"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = false
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "capgo"
+role = "PRODUCTION_CONSUMER"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "Cap-go/capgo.app"
+canonical_url = "https://github.com/Cap-go/capgo.app"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "7bdd102d3c6d1bf32ba423f551f37e983f38eaf1"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = false
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "motor-de-expansao"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "Kastaldy/motor-de-expansao"
+canonical_url = "https://github.com/Kastaldy/motor-de-expansao"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "5255e4f68c07b167afa88ac47a63d4a29ba52c28"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "vultron"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "CERTCC/Vultron"
+canonical_url = "https://github.com/CERTCC/Vultron"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "61b836858ba85fe1cbe2b99ffd25f1e7b4a50af0"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "osint-engine"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "geldois/osint-engine"
+canonical_url = "https://github.com/geldois/osint-engine"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "0f89639d47b77a5dab7a43cef237d334ab45387d"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "felipefrizzo-dotfiles"
+role = "TOOLING_INTEGRATION"
+status = "REVIEWING"
+warnings = ["Lifecycle and license review remain incomplete; registry presence is not Graphify admission."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "CONFIGURED"
+path = "setup.sh"
+commit = "b26fa972413e0476a461b887523171d283e2afbf"
+observed_at_ns = 1786577308303273000
+summary = "Installs Graphify and its platform skills but does not prove graph lifecycle execution."
+
+[sources.repository]
+repo_id = "felipefrizzo/dotfiles"
+canonical_url = "https://github.com/felipefrizzo/dotfiles"
+ref = "master"
+default_branch = "master"
+reviewed_commit = "b26fa972413e0476a461b887523171d283e2afbf"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["setup.sh"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "METADATA_ONLY"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "prosell-sass"
+role = "RESEARCH_SOURCE"
+status = "REJECTED"
+warnings = ["Reviewed as a negative control; it must not be ingested or promoted."]
+capability_evidence = []
+
+[sources.repository]
+repo_id = "rap77/prosell-sass"
+canonical_url = "https://github.com/rap77/prosell-sass"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "717a6f8abe9e968c510501b328231c56a498ba57"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = []
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "DENIED"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "maru"
+role = "RESEARCH_SOURCE"
+status = "REJECTED"
+warnings = ["Reviewed as a negative control; it must not be ingested or promoted."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "DECLARED"
+path = "src-tauri/skills-bootstrap/envs/default/pyproject.toml"
+commit = "d92dc7ee677cb6b7abc818e1539ec404978f21f2"
+observed_at_ns = 1786577308303273000
+summary = "Version declaration alone is retained as a negative control, not lifecycle evidence."
+
+[sources.repository]
+repo_id = "STAIxBWLB/maru"
+canonical_url = "https://github.com/STAIxBWLB/maru"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "d92dc7ee677cb6b7abc818e1539ec404978f21f2"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["src-tauri/skills-bootstrap/envs/default/pyproject.toml"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "DENIED"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "cubecloud-skills"
+role = "RESEARCH_SOURCE"
+status = "REJECTED"
+warnings = ["Reviewed as a negative control; it must not be ingested or promoted."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "CONFIGURED"
+path = "setup/setup-global-skills.ps1"
+commit = "b8a1431c3f8ed19fe1af2d69f0e13406daf02729"
+observed_at_ns = 1786577308303273000
+summary = "Unpinned global installer is retained as a negative control for project-scoped reproducibility."
+
+[sources.repository]
+repo_id = "JZKK720/cubecloud-skills-bundle-kit"
+canonical_url = "https://github.com/JZKK720/cubecloud-skills-bundle-kit"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "b8a1431c3f8ed19fe1af2d69f0e13406daf02729"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["setup/setup-global-skills.ps1"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "DENIED"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []
+
+[[sources]]
+source_id = "josu"
+role = "RESEARCH_SOURCE"
+status = "REJECTED"
+warnings = ["Reviewed as a negative control; it must not be ingested or promoted."]
+
+[[sources.capability_evidence]]
+capability = "PROJECT_SETUP"
+stage = "DECLARED"
+path = "pyproject.toml"
+commit = "3c8b8d6c3221196ef57184a71c088e70258e0dbf"
+observed_at_ns = 1786577308303273000
+summary = "Removal after zero imports is retained as a negative control against unused dependency declarations."
+
+[sources.repository]
+repo_id = "dsh971/Josu"
+canonical_url = "https://github.com/dsh971/Josu"
+ref = "main"
+default_branch = "main"
+reviewed_commit = "3c8b8d6c3221196ef57184a71c088e70258e0dbf"
+is_fork = false
+is_archived = false
+is_vendor_mirror = false
+
+[sources.license]
+status = "REVIEW_REQUIRED"
+evidence = []
+
+[sources.paths]
+include_paths = ["pyproject.toml"]
+exclude_paths = []
+graphifyignore_policy = "HONOR_IF_PRESENT"
+
+[sources.timestamps]
+discovered_at_ns = 1786577308303273000
+last_reviewed_at_ns = 1786577308303273000
+last_status_change_at_ns = 1786577308303273000
+
+[sources.budgets.source]
+
+[sources.budgets.semantic]
+
+[sources.policies]
+registry_admission = "DENIED"
+graph_ingestion = "DISABLED"
+deep_extraction = "DISABLED"
+reflection = "DISABLED"
+artifacts = "DISABLED"
+promotion = "BLOCKED"
+
+[sources.refresh]
+cadence = "WEEKLY"
+last_checked_at_ns = 1786577308303273000
+next_check_after_ns = 1787182108303273000
+update_available = true
+
+[sources.pivot]
+is_candidate = false
+status = "NOT_EVALUATED"
+comparison_dimensions = []

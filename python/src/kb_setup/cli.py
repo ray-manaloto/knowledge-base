@@ -75,6 +75,9 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
+            "graphify-contract | ecosystem-discovery-plan [alternative...] | "
+            "detect-census [--output .agent/<path>.json] | "
+            "source-groups-check [path] | "
             "ensure-deps | version"
         )
         return 0
@@ -94,10 +97,7 @@ def _run(argv: list[str] | None = None) -> int:
         # library functions stay drivable by test stubs that fake the exe.
         graphify_env.assert_pinned_graphify(repo_root)
     if cmd == "build":
-        from kb_setup import graph
-
-        graph.build(repo_root)
-        return 0
+        return _build_checked(repo_root)
     if cmd == "update":
         from kb_setup import graph
 
@@ -128,6 +128,18 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.query(repo_root, rest)
+    if cmd == "graphify-contract":
+        from kb_setup import graphify_sdk
+
+        return graphify_sdk.contract_main(repo_root)
+    if cmd == "source-groups-check":
+        from kb_setup import source_groups
+
+        return source_groups.check_main(repo_root, rest)
+    if cmd == "ecosystem-discovery-plan":
+        from kb_setup import ecosystem_discovery
+
+        return ecosystem_discovery.plan_main(rest)
     if cmd == "affected":
         from kb_setup import graphify_ops
 
@@ -146,9 +158,16 @@ def _run(argv: list[str] | None = None) -> int:
         # disagreeing.
         return mcp_serve.serve(repo_root, rest)
     if cmd == "artifacts":
-        from kb_setup import artifacts
+        from kb_setup import artifacts, graphify_health
 
-        return artifacts.generate(repo_root, only=rest or None)
+        rc = artifacts.generate(repo_root, only=rest or None)
+        graphify_health.require_complete(
+            graphify_health.assess(
+                graphify_health.GraphifyOperation.ARTIFACT,
+                graphify_health.GraphifyEvidence(observed=True, returncode=rc),
+            )
+        )
+        return rc
     if cmd == "merge":
         from kb_setup import graphify_ops
 
@@ -274,6 +293,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import hook_guard
 
         return hook_guard.run()
+    if cmd == "detect-census":
+        from kb_setup import graph
+
+        return graph.detection_census_main(repo_root, rest)
     if cmd == "brain":
         from kb_setup import brain
 
@@ -376,6 +399,28 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         file=sys.stderr,
     )
     return 2
+
+
+def _build_checked(repo_root: Path) -> int:
+    """Build and require typed evidence for the complete graph output set."""
+    from kb_setup import graph, graphify_health
+
+    graph.build(repo_root)
+    expected = ("graphify-out/graph.json", "graphify-out/graph-prose.json")
+    produced = tuple(path for path in expected if (repo_root / path).is_file())
+    graphify_health.require_complete(
+        graphify_health.assess(
+            graphify_health.GraphifyOperation.BUILD,
+            graphify_health.GraphifyEvidence(
+                observed=True,
+                mode="deep",
+                deep_required=True,
+                expected_artifacts=expected,
+                produced_artifacts=produced,
+            ),
+        )
+    )
+    return 0
 
 
 #: Every flag `kb-setup review-receipt` reads. Stating one twice is refused

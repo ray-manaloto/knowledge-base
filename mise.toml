@@ -35,11 +35,6 @@ uv = "0.12.3"
 hk = "1.54.1"
 pkl = "0.32.1"
 typos = "1.49.0"
-# graphify [all] resolves on host Python 3.14 (leiden/graspologic extra
-# auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
-# `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
-# strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.36", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
@@ -76,6 +71,7 @@ fnox = "1.32.0"
 # `sources/doppler.manifest`; credentials/config remain user-owned and are not
 # stored in this repository.
 doppler = "3.76.1"
+
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
 # (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
@@ -111,6 +107,10 @@ doppler = "3.76.1"
 # ask the binary. Same class as the `fnox`/`latest` note above.
 codex = "0.147.0"
 antigravity-cli = "1.1.11"
+
+[deps.uv]
+auto = true
+run = "uv sync --locked"
 
 [settings]
 experimental = true
@@ -463,6 +463,10 @@ description = "Reproduce graph.json from committed inputs (manifests + doc extra
 # correctness, so a speedup measurement cannot answer it.
 run = "uv run kb-setup build"
 
+[tasks.kb-detect-census]
+description = "Emit a read-only complete-source Graphify detection receipt"
+run = "uv run kb-setup detect-census"
+
 [tasks.kb-update]
 description = "Advance a source to latest upstream + incrementally re-extract: mise run kb-update -- <name>"
 # Bumps the manifest SHA to upstream HEAD, re-clones, `graphify update` (incremental
@@ -517,6 +521,32 @@ description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N]
 # never shells out to graphify, so graphify's own flags (--budget, --depth) are
 # REJECTED rather than ignored. `--top N` sets how many ranked hits print.
 run = "uv run kb-setup query"
+
+[tasks.kb-graphify-contract]
+description = "Fail closed unless locked Graphify CLI and reviewed public SDK signatures agree"
+run = "uv run kb-setup graphify-contract"
+
+[tasks.kb-source-groups-check]
+description = "Validate the typed Graphify ecosystem source registry"
+usage = '''
+arg "[path]" help="Source-group TOML (defaults to sources/groups/graphify-ecosystem.toml)"
+'''
+run = "uv run kb-setup source-groups-check{% if usage.path is string and usage.path != '' %} {{ usage.path | quote }}{% endif %}"
+
+[tasks.kb-ecosystem-discovery-plan]
+description = "Emit bounded GitHub searches for Graphify consumers and alternatives"
+usage = '''
+arg "[alternatives]" var=#true help="Optional alternative technology names"
+'''
+run = "uv run kb-setup ecosystem-discovery-plan{% for alternative in usage.alternatives %} {{ alternative | quote }}{% endfor %}"
+
+[tasks.kb-source-groups-codegen]
+description = "Regenerate strict source-group msgspec models from JSON Schema"
+run = "uv run --group codegen python schemas/generate_source_groups.py"
+
+[tasks.kb-source-groups-codegen-check]
+description = "Fail if generated source-group models differ from the schema"
+run = "uv run --group codegen python -m schemas.check_source_groups_codegen"
 
 [tasks.kb-affected]
 description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'

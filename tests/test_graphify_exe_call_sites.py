@@ -24,7 +24,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kb_setup import artifacts, graph, graphify_ops, stamps
+from kb_setup import artifacts, graph, graphify_ops, graphify_sdk, stamps
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -60,7 +60,11 @@ def test_extract_code_runs_the_resolved_binary(
     """kb-build's AST pass — the one that produces the corpus."""
     exe = _sentinel(tmp_path)
     rec = _Recorder()
+    subgraph = tmp_path / "sources" / "somesource" / "graphify-out" / "graph.json"
+    subgraph.parent.mkdir(parents=True)
+    subgraph.write_text('{"nodes": [{"id": "one"}], "links": []}', encoding="utf-8")
     monkeypatch.setattr(graph, "graphify_exe", lambda _root: exe)
+    monkeypatch.setattr(graphify_sdk, "detect_checked", lambda _root, **_kwargs: ({}, object()))
     monkeypatch.setattr(graph.subprocess, "run", rec)
 
     graph._extract_code(tmp_path, "somesource")

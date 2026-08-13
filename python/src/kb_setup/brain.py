@@ -312,6 +312,18 @@ def reflect(repo_root: Path) -> int:
     out = repo_root / _BRAIN / _LESSONS_SUBPATH
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render_lessons(lessons), encoding="utf-8")
+    from kb_setup import graphify_health
+
+    graphify_health.require_complete(
+        graphify_health.assess(
+            graphify_health.GraphifyOperation.REFLECT,
+            graphify_health.GraphifyEvidence(
+                observed=True,
+                reflection_expected=True,
+                reflection_produced=out.is_file(),
+            ),
+        )
+    )
     decided = [le for le in lessons if le.tag != "tentative"]
     print(
         f"[brain] {len(outcomes)} outcomes -> {len(lessons)} cells "

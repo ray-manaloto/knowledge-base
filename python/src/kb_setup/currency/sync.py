@@ -145,6 +145,8 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
     A pin is either a bare string or a table (`{ version = ..., extras = [...] }`);
     both forms are live in these repos, so both are read here.
     """
+    if spec.python_package:
+        return _python_project_pin(repo_root, spec.python_package)
     entry = _tools_table(repo_root).get(spec.mise_key)
     if isinstance(entry, str):
         return entry, ()
@@ -153,6 +155,26 @@ def pinned_version(repo_root: Path, spec: ToolSpec) -> tuple[str, tuple[str, ...
         raw = entry.get("extras", [])
         extras = tuple(str(e) for e in raw) if isinstance(raw, list) else ()
         return version, extras
+    return "", ()
+
+
+def _python_project_pin(repo_root: Path, package: str) -> tuple[str, tuple[str, ...]]:
+    """Read one exact PEP 508 dependency from the project's exported runtime set."""
+    try:
+        with (repo_root / "pyproject.toml").open("rb") as handle:
+            project = tomllib.load(handle).get("project", {})
+    except OSError, tomllib.TOMLDecodeError:
+        return "", ()
+    dependencies = project.get("dependencies", []) if isinstance(project, dict) else []
+    pattern = re.compile(
+        rf"{re.escape(package)}(?:\[([^]]+)\])?==([0-9]+(?:\.[0-9]+)+)",
+        re.IGNORECASE,
+    )
+    for requirement in dependencies if isinstance(dependencies, list) else []:
+        match = pattern.fullmatch(str(requirement))
+        if match:
+            extras = tuple(part.strip() for part in (match.group(1) or "").split(",") if part)
+            return match.group(2), extras
     return "", ()
 
 
@@ -787,7 +809,9 @@ def manifest_ref(repo_root: Path, spec: ToolSpec) -> str:
 # ----------------------------------------------------------------- checks ----
 
 
-def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
+def _check_resolution(repo_root: Path, spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
+    if spec.python_package:
+        return _check_python_resolution(repo_root, spec, pinned)
     resolved, how = resolve_from_path(spec.binary)
     if how == "shim":
         return (
@@ -824,6 +848,28 @@ def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
             resolved,
         )
     return Finding("resolution", OK, f"PATH reaches the pinned {resolved}"), resolved
+
+
+def _check_python_resolution(
+    repo_root: Path,
+    spec: ToolSpec,
+    pinned: str,
+) -> tuple[Finding, str]:
+    """Compare the locked project executable with its exact pyproject pin."""
+    executable = repo_root / ".venv" / "bin" / spec.binary
+    if not executable.is_file():
+        return Finding("resolution", DRIFT, f"{executable} is missing; run `mise deps`"), ""
+    observed = observed_version(str(executable), spec.version_pattern)
+    if observed != pinned:
+        return (
+            Finding(
+                "resolution",
+                DRIFT,
+                f"{executable} reports {observed or 'UNKNOWN'} but pyproject pins {pinned}",
+            ),
+            observed,
+        )
+    return Finding("resolution", OK, f"locked uv environment runs {observed}"), observed
 
 
 def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
@@ -1010,7 +1056,14 @@ def _check_extras(spec: ToolSpec, declared: tuple[str, ...]) -> Finding:
     return Finding("extras", OK, f"pin declares the expected extras {list(spec.extras)}")
 
 
-def install_site_packages(binary: str, mise_key: str, *, deep: bool) -> Path | None:
+def install_site_packages(
+    binary: str,
+    mise_key: str,
+    *,
+    deep: bool,
+    repo_root: Path | None = None,
+    python_package: str = "",
+) -> Path | None:
     """The resolved install's `site-packages`, or None when it cannot be located.
 
     Free path: the binary resolves inside a mise install dir, so the root is a
@@ -1018,6 +1071,8 @@ def install_site_packages(binary: str, mise_key: str, *, deep: bool) -> Path | N
     only `mise where` can supply it — a ~0.4s subprocess, so it is gated behind
     `deep` and never runs in the per-session hook.
     """
+    if python_package and repo_root is not None:
+        return next(iter(sorted((repo_root / ".venv" / "lib").glob("python*/site-packages"))), None)
     root = _pinned_install_root(mise_key) if deep else None
     if root is None:
         root = _install_root_from_path(binary)
@@ -1056,7 +1111,7 @@ def _install_root_from_path(binary: str) -> Path | None:
     return Path(*parts[: idx + 3]) if len(parts) > idx + 2 else None
 
 
-def _check_extra_probes(spec: ToolSpec, *, deep: bool) -> Finding:
+def _check_extra_probes(repo_root: Path, spec: ToolSpec, *, deep: bool) -> Finding:
     """Are the packages the extras are supposed to deliver actually installed?
 
     This is the half of "extensions tools are in sync" that comparing two config
@@ -1065,7 +1120,13 @@ def _check_extra_probes(spec: ToolSpec, *, deep: bool) -> Finding:
     """
     if not spec.extra_probes:
         return Finding("extra-probes", SKIP, "no extra_probes declared for this tool")
-    site = install_site_packages(spec.binary, spec.mise_key, deep=deep)
+    site = install_site_packages(
+        spec.binary,
+        spec.mise_key,
+        deep=deep,
+        repo_root=repo_root,
+        python_package=spec.python_package,
+    )
     if site is None:
         return Finding(
             "extra-probes",
@@ -1322,23 +1383,33 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
 
     pinned, declared_extras = pinned_version(repo_root, spec)
     if not pinned:
+        owner = (
+            f"pyproject.toml has no exact pin for {spec.python_package!r}"
+            if spec.python_package
+            else f"mise.toml has no pin for {spec.mise_key!r}"
+        )
         return SyncStatus(
             tool=spec.name,
             pinned="",
             resolved="",
-            findings=(Finding("pin", DRIFT, f"mise.toml has no pin for {spec.mise_key!r}"),),
+            findings=(Finding("pin", DRIFT, owner),),
         )
 
-    resolution, resolved = _check_resolution(spec, pinned)
+    resolution, resolved = _check_resolution(repo_root, spec, pinned)
+    pin_owner = (
+        f"pyproject.toml pins {spec.python_package} at {pinned}"
+        if spec.python_package
+        else f"mise.toml pins {spec.mise_key} at {pinned}"
+    )
     return SyncStatus(
         tool=spec.name,
         pinned=pinned,
         resolved=resolved,
         findings=(
-            Finding("pin", OK, f"mise.toml pins {spec.mise_key} at {pinned}"),
+            Finding("pin", OK, pin_owner),
             resolution,
             _check_extras(spec, declared_extras),
-            _check_extra_probes(spec, deep=deep),
+            _check_extra_probes(repo_root, spec, deep=deep),
             _check_manifest(repo_root, spec, pinned),
             _check_stamp(repo_root, spec, pinned),
         ),
