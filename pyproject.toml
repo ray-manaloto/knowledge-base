@@ -3,13 +3,13 @@ name = "kb-setup"
 version = "0.1.0"
 description = "Thin helpers for the knowledge-base graphify substrate"
 requires-python = ">=3.14"
-# The FIRST runtime dependency this package has ever had, and it is exported:
+# Runtime dependencies are exported:
 # dotfiles installs kb-setup as a SHA-pinned git dependency, so anything here
 # lands in a tree with its own resolution to satisfy. Chosen deliberately, and
 # the reasoning is in docs/research/reports/2026-08-10-logging-library-selection.md
 # rather than summarised here.
 #
-# Three facts made it affordable. structlog is pure Python and declares ZERO
+# Three facts made structlog affordable. It is pure Python and declares ZERO
 # runtime dependencies on py>=3.11 (its only entry is a typing-extensions marker
 # for older interpreters), so the export is one package and not a tree. It is an
 # EVENT layer, not a logging system: it owns no sinks, which is what lets §2.5's
@@ -20,7 +20,16 @@ requires-python = ">=3.14"
 # A FLOOR, not an `==`, for the same reason the fetch extra below is: an exact
 # pin here is exported as someone else's constraint. Reproducibility for us is
 # uv.lock.
-dependencies = ["structlog>=26.1"]
+dependencies = [
+  # Public Graphify SDK calls are part of kb-setup's runtime contract. Keep the
+  # accepted release interval intentionally one-patch wide: every Graphify
+  # release must pass the API/signature and behavioral gates before widening.
+  "graphifyy>=0.9.41,<0.9.42",
+  # Generated strict wire models are the persistence boundary for source-group
+  # workflow state. The repository lock selects the exact accepted build.
+  "msgspec>=0.21.1,<0.22",
+  "structlog>=26.1",
+]
 
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
@@ -70,6 +79,11 @@ dev = [
   "pytest-xdist==3.8.0",
   "trafilatura==2.2.0",
 ]
+
+# Schema compiler only; it is not exported to kb-setup consumers. 0.72.4 fixes
+# nullable forward-reference unions and refactors generation phases, so the
+# byte-compare gate below is mandatory whenever this pin changes.
+codegen = ["datamodel-code-generator==0.72.4"]
 
 [build-system]
 requires = ["hatchling"]

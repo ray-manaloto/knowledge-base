@@ -61,6 +61,7 @@ def _run(argv: list[str] | None = None) -> int:
             "affected <symbol> [--depth N] | insights [--top N] | serve | "
             "merge <chunk> | label | "
             "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
+            "manifest-add <url> [--ref R --kind K --scope corpus|study --commit SHA] | "
             "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
             "arms <spec.toml> [--dry-run] | "
             "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
@@ -75,6 +76,8 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
+            "graphify-contract | ecosystem-discovery-plan [alternative...] | "
+            "source-groups-check [path] | "
             "ensure-deps | version"
         )
         return 0
@@ -128,6 +131,18 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.query(repo_root, rest)
+    if cmd == "graphify-contract":
+        from kb_setup import graphify_sdk
+
+        return graphify_sdk.contract_main(repo_root)
+    if cmd == "source-groups-check":
+        from kb_setup import source_groups
+
+        return source_groups.check_main(repo_root, rest)
+    if cmd == "ecosystem-discovery-plan":
+        from kb_setup import ecosystem_discovery
+
+        return ecosystem_discovery.plan_main(rest)
     if cmd == "affected":
         from kb_setup import graphify_ops
 
@@ -363,7 +378,8 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
         "currency [check|run|stamp|docs-reviewed] [--tool T --json --no-write] | "
         "manifest-add <url> "
-        "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
+        "[--ref R --kind K --scope corpus|study --commit SHA --name N --comment C --force] | "
+        "assemble <name> <chunk...> | "
         "brain [query|record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "md-budget | skill-lint | "
@@ -594,19 +610,31 @@ def _manifest_add(repo_root: Path, rest: list[str]) -> int:
     urls = [a for a in rest if a.startswith(("http://", "https://", "git@"))]
     if not urls:
         print(
-            "kb-setup manifest-add <url> [--ref --kind --name --comment --force]", file=sys.stderr
+            "kb-setup manifest-add <url> "
+            "[--ref --kind --scope corpus|study --commit SHA --name --comment --force]",
+            file=sys.stderr,
         )
         return 2
+    for flag in ("--scope", "--commit"):
+        if any(
+            arg == flag and (index + 1 == len(rest) or rest[index + 1].startswith("--"))
+            for index, arg in enumerate(rest)
+        ):
+            print(f"kb-setup manifest-add: {flag} requires a value", file=sys.stderr)
+            return 2
+    scope = _opt(rest, "--scope")
     source = manifest.NewSource(
         url=urls[0],
         ref=_opt(rest, "--ref", "main") or "main",
         kind=_opt(rest, "--kind", "code") or "code",
         name=_opt(rest, "--name"),
         comment=_opt(rest, "--comment"),
+        scope="corpus" if scope is None else scope,
+        commit=_opt(rest, "--commit"),
     )
     try:
         m = manifest.add(repo_root / "sources", source, force="--force" in rest)
-    except (FileExistsError, RuntimeError) as e:
+    except (FileExistsError, RuntimeError, ValueError) as e:
         print(f"[kb-manifest-add] {e}", file=sys.stderr)
         return 1
     print(f"[kb-manifest-add] wrote {m.path.relative_to(repo_root)} @ {m.commit}")

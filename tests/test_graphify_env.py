@@ -300,24 +300,38 @@ def test_gate_passes_silently_on_a_match(
     monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r: "/pinned/graphify")
     monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r: "0.9.34")
     monkeypatch.setattr(graphify_env, "running_graphify_version", lambda _e: "0.9.34")
+    from kb_setup import graphify_sdk
+
+    monkeypatch.setattr(graphify_sdk, "assert_public_sdk", lambda _version: None)
 
     assert graphify_env.assert_pinned_graphify(tmp_path) is None
     assert capsys.readouterr().err == ""
 
 
-def test_gate_says_could_not_compare_rather_than_guessing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+def test_gate_refuses_when_it_cannot_compare(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An unreadable side proceeds LOUDLY — never collapsed into pass or drift.
-
-    The real invocation fails with a better message than this gate could
-    synthesize, and an unpinned repo has nothing to enforce; but silence here
-    would be the "could not check, rendered as fine" collapse.
-    """
+    """UNKNOWN is not current and cannot authorize a graph operation."""
     monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r: "/mystery/graphify")
     monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r: "0.9.34")
     monkeypatch.setattr(graphify_env, "running_graphify_version", lambda _e: "")
 
-    graphify_env.assert_pinned_graphify(tmp_path)
+    with pytest.raises(SystemExit, match="REFUSING an unverified"):
+        graphify_env.assert_pinned_graphify(tmp_path)
 
-    assert "could not compare" in capsys.readouterr().err
+
+def test_gate_refuses_public_sdk_signature_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Matching CLI versions cannot hide an incompatible imported SDK."""
+    monkeypatch.setattr(graphify_env, "graphify_exe", lambda _r: "/pinned/graphify")
+    monkeypatch.setattr(graphify_env, "pinned_graphify_version", lambda _r: "0.9.41")
+    monkeypatch.setattr(graphify_env, "running_graphify_version", lambda _e: "0.9.41")
+    from kb_setup import graphify_sdk
+
+    def drift(_version: str) -> None:
+        raise RuntimeError("signature changed")
+
+    monkeypatch.setattr(graphify_sdk, "assert_public_sdk", drift)
+    with pytest.raises(RuntimeError, match="signature changed"):
+        graphify_env.assert_pinned_graphify(tmp_path)

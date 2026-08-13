@@ -27,7 +27,7 @@
 #   git ls-remote --tags --refs https://github.com/Graphify-Labs/graphify | grep v<version>
 # and re-run `mise run kb-build`.
 url = https://github.com/Graphify-Labs/graphify
-ref = v0.9.36
-commit = 3d19463484ebcf773b399ddad9fd3363b2ab3bff
+ref = v0.9.41
+commit = e4bfd2ad1a9393251023a4edef93e93dc798afc7
 kind = code
 added = 2026-07-21

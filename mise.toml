@@ -39,7 +39,7 @@ typos = "1.49.0"
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.36", extras = ["all"] }
+"pipx:graphifyy" = { version = "0.9.41", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
@@ -518,6 +518,32 @@ description = 'Query the graph: mise run kb-query -- "<q>" [--prose [--budget N]
 # REJECTED rather than ignored. `--top N` sets how many ranked hits print.
 run = "uv run kb-setup query"
 
+[tasks.kb-graphify-contract]
+description = "Fail closed unless pinned Graphify CLI and reviewed public SDK signatures agree"
+run = "uv run kb-setup graphify-contract"
+
+[tasks.kb-source-groups-check]
+description = "Validate the typed Graphify ecosystem source registry"
+usage = '''
+arg "[path]" help="Source-group TOML (defaults to sources/groups/graphify-ecosystem.toml)"
+'''
+run = "uv run kb-setup source-groups-check{% if usage.path is string %} {{ usage.path | quote }}{% endif %}"
+
+[tasks.kb-ecosystem-discovery-plan]
+description = "Emit bounded GitHub searches for Graphify consumers and alternatives"
+usage = '''
+arg "[alternatives]" var=#true help="Optional alternative technology names"
+'''
+run = "uv run kb-setup ecosystem-discovery-plan{% for alternative in usage.alternatives %} {{ alternative | quote }}{% endfor %}"
+
+[tasks.kb-source-groups-codegen]
+description = "Regenerate strict source-group msgspec models from JSON Schema"
+run = "uv run --group codegen python schemas/generate_source_groups.py"
+
+[tasks.kb-source-groups-codegen-check]
+description = "Fail if generated source-group models differ from the schema"
+run = "uv run --group codegen python -m schemas.check_source_groups_codegen"
+
 [tasks.kb-affected]
 description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
 # The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from
@@ -750,10 +776,22 @@ description = 'Await terminal checks + review receipt → SHA-pinned squash-merg
 run = "uv run kb-setup land"
 
 [tasks.kb-manifest-add]
-description = 'Pin a new repo source: mise run kb-manifest-add -- <url> [--ref R --kind K --name N --comment C --force]'
-# Resolves upstream HEAD via git ls-remote (no clone) + writes sources/<name>.manifest.
+description = 'Pin a new repo source: mise run kb-manifest-add -- <url> [--ref R --kind K --scope corpus|study --commit SHA --name N --comment C --force]'
+usage = '''
+arg "<url>" help="Repository URL to pin"
+flag "--ref <ref>" default="main" help="Branch or tag the commit must be reachable from"
+flag "--kind <kind>" default="code" help="Source content kind"
+flag "--scope <scope>" default="corpus" help="Graph partition for this source" {
+  choices "corpus" "study"
+}
+flag "--commit <commit>" help="Exact reviewed 40-hex commit (defaults to current ref HEAD)"
+flag "--name <name>" help="Manifest stem override"
+flag "--comment <comment>" help="Optional manifest comment"
+flag "--force" effect="destructive" help="Overwrite an existing manifest"
+'''
+# Defaults to upstream HEAD; --commit verifies and preserves an exact reviewed ancestor.
 # The reusable replacement for hand-writing a manifest. Logic in kb_setup.manifest.add.
-run = "uv run kb-setup manifest-add"
+run = '''uv run kb-setup manifest-add {{ usage.url | quote }} --ref {{ usage.ref | quote }} --kind {{ usage.kind | quote }} --scope {{ usage.scope | quote }}{% if usage.commit is string %} --commit {{ usage.commit | quote }}{% endif %}{% if usage.name is string %} --name {{ usage.name | quote }}{% endif %}{% if usage.comment is string %} --comment {{ usage.comment | quote }}{% endif %}{% if usage.force %} --force{% endif %}'''
 
 [tasks.kb-assemble]
 description = 'Validate + combine host-agent extraction chunks: mise run kb-assemble -- <name> <chunk.json>...'

@@ -5,10 +5,46 @@ Network-free: name_from_url is pure, and add()'s exists-guard fires BEFORE the
 `git ls-remote` in latest_commit, so the refuse-to-clobber path needs no network.
 """
 
+import os
 import re
+import subprocess
+from pathlib import Path
 
 import pytest
-from kb_setup import manifest
+from kb_setup import cli, manifest
+
+_GIT_TIMEOUT = 30
+
+
+def _git(repo: Path, *args: str) -> str:
+    proc = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=_GIT_TIMEOUT,
+    )
+    return proc.stdout.strip()
+
+
+def _upstream_with_reviewed_ancestor(tmp_path: Path) -> tuple[Path, str, str]:
+    upstream = tmp_path / "upstream"
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main", str(upstream)],
+        check=True,
+        timeout=_GIT_TIMEOUT,
+    )
+    _git(upstream, "config", "user.email", "t@example.com")
+    _git(upstream, "config", "user.name", "T")
+    _git(upstream, "config", "commit.gpgsign", "false")
+    source = upstream / "source.txt"
+    source.write_text("reviewed\n", encoding="utf-8")
+    _git(upstream, "add", "--", "source.txt")
+    _git(upstream, "commit", "-q", "-m", "reviewed")
+    reviewed = _git(upstream, "rev-parse", "HEAD")
+    source.write_text("unreviewed head\n", encoding="utf-8")
+    _git(upstream, "commit", "-q", "-am", "unreviewed")
+    return upstream, reviewed, _git(upstream, "rev-parse", "HEAD")
 
 
 def test_name_from_url_strips_git_and_trailing_slash() -> None:
@@ -26,6 +62,280 @@ def test_add_refuses_to_clobber_existing_manifest(tmp_path) -> None:
     with pytest.raises(FileExistsError):
         manifest.add(sources, manifest.NewSource("https://github.com/openai/symphony"))
     assert "deadbeef" in existing.read_text()
+
+
+def test_add_emits_corpus_scope_by_default(tmp_path, monkeypatch) -> None:
+    commit = "a" * 40
+    monkeypatch.setattr(manifest, "latest_commit", lambda _manifest: commit)
+
+    added = manifest.add(
+        tmp_path / "sources",
+        manifest.NewSource("https://github.com/openai/symphony"),
+    )
+
+    assert added.scope == "corpus"
+    assert "scope = corpus\n" in added.path.read_text(encoding="utf-8")
+
+
+def test_add_emits_study_scope_when_requested(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(manifest, "latest_commit", lambda _manifest: "b" * 40)
+
+    added = manifest.add(
+        tmp_path / "sources",
+        manifest.NewSource("https://github.com/example/peer", scope="study"),
+    )
+
+    assert added.scope == "study"
+    assert "scope = study\n" in added.path.read_text(encoding="utf-8")
+
+
+def test_add_rejects_quarantine_scope_before_network_or_write(tmp_path, monkeypatch) -> None:
+    def unexpected_network(_manifest: manifest.Manifest) -> str:
+        pytest.fail("invalid scope reached the network")
+
+    monkeypatch.setattr(manifest, "latest_commit", unexpected_network)
+    sources = tmp_path / "sources"
+
+    with pytest.raises(ValueError, match=r"scope.*corpus.*study"):
+        manifest.add(
+            sources,
+            manifest.NewSource("https://github.com/example/peer", scope="quarantine"),
+        )
+
+    assert not sources.exists()
+
+
+@pytest.mark.parametrize("commit", ["a" * 39, "a" * 41, "g" * 40, "", "a" * 20 + "Z" * 20])
+def test_add_rejects_malformed_explicit_commit_before_network_or_write(
+    tmp_path, monkeypatch, commit: str
+) -> None:
+    def unexpected_network(_manifest: manifest.Manifest) -> str:
+        pytest.fail("malformed commit reached the network")
+
+    monkeypatch.setattr(manifest, "latest_commit", unexpected_network)
+    sources = tmp_path / "sources"
+
+    with pytest.raises(ValueError, match="40 hexadecimal"):
+        manifest.add(
+            sources,
+            manifest.NewSource("https://github.com/example/peer", commit=commit),
+        )
+
+    assert not sources.exists()
+
+
+def test_add_pins_requested_reachable_commit_without_advancing_to_head(tmp_path) -> None:
+    upstream, reviewed, current_head = _upstream_with_reviewed_ancestor(tmp_path)
+    requested = reviewed.upper()
+
+    added = manifest.add(
+        tmp_path / "sources",
+        manifest.NewSource(str(upstream), commit=requested),
+    )
+
+    body = added.path.read_text(encoding="utf-8")
+    assert added.commit == requested
+    assert f"commit = {requested}\n" in body
+    assert current_head not in body
+    assert list((tmp_path / "sources").iterdir()) == [added.path]
+
+
+def test_add_rejects_well_formed_but_unfetchable_commit(tmp_path) -> None:
+    upstream, _reviewed, _current_head = _upstream_with_reviewed_ancestor(tmp_path)
+    sources = tmp_path / "sources"
+
+    with pytest.raises(RuntimeError, match="not reachable"):
+        manifest.add(
+            sources,
+            manifest.NewSource(str(upstream), commit="f" * 40),
+        )
+
+    assert not sources.exists()
+
+
+def test_add_rejects_commit_that_exists_only_on_another_ref(tmp_path) -> None:
+    upstream, reviewed, _current_head = _upstream_with_reviewed_ancestor(tmp_path)
+    _git(upstream, "checkout", "-q", "-b", "other", reviewed)
+    (upstream / "source.txt").write_text("other branch\n", encoding="utf-8")
+    _git(upstream, "commit", "-q", "-am", "other branch")
+    other_commit = _git(upstream, "rev-parse", "HEAD")
+    _git(upstream, "checkout", "-q", "main")
+    sources = tmp_path / "sources"
+
+    with pytest.raises(RuntimeError, match="not reachable from ref 'main'"):
+        manifest.add(
+            sources,
+            manifest.NewSource(str(upstream), ref="main", commit=other_commit),
+        )
+
+    assert not sources.exists()
+
+
+def test_cli_forwards_scope_and_exact_commit(tmp_path, monkeypatch) -> None:
+    requested = "A" * 40
+    seen: list[tuple[Path, manifest.NewSource, bool]] = []
+
+    def fake_add(
+        sources_dir: Path, source: manifest.NewSource, *, force: bool = False
+    ) -> manifest.Manifest:
+        seen.append((sources_dir, source, force))
+        return manifest.Manifest(
+            name=source.stem,
+            path=sources_dir / f"{source.stem}.manifest",
+            url=source.url,
+            ref=source.ref,
+            commit=source.commit or "",
+            kind=source.kind,
+            scope=source.scope,
+        )
+
+    monkeypatch.setattr(manifest, "add", fake_add)
+    monkeypatch.chdir(tmp_path)
+
+    assert (
+        cli.main(
+            [
+                "manifest-add",
+                "https://github.com/example/peer",
+                "--scope",
+                "study",
+                "--commit",
+                requested,
+                "--force",
+            ]
+        )
+        == 0
+    )
+    assert seen == [
+        (
+            tmp_path / "sources",
+            manifest.NewSource(
+                "https://github.com/example/peer",
+                scope="study",
+                commit=requested,
+            ),
+            True,
+        )
+    ]
+
+
+@pytest.mark.parametrize("scope", ["quarantine", ""])
+def test_cli_rejects_invalid_scope_without_network_or_write(
+    tmp_path, monkeypatch, capsys, scope: str
+) -> None:
+    def unexpected_network(_manifest: manifest.Manifest) -> str:
+        pytest.fail("invalid CLI scope reached the network")
+
+    monkeypatch.setattr(manifest, "latest_commit", unexpected_network)
+    monkeypatch.chdir(tmp_path)
+
+    assert (
+        cli.main(
+            [
+                "manifest-add",
+                "https://github.com/example/peer",
+                "--scope",
+                scope,
+            ]
+        )
+        == 1
+    )
+    assert "scope must be one of: corpus, study" in capsys.readouterr().err
+    assert not (tmp_path / "sources").exists()
+
+
+@pytest.mark.parametrize("flag", ["--scope", "--commit"])
+def test_cli_rejects_bare_value_flag_without_defaulting_to_head(
+    tmp_path, monkeypatch, capsys, flag: str
+) -> None:
+    def unexpected_network(_manifest: manifest.Manifest) -> str:
+        pytest.fail(f"bare {flag} reached the network")
+
+    monkeypatch.setattr(manifest, "latest_commit", unexpected_network)
+    monkeypatch.chdir(tmp_path)
+
+    assert cli.main(["manifest-add", "https://github.com/example/peer", flag]) == 2
+    assert f"{flag} requires a value" in capsys.readouterr().err
+    assert not (tmp_path / "sources").exists()
+
+
+def test_mise_manifest_add_help_declares_scope_and_commit_contract() -> None:
+    repo_root = Path(__file__).parents[1]
+    proc = subprocess.run(
+        ["mise", "run", "kb-manifest-add", "--help"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=_GIT_TIMEOUT,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "--scope <scope>" in proc.stdout
+    assert "corpus" in proc.stdout
+    assert "study" in proc.stdout
+    assert "--commit <commit>" in proc.stdout
+
+
+def test_mise_manifest_add_rejects_quarantine_before_running_cli() -> None:
+    repo_root = Path(__file__).parents[1]
+    proc = subprocess.run(
+        [
+            "mise",
+            "run",
+            "kb-manifest-add",
+            "--",
+            "https://example.invalid/peer",
+            "--scope",
+            "quarantine",
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=_GIT_TIMEOUT,
+    )
+
+    assert proc.returncode != 0
+    assert "Invalid choice for option scope: quarantine" in proc.stderr
+
+
+def test_mise_manifest_add_dry_run_forwards_all_typed_arguments() -> None:
+    repo_root = Path(__file__).parents[1]
+    requested = "A" * 40
+    proc = subprocess.run(
+        [
+            "mise",
+            "run",
+            "--dry-run",
+            "kb-manifest-add",
+            "--",
+            "https://github.com/example/peer",
+            "--scope",
+            "study",
+            "--commit",
+            requested,
+            "--name",
+            "peer-study",
+            "--comment",
+            "reviewed source",
+            "--force",
+        ],
+        cwd=repo_root,
+        env={**os.environ, "MISE_TASK_SHOW_FULL_CMD": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=_GIT_TIMEOUT,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    rendered = proc.stdout + proc.stderr
+    assert "--scope 'study'" in rendered
+    assert f"--commit '{requested}'" in rendered
+    assert "--name 'peer-study'" in rendered
+    assert "--comment 'reviewed source'" in rendered
+    assert rendered.rstrip().endswith("--force")
 
 
 def test_resolve_tag_wraps_subprocess_failures_as_runtime_error(monkeypatch) -> None:

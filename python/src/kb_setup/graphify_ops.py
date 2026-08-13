@@ -15,12 +15,18 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kb_setup import events, prose, stamps
-from kb_setup.graphify_env import clean_env, graphify_exe, graphify_python
+from kb_setup.graphify_env import (
+    assert_pinned_graphify,
+    clean_env,
+    graphify_exe,
+    graphify_python,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -608,6 +614,7 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
         return 2
     if wants_idf:
         return _idf_query(repo_root, rest)
+    assert_pinned_graphify(repo_root)
     if GRAPH_FLAG not in rest:
         graph = prose.prose_graph_path(repo_root) if wants_prose else _full_graph(repo_root)
         if not graph.is_file():
@@ -619,9 +626,44 @@ def query(repo_root: Path, args: Sequence[str]) -> int:
             )
             return 2
         rest = [*rest, "--graph", str(graph)]
-    return subprocess.run(
-        [graphify_exe(repo_root), "query", *rest], cwd=repo_root, env=clean_env(), check=False
-    ).returncode
+    return _run_graphify_query(repo_root, rest)
+
+
+def _run_graphify_query(repo_root: Path, args: Sequence[str]) -> int:
+    """Run a pinned query and refuse rc=0 output that declares lost coverage."""
+    proc = subprocess.run(
+        [graphify_exe(repo_root), "query", *args],
+        cwd=repo_root,
+        env=clean_env(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    stdout = proc.stdout or ""
+    stderr = proc.stderr or ""
+    if stdout:
+        print(stdout, end="")
+    if stderr:
+        print(stderr, end="", file=sys.stderr)
+    if proc.returncode != 0:
+        return proc.returncode
+    if "TRUNCATED" in stdout or "TRUNCATED" in stderr:
+        events.fail(
+            "query.truncated",
+            "[kb-query] Graphify returned an incomplete TRUNCATED result with rc=0. "
+            "Narrow the query or raise --budget; this prefix is not evidence of absence.",
+            coverage_reduced=True,
+        )
+        return 3
+    if stderr.strip():
+        events.fail(
+            "query.stderr_warning",
+            "[kb-query] Graphify emitted stderr while returning rc=0. The warning/error "
+            "must be investigated before this result can be used.",
+            coverage_reduced=True,
+        )
+        return 3
+    return 0
 
 
 def _full_graph(repo_root: Path) -> Path:

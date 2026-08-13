@@ -241,24 +241,22 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
     for a WRITER it is destroyed data, so the writer tasks call this and
     refuse (`SystemExit`) on a mismatch, naming both versions and the remedy.
 
-    Either side being unreadable is reported LOUDLY and not treated as a
-    mismatch: an unpinned repo has nothing to enforce, and an exe that cannot
-    answer `--version` will fail its real invocation with a better message
-    than this gate could synthesize. "Could not compare" is printed as itself
-    — never collapsed into either "current" or "drifted" (the currency
-    engine's DRIFT/SKIP/OK discipline, applied here).
+    Either side being unreadable is a refusal.  Proceeding after an UNKNOWN
+    comparison defeats the gate: it lets the exact unreviewed binary/API state
+    this function exists to prevent touch the graph.  The public SDK version
+    and reviewed function signatures are checked alongside the CLI so the two
+    installations cannot silently drift apart.
     """
     root = repo_root or Path.cwd()
     exe = graphify_exe(root)
     pinned = pinned_graphify_version(root)
     running = running_graphify_version(exe)
     if not pinned or not running:
-        print(
-            f"[graphify] version gate could not compare (pin={pinned or 'UNKNOWN'}, "
-            f"running={running or 'UNKNOWN'}, exe={exe}) — proceeding unverified",
-            file=sys.stderr,
+        raise SystemExit(
+            f"[graphify] REFUSING an unverified Graphify operation "
+            f"(pin={pinned or 'UNKNOWN'}, running={running or 'UNKNOWN'}, exe={exe}). "
+            "Restore the project pin and run `mise install`; UNKNOWN is not current."
         )
-        return
     if pinned != running:
         raise SystemExit(
             f"[graphify] REFUSING to write the graph with graphify {running} ({exe}) "
@@ -267,6 +265,9 @@ def assert_pinned_graphify(repo_root: Path | None = None) -> None:
             f"masked it is retired. Run `mise install`, then retry; "
             f"`mise run kb-currency-check` shows what is stale."
         )
+    from kb_setup.graphify_sdk import assert_public_sdk
+
+    assert_public_sdk(pinned)
 
 
 def _imports_graphify(py: Path) -> bool:

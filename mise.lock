@@ -1594,7 +1594,7 @@ url = "https://github.com/jdx/hk/releases/download/v1.54.1/hk-x86_64-pc-windows-
 url_api = "https://api.github.com/repos/jdx/hk/releases/assets/505018165"
 
 [[tools."pipx:graphifyy"]]
-version = "0.9.36"
+version = "0.9.41"
 backend = "pipx:graphifyy"
 
 [tools."pipx:graphifyy".options]

@@ -7,9 +7,14 @@ committed graph outputs make the KB reproducible without vendoring source.
 
 from __future__ import annotations
 
+import re
 import subprocess
+import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
+
+_SOURCE_SCOPES = frozenset({"corpus", "study"})
+_FULL_COMMIT = re.compile(r"[0-9a-fA-F]{40}")
 
 
 @dataclass(frozen=True)
@@ -86,6 +91,40 @@ def latest_commit(m: Manifest) -> str:
     if not out:
         raise RuntimeError(f"{m.name}: ref {m.ref!r} not found at {m.url}")
     return out.split()[0]
+
+
+def _verify_commit_reachable(m: Manifest, commit: str) -> None:
+    """Prove ``commit`` is a commit reachable from ``m.ref`` in an ephemeral repo."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="kb-manifest-verify-") as tmp:
+            repo = Path(tmp) / "source.git"
+            subprocess.run(
+                ["git", "init", "--bare", "-q", str(repo)],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=60,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "fetch", "--no-tags", "--force", m.url, m.ref],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=60,
+            )
+            reachable = subprocess.run(
+                ["git", "-C", str(repo), "merge-base", "--is-ancestor", commit, "FETCH_HEAD"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        msg = f"{m.name}: could not verify commit {commit} at {m.url} ref {m.ref!r}: {e}"
+        raise RuntimeError(msg) from e
+    if reachable.returncode != 0:
+        msg = f"{m.name}: commit {commit} is not reachable from ref {m.ref!r} at {m.url}"
+        raise RuntimeError(msg)
 
 
 def write_commit(m: Manifest, commit: str) -> Manifest:
@@ -184,7 +223,7 @@ def name_from_url(url: str) -> str:
 
 @dataclass(frozen=True)
 class NewSource:
-    """A repo source to pin: url (required) + optional ref/kind/name/comment.
+    """Inputs for a generated repo manifest, including optional scope and exact commit.
 
     Bundled so `add()` stays a small (sources_dir, source, *, force) call. `name`
     defaults to the URL's last path segment; set it to disambiguate two repos that
@@ -196,6 +235,8 @@ class NewSource:
     kind: str = "code"
     name: str | None = None
     comment: str | None = None
+    scope: str = "corpus"
+    commit: str | None = None
 
     @property
     def stem(self) -> str:
@@ -204,30 +245,52 @@ class NewSource:
 
 
 def add(sources_dir: Path, source: NewSource, *, force: bool = False) -> Manifest:
-    """Create `sources/<stem>.manifest` for a new repo, SHA-pinned at upstream HEAD.
+    """Create `sources/<stem>.manifest` pinned at ref HEAD or an exact reviewed commit.
 
-    The reusable replacement for hand-writing a manifest: resolve the pinned commit
-    via `latest_commit` (a `git ls-remote`, no clone — same path `kb-update` uses),
-    then write the file. Raises `FileExistsError` if the manifest already exists
-    unless `force` (so re-adds don't silently clobber a deliberately-pinned SHA —
-    advance an existing source with `kb-update`).
+    With no explicit commit, resolve the pin via `latest_commit` (the same
+    `git ls-remote` path `kb-update` uses). An explicit commit is verified in a
+    temporary bare repository as an ancestor of the declared ref and preserved
+    exactly rather than advanced to ref HEAD. Raises `FileExistsError` when the
+    manifest exists unless `force`.
     """
+    if source.scope not in _SOURCE_SCOPES:
+        allowed = ", ".join(sorted(_SOURCE_SCOPES))
+        raise ValueError(f"scope must be one of: {allowed}; got {source.scope!r}")
+    if source.commit is not None and _FULL_COMMIT.fullmatch(source.commit) is None:
+        raise ValueError(f"commit must be exactly 40 hexadecimal characters; got {source.commit!r}")
+
     stem = source.stem
     path = sources_dir / f"{stem}.manifest"
     if path.exists() and not force:
         raise FileExistsError(f"{path} already exists (use kb-update to advance, or --force)")
     probe = Manifest(
-        name=stem, path=path, url=source.url, ref=source.ref, commit="", kind=source.kind
+        name=stem,
+        path=path,
+        url=source.url,
+        ref=source.ref,
+        commit="",
+        kind=source.kind,
+        scope=source.scope,
     )
-    commit = latest_commit(probe)
+    if source.commit is None:
+        commit = latest_commit(probe)
+    else:
+        _verify_commit_reachable(probe, source.commit)
+        commit = source.commit
     header = "# Source manifest — reproducible-by-reference (Invariant 3)."
     body = f"# {source.comment}\n" if source.comment else ""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         f"{header}\n{body}url = {source.url}\nref = {source.ref}\n"
-        f"commit = {commit}\nkind = {source.kind}\n",
+        f"commit = {commit}\nkind = {source.kind}\nscope = {source.scope}\n",
         encoding="utf-8",
     )
     return Manifest(
-        name=stem, path=path, url=source.url, ref=source.ref, commit=commit, kind=source.kind
+        name=stem,
+        path=path,
+        url=source.url,
+        ref=source.ref,
+        commit=commit,
+        kind=source.kind,
+        scope=source.scope,
     )
