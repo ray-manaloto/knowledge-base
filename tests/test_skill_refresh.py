@@ -16,6 +16,7 @@ deliberately do not re-test repair, backups, or the installer contract.
 from __future__ import annotations
 
 import subprocess
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,19 @@ def test_a_clean_refresh_exits_zero(tmp_path, monkeypatch) -> None:
     """CONTROL ARM for every non-zero arm below."""
     _wire(monkeypatch, skill.SkillResult(ran=True, note="ok"))
     assert skill_refresh.refresh(tmp_path) == 0
+
+
+def test_codex_bundle_is_project_scoped_and_version_bound(tmp_path: Path) -> None:
+    """Codex gets reviewed project commands without installer side effects."""
+    skill_refresh._sync_codex_skill(tmp_path)
+
+    target = tmp_path / ".agents/skills/graphify"
+    assert (target / "SKILL.md").read_text(encoding="utf-8") == skill_refresh._CODEX_SKILL
+    assert (target / ".graphify_version").read_text(encoding="utf-8") == (
+        f"{distribution_version('graphifyy')}\n"
+    )
+    assert not (tmp_path / "AGENTS.md").exists()
+    assert not (tmp_path / ".codex").exists()
 
 
 def test_a_stale_binary_is_refused_before_anything_runs(tmp_path, monkeypatch) -> None:

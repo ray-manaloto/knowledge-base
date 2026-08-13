@@ -387,7 +387,7 @@ def approve_metadata_zero_node_warning(
     stderr: str,
     inventory: tuple[ExpectedMetadataOnly, ...],
 ) -> tuple[str, ...]:
-    """Approve only the exact 0.9.41 warning backed by reviewed path/bytes/disposition."""
+    """Approve only the reviewed warning backed by exact path/bytes/disposition."""
     if not inventory or any(item.source_name != source_name for item in inventory):
         return ()
     valid = True

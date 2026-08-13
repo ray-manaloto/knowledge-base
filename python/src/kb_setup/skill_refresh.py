@@ -29,6 +29,10 @@ What lives here rather than there, and why:
 
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 from subprocess import run
 
@@ -45,6 +49,87 @@ from kb_setup import events, graphify_env
 #: The tool whose skill this task refreshes. `currency.skill` is generic over
 #: `ToolSpec`; this task is not, because the version gate above is graphify's.
 _TOOL = "graphify"
+
+_CODEX_SKILL_DIR = Path(".agents/skills/graphify")
+
+_CODEX_SKILL = """---
+name: graphify
+description: Query and maintain this repository's provenance-bound Graphify knowledge graph.
+---
+
+# Graphify in knowledge-base
+
+Use the repository's reviewed tasks. Do not invoke a global Graphify binary, the
+upstream installer, or a raw source search before attempting the graph.
+
+## Before reading source
+
+1. Run `mise run kb-query -- "<question>"`.
+2. Treat missing, stale, corrupt, warning-bearing, or truncated graph evidence as
+   unavailable, never as an empty or complete answer.
+3. If the graph is unavailable, say so and use source only as the fallback
+   authority. Use `mise run kb-build` to reproduce the graph when the task
+   authorizes a build.
+
+## Supported operations
+
+- Query: `mise run kb-query -- "<question>"`
+- Reverse impact: `mise run kb-affected -- "<symbol>"`
+- Rebuild committed inputs: `mise run kb-build`
+- Advance one reviewed source: `mise run kb-update -- <source>`
+- Verify the installed SDK boundary: `mise run kb-graphify-contract`
+- Refresh Graphify skills after a version change: `mise run kb-skill-refresh`
+
+Never hide Graphify stderr, warnings, truncation, source omissions, or receipt
+failures. Never treat a queued build or an existing `graphify-out/graph.json` as
+proof that the graph is current. Cite graph source locations when an answer uses
+graph evidence.
+
+Detailed upstream workflows remain in the generated Claude reference tree under
+`.claude/skills/graphify/references/`; repository tasks and rules take precedence.
+"""
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _sync_codex_skill(repo_root: Path) -> None:
+    """Publish the reviewed project Codex skill without installer side effects."""
+    target = repo_root / _CODEX_SKILL_DIR
+    target.parent.mkdir(parents=True, exist_ok=True)
+    backup = target.with_name(f".{target.name}.backup-{os.getpid()}")
+    if backup.exists() or backup.is_symlink():
+        raise RuntimeError(f"Codex skill recovery path already exists: {backup}")
+
+    with tempfile.TemporaryDirectory(prefix=".graphify-codex-", dir=target.parent) as raw_stage:
+        stage = Path(raw_stage)
+        (stage / "SKILL.md").write_text(_CODEX_SKILL, encoding="utf-8")
+        version = distribution_version("graphifyy")
+        if not version:
+            raise RuntimeError("could not read the installed Graphify version")
+        (stage / ".graphify_version").write_text(f"{version}\n", encoding="utf-8")
+
+        replaced = target.exists()
+        if replaced:
+            target.replace(backup)
+        try:
+            stage.replace(target)
+            _fsync_directory(target.parent)
+        except BaseException:
+            if target.exists():
+                shutil.rmtree(target)
+            if replaced:
+                backup.replace(target)
+                _fsync_directory(target.parent)
+            raise
+        if replaced:
+            shutil.rmtree(backup)
+            _fsync_directory(target.parent)
 
 
 def refresh(repo_root: Path | None = None) -> int:
@@ -98,6 +183,16 @@ def refresh(repo_root: Path | None = None) -> int:
     if not result.ran:
         return 1
 
+    try:
+        _sync_codex_skill(root)
+    except (OSError, RuntimeError) as exc:
+        events.say(
+            "skill_refresh.codex_failed",
+            f"[skill-refresh] Codex bundle FAILED: {type(exc).__name__}",
+            error_type=type(exc).__name__,
+        )
+        return 1
+
     # After the addenda, so their bytes are formatted too. This is the
     # print -> subprocess -> print shape that recipe rule 3 could not absorb
     # before the sink existed: the operator must see "fmt" START, because it is
@@ -114,7 +209,7 @@ def refresh(repo_root: Path | None = None) -> int:
 
     events.say(
         "skill_refresh.review",
-        "[skill-refresh] review `git diff .claude/` before committing",
+        "[skill-refresh] review `git diff .claude/ .agents/` before committing",
     )
     # TWO conditions fail an otherwise-successful refresh, and the line above is
     # why both must: it tells the operator to go commit.
