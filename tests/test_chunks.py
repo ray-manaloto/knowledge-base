@@ -338,6 +338,7 @@ def test_kb_build_refuses_a_chunk_that_fails_validation(monkeypatch, tmp_path) -
             pytest.fail(f"build() merged an invalid chunk instead of refusing: {joined}")
 
     monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
+    monkeypatch.setattr(graph, "_required_input_fingerprints", lambda _root: {})
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
     monkeypatch.setattr(graph, "_detect_preflight", lambda _manifests: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)

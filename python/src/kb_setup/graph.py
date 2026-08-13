@@ -42,6 +42,7 @@ from kb_setup.graphify_env import (
     clean_env,
     graphify_exe,
     graphify_python,
+    pinned_graphify_version,
 )
 
 if TYPE_CHECKING:
@@ -93,6 +94,22 @@ class DetectionCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=
     sources: tuple[SourceCensusReceipt, ...] = ()
 
 
+class GraphifyBuildReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Content-bound proof that a complete build produced the current graph."""
+
+    schema_version: int
+    status: str
+    runtime_version: str
+    graph_sha256: str
+    graph_bytes: int
+    node_count: int
+    edge_count: int
+    hyperedge_count: int
+    input_fingerprints_sha256: str
+    recorded_at_ns: int
+    warnings: tuple[str, ...] = ()
+
+
 class SourceGitProvenance(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Manifest declaration and independently observed clone identities."""
 
@@ -104,6 +121,7 @@ class SourceGitProvenance(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
+_BUILD_RECEIPT_NAME = "build-receipt.json"
 
 _EXPECTED_UNCLASSIFIED = (
     graphify_health.ExpectedUnclassifiedFile(
@@ -162,7 +180,27 @@ _GRAPH_MODE = 0o644
 def _run(cmd: list[str], cwd: Path) -> None:
     print(f"  $ {' '.join(cmd)}")
     # clean_env: no non-Claude provider key reaches graphify (Claude-Code-only).
-    subprocess.run(cmd, cwd=cwd, check=True, env=clean_env())
+    result = subprocess.run(
+        cmd,
+        cwd=cwd,
+        check=False,
+        env=clean_env(),
+        capture_output=True,
+    )
+    if result.stdout:
+        sys.stdout.buffer.write(result.stdout)
+        sys.stdout.buffer.flush()
+    if result.stderr:
+        sys.stderr.buffer.write(result.stderr)
+        sys.stderr.buffer.flush()
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(result.returncode, cmd)
+    if result.stderr:
+        digest = hashlib.sha256(result.stderr).hexdigest()
+        raise SystemExit(
+            "[graphify] refusing warning-bearing subprocess success "
+            f"(stderr_bytes={len(result.stderr)}, stderr_sha256={digest})"
+        )
 
 
 def _ensure_clone(m: mf.Manifest) -> None:
@@ -1940,6 +1978,7 @@ def refresh_self(repo_root: Path) -> None:
     # only remaining chance to read what it is about to delete. See
     # `_held_stamp`'s own docstring (#175 cold review round 2, NEW-1).
     held_stamp = _held_stamp(repo_root)
+    refresh_build_receipt = _current_build_receipt_matches(repo_root, held_stamp)
     _recompose_into_temp(repo_root, real_out, [*corpus_leaves, *self_subgraphs], replay)
 
     label_rc = graphify_ops.label(repo_root)
@@ -1959,6 +1998,12 @@ def refresh_self(repo_root: Path) -> None:
     )
     _reset_merged_chunks(repo_root, tag="kb-watch")
     _restamp_self(repo_root, held_stamp)
+    if refresh_build_receipt and held_stamp is not None:
+        _write_build_receipt(
+            repo_root,
+            runtime_version=held_stamp.version,
+            inputs=held_stamp.inputs,
+        )
     print("[kb-watch] done — graphify-out/graph.json recomposed from recorded inputs")
 
 
@@ -2089,7 +2134,7 @@ def build(repo_root: Path) -> None:
     # produced exactly the false green the comment claimed to prevent. Keep this
     # line at the top of the function; nothing above it may touch `sources/`.
     # (Cold lane, round 1.)
-    inputs = _input_fingerprints(repo_root)
+    inputs = _required_input_fingerprints(repo_root)
 
     manifests = mf.load_all(sources)
     if not manifests:
@@ -2258,7 +2303,7 @@ def build(repo_root: Path) -> None:
     )
     _reset_merged_chunks(repo_root)
 
-    _stamp_build(repo_root, inputs)
+    _finalize_build_receipts(repo_root, inputs)
     print("[kb-build] done — graphify-out/graph.json + graph-prose.json reproduced")
 
 
@@ -2282,6 +2327,14 @@ def _clear_stamp(repo_root: Path, *, tag: str = "kb-build") -> None:
     bookkeeping is not misreported as `kb-build`'s (#175 cold review,
     finding 9).
     """
+    receipt_path = repo_root / "graphify-out" / _BUILD_RECEIPT_NAME
+    try:
+        if receipt_path.exists():
+            receipt_path.unlink()
+            print(f"[{tag}] cleared {receipt_path.name} — it is rewritten only on success")
+    except OSError as e:
+        raise SystemExit(f"[{tag}] could not clear {receipt_path.name}: {e}") from e
+
     try:
         from kb_setup.currency import sync
 
@@ -2316,7 +2369,17 @@ def _input_fingerprints(repo_root: Path) -> dict[str, str] | None:
         return None
 
 
-def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
+def _required_input_fingerprints(repo_root: Path) -> dict[str, str]:
+    """Return complete input evidence or refuse before any build input is read."""
+    inputs = _input_fingerprints(repo_root)
+    if inputs is None:
+        raise SystemExit(
+            "[kb-build] corpus input fingerprints are unavailable — refusing an unverifiable build"
+        )
+    return inputs
+
+
+def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> str:
     """Record which graphify version built these artifacts (currency step 1).
 
     graphify stamps nothing itself — `export.to_json()` writes only
@@ -2338,7 +2401,7 @@ def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
 
         spec = _currency_spec(repo_root)
         if spec is None:
-            return
+            return ""
         # NO fallback to the pin. Falling back would stamp the version we HOPED
         # ran, turning an unreadable binary into a false "in sync" — the exact
         # laundering this stamp exists to prevent. An empty version is written
@@ -2351,7 +2414,7 @@ def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
         # to a TOOL name — unreachable in the normal case and, for a config
         # setting `binary` to anything else, a silent fall back to the
         # PATH-resolved reading this exists to eliminate.
-        version = sync.observed_version(graphify_exe(repo_root))
+        version = _strict_graphify_version(repo_root)
         source_ref = sync.manifest_ref(repo_root, spec)
         path = sync.write_stamp(
             repo_root, spec, version=version, source_ref=source_ref, inputs=inputs
@@ -2366,6 +2429,122 @@ def _stamp_build(repo_root: Path, inputs: dict[str, str] | None = None) -> None:
             )
     except (OSError, ValueError, ImportError) as e:
         print(f"[kb-build] WARNING: could not write the currency stamp: {e}")
+        return ""
+    return version
+
+
+def _strict_graphify_version(repo_root: Path) -> str:
+    """Observe the builder executable without accepting warning-bearing output."""
+    exe = graphify_exe(repo_root)
+    try:
+        result = subprocess.run(
+            [exe, "--version"],
+            cwd=repo_root,
+            check=False,
+            env=clean_env(),
+            capture_output=True,
+        )
+    except OSError, subprocess.SubprocessError:
+        return ""
+    if result.returncode != 0 or result.stderr:
+        return ""
+    match = re.search(rb"\b(\d+\.\d+\.\d+(?:\.\d+)?)\b", result.stdout)
+    return match.group(1).decode() if match else ""
+
+
+def _write_build_receipt(
+    repo_root: Path,
+    *,
+    runtime_version: str,
+    inputs: dict[str, str] | None,
+) -> Path:
+    """Atomically bind a successful build to exact graph, runtime, and input bytes."""
+    pinned = pinned_graphify_version(repo_root)
+    if not runtime_version or not pinned or runtime_version != pinned:
+        raise SystemExit(
+            "[kb-build] refusing build receipt with Graphify version drift "
+            f"(pin={pinned or 'UNKNOWN'}, runtime={runtime_version or 'UNKNOWN'})"
+        )
+    if inputs is None:
+        raise SystemExit("[kb-build] refusing build receipt without corpus input fingerprints")
+
+    graph_path = repo_root / "graphify-out" / "graph.json"
+    try:
+        graph_bytes = graph_path.read_bytes()
+        payload = json.loads(graph_bytes)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise SystemExit(f"[kb-build] refusing build receipt for unreadable graph.json: {e}") from e
+    if not isinstance(payload, dict):
+        raise SystemExit("[kb-build] refusing build receipt: graph.json root is not an object")
+    collections: dict[str, list[object]] = {}
+    for field in ("nodes", "edges", "hyperedges"):
+        value = payload.get(field)
+        if not isinstance(value, list):
+            raise SystemExit(
+                f"[kb-build] refusing build receipt: graph field {field!r} is not an array"
+            )
+        collections[field] = value
+
+    receipt = GraphifyBuildReceipt(
+        schema_version=1,
+        status="complete",
+        runtime_version=runtime_version,
+        graph_sha256=hashlib.sha256(graph_bytes).hexdigest(),
+        graph_bytes=len(graph_bytes),
+        node_count=len(collections["nodes"]),
+        edge_count=len(collections["edges"]),
+        hyperedge_count=len(collections["hyperedges"]),
+        input_fingerprints_sha256=_input_map_sha256(inputs),
+        recorded_at_ns=time.time_ns(),
+    )
+    path = graph_path.with_name(_BUILD_RECEIPT_NAME)
+    atomic.write_text(path, msgspec.json.encode(receipt).decode() + "\n")
+    print(f"[kb-build] wrote {path.name}: sha256={receipt.graph_sha256}")
+    return path
+
+
+def _input_map_sha256(inputs: dict[str, str]) -> str:
+    """Hash an input map with the same canonical encoding used in receipts."""
+    encoded = json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _current_build_receipt_matches(repo_root: Path, held: _HeldStamp | None) -> bool:
+    """Return whether kb-watch may honestly carry a prior build receipt forward."""
+    if held is None or held.inputs is None:
+        return False
+    graph_path = repo_root / "graphify-out" / "graph.json"
+    receipt_path = graph_path.with_name(_BUILD_RECEIPT_NAME)
+    try:
+        graph_bytes = graph_path.read_bytes()
+        payload = json.loads(graph_bytes)
+        receipt = msgspec.json.decode(receipt_path.read_bytes(), type=GraphifyBuildReceipt)
+    except OSError, json.JSONDecodeError, UnicodeDecodeError, msgspec.DecodeError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    collections = tuple(payload.get(field) for field in ("nodes", "edges", "hyperedges"))
+    if not all(isinstance(value, list) for value in collections):
+        return False
+    nodes, edges, hyperedges = collections
+    return (
+        receipt.schema_version == 1
+        and receipt.status == "complete"
+        and receipt.warnings == ()
+        and receipt.runtime_version == held.version
+        and receipt.graph_sha256 == hashlib.sha256(graph_bytes).hexdigest()
+        and receipt.graph_bytes == len(graph_bytes)
+        and receipt.node_count == len(nodes)
+        and receipt.edge_count == len(edges)
+        and receipt.hyperedge_count == len(hyperedges)
+        and receipt.input_fingerprints_sha256 == _input_map_sha256(held.inputs)
+    )
+
+
+def _finalize_build_receipts(repo_root: Path, inputs: dict[str, str]) -> None:
+    """Write both compatible build receipts only after the graph is complete."""
+    runtime_version = _stamp_build(repo_root, inputs)
+    _write_build_receipt(repo_root, runtime_version=runtime_version, inputs=inputs)
 
 
 @dataclass(frozen=True)

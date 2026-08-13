@@ -51,7 +51,7 @@ def test_the_stamp_reads_the_binary_the_build_ran(
 
     from kb_setup.currency import sync
 
-    monkeypatch.setattr(sync, "observed_version", _observed)
+    monkeypatch.setattr(graph, "_strict_graphify_version", lambda _root: _observed(_PINNED_EXE))
     monkeypatch.setattr(sync, "manifest_ref", lambda *_a, **_k: None)
     written: dict[str, str | None] = {}
     monkeypatch.setattr(
@@ -117,7 +117,9 @@ def test_a_config_without_graphify_stamps_nothing_at_all(
 
     calls: list[str] = []
     monkeypatch.setattr(graph, "graphify_exe", lambda _root: _PINNED_EXE)
-    monkeypatch.setattr(sync, "observed_version", lambda b: calls.append(b) or "")
+    monkeypatch.setattr(
+        graph, "_strict_graphify_version", lambda _root: calls.append(_PINNED_EXE) or ""
+    )
     monkeypatch.setattr(sync, "write_stamp", lambda *_a, **_k: calls.append("WROTE"))
 
     graph._stamp_build(tmp_path)
@@ -138,7 +140,11 @@ def test_the_selector_does_reach_the_stamp_for_graphify(
 
     calls: list[str] = []
     monkeypatch.setattr(graph, "graphify_exe", lambda _root: _PINNED_EXE)
-    monkeypatch.setattr(sync, "observed_version", lambda b: calls.append(b) or "0.9.26")
+    monkeypatch.setattr(
+        graph,
+        "_strict_graphify_version",
+        lambda _root: calls.append(_PINNED_EXE) or "0.9.26",
+    )
     monkeypatch.setattr(sync, "manifest_ref", lambda *_a, **_k: None)
     monkeypatch.setattr(sync, "write_stamp", lambda *_a, **_k: Path("stamp.json"))
 
