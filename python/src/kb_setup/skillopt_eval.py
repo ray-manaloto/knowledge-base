@@ -1,8 +1,9 @@
 # Copyright (c) 2026 Raymond Manaloto
-"""Controlled held-out evaluation and manual adoption eligibility for SkillOpt."""
+"""Mock-only held-out contract checks with no adoption authority for SkillOpt."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -27,8 +28,12 @@ from kb_setup.skillopt_reviewed import (
 )
 
 _EVAL_BACKENDS = frozenset({"mock"})
-_HISTORICAL_REGISTRY_SHA256 = "bb0dce658177e1018acc5ecd7b5ef2071eae24c6567f47c039151ec9732a78ae"
-_HISTORICAL_TASK_COUNT = 6
+_EXTERNAL_PROVENANCE_SHA256 = "958b45376a58a7e07ef0e9500bb6e2f9c60a31f538190f01826c57340d0a5e67"
+_DOTFILES_PUBLICATION_COMMIT = "49117bd5874e39ebbb4a59a0b6fd4b762f9dcc2e"
+_DOTFILES_PUBLICATION_TREE = "ef8af4ad3c39261712f5aa8f414e6123a9854df0"
+_EXTERNAL_TASK_COUNT = 6
+_EXTERNAL_MUTATION_COUNT = 3
+_HARNESSES_PER_MUTATION = 2
 _HARNESSES = frozenset({"agents", "claude"})
 _SPLITS = frozenset({"train", "val", "test"})
 _RUN_LIMIT = 3
@@ -90,6 +95,8 @@ class EvalCorpus:
     seed: int
     runs: int
     materialized_at_epoch: int
+    external_mutation_provenance: bool
+    external_publication_commit: str
     historical_authority: bool
 
 
@@ -140,6 +147,10 @@ class EvaluationReceipt:
     test_task_manifest_sha256: str
     scores: tuple[HarnessScore, ...]
     warnings: tuple[str, ...]
+    external_mutation_provenance: bool
+    external_publication_commit: str
+    source_not_historical_execution: bool
+    source_adoption_eligible: bool
     historical_authority: bool
     certification: str
 
@@ -202,7 +213,7 @@ def load_eval_corpus(
             "materialized_at_epoch",
             "neutral_spec",
             "baseline_skill",
-            "historical_registry_sha256",
+            "external_mutation_provenance_sha256",
             "tasks",
         },
     )
@@ -224,11 +235,15 @@ def load_eval_corpus(
         raise ReviewedLedgerError("evaluation manifest has no tasks")
     tasks = tuple(_eval_task(value) for value in values)
     _validate_partitions(tasks)
-    registry_path = repo_root / "skillopt/evaluation/historical-task-authority.json"
-    registry_raw, registry_value = _json(registry_path, label="historical task registry")
-    registry_sha = _sha(registry_raw)
-    historical_authority = _historical_authority(
-        registry_value, registry_sha, manifest["historical_registry_sha256"], tasks
+    provenance_path = repo_root / "skillopt/evaluation/external-mutation-provenance.json"
+    provenance_raw, provenance_value = _json(provenance_path, label="external mutation provenance")
+    provenance_sha = _sha(provenance_raw)
+    external_provenance, publication_commit = _external_mutation_provenance(
+        repo_root,
+        provenance_value,
+        provenance_sha,
+        manifest["external_mutation_provenance_sha256"],
+        tasks,
     )
     receipt_path = manifest_path.with_suffix(".receipt.json")
     receipt_raw, receipt_value = _json(receipt_path, label="evaluation authority receipt")
@@ -244,7 +259,7 @@ def load_eval_corpus(
             "spec_sha256",
             "baseline_sha256",
             "generation_receipt_sha256",
-            "historical_registry_sha256",
+            "external_mutation_provenance_sha256",
         },
     )
     valid = (
@@ -253,7 +268,7 @@ def load_eval_corpus(
         and receipt["manifest_sha256"] == _sha(raw)
         and receipt["spec_sha256"] == spec[1]
         and receipt["baseline_sha256"] == baseline[1]
-        and receipt["historical_registry_sha256"] == registry_sha
+        and receipt["external_mutation_provenance_sha256"] == provenance_sha
     )
     if not valid:
         raise ReviewedLedgerError("evaluation authority receipt does not bind inputs")
@@ -271,42 +286,273 @@ def load_eval_corpus(
         seed,
         runs,
         materialized,
-        historical_authority,
+        external_provenance,
+        publication_commit,
+        historical_authority=False,
     )
 
 
-def _historical_authority(
-    value: dict[str, Any], actual_sha: str, claimed_sha: object, tasks: tuple[EvalTask, ...]
-) -> bool:
-    registry = _object(value, label="historical task registry", keys={"format", "entries"})
-    entries = registry["entries"]
+def _git_blob(raw: bytes) -> str:
+    return hashlib.sha1(f"blob {len(raw)}\0".encode() + raw, usedforsecurity=False).hexdigest()
+
+
+def _external_mutation_provenance(
+    repo_root: Path,
+    value: dict[str, Any],
+    actual_sha: str,
+    claimed_sha: object,
+    tasks: tuple[EvalTask, ...],
+) -> tuple[bool, str]:
+    """Verify exact dotfiles replay bytes without granting historical/adoption authority."""
+    registry = _object(
+        value,
+        label="external mutation provenance",
+        keys={
+            "format",
+            "historical_authority",
+            "source_adoption_eligible",
+            "publication",
+            "task_bindings",
+        },
+    )
+    bindings = registry["task_bindings"]
     if (
-        registry["format"] != "kb.skillopt.historical-task-authority.v1"
-        or actual_sha != _HISTORICAL_REGISTRY_SHA256
+        registry["format"] != "kb.skillopt.external-mutation-provenance.v1"
+        or registry["historical_authority"] is not False
+        or registry["source_adoption_eligible"] is not False
+        or actual_sha != _EXTERNAL_PROVENANCE_SHA256
         or claimed_sha != actual_sha
-        or not isinstance(entries, list)
-        or len(entries) != _HISTORICAL_TASK_COUNT
+        or not isinstance(bindings, list)
+        or len(bindings) != _EXTERNAL_TASK_COUNT
     ):
-        raise ReviewedLedgerError("historical task authority is not project-reviewed")
+        raise ReviewedLedgerError("external mutation provenance is not exact")
+    identities, publication_commit = _verify_dotfiles_publication(
+        repo_root, registry["publication"]
+    )
     expected: list[EvalTask] = []
-    commits: set[str] = set()
-    for item in entries:
-        entry = _object(
+    bound_identities: list[str] = []
+    for item in bindings:
+        binding = _object(
             item,
-            label="historical task authority entry",
-            keys={"commit", "issue", "mutation", "task", "test_ref"},
+            label="external mutation task binding",
+            keys={"mutation_identity", "task"},
         )
-        commits.add(_text(entry["commit"], label="historical fix commit"))
-        _eval_text(entry["issue"], label="historical issue")
-        _eval_text(entry["mutation"], label="historical harmful mutation")
-        _text(entry["test_ref"], label="historical test reference", pattern=_RELATIVE_PATH)
-        expected.append(_eval_task(entry["task"]))
-    if commits != {"9ad8958", "8afffede", "4773dc0"}:
-        raise ReviewedLedgerError("historical fix inventory is incomplete")
-    actual = tuple(task for task in tasks if task.split == "test")
-    if actual != tuple(expected):
-        raise ReviewedLedgerError("evaluation tasks do not match historical authority")
-    return True
+        bound_identities.append(
+            _text(binding["mutation_identity"], label="external mutation identity")
+        )
+        expected.append(_eval_task(binding["task"]))
+    if set(bound_identities) != identities or any(
+        bound_identities.count(identity) != _HARNESSES_PER_MUTATION for identity in identities
+    ):
+        raise ReviewedLedgerError("external mutation task binding inventory is incomplete")
+    if tuple(task for task in tasks if task.split == "test") != tuple(expected):
+        raise ReviewedLedgerError("evaluation tasks do not match external mutation bindings")
+    return True, publication_commit
+
+
+def _vendored_source(
+    repo_root: Path, source_path: object, expected_sha: object, expected_blob: object
+) -> tuple[bytes, dict[str, Any]]:
+    relative = _text(source_path, label="dotfiles provenance path", pattern=_RELATIVE_PATH)
+    path = repo_root / "skillopt/evaluation/dotfiles-provenance" / Path(relative).name
+    raw, value = _json(path, label="vendored dotfiles provenance")
+    if _sha(raw) != expected_sha or _git_blob(raw) != expected_blob:
+        raise ReviewedLedgerError("vendored dotfiles provenance bytes do not match publication")
+    return raw, value
+
+
+def _verify_dotfiles_publication(repo_root: Path, value: object) -> tuple[set[str], str]:
+    publication = _object(
+        value,
+        label="dotfiles provenance publication",
+        keys={
+            "repository",
+            "commit",
+            "tree",
+            "manifest_path",
+            "manifest_git_blob",
+            "manifest_sha256",
+            "digest_path",
+            "digest_git_blob",
+            "receipts",
+        },
+    )
+    commit = _text(publication["commit"], label="dotfiles publication commit")
+    if (
+        publication["repository"] != "ray-manaloto/dotfiles"
+        or commit != _DOTFILES_PUBLICATION_COMMIT
+        or publication["tree"] != _DOTFILES_PUBLICATION_TREE
+    ):
+        raise ReviewedLedgerError("dotfiles provenance publication identity does not match")
+    manifest_raw, manifest_value = _vendored_source(
+        repo_root,
+        publication["manifest_path"],
+        publication["manifest_sha256"],
+        publication["manifest_git_blob"],
+    )
+    digest_path = (
+        repo_root / "skillopt/evaluation/dotfiles-provenance/session-review-history.sha256"
+    )
+    try:
+        digest_raw = digest_path.read_bytes()
+    except OSError as exc:
+        raise ReviewedLedgerError("vendored dotfiles provenance digest is missing") from exc
+    if (
+        _git_blob(digest_raw) != publication["digest_git_blob"]
+        or digest_raw != f"{_sha(manifest_raw)}\n".encode()
+    ):
+        raise ReviewedLedgerError("dotfiles provenance manifest digest does not match")
+    manifest = _object(
+        manifest_value,
+        label="dotfiles provenance manifest",
+        keys={
+            "schema",
+            "repository",
+            "evidence_kind",
+            "not_historical_execution",
+            "fixes",
+            "verified_replay_receipts",
+        },
+    )
+    receipts = publication["receipts"]
+    fixes = manifest["fixes"]
+    manifest_receipts = manifest["verified_replay_receipts"]
+    if (
+        manifest["schema"] != "dotfiles.skillopt-present-day-replay.v1"
+        or manifest["repository"] != publication["repository"]
+        or manifest["evidence_kind"] != "present_day_replay"
+        or manifest["not_historical_execution"] is not True
+        or not isinstance(receipts, list)
+        or not isinstance(fixes, list)
+        or not isinstance(manifest_receipts, list)
+        or len(receipts) != _EXTERNAL_MUTATION_COUNT
+        or len(fixes) != _EXTERNAL_MUTATION_COUNT
+        or len(manifest_receipts) != _EXTERNAL_MUTATION_COUNT
+    ):
+        raise ReviewedLedgerError("dotfiles provenance manifest authority is invalid")
+    identities: set[str] = set()
+    for receipt_ref, source_ref, fix_value in zip(receipts, manifest_receipts, fixes, strict=True):
+        identity = _verify_dotfiles_receipt(
+            repo_root, publication, receipt_ref, source_ref, fix_value
+        )
+        if identity in identities:
+            raise ReviewedLedgerError("dotfiles provenance identity is duplicated")
+        identities.add(identity)
+    if identities != {"unknown-omission", "open-disposition", "form-pairing"}:
+        raise ReviewedLedgerError("dotfiles provenance replay inventory is incomplete")
+    return identities, commit
+
+
+def _verify_dotfiles_receipt(
+    repo_root: Path,
+    publication: dict[str, Any],
+    receipt_value: object,
+    source_value: object,
+    fix_value: object,
+) -> str:
+    receipt_ref = _object(
+        receipt_value,
+        label="dotfiles publication receipt",
+        keys={"identity", "path", "git_blob", "sha256"},
+    )
+    source_ref = _object(
+        source_value,
+        label="dotfiles manifest receipt",
+        keys={"path", "sha256"},
+    )
+    fix = _object(
+        fix_value,
+        label="dotfiles provenance fix",
+        keys={
+            "adoption_eligible",
+            "authority_status",
+            "blob_sha256",
+            "commit",
+            "git_blob",
+            "identity",
+            "mutation_patch_sha256",
+            "node",
+            "path",
+            "pull",
+            "tree",
+        },
+    )
+    if (
+        source_ref["path"] != receipt_ref["path"]
+        or source_ref["sha256"] != receipt_ref["sha256"]
+        or fix["identity"] != receipt_ref["identity"]
+        or fix["adoption_eligible"] is not False
+        or fix["authority_status"] != "verified_replay"
+    ):
+        raise ReviewedLedgerError("dotfiles provenance receipt reference does not match")
+    raw, receipt_value = _vendored_source(
+        repo_root, receipt_ref["path"], receipt_ref["sha256"], receipt_ref["git_blob"]
+    )
+    del raw
+    receipt = _object(
+        receipt_value,
+        label="dotfiles present-day replay receipt",
+        keys={
+            "schema",
+            "repository",
+            "evidence_kind",
+            "not_historical_execution",
+            "source_commit",
+            "source_tree",
+            "test_path",
+            "test_blob_sha256",
+            "test_node",
+            "mutation_patch_sha256",
+            "positive",
+            "hostile_mutation",
+        },
+    )
+    if (
+        receipt["schema"] != "dotfiles.skillopt-present-day-replay.v1"
+        or receipt["repository"] != publication["repository"]
+        or receipt["evidence_kind"] != "present_day_replay"
+        or receipt["not_historical_execution"] is not True
+        or receipt["source_commit"] != fix["commit"]
+        or receipt["source_tree"] != fix["tree"]
+        or receipt["test_path"] != fix["path"]
+        or receipt["test_blob_sha256"] != fix["blob_sha256"]
+        or receipt["test_node"] != fix["node"]
+        or receipt["mutation_patch_sha256"] != fix["mutation_patch_sha256"]
+    ):
+        raise ReviewedLedgerError("dotfiles present-day replay receipt does not bind fix")
+    _verify_replay_result(receipt["positive"], passed=True)
+    _verify_replay_result(receipt["hostile_mutation"], passed=False)
+    return _text(fix["identity"], label="dotfiles mutation identity")
+
+
+def _verify_replay_result(value: object, *, passed: bool) -> None:
+    result = _object(
+        value,
+        label="dotfiles replay result",
+        keys={
+            "argv_sha256",
+            "ended_ns",
+            "outcome",
+            "python",
+            "rc",
+            "runner",
+            "started_ns",
+            "stderr_bytes",
+            "stderr_sha256",
+            "stdout_bytes",
+            "stdout_sha256",
+        },
+    )
+    valid_rc = result["rc"] == 0 if passed else isinstance(result["rc"], int) and result["rc"] > 0
+    if (
+        result["outcome"] != ("PASSED" if passed else "REJECTED")
+        or result["runner"] != "uv+pytest"
+        or not valid_rc
+        or not isinstance(result["started_ns"], int)
+        or not isinstance(result["ended_ns"], int)
+        or result["started_ns"] >= result["ended_ns"]
+    ):
+        raise ReviewedLedgerError("dotfiles replay result is not discriminating")
 
 
 def _content_ref(repo_root: Path, value: object, suffix: str, label: str) -> tuple[Path, str]:
@@ -619,7 +865,7 @@ def evaluate_candidate(
                 discriminated,
             )
         )
-    eligible = all(
+    contract_passed = all(
         score.zero_regression
         and score.strict_improvement
         and score.harmful_discriminated
@@ -630,7 +876,7 @@ def evaluate_candidate(
     return EvaluationReceipt(
         1,
         "complete",
-        "eligible_for_human_review" if eligible else "reject_or_abstain",
+        "mock_contract_passed_no_adoption" if contract_passed else "reject_or_abstain",
         f"agents={config.agents_backend};claude={config.claude_backend}",
         f"agents={config.agents_model};claude={config.claude_model}",
         f"agents={resolved_models['agents']};claude={resolved_models['claude']}",
@@ -645,42 +891,19 @@ def evaluate_candidate(
         comparison_config["task_manifest"],
         tuple(scores),
         (),
-        corpus.historical_authority,
-        "contract_validated_mock_only_no_real_backend_no_adoption",
+        external_mutation_provenance=corpus.external_mutation_provenance,
+        external_publication_commit=corpus.external_publication_commit,
+        source_not_historical_execution=True,
+        source_adoption_eligible=False,
+        historical_authority=corpus.historical_authority,
+        certification="contract_validated_mock_only_no_real_backend_no_adoption",
     )
 
 
 def adoption_eligible(receipt: EvaluationReceipt, candidate_path: Path) -> bool:
-    """Return eligibility only; this function cannot mutate or adopt anything."""
-    return (
-        receipt.status == "complete"
-        and receipt.eligibility == "eligible_for_human_review"
-        and receipt.historical_authority
-        and receipt.certification == "contract_validated_mock_only_no_real_backend_no_adoption"
-        and candidate_path.is_file()
-        and _sha(candidate_path.read_bytes()) == receipt.candidate_sha256
-        and len(receipt.scores) == len(_HARNESSES)
-        and {score.harness for score in receipt.scores} == _HARNESSES
-        and all(
-            score.zero_regression
-            and score.strict_improvement
-            and score.harmful_discriminated
-            and all(value == 1.0 for value in score.candidate.hard_scores)
-            and all(
-                arm.status == "complete"
-                and len(arm.hard_scores) == receipt.runs * 3
-                and len(arm.sample_ids) == receipt.runs
-                and len(set(arm.sample_ids)) == receipt.runs
-                for arm in (
-                    score.no_skill,
-                    score.baseline,
-                    score.candidate,
-                    score.harmful,
-                )
-            )
-            for score in receipt.scores
-        )
-    )
+    """Always refuse adoption: present-day external replay evidence grants no authority."""
+    del receipt, candidate_path
+    return False
 
 
 def _executable_sha(backend: str, executable: str) -> str:
@@ -718,7 +941,7 @@ def eval_main(repo_root: Path, argv: list[str]) -> int:
         encoding="utf-8",
     )
     print(json.dumps(asdict(receipt), sort_keys=True, separators=(",", ":")))
-    return Rc.OK if receipt.eligibility == "eligible_for_human_review" else Rc.FINDINGS
+    return Rc.OK if receipt.eligibility == "mock_contract_passed_no_adoption" else Rc.FINDINGS
 
 
 def generate_main(repo_root: Path, argv: list[str]) -> int:

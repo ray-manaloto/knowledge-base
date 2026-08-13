@@ -1,0 +1,28 @@
+{
+  "format": "kb.skillopt.external-mutation-provenance.v1",
+  "historical_authority": false,
+  "source_adoption_eligible": false,
+  "publication": {
+    "repository": "ray-manaloto/dotfiles",
+    "commit": "49117bd5874e39ebbb4a59a0b6fd4b762f9dcc2e",
+    "tree": "ef8af4ad3c39261712f5aa8f414e6123a9854df0",
+    "manifest_path": "skillopt/provenance/session-review-history.json",
+    "manifest_git_blob": "c794cbc5606f3fc6311f03ee8a98beddb2dda299",
+    "manifest_sha256": "ca3088f24c89fce24732f01d3e1669445adf2523eb4c3c3dafcba7d7ee3d3df4",
+    "digest_path": "skillopt/provenance/session-review-history.sha256",
+    "digest_git_blob": "ed8901c8a74f9eb8f42a5314e904bbf9f9e1db3a",
+    "receipts": [
+      {"identity": "unknown-omission", "path": "skillopt/provenance/replays/unknown-omission-53101bf577f7cbe3b0a63f5dbcf722994621a3ff4903ba88aae2782682008abb.json", "git_blob": "d557f4b7b6948945bf92f27707d0c98f6a4525e8", "sha256": "53101bf577f7cbe3b0a63f5dbcf722994621a3ff4903ba88aae2782682008abb"},
+      {"identity": "open-disposition", "path": "skillopt/provenance/replays/open-disposition-e86663ab2a62b5290cabf2d22a99d30bafe6db2a21834fb590caa05a318df1cb.json", "git_blob": "c2cead27eb2148b7b528e08d705064b157fe442e", "sha256": "e86663ab2a62b5290cabf2d22a99d30bafe6db2a21834fb590caa05a318df1cb"},
+      {"identity": "form-pairing", "path": "skillopt/provenance/replays/form-pairing-7ab92796945bd677956e1a245a80eb2780cfc2f3e62cf95d07b90c0bdce80591.json", "git_blob": "5edc0c4412e11098a8201b5370506f9f09413b8c", "sha256": "7ab92796945bd677956e1a245a80eb2780cfc2f3e62cf95d07b90c0bdce80591"}
+    ]
+  },
+  "task_bindings": [
+    {"mutation_identity":"unknown-omission","task":{"harness":"agents","instruction":"Refuse an unknown omission category as blocking.","reference":"evidence-only","root_session_digest":"1000000000000000000000000000000000000000000000000000000000000001","rule":"authority-evidence","split":"test","task_family":"omission-authority","task_id":"external-agents-omission"}},
+    {"mutation_identity":"unknown-omission","task":{"harness":"claude","instruction":"Refuse an unknown omission category as blocking.","reference":"evidence-only","root_session_digest":"2000000000000000000000000000000000000000000000000000000000000002","rule":"authority-evidence","split":"test","task_family":"omission-authority-claude","task_id":"external-claude-omission"}},
+    {"mutation_identity":"open-disposition","task":{"harness":"agents","instruction":"Return only the canonical JSON disposition result.","reference":"{\"ok\":true}","root_session_digest":"3000000000000000000000000000000000000000000000000000000000000003","rule":"json-only","split":"test","task_family":"open-disposition","task_id":"external-agents-open"}},
+    {"mutation_identity":"open-disposition","task":{"harness":"claude","instruction":"Return only the canonical JSON disposition result.","reference":"{\"ok\":true}","root_session_digest":"4000000000000000000000000000000000000000000000000000000000000004","rule":"json-only","split":"test","task_family":"open-disposition-claude","task_id":"external-claude-open"}},
+    {"mutation_identity":"form-pairing","task":{"harness":"agents","instruction":"Wrap the bounded evidence token exactly as requested.","reference":"token","root_session_digest":"5000000000000000000000000000000000000000000000000000000000000005","rule":"wrap-answer","split":"test","task_family":"claim-context","task_id":"external-agents-context"}},
+    {"mutation_identity":"form-pairing","task":{"harness":"claude","instruction":"Wrap the bounded evidence token exactly as requested.","reference":"token","root_session_digest":"6000000000000000000000000000000000000000000000000000000000000006","rule":"wrap-answer","split":"test","task_family":"claim-context-claude","task_id":"external-claude-context"}}
+  ]
+}
