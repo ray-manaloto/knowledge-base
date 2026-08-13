@@ -75,7 +75,9 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
-            "graphify-contract | skillopt-contract | ecosystem-discovery-plan [alternative...] | "
+            "graphify-contract | skillopt-contract | "
+            "skillopt-reviewed --packet P --target T --backend mock|handoff | "
+            "ecosystem-discovery-plan [alternative...] | "
             "detect-census [--output .agent/<path>.json] | "
             "source-groups-check [path] | "
             "ensure-deps | version"
@@ -130,6 +132,10 @@ def _run(argv: list[str] | None = None) -> int:
         return graphify_ops.query(repo_root, rest)
     if cmd in {"graphify-contract", "skillopt-contract"}:
         return _dispatch_contract(repo_root, cmd)
+    if cmd == "skillopt-reviewed":
+        from kb_setup import skillopt_reviewed
+
+        return skillopt_reviewed.reviewed_main(repo_root, rest)
     if cmd == "source-groups-check":
         from kb_setup import source_groups
 

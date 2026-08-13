@@ -22,6 +22,8 @@ from pathlib import Path
 
 from skillopt_sleep.__main__ import main as sleep_main
 from skillopt_sleep.cycle import run_sleep_cycle
+from skillopt_sleep.tasks_file import load_tasks_file
+from skillopt_sleep.types import TaskRecord
 
 SKILLOPT_COMMIT = "93bdf3d770b99128daf35278218e5a666fe392f3"
 SKILLOPT_REPOSITORY = "https://github.com/microsoft/SkillOpt"
@@ -82,6 +84,22 @@ _PUBLIC_SYMBOLS = (
         "(cfg: 'Optional[SleepConfig]' = None, *, seed_tasks: 'Optional[List[TaskRecord]]' = "
         "None, dry_run: 'bool' = False, clock: 'Optional[float]' = None, backend: "
         "'Optional[Backend]' = None) -> 'CycleOutcome'",
+    ),
+    PublicSymbol(
+        "skillopt_sleep.tasks_file.load_tasks_file",
+        load_tasks_file,
+        "(path: 'str', *, holdout_fraction: 'float' = 0.34, seed: 'int' = 42) -> "
+        "'Tuple[List[TaskRecord], Dict[str, Any]]'",
+    ),
+    PublicSymbol(
+        "skillopt_sleep.types.TaskRecord",
+        TaskRecord,
+        "(id: 'str', project: 'str', intent: 'str', context_excerpt: 'str' = '', "
+        "system: 'str' = '', attempted_solution: 'str' = '', outcome: 'str' = "
+        "'unknown', reference_kind: 'str' = 'none', reference: 'str' = '', judge: "
+        "'Dict[str, Any]' = <factory>, tags: 'List[str]' = <factory>, source_sessions: "
+        "'List[str]' = <factory>, split: 'str' = 'train', origin: 'str' = 'real', "
+        "derived_from: 'str' = '', skill_hint: 'str' = '') -> None",
     ),
 )
 
