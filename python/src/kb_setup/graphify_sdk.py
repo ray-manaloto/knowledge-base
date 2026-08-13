@@ -13,9 +13,13 @@ writer runs.
 from __future__ import annotations
 
 import inspect
+import io
+import os
+import re
 import signal
 import warnings
 from collections.abc import Callable
+from contextlib import redirect_stderr
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
@@ -31,6 +35,7 @@ from graphify.reflect import build_learning_overlay, reflect
 from kb_setup.graphify_health import (
     APPROVED_METADATA_ZERO_NODE_WARNING,
     ExpectedMetadataOnly,
+    ExpectedUnclassifiedFile,
     GraphifyEvidence,
     GraphifyOperation,
     GraphifyReceipt,
@@ -196,7 +201,8 @@ def detect_checked(
 ) -> tuple[dict, GraphifyReceipt]:
     """Run public detection and refuse warnings or undeclared coverage gaps."""
     try:
-        with warnings.catch_warnings(record=True) as caught:
+        stream = io.StringIO()
+        with warnings.catch_warnings(record=True) as caught, redirect_stderr(stream):
             warnings.simplefilter("always")
             result = _detect_with_timeout(root, timeout_seconds)
     except TimeoutError:
@@ -211,8 +217,13 @@ def detect_checked(
         )
         require_complete(receipt)
         return {}, receipt
-    warning_text = "\n".join(str(item.message) for item in caught)
+    warning_text = "\n".join(
+        part
+        for part in (stream.getvalue().strip(), *(str(item.message) for item in caught))
+        if part
+    )
     unclassified = tuple(_relative_paths(root, result.get("unclassified", [])))
+    ignored = tuple(_relative_paths(root, result.get("ignored", [])))
     receipt = assess(
         GraphifyOperation.DETECT,
         GraphifyEvidence(
@@ -222,6 +233,7 @@ def detect_checked(
             detected_sources=int(result.get("total_files", 0)) + len(unclassified),
             unclassified_files=len(unclassified),
             unclassified_paths=unclassified,
+            ignored_paths=ignored,
             coverage_policy=coverage_policy,
         ),
     )
@@ -339,11 +351,13 @@ def artifact_checked(
 def _relative_paths(root: Path, paths: object) -> tuple[str, ...]:
     if not isinstance(paths, list):
         return ()
+    absolute_root = root.resolve()
     relative: list[str] = []
     for raw in paths:
         path = Path(str(raw))
         try:
-            relative.append(str(path.relative_to(root)))
+            absolute_path = path if path.is_absolute() else path.resolve()
+            relative.append(str(absolute_path.relative_to(absolute_root)))
         except ValueError:
             relative.append(str(path))
     return tuple(relative)
@@ -391,3 +405,72 @@ def _sha256_file(path: Path) -> str:
     import hashlib
 
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+_ROOT_LICENSE_NAMES = frozenset(
+    {"LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING", "COPYING.md", "COPYING.txt"}
+)
+_IGNORE_MAX_BYTES = 16 * 1024
+_IGNORE_PATTERN = re.compile(r"!?[A-Za-z0-9_.*?/[\]{}()@+,:=~-]+")
+
+
+def source_detection_policy(
+    root: Path,
+    source_name: str,
+    reviewed: tuple[ExpectedUnclassifiedFile, ...] = (),
+) -> SourceCoveragePolicy:
+    """Return only structurally and cryptographically reviewed unclassified metadata."""
+    allowed = [
+        name
+        for name in sorted({".gitignore", *_ROOT_LICENSE_NAMES})
+        if _safe_root_regular_file(root, name)
+    ]
+    for item in reviewed:
+        if item.source_name != source_name:
+            continue
+        if item.classification == "reviewed-version-marker" and _safe_exact_reviewed_file(
+            root, item
+        ):
+            allowed.append(item.relative_path)
+        if item.classification == "reviewed-root-ignore-metadata" and _safe_reviewed_ignore(
+            root, item
+        ):
+            allowed.append(item.relative_path)
+    return SourceCoveragePolicy(optional_unclassified_paths=tuple(sorted(allowed)))
+
+
+def _safe_root_regular_file(root: Path, name: str) -> bool:
+    path = root / name
+    return path.parent == root and path.is_file() and not path.is_symlink()
+
+
+def _safe_reviewed_ignore(root: Path, item: ExpectedUnclassifiedFile) -> bool:
+    if item.relative_path != ".claudeignore" or not _safe_root_regular_file(root, ".claudeignore"):
+        return False
+    path = root / item.relative_path
+    try:
+        raw = path.read_bytes()
+        text = raw.decode("utf-8")
+    except OSError, UnicodeDecodeError:
+        return False
+    if len(raw) > _IGNORE_MAX_BYTES or "\x00" in text or _sha256_file(path) != item.content_sha256:
+        return False
+    return all(
+        not line or line.startswith("#") or _IGNORE_PATTERN.fullmatch(line) is not None
+        for line in (item.strip() for item in text.splitlines())
+    )
+
+
+def _safe_exact_reviewed_file(root: Path, item: ExpectedUnclassifiedFile) -> bool:
+    relative = Path(item.relative_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        return False
+    path = root / relative
+    if not path.is_file() or path.is_symlink():
+        return False
+    try:
+        if os.path.commonpath((root.resolve(), path.resolve())) != str(root.resolve()):
+            return False
+        return _sha256_file(path) == item.content_sha256
+    except OSError:
+        return False

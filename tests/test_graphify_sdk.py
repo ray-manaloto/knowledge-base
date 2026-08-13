@@ -11,6 +11,7 @@ import pytest
 from kb_setup import graphify_sdk
 from kb_setup.graphify_health import (
     ExpectedMetadataOnly,
+    ExpectedUnclassifiedFile,
     IncompleteGraphifyOperationError,
     SourceCoveragePolicy,
 )
@@ -96,6 +97,26 @@ def test_checked_detect_allows_only_reviewed_root_metadata(
 
     assert receipt.source_name == "10x-Team"
     assert receipt.unclassified_paths == (".gitignore", "LICENSE")
+
+
+def test_checked_detect_normalizes_absolute_results_for_relative_source_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".gitignore").write_text("build/\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path.parent)
+    relative_root = Path(tmp_path.name)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "detect",
+        lambda _root: {"total_files": 1, "unclassified": [str(tmp_path / ".gitignore")]},
+    )
+
+    _result, receipt = graphify_sdk.detect_checked(
+        relative_root,
+        coverage_policy=graphify_sdk.source_detection_policy(relative_root, "source"),
+    )
+
+    assert receipt.unclassified_paths == (".gitignore",)
 
 
 def test_checked_detect_rejects_unknown_code_like_file_with_source_and_bounded_paths(
@@ -265,3 +286,79 @@ def test_metadata_skip_mutations_do_not_approve(
     )
 
     assert approved == ()
+
+
+def test_detection_policy_allows_only_safe_root_metadata(tmp_path: Path) -> None:
+    (tmp_path / ".gitignore").write_text("build/\n", encoding="utf-8")
+    (tmp_path / "LICENSE").write_text("license\n", encoding="utf-8")
+
+    policy = graphify_sdk.source_detection_policy(tmp_path, "source")
+
+    assert set(policy.optional_unclassified_paths) == {".gitignore", "LICENSE"}
+
+
+def test_detection_policy_rejects_nested_basename_symlink_and_bad_ignore(
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "LICENSE").write_text("nested\n", encoding="utf-8")
+    outside = tmp_path.parent / "outside-license"
+    outside.write_text("outside\n", encoding="utf-8")
+    (tmp_path / "LICENSE").symlink_to(outside)
+    (tmp_path / ".claudeignore").write_text("valid/\n", encoding="utf-8")
+
+    policy = graphify_sdk.source_detection_policy(tmp_path, "source")
+
+    assert policy.optional_unclassified_paths == ()
+
+
+def test_detection_policy_requires_exact_reviewed_source_path_and_hash(tmp_path: Path) -> None:
+    import hashlib
+
+    marker = tmp_path / ".github" / "BOILERPLATE_VERSION"
+    marker.parent.mkdir()
+    marker.write_text("v1\n", encoding="utf-8")
+    expected = ExpectedUnclassifiedFile(
+        source_name="Attacca",
+        relative_path=".github/BOILERPLATE_VERSION",
+        content_sha256=hashlib.sha256(marker.read_bytes()).hexdigest(),
+        classification="reviewed-version-marker",
+    )
+
+    accepted = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (expected,))
+    wrong_source = graphify_sdk.source_detection_policy(tmp_path, "other", (expected,))
+    marker.write_text("v2\n", encoding="utf-8")
+    changed = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (expected,))
+
+    assert accepted.optional_unclassified_paths == (".github/BOILERPLATE_VERSION",)
+    assert wrong_source.optional_unclassified_paths == ()
+    assert changed.optional_unclassified_paths == ()
+
+
+def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
+    tmp_path: Path,
+) -> None:
+    import hashlib
+
+    ignored = tmp_path / ".claudeignore"
+    ignored.write_text("# reviewed\nnode_modules/\n*.log\n", encoding="utf-8")
+    expected = ExpectedUnclassifiedFile(
+        source_name="Attacca",
+        relative_path=".claudeignore",
+        content_sha256=hashlib.sha256(ignored.read_bytes()).hexdigest(),
+        classification="reviewed-root-ignore-metadata",
+    )
+
+    accepted = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (expected,))
+    ignored.write_text("command $(unsafe)\n", encoding="utf-8")
+    hostile = ExpectedUnclassifiedFile(
+        source_name="Attacca",
+        relative_path=".claudeignore",
+        content_sha256=hashlib.sha256(ignored.read_bytes()).hexdigest(),
+        classification="reviewed-root-ignore-metadata",
+    )
+    rejected = graphify_sdk.source_detection_policy(tmp_path, "Attacca", (hostile,))
+
+    assert accepted.optional_unclassified_paths == (".claudeignore",)
+    assert rejected.optional_unclassified_paths == ()

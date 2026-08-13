@@ -47,6 +47,7 @@ class GraphifyReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     zero_node_sources: int = 0
     unclassified_paths: tuple[str, ...] = ()
     zero_node_paths: tuple[str, ...] = ()
+    ignored_paths: tuple[str, ...] = ()
     timed_out: bool = False
     approved_classifications: tuple[str, ...] = ()
     mode: str | None = None
@@ -73,6 +74,15 @@ class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     skipped_disposition: str
 
 
+class ExpectedUnclassifiedFile(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Reviewed source-specific file Graphify intentionally cannot classify."""
+
+    source_name: str
+    relative_path: str
+    content_sha256: str
+    classification: str
+
+
 class IncompleteGraphifyOperationError(RuntimeError):
     """A Graphify receipt cannot authorize downstream work."""
 
@@ -91,6 +101,7 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     zero_node_sources: int = 0
     unclassified_paths: tuple[str, ...] = ()
     zero_node_paths: tuple[str, ...] = ()
+    ignored_paths: tuple[str, ...] = ()
     coverage_policy: SourceCoveragePolicy | None = None
     timed_out: bool = False
     approved_classifications: tuple[str, ...] = ()
@@ -133,6 +144,8 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
 
 def _coverage_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
+    if evidence.ignored_paths:
+        reasons.append("ignored-paths")
     if evidence.coverage_policy is None:
         if evidence.unclassified_files or evidence.unclassified_paths:
             reasons.append("unclassified-files")
@@ -198,6 +211,7 @@ def assess(
         zero_node_sources=evidence.zero_node_sources,
         unclassified_paths=_bounded_paths(evidence.unclassified_paths),
         zero_node_paths=_bounded_paths(evidence.zero_node_paths),
+        ignored_paths=_bounded_paths(evidence.ignored_paths),
         timed_out=evidence.timed_out,
         approved_classifications=evidence.approved_classifications,
         mode=evidence.mode,
@@ -219,6 +233,8 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
             evidence.append(f"unclassified={list(receipt.unclassified_paths)!r}")
         if receipt.zero_node_paths:
             evidence.append(f"zero_nodes={list(receipt.zero_node_paths)!r}")
+        if receipt.ignored_paths:
+            evidence.append(f"ignored={list(receipt.ignored_paths)!r}")
         suffix = f"; {'; '.join(evidence)}" if evidence else ""
         raise IncompleteGraphifyOperationError(
             f"Graphify {receipt.operation.value} failed closed "

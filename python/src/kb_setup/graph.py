@@ -18,15 +18,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import os
+import queue as queue_module
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
+from collections import Counter, deque
 from dataclasses import dataclass, replace
+from multiprocessing.process import BaseProcess
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from kb_setup import atomic, graph_checks, graphify_health, graphify_ops
 from kb_setup import manifest as mf
@@ -40,19 +45,29 @@ from kb_setup.graphify_env import (
 if TYPE_CHECKING:
     from kb_setup.currency.config import ToolSpec
 
+
+class _ResultQueue(Protocol):
+    def put(self, item: tuple[str, str]) -> None: ...
+
+    def get_nowait(self) -> tuple[str, str]: ...
+
+
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
 
-# Graphify 0.9.41 intentionally does not classify these root-level repository
-# control/license files as source. This is an exact metadata allowlist, not an
-# extension or directory wildcard: an unknown code-like file still fails.
-_REVIEWED_UNCLASSIFIED_METADATA = (
-    ".gitignore",
-    "LICENSE",
-    "LICENSE.md",
-    "LICENSE.txt",
-    "COPYING",
-    "COPYING.md",
-    "COPYING.txt",
+_EXPECTED_UNCLASSIFIED = (
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="Attacca",
+        relative_path=".claudeignore",
+        content_sha256="ea4bc0ca648a2339096adda7b96bc619eae53d96c7ccd4a1fe7d3f6dcf86319a",
+        classification="reviewed-root-ignore-metadata",
+    ),
+    graphify_health.ExpectedUnclassifiedFile(
+        source_name="Attacca",
+        relative_path=".github/BOILERPLATE_VERSION",
+        content_sha256="2819592ffada78626fb51ebec43f23a97c1447270ec7f96b0567f830f530c462",
+        # Operational input read by scripts/validate-plugins.mjs at this immutable pin.
+        classification="reviewed-version-marker",
+    ),
 )
 
 _EXPECTED_METADATA_ONLY = (
@@ -190,13 +205,6 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     from kb_setup import graphify_health, graphify_sdk
 
     source_root = repo_root / "sources" / name
-    graphify_sdk.detect_checked(
-        source_root,
-        source_name=name,
-        coverage_policy=graphify_health.SourceCoveragePolicy(
-            optional_unclassified_paths=_REVIEWED_UNCLASSIFIED_METADATA
-        ),
-    )
     print(f"  $ graphify extract sources/{name} --code-only --force")
     proc = subprocess.run(
         [graphify_exe(repo_root), "extract", f"sources/{name}", "--code-only", "--force"],
@@ -243,6 +251,156 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     )
     graphify_health.require_complete(receipt)
     return True
+
+
+_DETECT_WORKERS = 4
+_DETECT_SOURCE_TIMEOUT_SECONDS = 30.0
+_DETECT_GLOBAL_TIMEOUT_SECONDS = 600.0
+
+
+def _detect_worker(
+    root: Path,
+    source_name: str,
+    policy: graphify_health.SourceCoveragePolicy,
+    result_queue: _ResultQueue,
+) -> None:
+    """Child-process detection body; parent owns all timeout enforcement."""
+    from kb_setup import graphify_sdk
+
+    try:
+        graphify_sdk.detect_checked(
+            root,
+            source_name=source_name,
+            coverage_policy=policy,
+            timeout_seconds=_DETECT_SOURCE_TIMEOUT_SECONDS,
+        )
+        result = (source_name, "")
+    except (
+        OSError,
+        RuntimeError,
+        TimeoutError,
+        ValueError,
+        graphify_health.IncompleteGraphifyOperationError,
+    ) as exc:
+        detail = " ".join(str(exc).split())[:900]
+        result = (source_name, f"{type(exc).__name__}: {detail}")
+    result_queue.put(result)
+
+
+def _run_detection_census(
+    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]],
+) -> list[tuple[str, str]]:
+    """Run at most four detector children with hard per-source/global deadlines."""
+    context = multiprocessing.get_context("spawn")
+    pending = deque(jobs)
+    active: dict[BaseProcess, tuple[str, float, _ResultQueue]] = {}
+    failures: list[tuple[str, str]] = []
+    started = time.monotonic()
+    while pending or active:
+        while pending and len(active) < _DETECT_WORKERS:
+            name, root, policy = pending.popleft()
+            queue = context.Queue()
+            process = context.Process(target=_detect_worker, args=(root, name, policy, queue))
+            process.start()
+            active[process] = (name, time.monotonic(), cast("_ResultQueue", queue))
+        global_expired = time.monotonic() - started > _DETECT_GLOBAL_TIMEOUT_SECONDS
+        _reap_detection_processes(active, failures, global_expired=global_expired)
+        if global_expired:
+            failures.extend((name, "TimeoutError: detect global deadline") for name, *_ in pending)
+            pending.clear()
+        if active:
+            time.sleep(0.02)
+    return sorted(failures)
+
+
+def _reap_detection_processes(
+    active: dict[BaseProcess, tuple[str, float, _ResultQueue]],
+    failures: list[tuple[str, str]],
+    *,
+    global_expired: bool,
+) -> None:
+    now = time.monotonic()
+    for process, (name, source_started, result_queue) in list(active.items()):
+        timed_out = global_expired or now - source_started > _DETECT_SOURCE_TIMEOUT_SECONDS
+        if timed_out:
+            process.terminate()
+            process.join(timeout=2)
+            if process.is_alive():
+                process.kill()
+                process.join(timeout=2)
+            label = "global deadline" if global_expired else "source timeout"
+            failures.append((name, f"TimeoutError: detect {label}"))
+            del active[process]
+        elif not process.is_alive():
+            process.join(timeout=2)
+            try:
+                result_name, detail = result_queue.get_nowait()
+            except queue_module.Empty:
+                result_name, detail = name, "RuntimeError: detector child returned no receipt"
+            if detail:
+                failures.append((result_name, detail))
+            del active[process]
+
+
+def _detect_preflight(manifests: list[mf.Manifest]) -> None:
+    """Census every code source before aggregate graph/stamp mutation."""
+    from kb_setup import graphify_sdk
+
+    failures: list[tuple[str, str]] = []
+    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]] = []
+    for manifest in sorted(manifests, key=lambda item: item.name):
+        if manifest.kind == "docs":
+            continue
+        root = manifest.clone_dir
+        if not (root / ".git").is_dir():
+            failures.append((manifest.name, "missing verified clone"))
+            continue
+        reviewed = tuple(
+            item for item in _EXPECTED_UNCLASSIFIED if item.source_name == manifest.name
+        )
+        policy = graphify_sdk.source_detection_policy(root, manifest.name, reviewed)
+        jobs.append((manifest.name, root, policy))
+    if jobs:
+        failures.extend(_run_detection_census(jobs))
+    failures.sort()
+    if failures:
+        categorized = [
+            (_detect_failure_categories(detail), name, detail) for name, detail in failures
+        ]
+        category_counts = Counter(
+            category for categories, _name, _detail in categorized for category in categories
+        )
+        summary = ", ".join(
+            f"{category}: {category_counts[category]}" for category in sorted(category_counts)
+        )
+        lines = [
+            f"  {name}: {'+'.join(categories)}: {detail[:240]}"
+            for categories, name, detail in categorized
+        ]
+        raise SystemExit(
+            f"Graphify detect preflight failed for {len(failures)} source(s); "
+            f"categories={{{summary}}}; no aggregate artifact or stamp was mutated:\n"
+            + "\n".join(lines)
+        )
+
+
+def _detect_failure_categories(detail: str) -> tuple[str, ...]:
+    normalized = detail.casefold()
+    patterns = (
+        ("timeout", ("timeout", "deadline")),
+        ("missing-clone", ("missing verified clone",)),
+        ("ignored-paths", ("ignored-paths", "ignored=")),
+        ("unclassified-files", ("unclassified-files", "unclassified=")),
+        ("stderr", ("stderr",)),
+    )
+    categories = tuple(
+        category for category, tokens in patterns if any(token in normalized for token in tokens)
+    )
+    if categories:
+        return categories
+    if normalized.startswith(("oserror:", "runtimeerror:", "valueerror:")):
+        return ("detector-error",)
+    return ("incomplete",)
 
 
 #: THIS repo's own code, indexed into the aggregate graph beside the pinned
@@ -1390,16 +1548,22 @@ def build(repo_root: Path) -> None:
             + "\n  ".join(collisions)
         )
 
+    print(f"[kb-build] {len(manifests)} source(s)")
+    for m in manifests:
+        _ensure_clone(m)
+
+    # Detection is a read-only, complete-corpus preflight. It runs only after
+    # every immutable pin is present and verified, and before either the stamp
+    # or graph.json is touched. One bad source must not hide the others.
+    _detect_preflight(manifests)
+
     # Invalidate the stamp BEFORE anything touches graph.json. `build()` overwrites
     # the artifact at the seed step but only stamps at the very end, so any abort in
     # between — a merge failure, Ctrl-C — used to leave a NEW artifact under the OLD
     # stamp, which then asserted it was built by the pinned version. Clearing first
-    # makes every abort fail closed as "never stamped".
+    # makes every abort fail closed as "never stamped". Detection above is deliberately
+    # outside this mutation window.
     _clear_stamp(repo_root)
-
-    print(f"[kb-build] {len(manifests)} source(s)")
-    for m in manifests:
-        _ensure_clone(m)
 
     # Code graph (AST — free, deterministic). Each source extracts into its own
     # sub-graph; prose-only repos (no code) are skipped WITHOUT aborting the build —

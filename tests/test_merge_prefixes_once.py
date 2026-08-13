@@ -84,6 +84,7 @@ def test_build_composes_every_corpus_source_in_one_merge(monkeypatch, tmp_path):
     calls: list[list[str]] = []
     monkeypatch.setattr(graph, "_clear_stamp", lambda _root: None)
     monkeypatch.setattr(graph, "_ensure_clone", lambda _m: None)
+    monkeypatch.setattr(graph, "_detect_preflight", lambda _manifests: None)
     monkeypatch.setattr(graph, "_extract_code", lambda _root, _name: True)
     monkeypatch.setattr(graph, "_stamp_build", lambda _root, _inputs: None)
     monkeypatch.setattr(graph.graphify_ops, "label", lambda _root: 0)
