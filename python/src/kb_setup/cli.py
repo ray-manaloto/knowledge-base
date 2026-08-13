@@ -77,6 +77,8 @@ def _run(argv: list[str] | None = None) -> int:
             "cc | cc-doctor | eval [--live] [--slow] | "
             "graphify-contract | skillopt-contract | "
             "skillopt-reviewed --packet P --target T --backend mock|handoff | "
+            "skillopt-generate --check | skillopt-evaluate MANIFEST RECEIPT CANDIDATE "
+            "mock default mock mock default mock | "
             "ecosystem-discovery-plan [alternative...] | "
             "detect-census [--output .agent/<path>.json] | "
             "source-groups-check [path] | "
@@ -130,12 +132,14 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.query(repo_root, rest)
-    if cmd in {"graphify-contract", "skillopt-contract"}:
-        return _dispatch_contract(repo_root, cmd)
-    if cmd == "skillopt-reviewed":
-        from kb_setup import skillopt_reviewed
-
-        return skillopt_reviewed.reviewed_main(repo_root, rest)
+    if cmd in {
+        "graphify-contract",
+        "skillopt-contract",
+        "skillopt-reviewed",
+        "skillopt-generate",
+        "skillopt-evaluate",
+    }:
+        return _dispatch_contract(repo_root, cmd, rest)
     if cmd == "source-groups-check":
         from kb_setup import source_groups
 
@@ -197,12 +201,24 @@ def _run(argv: list[str] | None = None) -> int:
     return _dispatch_ops(repo_root, cmd, rest)
 
 
-def _dispatch_contract(repo_root: Path, cmd: str) -> int:
+def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
     """Run one strict dependency/API contract."""
     if cmd == "graphify-contract":
         from kb_setup import graphify_sdk
 
         return graphify_sdk.contract_main(repo_root)
+    if cmd == "skillopt-reviewed":
+        from kb_setup import skillopt_reviewed
+
+        return skillopt_reviewed.reviewed_main(repo_root, rest)
+    if cmd in {"skillopt-generate", "skillopt-evaluate"}:
+        from kb_setup import skillopt_eval
+
+        return (
+            skillopt_eval.generate_main(repo_root, rest)
+            if cmd == "skillopt-generate"
+            else skillopt_eval.eval_main(repo_root, rest)
+        )
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)
