@@ -80,6 +80,7 @@ def _run(argv: list[str] | None = None) -> int:
             "ecosystem-discovery-plan [alternative...] | "
             "detect-census [--output .agent/<path>.json] | "
             "source-groups-check [path] | "
+            "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
             "ensure-deps | version"
         )
         return 0
@@ -136,10 +137,8 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import skillopt_reviewed
 
         return skillopt_reviewed.reviewed_main(repo_root, rest)
-    if cmd == "source-groups-check":
-        from kb_setup import source_groups
-
-        return source_groups.check_main(repo_root, rest)
+    if cmd in {"source-groups-check", "artifact-download"}:
+        return _dispatch_registry(repo_root, cmd, rest)
     if cmd == "ecosystem-discovery-plan":
         from kb_setup import ecosystem_discovery
 
@@ -206,6 +205,17 @@ def _dispatch_contract(repo_root: Path, cmd: str) -> int:
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)
+
+
+def _dispatch_registry(repo_root: Path, cmd: str, rest: list[str]) -> int:
+    """Run one typed registry or immutable artifact boundary."""
+    if cmd == "source-groups-check":
+        from kb_setup import source_groups
+
+        return source_groups.check_main(repo_root, rest)
+    from kb_setup import artifact_download
+
+    return artifact_download.main(repo_root, rest)
 
 
 def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:

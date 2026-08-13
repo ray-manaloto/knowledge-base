@@ -562,6 +562,28 @@ run = "uv run --group codegen python schemas/generate_source_groups.py"
 description = "Fail if generated source-group models differ from the schema"
 run = "uv run --group codegen python -m schemas.check_source_groups_codegen"
 
+[tasks.kb-artifact-download]
+description = "Plan or apply one immutable provider artifact transfer with an atomic receipt"
+usage = '''
+arg "<provider>" help="Reviewed provider adapter name"
+arg "<source>" help="Credential-free owner/repository identifier"
+arg "<revision>" help="Full immutable 40-character revision"
+arg "<destination>" help="Project-local artifact destination"
+arg "[receipt]" help="Optional receipt path"
+arg "[mode]" help="Plan by default; apply explicitly transfers" choices "plan" "apply"
+'''
+run = '''
+uv run kb-setup artifact-download --provider ${usage_provider?} --source ${usage_source?} --revision ${usage_revision?} --destination ${usage_destination?}{% if usage.receipt is string and usage.receipt != '' %} --receipt {{ usage.receipt | quote }}{% endif %}{% if usage.mode == "apply" %} --apply{% endif %}
+'''
+
+[tasks.kb-fetch-receipt-codegen]
+description = "Regenerate strict fetch-receipt msgspec models from JSON Schema"
+run = "uv run --group codegen python schemas/generate_fetch_receipt.py"
+
+[tasks.kb-fetch-receipt-codegen-check]
+description = "Fail if generated fetch-receipt models differ from the schema"
+run = "uv run --group codegen python -m schemas.check_fetch_receipt_codegen"
+
 [tasks.kb-affected]
 description = 'Reverse dependencies of a symbol: mise run kb-affected -- "<symbol>" [--depth N]'
 # The question `kb-query` structurally CANNOT answer. `query` is a forward BFS from
