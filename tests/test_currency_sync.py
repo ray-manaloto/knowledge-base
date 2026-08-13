@@ -76,6 +76,34 @@ def test_reads_bare_string_pin(tmp_path) -> None:
     assert extras == ()
 
 
+def test_reads_exact_python_project_pin_and_extras(tmp_path) -> None:
+    root = _repo(tmp_path)
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "probe"\nversion = "0"\ndependencies = ["graphifyy[all]==0.9.41"]\n',
+        encoding="utf-8",
+    )
+    (root / "currency.toml").write_text(
+        '[tool.graphify]\npython_package = "graphifyy"\nextras = ["all"]\n',
+        encoding="utf-8",
+    )
+    version, extras = sync.pinned_version(root, _spec(root))
+    assert version == "0.9.41"
+    assert extras == ("all",)
+
+
+def test_python_package_owner_requires_an_exact_project_pin(tmp_path) -> None:
+    root = _repo(tmp_path)
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "probe"\nversion = "0"\ndependencies = ["graphifyy[all]>=0.9.41"]\n',
+        encoding="utf-8",
+    )
+    (root / "currency.toml").write_text(
+        '[tool.graphify]\npython_package = "graphifyy"\nextras = ["all"]\n',
+        encoding="utf-8",
+    )
+    assert _finding(sync.check_sync(root, _spec(root)), "pin").status == sync.DRIFT
+
+
 def test_missing_pin_is_drift_not_a_crash(tmp_path) -> None:
     root = _repo(tmp_path, pin='hk = "1.52.0"')
     status = sync.check_sync(root, _spec(root))

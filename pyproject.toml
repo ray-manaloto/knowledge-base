@@ -3,7 +3,7 @@ name = "kb-setup"
 version = "0.1.0"
 description = "Thin helpers for the knowledge-base graphify substrate"
 requires-python = ">=3.14"
-# The FIRST runtime dependency this package has ever had, and it is exported:
+# Runtime dependencies are exported:
 # dotfiles installs kb-setup as a SHA-pinned git dependency, so anything here
 # lands in a tree with its own resolution to satisfy. Chosen deliberately, and
 # the reasoning is in docs/research/reports/2026-08-10-logging-library-selection.md
@@ -20,7 +20,7 @@ requires-python = ">=3.14"
 # A FLOOR, not an `==`, for the same reason the fetch extra below is: an exact
 # pin here is exported as someone else's constraint. Reproducibility for us is
 # uv.lock.
-dependencies = ["structlog>=26.1"]
+dependencies = ["graphifyy[all]==0.9.41", "msgspec==0.21.1", "structlog>=26.1"]
 
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
@@ -70,6 +70,8 @@ dev = [
   "pytest-xdist==3.8.0",
   "trafilatura==2.2.0",
 ]
+
+codegen = ["datamodel-code-generator==0.72.4"]
 
 [build-system]
 requires = ["hatchling"]

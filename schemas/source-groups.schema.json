@@ -1,0 +1,504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/source-groups.schema.json",
+  "title": "SourceGroupConfig",
+  "description": "Strict registry contract for Graphify ecosystem candidates and admitted sources.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "group_id", "generated_at_ns", "sources"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "group_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "generated_at_ns": {"$ref": "#/$defs/EpochNs"},
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/SourceRecord"}
+    }
+  },
+  "$defs": {
+    "EpochNs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "NullableEpochNs": {
+      "anyOf": [
+        {"$ref": "#/$defs/EpochNs"},
+        {"type": "null"}
+      ]
+    },
+    "NullableNonNegativeInteger": {
+      "anyOf": [
+        {"type": "integer", "minimum": 0},
+        {"type": "null"}
+      ]
+    },
+    "NullableString": {
+      "type": ["string", "null"]
+    },
+    "CommitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "NullableCommitSha": {
+      "anyOf": [
+        {"$ref": "#/$defs/CommitSha"},
+        {"type": "null"}
+      ]
+    },
+    "RepoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "SourceWarning": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Role": {
+      "title": "Role",
+      "type": "string",
+      "enum": [
+        "REFERENCE_IMPLEMENTATION",
+        "PRODUCTION_CONSUMER",
+        "EXPERIMENTAL_CONSUMER",
+        "TOOLING_INTEGRATION",
+        "RESEARCH_SOURCE",
+        "ALTERNATIVE_TECHNOLOGY"
+      ]
+    },
+    "SourceStatus": {
+      "title": "SourceStatus",
+      "type": "string",
+      "enum": [
+        "DISCOVERED",
+        "REVIEWING",
+        "LICENSE_REVIEW_REQUIRED",
+        "CANDIDATE",
+        "ADMITTED",
+        "QUARANTINED",
+        "REJECTED",
+        "RETIRED"
+      ]
+    },
+    "Capability": {
+      "title": "Capability",
+      "type": "string",
+      "enum": [
+        "PROJECT_SETUP",
+        "INGEST",
+        "DEEP_EXTRACTION",
+        "REFLECTION",
+        "ARTIFACT_GENERATION",
+        "ARTIFACT_CONSUMPTION",
+        "CODEBASE_UNDERSTANDING",
+        "TOPIC_CORRELATION",
+        "GOD_NODE_CORRELATION",
+        "SOURCE_REFRESH",
+        "PIVOT_EVALUATION"
+      ]
+    },
+    "EvidenceStage": {
+      "title": "EvidenceStage",
+      "type": "string",
+      "enum": [
+        "DECLARED",
+        "CONFIGURED",
+        "EXECUTED",
+        "VERIFIED",
+        "FAILED",
+        "NOT_SUPPORTED"
+      ]
+    },
+    "CapabilityEvidence": {
+      "title": "CapabilityEvidence",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "stage",
+        "path",
+        "commit",
+        "observed_at_ns",
+        "summary"
+      ],
+      "properties": {
+        "capability": {"$ref": "#/$defs/Capability"},
+        "stage": {"$ref": "#/$defs/EvidenceStage"},
+        "path": {"$ref": "#/$defs/RepoPath"},
+        "commit": {"$ref": "#/$defs/CommitSha"},
+        "observed_at_ns": {"$ref": "#/$defs/EpochNs"},
+        "summary": {"type": "string", "minLength": 1}
+      }
+    },
+    "LicenseStatus": {
+      "title": "LicenseStatus",
+      "type": "string",
+      "enum": [
+        "UNKNOWN",
+        "REVIEW_REQUIRED",
+        "ALLOWED",
+        "RESTRICTED",
+        "PROHIBITED"
+      ]
+    },
+    "LicenseEvidence": {
+      "title": "LicenseEvidence",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "commit"],
+      "properties": {
+        "path": {"$ref": "#/$defs/RepoPath"},
+        "commit": {"$ref": "#/$defs/CommitSha"}
+      }
+    },
+    "License": {
+      "title": "License",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "spdx_id", "evidence", "reviewed_at_ns"],
+      "properties": {
+        "status": {"$ref": "#/$defs/LicenseStatus"},
+        "spdx_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]*(?: WITH [A-Za-z0-9][A-Za-z0-9.+-]*)?$"
+            },
+            {"type": "null"}
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/LicenseEvidence"},
+          "uniqueItems": true
+        },
+        "reviewed_at_ns": {"$ref": "#/$defs/NullableEpochNs"}
+      }
+    },
+    "CurrentHead": {
+      "title": "CurrentHead",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "observed_at_ns"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/CommitSha"},
+        "observed_at_ns": {"$ref": "#/$defs/EpochNs"}
+      }
+    },
+    "Repository": {
+      "title": "Repository",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo_id",
+        "canonical_url",
+        "ref",
+        "default_branch",
+        "reviewed_commit",
+        "current_head",
+        "is_fork",
+        "is_archived",
+        "is_vendor_mirror"
+      ],
+      "properties": {
+        "repo_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "canonical_url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "ref": {"type": "string", "minLength": 1},
+        "default_branch": {"type": "string", "minLength": 1},
+        "reviewed_commit": {"$ref": "#/$defs/NullableCommitSha"},
+        "current_head": {
+          "anyOf": [
+            {"$ref": "#/$defs/CurrentHead"},
+            {"type": "null"}
+          ]
+        },
+        "is_fork": {"type": "boolean"},
+        "is_archived": {"type": "boolean"},
+        "is_vendor_mirror": {"type": "boolean"}
+      }
+    },
+    "GraphifyIgnorePolicy": {
+      "title": "GraphifyIgnorePolicy",
+      "type": "string",
+      "enum": [
+        "REQUIRE_AND_HONOR",
+        "HONOR_IF_PRESENT",
+        "EXPLICIT_PATHS_ONLY"
+      ]
+    },
+    "PathSelection": {
+      "title": "PathSelection",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "include_paths",
+        "exclude_paths",
+        "graphifyignore_policy",
+        "graphifyignore_path"
+      ],
+      "properties": {
+        "include_paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/RepoPath"},
+          "uniqueItems": true
+        },
+        "exclude_paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/RepoPath"},
+          "uniqueItems": true
+        },
+        "graphifyignore_policy": {"$ref": "#/$defs/GraphifyIgnorePolicy"},
+        "graphifyignore_path": {
+          "anyOf": [
+            {"$ref": "#/$defs/RepoPath"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "LifecycleTimestamps": {
+      "title": "LifecycleTimestamps",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "discovered_at_ns",
+        "last_reviewed_at_ns",
+        "last_status_change_at_ns"
+      ],
+      "properties": {
+        "discovered_at_ns": {"$ref": "#/$defs/EpochNs"},
+        "last_reviewed_at_ns": {"$ref": "#/$defs/NullableEpochNs"},
+        "last_status_change_at_ns": {"$ref": "#/$defs/EpochNs"}
+      }
+    },
+    "SourceBudget": {
+      "title": "SourceBudget",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimated_checkout_bytes",
+        "estimated_selected_files",
+        "estimated_ingest_seconds"
+      ],
+      "properties": {
+        "estimated_checkout_bytes": {"$ref": "#/$defs/NullableNonNegativeInteger"},
+        "estimated_selected_files": {"$ref": "#/$defs/NullableNonNegativeInteger"},
+        "estimated_ingest_seconds": {"$ref": "#/$defs/NullableNonNegativeInteger"}
+      }
+    },
+    "SemanticBudget": {
+      "title": "SemanticBudget",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimated_input_tokens",
+        "max_output_tokens",
+        "estimated_deep_seconds",
+        "max_cost_usd_micros"
+      ],
+      "properties": {
+        "estimated_input_tokens": {"$ref": "#/$defs/NullableNonNegativeInteger"},
+        "max_output_tokens": {"$ref": "#/$defs/NullableNonNegativeInteger"},
+        "estimated_deep_seconds": {"$ref": "#/$defs/NullableNonNegativeInteger"},
+        "max_cost_usd_micros": {"$ref": "#/$defs/NullableNonNegativeInteger"}
+      }
+    },
+    "ResourceBudgets": {
+      "title": "ResourceBudgets",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "semantic"],
+      "properties": {
+        "source": {"$ref": "#/$defs/SourceBudget"},
+        "semantic": {"$ref": "#/$defs/SemanticBudget"}
+      }
+    },
+    "RegistryAdmissionPolicy": {
+      "title": "RegistryAdmissionPolicy",
+      "type": "string",
+      "enum": ["METADATA_ONLY", "REVIEW_REQUIRED", "ADMITTED", "DENIED"]
+    },
+    "GraphIngestionPolicy": {
+      "title": "GraphIngestionPolicy",
+      "type": "string",
+      "enum": ["DISABLED", "SELECTED_PATHS_ONLY"]
+    },
+    "DeepExtractionPolicy": {
+      "title": "DeepExtractionPolicy",
+      "type": "string",
+      "enum": ["DISABLED", "CANARY", "ENABLED"]
+    },
+    "ReflectionPolicy": {
+      "title": "ReflectionPolicy",
+      "type": "string",
+      "enum": ["DISABLED", "AFTER_SUCCESSFUL_DEEP"]
+    },
+    "ArtifactPolicy": {
+      "title": "ArtifactPolicy",
+      "type": "string",
+      "enum": [
+        "DISABLED",
+        "STRUCTURAL_ONLY",
+        "SEMANTIC_ON_SUCCESS",
+        "STRUCTURAL_AND_SEMANTIC"
+      ]
+    },
+    "PromotionPolicy": {
+      "title": "PromotionPolicy",
+      "type": "string",
+      "enum": ["BLOCKED", "MANUAL_AFTER_GATES", "AUTOMATIC_AFTER_GATES"]
+    },
+    "Policies": {
+      "title": "Policies",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_admission",
+        "graph_ingestion",
+        "deep_extraction",
+        "reflection",
+        "artifacts",
+        "promotion"
+      ],
+      "properties": {
+        "registry_admission": {"$ref": "#/$defs/RegistryAdmissionPolicy"},
+        "graph_ingestion": {"$ref": "#/$defs/GraphIngestionPolicy"},
+        "deep_extraction": {"$ref": "#/$defs/DeepExtractionPolicy"},
+        "reflection": {"$ref": "#/$defs/ReflectionPolicy"},
+        "artifacts": {"$ref": "#/$defs/ArtifactPolicy"},
+        "promotion": {"$ref": "#/$defs/PromotionPolicy"}
+      }
+    },
+    "RefreshCadence": {
+      "title": "RefreshCadence",
+      "type": "string",
+      "enum": ["MANUAL", "WEEKLY", "MONTHLY", "QUARTERLY"]
+    },
+    "Refresh": {
+      "title": "Refresh",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cadence",
+        "last_checked_at_ns",
+        "next_check_after_ns",
+        "update_available"
+      ],
+      "properties": {
+        "cadence": {"$ref": "#/$defs/RefreshCadence"},
+        "last_checked_at_ns": {"$ref": "#/$defs/NullableEpochNs"},
+        "next_check_after_ns": {"$ref": "#/$defs/NullableEpochNs"},
+        "update_available": {"type": "boolean"}
+      }
+    },
+    "PivotEvaluationStatus": {
+      "title": "PivotEvaluationStatus",
+      "type": "string",
+      "enum": [
+        "NOT_EVALUATED",
+        "QUEUED",
+        "ACTIVE",
+        "SUPERIOR",
+        "INFERIOR",
+        "COMPLEMENTARY",
+        "REJECTED"
+      ]
+    },
+    "PivotDimension": {
+      "title": "PivotDimension",
+      "type": "string",
+      "enum": [
+        "PROTOCOL_COMPATIBILITY",
+        "SEMANTIC_QUALITY",
+        "STRUCTURAL_QUALITY",
+        "PERFORMANCE",
+        "COST",
+        "OPERABILITY",
+        "MAINTENANCE",
+        "LICENSE"
+      ]
+    },
+    "PivotCandidate": {
+      "title": "PivotCandidate",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "is_candidate",
+        "technology_name",
+        "status",
+        "comparison_dimensions",
+        "last_evaluated_at_ns",
+        "next_evaluation_after_ns",
+        "recommendation"
+      ],
+      "properties": {
+        "is_candidate": {"type": "boolean"},
+        "technology_name": {"$ref": "#/$defs/NullableString"},
+        "status": {"$ref": "#/$defs/PivotEvaluationStatus"},
+        "comparison_dimensions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/PivotDimension"},
+          "uniqueItems": true
+        },
+        "last_evaluated_at_ns": {"$ref": "#/$defs/NullableEpochNs"},
+        "next_evaluation_after_ns": {"$ref": "#/$defs/NullableEpochNs"},
+        "recommendation": {"$ref": "#/$defs/NullableString"}
+      }
+    },
+    "SourceRecord": {
+      "title": "SourceRecord",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "repository",
+        "role",
+        "status",
+        "capability_evidence",
+        "license",
+        "paths",
+        "timestamps",
+        "budgets",
+        "policies",
+        "warnings",
+        "refresh",
+        "pivot"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "repository": {"$ref": "#/$defs/Repository"},
+        "role": {"$ref": "#/$defs/Role"},
+        "status": {"$ref": "#/$defs/SourceStatus"},
+        "capability_evidence": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/CapabilityEvidence"},
+          "uniqueItems": true
+        },
+        "license": {"$ref": "#/$defs/License"},
+        "paths": {"$ref": "#/$defs/PathSelection"},
+        "timestamps": {"$ref": "#/$defs/LifecycleTimestamps"},
+        "budgets": {"$ref": "#/$defs/ResourceBudgets"},
+        "policies": {"$ref": "#/$defs/Policies"},
+        "warnings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/SourceWarning"},
+          "uniqueItems": true
+        },
+        "refresh": {"$ref": "#/$defs/Refresh"},
+        "pivot": {"$ref": "#/$defs/PivotCandidate"}
+      }
+    }
+  }
+}

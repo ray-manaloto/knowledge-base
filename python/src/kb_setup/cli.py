@@ -75,6 +75,8 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
+            "graphify-contract | ecosystem-discovery-plan [alternative...] | "
+            "source-groups-check [path] | "
             "ensure-deps | version"
         )
         return 0
@@ -128,6 +130,18 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.query(repo_root, rest)
+    if cmd == "graphify-contract":
+        from kb_setup import graphify_sdk
+
+        return graphify_sdk.contract_main(repo_root)
+    if cmd == "source-groups-check":
+        from kb_setup import source_groups
+
+        return source_groups.check_main(repo_root, rest)
+    if cmd == "ecosystem-discovery-plan":
+        from kb_setup import ecosystem_discovery
+
+        return ecosystem_discovery.plan_main(rest)
     if cmd == "affected":
         from kb_setup import graphify_ops
 

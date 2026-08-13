@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from kb_setup import graphify_ops, prose
 
-if TYPE_CHECKING:
-    import pytest
+
+@pytest.fixture(autouse=True)
+def _reviewed_graphify_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit cases isolate query behavior from the installed SDK contract."""
+    monkeypatch.setattr(graphify_ops, "assert_pinned_graphify", lambda _root: None)
 
 
 class _Recorder:
@@ -110,6 +113,39 @@ def test_an_explicit_graph_is_left_alone(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert argv is not None
     assert argv.count("--graph") == 1
     assert argv[argv.index("--graph") + 1] == "/elsewhere/graph.json"
+
+
+def test_rc_zero_truncation_banner_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout="[!] TRUNCATED: showing 20 of 200 nodes\npartial\n",
+        stderr="",
+    )
+    monkeypatch.setattr(graphify_ops.subprocess, "run", lambda *_a, **_k: result)
+
+    assert graphify_ops.query(_repo(tmp_path), ["q"]) == 3
+    captured = capsys.readouterr()
+    assert "partial" in captured.out
+    assert "incomplete TRUNCATED" in captured.err
+
+
+def test_rc_zero_stderr_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="answer\n", stderr="coverage reduced\n"
+    )
+    monkeypatch.setattr(graphify_ops.subprocess, "run", lambda *_a, **_k: result)
+
+    assert graphify_ops.query(_repo(tmp_path), ["q"]) == 3
+    assert "coverage reduced" in capsys.readouterr().err
 
 
 def test_prose_and_an_explicit_graph_together_is_an_error(
