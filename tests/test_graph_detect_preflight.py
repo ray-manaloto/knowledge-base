@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -661,6 +662,38 @@ def test_disposable_clones_are_independent_and_cleaned(
     assert receipt.state == "complete"
     assert clones
     assert all(not clone.exists() for clone in clones)
+
+
+def test_disposable_clone_owns_objects_from_shared_source(tmp_path: Path) -> None:
+    upstream = _real_manifest(tmp_path, "upstream")
+    shared = _manifest(tmp_path, "shared", clone=False)
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", str(upstream.clone_dir), str(shared.clone_dir)],
+        check=True,
+    )
+    shared = mf.Manifest(
+        name=shared.name,
+        path=shared.path,
+        url=shared.url,
+        ref=shared.ref,
+        commit=upstream.commit,
+    )
+    provenance = graph._verify_source_provenance(shared)
+    destination = tmp_path / "disposable"
+
+    result = graph._create_source_snapshot(shared, provenance, destination)
+
+    assert result.failure_category == ""
+    assert not (destination / ".git" / "objects" / "info" / "alternates").exists()
+    shutil.rmtree(shared.clone_dir)
+    shutil.rmtree(upstream.clone_dir)
+    subprocess.run(
+        ["git", "-C", str(destination), "fsck", "--full", "--no-dangling"],
+        check=True,
+        capture_output=True,
+    )
+    assert (destination / "source.py").read_text(encoding="utf-8") == "value = 1\n"
+    graph._assert_disposable_clone_identity(destination, provenance)
 
 
 def test_timed_out_detection_cleans_disposable_clone(

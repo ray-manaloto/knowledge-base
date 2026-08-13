@@ -540,10 +540,11 @@ def _create_source_snapshot(
                 "clone",
                 "--quiet",
                 "--no-checkout",
+                "--no-local",
                 "--no-hardlinks",
                 "--no-tags",
                 "--",
-                str(manifest.clone_dir),
+                manifest.clone_dir.resolve().as_uri(),
                 str(destination),
             ],
             check=True,
@@ -602,6 +603,9 @@ def _create_source_snapshot(
 
 def _assert_disposable_clone_identity(clone_dir: Path, provenance: SourceGitProvenance) -> None:
     """Fail unless a disposable clone remains exact, detached, and clean."""
+    alternates = clone_dir / ".git" / "objects" / "info" / "alternates"
+    if alternates.exists():
+        raise RuntimeError("disposable clone inherited an object alternates dependency")
     head = _rev_parse(clone_dir, "HEAD^{commit}")
     tree = _rev_parse(clone_dir, "HEAD^{tree}")
     symbolic = subprocess.run(
