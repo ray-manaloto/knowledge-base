@@ -530,6 +530,16 @@ run = "uv run kb-setup graphify-contract"
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
 run = "uv run kb-setup skillopt-contract"
 
+[tasks.kb-skillopt-reviewed]
+description = "Stage a reviewed-ledger-only SkillOpt mock or handoff run under .agent/skillopt"
+usage = '''
+arg "<packet>" help="Content-addressed reviewed ledger packet"
+arg "<target>" help="Content-addressed project target descriptor"
+arg "<backend>" help="Confined backend" choices "mock" "handoff"
+arg "<review_receipt_sha256>" help="Out-of-band trusted review receipt digest"
+'''
+run = "uv run kb-setup skillopt-reviewed --packet ${usage_packet?} --target ${usage_target?} --backend ${usage_backend?} --review-receipt-sha256 ${usage_review_receipt_sha256?}"
+
 [tasks.kb-source-groups-check]
 description = "Validate the typed Graphify ecosystem source registry"
 usage = '''
