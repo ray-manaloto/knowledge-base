@@ -9,6 +9,7 @@ from pathlib import Path
 import networkx as nx
 import pytest
 from kb_setup import graphify_sdk
+from kb_setup.currency import config as currency_config
 from kb_setup.graphify_health import (
     ExpectedMetadataOnly,
     ExpectedUnclassifiedFile,
@@ -20,6 +21,16 @@ from kb_setup.graphify_health import (
 
 def test_graphify_0942_public_sdk_contract_is_current() -> None:
     assert graphify_sdk.contract_errors("0.9.42") == ()
+
+
+def test_graphify_0942_watch_conclusions_are_structured_notes() -> None:
+    repo = Path(__file__).parent.parent.absolute()
+    graphify = {spec.name: spec for spec in currency_config.load(repo)}["graphify"]
+    conclusions = {item.ref: item.note for item in graphify.watch if item.kind == "local"}
+
+    assert "2026-08-13 for 0.9.42" in conclusions["label-communities-schema-gap"]
+    assert "Remains RESOLVED" in conclusions["mcp-major-pin-is-what-makes-kb-serve-installable"]
+    assert "remains UNKNOWN" in conclusions["data-only-json-produces-zero-nodes"]
 
 
 def test_every_contract_symbol_is_public() -> None:
