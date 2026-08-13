@@ -102,6 +102,7 @@ sources/*/
 !sources/extractions/
 !sources/groups/
 !sources/groups/*.toml
+!sources/groups/*.baseline.json
 !sources/media/
 !sources/.gitkeep
 sources/media/*.m4a       # audio — the transcript is the committed artifact

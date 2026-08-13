@@ -16,14 +16,17 @@ from kb_setup.graphify_health import (
 
 
 def test_clean_query_is_complete() -> None:
-    receipt = assess(GraphifyOperation.QUERY, GraphifyEvidence(stdout="answer\n"))
+    receipt = assess(GraphifyOperation.QUERY, GraphifyEvidence(observed=True, stdout="answer\n"))
     assert receipt.state is GraphifyState.COMPLETE
     assert receipt.reasons == ()
 
 
 @pytest.mark.parametrize("stderr", ["SyntaxWarning: invalid escape sequence", "coverage reduced"])
 def test_success_with_stderr_is_incomplete(stderr: str) -> None:
-    receipt = assess(GraphifyOperation.QUERY, GraphifyEvidence(stdout="answer\n", stderr=stderr))
+    receipt = assess(
+        GraphifyOperation.QUERY,
+        GraphifyEvidence(observed=True, stdout="answer\n", stderr=stderr),
+    )
     assert receipt.state is GraphifyState.INCOMPLETE
     assert "stderr" in receipt.reasons
 
@@ -32,6 +35,7 @@ def test_extract_refuses_unclassified_zero_node_and_partial_coverage() -> None:
     receipt = assess(
         GraphifyOperation.EXTRACT,
         GraphifyEvidence(
+            observed=True,
             detected_sources=100,
             extracted_sources=45,
             unclassified_files=54,
@@ -46,6 +50,15 @@ def test_extract_refuses_unclassified_zero_node_and_partial_coverage() -> None:
     }
 
 
+def test_query_partial_count_banner_is_incomplete() -> None:
+    receipt = assess(
+        GraphifyOperation.QUERY,
+        GraphifyEvidence(observed=True, stdout="PARTIAL: 278/562 nodes\n"),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "partial-result" in receipt.reasons
+
+
 def test_coverage_policy_allows_declared_optional_gaps_only() -> None:
     policy = SourceCoveragePolicy(
         required_paths=("mise.toml", "Dockerfile"),
@@ -55,6 +68,7 @@ def test_coverage_policy_allows_declared_optional_gaps_only() -> None:
     receipt = assess(
         GraphifyOperation.EXTRACT,
         GraphifyEvidence(
+            observed=True,
             coverage_policy=policy,
             unclassified_paths=("CHANGELOG.legacy",),
             zero_node_paths=("empty.json",),
@@ -68,6 +82,7 @@ def test_required_unsupported_source_is_never_silently_ignored() -> None:
     receipt = assess(
         GraphifyOperation.EXTRACT,
         GraphifyEvidence(
+            observed=True,
             coverage_policy=policy,
             unclassified_paths=("mise.toml", "Dockerfile"),
         ),
@@ -80,6 +95,7 @@ def test_deep_reflection_artifact_and_scope_expectations_fail_closed() -> None:
     receipt = assess(
         GraphifyOperation.BUILD,
         GraphifyEvidence(
+            observed=True,
             mode="ast",
             deep_required=True,
             reflection_expected=True,
@@ -100,7 +116,16 @@ def test_deep_reflection_artifact_and_scope_expectations_fail_closed() -> None:
 
 
 def test_nonzero_operation_is_failed_and_require_complete_raises() -> None:
-    receipt = assess(GraphifyOperation.ARTIFACT, GraphifyEvidence(returncode=2))
+    receipt = assess(GraphifyOperation.ARTIFACT, GraphifyEvidence(observed=True, returncode=2))
     assert receipt.state is GraphifyState.FAILED
     with pytest.raises(IncompleteGraphifyOperationError, match="artifact failed"):
         require_complete(receipt)
+
+
+@pytest.mark.parametrize("operation", list(GraphifyOperation))
+def test_missing_evidence_is_incomplete_for_every_operation(
+    operation: GraphifyOperation,
+) -> None:
+    receipt = assess(operation)
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert receipt.reasons == ("evidence-missing",)

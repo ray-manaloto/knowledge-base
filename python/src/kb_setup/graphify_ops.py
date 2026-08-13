@@ -645,6 +645,7 @@ def _run_graphify_query(repo_root: Path, args: Sequence[str]) -> int:
     receipt = graphify_health.assess(
         graphify_health.GraphifyOperation.QUERY,
         graphify_health.GraphifyEvidence(
+            observed=True,
             returncode=proc.returncode,
             stdout=stdout,
             stderr=stderr,
@@ -664,6 +665,15 @@ def _run_graphify_query(repo_root: Path, args: Sequence[str]) -> int:
             "[kb-query] Graphify emitted stderr while returning rc=0. The warning/error "
             "must be investigated before this result can be used.",
             coverage_reduced=True,
+        )
+        return 3
+    if receipt.state is not graphify_health.GraphifyState.COMPLETE:
+        events.fail(
+            "query.incomplete",
+            "[kb-query] Graphify returned incomplete coverage with rc=0; this result "
+            "cannot be used as evidence of absence.",
+            coverage_reduced=True,
+            reasons=list(receipt.reasons),
         )
         return 3
     return 0

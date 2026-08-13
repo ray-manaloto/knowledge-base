@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 
 import msgspec
@@ -63,6 +64,7 @@ class IncompleteGraphifyOperationError(RuntimeError):
 class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Raw observations to classify for one Graphify operation."""
 
+    observed: bool = False
     returncode: int = 0
     stdout: str = ""
     stderr: str = ""
@@ -85,10 +87,18 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
 
 def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
+    if not evidence.observed:
+        reasons.append("evidence-missing")
     if evidence.stderr.strip():
         reasons.append("stderr")
     if "truncated" in f"{evidence.stdout}\n{evidence.stderr}".casefold():
         reasons.append("truncated")
+    if re.search(
+        r"\bpartial(?:\s+result)?\s*:\s*\d+\s*/\s*\d+\b",
+        f"{evidence.stdout}\n{evidence.stderr}",
+        flags=re.IGNORECASE,
+    ):
+        reasons.append("partial-result")
     if (
         evidence.detected_sources is not None
         and evidence.extracted_sources is not None

@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -103,21 +104,48 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     NON-fatal here (its value comes from the host-agent prose wave), so the status is
     swallowed and emptiness is read from the sub-graph.
     """
+    from kb_setup import graphify_health, graphify_sdk
+
+    source_root = repo_root / "sources" / name
+    graphify_sdk.detect_checked(source_root)
     print(f"  $ graphify extract sources/{name} --code-only --force")
-    subprocess.run(
+    proc = subprocess.run(
         [graphify_exe(repo_root), "extract", f"sources/{name}", "--code-only", "--force"],
         cwd=repo_root,
         check=False,
         env=clean_env(),
+        capture_output=True,
+        text=True,
     )
+    if proc.stdout:
+        print(proc.stdout, end="")
+    if proc.stderr:
+        print(proc.stderr, end="", file=sys.stderr)
     sub = repo_root / "sources" / name / "graphify-out" / "graph.json"
-    if not sub.is_file():
-        return False
+    nodes: list[object] = []
     try:
         data = json.loads(sub.read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
-        return False
-    return bool(data.get("nodes"))
+        data = {}
+    raw_nodes = data.get("nodes", [])
+    if isinstance(raw_nodes, list):
+        nodes = raw_nodes
+    receipt = graphify_health.assess(
+        graphify_health.GraphifyOperation.EXTRACT,
+        graphify_health.GraphifyEvidence(
+            observed=True,
+            returncode=proc.returncode,
+            stdout=proc.stdout or "",
+            stderr=proc.stderr or "",
+            detected_sources=1,
+            extracted_sources=1 if nodes else 0,
+            zero_node_sources=0 if nodes else 1,
+            zero_node_paths=() if nodes else (name,),
+            mode="ast",
+        ),
+    )
+    graphify_health.require_complete(receipt)
+    return True
 
 
 #: THIS repo's own code, indexed into the aggregate graph beside the pinned

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tomllib
 from collections.abc import Hashable, Sequence
@@ -29,6 +30,7 @@ from kb_setup.generated.source_groups import (
 )
 
 DEFAULT_SOURCE_GROUP_PATH = Path("sources/groups/graphify-ecosystem.toml")
+DEFAULT_SOURCE_GROUP_BASELINE = Path("sources/groups/graphify-ecosystem.baseline.json")
 
 
 class SourceGroupValidationError(ValueError):
@@ -110,6 +112,10 @@ def check_main(repo_root: Path, args: Sequence[str]) -> int:
         path = repo_root / path
     try:
         config = load_source_groups(path)
+        baseline = DEFAULT_SOURCE_GROUP_BASELINE
+        if not baseline.is_absolute():
+            baseline = repo_root / baseline
+        validate_reviewed_baseline(config, baseline)
     except (OSError, SourceGroupValidationError) as exc:
         print(f"source-groups-check: FAIL: {exc}", file=sys.stderr)
         return 1
@@ -128,6 +134,82 @@ def check_main(repo_root: Path, args: Sequence[str]) -> int:
         )
     )
     return 0
+
+
+def validate_reviewed_baseline(config: SourceGroupConfig, path: Path) -> None:
+    """Bind registry membership, identity, ref, reviewed SHA, and evidence to review."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SourceGroupValidationError(f"reviewed baseline unavailable: {exc}") from exc
+    if raw.get("schema_version") != config.schema_version or raw.get("group_id") != config.group_id:
+        raise SourceGroupValidationError("reviewed baseline identity does not match registry")
+    expected_sources = raw.get("sources")
+    if not isinstance(expected_sources, list):
+        raise SourceGroupValidationError("reviewed baseline has no source list")
+    expected = {
+        str(item.get("source_id")): item for item in expected_sources if isinstance(item, dict)
+    }
+    actual = {source.source_id: source for source in config.sources}
+    if set(actual) != set(expected):
+        missing = sorted(set(expected) - set(actual))
+        added = sorted(set(actual) - set(expected))
+        raise SourceGroupValidationError(
+            f"registry membership differs from reviewed baseline: missing={missing}, added={added}"
+        )
+    for source_id, source in actual.items():
+        _validate_reviewed_source(source, expected[source_id])
+
+
+def _validate_reviewed_source(source: SourceRecord, expected: dict[str, object]) -> None:
+    identity = {
+        "repo_id": source.repository.repo_id,
+        "canonical_url": source.repository.canonical_url,
+        "ref": source.repository.ref,
+        "reviewed_commit": source.repository.reviewed_commit,
+    }
+    for field, value in identity.items():
+        if expected.get(field) != value:
+            raise SourceGroupValidationError(
+                f"{source.source_id}: {field} differs from reviewed baseline"
+            )
+    evidence = [
+        {"capability": item.capability.value, "path": item.path, "commit": item.commit}
+        for item in source.capability_evidence
+    ]
+    expected_evidence = expected.get("capability_evidence")
+    if not isinstance(expected_evidence, list):
+        raise SourceGroupValidationError(
+            f"{source.source_id}: reviewed baseline capability evidence is invalid"
+        )
+    reviewed_evidence = [
+        {key: item.get(key) for key in ("capability", "path", "commit")}
+        for item in expected_evidence
+        if isinstance(item, dict)
+    ]
+    if len(reviewed_evidence) != len(expected_evidence) or reviewed_evidence != evidence:
+        raise SourceGroupValidationError(
+            f"{source.source_id}: capability evidence differs from reviewed baseline"
+        )
+    for item in expected_evidence:
+        content_sha256 = item.get("content_sha256")
+        if (
+            not isinstance(content_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", content_sha256) is None
+        ):
+            raise SourceGroupValidationError(
+                f"{source.source_id}: evidence lacks reviewed content SHA-256"
+            )
+    selected = set(source.paths.include_paths)
+    for item in source.capability_evidence:
+        if item.path not in selected:
+            raise SourceGroupValidationError(
+                f"{source.source_id}: evidence path {item.path!r} is not a selected in-repo path"
+            )
+        if item.commit != source.repository.reviewed_commit:
+            raise SourceGroupValidationError(
+                f"{source.source_id}: evidence commit does not bind the reviewed commit"
+            )
 
 
 def validate_source_groups(config: SourceGroupConfig) -> None:

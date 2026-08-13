@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from kb_setup import prose, stamps
@@ -61,6 +62,34 @@ def _node_count(graph: Path) -> int:
         return 0
 
 
+def _run_generator(repo_root: Path, exe: str, args: list[str]) -> int:
+    """Run one artifact command and translate incomplete evidence to failure."""
+    proc = subprocess.run(
+        [exe, *args],
+        cwd=repo_root,
+        env=clean_env(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.stdout:
+        print(proc.stdout, end="")
+    if proc.stderr:
+        print(proc.stderr, end="", file=sys.stderr)
+    from kb_setup import graphify_health
+
+    receipt = graphify_health.assess(
+        graphify_health.GraphifyOperation.ARTIFACT,
+        graphify_health.GraphifyEvidence(
+            observed=True,
+            returncode=proc.returncode,
+            stdout=proc.stdout or "",
+            stderr=proc.stderr or "",
+        ),
+    )
+    return 0 if receipt.state is graphify_health.GraphifyState.COMPLETE else 3
+
+
 def generate(repo_root: Path, only: list[str] | None = None) -> int:
     """Generate all artifacts (or the subset in `only`). Returns non-zero on any failure."""
     graph = repo_root / "graphify-out" / "graph.json"
@@ -99,7 +128,7 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
         print(f"  → {name}: {desc}")
         rewrites = name in _REWRITES_GRAPH
         # clean_env: no non-Claude backend key reaches graphify (Gemini-free).
-        rc = subprocess.run([exe, *args], cwd=repo_root, env=clean_env(), check=False).returncode
+        rc = _run_generator(repo_root, exe, args)
         if rc != 0:
             print(f"    FAILED ({name}, rc={rc})")
             failures.append(name)

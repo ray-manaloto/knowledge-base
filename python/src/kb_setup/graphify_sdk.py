@@ -13,16 +13,30 @@ writer runs.
 from __future__ import annotations
 
 import inspect
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from graphify.build import build, build_from_json, build_merge
 from graphify.detect import detect, detect_incremental
 from graphify.export import prune_dangling_edges, to_json
 from graphify.extract import collect_files, extract
 from graphify.reflect import build_learning_overlay, reflect
+
+from kb_setup.graphify_health import (
+    GraphifyEvidence,
+    GraphifyOperation,
+    GraphifyReceipt,
+    SourceCoveragePolicy,
+    assess,
+    require_complete,
+)
+
+if TYPE_CHECKING:
+    import networkx as nx
 
 
 @dataclass(frozen=True)
@@ -162,3 +176,128 @@ def contract_main(repo_root: Path) -> int:
     for dotted_name, signature in public_api_fingerprint():
         print(f"  {dotted_name}{signature}")
     return 0
+
+
+def detect_checked(
+    root: Path,
+    *,
+    coverage_policy: SourceCoveragePolicy | None = None,
+) -> tuple[dict, GraphifyReceipt]:
+    """Run public detection and refuse warnings or undeclared coverage gaps."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = detect(root)
+    warning_text = "\n".join(str(item.message) for item in caught)
+    unclassified = tuple(_relative_paths(root, result.get("unclassified", [])))
+    receipt = assess(
+        GraphifyOperation.DETECT,
+        GraphifyEvidence(
+            observed=True,
+            stderr=warning_text,
+            detected_sources=int(result.get("total_files", 0)) + len(unclassified),
+            unclassified_files=len(unclassified),
+            unclassified_paths=unclassified,
+            coverage_policy=coverage_policy,
+        ),
+    )
+    require_complete(receipt)
+    return result, receipt
+
+
+def extract_checked(paths: list[Path], *, root: Path) -> tuple[dict, GraphifyReceipt]:
+    """Run public extraction and refuse warnings, partial input, or zero-node sources."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = extract(paths, root=root)
+    nodes = result.get("nodes", [])
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="\n".join(str(item.message) for item in caught),
+            detected_sources=len(paths),
+            extracted_sources=len(paths) if nodes else 0,
+            zero_node_sources=0 if nodes else len(paths),
+            mode="ast",
+        ),
+    )
+    require_complete(receipt)
+    return result, receipt
+
+
+def build_checked(extractions: list[dict], *, root: Path) -> tuple[nx.Graph, GraphifyReceipt]:
+    """Run public graph construction and require a nonempty, warning-free result."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        graph = build(extractions, root=root)
+    node_count = int(graph.number_of_nodes())
+    receipt = assess(
+        GraphifyOperation.BUILD,
+        GraphifyEvidence(
+            observed=True,
+            stderr="\n".join(str(item.message) for item in caught),
+            detected_sources=len(extractions),
+            extracted_sources=len(extractions) if node_count else 0,
+            zero_node_sources=0 if node_count else len(extractions),
+        ),
+    )
+    require_complete(receipt)
+    return graph, receipt
+
+
+def reflect_checked(
+    memory_dir: Path,
+    out_path: Path,
+    *,
+    graph_path: Path,
+) -> tuple[tuple[Path, dict], GraphifyReceipt]:
+    """Run public reflection and require its declared output."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = reflect(memory_dir, out_path, graph_path)
+    receipt = assess(
+        GraphifyOperation.REFLECT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="\n".join(str(item.message) for item in caught),
+            reflection_expected=True,
+            reflection_produced=out_path.is_file(),
+        ),
+    )
+    require_complete(receipt)
+    return result, receipt
+
+
+def artifact_checked(
+    graph: nx.Graph,
+    communities: dict[int, list[str]],
+    output_path: Path,
+) -> GraphifyReceipt:
+    """Run the public JSON exporter and require the requested artifact."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        written = to_json(graph, communities, str(output_path), force=True)
+    receipt = assess(
+        GraphifyOperation.ARTIFACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="\n".join(str(item.message) for item in caught),
+            expected_artifacts=(str(output_path),),
+            produced_artifacts=(str(output_path),) if written and output_path.is_file() else (),
+        ),
+    )
+    require_complete(receipt)
+    return receipt
+
+
+def _relative_paths(root: Path, paths: object) -> tuple[str, ...]:
+    if not isinstance(paths, list):
+        return ()
+    relative: list[str] = []
+    for raw in paths:
+        path = Path(str(raw))
+        try:
+            relative.append(str(path.relative_to(root)))
+        except ValueError:
+            relative.append(str(path))
+    return tuple(relative)

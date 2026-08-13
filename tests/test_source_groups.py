@@ -1,6 +1,9 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Strict source-group parsing and lifecycle controls."""
 
+from __future__ import annotations
+
+import shutil
 from pathlib import Path
 
 import pytest
@@ -12,6 +15,7 @@ from kb_setup.generated.source_groups import (
 )
 from kb_setup.source_groups import (
     SourceGroupValidationError,
+    check_main,
     load_source_groups,
     parse_source_groups,
     validate_transition,
@@ -193,6 +197,60 @@ def test_committed_ecosystem_registry_tracks_every_reviewed_project() -> None:
     assert sum(source.status == SourceStatus.REVIEWING for source in config.sources) == 16
     assert sum(source.status == SourceStatus.REJECTED for source in config.sources) == 4
     assert all(source.policies.graph_ingestion.value == "DISABLED" for source in config.sources)
+
+
+def _copy_reviewed_registry(tmp_path: Path) -> Path:
+    root = Path(__file__).resolve().parents[1]
+    destination = tmp_path / "sources" / "groups"
+    destination.mkdir(parents=True)
+    shutil.copy2(root / "sources/groups/graphify-ecosystem.toml", destination)
+    shutil.copy2(root / "sources/groups/graphify-ecosystem.baseline.json", destination)
+    return destination / "graphify-ecosystem.toml"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "message"),
+    [
+        (
+            "program-context-protocol/program-context-protocol",
+            "attacker/identity-substitute",
+            "repo_id differs",
+        ),
+        ("src/pcp/coupling.py", "does/not/exist.py", "capability evidence differs"),
+        (
+            "8a5eccc6a2034ab61c9d0738dedbc988ee9fda23",
+            "0000000000000000000000000000000000000000",
+            "reviewed_commit differs",
+        ),
+    ],
+)
+def test_public_check_rejects_review_identity_evidence_and_sha_mutations(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    old: str,
+    new: str,
+    message: str,
+) -> None:
+    registry = _copy_reviewed_registry(tmp_path)
+    text = registry.read_text(encoding="utf-8")
+    if message == "repo_id differs":
+        text = text.replace(f"https://github.com/{old}", f"https://github.com/{new}", 1)
+    registry.write_text(text.replace(old, new), encoding="utf-8")
+
+    assert check_main(tmp_path, [str(registry)]) == 1
+    assert message in capsys.readouterr().err
+
+
+def test_public_check_rejects_incomplete_registry_membership(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    registry = _copy_reviewed_registry(tmp_path)
+    text = registry.read_text(encoding="utf-8")
+    marker = text.index("[[sources]]", text.index("[[sources]]") + 1)
+    registry.write_text(text[:marker], encoding="utf-8")
+
+    assert check_main(tmp_path, [str(registry)]) == 1
+    assert "registry membership differs" in capsys.readouterr().err
 
 
 def test_rejects_duplicate_source_ids() -> None:
