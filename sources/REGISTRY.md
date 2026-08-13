@@ -129,17 +129,27 @@ not just ingested).
 | 103 | [pallets/click](https://github.com/pallets/click) | repo | T2 | candidate | **§2 R5 — the origin of this repo's undeclared `rc 2 = usage error`.** R10 **PASS**, last commit 2026-08-09 (`9c4dfdaebe0e`). `ClickException.exit_code = 1` / `UsageError.exit_code = 2` as `ClassVar[int]` on the exception class. Small, stable, and the CLI-conventions half of R5 that the SDK sources do not cover. |
 | 104 | [openai/openai-python](https://github.com/openai/openai-python) | repo | T3 | **not recommended** | Read for R5 as a second route to #102 and found to be **the same Stainless generator** — `_exceptions.py` agrees line for line, `status_code: Literal[400] = 400` included. Recorded so a future session does not spend the ingestion believing it is independent corroboration; it is one decision counted twice. R10 PASS (2026-08-04, `0c09a3fe8151`) but that is not the reason to skip it. |
 | 105 | [encode/httpx](https://github.com/encode/httpx) | repo | T3 | deferred | **§2 R5 — the no-codes-at-all end of the design range** (a pure exception hierarchy, `httpx/_exceptions.py`). **R10 SCREEN FAIL**: last commit 2026-02-23 (`b5addb64f016`), 167 days. Deferred rather than dropped — it is already present in the corpus *as a graphify worked example* (`graphify/worked/httpx/review.md`), which is a different artifact from its source and should not be mistaken for it. |
+| 106 | [agent-sh/agnix](https://github.com/agent-sh/agnix) | repo | T1 | pinned | Critical validator used by this repo. Manifest reconciled to the actually pinned 0.46.0 release (`73ce063c`); the previous 0.40.0 source was six releases behind the executable whose rules it was meant to explain. |
+| 107 | [twpayne/chezmoi](https://github.com/twpayne/chezmoi) | repo | T1 | pinned | Critical dotfiles/devcontainer dependency. Pinned and locally materialized at v2.72.0 (`f81cb321`), matching dotfiles' shared tool pin; source-only here because knowledge-base does not install the host binary. |
+| 108 | [Claude Code full documentation](https://code.claude.com/docs/llms-full.txt) | docs | T1 | captured | Full 7,115,382-byte offline body in `sources/media/claude-code-llms-full.md`, alongside the pinned product repo and agent-harness-docs mirror. `sources/critical-docs.receipts.json` records whole-body, prefix, and tail hashes with `truncated=false`; Graphify's former 12,000-character URL path would have discarded effectively all of it. |
+| 109 | [Codex full documentation](https://learn.chatgpt.com/docs/llms-full.txt) | docs | T1 | captured | Full 1,477,308-byte offline body in `sources/media/codex-llms-full.md`, alongside the pinned Codex repo and agent-harness-docs mirror. The same receipt verifies its exact cutoff and tail; it is not inferred complete from a successful HTTP status. |
+| 110 | [Meta Muse Glimmer developer docs](https://dev.meta.ai/docs/muse-glimmer) + [official announcement](https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model) + [model card](https://huggingface.co/meta-models/Muse-Glimmer-30B) + [GGUF model card](https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF) | docs | T1 | captured | Local-model candidate for Graphify deep extraction. The supplied developer-doc URL rendered only a 235-byte `Overview` stub and the lossless fetch returned HTTP 500, so it is explicitly **not** treated as complete. Durable authoritative fallbacks are captured under `sources/media/muse-glimmer-*.md`; per-source receipts bind hashes, byte/character counts, and cutoff witnesses. Semantic extraction remains pending the approved local-model canary. |
+| 111 | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | repo | T1 | manifest | Pinned as `kind = docs` at release `b10360` (`48d22e29…`), the selected OpenAI-compatible `llama-server` dependency for the Muse Glimmer canary after Muse support PR #26841 merged. Kept out of the aggregate AST because the decision needs the server contract and release behavior, not another large implementation graph. Initial trial excludes DFlash and vision while current Muse-specific runtime issues remain open. |
+| 112 | [jdx/fnox](https://github.com/jdx/fnox) | repo | T1 | code; prose pending | Critical credential-resolution dependency. Runtime, manifest, clone, and upstream release all agree on v1.33.0 (`a43f43ee…`); the aggregate contains 2,699 AST nodes. No dedicated fnox semantic extraction chunk exists yet, so shell activation, Keychain, cache, and release behavior remain a focused prose-extraction gap rather than being mislabeled complete. |
 
 ### Toolchain docs — the gap this registry did not show (2026-07-30)
 
-Of the 26 `sources/*.manifest` pins, **only `graphify` is a tool this repo runs.** mise, hk,
-fnox, uv, ruff, ty, pkl, taplo, rumdl, gitleaks, typos and agnix are all absent, which is why
-`kb-currency` `curl`s release notes instead of querying the graph. Tracked as **#81** with the
-full scan; suggested order is the jdx trio (mise/hk/fnox), then the astral trio (uv/ruff/ty).
+This was the gap observed on 2026-07-30; it is no longer a current inventory.
+The critical tool source manifests now include graphify, mise, hk, fnox, uv,
+ruff, ty, agnix, and chezmoi. Their code ASTs do not imply prose/release-note
+coverage: fnox, for example, has 2,699 AST nodes but no dedicated semantic docs
+chunk. Use the extraction inventory and #81 to distinguish `code`, `prose`, and
+`prose pending` instead of treating manifest presence as deep extraction.
 
-**Do not pin them `kind = code`** — that AST-extracts the *source* and skips every `.md`, so it
-misses the docs entirely while adding ruff's 176MB and uv's 183MB of AST to a graph already
-crowding prose out of the query budget (#12). `kind = docs` is the path.
+For documentation coverage, use a docs mirror or focused host-agent extraction.
+A `kind = code` manifest answers implementation questions through AST but skips
+Markdown; it is never evidence that release notes or operating guidance were
+deeply extracted.
 
 
 ## Progress log

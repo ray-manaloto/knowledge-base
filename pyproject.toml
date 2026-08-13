@@ -20,7 +20,7 @@ requires-python = ">=3.14"
 # A FLOOR, not an `==`, for the same reason the fetch extra below is: an exact
 # pin here is exported as someone else's constraint. Reproducibility for us is
 # uv.lock.
-dependencies = ["structlog>=26.1"]
+dependencies = ["msgspec==0.21.1", "structlog>=26.1"]
 
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
@@ -65,10 +65,27 @@ fetch = ["trafilatura>=2.0"]
 # parallelises well; a suite dominated by one slow test would not have been.
 dev = [
   "ruff==0.16.2",
-  "ty==0.0.69",
+  "ty==0.0.70",
   "pytest==9.1.1",
   "pytest-xdist==3.8.0",
   "trafilatura==2.2.0",
+]
+
+# Schema-driven wire contracts are generated in the project venv, never via an
+# ambient CLI or a temporary `uv --with` environment.  `msgspec` is a runtime
+# dependency because generated contracts decode receipts in production; the
+# generator is development-only.
+codegen = ["datamodel-code-generator==0.72.3"]
+
+# Large-model transfer and the Colibri canary share this exact-locked group.
+# Keeping it separate avoids exporting heavyweight model dependencies to
+# dotfiles, while plain `uv run --group models` reuses this project's .venv.
+artifact-download = ["hf-xet==1.6.0", "huggingface-hub==1.27.0"]
+models = [
+  { include-group = "artifact-download" },
+  "numpy==2.4.4",
+  "safetensors==0.8.0",
+  "torch==2.13.0",
 ]
 
 [build-system]
@@ -117,6 +134,11 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# These files are deterministically replaced by the exact-pinned generator.
+# The generator emits its provenance header and public model surface without
+# project docstrings/copyright notices; keeping it unmodified is the freshness
+# contract. This exception is intentionally limited to generated output.
+"python/src/kb_setup/generated/*.py" = ["CPY001", "D100", "D101", "ERA001"]
 # Tests: assert IS the mechanism (S101), self-describing names (D103), magic
 # values (PLR2004), private-member probing is the point (SLF001), fixture args
 # are untyped by pytest convention (ANN), and the dir is an implicit package (INP001).
@@ -153,10 +175,14 @@ max-complexity = 10
 python-version = "3.14"
 
 [tool.ty.src]
-# _merge_docs.py runs ONLY under graphify's bundled interpreter (it imports
-# graphify.build/cluster/export/... which are absent from the KB uv env), so ty
-# cannot resolve those imports here. It is a foreign-interpreter script driven via
-# `mise run kb-merge` — ruff still lints it; ty legitimately cannot type-check it.
+# These run ONLY under graphify's bundled interpreter (they import
+# graphify.build/cluster/export/reflect, which are absent from the KB uv env), so
+# ty cannot resolve those imports here. They are foreign-interpreter scripts
+# driven via `mise run kb-merge` / `kb-lessons-check` — ruff still lints them; ty
+# legitimately cannot type-check them.
+#
+# The underscore prefix is the marker: a `kb_setup/_*.py` module is a script for
+# graphify's interpreter, never an import target for the rest of the package.
 exclude = ["**/_merge_docs.py"]
 
 [tool.pytest.ini_options]

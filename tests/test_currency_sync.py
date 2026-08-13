@@ -158,6 +158,17 @@ def test_matching_install_dir_is_ok(tmp_path, monkeypatch) -> None:
     assert _finding(status, "resolution").status == sync.OK
 
 
+def test_release_version_equivalence_ignores_tag_prefix_and_zero_patch() -> None:
+    """Tag spelling and SemVer display precision are not dependency drift."""
+    assert sync._versions_equivalent("1.33.0", "v1.33.0")
+    assert sync._versions_equivalent("9.0.0", "9.0")
+
+
+def test_release_version_equivalence_keeps_prereleases_literal() -> None:
+    """Normalization must not erase a qualifier that changes the release."""
+    assert not sync._versions_equivalent("1.0.0-rc1", "1.0.0")
+
+
 def test_binary_outside_mise_is_drift(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(sync.shutil, "which", lambda _: "/opt/homebrew/bin/graphify")
     root = _repo(tmp_path)

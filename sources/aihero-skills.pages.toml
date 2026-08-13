@@ -20,6 +20,20 @@
 
 sitemap = "https://www.aihero.dev/sitemap.xml"
 fetched_at = "2026-08-02"
+# Reconciled against the complete sitemap body captured through `kb-fetch`.
+# The body is gitignored for licensing; its lossless receipt is committed at
+# `sources/aihero-skills.receipts.json`. Forty means "URL contains skill", not
+# "forty pages should be retained". Eight are selected, 21 were measured as
+# byte-content-equivalent in meaning to the MIT repo, and 11 newly observed or
+# structural candidates remain UNRECONCILED. This is deliberately not a claim
+# of full editorial coverage.
+sitemap_cutoff = "2026-08-11"
+sitemap_pages_at_cutoff = 188
+skill_url_candidates_at_cutoff = 40
+selected_pages = 8
+excluded_repo_overlap = 21
+unreconciled_candidates = 11
+sitemap_receipt = "sources/aihero-skills.receipts.json"
 
 [[page]]
 stem = "aihero-5-agent-skills-i-use-every-day"

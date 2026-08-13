@@ -118,8 +118,8 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     bare `<version>` — projects tag all three ways. Raises if NONE exists at the
     remote, so the currency engine can never pin a manifest to a version that was
     published to PyPI but tagged nowhere in git (the mirror of graphify's
-    v1.0.0-tagged-not-on-PyPI trap). `--refs` strips the `^{}` dereference line so
-    a peeled annotated tag yields one clean SHA.
+    v1.0.0-tagged-not-on-PyPI trap). Annotated tags return both the tag object and
+    its `^{}` dereference; the dereferenced commit is the reproducible source pin.
 
     `prefix` exists because the two halves of #245 were fixed in different
     places and only one of them landed: `ToolSpec.tag_prefix` taught the *sync*
@@ -137,7 +137,7 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
     for ref in candidates:
         try:
             out = subprocess.run(
-                ["git", "ls-remote", "--tags", "--refs", url, ref],
+                ["git", "ls-remote", "--tags", url, f"{ref}*"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -150,7 +150,9 @@ def resolve_tag(url: str, version: str, *, prefix: str = "") -> tuple[str, str]:
             # raw traceback escapes instead of the clean "[currency] apply failed".
             raise RuntimeError(f"git ls-remote failed for {url} @ {ref}: {e}") from e
         if out:
-            return ref, out.split()[0]
+            lines = out.splitlines()
+            peeled = next((line for line in lines if line.split()[-1].endswith("^{}")), "")
+            return ref, (peeled or lines[0]).split()[0]
     # Name EVERY candidate actually tried. The old wording hard-coded two, so a
     # prefixed miss would have reported that `rust-v` was never attempted when it
     # was — a failure message that misdescribes its own probe sends the reader to

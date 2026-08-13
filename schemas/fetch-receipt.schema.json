@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ray-manaloto.github.io/knowledge-base/schemas/fetch-receipt.schema.json",
+  "title": "FetchReceipt",
+  "description": "Versioned, lossless web-fetch provenance receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sources"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/FetchReceiptSource"}
+    }
+  },
+  "$defs": {
+    "FetchReceiptSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "artifact",
+        "content_sha256",
+        "content_bytes",
+        "content_chars",
+        "prefix_sha256",
+        "tail_sha256",
+        "read_to_eof",
+        "truncated"
+      ],
+      "properties": {
+        "url": {"type": "string"},
+        "artifact": {"type": "string"},
+        "content_sha256": {"type": "string"},
+        "content_bytes": {"type": "integer", "minimum": 0},
+        "content_chars": {"type": "integer", "minimum": 0},
+        "prefix_sha256": {"type": "string"},
+        "tail_sha256": {"type": "string"},
+        "read_to_eof": {"const": true, "type": "boolean"},
+        "truncated": {"const": false, "type": "boolean"}
+      }
+    }
+  }
+}

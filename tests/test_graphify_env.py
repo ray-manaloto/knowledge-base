@@ -258,6 +258,27 @@ def test_pinned_version_absent_pin_is_empty(tmp_path: Path) -> None:
     assert graphify_env.pinned_graphify_version(root) == ""
 
 
+def test_graphify_python_rejects_a_stale_build_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A prior build marker cannot keep SDK tasks on the old Graphify release."""
+    root = _mise_toml(tmp_path, '"pipx:graphifyy" = { version = "0.9.40", extras = ["all"] }')
+    marker = root / "graphify-out" / ".graphify_python"
+    marker.parent.mkdir()
+    marker.write_text("/old/python\n", encoding="utf-8")
+    monkeypatch.setattr(Path, "is_file", lambda self: str(self) in {str(marker), "/old/python"})
+    monkeypatch.setattr(graphify_env, "_python_graphify_version", lambda _py: "0.9.39")
+    monkeypatch.setattr(
+        graphify_env.subprocess,
+        "run",
+        lambda *_a, **_k: _fake_run("/new/install\n"),
+    )
+    monkeypatch.setattr(Path, "glob", lambda _self, _pat: iter((Path("/new/python"),)))
+    monkeypatch.setattr(graphify_env, "_imports_graphify", lambda py: str(py) == "/new/python")
+
+    assert graphify_env.graphify_python(root) == "/new/python"
+
+
 def test_pinned_version_unreadable_toml_is_empty_not_an_error(tmp_path: Path) -> None:
     (tmp_path / "mise.toml").write_text("[tools\nbroken", encoding="utf-8")
     assert graphify_env.pinned_graphify_version(tmp_path) == ""

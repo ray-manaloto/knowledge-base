@@ -79,20 +79,45 @@ def _ensure_clone(m: mf.Manifest) -> None:
     # aborted — i.e. update was broken for every source whose clone already
     # existed, which is every source after its first build. Fetch when (and only
     # when) the object is absent, so the common no-op path stays offline.
-    have = subprocess.run(
+    have_commit = subprocess.run(
         ["git", "-C", str(d), "cat-file", "-e", f"{m.commit}^{{commit}}"],
         check=False,
         capture_output=True,
         timeout=60,
     )
-    if have.returncode != 0:
-        print(f"  fetching {m.name} @ {m.commit[:10]} (not in local clone)")
+    have_ref = subprocess.run(
+        ["git", "-C", str(d), "rev-parse", "--verify", "--quiet", m.ref],
+        check=False,
+        capture_output=True,
+        timeout=60,
+    )
+    if have_commit.returncode != 0 or have_ref.returncode != 0:
+        print(f"  fetching {m.name} @ {m.ref} (commit or ref absent)")
         subprocess.run(
-            ["git", "-C", str(d), "fetch", "--quiet", "origin", m.ref],
+            [
+                "git",
+                "-C",
+                str(d),
+                "fetch",
+                "--quiet",
+                "--tags",
+                "origin",
+                m.ref,
+            ],
             check=True,
             timeout=600,
         )
     subprocess.run(["git", "-C", str(d), "checkout", "--quiet", m.commit], check=True, timeout=120)
+
+
+def ensure_source_clone(repo_root: Path, name: str) -> Path:
+    """Materialize one manifest pin without extracting or rebuilding any graph."""
+    matches = [m for m in mf.load_all(repo_root / "sources") if m.name == name]
+    if not matches:
+        raise ValueError(f"unknown source manifest: {name}")
+    source = matches[0]
+    _ensure_clone(source)
+    return source.clone_dir
 
 
 def _extract_code(repo_root: Path, name: str) -> bool:
@@ -1671,7 +1696,7 @@ def update(repo_root: Path, name: str) -> int:
     _run([graphify_exe(repo_root), "update", f"sources/{name}"], repo_root)
     print(
         f"[kb-update] {name} code updated. NOTE: changed DOCS are not re-extracted "
-        f"here — host-agent extraction (a Claude Code session) must re-run on changed "
+        f"here — host-agent extraction (Codex or Claude Code) must re-run on changed "
         f"docs and refresh sources/extractions/{name}-docs.json (the semantic cache "
         f"skips unchanged docs)."
     )

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+      "artifact": "sources/media/muse-glimmer-meta-research.md",
+      "content_sha256": "97fb4ceef75cc7ad545a00421e426b7a30502f8126c6e358ddba8b647c87f44f",
+      "content_bytes": 8531,
+      "content_chars": 8492,
+      "prefix_sha256": "e94c9c8e1674dafb51133531ae52f6ef5ea1719bb4b295b432118b123e65602e",
+      "tail_sha256": "ba6b088e07344d5c2f348a606097e3c8f1f8b789611d5a675f89529240d4feb7",
+      "read_to_eof": true,
+      "truncated": false
+    }
+  ]
+}

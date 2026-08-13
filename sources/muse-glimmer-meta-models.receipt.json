@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "url": "https://huggingface.co/collections/meta-models/muse-glimmer",
+      "artifact": "sources/media/muse-glimmer-meta-models.md",
+      "content_sha256": "80db27ccb778fa4f8c48b1468866d4a5678391e902c8f387103cf70419884aab",
+      "content_bytes": 461,
+      "content_chars": 455,
+      "prefix_sha256": "80db27ccb778fa4f8c48b1468866d4a5678391e902c8f387103cf70419884aab",
+      "tail_sha256": "80db27ccb778fa4f8c48b1468866d4a5678391e902c8f387103cf70419884aab",
+      "read_to_eof": true,
+      "truncated": false
+    }
+  ]
+}

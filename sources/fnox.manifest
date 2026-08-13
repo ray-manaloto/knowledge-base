@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] fnox`
-#   pinned here:    1.32.0
+#   pinned here:    1.33.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -20,7 +20,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/fnox
-ref = v1.32.0
-commit = 13e2a7bbc6af47423ef0b614291ced536a539c90
+ref = v1.33.0
+commit = a43f43eef1dd55a0797100d7f181184b209c9036
 kind = code
 added = 2026-08-02

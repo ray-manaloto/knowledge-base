@@ -63,7 +63,14 @@ def test_the_writer_set_names_every_graph_writer() -> None:
     a kind=docs pin advance is pure git, so `graph.update` gates its own
     code-kind branch where the kind is actually known (cold lane round 2).
     """
-    assert {"build", "watch", "merge", "label", "artifacts"} == cli._GRAPH_WRITERS
+    assert {
+        "build",
+        "watch",
+        "merge",
+        "label",
+        "artifacts",
+        "critical-corpus",
+    } == cli._GRAPH_WRITERS
 
 
 def test_update_is_not_gated_at_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:

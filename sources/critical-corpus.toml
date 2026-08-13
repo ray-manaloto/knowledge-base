@@ -1,0 +1,85 @@
+schema = 1
+graphify_version = "0.9.40"
+
+# This is deliberately a curated slice, not a recursive source-repo scan.  It
+# gives the critical-dependency graph stable structural entry points while the
+# full pinned clones remain available to the aggregate corpus.
+
+[[dependency]]
+name = "graphify"
+manifest = "sources/graphify.manifest"
+code = ["sources/graphify/graphify/cli.py", "sources/graphify/graphify/extract.py"]
+documents = ["sources/graphify/ARCHITECTURE.md", "sources/graphify/CHANGELOG.md"]
+depends_on = []
+
+[[dependency]]
+name = "mise"
+manifest = "sources/mise.manifest"
+code = ["sources/mise/src/cli/run.rs", "sources/mise/src/config/mod.rs"]
+documents = ["sources/mise/docs/tasks/index.md", "sources/mise/CHANGELOG.md"]
+depends_on = []
+
+[[dependency]]
+name = "hk"
+manifest = "sources/hk.manifest"
+code = ["sources/hk/src/main.rs", "sources/hk/src/config.rs"]
+documents = ["sources/hk/docs/mise_integration.md", "sources/hk/CHANGELOG.md"]
+depends_on = ["mise"]
+
+[[dependency]]
+name = "uv"
+manifest = "sources/uv.manifest"
+code = ["sources/uv/crates/uv-cli/src/lib.rs", "sources/uv/crates/uv-dev/src/main.rs"]
+documents = ["sources/uv/README.md", "sources/uv/CHANGELOG.md"]
+depends_on = []
+
+[[dependency]]
+name = "ruff"
+manifest = "sources/ruff.manifest"
+code = ["sources/ruff/crates/ruff/src/main.rs", "sources/ruff/crates/ruff_linter/src/lib.rs"]
+documents = ["sources/ruff/README.md", "sources/ruff/CHANGELOG.md"]
+depends_on = []
+
+[[dependency]]
+name = "ty"
+manifest = "sources/ty.manifest"
+code = ["sources/ty/python/ty/__main__.py", "sources/ty/python/ty/_find_ty.py"]
+documents = ["sources/ty/docs/type-checking.md", "sources/ty/CHANGELOG.md"]
+depends_on = ["ruff"]
+
+[[dependency]]
+name = "agnix"
+manifest = "sources/agnix.manifest"
+code = ["sources/agnix/crates/agnix-cli/src/main.rs", "sources/agnix/crates/agnix-core/src/lib.rs"]
+documents = ["sources/agnix/README.md", "sources/agnix/CHANGELOG.md"]
+depends_on = []
+
+[[dependency]]
+name = "chezmoi"
+manifest = "sources/chezmoi.manifest"
+code = ["sources/chezmoi/internal/cmd/applycmd.go", "sources/chezmoi/internal/cmd/updatecmd.go"]
+documents = ["sources/chezmoi/README.md"]
+depends_on = []
+
+[[dependency]]
+name = "codex"
+manifest = "sources/codex.manifest"
+code = ["sources/codex/codex-rs/core/src/codex_delegate.rs", "sources/codex/codex-rs/app-server/src/lib.rs"]
+documents = ["sources/agent-harness-docs/docs/codex/agent-configuration__subagents.md", "sources/agent-harness-docs/docs/codex/config-file__config-reference.md"]
+coverage_only = ["sources/media/codex-llms-full.md"]
+depends_on = []
+
+[[dependency]]
+name = "claude-code"
+manifest = "sources/claude-code.manifest"
+code = []
+documents = ["sources/claude-code/README.md", "sources/agent-harness-docs/docs/claude-code/hooks.md", "sources/agent-harness-docs/docs/claude-code/sub-agents.md"]
+coverage_only = ["sources/media/claude-code-llms-full.md"]
+depends_on = []
+
+[[dependency]]
+name = "mattpocock-skills"
+manifest = "sources/mattpocock-skills.manifest"
+code = []
+documents = ["sources/mattpocock-skills/docs/engineering/research.md", "sources/mattpocock-skills/docs/engineering/to-spec.md", "sources/mattpocock-skills/docs/engineering/implement.md", "sources/mattpocock-skills/docs/productivity/writing-for-agents.md", "sources/mattpocock-skills/docs/productivity/handoff.md"]
+depends_on = []

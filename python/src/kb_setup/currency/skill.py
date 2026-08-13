@@ -72,11 +72,13 @@ gate lives at that entry point instead.
 from __future__ import annotations
 
 import subprocess
-from dataclasses import dataclass
+import tempfile
+from dataclasses import dataclass, replace
 from pathlib import Path
+from shutil import copytree
 from typing import TYPE_CHECKING
 
-from kb_setup.graphify_env import clean_env
+from kb_setup.graphify_env import clean_env, graphify_exe
 
 if TYPE_CHECKING:
     from kb_setup.currency.config import ToolSpec
@@ -133,10 +135,11 @@ class Addendum:
 #: taken responsibility for, and an entry upstream later adopts should be DELETED
 #: rather than left in place: `_apply_addenda` is idempotent so it would not
 #: double the text, but a dead entry still fails the day its anchor moves.
-ADDENDA: dict[str, tuple[Addendum, ...]] = {
-    ".claude/skills/graphify": (
+def _graphify_addenda(skill_dir: str) -> tuple[Addendum, ...]:
+    """Return the local Graphify notes rooted at one generated skill tree."""
+    return (
         Addendum(
-            path=".claude/skills/graphify/references/query.md",
+            path=f"{skill_dir}/references/query.md",
             anchor='graphify path "NODE_A" "NODE_B"\n```\n',
             text=(
                 "\nSince graphify 0.9.34 (#2487), `path` respects edge DIRECTION by default and\n"
@@ -150,7 +153,7 @@ ADDENDA: dict[str, tuple[Addendum, ...]] = {
             ),
         ),
         Addendum(
-            path=".claude/skills/graphify/SKILL.md",
+            path=f"{skill_dir}/SKILL.md",
             anchor="### Step 5 - Label communities\n",
             text=(
                 "\n> **DO NOT RUN STEP 5 IN THIS REPO — use `mise run kb-label`.** Two reasons,\n"
@@ -172,7 +175,12 @@ ADDENDA: dict[str, tuple[Addendum, ...]] = {
                 "> itself would be eaten by the next refresh. (Cold lane on 5204e57, F1/F2.)\n"
             ),
         ),
-    ),
+    )
+
+
+ADDENDA: dict[str, tuple[Addendum, ...]] = {
+    skill_dir: _graphify_addenda(skill_dir)
+    for skill_dir in (".claude/skills/graphify", ".agents/skills/graphify")
 }
 
 
@@ -350,7 +358,7 @@ def _dirty(repo_root: Path, paths: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(sorted({line[3:] for line in out.stdout.splitlines() if line[3:]}))
 
 
-def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
+def _refresh_one(repo_root: Path, spec: ToolSpec) -> SkillResult:
     """Re-install `spec`'s project-scoped skill, then repair what that breaks.
 
     Returns rather than raises on installer failure: the caller has already
@@ -363,7 +371,7 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
         return SkillResult(ran=False, note="tool declares no project-scoped skill")
 
     skill = repo_root / spec.skill_dir
-    if not skill.is_dir():
+    if not skill.is_dir() and not spec.skill_generated_dir:
         return SkillResult(ran=False, note=f"{spec.skill_dir} is not present — nothing to refresh")
 
     # REFUSE on a pre-dirty repair target. The repair below is `git checkout --`,
@@ -381,15 +389,43 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
             ),
         )
 
-    proc = subprocess.run(
-        list(spec.skill_install),
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=_TIMEOUT,
-        env=clean_env(),
-    )
+    if spec.skill_generated_dir:
+        with tempfile.TemporaryDirectory(prefix="kb-skill-refresh-") as temp:
+            scratch = Path(temp)
+            graphify_index = spec.skill_install.index("graphify")
+            argv = [
+                str(graphify_exe(repo_root)),
+                *spec.skill_install[graphify_index + 1 :],
+            ]
+            proc = subprocess.run(
+                argv,
+                cwd=scratch,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=_TIMEOUT,
+                env=clean_env(),
+            )
+            generated = scratch / spec.skill_generated_dir
+            if proc.returncode == 0 and not generated.is_dir():
+                proc = subprocess.CompletedProcess(
+                    argv,
+                    1,
+                    stdout=proc.stdout,
+                    stderr=f"native installer did not generate {spec.skill_generated_dir}",
+                )
+            if proc.returncode == 0:
+                copytree(generated, skill, dirs_exist_ok=True)
+    else:
+        proc = subprocess.run(
+            list(spec.skill_install),
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_TIMEOUT,
+            env=clean_env(),
+        )
     if proc.returncode != 0:
         # REPAIR ON THE FAILURE PATH TOO. The pre-flight above proved the tree
         # started clean, so anything dirty in `_REPAIR` now was written by this
@@ -473,3 +509,51 @@ def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
             "(0.9.31 -> 0.9.32 changed 0 lines), so a large diff is usually formatting."
         ),
     )
+
+
+def _combine(results: list[tuple[str, SkillResult]]) -> SkillResult:
+    """Combine per-harness refresh evidence without laundering a failed target."""
+    return SkillResult(
+        ran=all(result.ran for _name, result in results),
+        changed=tuple(dict.fromkeys(path for _name, result in results for path in result.changed)),
+        repaired=tuple(
+            dict.fromkeys(path for _name, result in results for path in result.repaired)
+        ),
+        repair_delta="".join(result.repair_delta for _name, result in results),
+        addenda=tuple(dict.fromkeys(path for _name, result in results for path in result.addenda)),
+        lost_addenda=tuple(
+            dict.fromkeys(path for _name, result in results for path in result.lost_addenda)
+        ),
+        unrepaired=tuple(
+            dict.fromkeys(path for _name, result in results for path in result.unrepaired)
+        ),
+        note=" | ".join(f"{name}: {result.note}" for name, result in results),
+    )
+
+
+def refresh(repo_root: Path, spec: ToolSpec) -> SkillResult:
+    """Refresh every declared harness-specific skill bundle for ``spec``."""
+    targets = [
+        (spec.skill_dir, spec.skill_install, spec.skill_generated_dir),
+        *(
+            (target.directory, target.install, target.generated_directory)
+            for target in spec.skill_mirrors
+        ),
+    ]
+    results = [
+        (
+            directory,
+            _refresh_one(
+                repo_root,
+                replace(
+                    spec,
+                    skill_dir=directory,
+                    skill_install=install,
+                    skill_generated_dir=generated_directory,
+                    skill_mirrors=(),
+                ),
+            ),
+        )
+        for directory, install, generated_directory in targets
+    ]
+    return results[0][1] if len(results) == 1 else _combine(results)

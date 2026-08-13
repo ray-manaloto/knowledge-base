@@ -15,7 +15,13 @@ from typing import Never
 import pytest
 from kb_setup.currency import apply as apply_mod
 from kb_setup.currency import skill
-from kb_setup.currency.apply import ApplyResult, NotAuthorizedError, apply, set_pin_version
+from kb_setup.currency.apply import (
+    ApplyResult,
+    NotAuthorizedError,
+    apply,
+    set_expected_version,
+    set_pin_version,
+)
 from kb_setup.currency.config import ToolSpec
 from kb_setup.currency.decide import Verdict
 
@@ -71,6 +77,40 @@ def test_a_missing_key_raises_rather_than_no_op() -> None:
         set_pin_version(_TABLE, "pipx:nonesuch", "1.0.0")
 
 
+def test_expected_version_moves_only_inside_the_named_tool() -> None:
+    text = '[tool.ty]\nexpected = "0.0.69"\n[tool.ruff]\nexpected = "0.16.2"\n'
+    moved, old = set_expected_version(text, "ty", "0.0.70")
+    assert old == "0.0.69"
+    assert '[tool.ty]\nexpected = "0.0.70"' in moved
+    assert '[tool.ruff]\nexpected = "0.16.2"' in moved
+
+
+def test_reviewed_self_managed_dependency_moves_expected_pyproject_and_manifest(
+    tmp_path, monkeypatch
+) -> None:
+    (tmp_path / "currency.toml").write_text('[tool.ty]\nexpected = "0.0.69"\n', encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[dependency-groups]\ndev = ["ty==0.0.69"]\n', encoding="utf-8"
+    )
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "ty.manifest").write_text(
+        "url = https://github.com/astral-sh/ty\nref = 0.0.69\ncommit = aaaa\nkind = code\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(apply_mod.mf, "resolve_tag", lambda *_a, **_k: ("0.0.70", "beef"))
+    spec = ToolSpec(
+        name="ty",
+        mise_key="",
+        expected="0.0.69",
+        manifest="sources/ty.manifest",
+    )
+    result = apply(tmp_path, spec, _verdict(current="0.0.69", latest="0.0.70"))
+    assert set(result.changed) == {"currency.toml", "pyproject.toml", "sources/ty.manifest"}
+    assert 'expected = "0.0.70"' in (tmp_path / "currency.toml").read_text()
+    assert '"ty==0.0.70"' in (tmp_path / "pyproject.toml").read_text()
+
+
 # --------------------------------------------------------- authorization ----
 
 
@@ -109,6 +149,67 @@ def test_an_unauthorized_verdict_is_refused_and_writes_nothing(tmp_path) -> None
     with pytest.raises(NotAuthorizedError):
         apply(root, _spec(), ambiguous)
     assert (root / "mise.toml").read_text(encoding="utf-8") == before
+
+
+def test_an_explicitly_reviewed_verdict_can_apply(tmp_path) -> None:
+    """A human-reviewed ambiguity has a distinct path; unattended apply still refuses."""
+    root = _repo(tmp_path)
+    ambiguous = _verdict(auto=False, ambiguities=("reviewed release",))
+    result = apply(root, _spec(), ambiguous, reviewed=True)
+    assert result.to_version == "0.9.26"
+    assert 'version = "0.9.26"' in (root / "mise.toml").read_text(encoding="utf-8")
+
+
+def test_presence_only_tool_accepts_an_explicit_reviewed_target(tmp_path, monkeypatch) -> None:
+    """A reviewed target closes the gap when no upstream channel is configured."""
+    from kb_setup.currency import run
+    from kb_setup.currency.report import RunRecord
+    from kb_setup.currency.sync import SyncStatus
+    from kb_setup.currency.upstream import UpstreamStatus
+
+    root = _repo(tmp_path)
+    spec = _spec()
+    record = RunRecord(
+        tool=spec.name,
+        sync=SyncStatus(tool=spec.name, pinned="0.9.25", resolved="0.9.25", findings=()),
+        upstream=UpstreamStatus(source="none"),
+        observations=(),
+        moved=(),
+        verdict=_verdict(current="0.9.25", latest="", auto=False),
+    )
+    monkeypatch.setattr(run, "_specs", lambda *_a, **_k: (spec,))
+    monkeypatch.setattr(run, "_run_one", lambda *_a, **_k: record)
+    monkeypatch.setattr(run.report, "write_run", lambda *_a, **_k: None)
+    assert (
+        run.apply(
+            root,
+            only=spec.name,
+            review_note="reviewed official notes",
+            target_version="0.9.26",
+        )
+        == 0
+    )
+    assert 'version = "0.9.26"' in (root / "mise.toml").read_text(encoding="utf-8")
+
+
+def test_reviewed_source_tag_is_resolved_before_manifest_write(tmp_path, monkeypatch) -> None:
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    manifest = sources / "skill.manifest"
+    manifest.write_text(
+        "url = https://example.test/skill\nref = main\ncommit = old\nkind = code\n",
+        encoding="utf-8",
+    )
+    spec = ToolSpec(
+        name="skill",
+        mise_key="",
+        manifest="sources/skill.manifest",
+        source_only=True,
+    )
+    monkeypatch.setattr(apply_mod.mf, "resolve_tag", lambda *_a, **_k: ("v1.2.3", "beef"))
+    result = apply_mod.apply_source(tmp_path, spec, source_ref="v1.2.3")
+    assert result.to_version == "beef"
+    assert "ref = v1.2.3\ncommit = beef" in manifest.read_text(encoding="utf-8")
 
 
 def test_a_verdict_with_no_upgrade_is_refused(tmp_path) -> None:
@@ -189,7 +290,7 @@ def _prefixed_remote(monkeypatch, *tags: str) -> None:
     import subprocess
 
     def _ls_remote(argv: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
-        ref = argv[-1]
+        ref = argv[-1].removesuffix("*")
         out = f"cafe1234\trefs/tags/{ref}\n" if ref in tags else ""
         return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
 

@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Critical dotfiles/devcontainer dependency; source-only in knowledge-base.
+url = https://github.com/twpayne/chezmoi
+ref = v2.72.0
+commit = f81cb321789aa3df62871248f5e4d361a59e7cc1
+kind = code

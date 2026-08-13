@@ -359,6 +359,18 @@ def _iter_objects(fh: Iterator[str], stop: str | tuple[str, ...]) -> Iterator[di
             cur[key] = _value(stripped)
 
 
+def seek_top_level_array(fh: Iterator[str], prefix: str) -> None:
+    """Public streaming seam for another graph audit to find a root array."""
+    _skip_to(fh, prefix)
+
+
+def iter_top_level_objects(
+    fh: Iterator[str], stop: str | tuple[str, ...]
+) -> Iterator[dict[str, str]]:
+    """Public streaming seam for another audit to consume array objects."""
+    yield from _iter_objects(fh, stop)
+
+
 def _scan(graph_path: Path) -> tuple[Audit, Composition]:
     """One streaming pass over graph.json: edge-tier audit + cross-source composition.
 

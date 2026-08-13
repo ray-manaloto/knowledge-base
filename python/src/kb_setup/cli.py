@@ -22,7 +22,7 @@ _ASSEMBLE_MIN_ARGS = 2  # <name> + at least one <chunk.json>
 #: NOT here: a `kind = docs` pin advance is pure git and must not be blocked
 #: by a stale binary it never runs (cold lane round 2, P2), so `graph.update`
 #: gates its own code-kind branch instead — the one place the kind is known.
-_GRAPH_WRITERS = frozenset({"build", "watch", "merge", "label", "artifacts"})
+_GRAPH_WRITERS = frozenset({"build", "watch", "merge", "label", "artifacts", "critical-corpus"})
 
 
 #: Opt-in path for the JSONL event sink. Set it and every event this run emits
@@ -64,7 +64,7 @@ def _run(argv: list[str] | None = None) -> int:
             "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
             "arms <spec.toml> [--dry-run] | "
             "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
-            "graph-counts [--by-source] [name...] | "
+            "graph-counts [--by-source] [name...] | extraction-inventory [--json] | "
             "md-budget | skill-lint | "
             "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
@@ -75,7 +75,11 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
-            "ensure-deps | version"
+            "graph-integrity [--query-budget N] | critical-corpus | "
+            "artifact-download --source S --revision SHA --destination D | "
+            "artifact-download-control <pause|resume|status> --receipt R | "
+            "codegen-fetch-receipt [generate|check] | "
+            "tool-sync <currency-tool-name> | ensure-deps | version"
         )
         return 0
 
@@ -136,6 +140,18 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import insights
 
         return insights.report(repo_root, rest)
+    if cmd == "graph-integrity":
+        from kb_setup import graph_integrity
+
+        return graph_integrity.report(repo_root, rest)
+    if cmd == "critical-corpus":
+        from kb_setup import critical_corpus
+
+        return critical_corpus.build(repo_root, rest)
+    if cmd == "colibri-canary":
+        from kb_setup import colibri_canary
+
+        return colibri_canary.main(repo_root, rest)
     if cmd == "serve":
         from kb_setup import mcp_serve
 
@@ -268,6 +284,31 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
     return None
 
 
+def _dispatch_source_ops(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
+    """Dispatch source intake, validation, and semantic-chunk inventory commands."""
+    if cmd == "manifest-add":
+        return _manifest_add(repo_root, rest)
+    if cmd == "assemble":
+        return _assemble(repo_root, rest)
+    if cmd == "validate-chunks":
+        return _validate_chunks(rest)
+    if cmd == "extraction-inventory":
+        from kb_setup import extraction_inventory
+
+        return extraction_inventory.report(repo_root, rest)
+    if cmd == "fetch":
+        return _fetch(repo_root, rest)
+    if cmd == "codegen-fetch-receipt":
+        from kb_setup import codegen
+
+        return codegen.main(repo_root, rest)
+    if cmd == "source-verify":
+        return _source_verify(repo_root, rest)
+    if cmd == "source-clone":
+        return _source_clone(repo_root, rest)
+    return None
+
+
 def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
     """Dispatch the operational subcommands (hooks, brain, ship/land, currency, chunks)."""
     if cmd == "hookguard":
@@ -305,6 +346,18 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import skill_refresh
 
         return skill_refresh.refresh(repo_root)
+    if cmd == "tool-sync":
+        from kb_setup import tool_sync
+
+        return tool_sync.main(repo_root, rest)
+    if cmd == "artifact-download":
+        from kb_setup import artifact_download
+
+        return artifact_download.main(repo_root, rest)
+    if cmd == "artifact-download-control":
+        from kb_setup import artifact_download
+
+        return artifact_download.control_main(repo_root, rest)
     if cmd == "cc":
         from kb_setup import launch
 
@@ -343,14 +396,9 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         return _review_receipt(repo_root, rest)
     if cmd == "currency":
         return _currency(repo_root, rest)
-    if cmd == "manifest-add":
-        return _manifest_add(repo_root, rest)
-    if cmd == "assemble":
-        return _assemble(repo_root, rest)
-    if cmd == "validate-chunks":
-        return _validate_chunks(rest)
-    if cmd == "fetch":
-        return _fetch(repo_root, rest)
+    source_rc = _dispatch_source_ops(repo_root, cmd, rest)
+    if source_rc is not None:
+        return source_rc
 
     print(
         f"kb-setup: unknown command {cmd!r} "
@@ -366,8 +414,12 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "session-state [--no-pr] | remember [--audit] | cc | cc-doctor | "
-        "eval [--live] [--slow] | "
-        "validate-chunks <chunk...> | ship [--title T] | land <PR#> | ensure-deps | version)",
+        "eval [--live] [--slow] | graph-integrity [--query-budget N] | critical-corpus | "
+        "artifact-download --source S --revision SHA --destination D | "
+        "tool-sync <currency-tool-name> | "
+        "validate-chunks <chunk...> | extraction-inventory [--json] | "
+        "source-clone <name> | source-verify [receipt.json...] | "
+        "ship [--title T] | land <PR#> | ensure-deps | version)",
         file=sys.stderr,
     )
     return 2
@@ -505,10 +557,10 @@ def _review_receipt(repo_root: Path, rest: list[str]) -> int:
 
 
 def _fetch(repo_root: Path, rest: list[str]) -> int:
-    """`kb-setup fetch <url> [--stem NAME]` — lossless fetch into sources/."""
+    """Losslessly fetch one URL, optionally recording a cutoff receipt."""
     from kb_setup import fetch as fetch_mod
 
-    flags = {"--stem"}
+    flags = {"--stem", "--target-dir", "--receipt"}
     positional = [
         a
         for i, a in enumerate(rest)
@@ -517,7 +569,45 @@ def _fetch(repo_root: Path, rest: list[str]) -> int:
     if not positional:
         print("kb-setup fetch: need a URL", file=sys.stderr)
         return 2
-    return fetch_mod.fetch_main(repo_root, positional[0], stem=_opt(rest, "--stem"))
+    return fetch_mod.fetch_main(
+        repo_root,
+        positional[0],
+        options=fetch_mod.FetchOptions(
+            stem=_opt(rest, "--stem"),
+            target_dir=_opt(rest, "--target-dir", "sources") or "sources",
+            receipt=_opt(rest, "--receipt"),
+        ),
+    )
+
+
+def _source_verify(repo_root: Path, rest: list[str]) -> int:
+    """Verify lossless-download receipts without any network access."""
+    from kb_setup import fetch as fetch_mod
+
+    ok, failures = fetch_mod.verify_receipts(repo_root, tuple(Path(value) for value in rest))
+    if not ok:
+        for failure in failures:
+            print(f"[source-verify] FAIL: {failure}", file=sys.stderr)
+        return 1
+    scope = ", ".join(rest) if rest else "all sources/*.receipts.json"
+    print(f"[source-verify] OK: {scope}")
+    return 0
+
+
+def _source_clone(repo_root: Path, rest: list[str]) -> int:
+    """Materialize exactly one pinned repository source, without extraction."""
+    from kb_setup import graph
+
+    if len(rest) != 1:
+        print("kb-setup source-clone <name>", file=sys.stderr)
+        return 2
+    try:
+        path = graph.ensure_source_clone(repo_root, rest[0])
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"[source-clone] FAIL: {exc}", file=sys.stderr)
+        return 1
+    print(f"[source-clone] OK: {path.relative_to(repo_root)}")
+    return 0
 
 
 def _opt(rest: list[str], flag: str, default: str | None = None) -> str | None:
@@ -534,7 +624,7 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
     only = _opt(rest, "--tool", "") or ""
     # Skip the VALUES of value-taking flags when looking for the positional mode,
     # or `currency --tool graphify` reads "graphify" as the mode and errors out.
-    value_flags = {"--tool", "--version", "--source-ref"}
+    value_flags = {"--review-note", "--tool", "--version", "--source-ref"}
     positional: list[str] = []
     skip_next = False
     for arg in rest:
@@ -557,7 +647,21 @@ def _currency(repo_root: Path, rest: list[str]) -> int:
             write="--no-write" not in rest,
         )
     if mode == "apply":
-        return currency_run.apply(repo_root, only=only, as_json="--json" in rest)
+        return currency_run.apply(
+            repo_root,
+            only=only,
+            as_json="--json" in rest,
+            review_note=_opt(rest, "--review-note", "") or "",
+            target_version=_opt(rest, "--version", "") or "",
+        )
+    if mode == "source-apply":
+        return currency_run.source_apply(
+            repo_root,
+            only=only,
+            source_ref=_opt(rest, "--source-ref", "") or "",
+            review_note=_opt(rest, "--review-note", "") or "",
+            branch="--branch" in rest,
+        )
     if mode == "daily":
         return currency_run.daily(repo_root)
     if mode == "docs-reviewed":

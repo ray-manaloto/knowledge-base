@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "url": "https://www.aihero.dev/sitemap.xml",
+      "artifact": "sources/aihero-skills/aihero-sitemap.md",
+      "content_sha256": "8ac014fb6c4de509657bfa69ff7e068cfa9b6d464ec06fd6b84b407f47595344",
+      "content_bytes": 33855,
+      "content_chars": 33855,
+      "prefix_sha256": "34afec43c9851b8b61871b69fc664a16e5bf22988e0e88ca42bb0d4770a3fa1d",
+      "tail_sha256": "a5db545a7aa2eb2e6b95563f6422c9856449cf447b0115f00216536cf3ad01db",
+      "read_to_eof": true,
+      "truncated": false
+    }
+  ]
+}

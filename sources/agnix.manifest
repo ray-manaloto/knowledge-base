@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] "github:agent-sh/agnix"`
-#   pinned here:    0.40.0
+#   pinned here:    0.48.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -20,7 +20,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/agent-sh/agnix
-ref = v0.40.0
-commit = 4acd2ef33b1a6bf569ef44c324a071de3c1b039e
+ref = v0.48.0
+commit = 79e7753745f5e77e780fc0663014acbe5e33ee9a
 kind = code
 added = 2026-08-02

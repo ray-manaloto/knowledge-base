@@ -255,6 +255,17 @@ def test_github_source_with_no_stable_releases_fails_closed(monkeypatch) -> None
     assert err
 
 
+def test_github_source_accepts_a_declared_project_tag_prefix(monkeypatch) -> None:
+    """Codex's ``rust-v`` releases are versions, not an unreadable upstream."""
+    monkeypatch.setattr(
+        upstream,
+        "_gh_api_list",
+        lambda _p: ([{"tag_name": "rust-v0.147.0", "draft": False, "prerelease": False}], ""),
+    )
+    latest, versions, err = upstream.github_versions("openai/codex", tag_prefix="rust-v")
+    assert (latest, versions, err) == ("0.147.0", ("0.147.0",), "")
+
+
 def test_pypi_wins_when_both_sources_are_declared(monkeypatch) -> None:
     """Mise installs from PyPI, so a GitHub-only version can never be pinned."""
     monkeypatch.setattr(upstream, "_pypi_json", lambda _p: (_PYPI_PAYLOAD, ""))

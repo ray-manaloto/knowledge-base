@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Mapping
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from kb_setup.currency import (
@@ -213,7 +213,12 @@ def _run_one(repo_root: Path, spec: config.ToolSpec) -> report.RunRecord:
     # afford the one `mise where` subprocess the extras probe needs when the
     # binary resolves through a shim. The hook path stays subprocess-free.
     status = sync.check_sync(repo_root, spec, deep=True)
-    up = upstream.probe(pypi=spec.pypi, github=spec.github, current=status.pinned)
+    up = upstream.probe(
+        pypi=spec.pypi,
+        github=spec.github,
+        current=status.pinned,
+        tag_prefix=spec.tag_prefix,
+    )
     observations = issues.observe_all(spec)
     report_root = repo_root / report.REPORT_DIR
     previous = issues.load_previous(report_root, spec.name)
@@ -395,7 +400,26 @@ def docs_reviewed(repo_root: Path, *, only: str = "") -> int:
     return 0
 
 
-def apply(repo_root: Path, *, only: str, as_json: bool = False) -> int:
+def _reviewed_record(
+    record: report.RunRecord, *, review_note: str, target_version: str
+) -> report.RunRecord:
+    """Attach one explicit decision and, when supplied, its reviewed target."""
+    if target_version:
+        record = replace(record, verdict=replace(record.verdict, latest=target_version))
+    answers = tuple((ambiguity.gate, review_note) for ambiguity in record.verdict.ambiguities)
+    if target_version and not answers:
+        answers = (("explicit reviewed target", review_note),)
+    return replace(record, answers=answers)
+
+
+def apply(
+    repo_root: Path,
+    *,
+    only: str,
+    as_json: bool = False,
+    review_note: str = "",
+    target_version: str = "",
+) -> int:
     """Apply the authorized bump for ONE tool (steps 2's "and update").
 
     Requires `--tool`: applying a version change is never a fan-out over every
@@ -417,8 +441,20 @@ def apply(repo_root: Path, *, only: str, as_json: bool = False) -> int:
 
     spec = specs[0]
     record = _run_one(repo_root, spec)
+    reviewed_note = review_note.strip()
+    explicit_target = target_version.strip()
+    if explicit_target and not reviewed_note:
+        print("[currency] --version requires --review-note", file=sys.stderr)
+        return 2
+    if reviewed_note:
+        record = _reviewed_record(record, review_note=reviewed_note, target_version=explicit_target)
     try:
-        result = apply_mod.apply(repo_root, spec, record.verdict)
+        result = apply_mod.apply(
+            repo_root,
+            spec,
+            record.verdict,
+            reviewed=bool(reviewed_note),
+        )
     except apply_mod.NotAuthorizedError as e:
         print(f"[currency] not applied — {e}", file=sys.stderr)
         return 2
@@ -426,6 +462,8 @@ def apply(repo_root: Path, *, only: str, as_json: bool = False) -> int:
         print(f"[currency] apply failed — {e}", file=sys.stderr)
         return 2
 
+    if reviewed_note:
+        report.write_run(repo_root, record)
     if as_json:
         print(json.dumps(asdict(result), indent=2))
     else:
@@ -434,6 +472,41 @@ def apply(repo_root: Path, *, only: str, as_json: bool = False) -> int:
             f"edited {', '.join(result.changed)} — {result.note}"
         )
         print("[currency] open the PR with `mise run kb-ship` (auto-merge on).")
+    return 0
+
+
+def source_apply(
+    repo_root: Path,
+    *,
+    only: str,
+    source_ref: str,
+    review_note: str,
+    branch: bool = False,
+) -> int:
+    """Apply one reviewed source-only ref and preserve the decision receipt."""
+    from kb_setup.currency import apply as apply_mod
+
+    specs = _specs(repo_root, only)
+    if len(specs) != 1 or not source_ref.strip() or not review_note.strip():
+        print(
+            "[currency] source-apply needs exactly one --tool, --source-ref, and --review-note",
+            file=sys.stderr,
+        )
+        return 2
+    spec = specs[0]
+    record = replace(
+        _run_one(repo_root, spec),
+        answers=(("reviewed source ref", review_note.strip()),),
+    )
+    try:
+        result = apply_mod.apply_source(
+            repo_root, spec, source_ref=source_ref.strip(), branch=branch
+        )
+    except (apply_mod.NotAuthorizedError, OSError, RuntimeError, ValueError) as exc:
+        print(f"[currency] source not applied — {exc}", file=sys.stderr)
+        return 2
+    report.write_run(repo_root, record)
+    print(f"[currency] {result.tool}: {result.note}")
     return 0
 
 
@@ -505,7 +578,16 @@ def stamp(repo_root: Path, *, tool: str, version: str, source_ref: str = "") -> 
     # neither an explicit --version nor the binary can supply a version, refuse
     # rather than stamp an unverified one (a manual stamp has not just rebuilt, so
     # writing an empty stamp would only clobber a good one).
-    resolved = version or sync.observed_version(spec.binary)
+    if version:
+        resolved = version
+    elif spec.version_args == ("--version",):
+        # Keep the original one-argument seam for the common/default path.
+        # Besides avoiding needless coupling to configuration details, tests and
+        # callers use this boundary to prove an unreadable binary cannot produce
+        # a false-green stamp.
+        resolved = sync.observed_version(spec.binary)
+    else:
+        resolved = sync.observed_version(spec.binary, spec.version_pattern, spec.version_args)
     if not resolved:
         print(
             f"[currency] cannot determine a version to stamp for {tool} — pass "

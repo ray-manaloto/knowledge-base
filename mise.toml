@@ -26,7 +26,7 @@
 # comment and the value drift apart (they did, and the cold lane caught it).
 # Keep soft > hard or soft is inert: hard errors across exactly the range soft
 # would warn in, so an equal pair makes the warning unobservable.
-min_version = { hard = "2026.7.14", soft = "2026.8.3" }
+min_version = { hard = "2026.7.14", soft = "2026.8.4" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
@@ -39,11 +39,11 @@ typos = "1.49.0"
 # auto-skips <3.13 → Louvain clustering fallback, accepted). Table form so
 # `mise upgrade --bump` can rewrite the pin in place (bracket-in-name form
 # strands the pin — dotfiles 2026-07-20).
-"pipx:graphifyy" = { version = "0.9.36", extras = ["all"] }
+"pipx:graphifyy" = { version = "0.9.40", extras = ["all"] }
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
 # extract audio before transcription — NOT a pip dep, so graphifyy[all] can't
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
-"conda:ffmpeg" = "8.1.2"
+"conda:ffmpeg" = "9.0"
 taplo = "0.10.0"
 rumdl = "v0.2.52"
 gitleaks = "8.30.1"
@@ -58,7 +58,7 @@ gitleaks = "8.30.1"
 # `mise run lint` while the pinned docs (`sub-agents.md:286`, `:303`) declare it
 # valid. Do not drop below 0.44.0 to "match dotfiles" — bump dotfiles instead.
 # 0.45.0 additionally accepts parameterized ids such as `claude-opus-5[effort=high]`.
-"github:agent-sh/agnix" = "0.46.0"
+"github:agent-sh/agnix" = "v0.48.0"
 # fnox: the credential tool the shell's secrets come from (jdx/fnox, in mise's
 # registry as `github:jdx/fnox`). Pinned here rather than left to the user's
 # GLOBAL mise, where it installs into a directory literally named `latest` and
@@ -70,7 +70,7 @@ gitleaks = "8.30.1"
 # while the global install stays on `latest` — a deliberate, accepted skew.
 # This repo pins what fnox it EXPECTS; it does not touch `~/.config/fnox`, so
 # `do-not.md` #11 is not engaged. Bump alongside the global one.
-fnox = "1.32.0"
+fnox = "v1.33.0"
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
 # (yuting0624/antigravity-for-claude-code). Canonical mise registry short names
@@ -329,16 +329,18 @@ run = "uv run kb-setup skill-lint"
 
 [tasks.kb-graph-counts]
 description = "Print graph.json's node/link/hyperedge counts (+ --by-source)"
+usage = 'arg "[args]" help="Arguments forwarded to graph-counts" var=#true'
 # The seam `kb_setup.graph_counts` never had. It had callers and a ledger but no
 # way to ASK it anything, so 25 sessions hand-wrote 125 throwaway json probes
 # (`kb-distill` candidate #2) — one of which shipped a false "the graph has ZERO
 # edges" finding into a handoff, a memory record AND a commit message, because
 # graph.json spells it `links` and a `.get("edges", [])` probe returns 0 on a
 # perfectly healthy graph. Deciding that spelling once is the whole point.
-run = "uv run kb-setup graph-counts {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup graph-counts ${usage_args?}"
 
 [tasks.kb-reclaim]
 description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --apply to reclaim"
+usage = 'arg "[args]" help="Arguments forwarded to reclaim" var=#true'
 # REPORT-ONLY by default and there is no config key that changes that: reclaiming
 # needs `-- --apply` on every run. A deleter whose destructive mode can be armed
 # from a config file is a destructive action at a distance, which is precisely
@@ -348,10 +350,11 @@ description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --
 # re-thresholded there, and `--only`/`--skip` narrow a single run. Docker cleanup
 # is ONE category, not the tool: adding a reclaimer is a scanner plus a config
 # block. See `.claude/skills/kb-reclaim/SKILL.md`.
-run = "uv run kb-setup reclaim {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup reclaim ${usage_args?}"
 
 [tasks.kb-session-reflect]
 description = "What did THIS round do by hand that a task already owns? (advisory)"
+usage = 'arg "[args]" help="Arguments forwarded to session-reflect" var=#true'
 # The complement to `kb-distill`, not a duplicate of it. distill is a FREQUENCY
 # miner: it groups ad-hoc scripts across 50 sessions on their import signature,
 # so it answers "was a program written twice?". This asks "what did this ROUND
@@ -367,7 +370,7 @@ description = "What did THIS round do by hand that a task already owns? (advisor
 #
 # Advisory by construction: always exits 0 and gates nothing. An un-automated
 # step is a statement about future cost, not a failure.
-run = "uv run kb-setup session-reflect {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup session-reflect ${usage_args?}"
 
 [tasks.kb-distill]
 description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
@@ -411,6 +414,7 @@ depends = ["lint", "test"]
 
 [tasks.kb-check]
 description = "Check specific paths (ruff + format + ty + their tests) with REAL exit codes"
+usage = 'arg "<paths>" help="Python or test paths to check" var=#true'
 # The DEV-LOOP gate, and the one this repo did not have. `check` above is
 # whole-repo and `kb-gates` runs the four ship gates; neither answers "are these
 # two files clean?", so that question was being answered in the shell — measured
@@ -429,7 +433,7 @@ description = "Check specific paths (ruff + format + ty + their tests) with REAL
 # everything wrong with the file. Exits non-zero if any tool failed AND if
 # nothing applicable was given — "I did not understand your argument" must not
 # read as "your file is clean".
-run = "uv run kb-setup check {{arg(name='paths', var=true, default='')}}"
+run = "uv run kb-setup check ${usage_paths?}"
 
 # ---------------------------------------------------------------------------
 # Knowledge-base tasks — the reason this repo exists
@@ -547,6 +551,66 @@ description = 'Print what the graph already computed: surprises, questions, god 
 # whole-file count of `"confidence":` over-counts — five AST nodes carry the field.
 run = "uv run kb-setup insights"
 
+[tasks.kb-extraction-inventory]
+description = "Inventory exact committed extraction blobs from one immutable Git tree"
+usage = 'flag "--json" help="Print the full Git-tree snapshot receipt as JSON"'
+# Read-only. The Git object database is content authority; tracked/untracked
+# extraction worktree drift makes the receipt INCOMPLETE but can never change
+# its records. Legacy chunks remain reusable when schema-valid, reported UNBOUND.
+run = "uv run kb-setup extraction-inventory{% if usage.json %} --json{% endif %}"
+
+[tasks.kb-graph-integrity]
+description = "Audit typed dependency anchors, cross-links, and Graphify limit semantics"
+# Canonical dependencies are typed navigation anchors, never synthetic
+# degree-ranked god nodes. Logic and the derived JSON artifact live in
+# kb_setup.graph_integrity; this task is the only supported entry point.
+run = "uv run kb-setup graph-integrity"
+
+[tasks.kb-critical-corpus]
+description = "Build the isolated critical-dependency graph and optionally probe local-model deep extraction"
+# Bounded by sources/critical-corpus.toml. This never recursively deep-extracts
+# pinned repositories and never writes the aggregate graph. Semantic work is
+# reports the LOCAL-MODEL PROTOTYPE as not run until
+# KB_CRITICAL_LOCAL_BACKEND=ollama or a localhost OpenAI-compatible server is
+# explicitly configured. That prototype status does not block Codex host-agent
+# semantic extraction through kb-curator. Logic lives in
+# kb_setup.critical_corpus; Python runs through this uv-backed task only.
+run = "uv run kb-setup critical-corpus"
+
+[tasks.kb-colibri-canary]
+description = "Run a pinned real Colibri model -> Graphify deep-extraction canary"
+env = { HF_XET_HIGH_PERFORMANCE = "1" }
+usage = '''
+arg "<model>" help="Model profile" {
+  choices "olmoe" "glm52"
+}
+arg "<work>" help="Persistent model and result directory"
+flag "--source <source>" help="Existing pinned Colibri checkout (default: create under work)"
+flag "--port <port>" help="Loopback server port" default="18081"
+'''
+run = "uv run --group models kb-setup colibri-canary --model {{ usage.model | quote }} --work {{ usage.work | quote }} --port {{ usage.port | quote }}{% if usage.source %} --source {{ usage.source | quote }}{% endif %}"
+
+[tasks.kb-artifact-download]
+description = "Plan, resume, and attest an immutable large-artifact download"
+usage = 'arg "<args>" help="Arguments forwarded to artifact-download" var=#true'
+# The Python layer selects a pinned upstream provider and writes a receipt; it
+# never implements HTTP/range transfer itself. The models group is exact-locked
+# and reuses the project .venv instead of uv's temporary `--with` overlay.
+run = "uv run --group artifact-download kb-setup artifact-download ${usage_args}"
+
+[tasks.kb-colibri-canary-control]
+description = "Pause, resume, or inspect the live detached Colibri download"
+usage = '''
+arg "<action>" help="Control action" {
+  choices "pause" "resume" "status"
+}
+arg "<work>" help="Persistent Colibri work directory"
+'''
+# True pause/resume is POSIX process suspension, not Xet abort/restart. The
+# Python controller validates PID/PGID and tmux-pane identity before signaling
+# the exact Python/Xet process; wrappers remain idle in the dedicated group.
+run = "uv run --group artifact-download kb-setup artifact-download-control {{ usage.action | quote }} --receipt {{ usage.work | quote }}/model-download.json --log {{ usage.work | quote }}/colibri-canary.log"
+
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"
 # graphify-mcp binds to an ABSOLUTE graph path, so this server only ever serves
@@ -591,7 +655,7 @@ env = { GEMINI_API_KEY = "", GOOGLE_API_KEY = "" }
 run = "graphify add"
 
 [tasks.kb-fetch]
-description = 'Losslessly fetch a URL into sources/: mise run kb-fetch -- <url> [--stem NAME]'
+description = 'Losslessly fetch a URL: mise run kb-fetch -- <url> [--stem NAME --target-dir DIR --receipt FILE]'
 # Bypasses `graphify add <url>`, which truncates at markdown[:12000] after a
 # no-boilerplate markdownify pass (graphify 0.9.25 ingest.py:159) — measured to
 # discard 86-89% of a long reference page, silently, exiting 0. This task prefers
@@ -599,6 +663,25 @@ description = 'Losslessly fetch a URL into sources/: mise run kb-fetch -- <url> 
 # writes a file, and reports the verbatim-token roundtrip verdict. Hand the
 # resulting file to `graphify add <file>`, whose slicing is lossless.
 run = "uv run --extra fetch kb-setup fetch"
+
+[tasks.codegen-fetch-receipt]
+description = "Generate the msgspec fetch-receipt model from its JSON Schema"
+# The full protocol is mise -> uv's project .venv -> kb_setup.codegen -> the
+# exact-pinned datamodel-code-generator binary. Never use a bare generator or
+# Python interpreter; `check` regenerates in a temp directory and byte-compares.
+run = "uv run --group codegen kb-setup codegen-fetch-receipt generate"
+
+[tasks.codegen-fetch-receipt-check]
+description = "Fail when the generated msgspec fetch-receipt model is stale"
+run = "uv run --group codegen kb-setup codegen-fetch-receipt check"
+
+[tasks.kb-source-verify]
+description = "Verify download bytes, hashes, and cutoff witnesses without network access"
+run = "uv run kb-setup source-verify"
+
+[tasks.kb-source-clone]
+description = "Materialize one pinned source without extracting: mise run kb-source-clone -- <name>"
+run = "uv run kb-setup source-clone"
 
 [tasks.kb-merge]
 description = 'Merge one host-agent extraction chunk into the graph: mise run kb-merge -- <chunk.json> [source_root]'
@@ -705,6 +788,35 @@ description = 'Full tool-currency workflow (steps 1-4 + 6): mise run kb-currency
 # ALWAYS exits 0 — an out-of-date tool is a signal, not a failure — so this can
 # never serve as a CI gate. Read docs/currency/, not the rc.
 run = "uv run kb-setup currency run"
+
+[tasks.kb-currency-apply]
+description = "Apply one explicitly reviewed currency update and record its authorization"
+usage = '''
+arg "<tool>" help="Deep-tracked currency tool name"
+arg "<review_note>" help="Human-reviewed release decision recorded in the currency report"
+flag "--version <version>" help="Explicit reviewed target for a presence-only upstream"
+'''
+# This is deliberately separate from kb-currency: unattended runs remain report-
+# only, while this mutation seam requires an explicit reviewed decision on every
+# invocation and still uses currency.apply's tag, TOCTOU, and source-sync guards.
+run = 'uv run kb-setup currency apply --tool {{ usage.tool | quote }} --review-note {{ usage.review_note | quote }}{% if usage.version %} --version {{ usage.version | quote }}{% endif %}'
+
+[tasks.kb-currency-source-apply]
+description = "Pin one reviewed currency source manifest to an immutable commit"
+usage = '''
+arg "<tool>" help="Source-only currency tool name"
+arg "<source_ref>" help="Reviewed release tag or branch"
+arg "<review_note>" help="Human-reviewed source decision recorded in the currency report"
+flag "--branch" help="Resolve source_ref as a mutable branch head instead of a release tag"
+'''
+run = 'uv run kb-setup currency source-apply --tool {{ usage.tool | quote }} --source-ref {{ usage.source_ref | quote }} --review-note {{ usage.review_note | quote }}{% if usage.branch %} --branch{% endif %}'
+
+[tasks.kb-tool-sync]
+description = "Lock, install, and refresh generated skills for one reviewed mise pin"
+usage = 'arg "<tool>" help="Deep-tracked currency tool name"'
+# Thin protocol seam: exact-pin lookup, lock/install ordering, post-install
+# executable proof, and generated-skill refresh live in kb_setup.tool_sync.
+run = 'uv run kb-setup tool-sync {{ usage.tool | quote }}'
 
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
 [tasks.kb-review-receipt]

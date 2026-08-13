@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "url": "https://huggingface.co/meta-models/Muse-Glimmer-30B/raw/main/README.md",
+      "artifact": "sources/media/muse-glimmer-30b-model-card.md",
+      "content_sha256": "5894e358c58f4f8425645a5b0b890468ecb3e6b049c2e941648db077c4b7df58",
+      "content_bytes": 16892,
+      "content_chars": 16849,
+      "prefix_sha256": "f03002c24b4897c6a54a8848921b337b83597920253d52222d89dee8069c4b65",
+      "tail_sha256": "c1e6ff38a3c0ea5eb68996ecac140d7b0ceca3d4c5a39eabc451a8cb12b56d0a",
+      "read_to_eof": true,
+      "truncated": false
+    }
+  ]
+}

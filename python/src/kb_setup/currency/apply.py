@@ -28,7 +28,7 @@ manifest is never pinned to a tag that does not exist.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from kb_setup import manifest as mf
@@ -52,6 +52,17 @@ class ApplyResult:
     manifest_ref: str = ""  # "" when the tool declares no manifest
     manifest_commit: str = ""
     note: str = ""
+
+
+@dataclass(frozen=True)
+class _PinEdit:
+    """Prepared pin edits, resolved before any file is written."""
+
+    path: Path
+    text: str
+    old: str
+    extra_path: Path | None = None
+    extra_text: str = ""
 
 
 class NotAuthorizedError(RuntimeError):
@@ -105,6 +116,85 @@ def set_pin_version(text: str, mise_key: str, new_version: str) -> tuple[str, st
     raise KeyError(f"no mise.toml pin found for {mise_key!r}")
 
 
+def set_expected_version(text: str, tool: str, new_version: str) -> tuple[str, str]:
+    """Move one ``[tool.<name>] expected`` value without reformatting the TOML."""
+    section = f"[tool.{tool}]"
+    lines = text.splitlines(keepends=True)
+    active = False
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            active = stripped == section
+            continue
+        if not active or not stripped.startswith("expected"):
+            continue
+        match = re.search(r'(expected\s*=\s*")([^"]+)(")', line)
+        if not match:
+            raise ValueError(f"{section} expected line has no quoted version: {line!r}")
+        old = match.group(2)
+        lines[index] = line[: match.start(2)] + new_version + line[match.end(2) :]
+        return "".join(lines), old
+    raise KeyError(f"no expected version found under {section}")
+
+
+def set_exact_dependency_version(
+    text: str, package: str, current: str, new_version: str
+) -> tuple[str, bool]:
+    """Move an exact quoted dependency when this repo declares one."""
+    old = f'"{package}=={current}"'
+    if old not in text:
+        return text, False
+    return text.replace(old, f'"{package}=={new_version}"', 1), True
+
+
+def _prepare_pin_edit(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> _PinEdit:
+    """Prepare either a mise pin or a self-managed expected/dependency pin edit."""
+    if not spec.self_managed:
+        path = repo_root / "mise.toml"
+        text, old = set_pin_version(path.read_text(encoding="utf-8"), spec.mise_key, verdict.latest)
+        return _PinEdit(path, text, old)
+
+    path = repo_root / "currency.toml"
+    if not path.is_file():
+        raise NotAuthorizedError(
+            f"{spec.name}: no `mise_key` and no currency.toml expected pin; "
+            "bump it where it is actually pinned (for example pyproject.toml)"
+        )
+    text, old = set_expected_version(
+        path.read_text(encoding="utf-8"), spec.name, verdict.latest.lstrip("v")
+    )
+    pyproject = repo_root / "pyproject.toml"
+    if not pyproject.is_file():
+        return _PinEdit(path, text, old)
+    candidate, moved = set_exact_dependency_version(
+        pyproject.read_text(encoding="utf-8"), spec.name, verdict.current, verdict.latest
+    )
+    return _PinEdit(path, text, old, pyproject if moved else None, candidate if moved else "")
+
+
+def _authorize(spec: ToolSpec, verdict: Verdict, *, reviewed: bool) -> None:
+    """Fail closed unless automation or an explicit reviewed decision authorizes the bump."""
+    if spec.source_only:
+        raise NotAuthorizedError(
+            f"{spec.name} is an ingested source, not an installed tool — advance it with "
+            f"`mise run kb-update -- {spec.name}`, which moves {spec.manifest} and "
+            f"re-extracts, rather than editing a mise pin that does not exist"
+        )
+    if not verdict.auto_apply and not reviewed:
+        raise NotAuthorizedError(
+            f"{spec.name}: verdict is not auto-apply — "
+            f"{len(verdict.ambiguities)} gate(s) still open; resolve them via the interview first"
+        )
+    if not verdict.has_upgrade:
+        raise NotAuthorizedError(f"{spec.name}: no upgrade pending ({verdict.current} is current)")
+    if not spec.mise_key and not spec.self_managed:
+        raise NotAuthorizedError(
+            f"{spec.name}: no `mise_key`, so there is no mise.toml pin to move — "
+            "bump it where it is actually pinned (pyproject.toml for ruff/ty, or "
+            "`expected` in currency.toml for a self-updating tool), then re-run"
+        )
+
+
 def _skill_warnings(result: skill.SkillResult) -> list[str]:
     """The skill-refresh conditions that make a bump NOT clean, led with.
 
@@ -147,7 +237,13 @@ def _skill_warnings(result: skill.SkillResult) -> list[str]:
     return warnings
 
 
-def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
+def apply(
+    repo_root: Path,
+    spec: ToolSpec,
+    verdict: Verdict,
+    *,
+    reviewed: bool = False,
+) -> ApplyResult:
     """Edit the committable files for an authorized bump; return what changed.
 
     Never rebuilds the graph (G8) and never opens a PR (H3) — that is the ship
@@ -155,59 +251,22 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     and propagates `manifest.resolve_tag`'s error if the target tag does not
     exist in git (the v1.0.0-trap guard).
     """
-    if spec.source_only:
-        # Fail closed, and say what the real remedy is. A source-only tool has no
-        # `[tools]` entry, so the pin edit below would fail anyway — but it would
-        # fail with a KeyError about a mise key nobody declared, which reads as a
-        # bug in the engine rather than as "this is the wrong verb for this tool".
-        raise NotAuthorizedError(
-            f"{spec.name} is an ingested source, not an installed tool — advance it with "
-            f"`mise run kb-update -- {spec.name}`, which moves {spec.manifest} and "
-            f"re-extracts, rather than editing a mise pin that does not exist"
-        )
-    if not verdict.auto_apply:
-        raise NotAuthorizedError(
-            f"{spec.name}: verdict is not auto-apply — "
-            f"{len(verdict.ambiguities)} gate(s) still open; resolve them via the interview first"
-        )
-    if not verdict.has_upgrade:
-        raise NotAuthorizedError(f"{spec.name}: no upgrade pending ({verdict.current} is current)")
+    _authorize(spec, verdict, reviewed=reviewed)
 
-    if not spec.mise_key:
-        # A row with no `mise_key` has no `[tools]` pin for this function to move
-        # — `expected`-based tools either self-update (mise, claude-code) or are
-        # pinned somewhere apply() does not own (ruff and ty live in
-        # pyproject.toml's `dev` group). Falling through raised a bare
-        # `KeyError: no mise.toml pin found for ''` from `set_pin_version`, which
-        # reads as an engine bug rather than as "this tool cannot be auto-applied
-        # here" — and it escapes as a traceback instead of the clean
-        # "[currency] apply failed" that every other refusal produces.
-        #
-        # Refusing is also the honest answer, not merely the tidy one: applying
-        # would have to edit a file whose format this function does not know, and
-        # a half-applied bump is exactly what the resolve-everything-first
-        # ordering below exists to prevent. (Cold lane, 2026-08-08.)
-        raise NotAuthorizedError(
-            f"{spec.name}: no `mise_key`, so there is no mise.toml pin to move — "
-            f"bump it where it is actually pinned (pyproject.toml for ruff/ty, or "
-            f"`expected` in currency.toml for a self-updating tool), then re-run"
-        )
-
-    mise_path = repo_root / "mise.toml"
-    new_text, old = set_pin_version(
-        mise_path.read_text(encoding="utf-8"), spec.mise_key, verdict.latest
-    )
-    if old != verdict.current:
+    pin = _prepare_pin_edit(repo_root, spec, verdict)
+    if pin.old != verdict.current:
         # The file moved under us between the verdict and the apply. Refuse rather
         # than bump from a state the gates never evaluated.
         raise NotAuthorizedError(
-            f"{spec.name}: mise.toml pins {old!r}, but the verdict was computed "
+            f"{spec.name}: {pin.path.name} pins {pin.old!r}, but the verdict was computed "
             f"against {verdict.current!r} — re-run the workflow before applying"
         )
 
     # Resolve EVERYTHING that can fail before writing ANYTHING, so a bad tag or a
     # missing manifest leaves the tree untouched rather than half-applied.
-    changed: list[str] = ["mise.toml"]
+    changed: list[str] = [pin.path.name]
+    if pin.extra_path is not None:
+        changed.append(pin.extra_path.name)
     manifest_ref = ""
     manifest_commit = ""
     manifest_obj: mf.Manifest | None = None
@@ -226,7 +285,9 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
     # Past this point nothing raises, so the two writes are effectively atomic.
     if manifest_obj is not None:
         mf.write_pin(manifest_obj, ref=manifest_ref, commit=manifest_commit)
-    mise_path.write_text(new_text, encoding="utf-8")
+    pin.path.write_text(pin.text, encoding="utf-8")
+    if pin.extra_path is not None:
+        pin.extra_path.write_text(pin.extra_text, encoding="utf-8")
 
     # THE SKILL, refreshed here rather than by a task someone must remember (Ray,
     # 2026-08-03). A project-scoped agent skill is the fourth thing a bump has to
@@ -256,4 +317,34 @@ def apply(repo_root: Path, spec: ToolSpec, verdict: Verdict) -> ApplyResult:
         manifest_ref=manifest_ref,
         manifest_commit=manifest_commit,
         note="; ".join(notes),
+    )
+
+
+def apply_source(
+    repo_root: Path,
+    spec: ToolSpec,
+    *,
+    source_ref: str,
+    branch: bool = False,
+) -> ApplyResult:
+    """Move one reviewed source-only manifest to a resolved immutable commit."""
+    if not spec.manifest:
+        raise NotAuthorizedError(f"{spec.name}: no source manifest is declared")
+    manifest_obj = mf.load(repo_root / spec.manifest)
+    if branch:
+        requested = replace(manifest_obj, ref=source_ref)
+        ref, commit = source_ref, mf.latest_commit(requested)
+    else:
+        ref, commit = mf.resolve_tag(manifest_obj.url, source_ref, prefix=spec.tag_prefix)
+    old = manifest_obj.commit
+    mf.write_pin(manifest_obj, ref=ref, commit=commit)
+    return ApplyResult(
+        tool=spec.name,
+        from_version=old,
+        to_version=commit,
+        changed=(spec.manifest,),
+        note=(
+            f"source pinned to {ref} @ {commit}; materialize with "
+            f"`mise run kb-source-clone -- {spec.name}`"
+        ),
     )

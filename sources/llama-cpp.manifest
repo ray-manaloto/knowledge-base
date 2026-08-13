@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Pinned local OpenAI-compatible serving dependency for the Muse Glimmer Graphify deep-extraction canary; b10360 is the first release selected after Muse support PR #26841 merged.
+url = https://github.com/ggml-org/llama.cpp
+ref = b10360
+commit = 48d22e295e2b86b47366c16390794f3e05ba970a
+kind = docs

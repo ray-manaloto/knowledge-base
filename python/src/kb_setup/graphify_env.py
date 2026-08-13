@@ -281,6 +281,25 @@ def _imports_graphify(py: Path) -> bool:
         return False
 
 
+def _python_graphify_version(py: Path) -> str:
+    """Read the Graphify distribution version from one candidate interpreter."""
+    try:
+        result = subprocess.run(
+            [
+                str(py),
+                "-c",
+                "from importlib.metadata import version; print(version('graphifyy'))",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except OSError, subprocess.SubprocessError:
+        return ""
+    return (result.stdout or "").strip() if result.returncode == 0 else ""
+
+
 def graphify_python(repo_root: Path | None = None) -> str:
     """Return a path to an interpreter that can ``import graphify``.
 
@@ -293,7 +312,9 @@ def graphify_python(repo_root: Path | None = None) -> str:
     marker = root / "graphify-out" / ".graphify_python"
     if marker.is_file():
         cand = Path(marker.read_text(encoding="utf-8").strip())
-        if cand.is_file() and _imports_graphify(cand):
+        pinned = pinned_graphify_version(root)
+        marker_version = _python_graphify_version(cand) if cand.is_file() else ""
+        if marker_version and (not pinned or marker_version == pinned) and _imports_graphify(cand):
             return str(cand)
 
     try:

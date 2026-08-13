@@ -18,10 +18,13 @@ No network: the fetch boundary is an injected callable, per tests/AGENTS.md
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import msgspec
 import pytest
 from kb_setup import fetch
+from kb_setup.generated.fetch_receipt import FetchReceipt
 
 FIXTURE = Path(__file__).parent / "fixtures" / "reference-sample.md"
 RAW = FIXTURE.read_text(encoding="utf-8")
@@ -213,6 +216,118 @@ def test_write_source_is_repeatable(tmp_path: Path) -> None:
     b = fetch.write_source(tmp_path, "ref", RAW, url="https://example.com/ref")
     second = fetch.content_hash(b.read_text(encoding="utf-8"))
     assert first == second
+
+
+def test_generated_receipt_model_decodes_a_valid_receipt() -> None:
+    """The committed schema model accepts the complete current wire contract."""
+    payload = {
+        "schema_version": 1,
+        "sources": [
+            {
+                "url": "https://example.com/ref",
+                "artifact": "sources/ref.md",
+                "content_sha256": "a" * 64,
+                "content_bytes": 10,
+                "content_chars": 10,
+                "prefix_sha256": "b" * 64,
+                "tail_sha256": "c" * 64,
+                "read_to_eof": True,
+                "truncated": False,
+            }
+        ],
+    }
+
+    decoded = msgspec.json.decode(json.dumps(payload).encode(), type=FetchReceipt)
+
+    assert decoded.sources[0].artifact == "sources/ref.md"
+
+
+def test_generated_receipt_model_rejects_unknown_fields() -> None:
+    """The generator's generic base class keeps strict-schema decoding active."""
+    payload = {
+        "schema_version": 1,
+        "sources": [
+            {
+                "url": "https://example.com/ref",
+                "artifact": "sources/ref.md",
+                "content_sha256": "a" * 64,
+                "content_bytes": 10,
+                "content_chars": 10,
+                "prefix_sha256": "b" * 64,
+                "tail_sha256": "c" * 64,
+                "read_to_eof": True,
+                "truncated": False,
+                "unreviewed_extension": "must not be silently accepted",
+            }
+        ],
+    }
+
+    with pytest.raises(msgspec.ValidationError, match="unknown field"):
+        msgspec.json.decode(json.dumps(payload).encode(), type=FetchReceipt)
+
+
+def test_receipt_verifies_the_complete_body_and_both_cutoff_witnesses(tmp_path: Path) -> None:
+    artifact = fetch.write_source(tmp_path / "sources", "ref", RAW, url="https://example.com/ref")
+    receipt = fetch.write_receipt(
+        tmp_path,
+        Path("sources/downloads.receipts.json"),
+        artifact,
+        RAW,
+        url="https://example.com/ref",
+    )
+
+    ok, failures = fetch.verify_receipt(tmp_path, receipt)
+
+    assert ok, failures
+    row = json.loads(receipt.read_text(encoding="utf-8"))["sources"][0]
+    assert row["content_bytes"] == len(RAW.encode("utf-8"))
+    assert row["read_to_eof"] is True
+    assert row["truncated"] is False
+
+
+def test_receipt_fails_when_the_artifact_tail_is_cut(tmp_path: Path) -> None:
+    artifact = fetch.write_source(tmp_path / "sources", "ref", RAW, url="https://example.com/ref")
+    receipt = fetch.write_receipt(
+        tmp_path,
+        Path("sources/downloads.receipts.json"),
+        artifact,
+        RAW,
+        url="https://example.com/ref",
+    )
+    artifact.write_text(artifact.read_text(encoding="utf-8")[:-80], encoding="utf-8")
+
+    ok, failures = fetch.verify_receipt(tmp_path, receipt)
+
+    assert not ok
+    assert any("tail_sha256 mismatch" in failure for failure in failures)
+
+
+def test_verify_receipts_defaults_to_every_source_receipt(tmp_path: Path) -> None:
+    artifact = fetch.write_source(tmp_path / "sources", "ref", RAW, url="https://example.com/ref")
+    fetch.write_receipt(
+        tmp_path,
+        Path("sources/downloads.receipts.json"),
+        artifact,
+        RAW,
+        url="https://example.com/ref",
+    )
+
+    assert fetch.verify_receipts(tmp_path) == (True, ())
+
+
+def test_verify_receipts_fails_when_default_scope_is_empty(tmp_path: Path) -> None:
+    assert fetch.verify_receipts(tmp_path) == (
+        False,
+        ("no source receipt files found",),
+    )
+
+
+def test_receipt_path_cannot_escape_the_repository(tmp_path: Path) -> None:
+    artifact = fetch.write_source(tmp_path / "sources", "ref", RAW, url="https://example.com/ref")
+    with pytest.raises(ValueError, match="inside the repository"):
+        fetch.write_receipt(
+            tmp_path, Path("../receipt.json"), artifact, RAW, url="https://example.com/ref"
+        )
 
 
 # --------------------------------------------------------------------------

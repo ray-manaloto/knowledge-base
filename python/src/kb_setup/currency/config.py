@@ -52,6 +52,15 @@ class WatchItem:
 
 
 @dataclass(frozen=True)
+class SkillTarget:
+    """One additional project-scoped skill surface shipped by a tool."""
+
+    directory: str
+    install: tuple[str, ...]
+    generated_directory: str = ""
+
+
+@dataclass(frozen=True)
 class ToolSpec:
     """Everything the engine needs to assess one tool's currency.
 
@@ -100,6 +109,13 @@ class ToolSpec:
     # human reviews rather than assembled at runtime where a refactor could drop it.
     skill_dir: str = ""
     skill_install: tuple[str, ...] = ()
+    skill_generated_dir: str = ""
+    # A tool can ship distinct generated instructions for more than one agent
+    # harness. Graphify is the founding case: its Claude bundle and generic
+    # Agent-Skills bundle are different files, so copying a version stamp (or
+    # copying one tree onto the other) falsely reports current content. Every
+    # target carries its own project-scoped installer argv.
+    skill_mirrors: tuple[SkillTarget, ...] = ()
     # `artifact` is the PRIMARY build output — the one whose `built_at_commit` is
     # read for identity (graphify writes it only into graph.json). `artifacts` is
     # the wider set of GENERATED outputs (wiki/graphml/svg/GRAPH_REPORT.md) that
@@ -151,6 +167,9 @@ class ToolSpec:
     # remedy is `mise run kb-update -- <name>`, never a pin edit, so an auto-apply
     # is refused in `currency.apply`.
     source_only: bool = False
+    # Override the conventional ``--version`` argv for tools such as ffmpeg,
+    # whose version flag is the single-dash ``-version`` form.
+    version_args: tuple[str, ...] = ("--version",)
     # Regex with ONE capture group pulling the version out of `--version` output.
     # Needed because the default heuristic (last whitespace field) is wrong for
     # any tool that prints more than "<name> <version>": mise prints
@@ -234,6 +253,33 @@ def _watch_items(raw: object) -> tuple[WatchItem, ...]:
     return tuple(items)
 
 
+def _skill_targets(raw: object) -> tuple[SkillTarget, ...]:
+    """Parse additional generated skill targets, rejecting incomplete rows."""
+    if not isinstance(raw, list):
+        return ()
+    targets: list[SkillTarget] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        directory = str(entry.get("dir") or "")
+        install_raw = entry.get("install", [])
+        install = (
+            tuple(str(value) for value in install_raw) if isinstance(install_raw, list) else ()
+        )
+        if not directory or not install:
+            raise ValueError(
+                f"{CONFIG_NAME}: each skill_mirrors row needs non-empty 'dir' and 'install'"
+            )
+        targets.append(
+            SkillTarget(
+                directory=directory,
+                install=install,
+                generated_directory=str(entry.get("generated_dir") or ""),
+            )
+        )
+    return tuple(targets)
+
+
 def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
     # One of the two must be present, and they are alternatives: `mise_key` says
     # "mise installs this, read the pin from mise.toml"; `expected` says "this
@@ -269,6 +315,8 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         extra_probes=_tuple("extra_probes"),
         skill_dir=_str("skill_dir"),
         skill_install=_tuple("skill_install"),
+        skill_generated_dir=_str("skill_generated_dir"),
+        skill_mirrors=_skill_targets(table.get("skill_mirrors")),
         manifest=_str("manifest"),
         tag_prefix=_str("tag_prefix"),
         artifact=_str("artifact"),
@@ -277,6 +325,7 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         stamp=_str("stamp"),
         expected=_str("expected"),
         source_only=bool(table.get("source_only", False)),
+        version_args=_tuple("version_args") or ("--version",),
         version_pattern=_str("version_pattern"),
         os=_tuple("os"),
         watch=_watch_items(table.get("watch")),

@@ -57,6 +57,22 @@ def test_resolve_tag_returns_ref_and_commit_on_success(monkeypatch) -> None:
     assert manifest.resolve_tag("https://example/x", "0.9.26") == ("v0.9.26", "cafe1234")
 
 
+def test_resolve_tag_returns_the_peeled_commit_for_an_annotated_tag(monkeypatch) -> None:
+    """A manifest pins executable source bytes, not the annotated tag object."""
+    import subprocess
+
+    def _ok(*_a: object, **_k: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=("tagobject\trefs/tags/v1.2.3\ncommitsha\trefs/tags/v1.2.3^{}\n"),
+            stderr="",
+        )
+
+    monkeypatch.setattr(manifest.subprocess, "run", _ok)
+    assert manifest.resolve_tag("https://example/x", "1.2.3") == ("v1.2.3", "commitsha")
+
+
 # --- #245: a project whose tags carry a prefix -------------------------------
 
 
@@ -73,7 +89,7 @@ def _remote(monkeypatch, *tags: str) -> list[str]:
     asked: list[str] = []
 
     def _ls_remote(argv: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
-        ref = argv[-1]
+        ref = argv[-1].removesuffix("*")
         asked.append(ref)
         out = f"cafe1234\trefs/tags/{ref}\n" if ref in tags else ""
         return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from kb_setup.currency import skill
-from kb_setup.currency.config import ToolSpec
+from kb_setup.currency.config import SkillTarget, ToolSpec
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -46,6 +46,54 @@ def _spec(
         skill_dir=skill_dir,
         skill_install=skill_install,
     )
+
+
+def test_each_declared_agent_skill_is_regenerated_from_its_own_bundle(
+    tmp_path, monkeypatch
+) -> None:
+    """A current stamp cannot hide stale bytes in a second harness skill tree."""
+    repo = _repo(tmp_path)
+    agents = repo / ".agents" / "skills" / "graphify"
+    agents.mkdir(parents=True)
+    (agents / "SKILL.md").write_text("stale agent bundle\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, timeout=30)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "agents"], check=True, timeout=30)
+
+    script = (
+        "from pathlib import Path;"
+        "p=Path('.codex/skills/graphify');p.mkdir(parents=True);"
+        "(p/'SKILL.md').write_text('native codex bundle\\n', encoding='utf-8');"
+        "(p/'.graphify_version').write_text('0.9.39', encoding='utf-8')"
+    )
+    install = (
+        "mise",
+        "exec",
+        "--",
+        "graphify",
+        "-c",
+        script,
+    )
+    monkeypatch.setattr(skill, "graphify_exe", lambda _root: sys.executable)
+    spec = ToolSpec(
+        name="graphify",
+        mise_key="pipx:graphifyy",
+        skill_dir=".claude/skills/graphify",
+        skill_install=("true",),
+        skill_mirrors=(
+            SkillTarget(
+                directory=".agents/skills/graphify",
+                install=install,
+                generated_directory=".codex/skills/graphify",
+            ),
+        ),
+    )
+
+    result = skill.refresh(repo, spec)
+
+    assert result.ran is True
+    assert (agents / "SKILL.md").read_text(encoding="utf-8") == "native codex bundle\n"
+    assert (agents / ".graphify_version").read_text(encoding="utf-8") == "0.9.39\n"
+    assert any(path.startswith(".agents/skills/graphify") for path in result.changed)
 
 
 def test_a_tool_with_no_declared_skill_is_a_clean_no_op(tmp_path) -> None:

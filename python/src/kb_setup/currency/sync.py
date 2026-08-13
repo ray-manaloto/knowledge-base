@@ -219,8 +219,10 @@ def _is_mise_shim(resolved: Path) -> bool:
     return any(resolved.is_relative_to(root) for root in _mise_shim_dirs())
 
 
-def observed_version(binary: str, pattern: str = "") -> str:
-    """Execute `binary --version` and return the bare version, or "" on failure.
+def observed_version(
+    binary: str, pattern: str = "", version_args: tuple[str, ...] = ("--version",)
+) -> str:
+    """Execute a tool's version command and return the bare version, or "" on failure.
 
     This is the authoritative reading, used when STAMPING a build — where the
     honest answer is "whatever actually ran", not "whatever the pin says". A
@@ -243,7 +245,7 @@ def observed_version(binary: str, pattern: str = "") -> str:
         return ""
     try:
         res = subprocess.run(
-            [found, "--version"], capture_output=True, text=True, check=False, timeout=30
+            [found, *version_args], capture_output=True, text=True, check=False, timeout=30
         )
     except OSError, subprocess.TimeoutExpired:
         return ""
@@ -787,6 +789,27 @@ def manifest_ref(repo_root: Path, spec: ToolSpec) -> str:
 # ----------------------------------------------------------------- checks ----
 
 
+def _versions_equivalent(left: str, right: str) -> bool:
+    """Compare release versions without mistaking tag or precision style for drift.
+
+    Git tags commonly add a leading ``v`` while mise pins omit it, and tools may
+    print the SemVer-normalized patch component (``9.0.0``) for a ``9.0`` pin.
+    Only normalize all-numeric dotted releases; prereleases and mutable refs keep
+    literal comparison so this helper cannot launder a meaningful qualifier.
+    """
+    numeric = re.compile(r"^v?(\d+(?:\.\d+)*)$")
+    parsed: list[tuple[int, ...]] = []
+    for value in (left, right):
+        match = numeric.fullmatch(value.strip())
+        if match is None:
+            return left == right
+        parts = [int(part) for part in match.group(1).split(".")]
+        while len(parts) > 1 and parts[-1] == 0:
+            parts.pop()
+        parsed.append(tuple(parts))
+    return parsed[0] == parsed[1]
+
+
 def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
     resolved, how = resolve_from_path(spec.binary)
     if how == "shim":
@@ -813,7 +836,7 @@ def _check_resolution(spec: ToolSpec, pinned: str) -> tuple[Finding, str]:
             ),
             "",
         )
-    if resolved != pinned:
+    if not _versions_equivalent(resolved, pinned):
         return (
             Finding(
                 "resolution",
@@ -868,7 +891,11 @@ def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
                 Finding("resolution", DRIFT, f"{spec.binary} is not installed on this host"),
             ),
         )
-    running = observed_version(spec.binary, spec.version_pattern)
+    running = (
+        observed_version(spec.binary, spec.version_pattern)
+        if spec.version_args == ("--version",)
+        else observed_version(spec.binary, spec.version_pattern, spec.version_args)
+    )
     if not running:
         # BLIND, not DRIFT: an unreadable version is "could not ask". Rendering
         # it as disagreement would make a broken `version_pattern` look like a
@@ -1095,7 +1122,7 @@ def _check_manifest(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     # the `v`, or a `rust-v` tag compares literally against an installed
     # `0.147.0` and reports drift on a manifest pinned exactly right (#245).
     bare = ref.removeprefix(spec.tag_prefix).lstrip("v") if spec.tag_prefix else ref.lstrip("v")
-    if bare != pinned:
+    if not _versions_equivalent(bare, pinned):
         # "mise installs" is TRUE only on the mise-managed path. Since 2026-08-08
         # this is also reached for `expected`-based tools (mise itself,
         # claude-code, ruff, ty), which mise does not install — the first armed

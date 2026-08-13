@@ -1135,6 +1135,30 @@ def test_a_hit_below_k_is_a_miss() -> None:
     assert "natural@2 0/1" in outcome.detail
 
 
+def test_a_source_cited_alternative_counts_but_an_unrelated_distractor_does_not() -> None:
+    """Corpus growth may add equivalent evidence; arbitrary nearby prose is not equivalent."""
+    alternatives = ("also-answers.md",)
+    queries = tuple(
+        evals.GoldenQuery(
+            query.topic,
+            query.phrasing,
+            query.query,
+            query.must_appear,
+            query.k,
+            acceptable_alternatives=alternatives if not query.expects_absent else (),
+        )
+        for query in _golden()
+    )
+    accepted = evals.retrieval_recall(
+        queries, _one(_returns("also-answers.md")), stamp="test corpus"
+    )
+    distractor = evals.retrieval_recall(
+        queries, _one(_returns("unrelated.md")), stamp="test corpus"
+    )
+    assert "natural@3 1/1" in accepted.detail
+    assert "natural@3 0/1" in distractor.detail
+
+
 def test_the_pair_gap_is_reported() -> None:
     """The gap between the phrasings IS the finding, so it must be printed."""
 

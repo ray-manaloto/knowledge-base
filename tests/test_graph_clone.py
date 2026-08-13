@@ -39,8 +39,8 @@ def _manifest(tmp_path: Path) -> mf.Manifest:
     )
 
 
-def _record(monkeypatch, *, has_commit: bool) -> list[list[str]]:
-    """Stub subprocess.run; `has_commit` decides what `git cat-file -e` reports."""
+def _record(monkeypatch, *, has_commit: bool, has_ref: bool = True) -> list[list[str]]:
+    """Stub subprocess.run; the booleans model local object/ref availability."""
     calls: list[list[str]] = []
 
     class _P:
@@ -51,6 +51,8 @@ def _record(monkeypatch, *, has_commit: bool) -> list[list[str]]:
         calls.append(cmd)
         if "cat-file" in cmd:
             return _P(0 if has_commit else 1)
+        if "rev-parse" in cmd:
+            return _P(0 if has_ref else 1)
         return _P(0)
 
     monkeypatch.setattr(graph.subprocess, "run", fake_run)
@@ -73,13 +75,22 @@ def test_fetches_when_pinned_commit_is_absent(monkeypatch, tmp_path):
 
 
 def test_does_not_fetch_when_commit_already_present(monkeypatch, tmp_path):
-    """CONTROL ARM: the common path must stay offline — no needless network."""
+    """CONTROL ARM: commit and ref are local, so no network is needed."""
     calls = _record(monkeypatch, has_commit=True)
     graph._ensure_clone(_manifest(tmp_path))
 
     verbs = _verbs(calls)
     assert "fetch" not in verbs, f"must not fetch when the object is present, saw {verbs}"
     assert "checkout" in verbs
+
+
+def test_fetches_when_commit_exists_but_manifest_ref_is_absent(monkeypatch, tmp_path):
+    """Currency must be able to prove which release names an existing commit."""
+    calls = _record(monkeypatch, has_commit=True, has_ref=False)
+    graph._ensure_clone(_manifest(tmp_path))
+
+    fetch = next(c for c in calls if len(c) > 3 and c[3] == "fetch")
+    assert fetch[-3:] == ["--tags", "origin", "main"]
 
 
 @pytest.mark.parametrize("has_commit", [True, False])

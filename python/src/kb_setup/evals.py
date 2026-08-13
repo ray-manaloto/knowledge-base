@@ -696,6 +696,11 @@ class GoldenQuery:
             document came back".
         k: How far down the returned list a hit counts. Per-query, because a
             broad question and a pointed one do not deserve the same window.
+        acceptable_alternatives: Other source documents independently verified
+            to answer the same question.  One of these may satisfy the query
+            when none of ``must_appear`` does.  This models evidence equivalence
+            as the corpus grows; it is not a filename alias and is forbidden on
+            negative queries.
     """
 
     topic: str
@@ -703,6 +708,7 @@ class GoldenQuery:
     query: str
     must_appear: tuple[str, ...]
     k: int = 10
+    acceptable_alternatives: tuple[str, ...] = ()
 
     @property
     def expects_absent(self) -> bool:
@@ -805,7 +811,22 @@ def score_retrieval(query: GoldenQuery, retrieve: Retrieve) -> RetrievalRow:
     rc, returned = retrieve(query)
     top = list(returned)[: query.k]
     hits = tuple(t for t in query.must_appear if t in top)
+    if not hits:
+        hits = tuple(t for t in query.acceptable_alternatives if t in top)[:1]
     return RetrievalRow(query=query, rc=rc, returned=len(returned), hits=hits)
+
+
+def _alternative_shape(queries: Sequence[GoldenQuery]) -> str:
+    """Reject alternative-source declarations whose score would be ambiguous."""
+    for query in queries:
+        if query.expects_absent and query.acceptable_alternatives:
+            return f"topic {query.topic!r}: an ABSENT query cannot declare acceptable alternatives"
+        if query.acceptable_alternatives and len(query.must_appear) != 1:
+            return (
+                f"topic {query.topic!r}: acceptable alternatives require exactly "
+                "one primary target, so recall keeps a 0/1 or 1/1 meaning"
+            )
+    return ""
 
 
 def _golden_set_shape(queries: Sequence[GoldenQuery]) -> str:
@@ -831,6 +852,8 @@ def _golden_set_shape(queries: Sequence[GoldenQuery]) -> str:
             "measure that something came back, so a retriever that returns the "
             "whole corpus would score perfectly"
         )
+    if alternative_problem := _alternative_shape(queries):
+        return alternative_problem
     pairs: dict[str, dict[Phrasing, GoldenQuery]] = {}
     for q in (q for q in queries if not q.expects_absent):
         pairs.setdefault(q.topic, {})[q.phrasing] = q
@@ -843,7 +866,11 @@ def _golden_set_shape(queries: Sequence[GoldenQuery]) -> str:
                 f"the measurement, since a lone number cannot show the gap"
             )
         natural, echo = halves[Phrasing.NATURAL], halves[Phrasing.ECHO]
-        if natural.must_appear != echo.must_appear or natural.k != echo.k:
+        if (
+            natural.must_appear != echo.must_appear
+            or natural.acceptable_alternatives != echo.acceptable_alternatives
+            or natural.k != echo.k
+        ):
             return (
                 f"topic {topic!r}: the two phrasings declare different targets or "
                 f"a different k, so their recall figures are not comparable"
@@ -859,7 +886,13 @@ def _fixture_integrity(queries: Sequence[GoldenQuery], present: Membership) -> s
     forever and reads as "retrieval is broken", while an ABSENT target that has
     since been ingested makes the negative direction unfalsifiable.
     """
-    names = sorted({t for q in queries for t in q.must_appear})
+    names = sorted(
+        {
+            target
+            for query in queries
+            for target in (*query.must_appear, *query.acceptable_alternatives)
+        }
+    )
     seen = present(names)
     rotten = [
         f"{q.topic}/{q.phrasing.name}: {target!r} is "
@@ -868,6 +901,12 @@ def _fixture_integrity(queries: Sequence[GoldenQuery], present: Membership) -> s
         for target in q.must_appear
         if seen.get(target, False) is q.expects_absent
     ]
+    rotten.extend(
+        f"{query.topic}/{query.phrasing.name}: alternative {target!r} is NOT in the corpus"
+        for query in queries
+        for target in query.acceptable_alternatives
+        if not seen.get(target, False)
+    )
     if rotten:
         return "fixture rot — " + "; ".join(rotten)
     return ""

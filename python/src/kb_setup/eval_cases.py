@@ -238,6 +238,17 @@ GOLDEN_K = 10
 #: hit for this name.
 NEAR_MISS_TARGET = "cerebras-knowledge-base-v2.md"
 
+# Corpus-growth alternatives, verified from graph evidence rather than inferred
+# from filenames (2026-08-11).  The migration article states that an objective
+# test oracle enables unattended days-long runs; the workflow guide states both
+# repository-wide parallel sweeps and independent verification.  Their exact
+# graph citations are respectively:
+#
+# * ``claude_com_blog_ai-code-migration.md`` node "A built-in referee ..."
+# * ``claudefa_st_blog_guide_development_dynamic-workflows.md`` whole article
+UNATTENDED_ALTERNATIVES = ("claude_com_blog_ai-code-migration.md",)
+MANY_AGENTS_ALTERNATIVES = ("claudefa_st_blog_guide_development_dynamic-workflows.md",)
+
 #: The golden retrieval set — 8 hand-written PAIRS plus both negatives.
 #:
 #: HAND-WRITTEN, not derived from the nodes under test. Generating queries by
@@ -290,6 +301,7 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
         "for days without watching it?",
         ("www_anthropic_com_research_long-running-Claude.md",),
         GOLDEN_K,
+        acceptable_alternatives=UNATTENDED_ALTERNATIVES,
     ),
     _G(
         "unattended-work",
@@ -298,6 +310,7 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
         "file as portable long-term memory across sessions",
         ("www_anthropic_com_research_long-running-Claude.md",),
         GOLDEN_K,
+        acceptable_alternatives=UNATTENDED_ALTERNATIVES,
     ),
     _G(
         "beyond-similarity",
@@ -354,6 +367,7 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
         "avoid having to take each of their claims on faith?",
         ("claude_com_blog_introducing-dynamic-workflows-in-claude-code.md",),
         GOLDEN_K,
+        acceptable_alternatives=MANY_AGENTS_ALTERNATIVES,
     ),
     _G(
         "many-agents-one-repo",
@@ -362,6 +376,7 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
         "independent per-finding verification",
         ("claude_com_blog_introducing-dynamic-workflows-in-claude-code.md",),
         GOLDEN_K,
+        acceptable_alternatives=MANY_AGENTS_ALTERNATIVES,
     ),
     _G(
         "capability-not-loading",

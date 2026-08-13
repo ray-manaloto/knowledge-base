@@ -15,6 +15,6 @@
 # `reference is not a tree` — a REAL defect signature, not a transient
 # (persistence-gate-retry.md), so it fails loudly rather than silently.
 url = https://github.com/mattpocock/skills
-ref = changeset-release/main
-commit = f34d927194a521688da962fff50708f6238d06af
+ref = v1.2.3
+commit = 6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
 kind = docs

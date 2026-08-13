@@ -1,0 +1,242 @@
+---
+name: kb-curator
+description: >-
+  Automate adding a source to this knowledge-base graph and keep the corpus
+  self-improving: register in the source backlog, ingest (code=AST free, or
+  prose=host-agent), MERGE into the aggregate graph, re-cluster, label, and —
+  ALWAYS — record work-memory (`graphify save-result`) and run `graphify reflect`
+  so lessons compound across every ingestion. Use this whenever the user wants to
+  add/ingest/extract a source into the KB (a GitHub repo, a docs URL or
+  sitemap.xml, a PDF, a video/transcript, a blog/reddit thread), refresh an
+  existing source, run reflection/LESSONS, or "teach the KB" something — even if
+  they just paste a URL or say "add this to the graph" without naming the skill.
+  Prefer graphify ingestion+extraction over raw web search: graphify fetches the
+  URL itself, so the graph is the primary research surface.
+---
+
+# kb-curator — self-improving ingest → extract → reflect
+
+You are the curator of a graphify knowledge graph that many Codex agents
+query. Your job: take a new source from "I want this in the KB" to a merged,
+clustered, labelled part of the aggregate graph — and leave the corpus a little
+smarter each time by recording what you learned. **Read `docs/graphify-reference.md`
+first** for the graphify mental model; this skill is the workflow on top of it.
+
+Why the self-learning step is non-negotiable: a knowledge base that only grows
+nodes but never records *how the last ingestion went* repeats every mistake.
+`save-result` + `reflect` turn each run's outcome into a durable, graph-aware
+lesson (`reflections/LESSONS.md` + the `.graphify_learning.json` overlay), which
+`graphify explain`/`query` then surface to the next agent. That is the whole point.
+
+## TWO HARD MANDATES (Ray, 2026-07-22 — machine-enforced)
+
+**1. NEVER run graphify by hand — every graphify operation is a mise task.**
+Do NOT type `graphify …`, `_merge_docs.py`, or run graphify's bundled interpreter
+directly. Drive it through the task; the PreToolUse guard (`kb_setup.hook_guard`,
+wired in `.Codex/settings.json`) DENIES raw graphify calls and redirects here.
+The task map:
+
+| Operation | mise task | not the raw command / one-off |
+|---|---|---|
+| pin a NEW repo source | `mise run kb-manifest-add -- <url> [--name N --ref R --kind K]` | ~~hand-write a `.manifest`~~ |
+| add a URL (page/blog/article/video) | `mise run kb-add -- <url> [--author NAME]` | ~~`graphify add`~~ |
+| rebuild from committed inputs | `mise run kb-build` | ~~`graphify extract`/`merge-graphs`~~ |
+| advance a repo source | `mise run kb-update -- <name>` | ~~`graphify update`~~ |
+| host-agent extract N sources | a bounded Codex extraction team | ~~an inline one-off script~~ |
+| combine + validate extraction chunks | `mise run kb-assemble -- <name> <chunk.json>...` | ~~inline python assembly~~ |
+| schema-check chunks | `mise run kb-validate-chunks -- <chunk.json>...` | ~~inline python validation~~ |
+| merge one doc chunk | `mise run kb-merge -- <chunk.json> [root]` | ~~`_merge_docs.py`~~ |
+| (re)label communities | `mise run kb-label` | ~~`graphify label`~~ |
+| transcribe local audio | `mise run kb-transcribe -- <audio>` | ~~`graphify.transcribe`~~ |
+| query | `mise run kb-query -- "<q>"`, plus `--prose` for a DOCUMENT question | ~~`graphify query`~~ |
+| re-derive the prose graph alone | `mise run kb-prose` (every task that writes `graph.json` already re-derives it) | — |
+| record / reflect | `mise run kb-remember` / `mise run kb-reflect` | ~~`graphify save-result`/`reflect`~~ |
+| artifacts | `mise run kb-artifacts` | — |
+
+**2. Codex only — NEVER Gemini or any auto-detected key.** Semantic work uses
+Codex host agents; deterministic labeling uses no LLM. This Codex path does not
+depend on Claude's saved Workflow existing.
+Every task strips `GEMINI_API_KEY`/`GOOGLE_API_KEY` (`graphify_env.clean_env`) so
+graphify's backend auto-detect can never pick a non-Codex provider. graphify's
+`Codex-cli` backend exists but is BROKEN for labeling (#2076 — prose-wrapped JSON),
+so `kb-label` defaults to the deterministic hub labeler.
+
+## Ingest every source THROUGH graphify (via the tasks above)
+
+**All ingestion goes through graphify's own tooling, never an ad-hoc fetch** — and
+via the task, per mandate 1. Entry points:
+
+- **GitHub repo** → `mise run kb-manifest-add -- <url> [--name N]` (pins upstream HEAD
+  via `git ls-remote`, writes the manifest — never hand-write it) + `mise run kb-build`.
+- **Any URL** (docs page, blog, article) → `mise run kb-add -- <url>` — fetches to
+  `./raw` (graphify writes `source_url`/`captured_at` frontmatter). `--author`/
+  `--contributor` tag provenance. No-key `add` fetches but does NOT re-cluster, so
+  batch all adds, then merge once.
+- **Sitemap** → enumerate, then `mise run kb-add --` each on-topic page.
+- **Video/YouTube** → `mise run kb-add -- <url>` downloads audio, then
+  `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — NO key, NO LLM).
+- **Live PostgreSQL** → (add a task if this recurs; do not hand-run `graphify extract`).
+
+`curl`/WebFetch/manual vendoring are a **fallback ONLY** when graphify genuinely
+cannot reach a source — and even then route the content into the graph via an
+extraction chunk. With no API key the *semantic* extraction falls to the host agent
+(Codex), but the FETCH + pipeline is graphify's. One ingestion path = uniform
+provenance, the freshness policy, and reproducibility.
+
+## The aggregate-graph model
+
+The KB is MANY per-source graphs merged into one (`graph.json`), extended every
+time a source lands. Each source is extracted into its own sub-graph, then
+union-merged. **Cross-project dedup is disabled by design** — a `main` in repo A
+is not repo B's — so merges never dedup across repos (`merge-graphs` for code;
+`dedup=False` for the doc path). Do not fight this; it is correct.
+
+## Pick the ingestion path by source type
+
+| Source | Path | Cost |
+|---|---|---|
+| **GitHub repo** | add `sources/<name>.manifest` (url+ref+SHA); `mise run kb-build` clones + AST-extracts + merges | free (AST) |
+| **A whole docs SITE with an auto-synced mirror repo** | `mise run kb-manifest-add -- <mirror-url> --kind docs`, then host-agent extract from the pinned clone | tokens, but only for CHANGED pages |
+| **Docs page / sitemap.xml** (no mirror exists) | parse the sitemap (use `advertools`/`usp` — do NOT hand-roll), fetch on-topic pages, host-agent prose-extract → chunk | tokens |
+| **PDF / video / transcript / blog / forum** | vendor under `sources/media/`, host-agent prose-extract → `sources/extractions/<name>-docs.json` | tokens |
+| **Any URL (quick)** | `mise run kb-add -- <url>` (graphify fetches → `./raw` → updates graph) | varies |
+
+**Prefer a mirror over per-page fetching whenever one exists.** `kind = docs` is
+not a cosmetic label: it makes `kb-build` SKIP the AST pass (`--code-only` is
+defined as *"index code … and skip doc/paper/image files"*, so it is a
+guaranteed-empty scan over markdown), and it makes `mise run kb-update` print the
+**changed-page worklist** from `git diff <old-sha>..<new-sha>`. That worklist is
+the whole point — fingerprinting a page proves THAT it changed and never WHAT, so
+without it every revision costs a re-read of the corpus to find a nine-line edit
+(#76). Control-arm a candidate mirror before pinning it: hash its copy of a page
+against the live page. `mrkhachaturov/agent-harness-docs` and
+`ericbuess/Codex-docs` were byte-identical on 2026-07-30 and sync every 3h.
+
+⚠️ **Never pin a tool's own repo `kind = code` to get its docs.** That extracts
+the SOURCE and skips every `.md` — the exact opposite — while adding the repo's
+whole AST to a graph already crowding prose out of the query budget (#12).
+See issue #81 for the full scan and the suggested order.
+
+**Tier by relevance** (host-agent prose is token-costly): T1 = full semantic + code
+for authoritative/on-topic sources; T2 = code-AST or README-only; T3 = register but
+defer (live timelines → reach via a trend tool, not static ingest). Record the tier
+in `sources/REGISTRY.md`.
+
+## The workflow (every ingestion)
+
+1. **Register.** Add/append a row in `sources/REGISTRY.md` (kind, tier, status) so
+   nothing is lost. The registry IS the backlog the KB works down over time.
+2. **Ingest** (via the tasks — never raw graphify).
+   - Repo → write the manifest, `mise run kb-build`. A prose-only repo (no code)
+     is skipped without aborting — its value comes from the prose step, not AST.
+   - URL(s) → `mise run kb-add -- <url>` (batch all; no-key add fetches to `./raw`
+     without re-clustering). Video → `mise run kb-add --` then
+     `mise run kb-transcribe -- raw/<yt>.m4a`.
+   - Prose extraction = **bounded Codex host-agent team**. Use
+     `gpt-5.6-terra` at `medium` effort for ordinary schema-driven source
+     packets; reserve `gpt-5.6-sol` at `high` effort for ambiguous evidence or
+     a failed review. Give each agent
+     `{scratchDir, capturedAt, sources:[{key,path,url,kind,note}]}` (`kind` ∈
+     `article|doc|designdoc|research_json|inventory|article_partial`).
+     **`capturedAt` is REQUIRED — pass TODAY's date as `YYYY-MM-DD`.** It has no
+     default: it was a hardcoded literal until #93, so every node every run
+     emitted carried one frozen date.
+     Each extraction agent
+     reads one file, extracts a schema-valid `{nodes,edges}`, and WRITES it to
+     `<scratchDir>/<key>.json`. Persist each completed chunk before launching
+     the next packet, so an agent dying at source 13 of 20 leaves 13 reusable
+     results (`agent-report-persistence`). **This is the ONLY LLM path and it is
+     Codex** (mandate 2).
+   - **Assemble** the per-source chunks into one committed doc chunk:
+     `mise run kb-assemble -- <name> <scratchDir>/*.json` — it validates every chunk
+     (schema, unique ids, no dangling edges, no cross-chunk id collision) and writes
+     `sources/extractions/<name>-docs.json`, failing loud on any problem. Never
+     hand-assemble or hand-validate. (`mise run kb-validate-chunks -- <chunk...>` is
+     the standalone gate.)
+   - ⚠️ **Every node MUST carry `"_origin": "semantic"`.** The extraction
+     contract requires it and the validator REJECTS a chunk without it, so a drifted
+     chunk now fails the build rather than merging. graphify 0.9.32 infers the tier
+     from shape when the marker is absent — a `source_location` matching `^L\d` reads
+     as AST — and our agents emit `L5`/`L13` unprompted, which silently deleted **629
+     doc nodes** (22% of the prose graph) on the first 0.9.32 build. Since 2026-08-03
+     both consumers validate FAIL-CLOSED before any merge subprocess runs, so this is
+     enforced rather than advised.
+   - Endpoints resolve across the WHOLE committed set, not per chunk — an edge
+     pointing at a node another chunk contributes is legitimate, because graphify's
+     merge resolves against the combined node set. Do not "clean up" a cross-chunk
+     edge the single-file view calls dangling: doing exactly that deleted four real
+     relationships on 2026-08-03.
+   - **Two chunks may not claim one `source_file` unless the winner SAYS SO** (#189).
+     `build_merge` gives a file to the last chunk that names it and DELETES the
+     other's nodes for it — how a 2026-08-06 chunk destroyed 72 nodes of an unrelated
+     source with every gate green. `kb-merge` and `kb-build` now refuse an undeclared
+     intersection. If the supersession is intended (a re-extraction of the same page),
+     add the paths to a top-level `"supersedes": [...]` in the chunk; if two unrelated
+     sources collided on a basename, fix the IDENTITY instead. `kb-extract.js` emits
+     `<source>/<clone-relative>` for clone files precisely so a root `README.md` /
+     `CHANGELOG.md` / `SKILL.md` cannot be a global name.
+3. **Merge.** `mise run kb-merge -- <chunk.json> [root]` (one chunk into the graph),
+   or `mise run kb-build` to replay all committed chunks. Both re-cluster; Louvain
+   renumbers communities globally + non-deterministically → **every merge staleifies
+   labels**, so relabel after. Every task that writes `graph.json` — `kb-build`,
+   `kb-merge` and `kb-label` alike — now re-derives `graph-prose.json`. Until
+   2026-07-30 only `kb-build` did, so every merge-only ingestion left `--prose`,
+   the recommended arm for a document question, on the pre-merge corpus.
+   `kb-label` matters here for a non-obvious reason: `graphify label` rewrites
+   `graph.json` outright rather than only its sidecars, so fixing the merge alone
+   would have been undone by step 4 below.
+4. **Label.** `mise run kb-label` — deterministic, no-LLM hub labels (Gemini-free,
+   instant). Do NOT expect an LLM to name communities: graphify's only non-Gemini LLM
+   backend is `Codex-cli`, and it is broken for labeling (#2076 — prose-wrapped JSON).
+   Unlabeled communities cripple the wiki, so always relabel after a merge.
+5. **SELF-LEARN (do not skip).** Record the outcome, then reflect:
+
+   ```bash
+   mise run kb-remember -- --question "Q" --answer "A" --nodes N1 N2 --outcome useful|dead_end|corrected
+   mise run kb-reflect                 # aggregates memory/ -> reflections/LESSONS.md + overlay
+   ```
+
+   Record the load-bearing thing you learned (a gotcha, a working command, a dead
+   end), citing the graph nodes it touched. `corrected` + `--correction` when you
+   fixed a wrong prior belief. This is what makes the KB self-improve per run.
+6. **Verify.** `mise run kb-query -- "<something the new source should answer>"`
+   returns cross-source hits; `mise run lint && mise run test` green.
+
+## Gotchas (hard-won — see LESSONS.md as it grows)
+
+- **NEVER Gemini / never an auto-detected key.** graphify's `detect_backend()`
+  priority is gemini→kimi→Codex→openai→deepseek→azure→**bedrock (any `AWS_REGION`/
+  `AWS_PROFILE`)**→ollama. A stray global `GEMINI_API_KEY` (a mise secret) once made
+  `graphify label` silently use Gemini; stripping only Gemini then fell to Bedrock
+  (25 failed "Converse" batches). `graphify_env.clean_env()` strips ALL of them from
+  every graphify subprocess (keeping only `ANTHROPIC_*` — the Codex path), so
+  detect_backend returns None. Verified 2026-07-22.
+- **`kb-label` = deterministic hub labels, and that is correct.** graphify prints
+  "no LLM backend configured; keeping Community N placeholders" — MISLEADING: the
+  deterministic hub labeler (names each community after its highest-degree node) still
+  runs during clustering, so `.graphify_labels.json` ends up fully named (2,409/2,409,
+  0 placeholders), just not LLM-enriched. Do not chase that warning.
+- **Codex-cli backend is BROKEN for labeling (#2076).** It returns prose-wrapped
+  JSON ("Done — cluster names above") graphify can't parse → every batch fails. This
+  is why `kb-label` is deterministic by default; `--Codex-cli` only to re-probe a fix.
+- **Never run graphify by hand** — the PreToolUse guard (`kb_setup.hook_guard`) denies
+  raw `graphify …`/`_merge_docs.py`/graphify-python and redirects to the task. Also
+  never `graphify hook install` (#857) or bare `graphify install` (mutates `~/.Codex`).
+- **`graphify extract --code-only` exits non-zero on a no-code repo.** `kb-build`
+  tolerates it (skips, keeps the pin). Never treat a prose-only repo as fatal.
+- **Python 3.14**: no Leiden (Louvain fallback, accepted) and `export svg` needs a
+  scipy inject (`mise run kb-ensure-deps`).
+- **YouTube**: `mise run kb-add -- <url>` downloads audio; then
+  `mise run kb-transcribe -- raw/<yt>.m4a` (graphify's bundled faster-whisper — local,
+  NO key, NO LLM; ffmpeg pinned). Then host-agent extract the transcript like any prose.
+- Version-gated (0.9.24+, not in installed 0.9.23): `reflect --if-stale`,
+  `extract --dedup-llm`. Bump the pin before relying on them.
+
+## Improving THIS skill (skill-creator loop)
+
+This skill was authored with the skill-creator methodology and is meant to be
+measured and improved, not frozen. When ingestion behavior drifts or a new source
+type recurs, run the skill-creator eval loop: draft/adjust test prompts in
+`evals/evals.json`, run with-skill vs baseline, review, and rewrite. Generalize
+from feedback — bundle a repeated helper into `scripts/` rather than hard-coding a
+one-off. Keep the description "pushy" so agents actually trigger it on a bare URL.

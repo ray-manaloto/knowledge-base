@@ -1,0 +1,299 @@
+{
+  "schema": 1,
+  "anchor_type": "canonical_dependency",
+  "ranking": [
+    "graph_nodes",
+    "source_receipts",
+    "project_reach"
+  ],
+  "god_node_eligible": false,
+  "cross_dependency_edges": 0,
+  "status": "RED",
+  "anchors": [
+    {
+      "type": "canonical_dependency",
+      "name": "codex",
+      "repo": "codex",
+      "manifest": "sources/codex.manifest",
+      "source_prefixes": [
+        "codex/",
+        "agent-harness-docs/docs/codex/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:codex",
+          "graph_nodes": 74458,
+          "receipts": 4173
+        },
+        {
+          "prefix": "agent-harness-docs/docs/codex/",
+          "graph_nodes": 0,
+          "receipts": 0
+        }
+      ],
+      "graph_nodes": 95031,
+      "source_receipts": 4173,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "ruff",
+      "repo": "ruff",
+      "manifest": "sources/ruff.manifest",
+      "source_prefixes": [
+        "ruff/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:ruff",
+          "graph_nodes": 46628,
+          "receipts": 5039
+        }
+      ],
+      "graph_nodes": 59782,
+      "source_receipts": 5039,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "mise",
+      "repo": "mise",
+      "manifest": "sources/mise.manifest",
+      "source_prefixes": [
+        "mise/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:mise",
+          "graph_nodes": 17483,
+          "receipts": 1642
+        }
+      ],
+      "graph_nodes": 21861,
+      "source_receipts": 1642,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "uv",
+      "repo": "uv",
+      "manifest": "sources/uv.manifest",
+      "source_prefixes": [
+        "uv/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:uv",
+          "graph_nodes": 15696,
+          "receipts": 794
+        }
+      ],
+      "graph_nodes": 21510,
+      "source_receipts": 794,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "graphify",
+      "repo": "graphify",
+      "manifest": "sources/graphify.manifest",
+      "source_prefixes": [
+        "graphify/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:graphify",
+          "graph_nodes": 11019,
+          "receipts": 420
+        }
+      ],
+      "graph_nodes": 11277,
+      "source_receipts": 420,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "agnix",
+      "repo": "agnix",
+      "manifest": "sources/agnix.manifest",
+      "source_prefixes": [
+        "agnix/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:agnix",
+          "graph_nodes": 9287,
+          "receipts": 272
+        }
+      ],
+      "graph_nodes": 10119,
+      "source_receipts": 272,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "skillopt",
+      "repo": "skillopt",
+      "manifest": "sources/skillopt.manifest",
+      "source_prefixes": [
+        "skillopt/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:skillopt",
+          "graph_nodes": 3465,
+          "receipts": 226
+        }
+      ],
+      "graph_nodes": 3560,
+      "source_receipts": 226,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "fnox",
+      "repo": "fnox",
+      "manifest": "sources/fnox.manifest",
+      "source_prefixes": [
+        "fnox/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:fnox",
+          "graph_nodes": 1956,
+          "receipts": 137
+        }
+      ],
+      "graph_nodes": 2699,
+      "source_receipts": 137,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "chezmoi",
+      "repo": "chezmoi",
+      "manifest": "sources/chezmoi.manifest",
+      "source_prefixes": [
+        "chezmoi/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:chezmoi",
+          "graph_nodes": 2468,
+          "receipts": 314
+        }
+      ],
+      "graph_nodes": 2597,
+      "source_receipts": 314,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "hk",
+      "repo": "hk",
+      "manifest": "sources/hk.manifest",
+      "source_prefixes": [
+        "hk/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:hk",
+          "graph_nodes": 1674,
+          "receipts": 202
+        }
+      ],
+      "graph_nodes": 2144,
+      "source_receipts": 202,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "claude-code",
+      "repo": "claude-code",
+      "manifest": "sources/claude-code.manifest",
+      "source_prefixes": [
+        "claude-code/",
+        "agent-harness-docs/docs/claude-code/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:claude-code",
+          "graph_nodes": 0,
+          "receipts": 0
+        },
+        {
+          "prefix": "agent-harness-docs/docs/claude-code/",
+          "graph_nodes": 254,
+          "receipts": 4
+        }
+      ],
+      "graph_nodes": 254,
+      "source_receipts": 4,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "mattpocock-skills",
+      "repo": "mattpocock-skills",
+      "manifest": "sources/mattpocock-skills.manifest",
+      "source_prefixes": [
+        "mattpocock-skills/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:mattpocock-skills",
+          "graph_nodes": 199,
+          "receipts": 6
+        }
+      ],
+      "graph_nodes": 199,
+      "source_receipts": 6,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    },
+    {
+      "type": "canonical_dependency",
+      "name": "ty",
+      "repo": "ty",
+      "manifest": "sources/ty.manifest",
+      "source_prefixes": [
+        "ty/"
+      ],
+      "source_coverage": [
+        {
+          "prefix": "repo:ty",
+          "graph_nodes": 33,
+          "receipts": 9
+        }
+      ],
+      "graph_nodes": 36,
+      "source_receipts": 9,
+      "project_reach": [],
+      "typed_edges": 0,
+      "god_node_eligible": false
+    }
+  ]
+}

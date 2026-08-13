@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "graph_contract": {
+    "cross_dependency_links": "unverified",
+    "required_method": "single combined extraction root/run or a separately verified cross-link pass",
+    "tracked_issue": "knowledge-base#101"
+  },
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/llms-full.txt",
+      "artifact": "sources/media/claude-code-llms-full.md",
+      "content_sha256": "3378d2207abad1fb9756a280123de9953bc8f128bb58df7e0fd8638e5df805f3",
+      "content_bytes": 7115382,
+      "content_chars": 7111626,
+      "prefix_sha256": "0cff919c7eb5c1cc31398a7572cb15f3befdd1669c5783a1ad8386a601c80bbf",
+      "tail_sha256": "b7d0e92d95aa1cc6b808cd5706bafb9b4b7e7492490a7c0b71e6fab26508c072",
+      "read_to_eof": true,
+      "truncated": false
+    },
+    {
+      "url": "https://learn.chatgpt.com/docs/llms-full.txt",
+      "artifact": "sources/media/codex-llms-full.md",
+      "content_sha256": "3e0b283357908f5340aac1433e9a5e5493e6599cea5be59b17ef1d9a8bd732ba",
+      "content_bytes": 1477308,
+      "content_chars": 1476646,
+      "prefix_sha256": "ddbc3cc5f40c130908adf742b755c2dbbe73a66cd83f3c2f2333acc68610bf06",
+      "tail_sha256": "2e5c1dc60c9d057c6184487852bbd2735617c3bb40cb9ee02c52a2157d467fc4",
+      "read_to_eof": true,
+      "truncated": false
+    }
+  ]
+}

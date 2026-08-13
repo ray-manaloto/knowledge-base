@@ -64,6 +64,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+import msgspec
+
+from kb_setup.generated.fetch_receipt import FetchReceipt, FetchReceiptSource
+
 # A fetch boundary returns (status, text, content_type). Injected so the unit
 # tests need no network and no patching (tests/AGENTS.md: "prefer injecting the
 # dependency over constructing it inside the function").
@@ -80,6 +84,9 @@ HTTP_OK = 200
 # graphify's own caps, named so a drift in either shows up as a diff here.
 GRAPHIFY_URL_CAP = 12_000
 GRAPHIFY_FILE_CAP = 20_000
+
+RECEIPT_SCHEMA_VERSION = 1
+_CUTOFF_WITNESS_BYTES = 4096
 
 _USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -116,6 +123,15 @@ class FetchResult:
     def exceeds_url_cap(self) -> bool:
         """True when graphify's URL path would have silently discarded a tail."""
         return len(self.text) > GRAPHIFY_URL_CAP
+
+
+@dataclass(frozen=True)
+class FetchOptions:
+    """Optional filesystem outputs for :func:`fetch_main`."""
+
+    stem: str | None = None
+    target_dir: str = "sources"
+    receipt: str | None = None
 
 
 def content_hash(text: str) -> str:
@@ -230,6 +246,130 @@ def write_source(target_dir: Path, stem: str, text: str, *, url: str) -> Path:
     out = target_dir / f"{stem}.md"
     out.write_text(source_document(text, url=url), encoding="utf-8")
     return out
+
+
+def _cutoff_hash(text: str, *, tail: bool) -> str:
+    """Hash one end of the UTF-8 body, so a contiguous cutoff is observable."""
+    raw = text.encode("utf-8")
+    witness = raw[-_CUTOFF_WITNESS_BYTES:] if tail else raw[:_CUTOFF_WITNESS_BYTES]
+    return hashlib.sha256(witness).hexdigest()
+
+
+def _receipt_row(repo_root: Path, artifact: Path, text: str, *, url: str) -> FetchReceiptSource:
+    """The reproducible receipt for one complete, EOF-read web artifact."""
+    return FetchReceiptSource(
+        url=url,
+        artifact=artifact.relative_to(repo_root).as_posix(),
+        content_sha256=content_hash(text),
+        content_bytes=len(text.encode("utf-8")),
+        content_chars=len(text),
+        prefix_sha256=_cutoff_hash(text, tail=False),
+        tail_sha256=_cutoff_hash(text, tail=True),
+        read_to_eof=True,
+        truncated=False,
+    )
+
+
+def _decode_receipt(raw: bytes, receipt: Path) -> FetchReceipt:
+    """Decode one receipt through the generated strict msgspec boundary."""
+    try:
+        return msgspec.json.decode(raw, type=FetchReceipt)
+    except (msgspec.DecodeError, msgspec.ValidationError) as exc:
+        msg = f"unsupported or malformed receipt: {receipt} ({exc})"
+        raise ValueError(msg) from exc
+
+
+def write_receipt(
+    repo_root: Path,
+    receipt_path: Path,
+    artifact: Path,
+    text: str,
+    *,
+    url: str,
+) -> Path:
+    """Upsert one deterministic download receipt and write it atomically."""
+    receipt = receipt_path if receipt_path.is_absolute() else repo_root / receipt_path
+    receipt = receipt.resolve()
+    root = repo_root.resolve()
+    if not receipt.is_relative_to(root):
+        raise ValueError(f"receipt must stay inside the repository: {receipt}")
+    payload = FetchReceipt(schema_version=RECEIPT_SCHEMA_VERSION, sources=[])
+    if receipt.exists():
+        payload = _decode_receipt(receipt.read_bytes(), receipt)
+    row = _receipt_row(root, artifact.resolve(), text, url=url)
+    kept = [source for source in payload.sources if source.url != url]
+    payload = FetchReceipt(
+        schema_version=RECEIPT_SCHEMA_VERSION,
+        sources=sorted([*kept, row], key=lambda item: item.url),
+    )
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    tmp = receipt.with_suffix(f"{receipt.suffix}.tmp")
+    tmp.write_bytes(msgspec.json.encode(payload))
+    tmp.replace(receipt)
+    return receipt
+
+
+def _source_body(document: str) -> str:
+    """Return the body written by :func:`source_document`, refusing impostors."""
+    marker = "---\n\n"
+    if not document.startswith("---\n") or marker not in document:
+        raise ValueError("artifact is not a kb-fetch source document")
+    return document.split(marker, 1)[1]
+
+
+def verify_receipt(repo_root: Path, receipt_path: Path) -> tuple[bool, tuple[str, ...]]:
+    """Verify every artifact byte/count/cutoff witness in a download receipt."""
+    receipt = receipt_path if receipt_path.is_absolute() else repo_root / receipt_path
+    try:
+        payload = _decode_receipt(receipt.read_bytes(), receipt)
+    except OSError, ValueError:
+        return False, ("unsupported or malformed receipt",)
+    failures: list[str] = []
+    root = repo_root.resolve()
+    for row in payload.sources:
+        artifact = (root / row.artifact).resolve()
+        if not artifact.is_relative_to(root) or not artifact.is_file():
+            failures.append(f"{row.artifact}: missing or outside repository")
+            continue
+        try:
+            body = _source_body(artifact.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{row.artifact}: {exc}")
+            continue
+        observed = _receipt_row(root, artifact, body, url=row.url)
+        failures.extend(
+            f"{row.artifact}: {key} mismatch"
+            for key in (
+                "content_sha256",
+                "content_bytes",
+                "content_chars",
+                "prefix_sha256",
+                "tail_sha256",
+                "read_to_eof",
+                "truncated",
+            )
+            if getattr(row, key) != getattr(observed, key)
+        )
+    return not failures, tuple(failures)
+
+
+def verify_receipts(
+    repo_root: Path, receipt_paths: tuple[Path, ...] = ()
+) -> tuple[bool, tuple[str, ...]]:
+    """Verify selected receipts, or every repository receipt when none are given."""
+    selected = receipt_paths or tuple(sorted((repo_root / "sources").glob("*.receipts.json")))
+    if not selected:
+        return False, ("no source receipt files found",)
+    failures: list[str] = []
+    for receipt_path in selected:
+        try:
+            ok, receipt_failures = verify_receipt(repo_root, receipt_path)
+        except (OSError, TypeError, ValueError) as exc:
+            failures.append(f"{receipt_path}: {exc}")
+            continue
+        if not ok:
+            failures.extend(f"{receipt_path}: {failure}" for failure in receipt_failures)
+    return not failures, tuple(failures)
 
 
 class _UpstreamRule(Protocol):
@@ -383,7 +523,7 @@ def fetch_main(
     repo_root: Path,
     url: str,
     *,
-    stem: str | None = None,
+    options: FetchOptions | None = None,
     fetcher: Fetcher = http_fetcher,
 ) -> int:
     """Fetch `url` losslessly into `sources/` and print the ingest evidence.
@@ -396,6 +536,7 @@ def fetch_main(
     gate that does not report what it saw is how a hard failure gets mistaken for
     flakiness.
     """
+    opts = options or FetchOptions()
     upstream = upstream_raw_url(url)
     chosen = upstream or url
     kind = "upstream-source" if upstream else "rendered-page"
@@ -421,7 +562,11 @@ def fetch_main(
         print(f"[kb-fetch] extracted {len(body):,} chars from {len(result.text):,} of HTML")
 
     tokens = sample_verbatim_tokens(body)
-    out = write_source(repo_root / "sources", stem or name_from_url(url), body, url=url)
+    target = (repo_root / opts.target_dir).resolve()
+    if not target.is_relative_to(repo_root.resolve()):
+        print(f"[kb-fetch] REJECTED target directory outside repository: {opts.target_dir}")
+        return 2
+    out = write_source(target, opts.stem or name_from_url(url), body, url=url)
     written = out.read_text(encoding="utf-8")
     missing = roundtrip_missing(tokens, written)
 
@@ -438,5 +583,8 @@ def fetch_main(
     if missing:
         print(f"[kb-fetch] FAIL: tokens lost in write: {missing[:5]}")
         return 1
+    if opts.receipt:
+        receipt_out = write_receipt(repo_root, Path(opts.receipt), out, body, url=url)
+        print(f"[kb-fetch] receipt={receipt_out.relative_to(repo_root)}")
     print(f"[kb-fetch] OK — ingest with: graphify add {out}")
     return 0

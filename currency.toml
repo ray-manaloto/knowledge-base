@@ -49,6 +49,21 @@ skill_dir = ".claude/skills/graphify"
 # engine was written for (`sync.py`'s module docstring), reached through the one
 # path `graphify_env.graphify_exe` cannot cover: an argv in a config file.
 skill_install = ["mise", "exec", "--", "graphify", "install", "--project"]
+# Graphify 0.9.40's native Codex bundle is not the Claude or generic Agent-Skills
+# bundle with a new stamp. Generate it in a disposable `.codex` tree, then mirror
+# those exact bytes to this repo's project-scoped `.agents` discovery surface.
+skill_mirrors = [
+  { dir = ".agents/skills/graphify", generated_dir = ".codex/skills/graphify", install = [
+    "mise",
+    "exec",
+    "--",
+    "graphify",
+    "install",
+    "--project",
+    "--platform",
+    "codex",
+  ] },
+]
 # graphify stamps no version into its own output (`export.to_json()` writes only
 # `built_at_commit`), so the build task writes this sidecar instead — otherwise
 # "which version built this graph?" is unanswerable from the artifact.
@@ -386,6 +401,20 @@ ref = "1653"
 kind = "issue"
 ref = "1824"
 
+# ---- agnix: agent/skill/hook documentation validator -------------------------
+[tool.agnix]
+mise_key = "github:agent-sh/agnix"
+binary = "agnix"
+github = "agent-sh/agnix"
+version_pattern = '^agnix (\d+\.\d+\.\d+)'
+manifest = "sources/agnix.manifest"
+
+# ---- chezmoi: dotfiles/devcontainer dependency, ingested but not installed ---
+[tool.chezmoi]
+source_only = true
+github = "twpayne/chezmoi"
+manifest = "sources/chezmoi.manifest"
+
 # ---- ffmpeg: graphify's video extra depends on it, but it is not a pip dep ----
 #
 # `graphify add <youtube-url>` shells out to ffmpeg (via faster-whisper) to
@@ -398,6 +427,8 @@ ref = "1824"
 [tool.ffmpeg]
 mise_key = "conda:ffmpeg"
 binary = "ffmpeg"
+version_args = ["-version"]
+version_pattern = '^ffmpeg version (\d+\.\d+(?:\.\d+)?)'
 # Host-only, like graphify: on a Linux CI runner this reports not-applicable
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]
@@ -427,7 +458,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.3"
+expected = "2026.8.4"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -650,7 +681,7 @@ setting, and task/lockfile/python fixes."""
 # `expected` (self-managed, like mise) rather than `mise_key`: pinning the
 # harness that runs the session is not a thing this repo can or should do. Bump
 # it after reviewing the release notes — that act IS the gap analysis.
-expected = "2.1.226"
+expected = "2.1.227"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
@@ -658,6 +689,10 @@ github = "anthropics/claude-code"
 # is the manifest that matters most, because `sources/agent-harness-docs` and
 # this pin are what a "what does Claude Code do?" query reads.
 manifest = "sources/claude-code.manifest"
+# The shared agent-harness-docs mirror is not a third harness. Attribute only
+# its Claude Code subtree to this canonical anchor; graph_integrity rejects a
+# prefix claimed by two anchors rather than counting the same document twice.
+anchor_source_prefixes = ["agent-harness-docs/docs/claude-code/"]
 # `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
 # is `Code)` — the same trap mise's `2026.7.15 macos-arm64 (2026-07-27)` set,
 # where the default heuristic returned the build DATE. Capture explicitly.
@@ -1192,6 +1227,14 @@ timestamp+PWD append to `~/.skillopt-sleep/session-end.log`, unconditional
 the v0.2.0 notes: "Redact secrets before persisting cycle diagnostics" — a fix
 in the right direction for the surface this item watches."""
 
+# Matt Pocock's skills are research inputs, not an installed binary. The
+# existing source_only currency lane is the honest representation: track its
+# pinned source/release without inventing a PATH check that can never pass.
+[tool.mattpocock-skills]
+source_only = true
+github = "mattpocock/skills"
+manifest = "sources/mattpocock-skills.manifest"
+
 # ─── Added 2026-08-08 (#242): the four tools with BOTH a pin and a manifest that
 # this table had never heard of. Until now a currency run checked 7 tools while
 # the repo pinned 11, so uv/ruff/codex/ty drifted in BOTH directions unwatched —
@@ -1234,7 +1277,7 @@ manifest = "sources/ruff.manifest"
 # `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
 # it needs a row rather than trust — a 0.0.x bump can carry a breaking change
 # with no marker to trip gate 3.
-expected = "0.0.69"
+expected = "0.0.70"
 binary = "ty"
 github = "astral-sh/ty"
 pypi = "ty"
@@ -1321,3 +1364,6 @@ version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # regression is a mutation arm that DIES.
 tag_prefix = "rust-v"
 manifest = "sources/codex.manifest"
+# Attribute the shared agent-harness-docs Codex subtree to the Codex anchor,
+# while `sources/codex` remains covered by the manifest-derived repo tag.
+anchor_source_prefixes = ["agent-harness-docs/docs/codex/"]
