@@ -122,6 +122,50 @@ def test_python_package_owner_reads_a_declared_nested_project(tmp_path) -> None:
     assert sync.pinned_version(root, spec) == ("0.9.41", ("all",))
 
 
+def test_python_package_owner_round_trips_exact_vcs_revision(tmp_path) -> None:
+    revision = "93bdf3d770b99128daf35278218e5a666fe392f3"
+    root = _repo(tmp_path)
+    (root / "pyproject.toml").write_text(
+        "[project]\ndependencies = ["
+        f'"skillopt[test] @ git+https://github.com/microsoft/SkillOpt@{revision}"'
+        "]\n",
+        encoding="utf-8",
+    )
+    spec = config.ToolSpec(
+        name="skillopt",
+        python_package="skillopt",
+        github="microsoft/SkillOpt",
+    )
+
+    assert sync.pinned_version(root, spec) == (revision, ("test",))
+
+
+def test_python_package_owner_rejects_wrong_vcs_origin_or_duplicate(tmp_path) -> None:
+    revision = "93bdf3d770b99128daf35278218e5a666fe392f3"
+    root = _repo(tmp_path)
+    pyproject = root / "pyproject.toml"
+    spec = config.ToolSpec(
+        name="skillopt",
+        python_package="skillopt",
+        github="microsoft/SkillOpt",
+    )
+    pyproject.write_text(
+        "[project]\ndependencies = ["
+        f'"skillopt @ git+https://github.com/attacker/SkillOpt@{revision}"'
+        "]\n",
+        encoding="utf-8",
+    )
+    assert sync.pinned_version(root, spec) == ("", ())
+    pyproject.write_text(
+        "[project]\ndependencies = ["
+        f'"skillopt @ git+https://github.com/microsoft/SkillOpt@{revision}",'
+        f'"skillopt @ git+https://github.com/microsoft/SkillOpt@{revision}"'
+        "]\n",
+        encoding="utf-8",
+    )
+    assert sync.pinned_version(root, spec) == ("", ())
+
+
 def test_python_package_owner_refuses_project_path_escape(tmp_path) -> None:
     root = _repo(tmp_path)
     (tmp_path / "pyproject.toml").write_text(

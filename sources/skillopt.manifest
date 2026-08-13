@@ -2,6 +2,6 @@
 # Self-learning / skill optimization (T1).
 url = https://github.com/microsoft/SkillOpt
 ref = main
-commit = 61735e3922efc2b90c6d6cab561e62e98452ca90
+commit = 93bdf3d770b99128daf35278218e5a666fe392f3
 kind = code
 added = 2026-07-22

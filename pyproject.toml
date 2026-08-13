@@ -19,8 +19,15 @@ requires-python = ">=3.14"
 #
 # A FLOOR, not an `==`, for the same reason the fetch extra below is: an exact
 # pin here is exported as someone else's constraint. Reproducibility for us is
-# uv.lock.
-dependencies = ["graphifyy[all]==0.9.41", "msgspec==0.21.1", "structlog>=26.1"]
+# uv.lock. SkillOpt is the deliberate exception: its current public surface is
+# 180 commits past the still-current 0.2.0 release, so only the reviewed VCS SHA
+# can identify it; the contract below rejects any other origin or revision.
+dependencies = [
+  "graphifyy[all]==0.9.41",
+  "msgspec==0.21.1",
+  "skillopt @ git+https://github.com/microsoft/SkillOpt@93bdf3d770b99128daf35278218e5a666fe392f3",
+  "structlog>=26.1",
+]
 
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
@@ -83,6 +90,9 @@ build-backend = "hatchling.build"
 # the same config. `uv run` (no --project) uses it.
 [tool.hatch.build.targets.wheel]
 packages = ["python/src/kb_setup"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 100

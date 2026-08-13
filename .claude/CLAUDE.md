@@ -43,17 +43,16 @@ Opus fallback) and `antigravity@antigravity-for-claude-code` (Google Antigravity
 
 Four more were enabled 2026-08-03 without needing a note here — `pr-review-toolkit`,
 `skill-creator`, `claude-md-management` (all `@claude-plugins-official`) and
-`mise@brentmitchell25`, all Ray's, all ordinary tooling. **Ten plugins are enabled in
+`mise@brentmitchell25`, all Ray's, all ordinary tooling. **Nine plugins are enabled in
 total**, which is what `md-size-budgets.md` § the skill-listing budget is about.
 
-Two are enabled for skill self-improvement and DO need a note, both PROJECT-scope
+One is enabled for skill self-improvement and DOES need a note, PROJECT-scope
 (`do-not.md` #11 — `extraKnownMarketplaces` + `enabledPlugins` here, never a write to
 `~/.claude`):
 `plugin-eval@claude-code-workflows` (`/eval`, `/certify`, `/compare`; its static layer is what
-`mise run kb-skill-score` wraps) and `skillopt-sleep@skillopt-sleep` (`/skillopt-sleep`, from
-`microsoft/SkillOpt`, tracked as a `source_only` entry in `currency.toml`). SkillOpt-Sleep stages
-bounded edits to memory and skills behind a held-out gate and changes **nothing** until
-`/skillopt-sleep adopt` — that human review is the control, not a formality.
+`mise run kb-skill-score` wraps). SkillOpt is installed at an immutable VCS revision for the
+read-only `mise run kb-skillopt-contract`; its mutable marketplace plugin is disabled until the
+later project-local adapter slice, so `/skillopt-sleep` is intentionally unavailable.
 
 - **Route with the graph.** Before a non-trivial routing/fallback decision, ground it in this repo's
   KB graph: `mise run kb-query -- "<routing question>"` (the doctrine lives there — advisor/executor,

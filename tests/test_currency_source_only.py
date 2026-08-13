@@ -18,7 +18,7 @@ from kb_setup.currency import apply as apply_mod
 from kb_setup.currency import config, sync
 from kb_setup.currency.decide import Verdict
 
-_PINNED = "61735e3922efc2b90c6d6cab561e62e98452ca90"
+_PINNED = "93bdf3d770b99128daf35278218e5a666fe392f3"
 
 
 def _repo(tmp_path: Path, *, ref: str = "main", commit: str = _PINNED) -> Path:
@@ -178,14 +178,16 @@ def test_auto_apply_is_refused_and_names_kb_update(tmp_path: Path):
 
 
 def test_this_repo_declares_skillopt_as_source_only():
-    """The config actually loads, and says what the docs claim it says."""
+    """The config binds the installed Python package to the source manifest."""
     repo = Path(__file__).parent.parent.absolute()
     specs = {s.name: s for s in config.load(repo)}
     skillopt = specs["skillopt"]
-    assert skillopt.source_only is True
+    assert skillopt.source_only is False
+    assert skillopt.python_package == "skillopt"
+    assert skillopt.binary == "skillopt-sleep"
     assert skillopt.manifest == "sources/skillopt.manifest"
     assert skillopt.github == "microsoft/SkillOpt"
-    # No PyPI: the plugin is fetched from git, so a PyPI version would be a number
-    # we compare against and never act on.
+    # No PyPI: main still reports 0.2.0 across many commits, so version metadata
+    # cannot certify the reviewed source revision.
     assert skillopt.pypi == ""
     assert skillopt.watch, "the two local watch items must survive a config edit"
