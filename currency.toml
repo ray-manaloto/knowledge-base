@@ -398,6 +398,8 @@ ref = "1824"
 [tool.ffmpeg]
 mise_key = "conda:ffmpeg"
 binary = "ffmpeg"
+version_args = ["-version"]
+version_pattern = '^ffmpeg version (\d+\.\d+(?:\.\d+)?)'
 # Host-only, like graphify: on a Linux CI runner this reports not-applicable
 # rather than failing, since the conda install lives on the Mac host.
 os = ["macos"]

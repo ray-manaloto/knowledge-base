@@ -509,7 +509,7 @@ def _gh_api_list(path: str) -> tuple[list[object], str]:
     )
 
 
-def github_versions(repo: str) -> tuple[str, tuple[str, ...], str]:
+def github_versions(repo: str, *, tag_prefix: str = "") -> tuple[str, tuple[str, ...], str]:
     """Latest stable release version and every release version, as (latest, all, err).
 
     The version source for tools that ship on GitHub but not PyPI — mise and hk,
@@ -533,6 +533,9 @@ def github_versions(repo: str) -> tuple[str, tuple[str, ...], str]:
         if not isinstance(item, dict) or item.get("draft") or item.get("prerelease"):
             continue
         tag = str(item.get("tag_name") or "")
+        if tag_prefix and not tag.startswith(tag_prefix):
+            continue
+        tag = tag.removeprefix(tag_prefix)
         parsed = Version.parse(tag)
         if parsed is not None:
             stable.append(parsed)
@@ -542,7 +545,7 @@ def github_versions(repo: str) -> tuple[str, tuple[str, ...], str]:
     return max(stable).raw, tuple(raw), ""
 
 
-def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
+def release_for_tag(repo: str, tag: str, *, tag_prefix: str = "") -> tuple[str, str, str]:
     """GitHub release for `tag`, as (tag_name, body, error).
 
     A tag with no release is not an error — plenty of projects tag without
@@ -550,7 +553,14 @@ def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
     by looking at the error string.
     """
     last_error = "no tag candidates tried"
-    for candidate in (tag, f"v{tag}"):
+    candidates = tuple(
+        dict.fromkeys(
+            candidate
+            for candidate in (f"{tag_prefix}{tag}" if tag_prefix else "", tag, f"v{tag}")
+            if candidate
+        )
+    )
+    for candidate in candidates:
         payload, err = _gh_api(f"repos/{repo}/releases/tags/{candidate}")
         if not err:
             # `... or <default>`, never `.get(k, default)`: GitHub returns the key
@@ -570,7 +580,9 @@ def release_for_tag(repo: str, tag: str) -> tuple[str, str, str]:
     return "", "", last_error
 
 
-def _resolve_source(pypi: str, github: str) -> tuple[str, str, tuple[str, ...], str]:
+def _resolve_source(
+    pypi: str, github: str, tag_prefix: str = ""
+) -> tuple[str, str, tuple[str, ...], str]:
     """Pick the version source and read it: (source, latest, all_versions, error).
 
     PyPI wins when both are declared, because mise installs from PyPI — a version
@@ -586,12 +598,16 @@ def _resolve_source(pypi: str, github: str) -> tuple[str, str, tuple[str, ...], 
         latest, err = latest_version(payload)
         return "pypi", latest, all_versions(payload), err
     if github:
-        latest, versions, err = github_versions(github)
+        latest, versions, err = (
+            github_versions(github)
+            if not tag_prefix
+            else github_versions(github, tag_prefix=tag_prefix)
+        )
         return "github", latest, versions, err
     return "none", "", (), ""
 
 
-def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
+def probe(*, pypi: str, github: str, current: str, tag_prefix: str = "") -> UpstreamStatus:
     """Fetch the upstream picture for one tool: every release we would be adopting.
 
     Three shapes, matching `UpstreamStatus`'s three states:
@@ -608,7 +624,7 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
     Release NOTES always come from GitHub when `github` is set, regardless of
     which source supplied the version list — PyPI carries no changelog.
     """
-    source, latest, versions, err = _resolve_source(pypi, github)
+    source, latest, versions, err = _resolve_source(pypi, github, tag_prefix)
     if source == "none":
         return UpstreamStatus(source="none")
     if err:
@@ -625,7 +641,11 @@ def probe(*, pypi: str, github: str, current: str) -> UpstreamStatus:
     newest_tag = ""
     last_error = ""
     for version in pending:
-        tag, body, tag_err = release_for_tag(github, version)
+        tag, body, tag_err = (
+            release_for_tag(github, version)
+            if not tag_prefix
+            else release_for_tag(github, version, tag_prefix=tag_prefix)
+        )
         if tag_err or not tag:
             unread.append(version)
             last_error = tag_err or f"no release found for {version}"

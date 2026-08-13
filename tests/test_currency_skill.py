@@ -84,6 +84,24 @@ def test_an_installer_failure_is_reported_not_raised(tmp_path) -> None:
     """
     result = skill.refresh(_repo(tmp_path), _spec(skill_install=("false",)))
     assert result.ran is False
+
+
+def test_installer_failure_diagnostic_never_leaks_output_body(tmp_path) -> None:
+    repo = _repo(tmp_path)
+    installer = repo / "failing-installer.sh"
+    installer.write_text(
+        "#!/bin/sh\nprintf SECRET_STDOUT\nprintf 'warning SECRET_STDERR' >&2\nexit 9\n",
+        encoding="utf-8",
+    )
+    installer.chmod(0o755)
+    result = skill.refresh(repo, _spec(skill_install=(str(installer),)))
+    assert result.ran is False
+    assert result.process_warning is True
+    assert result.diagnostic_bytes > 0
+    assert len(result.diagnostic_sha256) == 64
+    assert "SECRET_STDOUT" not in result.note
+    assert "SECRET_STDERR" not in result.note
+    assert "sha256=" in result.note
     assert "installer failed" in result.note
 
 

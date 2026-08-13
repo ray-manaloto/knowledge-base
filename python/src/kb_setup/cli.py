@@ -76,6 +76,7 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
             "graphify-contract | skillopt-contract | "
+            "tool-sync <currency-tool-name> | "
             "skillopt-reviewed --packet P --target T --backend mock|handoff | "
             "ecosystem-discovery-plan [alternative...] | "
             "detect-census [--output .agent/<path>.json] | "
@@ -391,6 +392,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         return _review_receipt(repo_root, rest)
     if cmd == "currency":
         return _currency(repo_root, rest)
+    if cmd == "tool-sync":
+        from kb_setup import tool_sync
+
+        return tool_sync.main(repo_root, rest)
     if cmd == "manifest-add":
         return _manifest_add(repo_root, rest)
     if cmd == "assemble":
@@ -410,6 +415,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "merge <chunk> [root] | label [--missing-only] "
         "[--claude-cli] | transcribe <audio> | artifacts [fmt...] | "
         "currency [check|run|stamp|docs-reviewed] [--tool T --json --no-write] | "
+        "tool-sync <currency-tool-name> | "
         "manifest-add <url> "
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
         "brain [query|record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "

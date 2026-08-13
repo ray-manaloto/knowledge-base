@@ -266,8 +266,12 @@ def _is_mise_shim(resolved: Path) -> bool:
     return any(resolved.is_relative_to(root) for root in _mise_shim_dirs())
 
 
-def observed_version(binary: str, pattern: str = "") -> str:
-    """Execute `binary --version` and return the bare version, or "" on failure.
+def observed_version(
+    binary: str,
+    pattern: str = "",
+    version_args: tuple[str, ...] = ("--version",),
+) -> str:
+    """Execute a tool's declared version command, or return ``""`` on failure.
 
     This is the authoritative reading, used when STAMPING a build — where the
     honest answer is "whatever actually ran", not "whatever the pin says". A
@@ -290,7 +294,7 @@ def observed_version(binary: str, pattern: str = "") -> str:
         return ""
     try:
         res = subprocess.run(
-            [found, "--version"], capture_output=True, text=True, check=False, timeout=30
+            [found, *version_args], capture_output=True, text=True, check=False, timeout=30
         )
     except OSError, subprocess.TimeoutExpired:
         return ""
@@ -897,7 +901,11 @@ def _check_python_resolution(
                 observed,
             )
         return Finding("resolution", OK, f"locked uv environment runs {pinned[:12]}"), observed
-    observed = observed_version(str(executable), spec.version_pattern)
+    observed = (
+        observed_version(str(executable), spec.version_pattern)
+        if spec.version_args == ("--version",)
+        else observed_version(str(executable), spec.version_pattern, spec.version_args)
+    )
     if observed != pinned:
         return (
             Finding(
@@ -970,7 +978,11 @@ def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
                 Finding("resolution", DRIFT, f"{spec.binary} is not installed on this host"),
             ),
         )
-    running = observed_version(spec.binary, spec.version_pattern)
+    running = (
+        observed_version(spec.binary, spec.version_pattern)
+        if spec.version_args == ("--version",)
+        else observed_version(spec.binary, spec.version_pattern, spec.version_args)
+    )
     if not running:
         # BLIND, not DRIFT: an unreadable version is "could not ask". Rendering
         # it as disagreement would make a broken `version_pattern` look like a
