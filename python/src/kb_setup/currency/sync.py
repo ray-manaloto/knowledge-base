@@ -862,7 +862,7 @@ def _check_python_resolution(
     pinned: str,
 ) -> tuple[Finding, str]:
     """Compare the locked project executable with its exact pyproject pin."""
-    executable = repo_root / ".venv" / "bin" / spec.binary
+    executable = repo_root / (spec.python_project_dir or ".") / ".venv" / "bin" / spec.binary
     if not executable.is_file():
         return Finding("resolution", DRIFT, f"{executable} is missing; run `mise deps`"), ""
     observed = observed_version(str(executable), spec.version_pattern)
@@ -1078,7 +1078,8 @@ def install_site_packages(
     `deep` and never runs in the per-session hook.
     """
     if python_package and repo_root is not None:
-        return next(iter(sorted((repo_root / ".venv" / "lib").glob("python*/site-packages"))), None)
+        env = repo_root / ".venv" / "lib"
+        return next(iter(sorted(env.glob("python*/site-packages"))), None)
     root = _pinned_install_root(mise_key) if deep else None
     if root is None:
         root = _install_root_from_path(binary)
@@ -1130,7 +1131,7 @@ def _check_extra_probes(repo_root: Path, spec: ToolSpec, *, deep: bool) -> Findi
         spec.binary,
         spec.mise_key,
         deep=deep,
-        repo_root=repo_root,
+        repo_root=repo_root / (spec.python_project_dir or "."),
         python_package=spec.python_package,
     )
     if site is None:
