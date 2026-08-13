@@ -652,8 +652,11 @@ def probe(*, pypi: str, github: str, current: str, tag_prefix: str = "") -> Upst
             continue
         if version == latest:
             newest_tag = tag
+        # Use the normalized release identity for the internal span boundary.
+        # The exact upstream tag remains in `github_tag`; a project-specific
+        # prefix here would make `_release_spans` merge adjacent releases.
         bodies.append(
-            f"## {tag}\n\n{body.strip()}" if body.strip() else f"## {tag}\n\n_(no notes)_"
+            f"## {version}\n\n{body.strip()}" if body.strip() else f"## {version}\n\n_(no notes)_"
         )
 
     return UpstreamStatus(

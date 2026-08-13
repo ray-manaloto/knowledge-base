@@ -783,7 +783,7 @@ run = "uv run kb-setup currency run"
 
 [tasks.kb-tool-sync]
 description = "Lock, install, and verify one eligible reviewed mise-only tool pin"
-run = "uv run kb-setup tool-sync ${usage_args?}"
+run = "uv run kb-setup tool-sync"
 
 # --- reusable ingestion seams (replace hand-rolled one-offs; logic in kb_setup) ---
 [tasks.kb-review-receipt]

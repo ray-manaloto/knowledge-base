@@ -20,6 +20,10 @@ _NEW_LOCK = '[[tools.probe]]\nversion = "1.2.3"\nbackend = "probe-new"\n'
 
 
 def _repo(tmp_path: Path, *, skill_declared: bool = False) -> tuple[Path, ToolSpec]:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "fixture"\nversion = "0"\ndependencies = []\n',
+        encoding="utf-8",
+    )
     (tmp_path / "mise.toml").write_text('[tools]\nprobe = "1.2.3"\n', encoding="utf-8")
     (tmp_path / "mise.lock").write_text(_LOCK, encoding="utf-8")
     skill_fields = (
@@ -126,6 +130,18 @@ def test_stderr_warning_rejects_and_does_not_leak_body(tmp_path, monkeypatch, ca
     assert 'version = "1.2.3"' in (root / "mise.lock").read_text()
 
 
+def test_exact_mise_already_installed_progress_is_not_a_warning(tmp_path) -> None:
+    _root, spec = _repo(tmp_path)
+    proc = subprocess.CompletedProcess(
+        ["mise", "install", "probe"],
+        0,
+        stdout="",
+        stderr="mise probe@1.2.3                ⇢ already installed\n",
+    )
+    assert tool_sync._mise_progress_only(proc.stderr, spec)
+    assert not tool_sync._mise_progress_only("warning: source changed\n", spec)
+
+
 def test_public_main_refuses_a_synthetic_skill_bearing_tool(tmp_path, monkeypatch) -> None:
     root, _spec = _repo(tmp_path, skill_declared=True)
     monkeypatch.setattr(
@@ -178,6 +194,12 @@ def test_actual_pyproject_dependency_owner_is_refused(tmp_path) -> None:
         '[project]\nname = "x"\nversion = "0"\ndependencies = ["probe==1.2.3"]\n',
         encoding="utf-8",
     )
+    assert tool_sync.main(root, ["probe"]) == 1
+
+
+def test_malformed_pyproject_refuses_ownership_authority(tmp_path) -> None:
+    root, _spec = _repo(tmp_path)
+    (root / "pyproject.toml").write_text("[project\nSECRET_PARSE_BODY", encoding="utf-8")
     assert tool_sync.main(root, ["probe"]) == 1
 
 
@@ -296,9 +318,25 @@ def test_persistent_rollback_fsync_failure_restores_all_bytes_and_keeps_recovery
         raise OSError("persistent durability failure")
 
     monkeypatch.setattr(tool_sync, "_fsync_tree", fsync)
-    with pytest.raises(tool_sync.ToolSyncError, match="recovery snapshot retained"):
+    with pytest.raises(tool_sync.ToolSyncError, match=str(backup)):
         tool_sync._sync(root, spec, "1.2.3")
     assert calls > 1
     assert 'version = "1.2.3"' in (root / "mise.lock").read_text()
     assert (root / ".claude/skills/probe/SKILL.md").read_text() == "old skill\n"
     assert backup.is_dir()
+    assert (backup / "0").read_text(encoding="utf-8") == _LOCK
+
+
+def test_public_mise_task_forwards_tool_after_double_dash() -> None:
+    repo_root = Path(__file__).parents[1]
+    proc = subprocess.run(
+        ["mise", "run", "kb-tool-sync", "--", "definitely-unknown-tool"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert proc.returncode != 0
+    assert "unknown or duplicated" in proc.stdout
+    assert "usage_args" not in proc.stderr

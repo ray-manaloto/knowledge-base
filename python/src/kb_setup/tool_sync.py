@@ -55,9 +55,28 @@ def _run(argv: list[str], repo_root: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _checked(label: str, argv: list[str], repo_root: Path) -> subprocess.CompletedProcess[str]:
+def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
+    """Recognize only mise's bounded ordinary install-status lines."""
+    lines = stderr.splitlines()
+    pattern = re.compile(
+        rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+⇢\s+"
+        r"(?:already installed|installed)$"
+    )
+    return bool(lines) and all(pattern.fullmatch(line) is not None for line in lines)
+
+
+def _checked(
+    label: str,
+    argv: list[str],
+    repo_root: Path,
+    *,
+    progress_spec: ToolSpec | None = None,
+) -> subprocess.CompletedProcess[str]:
     proc = _run(argv, repo_root)
-    warning = bool(proc.stderr) or _WARNING.search(proc.stdout) is not None
+    stderr_refused = bool(proc.stderr) and not (
+        progress_spec is not None and _mise_progress_only(proc.stderr, progress_spec)
+    )
+    warning = stderr_refused or _WARNING.search(proc.stdout) is not None
     if proc.returncode != 0 or warning:
         raise ToolSyncError(f"{label} refused: rc={proc.returncode}; {_diagnostic(proc)}")
     return proc
@@ -133,7 +152,9 @@ def _restore(snapshot: _Snapshot) -> None:
         except OSError:
             failures += 1
     if failures:
-        raise ToolSyncError("rollback durability failed; recovery snapshot retained")
+        raise ToolSyncError(
+            f"rollback durability failed; recovery snapshot retained at {snapshot.backup_root}"
+        )
 
 
 def _close(snapshot: _Snapshot) -> None:
@@ -191,8 +212,8 @@ def _python_dependency_owns(repo_root: Path, tool: str) -> bool:
     try:
         with (repo_root / "pyproject.toml").open("rb") as handle:
             data = tomllib.load(handle)
-    except OSError, tomllib.TOMLDecodeError:
-        return False
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise ToolSyncError("Python dependency ownership source is unreadable") from exc
     normalized = re.sub(r"[-_.]+", "-", tool).lower()
     values: list[object] = []
     project = data.get("project")
@@ -288,7 +309,12 @@ def _sync(repo_root: Path, spec: ToolSpec, pinned: str) -> None:
     try:
         _checked("lock", ["mise", "lock", spec.mise_key], repo_root)
         _lock_converged(repo_root, spec, pinned)
-        _checked("install", ["mise", "install", spec.mise_key], repo_root)
+        _checked(
+            "install",
+            ["mise", "install", spec.mise_key],
+            repo_root,
+            progress_spec=spec,
+        )
         observed = _observed(repo_root, spec)
         _validate_observed(observed, pinned)
         if spec.skill_dir:
