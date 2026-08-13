@@ -69,7 +69,9 @@ class SourceCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
     source: str
     kind: str
     status: str
-    source_commit: str = ""
+    declared_pin: str = ""
+    resolved_commit: str = ""
+    tree_digest: str = ""
     categories: tuple[str, ...] = ()
     detected_count: int | None = None
     unclassified_count: int = 0
@@ -83,10 +85,22 @@ class DetectionCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=
     """Deterministic complete-corpus receipt; never authorizes graph mutation."""
 
     schema_version: int = 1
+    state: str = "complete"
     total_sources: int = 0
     status_counts: tuple[tuple[str, int], ...] = ()
     category_counts: tuple[tuple[str, int], ...] = ()
+    integrity_errors: tuple[str, ...] = ()
     sources: tuple[SourceCensusReceipt, ...] = ()
+
+
+class SourceGitProvenance(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Manifest declaration and independently observed clone identities."""
+
+    declared_pin: str
+    resolved_commit: str = ""
+    tree_digest: str = ""
+    failure_category: str = ""
+    detail: str = ""
 
 
 _MERGE_SCRIPT = Path(__file__).with_name("_merge_docs.py")
@@ -449,35 +463,124 @@ def _source_census_failure_detail(receipt: SourceCensusReceipt) -> str:
     )
 
 
+def _verify_source_provenance(manifest: mf.Manifest) -> SourceGitProvenance:
+    """Bind a declared pin to the clean clone HEAD commit/tree without fetching."""
+    root = manifest.clone_dir
+    if not (root / ".git").is_dir():
+        return SourceGitProvenance(
+            declared_pin=manifest.commit,
+            failure_category="missing-clone",
+            detail="verified Git clone is missing",
+        )
+    try:
+        actual_commit = _rev_parse(root, "HEAD^{commit}")
+        actual_tree = _rev_parse(root, "HEAD^{tree}")
+    except OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
+        return SourceGitProvenance(
+            declared_pin=manifest.commit,
+            failure_category="clone-head-unreachable",
+            detail="clone HEAD commit/tree could not be resolved",
+        )
+    observed = SourceGitProvenance(
+        declared_pin=manifest.commit,
+        resolved_commit=actual_commit,
+        tree_digest=actual_tree,
+    )
+    cleanliness_failure = _clone_cleanliness_failure(root, observed)
+    if cleanliness_failure is not None:
+        return cleanliness_failure
+    try:
+        expected_commit = _rev_parse(root, f"{manifest.commit}^{{commit}}")
+        expected_tree = _rev_parse(root, f"{manifest.commit}^{{tree}}")
+    except OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
+        return msgspec.structs.replace(
+            observed,
+            failure_category="pin-unreachable",
+            detail="declared pin commit/tree is unavailable in the verified clone",
+        )
+    if (actual_commit, actual_tree) != (expected_commit, expected_tree):
+        return msgspec.structs.replace(
+            observed,
+            failure_category="head-tree-mismatch",
+            detail=(
+                f"HEAD {actual_commit[:12]}/{actual_tree[:12]} does not match declared pin "
+                f"{expected_commit[:12]}/{expected_tree[:12]}"
+            ),
+        )
+    return observed
+
+
+def _clone_cleanliness_failure(
+    root: Path, observed: SourceGitProvenance
+) -> SourceGitProvenance | None:
+    try:
+        status = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=all"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
+        return msgspec.structs.replace(
+            observed,
+            failure_category="clone-status-unavailable",
+            detail="clone cleanliness could not be verified",
+        )
+    if status.stdout:
+        first = " ".join(status.stdout.splitlines()[0].split())[:160]
+        return msgspec.structs.replace(
+            observed,
+            failure_category="dirty-clone",
+            detail=f"clone has tracked or untracked changes: {first}",
+        )
+    return None
+
+
 def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
     """Return a read-only, deterministic receipt for every configured source."""
     from kb_setup import graphify_sdk
 
     sources: list[SourceCensusReceipt] = []
+    manifest_names = [manifest.name for manifest in manifests]
+    duplicate_manifests = sorted(
+        name for name, count in Counter(manifest_names).items() if count != 1
+    )
+    if duplicate_manifests:
+        names = ", ".join(duplicate_manifests[:12])
+        raise ValueError(f"duplicate manifest source names: {names}")
     jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]] = []
+    verified: dict[str, SourceGitProvenance] = {}
     for manifest in sorted(manifests, key=lambda item: item.name):
+        provenance = _verify_source_provenance(manifest)
+        if provenance.failure_category:
+            sources.append(
+                SourceCensusReceipt(
+                    source=manifest.name,
+                    kind=manifest.kind,
+                    status="provenance-failed",
+                    declared_pin=provenance.declared_pin,
+                    resolved_commit=provenance.resolved_commit,
+                    tree_digest=provenance.tree_digest,
+                    categories=(provenance.failure_category,),
+                    stderr=provenance.detail[:_CENSUS_MAX_STDERR_LENGTH],
+                )
+            )
+            continue
+        verified[manifest.name] = provenance
         if manifest.kind == "docs":
             sources.append(
                 SourceCensusReceipt(
                     source=manifest.name,
                     kind="docs",
                     status="skipped-docs",
-                    source_commit=manifest.commit,
+                    declared_pin=provenance.declared_pin,
+                    resolved_commit=provenance.resolved_commit,
+                    tree_digest=provenance.tree_digest,
                 )
             )
             continue
         root = manifest.clone_dir
-        if not (root / ".git").is_dir():
-            sources.append(
-                SourceCensusReceipt(
-                    source=manifest.name,
-                    kind="code",
-                    status="missing-clone",
-                    source_commit=manifest.commit,
-                    categories=("missing-clone",),
-                )
-            )
-            continue
         reviewed = tuple(
             item for item in _EXPECTED_UNCLASSIFIED if item.source_name == manifest.name
         )
@@ -488,20 +591,74 @@ def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
                 graphify_sdk.source_detection_policy(root, manifest.name, reviewed),
             )
         )
-    commits = {manifest.name: manifest.commit for manifest in manifests}
-    sources.extend(
-        msgspec.structs.replace(receipt, source_commit=commits[receipt.source])
-        for receipt in _run_detection_census_receipts(jobs)
-    )
+    integrity_errors: tuple[str, ...] = ()
+    if jobs:
+        bound, integrity_errors = _bind_detection_receipts(
+            jobs, _run_detection_census_receipts(jobs), verified
+        )
+        sources.extend(bound)
     sources.sort(key=lambda receipt: receipt.source)
     status_counts = Counter(receipt.status for receipt in sources)
     category_counts = Counter(category for receipt in sources for category in receipt.categories)
     return DetectionCensusReceipt(
-        total_sources=len(sources),
+        state=(
+            "incomplete"
+            if integrity_errors
+            or any(source.status not in {"complete", "skipped-docs"} for source in sources)
+            else "complete"
+        ),
+        total_sources=len(manifests),
         status_counts=tuple(sorted(status_counts.items())),
         category_counts=tuple(sorted(category_counts.items())),
+        integrity_errors=integrity_errors,
         sources=tuple(sources),
     )
+
+
+def _bind_detection_receipts(
+    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]],
+    received: list[SourceCensusReceipt],
+    verified: dict[str, SourceGitProvenance],
+) -> tuple[list[SourceCensusReceipt], tuple[str, ...]]:
+    """Require exactly one child receipt for every and only expected source name."""
+    expected = {name for name, _root, _policy in jobs}
+    by_name: dict[str, list[SourceCensusReceipt]] = {}
+    for receipt in received:
+        by_name.setdefault(receipt.source, []).append(receipt)
+    unexpected = sorted(set(by_name) - expected)
+    integrity_errors = (
+        (f"unexpected-receipts:{len(unexpected)}:{','.join(unexpected[:12])}",)
+        if unexpected
+        else ()
+    )
+    bound: list[SourceCensusReceipt] = []
+    for name in sorted(expected):
+        rows = by_name.get(name, [])
+        provenance = verified[name]
+        if len(rows) != 1:
+            category = "receipt-missing" if not rows else "receipt-duplicate"
+            bound.append(
+                SourceCensusReceipt(
+                    source=name,
+                    kind="code",
+                    status="census-integrity-failed",
+                    declared_pin=provenance.declared_pin,
+                    resolved_commit=provenance.resolved_commit,
+                    tree_digest=provenance.tree_digest,
+                    categories=(category,),
+                    stderr=f"expected exactly one detector receipt; received {len(rows)}",
+                )
+            )
+            continue
+        bound.append(
+            msgspec.structs.replace(
+                rows[0],
+                declared_pin=provenance.declared_pin,
+                resolved_commit=provenance.resolved_commit,
+                tree_digest=provenance.tree_digest,
+            )
+        )
+    return bound, integrity_errors
 
 
 def write_detection_census(repo_root: Path, output: Path, receipt: DetectionCensusReceipt) -> Path:

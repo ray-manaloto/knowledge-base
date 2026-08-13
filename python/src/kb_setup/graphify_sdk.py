@@ -17,6 +17,7 @@ import io
 import os
 import re
 import signal
+import tempfile
 import warnings
 from collections.abc import Callable
 from contextlib import redirect_stderr
@@ -270,7 +271,8 @@ def _detect_with_timeout(root: Path, timeout_seconds: float) -> dict:
     signal.signal(signal.SIGALRM, timeout_handler)
     signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
     try:
-        return detect(root)
+        with tempfile.TemporaryDirectory(prefix="kb-graphify-detect-cache-") as cache_dir:
+            return detect(root, cache_root=Path(cache_dir))
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous_handler)

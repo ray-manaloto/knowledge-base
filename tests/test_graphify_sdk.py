@@ -71,7 +71,7 @@ def test_checked_detect_blocks_required_unclassified_source(
     monkeypatch.setattr(
         graphify_sdk,
         "detect",
-        lambda _root: {"total_files": 0, "unclassified": [str(required)]},
+        lambda _root, **_kwargs: {"total_files": 0, "unclassified": [str(required)]},
     )
     with pytest.raises(IncompleteGraphifyOperationError, match="required-source-unclassified"):
         graphify_sdk.detect_checked(
@@ -87,7 +87,10 @@ def test_checked_detect_allows_only_reviewed_root_metadata(
     monkeypatch.setattr(
         graphify_sdk,
         "detect",
-        lambda _root: {"total_files": 2, "unclassified": [str(path) for path in ignored]},
+        lambda _root, **_kwargs: {
+            "total_files": 2,
+            "unclassified": [str(path) for path in ignored],
+        },
     )
 
     _result, receipt = graphify_sdk.detect_checked(
@@ -109,7 +112,10 @@ def test_checked_detect_normalizes_absolute_results_for_relative_source_root(
     monkeypatch.setattr(
         graphify_sdk,
         "detect",
-        lambda _root: {"total_files": 1, "unclassified": [str(tmp_path / ".gitignore")]},
+        lambda _root, **_kwargs: {
+            "total_files": 1,
+            "unclassified": [str(tmp_path / ".gitignore")],
+        },
     )
 
     _result, receipt = graphify_sdk.detect_checked(
@@ -127,7 +133,10 @@ def test_checked_detect_rejects_unknown_code_like_file_with_source_and_bounded_p
     monkeypatch.setattr(
         graphify_sdk,
         "detect",
-        lambda _root: {"total_files": 30, "unclassified": [str(path) for path in unknown]},
+        lambda _root, **_kwargs: {
+            "total_files": 30,
+            "unclassified": [str(path) for path in unknown],
+        },
     )
 
     with pytest.raises(IncompleteGraphifyOperationError) as caught:
@@ -154,7 +163,7 @@ def test_observe_detect_retains_incomplete_receipt_without_raising(
     monkeypatch.setattr(
         graphify_sdk,
         "detect",
-        lambda _root: {"total_files": 1, "unclassified": [str(unknown)]},
+        lambda _root, **_kwargs: {"total_files": 1, "unclassified": [str(unknown)]},
     )
 
     result, receipt = graphify_sdk.observe_detect(tmp_path, source_name="source")
@@ -164,12 +173,33 @@ def test_observe_detect_retains_incomplete_receipt_without_raising(
     assert receipt.unclassified_paths == ("unknown.codeish",)
 
 
+def test_observe_detect_uses_ephemeral_cache_outside_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed_cache: list[Path] = []
+
+    def inspect_cache(_root: Path, *, cache_root: Path) -> dict[str, object]:
+        assert cache_root.is_dir()
+        assert not cache_root.is_relative_to(tmp_path)
+        observed_cache.append(cache_root)
+        (cache_root / "probe").write_text("cache\n", encoding="utf-8")
+        return {"total_files": 0, "unclassified": []}
+
+    monkeypatch.setattr(graphify_sdk, "detect", inspect_cache)
+
+    graphify_sdk.observe_detect(tmp_path)
+
+    assert len(observed_cache) == 1
+    assert not observed_cache[0].exists()
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_checked_detect_timeout_fails_typed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import time
 
-    def hangs(_root: Path) -> dict[str, object]:
+    def hangs(_root: Path, **_kwargs: object) -> dict[str, object]:
         time.sleep(1)
         return {"total_files": 0, "unclassified": []}
 

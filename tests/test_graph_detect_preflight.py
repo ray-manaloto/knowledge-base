@@ -138,6 +138,12 @@ def test_machine_census_receipt_covers_all_sources_and_is_deterministic(
         kind="docs",
     )
     code = _manifest(tmp_path, "code")
+    provenance = graph.SourceGitProvenance(
+        declared_pin="a" * 40,
+        resolved_commit="a" * 40,
+        tree_digest="b" * 40,
+    )
+    monkeypatch.setattr(graph, "_verify_source_provenance", lambda _manifest: provenance)
     monkeypatch.setattr(
         graph,
         "_run_detection_census_receipts",
@@ -146,6 +152,9 @@ def test_machine_census_receipt_covers_all_sources_and_is_deterministic(
                 source="code",
                 kind="code",
                 status="incomplete",
+                declared_pin="f" * 40,
+                resolved_commit="f" * 40,
+                tree_digest="f" * 40,
                 categories=("unclassified-files",),
                 unclassified_count=1,
                 unclassified=(
@@ -162,8 +171,49 @@ def test_machine_census_receipt_covers_all_sources_and_is_deterministic(
     assert first.total_sources == 2
     assert first.status_counts == (("incomplete", 1), ("skipped-docs", 1))
     assert [source.source for source in first.sources] == ["code", "docs"]
-    assert {source.source_commit for source in first.sources} == {"a" * 40}
+    assert {source.declared_pin for source in first.sources} == {"a" * 40}
+    assert first.sources[0].resolved_commit == "a" * 40
+    assert first.sources[0].tree_digest == "b" * 40
     assert msgspec.json.decode(msgspec.json.encode(first))["total_sources"] == 2
+
+
+def test_census_rejects_missing_duplicate_and_unexpected_child_receipts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifests = [_manifest(tmp_path, "a"), _manifest(tmp_path, "b")]
+    provenance = graph.SourceGitProvenance(
+        declared_pin="a" * 40,
+        resolved_commit="b" * 40,
+        tree_digest="c" * 40,
+    )
+    monkeypatch.setattr(graph, "_verify_source_provenance", lambda _manifest: provenance)
+    monkeypatch.setattr(
+        graph,
+        "_run_detection_census_receipts",
+        lambda _jobs: [
+            graph.SourceCensusReceipt(source="b", kind="code", status="complete"),
+            graph.SourceCensusReceipt(source="b", kind="code", status="complete"),
+            graph.SourceCensusReceipt(source="ghost", kind="code", status="complete"),
+        ],
+    )
+
+    receipt = graph.detection_census(manifests)
+
+    assert receipt.state == "incomplete"
+    assert receipt.total_sources == 2
+    assert [source.source for source in receipt.sources] == ["a", "b"]
+    assert [source.categories for source in receipt.sources] == [
+        ("receipt-missing",),
+        ("receipt-duplicate",),
+    ]
+    assert receipt.integrity_errors == ("unexpected-receipts:1:ghost",)
+
+
+def test_census_rejects_duplicate_manifest_authority(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path, "duplicate")
+
+    with pytest.raises(ValueError, match="duplicate manifest source names: duplicate"):
+        graph.detection_census([manifest, manifest])
 
 
 def test_census_output_refuses_tracked_or_out_of_repo_path(
@@ -253,3 +303,171 @@ def test_ignored_directory_uses_git_tree_hash(tmp_path: Path) -> None:
     assert evidence.file_type == "git-tree"
     assert evidence.sha256 is not None
     assert len(evidence.sha256) == 64
+
+
+def _real_manifest(tmp_path: Path, name: str = "source") -> mf.Manifest:
+    manifest = _manifest(tmp_path, name, clone=False)
+    manifest.clone_dir.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=manifest.clone_dir, check=True)
+    (manifest.clone_dir / "source.py").write_text("value = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "source.py"], cwd=manifest.clone_dir, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        cwd=manifest.clone_dir,
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=manifest.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return mf.Manifest(
+        name=manifest.name,
+        path=manifest.path,
+        url=manifest.url,
+        ref=manifest.ref,
+        commit=commit,
+    )
+
+
+def test_census_rejects_declared_aaaa_pin_for_real_clone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = _real_manifest(tmp_path)
+    hostile = mf.Manifest(
+        name=real.name,
+        path=real.path,
+        url=real.url,
+        ref=real.ref,
+        commit="a" * 40,
+    )
+    monkeypatch.setattr(
+        graph,
+        "_run_detection_census_receipts",
+        lambda _jobs: pytest.fail("unverified source reached detector"),
+    )
+
+    receipt = graph.detection_census([hostile]).sources[0]
+
+    assert receipt.status == "provenance-failed"
+    assert receipt.categories == ("pin-unreachable",)
+    assert receipt.declared_pin == "a" * 40
+    assert receipt.resolved_commit != receipt.declared_pin
+    assert receipt.tree_digest
+
+
+def test_census_rejects_missing_and_unresolvable_clone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing = _manifest(tmp_path, "missing", clone=False)
+    broken = _manifest(tmp_path, "broken")
+    monkeypatch.setattr(
+        graph,
+        "_run_detection_census_receipts",
+        lambda _jobs: pytest.fail("unverified source reached detector"),
+    )
+
+    receipts = graph.detection_census([broken, missing]).sources
+
+    assert [(receipt.source, receipt.categories) for receipt in receipts] == [
+        ("broken", ("clone-head-unreachable",)),
+        ("missing", ("missing-clone",)),
+    ]
+    assert all(receipt.status == "provenance-failed" for receipt in receipts)
+
+
+def test_census_rejects_wrong_tree_and_dirty_clone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = _real_manifest(tmp_path)
+    (original.clone_dir / "source.py").write_text("value = 2\n", encoding="utf-8")
+    subprocess.run(["git", "add", "source.py"], cwd=original.clone_dir, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "changed tree",
+        ],
+        cwd=original.clone_dir,
+        check=True,
+    )
+    monkeypatch.setattr(
+        graph,
+        "_run_detection_census_receipts",
+        lambda _jobs: pytest.fail("wrong tree reached detector"),
+    )
+
+    mismatch = graph.detection_census([original]).sources[0]
+    (original.clone_dir / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+    dirty = graph.detection_census([original]).sources[0]
+
+    assert mismatch.status == "provenance-failed"
+    assert mismatch.categories == ("head-tree-mismatch",)
+    assert mismatch.resolved_commit != original.commit
+    assert dirty.categories == ("dirty-clone",)
+
+
+def test_census_accepts_annotated_tag_object_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = _real_manifest(tmp_path)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "tag",
+            "-a",
+            "v-test",
+            "-m",
+            "tag",
+        ],
+        cwd=manifest.clone_dir,
+        check=True,
+    )
+    tag_object = subprocess.run(
+        ["git", "rev-parse", "v-test"],
+        cwd=manifest.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    tagged = mf.Manifest(
+        name=manifest.name,
+        path=manifest.path,
+        url=manifest.url,
+        ref="v-test",
+        commit=tag_object,
+    )
+    monkeypatch.setattr(
+        graph,
+        "_run_detection_census_receipts",
+        lambda _jobs: [
+            graph.SourceCensusReceipt(source=manifest.name, kind="code", status="complete")
+        ],
+    )
+
+    receipt = graph.detection_census([tagged]).sources[0]
+
+    assert receipt.status == "complete"
+    assert receipt.declared_pin == tag_object
+    assert receipt.resolved_commit == manifest.commit
+    assert receipt.tree_digest
