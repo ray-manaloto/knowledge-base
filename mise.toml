@@ -540,6 +540,25 @@ arg "<review_receipt_sha256>" help="Out-of-band trusted review receipt digest"
 '''
 run = "uv run kb-setup skillopt-reviewed --packet ${usage_packet?} --target ${usage_target?} --backend ${usage_backend?} --review-receipt-sha256 ${usage_review_receipt_sha256?}"
 
+[tasks.kb-skillopt-generate]
+description = "Check paired Agent and Claude skills generated from the neutral SkillOpt spec"
+run = "uv run kb-setup skillopt-generate --check"
+
+[tasks.kb-skillopt-evaluate]
+description = "Validate the mock-only held-out evaluator contract; never adopt"
+usage = '''
+arg "<manifest>" help="Content-addressed held-out task manifest"
+arg "<receipt_sha256>" help="Trusted project-issued authority receipt digest"
+arg "<candidate>" help="Staged candidate under .agent/skillopt"
+arg "<agents_backend>" help="Agents harness label" choices "mock"
+arg "<agents_model>" help="Mock model identity" choices "default"
+arg "<agents_executable>" help="Mock executable identity" choices "mock"
+arg "<claude_backend>" help="Claude harness label" choices "mock"
+arg "<claude_model>" help="Mock model identity" choices "default"
+arg "<claude_executable>" help="Mock executable identity" choices "mock"
+'''
+run = "uv run kb-setup skillopt-evaluate ${usage_manifest?} ${usage_receipt_sha256?} ${usage_candidate?} ${usage_agents_backend?} ${usage_agents_model?} ${usage_agents_executable?} ${usage_claude_backend?} ${usage_claude_model?} ${usage_claude_executable?}"
+
 [tasks.kb-source-groups-check]
 description = "Validate the typed Graphify ecosystem source registry"
 usage = '''
