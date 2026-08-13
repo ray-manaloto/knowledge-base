@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import io
 import subprocess
+import tarfile
 from pathlib import Path
 
 import msgspec
 import pytest
-from kb_setup import graph, graphify_health
+from kb_setup import graph, graphify_health, graphify_sdk
 from kb_setup import manifest as mf
 
 
@@ -32,11 +34,25 @@ def test_preflight_reports_all_sources_sorted_and_bounded(
 
     monkeypatch.setattr(
         graph,
-        "_run_detection_census",
-        lambda _jobs: [
-            ("zeta", "IncompleteGraphifyOperationError: bad zeta " + "x" * 900),
-            ("alpha", "IncompleteGraphifyOperationError: bad alpha " + "x" * 900),
-        ],
+        "detection_census",
+        lambda _manifests: graph.DetectionCensusReceipt(
+            state="incomplete",
+            total_sources=2,
+            sources=(
+                graph.SourceCensusReceipt(
+                    source="zeta",
+                    kind="code",
+                    status="incomplete",
+                    stderr="bad zeta " + "x" * 900,
+                ),
+                graph.SourceCensusReceipt(
+                    source="alpha",
+                    kind="code",
+                    status="incomplete",
+                    stderr="bad alpha " + "x" * 900,
+                ),
+            ),
+        ),
     )
 
     with pytest.raises(SystemExit) as caught:
@@ -60,12 +76,34 @@ def test_preflight_continues_after_timeout_exception_and_walk_stderr(
 
     monkeypatch.setattr(
         graph,
-        "_run_detection_census",
-        lambda _jobs: [
-            ("timeout-source", "IncompleteGraphifyOperationError: timeout"),
-            ("exception-source", "OSError: walk exploded"),
-            ("stderr-source", "IncompleteGraphifyOperationError: stderr: permission denied"),
-        ],
+        "detection_census",
+        lambda _manifests: graph.DetectionCensusReceipt(
+            state="incomplete",
+            total_sources=3,
+            sources=(
+                graph.SourceCensusReceipt(
+                    source="timeout-source",
+                    kind="code",
+                    status="timed-out",
+                    categories=("timeout",),
+                    stderr="timeout",
+                ),
+                graph.SourceCensusReceipt(
+                    source="exception-source",
+                    kind="code",
+                    status="error",
+                    categories=("detector-error",),
+                    stderr="walk exploded",
+                ),
+                graph.SourceCensusReceipt(
+                    source="stderr-source",
+                    kind="code",
+                    status="incomplete",
+                    categories=("stderr",),
+                    stderr="permission denied",
+                ),
+            ),
+        ),
     )
 
     with pytest.raises(SystemExit) as caught:
@@ -88,11 +126,22 @@ def test_preflight_reports_missing_clone_without_calling_detector(
     manifest = _manifest(tmp_path, "missing", clone=False)
     monkeypatch.setattr(
         graph,
-        "_run_detection_census",
-        lambda *_args, **_kwargs: pytest.fail("missing clone reached detector"),
+        "detection_census",
+        lambda _manifests: graph.DetectionCensusReceipt(
+            state="incomplete",
+            total_sources=1,
+            sources=(
+                graph.SourceCensusReceipt(
+                    source="missing",
+                    kind="code",
+                    status="provenance-failed",
+                    categories=("missing-clone",),
+                ),
+            ),
+        ),
     )
 
-    with pytest.raises(SystemExit, match="missing verified clone"):
+    with pytest.raises(SystemExit, match="missing-clone"):
         graph._detect_preflight([manifest])
 
 
@@ -102,15 +151,21 @@ def test_clean_preflight_proceeds_for_every_source(
     manifests = [_manifest(tmp_path, "beta"), _manifest(tmp_path, "alpha")]
     seen: list[str] = []
 
-    def pass_detect(jobs: list[tuple[str, Path, object]]) -> list[tuple[str, str]]:
-        seen.extend(name for name, _root, _policy in jobs)
-        return []
+    def pass_detect(manifests: list[mf.Manifest]) -> graph.DetectionCensusReceipt:
+        seen.extend(manifest.name for manifest in manifests)
+        return graph.DetectionCensusReceipt(
+            total_sources=2,
+            sources=tuple(
+                graph.SourceCensusReceipt(source=name, kind="code", status="complete")
+                for name in sorted(seen)
+            ),
+        )
 
-    monkeypatch.setattr(graph, "_run_detection_census", pass_detect)
+    monkeypatch.setattr(graph, "detection_census", pass_detect)
 
     graph._detect_preflight(manifests)
 
-    assert seen == ["alpha", "beta"]
+    assert sorted(seen) == ["alpha", "beta"]
 
 
 def test_parent_enforces_hard_child_timeout(
@@ -144,6 +199,11 @@ def test_machine_census_receipt_covers_all_sources_and_is_deterministic(
         tree_digest="b" * 40,
     )
     monkeypatch.setattr(graph, "_verify_source_provenance", lambda _manifest: provenance)
+    monkeypatch.setattr(
+        graph,
+        "_create_source_snapshot",
+        lambda _manifest, verified, destination: (destination.mkdir(), verified)[1],
+    )
     monkeypatch.setattr(
         graph,
         "_run_detection_census_receipts",
@@ -187,6 +247,11 @@ def test_census_rejects_missing_duplicate_and_unexpected_child_receipts(
         tree_digest="c" * 40,
     )
     monkeypatch.setattr(graph, "_verify_source_provenance", lambda _manifest: provenance)
+    monkeypatch.setattr(
+        graph,
+        "_create_source_snapshot",
+        lambda _manifest, verified, destination: (destination.mkdir(), verified)[1],
+    )
     monkeypatch.setattr(
         graph,
         "_run_detection_census_receipts",
@@ -255,7 +320,7 @@ def test_source_census_hashes_paths_and_bounds_stderr(tmp_path: Path) -> None:
         "b57b236c9bcd2a61fcd627b69ae2d7a6eb5bc13f2dc25311348ee08df43bc0c4"
     )
     assert census.unclassified[0].size == 5
-    assert len(census.stderr) == graph._CENSUS_MAX_STDERR_LENGTH
+    assert len(census.stderr) <= graph._CENSUS_MAX_STDERR_LENGTH
 
 
 def test_machine_census_timeout_is_typed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -297,10 +362,9 @@ def test_ignored_directory_uses_git_tree_hash(tmp_path: Path) -> None:
         cwd=root,
         check=True,
     )
-
     evidence = graph._source_path_evidence(root, "ignored")
 
-    assert evidence.file_type == "git-tree"
+    assert evidence.file_type == "snapshot-tree:1"
     assert evidence.sha256 is not None
     assert len(evidence.sha256) == 64
 
@@ -363,8 +427,8 @@ def test_census_rejects_declared_aaaa_pin_for_real_clone(
     assert receipt.status == "provenance-failed"
     assert receipt.categories == ("pin-unreachable",)
     assert receipt.declared_pin == "a" * 40
-    assert receipt.resolved_commit != receipt.declared_pin
-    assert receipt.tree_digest
+    assert receipt.resolved_commit == ""
+    assert receipt.tree_digest == ""
 
 
 def test_census_rejects_missing_and_unresolvable_clone(
@@ -381,16 +445,17 @@ def test_census_rejects_missing_and_unresolvable_clone(
     receipts = graph.detection_census([broken, missing]).sources
 
     assert [(receipt.source, receipt.categories) for receipt in receipts] == [
-        ("broken", ("clone-head-unreachable",)),
+        ("broken", ("pin-unreachable",)),
         ("missing", ("missing-clone",)),
     ]
     assert all(receipt.status == "provenance-failed" for receipt in receipts)
 
 
-def test_census_rejects_wrong_tree_and_dirty_clone(
+def test_census_scans_pinned_a_when_worktree_moves_to_b_and_back_to_a(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     original = _real_manifest(tmp_path)
+    original_bytes = (original.clone_dir / "source.py").read_bytes()
     (original.clone_dir / "source.py").write_text("value = 2\n", encoding="utf-8")
     subprocess.run(["git", "add", "source.py"], cwd=original.clone_dir, check=True)
     subprocess.run(
@@ -407,20 +472,64 @@ def test_census_rejects_wrong_tree_and_dirty_clone(
         cwd=original.clone_dir,
         check=True,
     )
-    monkeypatch.setattr(
-        graph,
-        "_run_detection_census_receipts",
-        lambda _jobs: pytest.fail("wrong tree reached detector"),
-    )
-
-    mismatch = graph.detection_census([original]).sources[0]
+    commit_b = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=original.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert commit_b != original.commit
     (original.clone_dir / "untracked.txt").write_text("dirty\n", encoding="utf-8")
-    dirty = graph.detection_census([original]).sources[0]
+    before = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=original.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    snapshots: list[Path] = []
 
-    assert mismatch.status == "provenance-failed"
-    assert mismatch.categories == ("head-tree-mismatch",)
-    assert mismatch.resolved_commit != original.commit
-    assert dirty.categories == ("dirty-clone",)
+    def inspect_snapshot(jobs: list[tuple[str, Path, object]]) -> list[graph.SourceCensusReceipt]:
+        name, snapshot, _policy = jobs[0]
+        snapshots.append(snapshot)
+        assert (snapshot / "source.py").read_bytes() == original_bytes
+        assert not (snapshot / ".git").exists()
+        subprocess.run(
+            ["git", "checkout", "--quiet", "--detach", original.commit],
+            cwd=original.clone_dir,
+            check=True,
+        )
+        assert (snapshot / "source.py").read_bytes() == original_bytes
+        return [graph.SourceCensusReceipt(source=name, kind="code", status="complete")]
+
+    monkeypatch.setattr(graph, "_run_detection_census_receipts", inspect_snapshot)
+
+    receipt = graph.detection_census([original]).sources[0]
+
+    assert receipt.status == "complete"
+    assert receipt.resolved_commit == original.commit
+    assert receipt.tree_digest
+    assert snapshots
+    assert not snapshots[0].exists()
+    assert (original.clone_dir / "untracked.txt").read_text(encoding="utf-8") == "dirty\n"
+    after = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=original.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert after == before
+    head_after = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=original.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert head_after == original.commit
+    assert "?? untracked.txt" in after
 
 
 def test_census_accepts_annotated_tag_object_pin(
@@ -471,3 +580,130 @@ def test_census_accepts_annotated_tag_object_pin(
     assert receipt.declared_pin == tag_object
     assert receipt.resolved_commit == manifest.commit
     assert receipt.tree_digest
+
+
+def test_census_reports_archive_failure_without_running_detector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = _real_manifest(tmp_path)
+
+    def fail_archive(_clone: Path, _commit: str, _archive: Path) -> None:
+        raise subprocess.CalledProcessError(1, ["git", "archive"])
+
+    monkeypatch.setattr(graph, "_write_git_archive", fail_archive)
+    monkeypatch.setattr(
+        graph,
+        "_run_detection_census_receipts",
+        lambda _jobs: pytest.fail("failed archive reached detector"),
+    )
+
+    receipt = graph.detection_census([manifest]).sources[0]
+
+    assert receipt.status == "provenance-failed"
+    assert receipt.categories == ("archive-failed",)
+    assert receipt.resolved_commit == manifest.commit
+
+
+@pytest.mark.parametrize("hostile", ["traversal", "symlink"])
+def test_safe_archive_rejects_traversal_and_links(tmp_path: Path, hostile: str) -> None:
+    archive_path = tmp_path / "hostile.tar"
+    with tarfile.open(archive_path, "w") as archive:
+        if hostile == "traversal":
+            info = tarfile.TarInfo("../escape")
+            info.size = 1
+            archive.addfile(info, io.BytesIO(b"x"))
+        else:
+            info = tarfile.TarInfo("link")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "../escape"
+            archive.addfile(info)
+    destination = tmp_path / "snapshot"
+    destination.mkdir()
+
+    with pytest.raises(graph.UnsafeArchiveError):
+        graph._safe_extract_git_archive(archive_path, destination)
+
+    assert not (tmp_path / "escape").exists()
+
+
+def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> None:
+    manifest = _real_manifest(tmp_path)
+    (manifest.clone_dir / ".gitignore").write_text("ignored/\n", encoding="utf-8")
+    ignored = manifest.clone_dir / "ignored"
+    ignored.mkdir()
+    (ignored / "secret.txt").write_text("tracked but ignored\n", encoding="utf-8")
+    subprocess.run(["git", "add", ".gitignore"], cwd=manifest.clone_dir, check=True)
+    subprocess.run(["git", "add", "-f", "ignored/secret.txt"], cwd=manifest.clone_dir, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "ignored fixture",
+        ],
+        cwd=manifest.clone_dir,
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=manifest.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    manifest = mf.Manifest(
+        name=manifest.name,
+        path=manifest.path,
+        url=manifest.url,
+        ref=manifest.ref,
+        commit=commit,
+    )
+    before = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=manifest.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    provenance = graph._verify_source_provenance(manifest)
+    snapshot = tmp_path / "snapshot"
+
+    result = graph._create_source_snapshot(manifest, provenance, snapshot)
+    detected, _receipt = graphify_sdk.observe_detect(snapshot, source_name=manifest.name)
+
+    assert result.failure_category == ""
+    assert not (snapshot / ".git").exists()
+    assert any(Path(path).name == "ignored" for path in detected["ignored"])
+    after = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=manifest.clone_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert after == before
+
+
+def test_unexpected_100k_name_and_total_receipt_remain_bounded(tmp_path: Path) -> None:
+    provenance = graph.SourceGitProvenance(
+        declared_pin="a" * 40,
+        resolved_commit="b" * 40,
+        tree_digest="c" * 40,
+    )
+    _bound, errors = graph._bind_detection_receipts(
+        [("expected", tmp_path, graphify_health.SourceCoveragePolicy())],
+        [graph.SourceCensusReceipt(source="x" * 100_000, kind="code", status="complete")],
+        {"expected": provenance},
+    )
+
+    assert len(errors) == 1
+    assert len(errors[0]) < 200
+    oversized = graph.DetectionCensusReceipt(
+        integrity_errors=("x" * (graph._CENSUS_MAX_RECEIPT_BYTES + 1),)
+    )
+    with pytest.raises(ValueError, match="aggregate size bound"):
+        graph._encode_detection_census(oversized)

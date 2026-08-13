@@ -25,6 +25,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from collections import Counter, deque
@@ -307,10 +308,28 @@ def _extract_code(repo_root: Path, name: str) -> bool:
 _DETECT_WORKERS = 1
 _DETECT_SOURCE_TIMEOUT_SECONDS = 120.0
 _DETECT_GLOBAL_TIMEOUT_SECONDS = 900.0
-_CENSUS_MAX_PATHS_PER_CLASS = 4096
+_CENSUS_MAX_PATHS_PER_CLASS = 128
 _CENSUS_MAX_PATH_LENGTH = 240
 _CENSUS_MAX_STDERR_LENGTH = 2000
+_CENSUS_MAX_SOURCE_LENGTH = 120
+_CENSUS_MAX_RECEIPT_BYTES = 8 * 1024 * 1024
 _CENSUS_OUTPUT_ARG_COUNT = 2
+_SNAPSHOT_MAX_MEMBER_BYTES = 2 * 1024 * 1024 * 1024
+_SNAPSHOT_MAX_TOTAL_BYTES = 8 * 1024 * 1024 * 1024
+_SNAPSHOT_MAX_PATH_LENGTH = 4096
+
+
+class UnsafeArchiveError(RuntimeError):
+    """A Git archive cannot be safely materialized for detection."""
+
+
+def _bounded_identity(value: str, limit: int) -> str:
+    """Bound a field while retaining collision-resistant identity evidence."""
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    suffix = hashlib.sha256(normalized.encode()).hexdigest()[:16]
+    return f"{normalized[: limit - 18]}~{suffix}"
 
 
 def _detect_worker(
@@ -337,14 +356,16 @@ def _detect_worker(
         ValueError,
         graphify_health.IncompleteGraphifyOperationError,
     ) as exc:
-        detail = " ".join(str(exc).split())[:900]
+        detail = _bounded_identity(str(exc), 900)
         result_queue.put(
             SourceCensusReceipt(
                 source=source_name,
                 kind="code",
                 status="error",
                 categories=("detector-error",),
-                stderr=f"{type(exc).__name__}: {detail}",
+                stderr=_bounded_identity(
+                    f"{type(exc).__name__}: {detail}", _CENSUS_MAX_STDERR_LENGTH
+                ),
             )
         )
 
@@ -373,7 +394,7 @@ def _source_census_receipt(
             _source_path_evidence(root, path)
             for path in ignored_paths[:_CENSUS_MAX_PATHS_PER_CLASS]
         ),
-        stderr=" ".join(receipt.stderr.split())[:_CENSUS_MAX_STDERR_LENGTH],
+        stderr=_bounded_identity(receipt.stderr, _CENSUS_MAX_STDERR_LENGTH),
     )
 
 
@@ -390,47 +411,69 @@ def graphify_sdk_paths(root: Path, paths: object) -> tuple[str, ...]:
             relative = str(absolute_path.relative_to(absolute_root))
         except ValueError:
             relative = str(path)
-        normalized.append(relative[:_CENSUS_MAX_PATH_LENGTH])
+        normalized.append(relative)
     return tuple(sorted(set(normalized)))
 
 
 def _source_path_evidence(root: Path, relative_path: str) -> SourcePathEvidence:
+    bounded_path = _bounded_identity(relative_path, _CENSUS_MAX_PATH_LENGTH)
+    if len(relative_path) > _SNAPSHOT_MAX_PATH_LENGTH:
+        return SourcePathEvidence(path=bounded_path, file_type="path-too-long")
     path = root / relative_path
     try:
         resolved_root = root.resolve()
         resolved_path = path.resolve(strict=True)
         if os.path.commonpath((resolved_root, resolved_path)) != str(resolved_root):
-            return SourcePathEvidence(path=relative_path, file_type="out-of-root")
+            return SourcePathEvidence(path=bounded_path, file_type="out-of-root")
         if path.is_symlink():
-            return SourcePathEvidence(path=relative_path, file_type="symlink")
+            return SourcePathEvidence(path=bounded_path, file_type="symlink")
         if path.is_dir():
             return _git_tree_evidence(root, relative_path)
+    except OSError:
+        return SourcePathEvidence(path=bounded_path, file_type="unreadable")
+    return _regular_path_evidence(path, bounded_path)
+
+
+def _regular_path_evidence(path: Path, bounded_path: str) -> SourcePathEvidence:
+    try:
         if not path.is_file():
-            return SourcePathEvidence(path=relative_path, file_type="non-regular")
+            return SourcePathEvidence(path=bounded_path, file_type="non-regular")
         content = path.read_bytes()
     except OSError:
-        return SourcePathEvidence(path=relative_path, file_type="unreadable")
+        return SourcePathEvidence(path=bounded_path, file_type="unreadable")
     return SourcePathEvidence(
-        path=relative_path,
+        path=bounded_path,
         sha256=hashlib.sha256(content).hexdigest(),
         size=len(content),
     )
 
 
 def _git_tree_evidence(root: Path, relative_path: str) -> SourcePathEvidence:
-    tree = subprocess.run(
-        ["git", "ls-tree", "-r", "HEAD", "--", relative_path],
-        cwd=root,
-        check=False,
-        capture_output=True,
-    )
-    if tree.returncode or not tree.stdout:
-        return SourcePathEvidence(path=relative_path, file_type="directory-unhashed")
+    bounded_path = _bounded_identity(relative_path, _CENSUS_MAX_PATH_LENGTH)
+    directory = root / relative_path
+    digest = hashlib.sha256()
+    entries = 0
+    total_size = 0
+    try:
+        paths = sorted(directory.rglob("*"), key=lambda path: str(path.relative_to(directory)))
+        for path in paths:
+            if path.is_symlink() or not (path.is_dir() or path.is_file()):
+                return SourcePathEvidence(path=bounded_path, file_type="directory-unsafe")
+            relative = str(path.relative_to(directory))
+            digest.update(relative.encode())
+            digest.update(b"\0d\0" if path.is_dir() else b"\0f\0")
+            if path.is_file():
+                content = path.read_bytes()
+                total_size += len(content)
+                digest.update(hashlib.sha256(content).digest())
+            entries += 1
+    except OSError:
+        return SourcePathEvidence(path=bounded_path, file_type="directory-unreadable")
     return SourcePathEvidence(
-        path=relative_path,
-        sha256=hashlib.sha256(tree.stdout).hexdigest(),
-        size=len(tree.stdout),
-        file_type="git-tree",
+        path=bounded_path,
+        sha256=digest.hexdigest(),
+        size=total_size,
+        file_type=f"snapshot-tree:{entries}",
     )
 
 
@@ -455,115 +498,201 @@ def _source_census_failure_detail(receipt: SourceCensusReceipt) -> str:
     if receipt.ignored:
         evidence.append(f"ignored={[item.path for item in receipt.ignored[:12]]!r}")
     if receipt.stderr:
-        evidence.append(f"stderr={receipt.stderr[:240]}")
+        evidence.append(f"detail={receipt.stderr[:240]}")
     suffix = f"; {'; '.join(evidence)}" if evidence else ""
-    return (
-        "IncompleteGraphifyOperationError: Graphify detect failed closed "
-        f"({receipt.status}): {categories}{suffix}"
-    )
+    exception = "RuntimeError" if receipt.status == "error" else "IncompleteGraphifyOperationError"
+    return f"{exception}: Graphify detect failed closed ({receipt.status}): {categories}{suffix}"
 
 
 def _verify_source_provenance(manifest: mf.Manifest) -> SourceGitProvenance:
-    """Bind a declared pin to the clean clone HEAD commit/tree without fetching."""
+    """Resolve the exact declared object; mutable worktree state is irrelevant."""
     root = manifest.clone_dir
+    declared_pin = _bounded_identity(manifest.commit, 80)
     if not (root / ".git").is_dir():
         return SourceGitProvenance(
-            declared_pin=manifest.commit,
+            declared_pin=declared_pin,
             failure_category="missing-clone",
             detail="verified Git clone is missing",
         )
+    if not re.fullmatch(r"[0-9a-f]{40,64}", manifest.commit):
+        return SourceGitProvenance(
+            declared_pin=declared_pin,
+            failure_category="invalid-pin",
+            detail="declared pin is not a full Git object identity",
+        )
     try:
-        actual_commit = _rev_parse(root, "HEAD^{commit}")
-        actual_tree = _rev_parse(root, "HEAD^{tree}")
+        resolved_commit = _rev_parse(root, f"{manifest.commit}^{{commit}}")
+        tree_digest = _rev_parse(root, f"{manifest.commit}^{{tree}}")
     except OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
         return SourceGitProvenance(
-            declared_pin=manifest.commit,
-            failure_category="clone-head-unreachable",
-            detail="clone HEAD commit/tree could not be resolved",
-        )
-    observed = SourceGitProvenance(
-        declared_pin=manifest.commit,
-        resolved_commit=actual_commit,
-        tree_digest=actual_tree,
-    )
-    cleanliness_failure = _clone_cleanliness_failure(root, observed)
-    if cleanliness_failure is not None:
-        return cleanliness_failure
-    try:
-        expected_commit = _rev_parse(root, f"{manifest.commit}^{{commit}}")
-        expected_tree = _rev_parse(root, f"{manifest.commit}^{{tree}}")
-    except OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
-        return msgspec.structs.replace(
-            observed,
+            declared_pin=declared_pin,
             failure_category="pin-unreachable",
             detail="declared pin commit/tree is unavailable in the verified clone",
         )
-    if (actual_commit, actual_tree) != (expected_commit, expected_tree):
+    return SourceGitProvenance(
+        declared_pin=declared_pin,
+        resolved_commit=resolved_commit,
+        tree_digest=tree_digest,
+    )
+
+
+def _create_source_snapshot(
+    manifest: mf.Manifest, provenance: SourceGitProvenance, destination: Path
+) -> SourceGitProvenance:
+    """Materialize the verified commit without consulting the mutable worktree."""
+    archive_path = destination.with_suffix(".tar")
+    destination.mkdir(parents=True, exist_ok=False)
+    try:
+        _write_git_archive(manifest.clone_dir, provenance.resolved_commit, archive_path)
+        _verify_archive_commit(archive_path, provenance.resolved_commit)
+        _safe_extract_git_archive(archive_path, destination)
+    except UnsafeArchiveError as exc:
+        shutil.rmtree(destination, ignore_errors=True)
         return msgspec.structs.replace(
-            observed,
-            failure_category="head-tree-mismatch",
-            detail=(
-                f"HEAD {actual_commit[:12]}/{actual_tree[:12]} does not match declared pin "
-                f"{expected_commit[:12]}/{expected_tree[:12]}"
+            provenance,
+            failure_category="unsafe-archive",
+            detail=_bounded_identity(str(exc), _CENSUS_MAX_STDERR_LENGTH),
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        shutil.rmtree(destination, ignore_errors=True)
+        return msgspec.structs.replace(
+            provenance,
+            failure_category="archive-failed",
+            detail=_bounded_identity(
+                f"{type(exc).__name__}: immutable Git archive failed",
+                _CENSUS_MAX_STDERR_LENGTH,
             ),
         )
-    return observed
+    finally:
+        archive_path.unlink(missing_ok=True)
+    return provenance
 
 
-def _clone_cleanliness_failure(
-    root: Path, observed: SourceGitProvenance
-) -> SourceGitProvenance | None:
-    try:
-        status = subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=all"],
-            check=True,
+def _write_git_archive(clone_dir: Path, commit: str, archive_path: Path) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(clone_dir),
+            "archive",
+            "--format=tar",
+            f"--output={archive_path}",
+            commit,
+        ],
+        check=True,
+        capture_output=True,
+        timeout=300,
+    )
+
+
+def _verify_archive_commit(archive_path: Path, expected_commit: str) -> None:
+    with archive_path.open("rb") as archive:
+        proc = subprocess.run(
+            ["git", "get-tar-commit-id"],
+            stdin=archive,
+            check=False,
             capture_output=True,
             text=True,
             timeout=60,
         )
-    except OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
-        return msgspec.structs.replace(
-            observed,
-            failure_category="clone-status-unavailable",
-            detail="clone cleanliness could not be verified",
-        )
-    if status.stdout:
-        first = " ".join(status.stdout.splitlines()[0].split())[:160]
-        return msgspec.structs.replace(
-            observed,
-            failure_category="dirty-clone",
-            detail=f"clone has tracked or untracked changes: {first}",
-        )
-    return None
+    actual_commit = proc.stdout.strip()
+    if proc.returncode or actual_commit != expected_commit:
+        raise UnsafeArchiveError("archive commit identity does not match the verified pin")
+
+
+def _safe_extract_git_archive(archive_path: Path, destination: Path) -> None:
+    """Extract only bounded relative directories and regular files, never links."""
+    with tarfile.open(archive_path, mode="r:") as archive:
+        members = archive.getmembers()
+        _validate_archive_members(members)
+        _extract_archive_members(archive, members, destination)
+
+
+def _validate_archive_members(members: list[tarfile.TarInfo]) -> None:
+    total_size = 0
+    names: set[str] = set()
+    for member in members:
+        name = member.name.rstrip("/")
+        parts = Path(name).parts
+        if (
+            not name
+            or name.startswith("/")
+            or ".." in parts
+            or ".git" in parts
+            or "\x00" in name
+            or len(name) > _SNAPSHOT_MAX_PATH_LENGTH
+        ):
+            raise UnsafeArchiveError("archive contains an unsafe relative path")
+        if name in names:
+            raise UnsafeArchiveError("archive contains a duplicate path")
+        names.add(name)
+        if not (member.isdir() or member.isreg()):
+            raise UnsafeArchiveError("archive contains a link or non-regular entry")
+        if member.size > _SNAPSHOT_MAX_MEMBER_BYTES:
+            raise UnsafeArchiveError("archive member exceeds the snapshot size bound")
+        total_size += member.size
+        if total_size > _SNAPSHOT_MAX_TOTAL_BYTES:
+            raise UnsafeArchiveError("archive exceeds the snapshot total-size bound")
+
+
+def _extract_archive_members(
+    archive: tarfile.TarFile, members: list[tarfile.TarInfo], destination: Path
+) -> None:
+    resolved_destination = destination.resolve()
+    for member in members:
+        target = destination / member.name.rstrip("/")
+        if os.path.commonpath((resolved_destination, target.parent.resolve())) != str(
+            resolved_destination
+        ):
+            raise UnsafeArchiveError("archive target escapes the snapshot root")
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = archive.extractfile(member)
+        if source is None:
+            raise UnsafeArchiveError("archive regular file has no readable content")
+        with source, target.open("xb") as output:
+            shutil.copyfileobj(source, output, length=1024 * 1024)
+        target.chmod(0o755 if member.mode & 0o111 else 0o644)
 
 
 def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
     """Return a read-only, deterministic receipt for every configured source."""
-    from kb_setup import graphify_sdk
-
-    sources: list[SourceCensusReceipt] = []
     manifest_names = [manifest.name for manifest in manifests]
     duplicate_manifests = sorted(
         name for name, count in Counter(manifest_names).items() if count != 1
     )
     if duplicate_manifests:
-        names = ", ".join(duplicate_manifests[:12])
+        names = ", ".join(
+            _bounded_identity(name, _CENSUS_MAX_SOURCE_LENGTH) for name in duplicate_manifests[:12]
+        )
         raise ValueError(f"duplicate manifest source names: {names}")
+    with tempfile.TemporaryDirectory(prefix="kb-graphify-census-") as snapshot_dir:
+        return _detection_census_from_snapshots(manifests, Path(snapshot_dir))
+
+
+def _detection_census_from_snapshots(
+    manifests: list[mf.Manifest], snapshot_dir: Path
+) -> DetectionCensusReceipt:
+    from kb_setup import graphify_sdk
+
+    sources: list[SourceCensusReceipt] = []
     jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]] = []
     verified: dict[str, SourceGitProvenance] = {}
-    for manifest in sorted(manifests, key=lambda item: item.name):
+    for index, manifest in enumerate(sorted(manifests, key=lambda item: item.name)):
         provenance = _verify_source_provenance(manifest)
         if provenance.failure_category:
             sources.append(
                 SourceCensusReceipt(
-                    source=manifest.name,
-                    kind=manifest.kind,
+                    source=_bounded_identity(manifest.name, _CENSUS_MAX_SOURCE_LENGTH),
+                    kind=_bounded_identity(manifest.kind, 32),
                     status="provenance-failed",
                     declared_pin=provenance.declared_pin,
                     resolved_commit=provenance.resolved_commit,
                     tree_digest=provenance.tree_digest,
                     categories=(provenance.failure_category,),
-                    stderr=provenance.detail[:_CENSUS_MAX_STDERR_LENGTH],
+                    stderr=_bounded_identity(provenance.detail, _CENSUS_MAX_STDERR_LENGTH),
                 )
             )
             continue
@@ -571,7 +700,7 @@ def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
         if manifest.kind == "docs":
             sources.append(
                 SourceCensusReceipt(
-                    source=manifest.name,
+                    source=_bounded_identity(manifest.name, _CENSUS_MAX_SOURCE_LENGTH),
                     kind="docs",
                     status="skipped-docs",
                     declared_pin=provenance.declared_pin,
@@ -580,7 +709,23 @@ def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
                 )
             )
             continue
-        root = manifest.clone_dir
+        root = snapshot_dir / f"source-{index:04d}"
+        snapshot = _create_source_snapshot(manifest, provenance, root)
+        if snapshot.failure_category:
+            sources.append(
+                SourceCensusReceipt(
+                    source=_bounded_identity(manifest.name, _CENSUS_MAX_SOURCE_LENGTH),
+                    kind="code",
+                    status="provenance-failed",
+                    declared_pin=snapshot.declared_pin,
+                    resolved_commit=snapshot.resolved_commit,
+                    tree_digest=snapshot.tree_digest,
+                    categories=(snapshot.failure_category,),
+                    stderr=_bounded_identity(snapshot.detail, _CENSUS_MAX_STDERR_LENGTH),
+                )
+            )
+            verified.pop(manifest.name, None)
+            continue
         reviewed = tuple(
             item for item in _EXPECTED_UNCLASSIFIED if item.source_name == manifest.name
         )
@@ -600,7 +745,7 @@ def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
     sources.sort(key=lambda receipt: receipt.source)
     status_counts = Counter(receipt.status for receipt in sources)
     category_counts = Counter(category for receipt in sources for category in receipt.categories)
-    return DetectionCensusReceipt(
+    census = DetectionCensusReceipt(
         state=(
             "incomplete"
             if integrity_errors
@@ -613,6 +758,9 @@ def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
         integrity_errors=integrity_errors,
         sources=tuple(sources),
     )
+    if len(msgspec.json.encode(census)) > _CENSUS_MAX_RECEIPT_BYTES:
+        raise ValueError("detection census receipt exceeds the aggregate size bound")
+    return census
 
 
 def _bind_detection_receipts(
@@ -626,8 +774,11 @@ def _bind_detection_receipts(
     for receipt in received:
         by_name.setdefault(receipt.source, []).append(receipt)
     unexpected = sorted(set(by_name) - expected)
+    bounded_unexpected = [
+        _bounded_identity(name, _CENSUS_MAX_SOURCE_LENGTH) for name in unexpected[:12]
+    ]
     integrity_errors = (
-        (f"unexpected-receipts:{len(unexpected)}:{','.join(unexpected[:12])}",)
+        (f"unexpected-receipts:{len(unexpected)}:{','.join(bounded_unexpected)}",)
         if unexpected
         else ()
     )
@@ -639,7 +790,7 @@ def _bind_detection_receipts(
             category = "receipt-missing" if not rows else "receipt-duplicate"
             bound.append(
                 SourceCensusReceipt(
-                    source=name,
+                    source=_bounded_identity(name, _CENSUS_MAX_SOURCE_LENGTH),
                     kind="code",
                     status="census-integrity-failed",
                     declared_pin=provenance.declared_pin,
@@ -653,6 +804,7 @@ def _bind_detection_receipts(
         bound.append(
             msgspec.structs.replace(
                 rows[0],
+                source=_bounded_identity(name, _CENSUS_MAX_SOURCE_LENGTH),
                 declared_pin=provenance.declared_pin,
                 resolved_commit=provenance.resolved_commit,
                 tree_digest=provenance.tree_digest,
@@ -669,9 +821,16 @@ def write_detection_census(repo_root: Path, output: Path, receipt: DetectionCens
     if os.path.commonpath((agent_root, resolved_parent)) != str(agent_root):
         raise ValueError("detect census output must be under .agent/")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    encoded = msgspec.json.encode(receipt).decode() + "\n"
+    encoded = _encode_detection_census(receipt) + "\n"
     atomic.write_text(destination, encoded)
     return destination
+
+
+def _encode_detection_census(receipt: DetectionCensusReceipt) -> str:
+    encoded = msgspec.json.encode(receipt)
+    if len(encoded) > _CENSUS_MAX_RECEIPT_BYTES:
+        raise ValueError("detection census receipt exceeds the aggregate size bound")
+    return encoded.decode()
 
 
 def detection_census_main(repo_root: Path, args: list[str]) -> int:
@@ -682,7 +841,7 @@ def detection_census_main(repo_root: Path, args: list[str]) -> int:
             raise ValueError("detect-census accepts only --output .agent/<path>.json")
         output = Path(args[1])
     receipt = detection_census(mf.load_all(repo_root / "sources"))
-    encoded = msgspec.json.encode(receipt).decode()
+    encoded = _encode_detection_census(receipt)
     if output is None:
         print(encoded)
     else:
@@ -781,24 +940,13 @@ def _reap_detection_processes(
 
 def _detect_preflight(manifests: list[mf.Manifest]) -> None:
     """Census every code source before aggregate graph/stamp mutation."""
-    from kb_setup import graphify_sdk
-
-    failures: list[tuple[str, str]] = []
-    jobs: list[tuple[str, Path, graphify_health.SourceCoveragePolicy]] = []
-    for manifest in sorted(manifests, key=lambda item: item.name):
-        if manifest.kind == "docs":
-            continue
-        root = manifest.clone_dir
-        if not (root / ".git").is_dir():
-            failures.append((manifest.name, "missing verified clone"))
-            continue
-        reviewed = tuple(
-            item for item in _EXPECTED_UNCLASSIFIED if item.source_name == manifest.name
-        )
-        policy = graphify_sdk.source_detection_policy(root, manifest.name, reviewed)
-        jobs.append((manifest.name, root, policy))
-    if jobs:
-        failures.extend(_run_detection_census(jobs))
+    census = detection_census(manifests)
+    failures = [
+        (source.source, _source_census_failure_detail(source))
+        for source in census.sources
+        if source.status not in {"complete", "skipped-docs"}
+    ]
+    failures.extend(("<census>", f"RuntimeError: {error}") for error in census.integrity_errors)
     failures.sort()
     if failures:
         categorized = [
