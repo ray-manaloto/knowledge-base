@@ -93,6 +93,49 @@ def test_coverage_policy_allows_declared_optional_gaps_only() -> None:
     assert receipt.state is GraphifyState.COMPLETE
 
 
+def test_coverage_policy_allows_only_declared_ignored_paths() -> None:
+    reviewed = assess(
+        GraphifyOperation.DETECT,
+        GraphifyEvidence(
+            observed=True,
+            ignored_paths=("docs/superpowers",),
+            coverage_policy=SourceCoveragePolicy(
+                optional_ignored_paths=("docs/superpowers",),
+            ),
+        ),
+    )
+    changed = assess(
+        GraphifyOperation.DETECT,
+        GraphifyEvidence(
+            observed=True,
+            ignored_paths=("docs/superpowers", "new-ignored"),
+            coverage_policy=SourceCoveragePolicy(
+                optional_ignored_paths=("docs/superpowers",),
+            ),
+        ),
+    )
+
+    assert reviewed.state is GraphifyState.COMPLETE
+    assert changed.state is GraphifyState.INCOMPLETE
+    assert changed.reasons == ("ignored-paths",)
+
+
+def test_required_ignored_path_is_never_allowlisted() -> None:
+    receipt = assess(
+        GraphifyOperation.DETECT,
+        GraphifyEvidence(
+            observed=True,
+            ignored_paths=("mise.toml",),
+            coverage_policy=SourceCoveragePolicy(
+                required_paths=("mise.toml",),
+                optional_ignored_paths=("mise.toml",),
+            ),
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert receipt.reasons == ("required-source-ignored",)
+
+
 def test_required_unsupported_source_is_never_silently_ignored() -> None:
     policy = SourceCoveragePolicy(required_paths=("mise.toml", "Dockerfile"))
     receipt = assess(

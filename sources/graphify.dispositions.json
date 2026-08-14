@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "source": "graphify",
+  "source_ref": "v0.9.42",
+  "source_commit": "7fe58b0b0f3873be9a21c30106b8b8527c353aa6",
+  "source_tree": "15ca81a8dbd3ded7083c4b573197140e62e95fcc",
+  "entries": [
+    {
+      "path": ".dockerignore",
+      "kind": "unsupported-file",
+      "reason": "container-build ignore metadata is not graph source",
+      "sha256": "7516e7f67d1095ac8250a8df8606f121d5b178a69a3315794361f1e821f5938f",
+      "size": 247,
+      "file_type": "regular"
+    },
+    {
+      "path": ".gitattributes",
+      "kind": "unsupported-file",
+      "reason": "version-control attributes metadata is not graph source",
+      "sha256": "a87d7a83aa5785d3c7fb206a60731a74272aab68978d084fab891a74d4d83fd0",
+      "size": 353,
+      "file_type": "regular"
+    },
+    {
+      "path": ".gitignore",
+      "kind": "unsupported-file",
+      "reason": "version-control ignore metadata is not graph source",
+      "sha256": "0fa6380234ccd1dc4b57b56a681770385b5d0a6a2adf1cd8416606e184e7bfa2",
+      "size": 894,
+      "file_type": "regular"
+    },
+    {
+      "path": "Dockerfile",
+      "kind": "unsupported-file",
+      "reason": "extensionless container build definition is unsupported by Graphify detection 0.9.42",
+      "sha256": "ef964d5fa34394fc13525e3857b60437f623d2ef081a997e42255eb5f9d494b0",
+      "size": 881,
+      "file_type": "regular"
+    },
+    {
+      "path": "LICENSE",
+      "kind": "unsupported-file",
+      "reason": "extensionless legal metadata is not graph source",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size": 11358,
+      "file_type": "regular"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "kind": "unsupported-file",
+      "reason": "extensionless legal metadata is not graph source",
+      "sha256": "36ecff6bbb97aca1be64e95f42538cf796adde5864edac583e620643c096931a",
+      "size": 1068,
+      "file_type": "regular"
+    },
+    {
+      "path": "NOTICE",
+      "kind": "unsupported-file",
+      "reason": "extensionless legal metadata is not graph source",
+      "sha256": "3448ea175bba09f6fed8a743000139fb4c7112de83f164355b5540b158576621",
+      "size": 335,
+      "file_type": "regular"
+    },
+    {
+      "path": "tools/skillgen/fragments/dispatch/.gitkeep",
+      "kind": "unsupported-file",
+      "reason": "empty-directory marker is not graph source",
+      "sha256": "ffec0356fc3c5e5cb0d8e88e1690be166a36945a30da4852cf76037031045978",
+      "size": 77,
+      "file_type": "regular"
+    },
+    {
+      "path": "tools/skillgen/fragments/extra/.gitkeep",
+      "kind": "unsupported-file",
+      "reason": "empty-directory marker is not graph source",
+      "sha256": "ffec0356fc3c5e5cb0d8e88e1690be166a36945a30da4852cf76037031045978",
+      "size": 77,
+      "file_type": "regular"
+    },
+    {
+      "path": "tools/skillgen/platforms.toml",
+      "kind": "unsupported-file",
+      "reason": "build-time skill-generation configuration is unsupported by Graphify detection 0.9.42",
+      "sha256": "3cf4f6e8375eb979fc45473d3a4bd5819720661c114d03b18d078b02ffbd14ed",
+      "size": 12264,
+      "file_type": "regular"
+    },
+    {
+      "path": "uv.lock",
+      "kind": "unsupported-file",
+      "reason": "uv lockfile is unsupported by Graphify detection 0.9.42",
+      "sha256": "e838b2889ae4d4df56f92cd1c6dc8d707940184d97e553e4acb5e551663ab86a",
+      "size": 1008053,
+      "file_type": "regular"
+    },
+    {
+      "path": "docs/superpowers",
+      "kind": "ignored-tree",
+      "reason": "tracked historical design subtree is explicitly ignored by the pinned source .gitignore",
+      "sha256": "32cdc5da8e6e0a4c2ea80a04b2238d259829b57e9560dcac4fed7b8f06b64584",
+      "size": 46443,
+      "file_type": "snapshot-tree:4"
+    },
+    {
+      "path": "tests/fixtures/extraction.json",
+      "kind": "zero-node-file",
+      "reason": "reviewed Graphify test data is intentionally not configuration AST input",
+      "sha256": "eb4097a213eb0d743056606d1a5ea0464dbe9613e339360f689827eac7efb417",
+      "size": 1235,
+      "file_type": "regular",
+      "extraction_disposition": "data json (not a config/manifest)"
+    },
+    {
+      "path": "tests/fixtures/sample.mcp.json",
+      "kind": "zero-node-file",
+      "reason": "reviewed Graphify test data is intentionally not configuration AST input",
+      "sha256": "b8e904a468ae73cffd669570d66122e31bc4415e18fa55e38bd75c7da1e5ed71",
+      "size": 622,
+      "file_type": "regular",
+      "extraction_disposition": "data json (not a config/manifest)"
+    },
+    {
+      "path": "worked/httpx/graph.json",
+      "kind": "zero-node-file",
+      "reason": "reviewed generated graph artifact is intentionally not configuration AST input",
+      "sha256": "3c291f1a2169b801f09d98cd73b69bcfe012d8b8172c4c5fb28254ef6da7f504",
+      "size": 139663,
+      "file_type": "regular",
+      "extraction_disposition": "data json (not a config/manifest)"
+    },
+    {
+      "path": "worked/karpathy-repos/graph.json",
+      "kind": "zero-node-file",
+      "reason": "reviewed generated graph artifact is intentionally not configuration AST input",
+      "sha256": "340025e342c6b08a7e14e5a9b830b1365323c6d02484e712cfa12acfae0c2b57",
+      "size": 120398,
+      "file_type": "regular",
+      "extraction_disposition": "data json (not a config/manifest)"
+    },
+    {
+      "path": "worked/mixed-corpus/graph.json",
+      "kind": "zero-node-file",
+      "reason": "reviewed generated graph artifact is intentionally not configuration AST input",
+      "sha256": "31a1b29da9f9c8742ea137ba9b4a267127dca06684d1fe7c384c6fb6371896db",
+      "size": 17813,
+      "file_type": "regular",
+      "extraction_disposition": "data json (not a config/manifest)"
+    },
+    {
+      "path": "worked/rsl-siege-manager/graph.json",
+      "kind": "excluded-ast-fixture",
+      "reason": "Graphify 0.9.42 rejects this generated graph at its JSON indexing safety cap; parser errors cannot certify a zero-node admission",
+      "sha256": "face5bc9eaf2d299747179382843d7a341c4c71acd44379cb8c2acdc13ab5c34",
+      "size": 1991261,
+      "file_type": "regular",
+      "extraction_disposition": "reviewed-json-indexing-safety-cap-exclusion"
+    },
+    {
+      "path": "tests/fixtures/sample.lpk",
+      "kind": "compatibility-correction",
+      "reason": "Graphify 0.9.42 assigns one ID to the distinct Lazarus package file and referenced sample.pas unit; an exact-shape pre-build correction preserves both entities and their role-proven edges",
+      "sha256": "d35ab7cfc6b30910020239b7389a4e732b5545269fd4b1cd43d7459aa2c40e1f",
+      "size": 609,
+      "file_type": "regular",
+      "extraction_disposition": "graphify-0.9.42-lpk-file-unit-identity"
+    },
+    {
+      "path": "tests/fixtures/sample.luau",
+      "kind": "excluded-ast-fixture",
+      "reason": "intentional Luau parser-recovery fixture emits Graphify 0.9.42 partial-syntax warning and cannot certify a warning-free AST baseline",
+      "sha256": "c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
+      "size": 664,
+      "file_type": "regular",
+      "extraction_disposition": "reviewed-intentional-syntax-error-fixture"
+    },
+    {
+      "path": "tests/fixtures/sample.dmf",
+      "kind": "excluded-ast-fixture",
+      "reason": "Graphify 0.9.42 DMF fixture node identities embed the random snapshot root and cannot certify byte-reproducible output",
+      "sha256": "a3a37c5f568c27497b39c8834b6108419b4d28265c7e89c448d159f35a200617",
+      "size": 898,
+      "file_type": "regular",
+      "extraction_disposition": "reviewed-nondeterministic-snapshot-path-identity"
+    }
+  ]
+}

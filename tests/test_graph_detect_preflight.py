@@ -293,6 +293,44 @@ def test_census_output_refuses_tracked_or_out_of_repo_path(
         graph.write_detection_census(tmp_path, Path("../escape.json"), receipt)
 
 
+def test_public_census_source_filter_admits_exactly_graphify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    graphify = _manifest(tmp_path, "graphify")
+    unrelated = _manifest(tmp_path, "unrelated")
+    admitted: list[str] = []
+
+    monkeypatch.setattr(graph.mf, "load_all", lambda _path: (unrelated, graphify))
+
+    def census(manifests: list[mf.Manifest]) -> graph.DetectionCensusReceipt:
+        admitted.extend(manifest.name for manifest in manifests)
+        return graph.DetectionCensusReceipt(
+            total_sources=1,
+            sources=(graph.SourceCensusReceipt(source="graphify", kind="code", status="complete"),),
+        )
+
+    monkeypatch.setattr(graph, "detection_census", census)
+
+    assert graph.detection_census_main(tmp_path, ["--source", "graphify"]) == 0
+    assert admitted == ["graphify"]
+    assert '"total_sources":1' in capsys.readouterr().out
+
+
+def test_public_census_source_filter_rejects_missing_and_duplicate_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    graphify = _manifest(tmp_path, "graphify")
+    monkeypatch.setattr(graph.mf, "load_all", lambda _path: (graphify,))
+
+    with pytest.raises(ValueError, match="source manifest not found: missing"):
+        graph.detection_census_main(tmp_path, ["--source", "missing"])
+    with pytest.raises(ValueError, match="flag may be specified only once"):
+        graph.detection_census_main(
+            tmp_path,
+            ["--source", "graphify", "--source", "graphify"],
+        )
+
+
 def test_source_census_hashes_paths_and_bounds_stderr(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
