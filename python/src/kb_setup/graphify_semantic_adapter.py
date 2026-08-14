@@ -415,7 +415,7 @@ def adapter_main() -> int:
         return 124
     elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
     envelope = _result_envelope(completed.stdout)
-    reasons = list(graphify_semantic_slice.envelope_reasons(envelope))
+    reasons = list(result_envelope_reasons(envelope, os.environ))
     if completed.returncode != 0:
         reasons.append("claude-returncode-nonzero")
     if completed.stderr:
@@ -442,6 +442,16 @@ def adapter_main() -> int:
         return 1
     sys.stdout.buffer.write(completed.stdout)
     return 0
+
+
+def result_envelope_reasons(
+    envelope: object,
+    environment: Mapping[str, str],
+) -> tuple[str, ...]:
+    """Apply the bounded #300 policy or #301 observation-only turn policy."""
+    if environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH"):
+        return graphify_semantic_slice.envelope_reasons(envelope, max_turns=None)
+    return graphify_semantic_slice.envelope_reasons(envelope)
 
 
 if __name__ == "__main__":

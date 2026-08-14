@@ -326,6 +326,19 @@ def prepare_prototype_topology(output: Path, state_root: Path) -> Path:
     return canonical_state / "provider-boundary-start.json"
 
 
+def prepare_authorized_prototype(
+    plan: Path,
+    source_root: Path,
+    output: Path,
+    state_root: Path,
+) -> Path:
+    """Require fresh external authority before creating any launch state."""
+    verdict = graphify_semantic_corpus.verify_plan(plan, source_root)
+    if verdict.state != "complete" or not verdict.execution_authorized or verdict.reasons:
+        raise ValueError(f"prototype plan is not authorized: {verdict.reasons}")
+    return prepare_prototype_topology(output, state_root)
+
+
 def _probe_runtime(
     argv: list[str], *, environment: dict[str, str]
 ) -> tuple[subprocess.CompletedProcess[bytes] | None, str | None]:

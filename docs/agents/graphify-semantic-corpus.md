@@ -7,9 +7,10 @@ description: Provider-free complete-source planning and evidence contract for Gr
 
 Issue [#301](https://github.com/ray-manaloto/knowledge-base/issues/301) scales the
 landed one-document real-provider proof into a complete, reproducible plan for
-the exact Graphify v0.9.42 tree. The current implementation is deliberately
-provider-free: it proves what would run, how it would be cached, and how its
-evidence would fail closed. It does not yet authorize the cold run.
+the exact Graphify v0.9.42 tree. The planner and verifier are provider-free: they
+prove what would run, how it would be cached, and how evidence fails closed. One
+separately authorized max-chunk boundary attempt is retained below; it does not
+authorize the cold run.
 
 ## Current exact scope
 
@@ -40,9 +41,11 @@ therefore preserves the exact commit, detector Git object, thresholds, observed 
 message, and provisional review state in `advisories.json`. Only that exact advisory is
 eligible for separate review; any unknown or additional warning remains fatal. The
 public verifier reports structurally complete but `execution_authorized=false`. Earlier
-authority roots were deliberately cleared after the provider-boundary marker changed
-the adapter and execution-config identities. The replacement roots must be reviewed
-outside planner bytes; they do not authorize the full corpus run by themselves.
+authority roots are deliberately empty because the one-call authority was consumed.
+Accepted roots remain only in historical receipts. A fresh checkout therefore reports
+`plan-authority-unset`, and deleting output/state cannot make the launcher runnable.
+Any replacement roots require a new review outside planner bytes and do not authorize
+the full corpus run by themselves.
 
 The planner reuses issue #299's accepted complete Git-source manifest digest
 `da56d50eadb82b0889d8e9ad4b1260c98d4d8e6ab413e8abed5ddfcac0bdee68`, so the
@@ -54,16 +57,27 @@ controls are symlink, Google Workspace, exclusion, cache-root, and gitignore beh
 there is no supported warning-threshold override. Subdirectory-by-subdirectory
 detection would avoid the aggregate advisory by construction and is therefore not
 equivalent evidence. The advisory is neither suppressed nor hidden by partitioning.
-Full provider execution remains blocked. One max-size prototype was authorized; its
-first adapter launch failed after the one-off launcher replaced rather than overlaid the
-ambient auth environment. Its exact inner stderr and boundary phase were not retained,
-so timing and empty adapter metadata cannot prove whether provider inference began. The
-append-only correction records one adapter invocation and `provider_inferences=unknown`.
-No corrected inference is authorized. The hardened launcher binds exact launcher and
-adapter bytes, preserves Max OAuth/runtime evidence, and uses a dedicated sibling state
-directory so the adapter can exclusively create (`O_CREAT|O_EXCL`) a durable phase
-marker immediately before any future real provider subprocess without pre-creating the
-atomic staged-output directory.
+Full provider execution remains blocked. The first max-size adapter launch replaced
+rather than overlaid the ambient auth environment. Its exact inner stderr and boundary
+phase were not retained, so the append-only correction records one adapter invocation
+and `provider_inferences=unknown`.
+
+A fresh user authorization later allowed exactly one corrected call despite that unknown
+state. Independent review removed an unenforceable derived three-turn claim because
+Claude Code 2.1.232 exposes no `--max-turns` option. The exact user bounds were Max OAuth,
+no API key, no tools, a `$0.25` cap, a 120-second timeout, and no retry. Fresh preflight
+proved the reviewed plan, launcher, adapter, prompt, Max first-party auth, and absent
+output/state roots before the call. The adapter started one Claude CLI subprocess at the
+reviewed provider boundary and failed closed after 35,524 ms. It was not retried. The
+marker proves one process-boundary invocation; provider inference remains unknown. Safe
+receipts preserve a 53,947-byte CLI stdout digest but not the raw response; the adapter could not derive a typed result
+envelope, model usage, or structured output from those bytes. This is an
+adapter-observation contract failure. It does not prove a provider or model failure, and
+it does not authorize the 57-chunk run. The preserved terminal metadata's
+`turn-bound-exceeded` reason came from an obsolete local three-turn post-parse policy;
+it is not evidence of the provider's turn count. The #301 adapter now retains observed
+positive turn counts without claiming an unenforceable upper bound, while #300 keeps
+its independently accepted three-turn contract.
 
 Durable authored evidence is tracked under `docs/agents/evidence/issue-301/`:
 the append-only unknown-boundary audit, the exact hardened launcher, and the last
@@ -94,7 +108,9 @@ flowchart LR
     MANIFEST --> VERIFY["Read-only typed verifier"]
     VERIFY -->|"review roots unset"| INCOMPLETE["INCOMPLETE: zero provider calls"]
     VERIFY -->|"unknown warning, digest, evidence, coverage, or drift"| FAILED
-    VERIFY -.->|"future independent authority and resolved prior-attempt authority"| READY["Eligible for one max-size prototype"]
+    VERIFY -->|"historical reviewed one-call authority"| PROTO["One max-size prototype"]
+    PROTO -->|"53,947-byte CLI stdout not typed"| BLOCKED["FAILED CLOSED: no retry"]
+    BLOCKED --> REVOKE["Active authority roots cleared"]
 ```
 
 The supported public seam is:
@@ -134,7 +150,7 @@ stateDiagram-v2
 The namespace binds source inventory, provisional decisions, chunk ledger, exact
 Graphify runtime and semantic/LLM code, planner and adapter bytes, prompt/schema
 fingerprints, Claude executable/help/version/requested and resolved model, endpoint and
-auth policy, disabled tools, token and file caps, timeout, output/turn/cost/retry bounds,
+auth policy, disabled tools, token and file caps, timeout, output/cost/retry bounds,
 concurrency, deep mode, and cache policy. A cold run may not read prior fragments.
 Provider and adapter agreement is not authority: both are independently compared with
 the derived config, tracked Graphify/Claude identities, tracked schema, and a prompt
@@ -147,7 +163,9 @@ only after the issue #300 referential/source-scope checks and an exact regular-f
 census. A stage also binds the exact plan manifest, execution config, prompt and schema
 contracts, provider prompt, corpus chunk ordinal/total, source Git object, source byte
 size/digest, 20,000-token budget, Graphify chunk/deep/retry/cache/timeout controls, and
-Claude model/tool/auth/endpoint/turn/cost controls. The landed issue #300 receipt is
+Claude model/tool/auth/endpoint/cost controls. Observed turns remain evidence, but no
+hard turn cap is claimed because the pinned Claude CLI cannot enforce one. The landed
+issue #300 receipt is
 valuable real evidence, but its single-file chunking, disabled deep mode, and unset
 token budget make it intentionally cache-incompatible with this corpus plan; it is
 retained as a typed failed stage and cannot certify a corpus execution.
@@ -233,12 +251,29 @@ flowchart LR
 
 ## Remaining decision sequence
 
-1. Review the append-only correction that classifies the first adapter attempt's
-   provider-inference state as unknown and disposition whether any new call is allowed.
-2. Independently review the replacement plan/config, exact launcher/adapter identities,
-   provider-boundary marker, and no-inference Max OAuth/runtime preflight.
-3. Only under fresh explicit authority, make exactly one max-size real inference to
-   measure packing, timeout, subscription use, and cost. Do not retry it or begin the
-   57-call cold run.
-4. Review its receipt, then either revise the plan or explicitly authorize the bounded
-   cold run.
+1. Preserve the first-attempt unknown audit and corrected one-call terminal receipts
+   without rewriting either history.
+2. Diagnose the adapter observation boundary from source and public-safe receipts. The
+   retained evidence proves Claude CLI subprocess return code zero, zero stderr, 53,947 stdout
+   bytes, and an empty typed envelope; it cannot distinguish invalid JSON from a
+   non-object JSON top level because raw response bytes and parse status were not retained.
+3. Decide and review a no-call parser-diagnostic improvement that retains only a typed
+   parse classification and bounded public metadata. Do not reconstruct or fabricate the
+   discarded response.
+4. Keep the cold 57-chunk run and issue #302 blocked. Any later provider call requires a
+   new explicit authority; the corrected prototype authority is consumed.
+
+```mermaid
+sequenceDiagram
+    participant Review as Independent review
+    participant Adapter as Hardened adapter
+    participant CLI as Claude CLI boundary
+    participant Evidence as Public-safe evidence
+    Review->>Adapter: Exact one-call authorization
+    Adapter->>Evidence: fsync provider-boundary-start marker
+    Adapter->>CLI: One subprocess invocation, no tools, no retry
+    CLI-->>Adapter: rc 0, stderr 0, 53,947 stdout bytes
+    Adapter->>Evidence: Empty typed envelope and failed stage
+    Evidence-->>Review: Hashes and typed reasons, raw response excluded
+    Note over Adapter,CLI: Provider inference unknown; no retry or full-corpus run
+```

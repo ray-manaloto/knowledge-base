@@ -56,14 +56,16 @@ def main() -> int:
         != prototype_authority.PROTOTYPE_CONTRACT_SHA256
     ):
         raise ValueError("prototype topology contract identity drifted")
-    boundary_path = prototype_contract.prepare_prototype_topology(output, state)
     adapter_invocations = 0
     with tempfile.TemporaryDirectory(prefix="kb301-max-chunk-source-") as source_dir:
         source_root = Path(source_dir) / "graphify"
         semantic.admit_source(repo, source_root)
-        verdict = corpus.verify_plan(plan, source_root)
-        if verdict.state != "complete" or not verdict.execution_authorized or verdict.reasons:
-            raise ValueError(f"prototype plan is not authorized: {verdict.reasons}")
+        boundary_path = prototype_contract.prepare_authorized_prototype(
+            plan,
+            source_root,
+            output,
+            state,
+        )
         inventory, _advisories, _exclusions, ledger, config = corpus._typed_members(plan)
         chunk = max(ledger.chunks, key=lambda item: item.estimated_tokens)
         context = corpus._ProviderValidationContext(

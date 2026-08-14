@@ -404,7 +404,11 @@ def _list_is_empty(value: object) -> bool:
     return isinstance(value, list) and not value
 
 
-def _result_reasons(envelope: dict[str, object]) -> list[str]:
+def _result_reasons(
+    envelope: dict[str, object],
+    *,
+    max_turns: int | None = _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR,
+) -> list[str]:
     reasons = []
     checks = (
         (envelope.get("type") == "result", "result-type-invalid"),
@@ -418,7 +422,8 @@ def _result_reasons(envelope: dict[str, object]) -> list[str]:
     if (
         isinstance(turns, bool)
         or not isinstance(turns, int)
-        or not 1 <= turns <= _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR
+        or turns < 1
+        or (max_turns is not None and turns > max_turns)
     ):
         reasons.append("turn-bound-exceeded")
     return reasons
@@ -466,12 +471,16 @@ def _negative_evidence_reasons(envelope: dict[str, object]) -> list[str]:
     return reasons
 
 
-def envelope_reasons(envelope: object) -> tuple[str, ...]:
+def envelope_reasons(
+    envelope: object,
+    *,
+    max_turns: int | None = _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR,
+) -> tuple[str, ...]:
     """Explain why a redacted real Claude result envelope cannot be accepted."""
     if not isinstance(envelope, dict):
         return ("result-envelope-invalid",)
     reasons = [
-        *_result_reasons(envelope),
+        *_result_reasons(envelope, max_turns=max_turns),
         *_structured_reasons(envelope),
         *_model_reasons(envelope),
         *_negative_evidence_reasons(envelope),
