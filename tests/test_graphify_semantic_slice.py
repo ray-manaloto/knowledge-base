@@ -577,3 +577,33 @@ def test_public_verifier_rejects_rehashed_fragment_not_returned_by_claude(
 
     assert not result.real_semantic_complete
     assert "adapter-structured-output-digest-mismatch" in result.reasons
+
+
+def test_staged_verifier_returns_typed_failure_for_rehashed_malformed_fragment(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate"
+    _copy_real_candidate(candidate)
+    fragment_raw = b'{"edges":[],"hyperedges":[],"nodes":{}}\n'
+    receipt = msgspec.json.decode(
+        (candidate / "receipt.json").read_bytes(),
+        type=graphify_semantic_slice.SemanticReceipt,
+    )
+    receipt_raw = (
+        graphify_semantic_slice.encode_json(
+            msgspec.structs.replace(
+                receipt,
+                semantic_fragment_sha256=hashlib.sha256(fragment_raw).hexdigest(),
+            )
+        )
+        + b"\n"
+    )
+    _replace_candidate_payloads(
+        candidate,
+        {"receipt.json": receipt_raw, "semantic-fragment.json": fragment_raw},
+    )
+
+    result = graphify_semantic_slice._verify_candidate(candidate, enforce_authority=False)
+
+    assert result.state == "failed"
+    assert result.reasons == ("fragment-schema-invalid",)

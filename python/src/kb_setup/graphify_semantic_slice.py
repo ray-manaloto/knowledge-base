@@ -891,18 +891,20 @@ def _verify_candidate(candidate: Path, *, enforce_authority: bool) -> SemanticVe
     except KeyError, msgspec.DecodeError:
         reasons.append("member-schema-mismatch")
     else:
-        reasons.extend(fragment_reasons(fragment, source_path=SOURCE_PATH))
-        reasons.extend(_adapter_reasons(metadata, receipt, fragment))
-        reasons.extend(_chunk_reasons(receipt, metadata, fragment))
-        reasons.extend(
-            _receipt_reasons(
-                receipt,
-                manifest,
-                payloads["adapter-metadata.json"],
-                payloads["semantic-fragment.json"],
-                fragment,
+        fragment_failures = fragment_reasons(fragment, source_path=SOURCE_PATH)
+        reasons.extend(fragment_failures)
+        if not fragment_failures:
+            reasons.extend(_adapter_reasons(metadata, receipt, fragment))
+            reasons.extend(_chunk_reasons(receipt, metadata, fragment))
+            reasons.extend(
+                _receipt_reasons(
+                    receipt,
+                    manifest,
+                    payloads["adapter-metadata.json"],
+                    payloads["semantic-fragment.json"],
+                    fragment,
+                )
             )
-        )
     unique = tuple(dict.fromkeys(reasons))
     return SemanticVerification(
         state="failed" if unique else ("complete" if enforce_authority else "unapproved"),
