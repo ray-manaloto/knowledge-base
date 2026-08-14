@@ -1733,6 +1733,9 @@ def build_baseline(repo_root: Path, output: Path) -> BaselineVerification:
 
 def certify_baseline_controls(repo_root: Path) -> ControlsReceipt:
     """Run only the real-source admission and mutation controls."""
+    from kb_setup import graphify_env
+
+    graphify_env.assert_pinned_graphify(repo_root)
     graphify_manifest = source_manifests.load(repo_root / "sources" / "graphify.manifest")
     catalog = load_disposition_catalog(repo_root)
     if graphify_manifest.ref != catalog.source_ref:

@@ -196,3 +196,12 @@ flowchart LR
 - Evidence: expected FIFO now fails immediately; 125 focused tests plus `ruff` and `ty` pass.
 - Affected tickets: only #299. #300 and #289 remain blocked and unchanged.
 - Disposition: final correction awaits exact-head gates and bounded replay before ship.
+
+## 2026-08-14 — iteration KB-299-8
+
+- Prior goal digest: iteration KB-299-7 and PR #307 at `2ed62c3736cc`.
+- Changed requirement: pin the runtime before controls and forbid required/ignored overlap.
+- Reason: CodeRabbit reproduced two false-green public paths during PR review.
+- Evidence: both hostile cases were RED before the fix and GREEN after it.
+- Affected tickets: only #299. Graphify coupling observations remain typed advisory backlog.
+- Disposition: the bounded PR-review fix awaits full exact-head gates before land.

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import msgspec
 import pytest
-from kb_setup import graph, graphify_baseline
+from kb_setup import graph, graphify_baseline, graphify_env
 
 _COMMIT = "7fe58b0b0f3873be9a21c30106b8b8527c353aa6"
 _TREE = "15ca81a8dbd3ded7083c4b573197140e62e95fcc"
@@ -1005,6 +1005,23 @@ def test_committed_graphify_disposition_catalog_is_typed_and_exact() -> None:
         "tests/fixtures/sample.luau",
         "tests/fixtures/sample.dmf",
     }
+
+
+def test_controls_refuse_unpinned_graphify_before_materializing_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def refuse(_repo_root: Path) -> None:
+        raise SystemExit("unpinned graphify")
+
+    monkeypatch.setattr(graphify_env, "assert_pinned_graphify", refuse)
+    monkeypatch.setattr(
+        graph,
+        "materialize_source_snapshot",
+        lambda *_args, **_kwargs: pytest.fail("source materialized before runtime gate"),
+    )
+
+    with pytest.raises(SystemExit, match="unpinned graphify"):
+        graphify_baseline.certify_baseline_controls(tmp_path)
 
 
 def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:

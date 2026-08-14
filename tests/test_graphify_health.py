@@ -133,7 +133,7 @@ def test_required_ignored_path_is_never_allowlisted() -> None:
         ),
     )
     assert receipt.state is GraphifyState.INCOMPLETE
-    assert "required-source-ignored" in receipt.reasons
+    assert receipt.reasons == ("required-source-ignored",)
 
 
 def test_required_unsupported_source_is_never_silently_ignored() -> None:
