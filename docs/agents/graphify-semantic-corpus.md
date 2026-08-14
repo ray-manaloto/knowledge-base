@@ -66,8 +66,9 @@ marker immediately before any future real provider subprocess without pre-creati
 atomic staged-output directory.
 
 Durable authored evidence is tracked under `docs/agents/evidence/issue-301/`:
-the append-only unknown-boundary audit, the exact hardened launcher, and the latest
-no-inference preflight receipt. Plan, staging, and earlier preflight artifacts under
+the append-only unknown-boundary audit, the exact hardened launcher, and the last
+pre-hardening no-inference preflight receipt (retained as historical evidence, not
+current authorization). Plan, staging, and earlier preflight artifacts under
 `graphify-out/` are derived runtime outputs and remain untracked. The implementation
 module remains intentionally cohesive for this incomplete infrastructure slice;
 splitting planning, provider evidence, and execution verification is deferred to the
@@ -170,11 +171,15 @@ The prototype marker and staged output deliberately have separate topologies. Th
 launcher creates only `graphify-semantic-corpus-prototype-corrected-state/` before the
 adapter call; `graphify-semantic-corpus-prototype-corrected/` remains absent for the
 atomic stage publisher. Marker creation is kernel-exclusive and refuses concurrent or
-pre-existing destinations rather than checking and later replacing a path.
+pre-existing destinations rather than checking and later replacing a path. The adapter
+opens the marker parent as a no-follow directory descriptor, creates the marker relative
+to that descriptor, and fsyncs both the file and parent directory.
 Before creating state, the topology contract rejects lexical `..`, any symlinked
 ancestor, equal or nested canonical identities, and non-sibling roots. It creates and
-returns the marker only beneath the resolved canonical state root while leaving the
-resolved output absent. Preflight independently binds the imported topology-contract
+returns the marker only after creating state relative to an already-opened trusted
+parent descriptor while leaving the resolved output absent. A later parent swap cannot
+redirect marker creation: the adapter refuses a symlinked replacement. Preflight
+independently binds the imported topology-contract
 bytes as well as the launcher and adapter, so a changed helper cannot inherit an
 accepted launcher identity.
 
@@ -183,6 +188,10 @@ namespace locates staged artifacts. Cold, reuse, and rebuild share the cache-der
 run namespace. Variance keeps the same cache identity but uses a distinct fresh run
 namespace. A changed cache namespace is drift, while a fresh variance run namespace is
 the intended isolation control.
+
+The exact-plan tests regenerate the plan from the pinned Graphify source into pytest
+temporary storage. They do not read the untracked runtime corpus/prototype directories,
+so a fresh checkout cannot inherit locally generated acceptance bytes.
 
 The HTML exclusion preserves the source order and multiplicity of every normalized
 node and edge identity. Duplicate node IDs or edge identities fail explicitly before

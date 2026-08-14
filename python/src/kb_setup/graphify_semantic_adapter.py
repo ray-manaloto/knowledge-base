@@ -10,6 +10,8 @@ import stat
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 
 import msgspec
@@ -17,6 +19,30 @@ import msgspec
 from kb_setup import atomic, graphify_semantic_slice
 
 _GRAPHIFY_ARG_COUNT = 8
+
+
+def open_directory_nofollow(directory: Path) -> int:
+    """Open every directory component without following a mutable symlink."""
+    if ".." in directory.parts:
+        raise ValueError("provider boundary marker destination is unavailable")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    parts = directory.parts
+    descriptor = os.open(os.sep if directory.is_absolute() else ".", flags)
+    try:
+        for part in parts[1:] if directory.is_absolute() else parts:
+            if part in ("", ".", os.sep):
+                continue
+            next_descriptor = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
 
 
 class ModelUsage(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -111,11 +137,9 @@ def write_provider_boundary_start(
 ) -> ProviderBoundaryStart:
     """Atomically retain the exact provider-boundary crossing before invocation."""
     try:
-        parent_mode = destination.parent.lstat().st_mode
+        parent_descriptor = open_directory_nofollow(destination.parent)
     except OSError as exc:
         raise ValueError("provider boundary marker destination is unavailable") from exc
-    if not stat.S_ISDIR(parent_mode) or destination.parent.is_symlink():
-        raise ValueError("provider boundary marker destination is unavailable")
     marker = ProviderBoundaryStart(
         schema_id="graphify-claude-provider-boundary-start/v0",
         phase="provider-boundary-started",
@@ -131,18 +155,32 @@ def write_provider_boundary_start(
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
-        descriptor = os.open(destination, flags, 0o600)
-    except FileExistsError as exc:
-        raise ValueError("provider boundary marker already exists") from exc
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-    except BaseException:
-        destination.unlink(missing_ok=True)
-        raise
+        if not stat.S_ISDIR(os.fstat(parent_descriptor).st_mode):
+            raise ValueError("provider boundary marker destination is unavailable")
+        try:
+            descriptor = os.open(destination.name, flags, 0o600, dir_fd=parent_descriptor)
+        except FileExistsError as exc:
+            raise ValueError("provider boundary marker already exists") from exc
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.fsync(parent_descriptor)
+        except BaseException:
+            with suppress(FileNotFoundError):
+                os.unlink(destination.name, dir_fd=parent_descriptor)
+            raise
+    finally:
+        os.close(parent_descriptor)
     return marker
+
+
+def _provider_boundary_path(environment: Mapping[str, str]) -> Path:
+    raw = environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH", "")
+    if not raw:
+        raise ValueError("provider boundary marker path is unset")
+    return Path(raw)
 
 
 def _real_executable() -> Path:
@@ -354,7 +392,7 @@ def adapter_main() -> int:
     )
     started = time.monotonic_ns()
     try:
-        boundary_path = Path(os.environ.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH", ""))
+        boundary_path = _provider_boundary_path(os.environ)
         write_provider_boundary_start(
             boundary_path,
             adapter_sha256=graphify_semantic_slice.sha256_file(Path(__file__)),
@@ -369,6 +407,9 @@ def adapter_main() -> int:
             env=environment,
             timeout=120,
         )
+    except (OSError, ValueError) as exc:
+        print(f"semantic adapter boundary marker failed: {exc}", file=sys.stderr)
+        return 2
     except subprocess.TimeoutExpired:
         print("semantic adapter inference timed out", file=sys.stderr)
         return 124

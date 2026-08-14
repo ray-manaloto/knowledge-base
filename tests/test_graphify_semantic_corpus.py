@@ -17,6 +17,7 @@ import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Never
 
 import msgspec
 import pytest
@@ -25,6 +26,7 @@ from kb_setup import (
     graphify_semantic_adapter,
     graphify_semantic_corpus,
     graphify_semantic_corpus_prototype,
+    graphify_semantic_slice,
 )
 
 
@@ -70,6 +72,23 @@ def _real_fragment(repo_root: Path) -> dict[str, object]:
 def _real_provider_evidence(repo_root: Path) -> tuple[bytes, bytes]:
     root = repo_root / "graphify-out/graphify-semantic-slice"
     return (root / "receipt.json").read_bytes(), (root / "adapter-metadata.json").read_bytes()
+
+
+def _exact_graphify_plan(tmp_path: Path) -> Path:
+    repo_root = Path(__file__).resolve().parents[1]
+    source = tmp_path / "exact-graphify-source"
+    graphify_semantic_slice.admit_source(repo_root, source)
+    candidate = tmp_path / "exact-graphify-plan"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(
+            ref="v0.9.42",
+            commit=_git(source, "rev-parse", "HEAD"),
+            tree=_git(source, "rev-parse", "HEAD^{tree}"),
+        ),
+    )
+    return candidate
 
 
 def test_cli_dispatches_semantic_corpus_verifier(monkeypatch, tmp_path: Path) -> None:
@@ -216,9 +235,9 @@ def test_verify_plan_requires_source_snapshot() -> None:
     assert parameter.default is inspect.Parameter.empty
 
 
-def test_public_cli_verify_recomputes_exact_pinned_snapshot(capsys) -> None:
+def test_public_cli_verify_recomputes_exact_pinned_snapshot(capsys, tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    candidate = repo_root / "graphify-out/graphify-semantic-corpus"
+    candidate = _exact_graphify_plan(tmp_path)
 
     assert graphify_semantic_corpus.corpus_main(repo_root, ["verify", str(candidate)]) == 2
     result = json.loads(capsys.readouterr().out)
@@ -269,8 +288,11 @@ def test_prototype_adapter_environment_overlays_required_ambient_without_secrets
 
 def test_failed_adapter_attempt_audit_preserves_unknown_provider_inferences() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    attempt = repo_root / "graphify-out/graphify-semantic-corpus-prototype"
-    audit = graphify_semantic_corpus_prototype.audit_failed_attempt(attempt)
+    audit = msgspec.json.decode(
+        (repo_root / "docs/agents/evidence/issue-301/failed-attempt-audit-v2.json").read_bytes(),
+        type=graphify_semantic_corpus_prototype.FailedAttemptAudit,
+        strict=True,
+    )
 
     assert audit.status == "failed-phase-unknown"
     assert audit.adapter_invocations == 1
@@ -285,8 +307,7 @@ def test_failed_adapter_attempt_audit_preserves_unknown_provider_inferences() ->
 
 
 def test_prototype_identity_check_rejects_wrong_launcher_file(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    plan = repo_root / "graphify-out/graphify-semantic-corpus"
+    plan = _exact_graphify_plan(tmp_path)
     launcher = tmp_path / "launcher.py"
     launcher.write_text("# hostile replacement\n", encoding="utf-8")
 
@@ -323,6 +344,30 @@ def test_adapter_retains_exact_provider_boundary_start_marker(tmp_path: Path) ->
             prompt=b"exact prompt",
             argv=("claude", "-p"),
         )
+
+
+def test_provider_boundary_marker_fsyncs_file_and_parent(monkeypatch, tmp_path: Path) -> None:
+    calls: list[int] = []
+    original = os.fsync
+
+    def record(descriptor: int) -> None:
+        calls.append(descriptor)
+        original(descriptor)
+
+    monkeypatch.setattr(os, "fsync", record)
+    graphify_semantic_adapter.write_provider_boundary_start(
+        tmp_path / "provider-boundary-start.json",
+        adapter_sha256="a" * 64,
+        prompt=b"exact prompt",
+        argv=("claude", "-p"),
+    )
+
+    assert len(calls) == 2
+
+
+def test_adapter_rejects_unset_provider_boundary_path() -> None:
+    with pytest.raises(ValueError, match="path is unset"):
+        graphify_semantic_adapter._provider_boundary_path({})
 
 
 def test_provider_boundary_marker_allows_only_one_concurrent_creator(tmp_path: Path) -> None:
@@ -398,6 +443,59 @@ def test_prototype_topology_rejects_symlinked_parent_equivalence(tmp_path: Path)
 
     assert not output.exists()
     assert not (real_parent / "prototype-state").exists()
+
+
+def test_prototype_topology_anchors_creation_against_parent_swap(
+    monkeypatch, tmp_path: Path
+) -> None:
+    trusted = tmp_path / "trusted"
+    trusted.mkdir()
+    anchored = tmp_path / "anchored"
+    attacker = tmp_path / "attacker"
+    attacker.mkdir()
+    real_mkdir = os.mkdir
+    swapped = False
+
+    def swap_then_create(
+        path: str | bytes | os.PathLike[str], mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> None:
+        nonlocal swapped
+        if dir_fd is not None and not swapped:
+            trusted.rename(anchored)
+            trusted.symlink_to(attacker, target_is_directory=True)
+            swapped = True
+        return real_mkdir(path, mode=mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "mkdir", swap_then_create)
+    marker = graphify_semantic_corpus_prototype.prepare_prototype_topology(
+        trusted / "output", trusted / "state"
+    )
+
+    assert marker == trusted / "state/provider-boundary-start.json"
+    assert (anchored / "state").is_dir()
+    assert not (attacker / "state").exists()
+    (attacker / "state").mkdir()
+    with pytest.raises(ValueError, match="destination is unavailable"):
+        graphify_semantic_adapter.write_provider_boundary_start(
+            marker,
+            adapter_sha256="a" * 64,
+            prompt=b"exact prompt",
+            argv=("claude", "-p"),
+        )
+    assert not (attacker / "state/provider-boundary-start.json").exists()
+
+
+def test_no_inference_runtime_probe_retains_typed_timeout(monkeypatch) -> None:
+    def timeout(argv: list[str], **_: object) -> Never:
+        raise subprocess.TimeoutExpired(argv, timeout=30)
+
+    monkeypatch.setattr(subprocess, "run", timeout)
+    completed, reason = graphify_semantic_corpus_prototype._probe_runtime(
+        ["claude", "--version"], environment={}
+    )
+
+    assert completed is None
+    assert reason == "TimeoutExpired"
 
 
 def test_exact_graphify_visual_exclusions_bind_deterministic_evidence(tmp_path: Path) -> None:
@@ -540,10 +638,9 @@ def test_visual_exclusion_evidence_rejects_real_source_drift(
         )
 
 
-def test_tracked_graphify_plan_is_exact_scope_and_awaits_reauthorization() -> None:
-    """Exercise the published #301 plan bytes, not a synthetic acceptance fixture."""
-    repo_root = Path(__file__).resolve().parents[1]
-    candidate = repo_root / "graphify-out/graphify-semantic-corpus"
+def test_exact_graphify_plan_is_exact_scope_and_awaits_reauthorization(tmp_path: Path) -> None:
+    """Regenerate and exercise the exact pinned #301 plan bytes."""
+    candidate = _exact_graphify_plan(tmp_path)
     inventory = json.loads((candidate / "source-inventory.json").read_text(encoding="utf-8"))
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
 
@@ -556,7 +653,7 @@ def test_tracked_graphify_plan_is_exact_scope_and_awaits_reauthorization() -> No
     )
     assert len(ledger["chunks"]) == 57
     result = graphify_semantic_corpus.verify_plan(
-        candidate, source_root=repo_root / "sources/graphify"
+        candidate, source_root=candidate.parent / "exact-graphify-source"
     )
     assert result.state == "incomplete"
     assert result.structural_complete is True

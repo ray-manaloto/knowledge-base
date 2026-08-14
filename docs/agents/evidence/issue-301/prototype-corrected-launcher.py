@@ -151,7 +151,7 @@ def main() -> int:
             except json.JSONDecodeError, UnicodeDecodeError:
                 envelope = {}
             metadata_raw = metadata_path.read_bytes() if metadata_path.is_file() else b""
-            provider_inferences = int(bool(metadata_raw) or elapsed_ms >= 120_000)
+            provider_inferences = int(boundary_path.is_file() or bool(metadata_raw))
             metadata = (
                 msgspec.json.decode(
                     metadata_raw,

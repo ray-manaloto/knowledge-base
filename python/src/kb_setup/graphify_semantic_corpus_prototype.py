@@ -21,6 +21,7 @@ from graphify.llm import (
 
 from kb_setup import (
     atomic,
+    graphify_semantic_adapter,
     graphify_semantic_corpus,
     graphify_semantic_corpus_authority,
     graphify_semantic_slice,
@@ -275,6 +276,31 @@ def prototype_identity_reasons(plan: Path, launcher: Path) -> tuple[str, ...]:
     return tuple(reasons)
 
 
+def _create_state_root(canonical_output: Path, canonical_state: Path) -> None:
+    try:
+        parent_descriptor = graphify_semantic_adapter.open_directory_nofollow(
+            canonical_state.parent
+        )
+    except OSError as exc:
+        raise ValueError("prototype topology parent is unavailable") from exc
+    try:
+        for name, label in (
+            (canonical_output.name, "output"),
+            (canonical_state.name, "state"),
+        ):
+            try:
+                os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            raise ValueError(f"prototype {label} already exists")
+        os.mkdir(canonical_state.name, mode=0o700, dir_fd=parent_descriptor)
+        os.fsync(parent_descriptor)
+    except OSError as exc:
+        raise ValueError("prototype topology state creation failed") from exc
+    finally:
+        os.close(parent_descriptor)
+
+
 def prepare_prototype_topology(output: Path, state_root: Path) -> Path:
     """Create marker state without pre-creating the atomic stage output root."""
     if ".." in output.parts or ".." in state_root.parts:
@@ -296,8 +322,26 @@ def prepare_prototype_topology(output: Path, state_root: Path) -> Path:
         or canonical_state in canonical_output.parents
     ):
         raise ValueError("prototype paths must be distinct canonical siblings")
-    canonical_state.mkdir()
+    _create_state_root(canonical_output, canonical_state)
     return canonical_state / "provider-boundary-start.json"
+
+
+def _probe_runtime(
+    argv: list[str], *, environment: dict[str, str]
+) -> tuple[subprocess.CompletedProcess[bytes] | None, str | None]:
+    try:
+        return (
+            subprocess.run(
+                argv,
+                capture_output=True,
+                check=False,
+                env=environment,
+                timeout=30,
+            ),
+            None,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return None, type(exc).__name__
 
 
 def build_no_inference_preflight(
@@ -326,32 +370,34 @@ def build_no_inference_preflight(
             original_path=adapter_environment["KB_SEMANTIC_ORIGINAL_PATH"],
         )
         executable = Path(adapter_environment["KB_SEMANTIC_REAL_CLAUDE"])
-        auth_process = subprocess.run(
-            [str(executable), "auth", "status"],
-            capture_output=True,
-            check=False,
-            env=real_environment,
-            timeout=30,
+        auth_process, auth_probe_error = _probe_runtime(
+            [str(executable), "auth", "status"], environment=real_environment
         )
-        version_process = subprocess.run(
-            [str(executable), "--version"],
-            capture_output=True,
-            check=False,
-            env=real_environment,
-            timeout=30,
+        version_process, version_probe_error = _probe_runtime(
+            [str(executable), "--version"], environment=real_environment
         )
         reasons: list[str] = []
         reasons.extend(prototype_identity_reasons(plan, launcher))
         if verdict.state != "complete" or not verdict.execution_authorized or verdict.reasons:
             reasons.append("plan-not-authorized")
         try:
-            auth = graphify_semantic_slice.classify_auth(auth_process.stdout)
+            auth = graphify_semantic_slice.classify_auth(
+                auth_process.stdout if auth_process is not None else b""
+            )
         except TypeError, ValueError:
             auth = runtime.auth
             reasons.append("corrected-environment-auth-failed")
-        version = version_process.stdout.decode("utf-8", errors="replace").strip()
+        version = (
+            version_process.stdout.decode("utf-8", errors="replace").strip()
+            if version_process is not None
+            else ""
+        )
         if (
-            auth_process.returncode
+            auth_probe_error
+            or version_probe_error
+            or auth_process is None
+            or version_process is None
+            or auth_process.returncode
             or auth_process.stderr
             or version_process.returncode
             or version_process.stderr

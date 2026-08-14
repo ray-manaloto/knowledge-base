@@ -647,3 +647,34 @@ flowchart LR
     STATE --> MARKER["Exclusive boundary marker destination"]
     CANON -.-> OUT["Canonical stage output remains absent"]
 ```
+
+## 2026-08-14 — iteration KB-301-12
+
+- Prior goal digest: iteration KB-301-11 and exact-head PR #309.
+- Changed requirement: disposition every terminal CodeRabbit finding before land.
+  Bind future inference count to the retained boundary marker, make missing/failed
+  marker creation typed, close the marker/topology symlink-swap window, retain failed
+  no-inference probe receipts, and remove tests' dependency on untracked runtime bytes.
+- Reason: CodeRabbit's exact-head review reproduced five future-boundary or
+  clean-checkout false greens after the first ship.
+- Evidence: marker files and their parent directories are fsynced through no-follow
+  directory descriptors; topology state is created relative to an anchored parent;
+  timeout/OSError probe controls return typed reasons; the durable launcher reads the
+  marker; exact-plan tests regenerate from the pinned Graphify Git source. Focused
+  corpus tests pass without provider execution.
+- Affected tickets: #301 and PR #309. #302 remains unstarted.
+- Disposition: full-corpus execution and a corrected prototype remain unauthorized.
+  The retained v5 preflight is historical evidence for the prior implementation bytes,
+  not authority for this fix commit.
+
+```mermaid
+sequenceDiagram
+    participant Planner as Exact pinned planner
+    participant State as Anchored marker state
+    participant Adapter as Provider adapter
+    participant Tests as Fresh-checkout tests
+    Planner->>Tests: Regenerate exact plan in temporary storage
+    Adapter->>State: O_EXCL marker via no-follow parent descriptor
+    State-->>Adapter: File and directory fsync complete
+    Note over Adapter: No provider call in this fix round
+```
