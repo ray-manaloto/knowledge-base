@@ -207,6 +207,14 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
     if cmd == "graphify-baseline":
         from kb_setup import graphify_baseline
 
+        if rest[:1] == ["controls"]:
+            from kb_setup import graphify_env
+
+            # `controls` reaches `graphify_sdk.observe_detect` without passing
+            # through `runtime_identity`, so it gets the same TASK-layer pin
+            # guard as `_GRAPH_WRITERS`. `build` is covered by
+            # `runtime_identity`; `verify` never runs Graphify.
+            graphify_env.assert_pinned_graphify(repo_root)
         return graphify_baseline.baseline_main(repo_root, rest)
     from kb_setup import skillopt_contract
 

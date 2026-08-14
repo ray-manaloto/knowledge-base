@@ -66,6 +66,36 @@ def test_the_writer_set_names_every_graph_writer() -> None:
     assert {"build", "watch", "merge", "label", "artifacts"} == cli._GRAPH_WRITERS
 
 
+def test_baseline_controls_is_gated_before_running_graphify(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`graphify-baseline controls` pays the pin gate; `verify` never does.
+
+    `controls` reaches `graphify_sdk.observe_detect` without passing through
+    `runtime_identity`, so an unpinned binary would certify controls with the
+    wrong Graphify. `build` carries its own gate via `runtime_identity`, and
+    `verify` never runs Graphify at all.
+    """
+    from kb_setup import graphify_baseline
+
+    calls: list[str] = []
+
+    def tripwire(_root: object) -> None:
+        calls.append("gate")
+        raise SystemExit("gate fired")
+
+    monkeypatch.setattr(graphify_env, "assert_pinned_graphify", tripwire)
+
+    with pytest.raises(SystemExit, match="gate fired"):
+        cli.main(["graphify-baseline", "controls"])
+    assert calls == ["gate"], "controls bypassed the pin gate"
+
+    monkeypatch.setattr(graphify_baseline, "baseline_main", lambda _r, _rest: 0)
+    calls.clear()
+    assert cli.main(["graphify-baseline", "verify"]) == 0
+    assert calls == [], "verify was gated at dispatch"
+
+
 def test_update_is_not_gated_at_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     """`update` must reach `graph.update` ungated.
 

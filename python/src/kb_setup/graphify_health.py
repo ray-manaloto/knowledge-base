@@ -145,9 +145,13 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
 
 def _coverage_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
-    if evidence.ignored_paths and (
+    required = set(evidence.coverage_policy.required_paths) if evidence.coverage_policy else set()
+    ignored = set(evidence.ignored_paths)
+    if required & ignored:
+        reasons.append("required-source-ignored")
+    if ignored and (
         evidence.coverage_policy is None
-        or set(evidence.ignored_paths) - set(evidence.coverage_policy.optional_ignored_paths)
+        or ignored - set(evidence.coverage_policy.optional_ignored_paths)
     ):
         reasons.append("ignored-paths")
     if evidence.coverage_policy is None:
@@ -156,7 +160,6 @@ def _coverage_reasons(evidence: GraphifyEvidence) -> list[str]:
         if evidence.zero_node_sources or evidence.zero_node_paths:
             reasons.append("zero-node-sources")
     else:
-        required = set(evidence.coverage_policy.required_paths)
         unclassified = set(evidence.unclassified_paths)
         zero_node = set(evidence.zero_node_paths)
         if required & unclassified:
