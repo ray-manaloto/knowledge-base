@@ -284,9 +284,9 @@ flowchart LR
 
 Current local, ignored evidence is under `.agent/kb/`:
 
-- `issue-301-plan-0943-final-v2/` is the provider-free Graphify 0.9.43 plan. Its plan
+- `issue-301-plan-0943-final-v3/` is the provider-free Graphify 0.9.43 plan. Its plan
   manifest digest is
-  `8b0717609ea02245f04308ecc8bc601edc994ce41e46673a2e8494ce69d838ed`.
+  `169fc674a1d0352e561d6bad21115a395f760ec1bf0d52d3e9a5c6158c246956`.
 - The deterministic AST baseline still describes its historical v0.9.42 source tree,
   but its runtime identity now binds the project-wide Graphify 0.9.43 wheel and source
   distribution. Source evidence and the tool used to read it are separate identities.
@@ -295,7 +295,8 @@ Current local, ignored evidence is under `.agent/kb/`:
   the unchanged 84,029-byte prompt, and the three-turn-cap capability probe. Its code
   identities predate the two review corrections below, so it is historical rather than
   current authorization evidence.
-- `issue-301-0943-no-inference-preflight-final.json` is the post-review local receipt;
+- `issue-301-0943-no-inference-preflight-final-v2.json` is the current post-review local
+  receipt;
   its tracked copy is
   `docs/agents/evidence/issue-301/no-inference-preflight-0943.json`. It records zero
   provider inferences and exactly one reason: `plan-not-authorized`. Its `failed` status
@@ -311,11 +312,22 @@ An independent exact-digest re-review accepted only the frozen prototype-contrac
 launcher identities. `AUTHORITY_JSON` remains empty: code identity says which reviewed
 program would run, while empty content roots still prevent that program from running.
 
+A later cold whole-branch review caught three compatibility regressions outside those
+two frozen identities. The shared current manifest had made the historical v0.9.42 AST
+baseline unreproducible; the #300 preflight still demanded an installed 0.9.42 SDK; and
+the shared adapter's new 19-argument command no longer matched #300's retained
+17-argument verifier. The correction derives an explicit historical source pin from the
+reviewed Graphify remote, lets structural verification recognize either exact historical
+or current runtime while public authority still recognizes only the historical receipt,
+and adds `--max-turns 3` only when the #301 provider-boundary marker is configured.
+Provider-free public probes now complete for the current #300 preflight and historical
+baseline controls.
+
 To reproduce the current state:
 
 ```text
-mise run kb-graphify-semantic-corpus -- plan .agent/kb/issue-301-plan-0943-final-v2
-mise run kb-graphify-semantic-corpus -- verify .agent/kb/issue-301-plan-0943-final-v2
+mise run kb-graphify-semantic-corpus -- plan .agent/kb/issue-301-plan-0943-final-v3
+mise run kb-graphify-semantic-corpus -- verify .agent/kb/issue-301-plan-0943-final-v3
 ```
 
 The second command must report `structural_complete=true`,

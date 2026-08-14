@@ -1041,6 +1041,38 @@ def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:
     assert len(identity.sdk_fingerprint_sha256) == 64
 
 
+def test_historical_baseline_source_does_not_reuse_current_manifest_pin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from kb_setup import manifest as source_manifests
+
+    current = source_manifests.Manifest(
+        name="graphify",
+        path=tmp_path / "sources/graphify.manifest",
+        url="https://github.com/Graphify-Labs/graphify",
+        ref="v0.9.43",
+        commit="7281f27eac568f77f50910f59f84543458f5dfd1",
+        kind="code",
+    )
+    monkeypatch.setattr(source_manifests, "load", lambda _path: current)
+
+    historical = graphify_baseline.historical_graphify_manifest(
+        tmp_path,
+        ref="v0.9.42",
+        commit="7fe58b0b0f3873be9a21c30106b8b8527c353aa6",
+    )
+
+    assert (historical.url, historical.ref, historical.commit) == (
+        current.url,
+        "v0.9.42",
+        "7fe58b0b0f3873be9a21c30106b8b8527c353aa6",
+    )
+    assert (current.ref, current.commit) == (
+        "v0.9.43",
+        "7281f27eac568f77f50910f59f84543458f5dfd1",
+    )
+
+
 def test_source_manifest_binds_every_git_blob_in_path_order(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")

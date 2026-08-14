@@ -754,21 +754,11 @@ def _runtime_identity(
     return auth, version
 
 
-def adapter_main() -> int:
-    """Forward one validated Graphify call to real Claude and retain safe evidence."""
-    executable = _real_executable()
-    args = sys.argv[1:]
-    if args in (["--help"], ["--version"]):
-        return _delegate_info(executable, args)
-    try:
-        schema = _validate_incoming_args(args)
-        environment = _child_environment()
-        auth, version = _runtime_identity(executable, environment)
-    except (OSError, subprocess.SubprocessError, UnicodeDecodeError, ValueError) as exc:
-        print(f"semantic adapter preflight failed: {exc}", file=sys.stderr)
-        return 2
-    prompt = sys.stdin.buffer.read()
-    real_args = (
+def _claude_invocation_args(
+    executable: Path, schema: str, environment: Mapping[str, str]
+) -> tuple[str, ...]:
+    """Keep #300's historical argv while adding the reviewed cap only at #301's boundary."""
+    base = (
         str(executable),
         "-p",
         "--output-format",
@@ -787,9 +777,27 @@ def adapter_main() -> int:
         "--no-chrome",
         "--max-budget-usd",
         "0.25",
-        "--max-turns",
-        "3",
     )
+    if environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH"):
+        return (*base, "--max-turns", "3")
+    return base
+
+
+def adapter_main() -> int:
+    """Forward one validated Graphify call to real Claude and retain safe evidence."""
+    executable = _real_executable()
+    args = sys.argv[1:]
+    if args in (["--help"], ["--version"]):
+        return _delegate_info(executable, args)
+    try:
+        schema = _validate_incoming_args(args)
+        environment = _child_environment()
+        auth, version = _runtime_identity(executable, environment)
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError, ValueError) as exc:
+        print(f"semantic adapter preflight failed: {exc}", file=sys.stderr)
+        return 2
+    prompt = sys.stdin.buffer.read()
+    real_args = _claude_invocation_args(executable, schema, os.environ)
     started = time.monotonic_ns()
     try:
         boundary_path = _provider_boundary_path(os.environ)

@@ -837,6 +837,14 @@ flowchart LR
   and the launcher reuses the strict adapter normalizer. A bounded exact-head re-review
   passed both corrections and changed only the accepted prototype-contract and launcher
   identity digests. The review did not set any plan, advisory, or exclusion root.
+- A later cold whole-branch review reproduced three compatibility regressions missed by
+  the focused and full suites: #300 preflight demanded SDK 0.9.42 after the 0.9.43 pin;
+  the historical baseline read the now-current shared manifest; and the shared adapter
+  emitted 19 arguments while #300's retained verifier required 17. TDD now separates
+  current runtime preflight from historical authority, derives the v0.9.42 source pin
+  without mutating the current manifest, and appends `--max-turns 3` only for #301's
+  provider-boundary environment. Real provider-free preflight and historical baseline
+  controls both complete.
 - Currency evidence: two generated currency batches were byte-identical except for their
   first-line timestamps. The later 19:42 batch was retained because the watch/baseline
   state matches it; the classified 19:41 duplicates and their index rows were removed.

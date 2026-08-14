@@ -24,6 +24,87 @@ def test_graphify_0943_semantic_sdk_contract_is_current() -> None:
     assert graphify_sdk.semantic_contract_errors("0.9.43") == ()
 
 
+def test_default_preflight_checks_the_current_graphify_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from kb_setup import graphify_env
+
+    checked: list[str] = []
+    monkeypatch.setattr(graphify_env, "assert_pinned_graphify", lambda _repo: None)
+
+    def stop_after_version(version: str) -> None:
+        checked.append(version)
+        raise RuntimeError("version tripwire")
+
+    monkeypatch.setattr(graphify_sdk, "assert_semantic_sdk", stop_after_version)
+
+    with pytest.raises(RuntimeError, match="version tripwire"):
+        graphify_semantic_slice.preflight(tmp_path, environment={"PATH": "/usr/bin"})
+
+    assert checked == ["0.9.43"]
+
+
+def test_historical_and_current_runtime_receipts_use_separate_authorities(
+    tmp_path: Path,
+) -> None:
+    from kb_setup import graphify_baseline
+
+    candidate = tmp_path / "candidate"
+    _copy_real_candidate(candidate)
+    receipt = msgspec.json.decode(
+        (candidate / "receipt.json").read_bytes(),
+        type=graphify_semantic_slice.SemanticReceipt,
+        strict=True,
+    )
+    historical = receipt.runtime
+    current = msgspec.structs.replace(
+        historical,
+        graphify_runtime=graphify_baseline.runtime_identity(Path(__file__).parent.parent),
+        graphify_version="0.9.43",
+    )
+
+    assert graphify_semantic_slice._runtime_reasons(historical, enforce_authority=True) == []
+    assert graphify_semantic_slice._runtime_reasons(current, enforce_authority=False) == []
+    assert "receipt-runtime-mismatch" in graphify_semantic_slice._runtime_reasons(
+        current, enforce_authority=True
+    )
+
+
+def test_adapter_keeps_historical_slice_argv_and_caps_only_301_boundary() -> None:
+    from kb_setup import graphify_semantic_adapter
+
+    legacy = graphify_semantic_adapter._claude_invocation_args(Path("/real/claude"), "{}", {})
+    corpus = graphify_semantic_adapter._claude_invocation_args(
+        Path("/real/claude"),
+        "{}",
+        {"KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": "/state/provider-start.json"},
+    )
+
+    assert len(legacy) == 18
+    assert legacy[1:] == (
+        "-p",
+        "--output-format",
+        "json",
+        "--no-session-persistence",
+        "--model",
+        _MODEL,
+        "--json-schema",
+        "{}",
+        "--safe-mode",
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--permission-mode",
+        "dontAsk",
+        "--no-chrome",
+        "--max-budget-usd",
+        "0.25",
+    )
+    assert len(corpus) == 20
+    assert corpus[:-2] == legacy
+    assert corpus[-2:] == ("--max-turns", "3")
+
+
 def test_cli_dispatches_semantic_slice_without_gating_public_verify(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
