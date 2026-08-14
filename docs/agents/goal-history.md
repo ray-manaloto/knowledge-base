@@ -755,3 +755,55 @@ flowchart LR
     TURNS["Observed num_turns metadata"] --> KB301["#301: positive count, no hard upper bound"]
     TURNS --> KB300["#300: accepted three-turn ceiling"]
 ```
+
+## 2026-08-14 — iteration KB-301-15
+
+- Prior goal digest: iteration KB-301-14 and PR #310 merge
+  `4f7d34c984f5fc9ba6ccc8d359e398bda265ab03`.
+- Changed requirement: diagnose future untyped Claude CLI stdout without retaining raw
+  private output, inspecting recovery archives, or making another provider call.
+- Reason: source replay proved the historical parser collapsed invalid UTF-8, invalid
+  JSON, and valid non-object JSON into one empty envelope. Because only the response
+  digest and size survive, choosing among those cases would fabricate evidence.
+- Evidence: TDD covers a valid object, invalid UTF-8, truncated JSON, trailing JSON,
+  array, and scalar using fixed local bytes. The adapter now performs one in-memory
+  parse and atomically embeds only a content-free observation and its canonical digest
+  in adapter metadata. #301 staging cross-binds that digest, response digest/size, and
+  accepted-object status. Exact SHA controls preserve every historical terminal file.
+- Affected tickets: #301 only. #302 remains unstarted.
+- Disposition: historical cause stays `untyped-response-cause-underdetermined`. This
+  no-provider diagnostic seam cannot certify provider behavior. Authority roots remain
+  empty, the public verifier remains incomplete, and any future provider boundary still
+  requires new explicit authority.
+
+```mermaid
+flowchart LR
+    RAW["Future stdout in process memory"] --> PARSE["Single strict parse"]
+    PARSE --> OBS["Content-free observation"]
+    OBS --> META["Atomic adapter metadata plus observation digest"]
+    META --> CHECK["#301 response and digest reconciliation"]
+    CHECK -->|"object and fully bound"| ELIGIBLE["Eligible for remaining semantic checks"]
+    CHECK -->|"UTF-8, JSON, shape, or digest failure"| FAIL["Failed closed"]
+    RAW -.->|"never retained"| DISCARD["Discarded after classification"]
+```
+
+### KB-301-15 review correction
+
+- Standards replay found that Python's default JSON decoder admits `NaN`, positive
+  infinity, and negative infinity even though JSON does not. An otherwise valid result
+  object could therefore have received `accepted-object` while an ignored field held a
+  non-JSON numeric constant.
+- Exact RED/GREEN fixtures now cover all three constants inside object envelopes. The
+  single parse rejects them through `parse_constant`, records only the typed
+  `non-json-constant` category, and retains no constant spelling or value. This correction
+  does not change the historical evidence, authority state, provider-call count, or #300
+  legacy receipt policy.
+- Spec replay then found two bounded decoder exits that still bypassed the observation:
+  Python's integer digit-limit `ValueError` and JSON nesting `RecursionError`. Exact
+  5,000-digit and 50,000-depth RED/GREEN fixtures now classify only those known exits as
+  `numeric-limit` and `nesting-limit`. The adapter does not broadly catch `ValueError` or
+  other implementation failures, and neither diagnostic retains payload content.
+- CodeRabbit's exact-head review found that UTF-8 failures recorded a byte offset while
+  JSON failures recorded a character offset. A multibyte malformed-JSON RED/GREEN fixture
+  now binds the latter to the original response's UTF-8 byte index. All retained
+  nonnegative offsets therefore have one documented unit; no response prefix is retained.

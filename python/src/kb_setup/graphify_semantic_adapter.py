@@ -19,6 +19,26 @@ import msgspec
 from kb_setup import atomic, graphify_semantic_slice
 
 _GRAPHIFY_ARG_COUNT = 8
+_SHA256_HEX_LENGTH = 64
+
+
+class _NonJsonConstantError(ValueError):
+    """Signal a Python-only numeric constant without retaining its spelling."""
+
+
+class _JsonNumericLimitError(ValueError):
+    """Signal the decoder's bounded integer conversion without retaining digits."""
+
+
+def _reject_non_json_constant(_value: str) -> None:
+    raise _NonJsonConstantError
+
+
+def _strict_json_integer(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise _JsonNumericLimitError from exc
 
 
 def open_directory_nofollow(directory: Path) -> int:
@@ -57,6 +77,20 @@ class ModelUsage(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     cache_creation_input_tokens: int
 
 
+class EnvelopeParseObservation(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Content-free facts about parsing one discarded Claude stdout payload."""
+
+    schema_id: str
+    status: str
+    response_sha256: str
+    response_size: int
+    utf8_valid: bool
+    json_valid: bool
+    top_level_kind: str
+    error_offset: int
+    trailing_non_whitespace: bool
+
+
 class AdapterMetadata(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Public-safe evidence captured before the raw envelope is discarded."""
 
@@ -91,6 +125,8 @@ class AdapterMetadata(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     elapsed_ms: int
     permission_denial_count: int
     reasons: tuple[str, ...]
+    parse_observation: EnvelopeParseObservation | None = None
+    parse_observation_sha256: str = ""
     attempt: int = 1
 
 
@@ -107,6 +143,7 @@ class MetadataInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     stderr: bytes
     returncode: int
     envelope: dict[str, object]
+    parse_observation: EnvelopeParseObservation
     elapsed_ms: int
     reasons: tuple[str, ...]
 
@@ -199,14 +236,243 @@ def _child_environment() -> dict[str, str]:
     )
 
 
-def _result_envelope(stdout: bytes) -> dict[str, object]:
+def _top_level_kind(payload: object) -> str:
+    candidates = (
+        (isinstance(payload, dict), "object"),
+        (isinstance(payload, list), "array"),
+        (isinstance(payload, str), "string"),
+        (isinstance(payload, bool), "boolean"),
+        (payload is None, "null"),
+        (isinstance(payload, (int, float)), "number"),
+    )
+    for accepted, kind in candidates:
+        if accepted:
+            return kind
+    return "unknown"
+
+
+def _intended_top_level_kind(text: str) -> str:
+    stripped = text.lstrip()
+    if not stripped:
+        return "unknown"
+    return {
+        "{": "object",
+        "[": "array",
+        '"': "string",
+        "t": "boolean",
+        "f": "boolean",
+        "n": "null",
+    }.get(stripped[0], "number" if stripped[0] in "-0123456789NI" else "unknown")
+
+
+def parse_result_envelope(stdout: bytes) -> tuple[dict[str, object], EnvelopeParseObservation]:
+    """Parse stdout while retaining only content-free diagnostic facts."""
+    response_sha256 = _sha256(stdout)
+    response_size = len(stdout)
     try:
-        payload = json.loads(stdout)
-    except json.JSONDecodeError, UnicodeDecodeError:
-        return {}
+        text = stdout.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        return {}, EnvelopeParseObservation(
+            schema_id="graphify-claude-envelope-parse/v0",
+            status="invalid-utf8",
+            response_sha256=response_sha256,
+            response_size=response_size,
+            utf8_valid=False,
+            json_valid=False,
+            top_level_kind="unknown",
+            error_offset=exc.start,
+            trailing_non_whitespace=False,
+        )
+    try:
+        payload = json.loads(
+            text,
+            parse_constant=_reject_non_json_constant,
+            parse_int=_strict_json_integer,
+        )
+    except (_NonJsonConstantError, _JsonNumericLimitError, RecursionError) as exc:
+        status = (
+            "non-json-constant"
+            if isinstance(exc, _NonJsonConstantError)
+            else "numeric-limit"
+            if isinstance(exc, _JsonNumericLimitError)
+            else "nesting-limit"
+        )
+        return {}, EnvelopeParseObservation(
+            schema_id="graphify-claude-envelope-parse/v0",
+            status=status,
+            response_sha256=response_sha256,
+            response_size=response_size,
+            utf8_valid=True,
+            json_valid=False,
+            top_level_kind=_intended_top_level_kind(text),
+            error_offset=-1,
+            trailing_non_whitespace=False,
+        )
+    except json.JSONDecodeError as exc:
+        trailing = exc.msg == "Extra data" and bool(text[exc.pos :].strip())
+        byte_offset = len(text[: exc.pos].encode("utf-8"))
+        status = (
+            "trailing-data"
+            if trailing
+            else "truncated-json"
+            if exc.pos >= len(text.rstrip())
+            else "invalid-json"
+        )
+        return {}, EnvelopeParseObservation(
+            schema_id="graphify-claude-envelope-parse/v0",
+            status=status,
+            response_sha256=response_sha256,
+            response_size=response_size,
+            utf8_valid=True,
+            json_valid=False,
+            top_level_kind=_intended_top_level_kind(text),
+            error_offset=byte_offset,
+            trailing_non_whitespace=trailing,
+        )
+    kind = _top_level_kind(payload)
+    observation = EnvelopeParseObservation(
+        schema_id="graphify-claude-envelope-parse/v0",
+        status="accepted-object" if kind == "object" else "valid-non-object",
+        response_sha256=response_sha256,
+        response_size=response_size,
+        utf8_valid=True,
+        json_valid=True,
+        top_level_kind=kind,
+        error_offset=-1,
+        trailing_non_whitespace=False,
+    )
     if isinstance(payload, dict):
-        return payload
-    return {}
+        return payload, observation
+    return {}, observation
+
+
+def _result_envelope(stdout: bytes) -> dict[str, object]:
+    envelope, _observation = parse_result_envelope(stdout)
+    return envelope
+
+
+def parse_observation_sha256(observation: EnvelopeParseObservation) -> str:
+    """Digest canonical sanitized observation bytes, never response content."""
+    return _sha256(graphify_semantic_slice.encode_json(observation))
+
+
+def _is_sha256(value: str) -> bool:
+    return len(value) == _SHA256_HEX_LENGTH and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
+def parse_observation_reasons(
+    observation: EnvelopeParseObservation | None,
+    *,
+    digest: str,
+    response_sha256: str,
+    response_size: int,
+) -> tuple[str, ...]:
+    """Cross-bind one sanitized observation to its enclosing adapter receipt."""
+    if observation is None:
+        return ("parse-observation-unavailable",)
+    valid_shapes = {
+        "accepted-object": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "object"
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "valid-non-object": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind in {"array", "string", "number", "boolean", "null"}
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "invalid-utf8": (
+            not observation.utf8_valid
+            and not observation.json_valid
+            and observation.top_level_kind == "unknown"
+            and observation.error_offset >= 0
+            and not observation.trailing_non_whitespace
+        ),
+        "truncated-json": (
+            observation.utf8_valid
+            and not observation.json_valid
+            and observation.error_offset >= 0
+            and not observation.trailing_non_whitespace
+        ),
+        "trailing-data": (
+            observation.utf8_valid
+            and not observation.json_valid
+            and observation.error_offset >= 0
+            and observation.trailing_non_whitespace
+        ),
+        "invalid-json": (
+            observation.utf8_valid
+            and not observation.json_valid
+            and observation.error_offset >= 0
+            and not observation.trailing_non_whitespace
+        ),
+        "non-json-constant": (
+            observation.utf8_valid
+            and not observation.json_valid
+            and observation.top_level_kind in {"object", "array", "number"}
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "numeric-limit": (
+            observation.utf8_valid
+            and not observation.json_valid
+            and observation.top_level_kind in {"object", "array", "number"}
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "nesting-limit": (
+            observation.utf8_valid
+            and not observation.json_valid
+            and observation.top_level_kind in {"object", "array"}
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+    }
+    checks = (
+        (
+            observation.schema_id == "graphify-claude-envelope-parse/v0",
+            "parse-observation-schema-mismatch",
+        ),
+        (_is_sha256(digest), "parse-observation-digest-invalid"),
+        (
+            parse_observation_sha256(observation) == digest,
+            "parse-observation-digest-mismatch",
+        ),
+        (
+            _is_sha256(observation.response_sha256) and _is_sha256(response_sha256),
+            "parse-observation-response-digest-invalid",
+        ),
+        (
+            observation.response_sha256 == response_sha256,
+            "parse-observation-response-digest-mismatch",
+        ),
+        (
+            observation.response_size >= 0 and response_size >= 0,
+            "parse-observation-response-size-invalid",
+        ),
+        (
+            observation.response_size == response_size,
+            "parse-observation-response-size-mismatch",
+        ),
+        (
+            observation.error_offset == -1
+            if observation.json_valid
+            or observation.status in {"non-json-constant", "numeric-limit", "nesting-limit"}
+            else 0 <= observation.error_offset <= observation.response_size,
+            "parse-observation-error-offset-invalid",
+        ),
+        (
+            valid_shapes.get(observation.status, False),
+            "parse-observation-shape-mismatch",
+        ),
+    )
+    return tuple(reason for accepted, reason in checks if not accepted)
 
 
 def _integer(value: object) -> int:
@@ -311,6 +577,8 @@ def _metadata(inputs: MetadataInputs) -> AdapterMetadata:
         elapsed_ms=inputs.elapsed_ms,
         permission_denial_count=len(denials) if isinstance(denials, list) else -1,
         reasons=inputs.reasons,
+        parse_observation=inputs.parse_observation,
+        parse_observation_sha256=parse_observation_sha256(inputs.parse_observation),
     )
 
 
@@ -414,7 +682,7 @@ def adapter_main() -> int:
         print("semantic adapter inference timed out", file=sys.stderr)
         return 124
     elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
-    envelope = _result_envelope(completed.stdout)
+    envelope, parse_observation = parse_result_envelope(completed.stdout)
     reasons = list(result_envelope_reasons(envelope, os.environ))
     if completed.returncode != 0:
         reasons.append("claude-returncode-nonzero")
@@ -432,6 +700,7 @@ def adapter_main() -> int:
             stderr=completed.stderr,
             returncode=completed.returncode,
             envelope=envelope,
+            parse_observation=parse_observation,
             elapsed_ms=elapsed_ms,
             reasons=tuple(dict.fromkeys(reasons)),
         )
