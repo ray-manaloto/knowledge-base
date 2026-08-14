@@ -31,6 +31,7 @@ from graphify.detect import detect, detect_incremental
 from graphify.export import prune_dangling_edges, to_json
 from graphify.extract import collect_files, extract
 from graphify.extractors.json_config import extract_json
+from graphify.llm import extract_corpus_parallel
 from graphify.reflect import build_learning_overlay, reflect
 
 from kb_setup.graphify_health import (
@@ -151,6 +152,24 @@ _PUBLIC_SYMBOLS = (
     ),
 )
 
+# Graphify's semantic module is not part of the deterministic baseline's public
+# compatibility fingerprint. Issue #300 nevertheless needs one exact SDK seam:
+# the non-underscore corpus function is the only callable that both exercises
+# Graphify's real claude-cli route and lets the caller set adaptive retries to
+# zero. Keep its reviewed contract separate so extending semantic evidence does
+# not re-authorize the already-landed #299 deterministic candidate.
+_SEMANTIC_SYMBOLS = (
+    PublicSymbol(
+        "graphify.llm.extract_corpus_parallel",
+        extract_corpus_parallel,
+        "(files: 'list[Path]', backend: 'str' = 'kimi', api_key: 'str | None' = None, "
+        "model: 'str | None' = None, root: 'Path' = PosixPath('.'), chunk_size: 'int' = 20, "
+        "on_chunk_done: 'Callable | None' = None, token_budget: 'int | None' = 60000, "
+        "max_concurrency: 'int' = 4, max_retry_depth: 'int' = 3, deep_mode: 'bool' = False, "
+        "cache_root: \"'Path | None'\" = None) -> 'dict'",
+    ),
+)
+
 
 def running_sdk_version() -> str:
     """Return the installed Graphify SDK distribution version."""
@@ -162,6 +181,41 @@ def public_api_fingerprint() -> tuple[tuple[str, str], ...]:
     return tuple(
         (symbol.dotted_name, str(inspect.signature(symbol.function))) for symbol in _PUBLIC_SYMBOLS
     )
+
+
+def semantic_api_fingerprint() -> tuple[tuple[str, str], ...]:
+    """Return the reviewed Graphify semantic-symbol fingerprint for issue #300."""
+    return tuple(
+        (symbol.dotted_name, str(inspect.signature(symbol.function)))
+        for symbol in _SEMANTIC_SYMBOLS
+    )
+
+
+def semantic_contract_errors(expected_version: str) -> tuple[str, ...]:
+    """Describe version or signature drift at the real semantic SDK seam."""
+    errors: list[str] = []
+    running = running_sdk_version()
+    if running != expected_version:
+        errors.append(f"graphify SDK version {running} != accepted version {expected_version}")
+    for symbol in _SEMANTIC_SYMBOLS:
+        actual = str(inspect.signature(symbol.function))
+        if actual != symbol.expected_signature:
+            errors.append(
+                f"{symbol.dotted_name} signature changed: expected "
+                f"{symbol.expected_signature}; got {actual}"
+            )
+    return tuple(errors)
+
+
+def assert_semantic_sdk(expected_version: str) -> None:
+    """Fail closed unless Graphify's one reviewed semantic seam still matches."""
+    errors = semantic_contract_errors(expected_version)
+    if errors:
+        details = "\n".join(f"- {error}" for error in errors)
+        raise RuntimeError(
+            "Graphify semantic SDK contract failed; review the release before inference:\n"
+            f"{details}"
+        )
 
 
 def contract_errors(expected_version: str) -> tuple[str, ...]:

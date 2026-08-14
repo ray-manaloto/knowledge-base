@@ -205,3 +205,67 @@ flowchart LR
 - Evidence: both hostile cases were RED before the fix and GREEN after it.
 - Affected tickets: only #299. Graphify coupling observations remain typed advisory backlog.
 - Disposition: the bounded PR-review fix awaits full exact-head gates before land.
+
+## 2026-08-14 — iteration KB-300-1
+
+- Prior goal digest: `bc50171ed9e64f8d4f05ae11f2077ff0b41cce40c85e5a3d146b34ce6d9c23e9`.
+- Changed requirement: certify one representative immutable Graphify document through
+  the real Graphify 0.9.42 `claude-cli` path and Claude Code Max OAuth, retain the
+  envelope fields Graphify discards, forward accepted structured output into Graphify,
+  and publish only an independently verified atomic candidate.
+- Reason: issue #293 proved the real backend and exact model but its observation shim
+  falsely rejected a valid `tool_use` success before Graphify could receive the fragment.
+- Evidence: the only acceptance call used Claude Code 2.1.232, first-party Max, exact
+  `claude-haiku-4-5-20251001`, one Graphify chunk, zero Graphify/API retries, and one
+  bounded structured repair. It completed in 98.752 seconds for `$0.0910219`, with zero
+  stderr, warnings, errors, denials, fallback, failed/uncovered chunks, or out-of-scope
+  drops. The candidate contains 16 nodes, 14 edges, and two hyperedges; its manifest
+  SHA-256 is `283b9b1221394a4ec7f7b1d456db248105a8090cd11f809dde374e05ab3aa5b2`.
+- Affected tickets: #300 only. #301 remains unstarted and blocked.
+- Disposition: real semantic acceptance is proven locally and awaits full gates,
+  independent exact-head review, ship, and land.
+
+```mermaid
+flowchart LR
+    PIN["Exact Graphify source bytes"] --> PREFLIGHT["Graphify + Claude + Max preflight"]
+    PREFLIGHT --> GRAPHIFY["Graphify one-document semantic extraction"]
+    GRAPHIFY --> ADAPTER["Bounded real-Claude adapter"]
+    ADAPTER --> FRAGMENT["Validated structured fragment"]
+    FRAGMENT --> BUILD["Graphify graph build"]
+    ADAPTER --> RECEIPT["Public-safe envelope receipt"]
+    BUILD --> CANDIDATE["Atomic content-addressed candidate"]
+    RECEIPT --> CANDIDATE
+    CANDIDATE --> VERIFY["Independent verifier: complete"]
+```
+
+## 2026-08-14 — iteration KB-300-2
+
+- Prior goal digest: iteration KB-300-1 and candidate manifest digest
+  `283b9b1221394a4ec7f7b1d456db248105a8090cd11f809dde374e05ab3aa5b2`.
+- Changed requirement: separate structurally valid but unapproved real output from the
+  reviewed acceptance authority; remove host paths; bind the exact Graphify runtime,
+  one-chunk ledger, JSON schema, arguments, safe environment names, and non-secret
+  execution values; cross-check public envelope hashes, identity, tokens, durations, and
+  cost; return typed failures for malformed hostile inputs.
+- Reason: independent exact-tree review reproduced a synthetic coherent false-green,
+  local-account path disclosure, and several receipt/verifier gaps without making a
+  provider call.
+- Evidence: the retained real result was privacy-redacted and mechanically rehashed
+  without changing the semantic fragment or rerunning inference. Its reviewed manifest
+  SHA-256 is `8d3407f5cca4c2ddca54d9a4f25df0727cbd5fd2fd378754d48afced220e94a7`;
+  public verification returns `complete`, while any other coherent manifest remains
+  `unapproved` until separately reviewed and pinned.
+- Affected tickets: #300 only. #301 remains unstarted and blocked.
+- Disposition: corrected retained evidence and hostile mutation controls await final
+  two-axis replay, full gates, ship, and land.
+
+```mermaid
+flowchart LR
+    REAL["One retained real Graphify plus Claude call"] --> STAGE["Structural verification"]
+    STAGE -->|"valid but new"| UNAPPROVED["Unapproved candidate retained"]
+    REVIEW["Human and independent review"] --> AUTH["Pinned manifest authority"]
+    UNAPPROVED --> REVIEW
+    AUTH --> PUBLIC["Public verifier"]
+    PUBLIC -->|"exact authority plus all invariants"| COMPLETE["real semantic complete"]
+    PUBLIC -->|"drift or malformed evidence"| FAILED["Typed failed reasons"]
+```
