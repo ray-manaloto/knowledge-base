@@ -63,6 +63,7 @@ class SourceCoveragePolicy(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     required_paths: tuple[str, ...] = ()
     optional_unclassified_paths: tuple[str, ...] = ()
     optional_zero_node_paths: tuple[str, ...] = ()
+    optional_ignored_paths: tuple[str, ...] = ()
 
 
 class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -144,7 +145,10 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
 
 def _coverage_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
-    if evidence.ignored_paths:
+    if evidence.ignored_paths and (
+        evidence.coverage_policy is None
+        or set(evidence.ignored_paths) - set(evidence.coverage_policy.optional_ignored_paths)
+    ):
         reasons.append("ignored-paths")
     if evidence.coverage_policy is None:
         if evidence.unclassified_files or evidence.unclassified_paths:

@@ -75,7 +75,8 @@ def _run(argv: list[str] | None = None) -> int:
             "goal-check <path|--text ...> | "
             "goal-outcome <pair> --result R [--turns N] [--note ...] | "
             "cc | cc-doctor | eval [--live] [--slow] | "
-            "graphify-contract | skillopt-contract | "
+            "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
+            "skillopt-contract | "
             "tool-sync <currency-tool-name> | "
             "skillopt-reviewed --packet P --target T --backend mock|handoff | "
             "ecosystem-discovery-plan [alternative...] | "
@@ -132,8 +133,8 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.query(repo_root, rest)
-    if cmd in {"graphify-contract", "skillopt-contract"}:
-        return _dispatch_contract(repo_root, cmd)
+    if cmd in {"graphify-contract", "graphify-baseline", "skillopt-contract"}:
+        return _dispatch_contract(repo_root, cmd, rest)
     if cmd == "skillopt-reviewed":
         from kb_setup import skillopt_reviewed
 
@@ -197,12 +198,16 @@ def _run(argv: list[str] | None = None) -> int:
     return _dispatch_ops(repo_root, cmd, rest)
 
 
-def _dispatch_contract(repo_root: Path, cmd: str) -> int:
+def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
     """Run one strict dependency/API contract."""
     if cmd == "graphify-contract":
         from kb_setup import graphify_sdk
 
         return graphify_sdk.contract_main(repo_root)
+    if cmd == "graphify-baseline":
+        from kb_setup import graphify_baseline
+
+        return graphify_baseline.baseline_main(repo_root, rest)
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)

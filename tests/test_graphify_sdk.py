@@ -232,11 +232,54 @@ def test_checked_extract_blocks_zero_node_source(
         graphify_sdk.extract_checked([tmp_path / "source.py"], root=tmp_path)
 
 
+def test_checked_extract_captures_printed_stderr_and_failed_source_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("broken\n", encoding="utf-8")
+
+    def incomplete(*_args: object, **_kwargs: object) -> dict[str, object]:
+        import sys
+
+        print("parser warning", file=sys.stderr)
+        return {"nodes": [{"id": "partial"}], "edges": [], "failed_sources": [str(source)]}
+
+    monkeypatch.setattr(graphify_sdk, "extract", incomplete)
+
+    with pytest.raises(IncompleteGraphifyOperationError) as caught:
+        graphify_sdk.extract_checked(
+            [source],
+            root=tmp_path,
+            cache_root=tmp_path.parent / "external-cache",
+        )
+
+    message = str(caught.value)
+    assert "stderr" in message
+    assert "source-coverage-partial" in message
+    assert "zero-node-sources" in message
+
+
 def test_checked_build_blocks_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     def warning_build(*_args: object, **_kwargs: object) -> nx.Graph:
         import warnings
 
         warnings.warn("coverage reduced", stacklevel=2)
+        graph = nx.Graph()
+        graph.add_node("one")
+        return graph
+
+    monkeypatch.setattr(graphify_sdk, "build", warning_build)
+    with pytest.raises(IncompleteGraphifyOperationError, match="stderr"):
+        graphify_sdk.build_checked([{"nodes": [{"id": "one"}]}], root=tmp_path)
+
+
+def test_checked_build_blocks_printed_stderr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def warning_build(*_args: object, **_kwargs: object) -> nx.Graph:
+        import sys
+
+        print("build warning", file=sys.stderr)
         graph = nx.Graph()
         graph.add_node("one")
         return graph
@@ -264,6 +307,56 @@ def test_checked_artifact_blocks_missing_output(
     monkeypatch.setattr(graphify_sdk, "to_json", lambda *_a, **_k: True)
     with pytest.raises(IncompleteGraphifyOperationError, match="artifacts-partial"):
         graphify_sdk.artifact_checked(nx.Graph(), {}, tmp_path / "graph.json")
+
+
+def test_checked_artifact_blocks_printed_stderr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def warning_export(*_args: object, **_kwargs: object) -> bool:
+        import sys
+
+        print("export warning", file=sys.stderr)
+        (tmp_path / "graph.json").write_text("{}\n", encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(graphify_sdk, "to_json", warning_export)
+    with pytest.raises(IncompleteGraphifyOperationError, match="stderr"):
+        graphify_sdk.artifact_checked(nx.Graph(), {}, tmp_path / "graph.json")
+
+
+def test_checked_artifact_binds_source_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "graph.json"
+    observed: list[str | None] = []
+
+    def export(
+        _graph: nx.Graph,
+        _communities: dict[int, list[str]],
+        output_path: str,
+        *,
+        force: bool,
+        built_at_commit: str | None,
+    ) -> bool:
+        assert force
+        observed.append(built_at_commit)
+        Path(output_path).write_text(
+            '{"nodes":[{"id":"n"}],"edges":[],"hyperedges":[]}\n',
+            encoding="utf-8",
+        )
+        return True
+
+    monkeypatch.setattr(graphify_sdk, "to_json", export)
+
+    receipt = graphify_sdk.artifact_checked(
+        nx.Graph(),
+        {},
+        output,
+        built_at_commit="a" * 40,
+    )
+
+    assert receipt.state is GraphifyState.COMPLETE
+    assert observed == ["a" * 40]
 
 
 _SKIPPED = "data json (not a config/manifest)"

@@ -350,7 +350,6 @@ _CENSUS_MAX_PATH_LENGTH = 240
 _CENSUS_MAX_STDERR_LENGTH = 2000
 _CENSUS_MAX_SOURCE_LENGTH = 120
 _CENSUS_MAX_RECEIPT_BYTES = 8 * 1024 * 1024
-_CENSUS_OUTPUT_ARG_COUNT = 2
 _SNAPSHOT_MAX_PATH_LENGTH = 4096
 
 
@@ -463,6 +462,11 @@ def _source_path_evidence(root: Path, relative_path: str) -> SourcePathEvidence:
     except OSError:
         return SourcePathEvidence(path=bounded_path, file_type="unreadable")
     return _regular_path_evidence(path, bounded_path)
+
+
+def source_path_evidence(root: Path, relative_path: str) -> SourcePathEvidence:
+    """Return content evidence for one source-relative path."""
+    return _source_path_evidence(root, relative_path)
 
 
 def _regular_path_evidence(path: Path, bounded_path: str) -> SourcePathEvidence:
@@ -668,6 +672,18 @@ def _assert_disposable_clone_identity(clone_dir: Path, provenance: SourceGitProv
         raise RuntimeError("disposable clone identity, detached state, or cleanliness changed")
 
 
+def materialize_source_snapshot(manifest: mf.Manifest, destination: Path) -> SourceGitProvenance:
+    """Materialize one verified, detached source snapshot for a public consumer."""
+    _ensure_clone(manifest)
+    provenance = _verify_source_provenance(manifest)
+    if provenance.failure_category:
+        raise ValueError(f"{manifest.name}: {provenance.failure_category}: {provenance.detail}")
+    materialized = _create_source_snapshot(manifest, provenance, destination)
+    if materialized.failure_category:
+        raise ValueError(f"{manifest.name}: {materialized.failure_category}: {materialized.detail}")
+    return materialized
+
+
 def detection_census(manifests: list[mf.Manifest]) -> DetectionCensusReceipt:
     """Return a read-only, deterministic receipt for every configured source."""
     manifest_names = [manifest.name for manifest in manifests]
@@ -869,13 +885,33 @@ def _encode_detection_census(receipt: DetectionCensusReceipt) -> str:
 
 
 def detection_census_main(repo_root: Path, args: list[str]) -> int:
-    """CLI boundary for the complete-corpus read-only JSON census."""
+    """CLI boundary for a complete-corpus or exact-source read-only JSON census."""
     output: Path | None = None
-    if args:
-        if len(args) != _CENSUS_OUTPUT_ARG_COUNT or args[0] != "--output":
-            raise ValueError("detect-census accepts only --output .agent/<path>.json")
-        output = Path(args[1])
-    receipt = detection_census(mf.load_all(repo_root / "sources"))
+    source_name: str | None = None
+    seen: set[str] = set()
+    index = 0
+    while index < len(args):
+        flag = args[index]
+        if flag not in {"--output", "--source"}:
+            raise ValueError("detect-census accepts only --source NAME and --output PATH")
+        if flag in seen:
+            raise ValueError(f"{flag} flag may be specified only once")
+        if index + 1 >= len(args):
+            raise ValueError(f"{flag} requires a value")
+        seen.add(flag)
+        value = args[index + 1]
+        if flag == "--output":
+            output = Path(value)
+        else:
+            source_name = value
+        index += 2
+
+    manifests = list(mf.load_all(repo_root / "sources"))
+    if source_name is not None:
+        manifests = [manifest for manifest in manifests if manifest.name == source_name]
+        if not manifests:
+            raise ValueError(f"source manifest not found: {source_name}")
+    receipt = detection_census(manifests)
     encoded = _encode_detection_census(receipt)
     if output is None:
         print(encoded)

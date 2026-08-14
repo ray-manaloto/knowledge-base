@@ -58,6 +58,15 @@ class PublicSymbol:
     expected_signature: str
 
 
+@dataclass(frozen=True)
+class ExtractionAdmission:
+    """Reviewed exceptions that can authorize exact zero-node AST inputs."""
+
+    source_name: str
+    coverage_policy: SourceCoveragePolicy
+    metadata_inventory: tuple[ExpectedMetadataOnly, ...]
+
+
 _PUBLIC_SYMBOLS = (
     PublicSymbol(
         "graphify.build.build",
@@ -280,20 +289,54 @@ def _detect_with_timeout(root: Path, timeout_seconds: float) -> dict:
             signal.setitimer(signal.ITIMER_REAL, *previous_timer)
 
 
-def extract_checked(paths: list[Path], *, root: Path) -> tuple[dict, GraphifyReceipt]:
+def extract_checked(
+    paths: list[Path],
+    *,
+    root: Path,
+    cache_root: Path | None = None,
+    admission: ExtractionAdmission | None = None,
+) -> tuple[dict, GraphifyReceipt]:
     """Run public extraction and refuse warnings, partial input, or zero-node sources."""
-    with warnings.catch_warnings(record=True) as caught:
+    stream = io.StringIO()
+    with warnings.catch_warnings(record=True) as caught, redirect_stderr(stream):
         warnings.simplefilter("always")
-        result = extract(paths, root=root)
+        result = extract(paths, root=root, cache_root=cache_root)
     nodes = result.get("nodes", [])
+    failed = tuple(_relative_paths(root, result.get("failed_sources", [])))
+    if not nodes and not failed:
+        failed = tuple(_relative_paths(root, paths))
+    raw_stderr = stream.getvalue()
+    approved = approve_metadata_zero_node_warning(
+        root,
+        admission.source_name if admission else "",
+        raw_stderr,
+        admission.metadata_inventory if admission else (),
+    )
+    warning_text = "\n".join(
+        part
+        for part in (
+            "" if approved else raw_stderr.strip(),
+            *(str(item.message) for item in caught),
+        )
+        if part
+    )
+    accepted_zero_nodes = (
+        bool(approved)
+        and admission is not None
+        and set(failed) <= set(admission.coverage_policy.optional_zero_node_paths)
+    )
     receipt = assess(
         GraphifyOperation.EXTRACT,
         GraphifyEvidence(
             observed=True,
-            stderr="\n".join(str(item.message) for item in caught),
+            source_name=admission.source_name if admission else None,
+            stderr=warning_text,
             detected_sources=len(paths),
-            extracted_sources=len(paths) if nodes else 0,
-            zero_node_sources=0 if nodes else len(paths),
+            extracted_sources=len(paths) if accepted_zero_nodes else len(paths) - len(failed),
+            zero_node_sources=len(failed),
+            zero_node_paths=failed,
+            coverage_policy=admission.coverage_policy if admission else None,
+            approved_classifications=approved,
             mode="ast",
         ),
     )
@@ -303,7 +346,8 @@ def extract_checked(paths: list[Path], *, root: Path) -> tuple[dict, GraphifyRec
 
 def build_checked(extractions: list[dict], *, root: Path) -> tuple[nx.Graph, GraphifyReceipt]:
     """Run public graph construction and require a nonempty, warning-free result."""
-    with warnings.catch_warnings(record=True) as caught:
+    stream = io.StringIO()
+    with warnings.catch_warnings(record=True) as caught, redirect_stderr(stream):
         warnings.simplefilter("always")
         graph = build(extractions, root=root)
     node_count = int(graph.number_of_nodes())
@@ -311,7 +355,11 @@ def build_checked(extractions: list[dict], *, root: Path) -> tuple[nx.Graph, Gra
         GraphifyOperation.BUILD,
         GraphifyEvidence(
             observed=True,
-            stderr="\n".join(str(item.message) for item in caught),
+            stderr="\n".join(
+                part
+                for part in (stream.getvalue().strip(), *(str(item.message) for item in caught))
+                if part
+            ),
             detected_sources=len(extractions),
             extracted_sources=len(extractions) if node_count else 0,
             zero_node_sources=0 if node_count else len(extractions),
@@ -348,16 +396,29 @@ def artifact_checked(
     graph: nx.Graph,
     communities: dict[int, list[str]],
     output_path: Path,
+    *,
+    built_at_commit: str | None = None,
 ) -> GraphifyReceipt:
     """Run the public JSON exporter and require the requested artifact."""
-    with warnings.catch_warnings(record=True) as caught:
+    stream = io.StringIO()
+    with warnings.catch_warnings(record=True) as caught, redirect_stderr(stream):
         warnings.simplefilter("always")
-        written = to_json(graph, communities, str(output_path), force=True)
+        written = to_json(
+            graph,
+            communities,
+            str(output_path),
+            force=True,
+            built_at_commit=built_at_commit,
+        )
     receipt = assess(
         GraphifyOperation.ARTIFACT,
         GraphifyEvidence(
             observed=True,
-            stderr="\n".join(str(item.message) for item in caught),
+            stderr="\n".join(
+                part
+                for part in (stream.getvalue().strip(), *(str(item.message) for item in caught))
+                if part
+            ),
             expected_artifacts=(str(output_path),),
             produced_artifacts=(str(output_path),) if written and output_path.is_file() else (),
         ),
@@ -405,12 +466,14 @@ def approve_metadata_zero_node_warning(
         if result.get("error") or result.get("nodes") or result.get("edges"):
             valid = False
             break
-        if result.get("skipped") != item.skipped_disposition:
+        actual_disposition = result.get("skipped")
+        if actual_disposition != item.skipped_disposition:
             valid = False
             break
-    names = ", ".join(Path(item.relative_path).name for item in inventory)
+    warned = tuple(item for item in inventory if not item.skipped_disposition.startswith("error:"))
+    names = ", ".join(Path(item.relative_path).name for item in warned)
     expected = (
-        f"  warning: {len(inventory)} source file(s) produced zero nodes and are absent "
+        f"  warning: {len(warned)} source file(s) produced zero nodes and are absent "
         f"from the graph: {names}. A re-run will retry them (empties are no longer "
         "cached); if it persists, please report the file(s) (#1666).\n"
     )
