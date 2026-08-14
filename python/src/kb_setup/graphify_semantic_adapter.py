@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -84,8 +85,64 @@ class MetadataInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     reasons: tuple[str, ...]
 
 
+class ProviderBoundaryStart(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Durable evidence written immediately before the real provider process starts."""
+
+    schema_id: str
+    phase: str
+    provider_process_invocations: int
+    provider_inferences: str
+    adapter_sha256: str
+    prompt_sha256: str
+    prompt_size: int
+    argv_sha256: str
+
+
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def write_provider_boundary_start(
+    destination: Path,
+    *,
+    adapter_sha256: str,
+    prompt: bytes,
+    argv: tuple[str, ...],
+) -> ProviderBoundaryStart:
+    """Atomically retain the exact provider-boundary crossing before invocation."""
+    try:
+        parent_mode = destination.parent.lstat().st_mode
+    except OSError as exc:
+        raise ValueError("provider boundary marker destination is unavailable") from exc
+    if not stat.S_ISDIR(parent_mode) or destination.parent.is_symlink():
+        raise ValueError("provider boundary marker destination is unavailable")
+    marker = ProviderBoundaryStart(
+        schema_id="graphify-claude-provider-boundary-start/v0",
+        phase="provider-boundary-started",
+        provider_process_invocations=1,
+        provider_inferences="unknown",
+        adapter_sha256=adapter_sha256,
+        prompt_sha256=_sha256(prompt),
+        prompt_size=len(prompt),
+        argv_sha256=_sha256(graphify_semantic_slice.encode_json(argv)),
+    )
+    raw = graphify_semantic_slice.encode_json(marker) + b"\n"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(destination, flags, 0o600)
+    except FileExistsError as exc:
+        raise ValueError("provider boundary marker already exists") from exc
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        destination.unlink(missing_ok=True)
+        raise
+    return marker
 
 
 def _real_executable() -> Path:
@@ -297,6 +354,13 @@ def adapter_main() -> int:
     )
     started = time.monotonic_ns()
     try:
+        boundary_path = Path(os.environ.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH", ""))
+        write_provider_boundary_start(
+            boundary_path,
+            adapter_sha256=graphify_semantic_slice.sha256_file(Path(__file__)),
+            prompt=prompt,
+            argv=real_args,
+        )
         completed = subprocess.run(
             real_args,
             input=prompt,
