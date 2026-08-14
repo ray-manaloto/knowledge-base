@@ -174,3 +174,16 @@ flowchart LR
     VERIFY -->|"deterministic evidence valid"| INC["INCOMPLETE only:<br/>semantic and release evidence absent"]
     VERIFY -->|"drift, warning, corruption,<br/>omission, false counts, wrong scope"| FAIL["FAILED with typed reasons"]
 ```
+
+## 2026-08-14 — iteration KB-299-6
+
+- Prior goal digest: iteration KB-299-5 and its first implementation commit.
+- Changed requirement: require the candidate directory's direct entries to equal the
+  manifest plus the exact required member set, with every expected entry a regular,
+  non-symlink file.
+- Reason: exact-head review added an unmanifested `semantic-receipt.json`; the public
+  verifier ignored it and still reported deterministic completeness.
+- Evidence: hostile file, directory, and symlink replays now fail; 124 focused tests plus
+  `ruff` and `ty` pass.
+- Affected tickets: only #299. #300 and #289 remain blocked and unchanged.
+- Disposition: follow-up correction awaits full gates and exact-head review before ship.

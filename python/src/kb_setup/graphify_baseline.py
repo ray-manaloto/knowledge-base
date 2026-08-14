@@ -532,6 +532,25 @@ def _member_reasons(
     return reasons, payloads
 
 
+def _candidate_entry_reasons(candidate: Path) -> list[str]:
+    expected = _REQUIRED_MEMBERS | {"manifest.json"}
+    try:
+        entries = tuple(candidate.iterdir())
+    except OSError:
+        return ["candidate-directory-unreadable"]
+    by_name = {entry.name: entry for entry in entries}
+    reasons = [
+        *(f"candidate-entry-omitted:{name}" for name in sorted(expected - by_name.keys())),
+        *(f"candidate-entry-unexpected:{name}" for name in sorted(by_name.keys() - expected)),
+    ]
+    reasons.extend(
+        f"candidate-entry-invalid:{name}"
+        for name in sorted(expected & by_name.keys())
+        if by_name[name].is_symlink() or not by_name[name].is_file()
+    )
+    return reasons
+
+
 def _graph_payload_reasons(payload: object) -> list[str]:
     reasons: list[str] = []
     if not isinstance(payload, dict):
@@ -1032,7 +1051,7 @@ def _verify_candidate(candidate: Path, authority: BaselineAuthority) -> Baseline
             deterministic_complete=False,
             reasons=("manifest-corrupt",),
         )
-    reasons = _manifest_structure_reasons(manifest)
+    reasons = [*_manifest_structure_reasons(manifest), *_candidate_entry_reasons(candidate)]
     member_reasons, payloads = _member_reasons(candidate, manifest)
     reasons.extend(member_reasons)
     reasons.extend(_authority_reasons(manifest, authority, payloads))

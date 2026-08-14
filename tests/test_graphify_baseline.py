@@ -570,13 +570,35 @@ def test_highest_public_verifier_distinguishes_missing_corrupt_and_digest_drift(
     corrupt_receipt = _verify_fixture_candidate(corrupt)
 
     assert missing_receipt.state is graphify_baseline.BaselineState.FAILED
-    assert missing_receipt.reasons == ("member-missing:health.json",)
+    assert missing_receipt.reasons == (
+        "candidate-entry-omitted:health.json",
+        "member-missing:health.json",
+    )
     assert corrupt_receipt.state is graphify_baseline.BaselineState.FAILED
     assert corrupt_receipt.reasons == (
         "member-size-mismatch:ast-graph.json",
         "member-digest-mismatch:ast-graph.json",
         "member-corrupt:ast-graph.json",
     )
+
+
+@pytest.mark.parametrize("entry_kind", ["file", "directory", "symlink"])
+def test_public_verifier_rejects_unmanifested_candidate_entries(
+    tmp_path: Path, entry_kind: str
+) -> None:
+    candidate = _write_public_candidate(tmp_path / "candidate")
+    extra = candidate / "semantic-receipt.json"
+    if entry_kind == "file":
+        extra.write_text('{"state":"complete"}\n', encoding="utf-8")
+    elif entry_kind == "directory":
+        extra.mkdir()
+    else:
+        extra.symlink_to("manifest.json")
+
+    receipt = _verify_fixture_candidate(candidate)
+
+    assert receipt.state is graphify_baseline.BaselineState.FAILED
+    assert "candidate-entry-unexpected:semantic-receipt.json" in receipt.reasons
 
 
 def test_highest_public_verifier_keeps_failure_classes_distinct(tmp_path: Path) -> None:

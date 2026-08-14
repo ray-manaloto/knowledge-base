@@ -56,6 +56,9 @@ mise run kb-graphify-baseline -- verify
 The build selects only `sources/graphify.manifest`. Derived output lives under
 `graphify-out/graphify-baseline/` and is intentionally ignored by Git. Its
 `manifest.json` binds every required member by SHA-256 and byte count.
+The candidate directory itself must contain exactly `manifest.json` plus those required
+regular-file members. Unmanifested files, directories, symlinks, and special entries fail
+verification, so later-phase evidence cannot be smuggled beside an unchanged manifest.
 
 A successful deterministic baseline returns exit code zero while reporting
 `state=incomplete`, `deterministic_complete=true`, and exactly
