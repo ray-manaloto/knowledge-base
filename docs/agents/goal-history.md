@@ -187,3 +187,12 @@ flowchart LR
   `ruff` and `ty` pass.
 - Affected tickets: only #299. #300 and #289 remain blocked and unchanged.
 - Disposition: follow-up correction awaits full gates and exact-head review before ship.
+
+## 2026-08-14 — iteration KB-299-7
+
+- Prior goal digest: iteration KB-299-6 and its first exact-head review.
+- Changed requirement: return the typed candidate-entry failure before reading any member.
+- Reason: an expected FIFO was classified invalid but the subsequent byte read blocked.
+- Evidence: expected FIFO now fails immediately; 125 focused tests plus `ruff` and `ty` pass.
+- Affected tickets: only #299. #300 and #289 remain blocked and unchanged.
+- Disposition: final correction awaits exact-head gates and bounded replay before ship.

@@ -1036,6 +1036,13 @@ def _authority_reasons(
 
 
 def _verify_candidate(candidate: Path, authority: BaselineAuthority) -> BaselineVerification:
+    entry_reasons = _candidate_entry_reasons(candidate)
+    if entry_reasons:
+        return BaselineVerification(
+            state=BaselineState.FAILED,
+            deterministic_complete=False,
+            reasons=tuple(entry_reasons),
+        )
     manifest_path = candidate / "manifest.json"
     try:
         manifest = msgspec.json.decode(manifest_path.read_bytes(), type=CandidateManifest)
@@ -1051,7 +1058,7 @@ def _verify_candidate(candidate: Path, authority: BaselineAuthority) -> Baseline
             deterministic_complete=False,
             reasons=("manifest-corrupt",),
         )
-    reasons = [*_manifest_structure_reasons(manifest), *_candidate_entry_reasons(candidate)]
+    reasons = _manifest_structure_reasons(manifest)
     member_reasons, payloads = _member_reasons(candidate, manifest)
     reasons.extend(member_reasons)
     reasons.extend(_authority_reasons(manifest, authority, payloads))
