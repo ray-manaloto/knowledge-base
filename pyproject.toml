@@ -23,7 +23,7 @@ requires-python = ">=3.14"
 # 180 commits past the still-current 0.2.0 release, so only the reviewed VCS SHA
 # can identify it; the contract below rejects any other origin or revision.
 dependencies = [
-  "graphifyy[all]==0.9.42",
+  "graphifyy[all]==0.9.43",
   "msgspec==0.21.1",
   "skillopt @ git+https://github.com/microsoft/SkillOpt@93bdf3d770b99128daf35278218e5a666fe392f3",
   "structlog>=26.1",

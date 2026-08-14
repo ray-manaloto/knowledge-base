@@ -1,8 +1,8 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Review-owned #301 authority roots, intentionally outside planner identity."""
 
-PROTOTYPE_CONTRACT_SHA256 = "d284df0303bdb9102332f91b49070ca6c5d4686a52cb461888afe97615b89cb7"
-PROTOTYPE_LAUNCHER_SHA256 = "069c1a3e940e148260f629dde3582a85a7209b97d35c920054cadebeb4e5328d"
+PROTOTYPE_CONTRACT_SHA256 = "b7a41ea639efc28a714e1f1faa47dcdc69c6d5b8cdf17719c7a78fffaa583848"
+PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88ec4577cd9fb428"
 
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"",'

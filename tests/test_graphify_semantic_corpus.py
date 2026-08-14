@@ -13,11 +13,14 @@ import inspect
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Never
+from types import ModuleType
+from typing import Never, cast
 
 import msgspec
 import pytest
@@ -77,16 +80,12 @@ def _real_provider_evidence(repo_root: Path) -> tuple[bytes, bytes]:
 def _exact_graphify_plan(tmp_path: Path) -> Path:
     repo_root = Path(__file__).resolve().parents[1]
     source = tmp_path / "exact-graphify-source"
-    graphify_semantic_slice.admit_source(repo_root, source)
+    source_pin = graphify_semantic_corpus.admit_source(repo_root, source)
     candidate = tmp_path / "exact-graphify-plan"
     graphify_semantic_corpus.plan_source(
         source,
         candidate,
-        source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.42",
-            commit=_git(source, "rev-parse", "HEAD"),
-            tree=_git(source, "rev-parse", "HEAD^{tree}"),
-        ),
+        source=source_pin,
     )
     return candidate
 
@@ -192,7 +191,7 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.42",
+            ref="v0.9.43",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -202,14 +201,14 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
     assert advisories["entries"] == [
         {
             "code": "graphify-large-corpus-token-cost",
-            "detector_git_object": "ab8e6b01116a23a3617e220830cdb22073d9784e",
+            "detector_git_object": "c51ea916eec10cee4e73ca8c9d565083a008ecd0",
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 782 files · ~1,371,478 words. Semantic extraction will be "
+                "Large corpus: 786 files · ~1,379,183 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 782,
-            "observed_words": 1_371_478,
+            "observed_files": 786,
+            "observed_words": 1_379_183,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }
@@ -255,7 +254,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.42",
+            ref="v0.9.43",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -264,7 +263,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
     advisory = json.loads(advisory_path.read_text(encoding="utf-8"))
     advisory["entries"][0]["observed_files"] += 1
     advisory["entries"][0]["message"] = advisory["entries"][0]["message"].replace(
-        "782 files", "783 files"
+        "786 files", "787 files"
     )
     advisory_path.write_bytes(_canonical(advisory))
     _rehash_plan(candidate)
@@ -711,15 +710,22 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
+    assert inventory["source_ref"] == "v0.9.43"
+    assert inventory["source_commit"] == "7281f27eac568f77f50910f59f84543458f5dfd1"
+    assert inventory["source_tree"] == "6ae1c399eb1beef4f51106bbeecf72ee035fbeb6"
     assert inventory["detected_source_count"] == 372
     assert inventory["discovered_unit_count"] == 474
     assert inventory["admitted_unit_count"] == 470
     assert (
         inventory["source_manifest_sha256"]
-        == "da56d50eadb82b0889d8e9ad4b1260c98d4d8e6ab413e8abed5ddfcac0bdee68"
+        == "f839cca43889465bb43449f77880ec39a92f68bcee5d892ab8bfb18452a0690a"
     )
     assert len(ledger["chunks"]) == 57
-    assert "max_turns" not in config
+    assert config["max_turns"] == 3
+    assert (
+        config["semantic_slice_sha256"]
+        == hashlib.sha256(Path(graphify_semantic_slice.__file__).read_bytes()).hexdigest()
+    )
     result = graphify_semantic_corpus.verify_plan(
         candidate, source_root=candidate.parent / "exact-graphify-source"
     )
@@ -751,7 +757,7 @@ def test_consumed_authority_blocks_prototype_before_topology_creation(tmp_path: 
     assert not state.exists()
 
 
-def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() -> None:
+def test_corpus_adapter_rejects_more_than_three_turns() -> None:
     envelope = {
         "type": "result",
         "subtype": "success",
@@ -775,8 +781,177 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
         {"KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": "/retained/state/provider-boundary-start.json"},
     )
 
-    assert reasons == ()
+    assert reasons == ("turn-bound-exceeded",)
     assert envelope["num_turns"] == 4
+
+
+def test_hidden_max_turns_parser_probe_requires_invalid_integer_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def supported(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        calls.append(argv)
+        return subprocess.CompletedProcess(
+            argv,
+            1,
+            b"",
+            b"error: option '--max-turns <turns>' argument "
+            b"'not-an-integer' is invalid. must be a number\n",
+        )
+
+    monkeypatch.setattr(subprocess, "run", supported)
+
+    graphify_semantic_slice._assert_value_flag_supported(
+        Path("/fake/claude"), "--max-turns", environment={}
+    )
+    assert calls == [["/fake/claude", "-p", "--max-turns", "not-an-integer"]]
+
+
+def test_hidden_max_turns_parser_probe_rejects_unknown_option(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unsupported(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(
+            argv,
+            1,
+            b"",
+            b"error: unknown option '--max-turns'\n",
+        )
+
+    monkeypatch.setattr(subprocess, "run", unsupported)
+
+    with pytest.raises(ValueError, match="--max-turns parser probe failed"):
+        graphify_semantic_slice._assert_value_flag_supported(
+            Path("/fake/claude"), "--max-turns", environment={}
+        )
+
+
+def test_result_array_normalizes_exactly_one_final_graphify_envelope() -> None:
+    # Mirrors Graphify v0.9.43's streamed error-envelope fixture. Parsing and
+    # policy validation are separate: this test proves strict normalization.
+    raw = (
+        b'[{"type":"system","subtype":"init"},'
+        b'{"type":"result","subtype":"success","is_error":true,'
+        b'"result":"API Error: Rate limit reached",'
+        b'"stop_reason":"stop_sequence","usage":{"input_tokens":0,'
+        b'"output_tokens":0},"modelUsage":{}}]'
+    )
+
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+
+    assert envelope == {
+        "type": "result",
+        "subtype": "success",
+        "is_error": True,
+        "result": "API Error: Rate limit reached",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 0, "output_tokens": 0},
+        "modelUsage": {},
+    }
+    assert msgspec.structs.asdict(observation) == {
+        "schema_id": "graphify-claude-envelope-parse/v1",
+        "status": "accepted-result-array",
+        "response_sha256": "9a20666913bb548f761e4a11c8b2f8d36fa9ef40a0ec50d09ce147e0efc6bf83",
+        "response_size": 222,
+        "utf8_valid": True,
+        "json_valid": True,
+        "top_level_kind": "array",
+        "event_count": 2,
+        "result_count": 1,
+        "selected_index": 1,
+        "error_offset": -1,
+        "trailing_non_whitespace": False,
+    }
+    encoded = graphify_semantic_slice.encode_json(observation)
+    assert b"API Error" not in encoded
+    assert b"modelUsage" not in encoded
+
+
+def test_tracked_prototype_launcher_uses_strict_result_normalization() -> None:
+    launcher = (
+        Path(__file__).resolve().parents[1]
+        / "docs/agents/evidence/issue-301/prototype-corrected-launcher.py"
+    )
+    namespace = runpy.run_path(str(launcher))
+    parse_fragment = cast("Callable[[bytes], dict[str, object]]", namespace["parse_fragment"])
+    raw = (
+        b'[{"type":"system","subtype":"init"},'
+        b'{"type":"result","structured_output":{"nodes":[],"edges":[]}}]'
+    )
+
+    assert parse_fragment(raw) == {"nodes": [], "edges": [], "hyperedges": []}
+    assert parse_fragment(b'[{"type":"result"},{"type":"assistant"}]') == {}
+
+
+@pytest.mark.parametrize(
+    ("raw", "status", "event_count", "result_count", "selected_index"),
+    [
+        (b"[]", "result-array-empty", 0, 0, -1),
+        (
+            b'[{"type":"assistant"}]',
+            "result-array-missing-final-result",
+            1,
+            0,
+            -1,
+        ),
+        (
+            b'[{"type":"result"},{"type":"result"}]',
+            "result-array-ambiguous-result",
+            2,
+            2,
+            -1,
+        ),
+        (
+            b'[{"type":"result"},{"type":"assistant"}]',
+            "result-array-trailing-event",
+            2,
+            1,
+            0,
+        ),
+        (
+            b'[{"type":"assistant"},"private-secret"]',
+            "result-array-non-object-event",
+            2,
+            0,
+            -1,
+        ),
+        (
+            b'[{"type":"result"},"private-secret"]',
+            "result-array-non-object-event",
+            2,
+            1,
+            -1,
+        ),
+    ],
+)
+def test_result_array_rejects_ambiguous_or_hostile_shapes_without_content(
+    raw: bytes,
+    status: str,
+    event_count: int,
+    result_count: int,
+    selected_index: int,
+) -> None:
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+
+    assert envelope == {}
+    assert observation.status == status
+    assert observation.top_level_kind == "array"
+    assert observation.event_count == event_count
+    assert observation.result_count == result_count
+    assert observation.selected_index == selected_index
+    assert (
+        graphify_semantic_adapter.parse_observation_reasons(
+            observation,
+            digest=graphify_semantic_adapter.parse_observation_sha256(observation),
+            response_sha256=observation.response_sha256,
+            response_size=observation.response_size,
+        )
+        == ()
+    )
+    encoded = graphify_semantic_slice.encode_json(observation)
+    assert raw not in encoded
+    assert b"private-secret" not in encoded
 
 
 @pytest.mark.parametrize(
@@ -794,6 +969,9 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": True,
                 "json_valid": True,
                 "top_level_kind": "object",
+                "event_count": 1,
+                "result_count": 1,
+                "selected_index": 0,
                 "error_offset": -1,
                 "trailing_non_whitespace": False,
             },
@@ -810,6 +988,9 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": False,
                 "json_valid": False,
                 "top_level_kind": "unknown",
+                "event_count": 0,
+                "result_count": 0,
+                "selected_index": -1,
                 "error_offset": 0,
                 "trailing_non_whitespace": False,
             },
@@ -826,6 +1007,9 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": True,
                 "json_valid": False,
                 "top_level_kind": "object",
+                "event_count": 0,
+                "result_count": 0,
+                "selected_index": -1,
                 "error_offset": 8,
                 "trailing_non_whitespace": False,
             },
@@ -842,6 +1026,9 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": True,
                 "json_valid": False,
                 "top_level_kind": "object",
+                "event_count": 0,
+                "result_count": 0,
+                "selected_index": -1,
                 "error_offset": 18,
                 "trailing_non_whitespace": True,
             },
@@ -858,15 +1045,18 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": True,
                 "json_valid": False,
                 "top_level_kind": "object",
+                "event_count": 0,
+                "result_count": 0,
+                "selected_index": -1,
                 "error_offset": 10,
                 "trailing_non_whitespace": False,
             },
         ),
         (
             b'[{"type":"result"}]',
-            {},
+            {"type": "result"},
             {
-                "status": "valid-non-object",
+                "status": "accepted-result-array",
                 "response_sha256": (
                     "5b51d00d46fe9b28ec9c405101ad42380081e0e8d5dd666e08a5d1d32375e543"
                 ),
@@ -874,6 +1064,9 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": True,
                 "json_valid": True,
                 "top_level_kind": "array",
+                "event_count": 1,
+                "result_count": 1,
+                "selected_index": 0,
                 "error_offset": -1,
                 "trailing_non_whitespace": False,
             },
@@ -890,6 +1083,9 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
                 "utf8_valid": True,
                 "json_valid": True,
                 "top_level_kind": "string",
+                "event_count": 0,
+                "result_count": 0,
+                "selected_index": -1,
                 "error_offset": -1,
                 "trailing_non_whitespace": False,
             },
@@ -905,7 +1101,7 @@ def test_parse_observation_retains_only_sanitized_shape(
 
     assert envelope == expected_envelope
     assert msgspec.structs.asdict(observation) == {
-        "schema_id": "graphify-claude-envelope-parse/v0",
+        "schema_id": "graphify-claude-envelope-parse/v1",
         **expected,
     }
     encoded = msgspec.json.encode(observation, order="sorted")
@@ -937,13 +1133,16 @@ def test_parse_observation_rejects_non_json_numeric_constants(
 
     assert envelope == {}
     assert msgspec.structs.asdict(observation) == {
-        "schema_id": "graphify-claude-envelope-parse/v0",
+        "schema_id": "graphify-claude-envelope-parse/v1",
         "status": "non-json-constant",
         "response_sha256": response_sha256,
         "response_size": len(raw),
         "utf8_valid": True,
         "json_valid": False,
         "top_level_kind": "object",
+        "event_count": 0,
+        "result_count": 0,
+        "selected_index": -1,
         "error_offset": -1,
         "trailing_non_whitespace": False,
     }
@@ -965,13 +1164,16 @@ def test_parse_observation_classifies_decoder_integer_limit() -> None:
 
     assert envelope == {}
     assert msgspec.structs.asdict(observation) == {
-        "schema_id": "graphify-claude-envelope-parse/v0",
+        "schema_id": "graphify-claude-envelope-parse/v1",
         "status": "numeric-limit",
         "response_sha256": ("1eff2f020fdbf3a04199fdb261f586dc21fc55a896c4cdc055dfdad0324fd1d3"),
         "response_size": 5_010,
         "utf8_valid": True,
         "json_valid": False,
         "top_level_kind": "object",
+        "event_count": 0,
+        "result_count": 0,
+        "selected_index": -1,
         "error_offset": -1,
         "trailing_non_whitespace": False,
     }
@@ -993,13 +1195,16 @@ def test_parse_observation_classifies_decoder_nesting_limit() -> None:
 
     assert envelope == {}
     assert msgspec.structs.asdict(observation) == {
-        "schema_id": "graphify-claude-envelope-parse/v0",
+        "schema_id": "graphify-claude-envelope-parse/v1",
         "status": "nesting-limit",
         "response_sha256": ("00ed238197a55cf471748c8cfee32101b3c61ddb1137b72ca0e97fce847f6fe5"),
         "response_size": 100_001,
         "utf8_valid": True,
         "json_valid": False,
         "top_level_kind": "array",
+        "event_count": 0,
+        "result_count": 0,
+        "selected_index": -1,
         "error_offset": -1,
         "trailing_non_whitespace": False,
     }
@@ -1020,7 +1225,7 @@ def test_parse_observation_digest_rejects_coherent_metadata_tampering() -> None:
     digest = graphify_semantic_adapter.parse_observation_sha256(observation)
     tampered = msgspec.structs.replace(
         observation,
-        status="valid-non-object",
+        status="accepted-result-array",
         top_level_kind="array",
     )
 
@@ -1132,6 +1337,42 @@ def test_adapter_metadata_atomically_binds_sanitized_parse_observation() -> None
     )
 
 
+def test_corpus_accepts_strictly_normalized_final_result_array() -> None:
+    raw = (
+        b'[{"type":"system","subtype":"init"},'
+        b'{"type":"result","subtype":"success","is_error":false,'
+        b'"terminal_reason":"completed","stop_reason":"tool_use",'
+        b'"permission_denials":[]}]'
+    )
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+    metadata = graphify_semantic_adapter._metadata(
+        graphify_semantic_adapter.MetadataInputs(
+            executable=Path("/bin/sh"),
+            version="test",
+            argv=(),
+            environment={},
+            auth=graphify_semantic_slice.AuthIdentity(
+                logged_in=True,
+                auth_method="claude.ai",
+                api_provider="firstParty",
+                subscription_type="max",
+            ),
+            prompt=b"prompt",
+            stdout=raw,
+            stderr=b"",
+            returncode=0,
+            envelope=envelope,
+            parse_observation=observation,
+            elapsed_ms=1,
+            reasons=(),
+        )
+    )
+
+    assert metadata.parse_observation is not None
+    assert metadata.parse_observation.status == "accepted-result-array"
+    assert graphify_semantic_corpus._adapter_metadata_reasons(metadata) == []
+
+
 def test_corrected_terminal_artifacts_remain_byte_identical() -> None:
     root = (
         Path(__file__).resolve().parents[1]
@@ -1225,6 +1466,32 @@ def test_file_backed_authority_converges_without_changing_planner_bytes(tmp_path
     )
     assert result.state == "failed"
     assert "config-contract-mismatch" in result.reasons
+
+
+def test_semantic_slice_policy_drift_invalidates_existing_plan(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    commit, tree = _source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+    )
+    original_module_sha = graphify_semantic_corpus._module_sha
+
+    def hostile_module_sha(module: ModuleType) -> str:
+        if module is graphify_semantic_slice:
+            return "f" * 64
+        return original_module_sha(module)
+
+    monkeypatch.setattr(graphify_semantic_corpus, "_module_sha", hostile_module_sha)
+
+    verdict = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+
+    assert "config-contract-mismatch" in verdict.reasons
 
 
 def test_ledger_is_reconciled_to_real_source_inventory(tmp_path: Path) -> None:

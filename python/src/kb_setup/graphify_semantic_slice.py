@@ -255,6 +255,15 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
     wheel_sha256="d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6",
     sdist_sha256="a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b",
 )
+_CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
+    version="0.9.43",
+    cli_version="0.9.43",
+    sdk_version="0.9.43",
+    executable=".venv/bin/graphify",
+    sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
+    wheel_sha256="a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b",
+    sdist_sha256="7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3",
+)
 _ACCEPTED_CLAUDE_VERSION = "2.1.232"
 _ACCEPTED_CLAUDE_EXECUTABLE_SHA256 = (
     "7b39c1588df919d001dea3ffd5651adb682f2451b5a0e18d42d4233296b53cc7"
@@ -359,7 +368,40 @@ def _completed_bytes(executable: Path, *args: str, environment: Mapping[str, str
     return completed.stdout
 
 
-def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> ClaudePreflight:
+def _assert_value_flag_supported(
+    executable: Path,
+    flag: str,
+    *,
+    environment: Mapping[str, str],
+) -> None:
+    """Prove a hidden value-taking CLI flag at parser time without inference."""
+    invalid_value = "not-an-integer"
+    completed = subprocess.run(
+        [str(executable), "-p", flag, invalid_value],
+        capture_output=True,
+        check=False,
+        env=dict(environment),
+        timeout=30,
+    )
+    diagnostic = completed.stderr
+    if (
+        completed.returncode != 1
+        or completed.stdout
+        or flag.encode() not in diagnostic
+        or invalid_value.encode() not in diagnostic
+        or b"is invalid" not in diagnostic
+        or b"must be a number" not in diagnostic
+    ):
+        raise ValueError(f"Claude {flag} parser probe failed")
+
+
+def preflight(
+    repo_root: Path,
+    environment: Mapping[str, str] | None = None,
+    *,
+    graphify_version: str = "0.9.43",
+    require_max_turns: bool = False,
+) -> ClaudePreflight:
     """Prove exact Graphify/Claude/auth/routing capability without inference."""
     from kb_setup import graphify_baseline, graphify_env, graphify_sdk
 
@@ -368,7 +410,7 @@ def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> 
     if overrides:
         raise ValueError("forbidden routing environment names: " + ", ".join(overrides))
     graphify_env.assert_pinned_graphify(repo_root)
-    graphify_sdk.assert_semantic_sdk("0.9.42")
+    graphify_sdk.assert_semantic_sdk(graphify_version)
     resolved = shutil.which("claude", path=current.get("PATH"))
     if not resolved:
         raise ValueError("Claude Code CLI is unavailable")
@@ -379,6 +421,10 @@ def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> 
     missing = tuple(flag for flag in _REQUIRED_CLAUDE_FLAGS if flag not in help_text)
     if missing:
         raise ValueError("Claude Code required flags are unavailable: " + ", ".join(missing))
+    required_flags = _REQUIRED_CLAUDE_FLAGS
+    if require_max_turns:
+        _assert_value_flag_supported(executable, "--max-turns", environment=child)
+        required_flags = (*required_flags, "--max-turns")
     version_raw = _completed_bytes(executable, "--version", environment=child)
     version_text = version_raw.decode("utf-8", errors="strict").strip()
     match = re.search(r"\b\d+\.\d+\.\d+\b", version_text)
@@ -391,7 +437,7 @@ def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> 
         executable_sha256=sha256_file(executable),
         version=match.group(0),
         help_sha256=hashlib.sha256(help_raw).hexdigest(),
-        required_flags=_REQUIRED_CLAUDE_FLAGS,
+        required_flags=required_flags,
         auth=classify_auth(auth_raw),
         environment_names=tuple(sorted(child)),
         graphify_runtime=graphify_baseline.runtime_identity(repo_root),
@@ -712,7 +758,10 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
                 response_size=metadata.response_size,
             )
         )
-        if metadata.parse_observation.status != "accepted-object":
+        if metadata.parse_observation.status not in {
+            "accepted-object",
+            "accepted-result-array",
+        }:
             reasons.append("adapter-response-untyped")
     if len(metadata.model_usage) != 1:
         reasons.append("adapter-model-count-mismatch")
@@ -767,7 +816,16 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
     return reasons
 
 
-def _runtime_reasons(runtime: ClaudePreflight) -> list[str]:
+def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> list[str]:
+    accepted_graphify_pairs = (
+        ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.42"),)
+        if enforce_authority
+        else (
+            (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.42"),
+            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.43"),
+        )
+    )
+    accepted_graphify_runtimes = tuple(pair[0] for pair in accepted_graphify_pairs)
     names = set(runtime.environment_names)
     allowed = {*_CHILD_BASE_ENV_NAMES, *_CHILD_CONTROL_ENV}
     required = {*_CHILD_CONTROL_ENV, "PATH"}
@@ -780,8 +838,14 @@ def _runtime_reasons(runtime: ClaudePreflight) -> list[str]:
         ),
         (runtime.help_sha256 == _ACCEPTED_CLAUDE_HELP_SHA256, "receipt-claude-help-mismatch"),
         (runtime.required_flags == _REQUIRED_CLAUDE_FLAGS, "receipt-cli-flags-mismatch"),
-        (runtime.graphify_runtime == _ACCEPTED_GRAPHIFY_RUNTIME, "receipt-runtime-mismatch"),
-        (runtime.graphify_version == "0.9.42", "receipt-graphify-version-mismatch"),
+        (
+            runtime.graphify_runtime in accepted_graphify_runtimes,
+            "receipt-runtime-mismatch",
+        ),
+        (
+            (runtime.graphify_runtime, runtime.graphify_version) in accepted_graphify_pairs,
+            "receipt-graphify-version-mismatch",
+        ),
         (
             runtime.graphify_semantic_fingerprint_sha256 == _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256,
             "receipt-semantic-fingerprint-mismatch",
@@ -817,10 +881,13 @@ def _chunk_reasons(receipt: SemanticReceipt, metadata: object, fragment: object)
 def _receipt_reasons(
     receipt: SemanticReceipt,
     manifest: CandidateManifest,
-    metadata_raw: bytes,
-    fragment_raw: bytes,
+    payloads: Mapping[str, bytes],
     fragment: object,
+    *,
+    enforce_authority: bool,
 ) -> list[str]:
+    metadata_raw = payloads["adapter-metadata.json"]
+    fragment_raw = payloads["semantic-fragment.json"]
     reasons: list[str] = []
     checks = (
         (receipt.schema_id == _CANDIDATE_SCHEMA, "receipt-schema-mismatch"),
@@ -861,7 +928,7 @@ def _receipt_reasons(
         ),
     )
     reasons.extend(reason for accepted, reason in checks if not accepted)
-    reasons.extend(_runtime_reasons(receipt.runtime))
+    reasons.extend(_runtime_reasons(receipt.runtime, enforce_authority=enforce_authority))
     if isinstance(fragment, dict):
         counts = (
             len(fragment.get("nodes", [])),
@@ -949,9 +1016,9 @@ def _verify_candidate(candidate: Path, *, enforce_authority: bool) -> SemanticVe
                 _receipt_reasons(
                     receipt,
                     manifest,
-                    payloads["adapter-metadata.json"],
-                    payloads["semantic-fragment.json"],
+                    payloads,
                     fragment,
+                    enforce_authority=enforce_authority,
                 )
             )
     unique = tuple(dict.fromkeys(reasons))
@@ -990,9 +1057,12 @@ def _write_json(path: Path, value: object) -> bytes:
 
 def _admit_source(repo_root: Path, destination: Path) -> tuple[Path, object]:
     from kb_setup import graph, graphify_baseline
-    from kb_setup import manifest as source_manifests
 
-    source_manifest = source_manifests.load(repo_root / "sources/graphify.manifest")
+    source_manifest = graphify_baseline.historical_graphify_manifest(
+        repo_root,
+        ref=SOURCE_REF,
+        commit=SOURCE_COMMIT,
+    )
     provenance = graph.materialize_source_snapshot(source_manifest, destination)
     if (source_manifest.ref, provenance.resolved_commit, provenance.tree_digest) != (
         SOURCE_REF,

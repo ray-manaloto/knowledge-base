@@ -82,12 +82,22 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_COMMIT = "7fe58b0b0f3873be9a21c30106b8b8527c353aa6"
-_ACCEPTED_GRAPHIFY_TREE = "15ca81a8dbd3ded7083c4b573197140e62e95fcc"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.43"
+_ACCEPTED_GRAPHIFY_COMMIT = "7281f27eac568f77f50910f59f84543458f5dfd1"
+_ACCEPTED_GRAPHIFY_TREE = "6ae1c399eb1beef4f51106bbeecf72ee035fbeb6"
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "da56d50eadb82b0889d8e9ad4b1260c98d4d8e6ab413e8abed5ddfcac0bdee68"
+    "f839cca43889465bb43449f77880ec39a92f68bcee5d892ab8bfb18452a0690a"
 )
-_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "ab8e6b01116a23a3617e220830cdb22073d9784e"
+_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "c51ea916eec10cee4e73ca8c9d565083a008ecd0"
+_ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
+    version="0.9.43",
+    cli_version="0.9.43",
+    sdk_version="0.9.43",
+    executable=".venv/bin/graphify",
+    sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
+    wheel_sha256="a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b",
+    sdist_sha256="7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3",
+)
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
 _CLAUDE_VERSION = "2.1.232"
@@ -104,6 +114,7 @@ _CLAUDE_REQUIRED_FLAGS = (
     "--safe-mode",
     "--strict-mcp-config",
     "--tools",
+    "--max-turns",
 )
 _EXTRACTION_USER_INSTRUCTION = (
     "\n\n---\n"
@@ -120,6 +131,28 @@ class SourcePin(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     ref: str
     commit: str
     tree: str
+
+
+def admit_source(repo_root: Path, destination: Path) -> SourcePin:
+    """Materialize the current #301 Graphify pin without reusing #300's old source."""
+    from kb_setup import graph
+    from kb_setup import manifest as source_manifests
+
+    source_manifest = source_manifests.load(repo_root / "sources/graphify.manifest")
+    provenance = graph.materialize_source_snapshot(source_manifest, destination)
+    observed = (
+        source_manifest.ref,
+        provenance.resolved_commit,
+        provenance.tree_digest,
+    )
+    expected = (
+        _ACCEPTED_GRAPHIFY_REF,
+        _ACCEPTED_GRAPHIFY_COMMIT,
+        _ACCEPTED_GRAPHIFY_TREE,
+    )
+    if observed != expected:
+        raise ValueError("Graphify semantic corpus source identity drifted")
+    return SourcePin(ref=observed[0], commit=observed[1], tree=observed[2])
 
 
 class SourceUnit(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -239,6 +272,7 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     graphify_llm_sha256: str
     planner_sha256: str
     adapter_sha256: str
+    semantic_slice_sha256: str
     prompt_contract_sha256: str
     structured_schema_sha256: str
     claude_version: str
@@ -258,6 +292,7 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     claude_max_output_tokens: int
     claude_max_retries: int
     structured_output_retries: int
+    max_turns: int
     max_cost_usd: float
     graphify_max_retry_depth: int
     graphify_chunk_size: int
@@ -547,12 +582,13 @@ def _effective_config(
         graphify_ref=source.ref,
         graphify_commit=source.commit,
         graphify_tree=source.tree,
-        graphify_version="0.9.42",
-        graphify_runtime=graphify_semantic_slice.accepted_graphify_runtime(),
+        graphify_version="0.9.43",
+        graphify_runtime=_ACCEPTED_GRAPHIFY_RUNTIME,
         graphify_semantic_fingerprint_sha256=semantic_fingerprint,
         graphify_llm_sha256=graphify_llm_sha,
         planner_sha256=_sha_file(Path(__file__)),
         adapter_sha256=_module_sha(graphify_semantic_adapter),
+        semantic_slice_sha256=_module_sha(graphify_semantic_slice),
         prompt_contract_sha256=prompt_contract_sha,
         structured_schema_sha256=graphify_semantic_slice.GRAPHIFY_SCHEMA_SHA256,
         claude_version=_CLAUDE_VERSION,
@@ -572,6 +608,7 @@ def _effective_config(
         claude_max_output_tokens=4096,
         claude_max_retries=0,
         structured_output_retries=1,
+        max_turns=3,
         max_cost_usd=0.25,
         graphify_max_retry_depth=0,
         graphify_chunk_size=20,
@@ -1796,9 +1833,10 @@ def _adapter_metadata_reasons(
         response_size=metadata.response_size,
     )
     reasons.extend(f"provider-{reason}" for reason in parse_reasons)
-    if metadata.parse_observation is not None and (
-        metadata.parse_observation.status != "accepted-object"
-    ):
+    if metadata.parse_observation is not None and metadata.parse_observation.status not in {
+        "accepted-object",
+        "accepted-result-array",
+    }:
         reasons.append("provider-response-untyped")
     return reasons
 
@@ -1826,6 +1864,8 @@ def _adapter_config_reasons(
         "--no-chrome",
         "--max-budget-usd",
         str(config.max_cost_usd),
+        "--max-turns",
+        str(config.max_turns),
     )
     usage_valid = (
         len(metadata.model_usage) == 1
@@ -2697,7 +2737,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
     if action in {"verify", "run"}:
         with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-verify-") as raw_source:
             source_root = Path(raw_source) / "graphify"
-            graphify_semantic_slice.admit_source(repo_root, source_root)
+            admit_source(repo_root, source_root)
             verification = verify_plan(output, source_root)
         if action == "verify":
             print(_encode(verification).decode().rstrip())
@@ -2707,15 +2747,11 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
         return _abort(output, ("provider-execution-not-implemented",))
     with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-source-") as raw_source:
         source_root = Path(raw_source) / "graphify"
-        graphify_semantic_slice.admit_source(repo_root, source_root)
+        source_pin = admit_source(repo_root, source_root)
         manifest = plan_source(
             source_root,
             output,
-            source=SourcePin(
-                ref=graphify_semantic_slice.SOURCE_REF,
-                commit=graphify_semantic_slice.SOURCE_COMMIT,
-                tree=graphify_semantic_slice.SOURCE_TREE,
-            ),
+            source=source_pin,
         )
     print(_encode(manifest).decode().rstrip())
     return 0

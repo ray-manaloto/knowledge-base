@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import tomllib
 from copy import deepcopy
+from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -216,9 +217,10 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.42"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.43"
 _ACCEPTED_GRAPHIFY_REF = "v0.9.42"
 _ACCEPTED_GRAPHIFY_EXECUTABLE = ".venv/bin/graphify"
+_ACCEPTED_GRAPHIFY_URL = "https://github.com/Graphify-Labs/graphify"
 _LPK_CORRECTION_NAME = "graphify-0.9.42-lpk-file-unit-identity"
 _LPK_CORRECTION_PATH = "tests/fixtures/sample.lpk"
 _LPK_CORRECTION_SHA256 = "d35ab7cfc6b30910020239b7389a4e732b5545269fd4b1cd43d7459aa2c40e1f"
@@ -229,8 +231,8 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6",
-    "sdist_sha256": "a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b",
+    "wheel_sha256": "a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b",
+    "sdist_sha256": "7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
@@ -325,6 +327,20 @@ def runtime_identity(repo_root: Path) -> RuntimeIdentity:
             "Graphify release, CLI, SDK, and locked distribution versions do not agree"
         )
     return identity
+
+
+def historical_graphify_manifest(
+    repo_root: Path, *, ref: str, commit: str
+) -> source_manifests.Manifest:
+    """Reuse the reviewed Graphify remote while pinning historical evidence explicitly."""
+    current = source_manifests.load(repo_root / "sources" / "graphify.manifest")
+    if (current.name, current.url, current.kind) != (
+        "graphify",
+        _ACCEPTED_GRAPHIFY_URL,
+        "code",
+    ):
+        raise ValueError("Graphify historical source remote identity drifted")
+    return replace(current, ref=ref, commit=commit)
 
 
 def _git_bytes(root: Path, *args: str) -> bytes:
@@ -1701,15 +1717,13 @@ def build_from_snapshot(
 
 def build_baseline(repo_root: Path, output: Path) -> BaselineVerification:
     """Materialize the pinned Graphify source and build its deterministic AST baseline."""
-    graphify_manifest = source_manifests.load(repo_root / "sources" / "graphify.manifest")
-    if graphify_manifest.name != "graphify" or graphify_manifest.kind != "code":
-        raise ValueError("Graphify baseline requires exactly the Graphify code manifest")
     catalog = load_disposition_catalog(repo_root)
+    graphify_manifest = historical_graphify_manifest(
+        repo_root,
+        ref=catalog.source_ref,
+        commit=catalog.source_commit,
+    )
     runtime = runtime_identity(repo_root)
-    if graphify_manifest.ref != catalog.source_ref:
-        raise ValueError("Graphify disposition catalog and source manifest refs differ")
-    if catalog.source_commit != graphify_manifest.commit:
-        raise ValueError("Graphify disposition catalog and source manifest commits differ")
     with tempfile.TemporaryDirectory(prefix="kb-graphify-baseline-source-") as source_dir:
         source = Path(source_dir) / "graphify"
         provenance = graph.materialize_source_snapshot(graphify_manifest, source)
@@ -1736,10 +1750,12 @@ def certify_baseline_controls(repo_root: Path) -> ControlsReceipt:
     from kb_setup import graphify_env
 
     graphify_env.assert_pinned_graphify(repo_root)
-    graphify_manifest = source_manifests.load(repo_root / "sources" / "graphify.manifest")
     catalog = load_disposition_catalog(repo_root)
-    if graphify_manifest.ref != catalog.source_ref:
-        raise ValueError("Graphify control catalog and source manifest refs differ")
+    graphify_manifest = historical_graphify_manifest(
+        repo_root,
+        ref=catalog.source_ref,
+        commit=catalog.source_commit,
+    )
     with tempfile.TemporaryDirectory(prefix="kb-graphify-controls-source-") as source_dir:
         source = Path(source_dir) / "graphify"
         provenance = graph.materialize_source_snapshot(graphify_manifest, source)

@@ -19,16 +19,16 @@ from kb_setup.graphify_health import (
 )
 
 
-def test_graphify_0942_public_sdk_contract_is_current() -> None:
-    assert graphify_sdk.contract_errors("0.9.42") == ()
+def test_graphify_0943_public_sdk_contract_is_current() -> None:
+    assert graphify_sdk.contract_errors("0.9.43") == ()
 
 
-def test_graphify_0942_watch_conclusions_are_structured_notes() -> None:
+def test_graphify_0943_watch_conclusions_are_structured_notes() -> None:
     repo = Path(__file__).parent.parent.absolute()
     graphify = {spec.name: spec for spec in currency_config.load(repo)}["graphify"]
     conclusions = {item.ref: item.note for item in graphify.watch if item.kind == "local"}
 
-    assert "2026-08-13 for 0.9.42" in conclusions["label-communities-schema-gap"]
+    assert "2026-08-14 for 0.9.43" in conclusions["label-communities-schema-gap"]
     assert "Remains RESOLVED" in conclusions["mcp-major-pin-is-what-makes-kb-serve-installable"]
     assert "remains UNKNOWN" in conclusions["data-only-json-produces-zero-nodes"]
 
@@ -50,14 +50,14 @@ def test_signature_drift_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     with pytest.raises(RuntimeError, match="signature changed"):
-        graphify_sdk.assert_public_sdk("0.9.42")
+        graphify_sdk.assert_public_sdk("0.9.43")
 
 
 def test_sdk_version_drift_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(graphify_sdk, "running_sdk_version", lambda: "0.9.41")
 
     with pytest.raises(RuntimeError, match=r"version 0\.9\.41"):
-        graphify_sdk.assert_public_sdk("0.9.42")
+        graphify_sdk.assert_public_sdk("0.9.43")
 
 
 def test_contract_main_checks_the_repository_pin(
@@ -67,11 +67,11 @@ def test_contract_main_checks_the_repository_pin(
 
     calls: list[Path] = []
     monkeypatch.setattr(graphify_env, "assert_pinned_graphify", calls.append)
-    monkeypatch.setattr(graphify_sdk, "running_sdk_version", lambda: "0.9.42")
+    monkeypatch.setattr(graphify_sdk, "running_sdk_version", lambda: "0.9.43")
 
     assert graphify_sdk.contract_main(tmp_path) == 0
     assert calls == [tmp_path]
-    assert "Graphify CLI/SDK contract PASS: 0.9.42" in capsys.readouterr().out
+    assert "Graphify CLI/SDK contract PASS: 0.9.43" in capsys.readouterr().out
 
 
 def test_checked_detect_blocks_required_unclassified_source(

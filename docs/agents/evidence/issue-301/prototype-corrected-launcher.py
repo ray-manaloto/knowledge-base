@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import subprocess
 import tempfile
@@ -46,6 +45,15 @@ def write_outcome(root: Path, outcome: PrototypeOutcome) -> None:
     atomic.write_text(root / "prototype-receipt.json", encode(outcome).decode("utf-8"))
 
 
+def parse_fragment(stdout: bytes) -> dict[str, object]:
+    envelope, _observation = adapter_contract.parse_result_envelope(stdout)
+    structured = envelope.get("structured_output")
+    fragment = dict(structured) if isinstance(structured, dict) else {}
+    if fragment:
+        fragment.setdefault("hyperedges", [])
+    return fragment
+
+
 def main() -> int:
     repo = Path.cwd()
     plan = repo / "graphify-out/graphify-semantic-corpus"
@@ -59,7 +67,7 @@ def main() -> int:
     adapter_invocations = 0
     with tempfile.TemporaryDirectory(prefix="kb301-max-chunk-source-") as source_dir:
         source_root = Path(source_dir) / "graphify"
-        semantic.admit_source(repo, source_root)
+        corpus.admit_source(repo, source_root)
         boundary_path = prototype_contract.prepare_authorized_prototype(
             plan,
             source_root,
@@ -92,12 +100,17 @@ def main() -> int:
             or config.claude_max_retries != 0
             or config.graphify_max_retry_depth != 0
             or config.structured_output_retries != 1
+            or config.max_turns != 3
             or config.tools
             or config.claude_model != "claude-haiku-4-5-20251001"
             or prompt_sha != "4162fec1faa5fdf12f1e8149aa6dcb641b268799112e5e7a80cfd3781786d4d6"
         ):
             raise ValueError("prototype execution contract drifted")
-        runtime = semantic.preflight(repo)
+        runtime = semantic.preflight(
+            repo,
+            graphify_version=config.graphify_version,
+            require_max_turns=True,
+        )
         if (
             runtime.auth.auth_method,
             runtime.auth.api_provider,
@@ -148,10 +161,7 @@ def main() -> int:
                 timeout=130,
             )
             elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
-            try:
-                envelope = json.loads(completed.stdout)
-            except json.JSONDecodeError, UnicodeDecodeError:
-                envelope = {}
+            fragment = parse_fragment(completed.stdout)
             metadata_raw = metadata_path.read_bytes() if metadata_path.is_file() else b""
             provider_inferences = int(boundary_path.is_file() or bool(metadata_raw))
             metadata = (
@@ -163,9 +173,6 @@ def main() -> int:
                 if metadata_raw
                 else None
             )
-            structured = envelope.get("structured_output") if isinstance(envelope, dict) else None
-            fragment = structured if isinstance(structured, dict) else {}
-            fragment.setdefault("hyperedges", [])
             records = [fragment.get(name) for name in ("nodes", "edges", "hyperedges")]
             counts = tuple(len(value) if isinstance(value, list) else 0 for value in records)
             scope_reasons = semantic.fragment_scope_reasons(

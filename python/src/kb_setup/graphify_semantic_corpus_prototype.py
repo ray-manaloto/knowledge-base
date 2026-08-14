@@ -367,10 +367,14 @@ def build_no_inference_preflight(
         tempfile.TemporaryDirectory(prefix="kb301-prototype-preflight-metadata-") as metadata_dir,
     ):
         source_root = Path(source_dir) / "graphify"
-        graphify_semantic_slice.admit_source(repo_root, source_root)
+        graphify_semantic_corpus.admit_source(repo_root, source_root)
         verdict = graphify_semantic_corpus.verify_plan(plan, source_root)
         _inventory, chunk, config, prompt = _plan_inputs(plan, source_root)
-        runtime = graphify_semantic_slice.preflight(repo_root)
+        runtime = graphify_semantic_slice.preflight(
+            repo_root,
+            graphify_version=config.graphify_version,
+            require_max_turns=True,
+        )
         overlay = _adapter_overlay(
             runtime,
             Path(metadata_dir) / "adapter-metadata.json",

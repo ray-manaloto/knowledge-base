@@ -1,23 +1,35 @@
 ---
 name: graphify-semantic-corpus
-description: Provider-free complete-source planning and evidence contract for Graphify v0.9.42.
+description: Provider-free complete-source planning and evidence contract for Graphify v0.9.43.
 ---
 
 # Graphify Semantic Corpus
 
 Issue [#301](https://github.com/ray-manaloto/knowledge-base/issues/301) scales the
 landed one-document real-provider proof into a complete, reproducible plan for
-the exact Graphify v0.9.42 tree. The planner and verifier are provider-free: they
+the exact Graphify v0.9.43 tree. The planner and verifier are provider-free: they
 prove what would run, how it would be cached, and how evidence fails closed. One
 separately authorized max-chunk boundary attempt is retained below; it does not
 authorize the cold run.
+
+If you are new to this project, start with these four facts:
+
+1. **Planning is safe and current.** It inspects pinned source and creates receipts;
+   it does not contact a model provider.
+2. **Execution is blocked.** Review authority is empty, four exclusions and one cost
+   advisory remain provisional, and no retry or full-corpus call is authorized.
+3. **Graphify 0.9.43 handles a Claude result shape our boundary did not.** A result may
+   be one object or a JSON array of events ending in one result object.
+4. **Claude is now bounded to three turns.** The option is documented and parser-
+   supported in Claude Code 2.1.232 even though the short help text omits it.
 
 ## Current exact scope
 
 | Boundary | Exact result |
 |---|---:|
-| Git commit | `7fe58b0b0f3873be9a21c30106b8b8527c353aa6` |
-| Git tree | `15ca81a8dbd3ded7083c4b573197140e62e95fcc` |
+| Graphify release | `v0.9.43` |
+| Git commit | `7281f27eac568f77f50910f59f84543458f5dfd1` |
+| Git tree | `6ae1c399eb1beef4f51106bbeecf72ee035fbeb6` |
 | Detected semantic source files | 372 |
 | Units after Graphify's 20,000-character expansion | 474 |
 | Provisionally admitted units | 470 |
@@ -47,12 +59,12 @@ Accepted roots remain only in historical receipts. A fresh checkout therefore re
 Any replacement roots require a new review outside planner bytes and do not authorize
 the full corpus run by themselves.
 
-The planner reuses issue #299's accepted complete Git-source manifest digest
-`da56d50eadb82b0889d8e9ad4b1260c98d4d8e6ab413e8abed5ddfcac0bdee68`, so the
+The planner uses the refreshed complete Git-source manifest digest
+`f839cca43889465bb43449f77880ec39a92f68bcee5d892ab8bfb18452a0690a`, so the
 source bytes are not in doubt. That baseline cannot erase this warning: #299's
 warning-free receipt covers its 410-input deterministic admission and 402-input AST
 extraction, whereas #301 invokes Graphify's official full-corpus `detect()` SDK for
-semantic scope and receives 782 total files / about 1.37 million words. The only SDK
+semantic scope and receives 786 total files / 1,379,183 words. The only SDK
 controls are symlink, Google Workspace, exclusion, cache-root, and gitignore behavior;
 there is no supported warning-threshold override. Subdirectory-by-subdirectory
 detection would avoid the aggregate advisory by construction and is therefore not
@@ -63,8 +75,16 @@ phase were not retained, so the append-only correction records one adapter invoc
 and `provider_inferences=unknown`.
 
 A fresh user authorization later allowed exactly one corrected call despite that unknown
-state. Independent review removed an unenforceable derived three-turn claim because
-Claude Code 2.1.232 exposes no `--max-turns` option. The exact user bounds were Max OAuth,
+state. At that time, review removed a derived three-turn claim because the short
+`claude --help` output did not list `--max-turns`. Later official documentation and a
+control-armed parser probe corrected that conclusion: Claude Code 2.1.232 accepts the
+option, reports a numeric validation error for
+`claude -p --max-turns not-an-integer`, and reports an unknown-option error for a
+made-up flag. The deliberately invalid value guarantees rejection at argument parsing,
+before Claude can read a prompt or cross a provider boundary. This check performs zero
+provider inferences. See the official
+[Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference). The exact
+historical user bounds were Max OAuth,
 no API key, no tools, a `$0.25` cap, a 120-second timeout, and no retry. Fresh preflight
 proved the reviewed plan, launcher, adapter, prompt, Max first-party auth, and absent
 output/state roots before the call. The adapter started one Claude CLI subprocess at the
@@ -74,10 +94,11 @@ receipts preserve a 53,947-byte CLI stdout digest but not the raw response; the 
 envelope, model usage, or structured output from those bytes. This is an
 adapter-observation contract failure. It does not prove a provider or model failure, and
 it does not authorize the 57-chunk run. The preserved terminal metadata's
-`turn-bound-exceeded` reason came from an obsolete local three-turn post-parse policy;
-it is not evidence of the provider's turn count. The #301 adapter now retains observed
-positive turn counts without claiming an unenforceable upper bound, while #300 keeps
-its independently accepted three-turn contract.
+`turn-bound-exceeded` reason came from the old post-parse policy after stdout could not
+be typed; it is not evidence of the provider's turn count. Future #301 calls now pass
+`--max-turns 3` to Claude and independently reject a typed result reporting more than
+three turns. Historical #300 receipts remain readable under their original 17-argument
+contract; the new #301 command has 19 arguments because it adds the flag and value.
 
 The historical 53,947 bytes cannot be classified more narrowly: the old parser mapped
 invalid UTF-8, invalid JSON, and valid non-object JSON to the same empty dictionary and
@@ -86,7 +107,8 @@ discarded the parse status. That evidence remains
 case occurred. Future adapter evidence now parses stdout once and embeds a sanitized,
 content-free observation in the same atomically written metadata record. The observation
 contains only the response digest/size, UTF-8 and JSON validity, a finite top-level kind,
-a byte-indexed error offset, and a trailing-data boolean. UTF-8 decode failures already
+event/result counts, the selected result index, a byte-indexed error offset, and a
+trailing-data boolean. UTF-8 decode failures already
 report byte positions; JSON character positions are converted against the decoded UTF-8
 prefix before retention, so every nonnegative offset uses the same unit. It contains no raw bytes, decoded
 text, excerpts, keys, or values. Its canonical digest and response identity are
@@ -98,7 +120,11 @@ including when they appear only in otherwise ignored object fields. Their spelli
 value is not retained, and they cannot produce an `accepted-object` observation.
 The same fail-closed boundary classifies only two other known decoder limits:
 `numeric-limit` for an integer rejected by Python's bounded integer conversion and
-`nesting-limit` for `RecursionError` during JSON container decoding. Exact hostile
+`nesting-limit` for `RecursionError` during JSON container decoding. A JSON array is
+accepted only when every element is an object, exactly one element has `type=result`,
+and that result is the final element. Empty arrays, scalar elements, missing or multiple
+results, and trailing events all fail closed without retaining their keys or values.
+Exact hostile
 fixtures use a 5,000-digit object field and a 50,000-deep array. Both retain only the
 response identity, outer kind, and typed category; unrelated implementation exceptions
 are not swallowed.
@@ -138,8 +164,8 @@ flowchart LR
     FUTURE["Future separately authorized stdout"] --> PARSE["One in-memory parse"]
     PARSE --> SAFE["Sanitized observation plus digest in atomic metadata"]
     SAFE --> STAGE{"#301 evidence checks"}
-    STAGE -->|"invalid UTF-8/JSON or non-object"| FAILED
-    STAGE -->|"valid bound object"| PROTO
+    STAGE -->|"invalid UTF-8/JSON or rejected array"| FAILED
+    STAGE -->|"one object or one final array result"| PROTO
 ```
 
 The supported public seam is:
@@ -177,9 +203,11 @@ stateDiagram-v2
 ```
 
 The namespace binds source inventory, provisional decisions, chunk ledger, exact
-Graphify runtime and semantic/LLM code, planner and adapter bytes, prompt/schema
+Graphify runtime and semantic/LLM code, planner, semantic-policy module, and adapter
+bytes, prompt/schema
 fingerprints, Claude executable/help/version/requested and resolved model, endpoint and
-auth policy, disabled tools, token and file caps, timeout, output/cost/retry bounds,
+auth policy, disabled tools, token and file caps, timeout, three-turn cap,
+output/cost/retry bounds,
 concurrency, deep mode, and cache policy. A cold run may not read prior fragments.
 Provider and adapter agreement is not authority: both are independently compared with
 the derived config, tracked Graphify/Claude identities, tracked schema, and a prompt
@@ -192,8 +220,9 @@ only after the issue #300 referential/source-scope checks and an exact regular-f
 census. A stage also binds the exact plan manifest, execution config, prompt and schema
 contracts, provider prompt, corpus chunk ordinal/total, source Git object, source byte
 size/digest, 20,000-token budget, Graphify chunk/deep/retry/cache/timeout controls, and
-Claude model/tool/auth/endpoint/cost controls. Observed turns remain evidence, but no
-hard turn cap is claimed because the pinned Claude CLI cannot enforce one. The landed
+Claude model/tool/auth/endpoint/cost/turn controls. The adapter invokes the pinned
+Claude CLI with `--max-turns 3`; the parser-only preflight proves that hidden-help
+option is accepted before any future provider boundary can start. The landed
 issue #300 receipt is
 valuable real evidence, but its single-file chunking, disabled deep mode, and unset
 token budget make it intentionally cache-incompatible with this corpus plan; it is
@@ -240,6 +269,81 @@ The exact-plan tests regenerate the plan from the pinned Graphify source into py
 temporary storage. They do not read the untracked runtime corpus/prototype directories,
 so a fresh checkout cannot inherit locally generated acceptance bytes.
 
+## Takeover checkpoint
+
+This section is the shortest safe path for a new developer or agent.
+
+```mermaid
+flowchart LR
+    REFRESH["Check critical/currency dependencies"] --> PIN["Pin exact release and source tree"]
+    PIN --> PLAN["Regenerate provider-free plan"]
+    PLAN --> PREFLIGHT["Run no-inference capability preflight"]
+    PREFLIGHT --> REVIEW["Independent code-identity review"]
+    REVIEW --> STOP["Keep authority empty and provider execution blocked"]
+```
+
+Current local, ignored evidence is under `.agent/kb/`:
+
+- `issue-301-plan-0943-final-v3/` is the provider-free Graphify 0.9.43 plan. Its plan
+  manifest digest is
+  `169fc674a1d0352e561d6bad21115a395f760ec1bf0d52d3e9a5c6158c246956`.
+- The deterministic AST baseline still describes its historical v0.9.42 source tree,
+  but its runtime identity now binds the project-wide Graphify 0.9.43 wheel and source
+  distribution. Source evidence and the tool used to read it are separate identities.
+- `issue-301-0943-no-inference-preflight.json` is the historical pre-review receipt. It records
+  zero provider inferences, Max first-party OAuth, Claude Code 2.1.232, chunk 22 of 57,
+  the unchanged 84,029-byte prompt, and the three-turn-cap capability probe. Its code
+  identities predate the two review corrections below, so it is historical rather than
+  current authorization evidence.
+- `issue-301-0943-no-inference-preflight-final-v2.json` is the current post-review local
+  receipt;
+  its tracked copy is
+  `docs/agents/evidence/issue-301/no-inference-preflight-0943.json`. It records zero
+  provider inferences and exactly one reason: `plan-not-authorized`. Its `failed` status
+  means **do not call the provider**; it does not mean the model failed.
+
+The first identity review caught two blockers before accepting those digests. The plan
+did not transitively bind `graphify_semantic_slice.py`, so an accepted plan could inherit
+changed envelope policy. The tracked launcher also parsed stdout a second time with
+plain `json.loads`, bypassing the strict array contract. Both are now corrected: the
+execution config binds the semantic-policy module hash, hostile policy drift yields
+`config-contract-mismatch`, and the launcher calls the adapter's strict normalizer.
+An independent exact-digest re-review accepted only the frozen prototype-contract and
+launcher identities. `AUTHORITY_JSON` remains empty: code identity says which reviewed
+program would run, while empty content roots still prevent that program from running.
+
+A later cold whole-branch review caught three compatibility regressions outside those
+two frozen identities. The shared current manifest had made the historical v0.9.42 AST
+baseline unreproducible; the #300 preflight still demanded an installed 0.9.42 SDK; and
+the shared adapter's new 19-argument command no longer matched #300's retained
+17-argument verifier. The correction derives an explicit historical source pin from the
+reviewed Graphify remote, lets structural verification recognize either exact historical
+or current runtime while public authority still recognizes only the historical receipt,
+and adds `--max-turns 3` only when the #301 provider-boundary marker is configured.
+Provider-free public probes now complete for the current #300 preflight and historical
+baseline controls.
+
+To reproduce the current state:
+
+```text
+mise run kb-graphify-semantic-corpus -- plan .agent/kb/issue-301-plan-0943-final-v3
+mise run kb-graphify-semantic-corpus -- verify .agent/kb/issue-301-plan-0943-final-v3
+```
+
+The second command must report `structural_complete=true`,
+`execution_authorized=false`, and exactly these reasons:
+`plan-authority-unset`, `cost-advisory-review-required`, and
+`provisional-input-decisions`. Do not turn those reasons into authority roots during
+routine implementation. The review-owned identity digests and the content-decision
+roots answer different questions.
+
+For long-running goals, repeat the critical/currency dependency check at a documented
+checkpoint instead of assuming the opening versions remain current. Preserve the old
+plan and receipts as historical evidence, pin the new exact release, rerun focused SDK
+and source-admission tests, then regenerate a new plan namespace. If a currency command
+is launched twice, compare every generated page first; keep the later run only when the
+pages differ solely by their timestamp. Never delete unique or unclassified bytes.
+
 The HTML exclusion preserves the source order and multiplicity of every normalized
 node and edge identity. Duplicate node IDs or edge identities fail explicitly before
 HTML and companion-graph lists are compared. The PNG evidence parser binds the exact
@@ -282,14 +386,14 @@ flowchart LR
 
 1. Preserve the first-attempt unknown audit and corrected one-call terminal receipts
    without rewriting either history.
-2. Diagnose the adapter observation boundary from source and public-safe receipts. The
-   retained evidence proves Claude CLI subprocess return code zero, zero stderr, 53,947 stdout
-   bytes, and an empty typed envelope; it cannot distinguish invalid JSON from a
-   non-object JSON top level because raw response bytes and parse status were not retained.
-3. Review and land the no-call parser-diagnostic seam. Its fixtures prove only parser
-   behavior; they do not certify Claude or Graphify behavior. Do not reconstruct or
-   fabricate the discarded response.
-4. Keep the cold 57-chunk run and issue #302 blocked. Any later provider call requires a
+2. Independently review the new launcher and prototype-contract code identities. This
+   may update their review-owned digests, but must not populate plan/exclusion/advisory
+   authority roots.
+3. Regenerate the no-inference receipt after that review. It must still report zero
+   provider inferences and an unauthorized plan.
+4. Review and land this no-provider slice. Its fixtures prove parser, command, and
+   receipt behavior; they do not certify a future Claude or Graphify result.
+5. Keep the cold 57-chunk run and issue #302 blocked. Any later provider call requires
    new explicit authority; the corrected prototype authority is consumed.
 
 ```mermaid

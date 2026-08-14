@@ -120,7 +120,7 @@ def _write_public_candidate(root: Path) -> Path:
             "status": "complete",
             "source_commit": _COMMIT,
             "source_tree": _TREE,
-            "runtime_version": "0.9.42",
+            "runtime_version": "0.9.43",
             "detected_count": 1,
             "extracted_count": 1,
             "node_count": 1,
@@ -143,15 +143,15 @@ def _write_public_candidate(root: Path) -> Path:
         },
         "runtime.json": {
             "schema_version": 1,
-            "version": "0.9.42",
-            "cli_version": "0.9.42",
-            "sdk_version": "0.9.42",
+            "version": "0.9.43",
+            "cli_version": "0.9.43",
+            "sdk_version": "0.9.43",
             "executable": ".venv/bin/graphify",
             "sdk_fingerprint_sha256": (
                 "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157"
             ),
-            "wheel_sha256": ("d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6"),
-            "sdist_sha256": ("a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b"),
+            "wheel_sha256": ("a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b"),
+            "sdist_sha256": ("7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3"),
         },
         "controls.json": {
             "schema_version": 1,
@@ -1029,16 +1029,48 @@ def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:
 
     identity = graphify_baseline.runtime_identity(repo)
 
-    assert identity.version == "0.9.42"
+    assert identity.version == "0.9.43"
     assert identity.cli_version == identity.sdk_version == identity.version
     assert identity.executable == ".venv/bin/graphify"
     assert identity.wheel_sha256 == (
-        "d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6"
+        "a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b"
     )
     assert identity.sdist_sha256 == (
-        "a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b"
+        "7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3"
     )
     assert len(identity.sdk_fingerprint_sha256) == 64
+
+
+def test_historical_baseline_source_does_not_reuse_current_manifest_pin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from kb_setup import manifest as source_manifests
+
+    current = source_manifests.Manifest(
+        name="graphify",
+        path=tmp_path / "sources/graphify.manifest",
+        url="https://github.com/Graphify-Labs/graphify",
+        ref="v0.9.43",
+        commit="7281f27eac568f77f50910f59f84543458f5dfd1",
+        kind="code",
+    )
+    monkeypatch.setattr(source_manifests, "load", lambda _path: current)
+
+    historical = graphify_baseline.historical_graphify_manifest(
+        tmp_path,
+        ref="v0.9.42",
+        commit="7fe58b0b0f3873be9a21c30106b8b8527c353aa6",
+    )
+
+    assert (historical.url, historical.ref, historical.commit) == (
+        current.url,
+        "v0.9.42",
+        "7fe58b0b0f3873be9a21c30106b8b8527c353aa6",
+    )
+    assert (current.ref, current.commit) == (
+        "v0.9.43",
+        "7281f27eac568f77f50910f59f84543458f5dfd1",
+    )
 
 
 def test_source_manifest_binds_every_git_blob_in_path_order(tmp_path: Path) -> None:
