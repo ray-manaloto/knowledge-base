@@ -65,6 +65,14 @@ directory so the adapter can exclusively create (`O_CREAT|O_EXCL`) a durable pha
 marker immediately before any future real provider subprocess without pre-creating the
 atomic staged-output directory.
 
+Durable authored evidence is tracked under `docs/agents/evidence/issue-301/`:
+the append-only unknown-boundary audit, the exact hardened launcher, and the latest
+no-inference preflight receipt. Plan, staging, and earlier preflight artifacts under
+`graphify-out/` are derived runtime outputs and remain untracked. The implementation
+module remains intentionally cohesive for this incomplete infrastructure slice;
+splitting planning, provider evidence, and execution verification is deferred to the
+continuation of #301 before full-corpus execution, when their public seams stop moving.
+
 ## Plan and execution boundary
 
 ```mermaid

@@ -14,8 +14,12 @@ outcome: "useful"
 
 - CRITICAL: Exact Graphify v0.9.42 planning reproduced 372 semantic files, 474
   units before disposition, 470 provisional admitted units, and 57 chunks at a
-  20,000-token budget. Largest planned chunk is 19,985 estimated tokens and 27
-  units. No provider call has run.
+  20,000-token budget. Largest planned chunk is 19,985 estimated tokens and 5
+  units.
+- CONDITION: one adapter invocation occurred during the separately authorized
+  max-size prototype. Its exact inner stderr and provider-boundary phase were not
+  retained, so the number of provider inferences is `unknown`; no corrected
+  inference is authorized.
 - The four provisional inputs are exact/content-bound: two PNGs require
   Graphify's Claude CLI `Read`-tool seam, while the current accepted adapter
   disables every tool; one 20,623-character SVG and one 1,846,384-character HTML
@@ -33,6 +37,8 @@ outcome: "useful"
 - TDD found a verifier mistake: Graphify groups units by directory when packing,
   so valid chunk order is not global source-inventory ordinal order. Coverage is
   correctly verified as exact set equality plus duplicate rejection.
+- Durable authored evidence is under `docs/agents/evidence/issue-301/`; runtime
+  plans and staged outputs under `graphify-out/` are derived and untracked.
 
 
 ## Outcome

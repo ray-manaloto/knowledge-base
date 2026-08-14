@@ -543,8 +543,8 @@ sequenceDiagram
     participant Claude as Claude provider
     Plan->>Adapter: Exact chunk 22 and bounded controls
     Note over Adapter: First launch failed auth preflight
-    Adapter--xClaude: Zero provider inferences
-    Note over Adapter: Append-only audit preserves failure
+    Adapter--xClaude: Provider boundary not retained
+    Note over Adapter: Append-only audit records inference count unknown
     Adapter->>Adapter: Safe HOME/XDG overlay preflight
     Note over Adapter: Independent review required
     Adapter-->>Claude: One future inference only if accepted
