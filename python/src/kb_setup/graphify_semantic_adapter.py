@@ -310,6 +310,7 @@ def parse_result_envelope(stdout: bytes) -> tuple[dict[str, object], EnvelopePar
         )
     except json.JSONDecodeError as exc:
         trailing = exc.msg == "Extra data" and bool(text[exc.pos :].strip())
+        byte_offset = len(text[: exc.pos].encode("utf-8"))
         status = (
             "trailing-data"
             if trailing
@@ -325,7 +326,7 @@ def parse_result_envelope(stdout: bytes) -> tuple[dict[str, object], EnvelopePar
             utf8_valid=True,
             json_valid=False,
             top_level_kind=_intended_top_level_kind(text),
-            error_offset=exc.pos,
+            error_offset=byte_offset,
             trailing_non_whitespace=trailing,
         )
     kind = _top_level_kind(payload)

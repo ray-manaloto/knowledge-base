@@ -803,3 +803,7 @@ flowchart LR
   5,000-digit and 50,000-depth RED/GREEN fixtures now classify only those known exits as
   `numeric-limit` and `nesting-limit`. The adapter does not broadly catch `ValueError` or
   other implementation failures, and neither diagnostic retains payload content.
+- CodeRabbit's exact-head review found that UTF-8 failures recorded a byte offset while
+  JSON failures recorded a character offset. A multibyte malformed-JSON RED/GREEN fixture
+  now binds the latter to the original response's UTF-8 byte index. All retained
+  nonnegative offsets therefore have one documented unit; no response prefix is retained.

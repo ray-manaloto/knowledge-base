@@ -86,7 +86,9 @@ discarded the parse status. That evidence remains
 case occurred. Future adapter evidence now parses stdout once and embeds a sanitized,
 content-free observation in the same atomically written metadata record. The observation
 contains only the response digest/size, UTF-8 and JSON validity, a finite top-level kind,
-a numeric error offset, and a trailing-data boolean. It contains no raw bytes, decoded
+a byte-indexed error offset, and a trailing-data boolean. UTF-8 decode failures already
+report byte positions; JSON character positions are converted against the decoded UTF-8
+prefix before retention, so every nonnegative offset uses the same unit. It contains no raw bytes, decoded
 text, excerpts, keys, or values. Its canonical digest and response identity are
 cross-bound before #301 staging can accept provider evidence. This instrumentation does
 not authorize another call and does not retrospectively classify the preserved attempt.

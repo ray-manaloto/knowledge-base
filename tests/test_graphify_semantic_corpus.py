@@ -847,6 +847,22 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
             },
         ),
         (
+            '{"x":"é" "y":1}'.encode(),
+            {},
+            {
+                "status": "invalid-json",
+                "response_sha256": (
+                    "6f54c4ec1bbb57e9e439c8cf41c323b2122936deda6092e8b858271b850cb3c8"
+                ),
+                "response_size": 16,
+                "utf8_valid": True,
+                "json_valid": False,
+                "top_level_kind": "object",
+                "error_offset": 10,
+                "trailing_non_whitespace": False,
+            },
+        ),
+        (
             b'[{"type":"result"}]',
             {},
             {
