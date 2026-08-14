@@ -1788,7 +1788,19 @@ def _adapter_metadata_reasons(
         and metadata.permission_denial_count == 0
         and not metadata.reasons
     )
-    return [] if complete else ["provider-truncated-or-incomplete"]
+    reasons = [] if complete else ["provider-truncated-or-incomplete"]
+    parse_reasons = graphify_semantic_adapter.parse_observation_reasons(
+        metadata.parse_observation,
+        digest=metadata.parse_observation_sha256,
+        response_sha256=metadata.response_sha256,
+        response_size=metadata.response_size,
+    )
+    reasons.extend(f"provider-{reason}" for reason in parse_reasons)
+    if metadata.parse_observation is not None and (
+        metadata.parse_observation.status != "accepted-object"
+    ):
+        reasons.append("provider-response-untyped")
+    return reasons
 
 
 def _adapter_config_reasons(

@@ -79,6 +79,28 @@ it is not evidence of the provider's turn count. The #301 adapter now retains ob
 positive turn counts without claiming an unenforceable upper bound, while #300 keeps
 its independently accepted three-turn contract.
 
+The historical 53,947 bytes cannot be classified more narrowly: the old parser mapped
+invalid UTF-8, invalid JSON, and valid non-object JSON to the same empty dictionary and
+discarded the parse status. That evidence remains
+`untyped-response-cause-underdetermined`; no source-level inference can recover which
+case occurred. Future adapter evidence now parses stdout once and embeds a sanitized,
+content-free observation in the same atomically written metadata record. The observation
+contains only the response digest/size, UTF-8 and JSON validity, a finite top-level kind,
+a numeric error offset, and a trailing-data boolean. It contains no raw bytes, decoded
+text, excerpts, keys, or values. Its canonical digest and response identity are
+cross-bound before #301 staging can accept provider evidence. This instrumentation does
+not authorize another call and does not retrospectively classify the preserved attempt.
+The one parse is strict JSON: Python-only numeric constants (`NaN`, positive infinity,
+and negative infinity) are rejected as the content-free `non-json-constant` category,
+including when they appear only in otherwise ignored object fields. Their spelling or
+value is not retained, and they cannot produce an `accepted-object` observation.
+The same fail-closed boundary classifies only two other known decoder limits:
+`numeric-limit` for an integer rejected by Python's bounded integer conversion and
+`nesting-limit` for `RecursionError` during JSON container decoding. Exact hostile
+fixtures use a 5,000-digit object field and a 50,000-deep array. Both retain only the
+response identity, outer kind, and typed category; unrelated implementation exceptions
+are not swallowed.
+
 Durable authored evidence is tracked under `docs/agents/evidence/issue-301/`:
 the append-only unknown-boundary audit, the exact hardened launcher, and the last
 pre-hardening no-inference preflight receipt (retained as historical evidence, not
@@ -111,6 +133,11 @@ flowchart LR
     VERIFY -->|"historical reviewed one-call authority"| PROTO["One max-size prototype"]
     PROTO -->|"53,947-byte CLI stdout not typed"| BLOCKED["FAILED CLOSED: no retry"]
     BLOCKED --> REVOKE["Active authority roots cleared"]
+    FUTURE["Future separately authorized stdout"] --> PARSE["One in-memory parse"]
+    PARSE --> SAFE["Sanitized observation plus digest in atomic metadata"]
+    SAFE --> STAGE{"#301 evidence checks"}
+    STAGE -->|"invalid UTF-8/JSON or non-object"| FAILED
+    STAGE -->|"valid bound object"| PROTO
 ```
 
 The supported public seam is:
@@ -257,9 +284,9 @@ flowchart LR
    retained evidence proves Claude CLI subprocess return code zero, zero stderr, 53,947 stdout
    bytes, and an empty typed envelope; it cannot distinguish invalid JSON from a
    non-object JSON top level because raw response bytes and parse status were not retained.
-3. Decide and review a no-call parser-diagnostic improvement that retains only a typed
-   parse classification and bounded public metadata. Do not reconstruct or fabricate the
-   discarded response.
+3. Review and land the no-call parser-diagnostic seam. Its fixtures prove only parser
+   behavior; they do not certify Claude or Graphify behavior. Do not reconstruct or
+   fabricate the discarded response.
 4. Keep the cold 57-chunk run and issue #302 blocked. Any later provider call requires a
    new explicit authority; the corrected prototype authority is consumed.
 

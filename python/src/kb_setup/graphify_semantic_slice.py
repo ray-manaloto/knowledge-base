@@ -637,7 +637,7 @@ def _member_reasons(
 
 
 def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: object) -> list[str]:
-    from kb_setup.graphify_semantic_adapter import AdapterMetadata
+    from kb_setup.graphify_semantic_adapter import AdapterMetadata, parse_observation_reasons
 
     if not isinstance(metadata, AdapterMetadata):
         return ["adapter-metadata-schema-mismatch"]
@@ -702,6 +702,18 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
         ),
     )
     reasons.extend(reason for accepted, reason in checks if not accepted)
+    if metadata.parse_observation is not None:
+        reasons.extend(
+            f"adapter-{reason}"
+            for reason in parse_observation_reasons(
+                metadata.parse_observation,
+                digest=metadata.parse_observation_sha256,
+                response_sha256=metadata.response_sha256,
+                response_size=metadata.response_size,
+            )
+        )
+        if metadata.parse_observation.status != "accepted-object":
+            reasons.append("adapter-response-untyped")
     if len(metadata.model_usage) != 1:
         reasons.append("adapter-model-count-mismatch")
     else:

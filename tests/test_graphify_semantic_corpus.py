@@ -779,6 +779,388 @@ def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() 
     assert envelope["num_turns"] == 4
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected_envelope", "expected"),
+    [
+        (
+            b'{"type":"result"}',
+            {"type": "result"},
+            {
+                "status": "accepted-object",
+                "response_sha256": (
+                    "f0ff450aef5c321f0d608f03568fc76dd0f14e04eeb8b2e86637a3459e128451"
+                ),
+                "response_size": 17,
+                "utf8_valid": True,
+                "json_valid": True,
+                "top_level_kind": "object",
+                "error_offset": -1,
+                "trailing_non_whitespace": False,
+            },
+        ),
+        (
+            b"\xff",
+            {},
+            {
+                "status": "invalid-utf8",
+                "response_sha256": (
+                    "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89"
+                ),
+                "response_size": 1,
+                "utf8_valid": False,
+                "json_valid": False,
+                "top_level_kind": "unknown",
+                "error_offset": 0,
+                "trailing_non_whitespace": False,
+            },
+        ),
+        (
+            b'{"type":',
+            {},
+            {
+                "status": "truncated-json",
+                "response_sha256": (
+                    "d356aa44394dfb9e6d62d1ee01fa0e67610ff5b42d93791e44c2731901c7df66"
+                ),
+                "response_size": 8,
+                "utf8_valid": True,
+                "json_valid": False,
+                "top_level_kind": "object",
+                "error_offset": 8,
+                "trailing_non_whitespace": False,
+            },
+        ),
+        (
+            b'{"type":"result"}\n{"extra":true}',
+            {},
+            {
+                "status": "trailing-data",
+                "response_sha256": (
+                    "2d59126638c06cb97de3d735190c0a1c11e4fb80ad8730d7ad9880727c9080b6"
+                ),
+                "response_size": 32,
+                "utf8_valid": True,
+                "json_valid": False,
+                "top_level_kind": "object",
+                "error_offset": 18,
+                "trailing_non_whitespace": True,
+            },
+        ),
+        (
+            b'[{"type":"result"}]',
+            {},
+            {
+                "status": "valid-non-object",
+                "response_sha256": (
+                    "5b51d00d46fe9b28ec9c405101ad42380081e0e8d5dd666e08a5d1d32375e543"
+                ),
+                "response_size": 19,
+                "utf8_valid": True,
+                "json_valid": True,
+                "top_level_kind": "array",
+                "error_offset": -1,
+                "trailing_non_whitespace": False,
+            },
+        ),
+        (
+            b'"result"',
+            {},
+            {
+                "status": "valid-non-object",
+                "response_sha256": (
+                    "d9fd9a3d81d750e6edc61aec66e7c4112f7af7c34ebe0a0d20189464ec9df135"
+                ),
+                "response_size": 8,
+                "utf8_valid": True,
+                "json_valid": True,
+                "top_level_kind": "string",
+                "error_offset": -1,
+                "trailing_non_whitespace": False,
+            },
+        ),
+    ],
+)
+def test_parse_observation_retains_only_sanitized_shape(
+    raw: bytes,
+    expected_envelope: dict[str, object],
+    expected: dict[str, object],
+) -> None:
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+
+    assert envelope == expected_envelope
+    assert msgspec.structs.asdict(observation) == {
+        "schema_id": "graphify-claude-envelope-parse/v0",
+        **expected,
+    }
+    encoded = msgspec.json.encode(observation, order="sorted")
+    assert raw not in encoded
+
+
+@pytest.mark.parametrize(
+    ("raw", "response_sha256"),
+    [
+        (
+            b'{"extra":NaN}',
+            "f67e63489a6b27b71a66522d7fb8a94d5996490dfae297a8431355bf3769d607",
+        ),
+        (
+            b'{"extra":Infinity}',
+            "74e7fa90f0854ffc55c2ee05e937bc97a89a5e41bace6e08e16d9e1ee6abe321",
+        ),
+        (
+            b'{"extra":-Infinity}',
+            "1cc56c056508f57245286e309e34ad7349ce971d7b2c64efebf72bb8a295254b",
+        ),
+    ],
+)
+def test_parse_observation_rejects_non_json_numeric_constants(
+    raw: bytes,
+    response_sha256: str,
+) -> None:
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+
+    assert envelope == {}
+    assert msgspec.structs.asdict(observation) == {
+        "schema_id": "graphify-claude-envelope-parse/v0",
+        "status": "non-json-constant",
+        "response_sha256": response_sha256,
+        "response_size": len(raw),
+        "utf8_valid": True,
+        "json_valid": False,
+        "top_level_kind": "object",
+        "error_offset": -1,
+        "trailing_non_whitespace": False,
+    }
+    assert (
+        graphify_semantic_adapter.parse_observation_reasons(
+            observation,
+            digest=graphify_semantic_adapter.parse_observation_sha256(observation),
+            response_sha256=response_sha256,
+            response_size=len(raw),
+        )
+        == ()
+    )
+
+
+def test_parse_observation_classifies_decoder_integer_limit() -> None:
+    raw = b'{"extra":' + (b"1" * 5_000) + b"}"
+
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+
+    assert envelope == {}
+    assert msgspec.structs.asdict(observation) == {
+        "schema_id": "graphify-claude-envelope-parse/v0",
+        "status": "numeric-limit",
+        "response_sha256": ("1eff2f020fdbf3a04199fdb261f586dc21fc55a896c4cdc055dfdad0324fd1d3"),
+        "response_size": 5_010,
+        "utf8_valid": True,
+        "json_valid": False,
+        "top_level_kind": "object",
+        "error_offset": -1,
+        "trailing_non_whitespace": False,
+    }
+    assert (
+        graphify_semantic_adapter.parse_observation_reasons(
+            observation,
+            digest=graphify_semantic_adapter.parse_observation_sha256(observation),
+            response_sha256=observation.response_sha256,
+            response_size=observation.response_size,
+        )
+        == ()
+    )
+
+
+def test_parse_observation_classifies_decoder_nesting_limit() -> None:
+    raw = (b"[" * 50_000) + b"0" + (b"]" * 50_000)
+
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+
+    assert envelope == {}
+    assert msgspec.structs.asdict(observation) == {
+        "schema_id": "graphify-claude-envelope-parse/v0",
+        "status": "nesting-limit",
+        "response_sha256": ("00ed238197a55cf471748c8cfee32101b3c61ddb1137b72ca0e97fce847f6fe5"),
+        "response_size": 100_001,
+        "utf8_valid": True,
+        "json_valid": False,
+        "top_level_kind": "array",
+        "error_offset": -1,
+        "trailing_non_whitespace": False,
+    }
+    assert (
+        graphify_semantic_adapter.parse_observation_reasons(
+            observation,
+            digest=graphify_semantic_adapter.parse_observation_sha256(observation),
+            response_sha256=observation.response_sha256,
+            response_size=observation.response_size,
+        )
+        == ()
+    )
+
+
+def test_parse_observation_digest_rejects_coherent_metadata_tampering() -> None:
+    raw = b'{"type":"result"}'
+    _envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+    digest = graphify_semantic_adapter.parse_observation_sha256(observation)
+    tampered = msgspec.structs.replace(
+        observation,
+        status="valid-non-object",
+        top_level_kind="array",
+    )
+
+    assert graphify_semantic_adapter.parse_observation_reasons(
+        tampered,
+        digest=digest,
+        response_sha256=("f0ff450aef5c321f0d608f03568fc76dd0f14e04eeb8b2e86637a3459e128451"),
+        response_size=17,
+    ) == ("parse-observation-digest-mismatch",)
+
+
+@pytest.mark.parametrize(
+    ("changes", "digest", "response_sha256", "response_size", "reason"),
+    [
+        ({}, "not-a-digest", None, None, "parse-observation-digest-invalid"),
+        (
+            {"response_sha256": "not-a-digest"},
+            None,
+            "not-a-digest",
+            None,
+            "parse-observation-response-digest-invalid",
+        ),
+        (
+            {"response_size": -1},
+            None,
+            None,
+            -1,
+            "parse-observation-response-size-invalid",
+        ),
+        (
+            {"status": "invalid-json", "json_valid": False, "error_offset": 18},
+            None,
+            None,
+            None,
+            "parse-observation-error-offset-invalid",
+        ),
+    ],
+)
+def test_parse_observation_rejects_malformed_or_impossible_bindings(
+    changes: dict[str, object],
+    digest: str | None,
+    response_sha256: str | None,
+    response_size: int | None,
+    reason: str,
+) -> None:
+    raw = b'{"type":"result"}'
+    _envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+    changed = msgspec.structs.replace(observation, **changes)
+
+    reasons = graphify_semantic_adapter.parse_observation_reasons(
+        changed,
+        digest=digest or graphify_semantic_adapter.parse_observation_sha256(changed),
+        response_sha256=response_sha256 or changed.response_sha256,
+        response_size=changed.response_size if response_size is None else response_size,
+    )
+
+    assert reason in reasons
+
+
+def test_parse_observation_does_not_retain_object_keys_or_values() -> None:
+    raw = b'{"private-secret-key":"private-secret-value"}'
+
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+    encoded = graphify_semantic_slice.encode_json(observation)
+
+    assert envelope == {"private-secret-key": "private-secret-value"}
+    assert b"private-secret-key" not in encoded
+    assert b"private-secret-value" not in encoded
+
+
+def test_adapter_metadata_atomically_binds_sanitized_parse_observation() -> None:
+    raw = b'{"type":"result"}'
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
+    metadata = graphify_semantic_adapter._metadata(
+        graphify_semantic_adapter.MetadataInputs(
+            executable=Path("/bin/sh"),
+            version="test",
+            argv=(),
+            environment={},
+            auth=graphify_semantic_slice.AuthIdentity(
+                logged_in=True,
+                auth_method="claude.ai",
+                api_provider="firstParty",
+                subscription_type="max",
+            ),
+            prompt=b"prompt",
+            stdout=raw,
+            stderr=b"",
+            returncode=0,
+            envelope=envelope,
+            parse_observation=observation,
+            elapsed_ms=1,
+            reasons=(),
+        )
+    )
+
+    assert metadata.parse_observation == observation
+    assert metadata.parse_observation_sha256 == (
+        graphify_semantic_adapter.parse_observation_sha256(observation)
+    )
+    assert (
+        graphify_semantic_adapter.parse_observation_reasons(
+            metadata.parse_observation,
+            digest=metadata.parse_observation_sha256,
+            response_sha256=metadata.response_sha256,
+            response_size=metadata.response_size,
+        )
+        == ()
+    )
+
+
+def test_corrected_terminal_artifacts_remain_byte_identical() -> None:
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "docs/agents/evidence/issue-301/corrected-max-chunk-terminal"
+    )
+    expected = {
+        "adapter-metadata.json": (
+            "3630a9938b2f1d67bbcdb6bc5f2980e4b3a5c7b04fcae5f59e6695c43a0df92a"
+        ),
+        "prototype-receipt.json": (
+            "440afc68da1f548dd88e3b633363239f289fddbac06ca75d04e4540e80e11074"
+        ),
+        "provider-boundary-start.json": (
+            "0fb585e7cc1b19b5649990baef8710a9a28c89eeb8676458dd870adc774644c7"
+        ),
+        "provider-receipt.json": (
+            "7bd4634e156ecd6afe9da5b6a569e216c159b95fd8d877a0cee801594e8ef961"
+        ),
+        "semantic-fragment.json": (
+            "65e21f615cda6af21bb599ee7a521f26aaa10dc1d337edeb749574948fbb4d15"
+        ),
+        "stage-receipt.json": ("070abf2f683fe21cd86ef5a28c4ae91025cc5c3045e4b1b43d96712336bac867"),
+    }
+
+    assert {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(root.iterdir())
+    } == expected
+
+
+def test_corpus_refuses_provider_evidence_without_bound_parse_observation() -> None:
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "docs/agents/evidence/issue-301/corrected-max-chunk-terminal"
+    )
+    metadata = msgspec.json.decode(
+        (root / "adapter-metadata.json").read_bytes(),
+        type=graphify_semantic_adapter.AdapterMetadata,
+        strict=True,
+    )
+
+    assert "provider-parse-observation-unavailable" in (
+        graphify_semantic_corpus._adapter_metadata_reasons(metadata)
+    )
+
+
 def test_file_backed_authority_converges_without_changing_planner_bytes(tmp_path: Path) -> None:
     source = tmp_path / "source"
     commit, tree = _source(source)
