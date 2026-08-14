@@ -191,6 +191,14 @@ def test_tool_use_is_accepted_only_with_the_full_proven_success_envelope() -> No
     assert "model-identity-invalid" in graphify_semantic_slice.envelope_reasons(multiple_models)
 
 
+def test_corpus_observes_positive_turn_count_without_an_unenforced_upper_bound() -> None:
+    envelope = _successful_envelope()
+    envelope["num_turns"] = 4
+
+    assert graphify_semantic_slice.envelope_reasons(envelope, max_turns=None) == ()
+    assert "turn-bound-exceeded" in graphify_semantic_slice.envelope_reasons(envelope)
+
+
 def test_fragment_validation_rejects_unresolved_edges_and_wrong_source() -> None:
     fragment = {
         "nodes": [

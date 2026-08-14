@@ -258,7 +258,6 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     claude_max_output_tokens: int
     claude_max_retries: int
     structured_output_retries: int
-    max_turns: int
     max_cost_usd: float
     graphify_max_retry_depth: int
     graphify_chunk_size: int
@@ -573,7 +572,6 @@ def _effective_config(
         claude_max_output_tokens=4096,
         claude_max_retries=0,
         structured_output_retries=1,
-        max_turns=3,
         max_cost_usd=0.25,
         graphify_max_retry_depth=0,
         graphify_chunk_size=20,
@@ -1837,7 +1835,6 @@ def _adapter_config_reasons(
         ),
         (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
         (not forbidden_environment, "provider-adapter-endpoint-policy-mismatch"),
-        (metadata.num_turns <= config.max_turns, "provider-adapter-turn-bound-exceeded"),
         (metadata.total_cost_usd <= config.max_cost_usd, "provider-adapter-cost-bound-exceeded"),
         (usage_valid, "provider-adapter-model-usage-mismatch"),
     )

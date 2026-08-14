@@ -155,7 +155,31 @@ def test_plan_warning_is_a_structural_failure(tmp_path: Path) -> None:
         ),
     )
 
-    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    authority_path = tmp_path / "reviewed-authority.json"
+    authority_path.write_bytes(
+        _canonical(
+            {
+                "advisories_sha256": hashlib.sha256(
+                    (candidate / "advisories.json").read_bytes()
+                ).hexdigest(),
+                "execution_config_sha256": hashlib.sha256(
+                    (candidate / "execution-config.json").read_bytes()
+                ).hexdigest(),
+                "exclusions_sha256": hashlib.sha256(
+                    (candidate / "exclusions.json").read_bytes()
+                ).hexdigest(),
+                "plan_manifest_sha256": hashlib.sha256(
+                    (candidate / "manifest.json").read_bytes()
+                ).hexdigest(),
+                "schema_version": 1,
+            }
+        )
+    )
+    result = graphify_semantic_corpus.verify_plan(
+        candidate,
+        source_root=source,
+        authority_path=authority_path,
+    )
     assert result.state == "failed"
     assert result.reasons == ("plan-warning-bearing",)
 
@@ -190,15 +214,35 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
             "word_count_threshold": 500_000,
         }
     ]
-    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
-    assert result.state == "incomplete"
-    assert result.structural_complete is True
-    assert result.execution_authorized is False
-    assert result.reasons == (
-        "plan-authority-unset",
-        "cost-advisory-review-required",
-        "provisional-input-decisions",
+    authority_path = tmp_path / "reviewed-authority.json"
+    authority_path.write_bytes(
+        _canonical(
+            {
+                "advisories_sha256": hashlib.sha256(
+                    (candidate / "advisories.json").read_bytes()
+                ).hexdigest(),
+                "execution_config_sha256": hashlib.sha256(
+                    (candidate / "execution-config.json").read_bytes()
+                ).hexdigest(),
+                "exclusions_sha256": hashlib.sha256(
+                    (candidate / "exclusions.json").read_bytes()
+                ).hexdigest(),
+                "plan_manifest_sha256": hashlib.sha256(
+                    (candidate / "manifest.json").read_bytes()
+                ).hexdigest(),
+                "schema_version": 1,
+            }
+        )
     )
+    result = graphify_semantic_corpus.verify_plan(
+        candidate,
+        source_root=source,
+        authority_path=authority_path,
+    )
+    assert result.state == "complete"
+    assert result.structural_complete is True
+    assert result.execution_authorized is True
+    assert result.reasons == ()
 
 
 def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
@@ -304,6 +348,26 @@ def test_failed_adapter_attempt_audit_preserves_unknown_provider_inferences() ->
     assert audit.stage_receipt_sha256 == (
         "534891bb528e923928d1a83ed3dbb26a3d0c7ff221cec03cbd2c36473f62d1ad"
     )
+
+
+def test_corrected_call_consumption_distinguishes_boundary_from_inference() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    evidence = repo_root / "docs/agents/evidence/issue-301"
+    consumption = json.loads(
+        (evidence / "corrected-max-chunk-consumption.json").read_text(encoding="utf-8")
+    )
+    marker = json.loads(
+        (evidence / "corrected-max-chunk-terminal" / "provider-boundary-start.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert consumption["adapter_invocations"] == 1
+    assert consumption["provider_inferences"] == "unknown"
+    assert consumption["provider_process_boundary_invocations"] == 1
+    assert consumption["obsolete_local_post_parse_reasons"] == ["turn-bound-exceeded"]
+    assert marker["provider_process_invocations"] == 1
+    assert marker["provider_inferences"] == "unknown"
 
 
 def test_prototype_identity_check_rejects_wrong_launcher_file(tmp_path: Path) -> None:
@@ -638,11 +702,14 @@ def test_visual_exclusion_evidence_rejects_real_source_drift(
         )
 
 
-def test_exact_graphify_plan_is_exact_scope_and_awaits_reauthorization(tmp_path: Path) -> None:
+def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation(
+    tmp_path: Path,
+) -> None:
     """Regenerate and exercise the exact pinned #301 plan bytes."""
     candidate = _exact_graphify_plan(tmp_path)
     inventory = json.loads((candidate / "source-inventory.json").read_text(encoding="utf-8"))
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
+    config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
     assert inventory["detected_source_count"] == 372
     assert inventory["discovered_unit_count"] == 474
@@ -652,6 +719,7 @@ def test_exact_graphify_plan_is_exact_scope_and_awaits_reauthorization(tmp_path:
         == "da56d50eadb82b0889d8e9ad4b1260c98d4d8e6ab413e8abed5ddfcac0bdee68"
     )
     assert len(ledger["chunks"]) == 57
+    assert "max_turns" not in config
     result = graphify_semantic_corpus.verify_plan(
         candidate, source_root=candidate.parent / "exact-graphify-source"
     )
@@ -663,6 +731,52 @@ def test_exact_graphify_plan_is_exact_scope_and_awaits_reauthorization(tmp_path:
         "cost-advisory-review-required",
         "provisional-input-decisions",
     )
+
+
+def test_consumed_authority_blocks_prototype_before_topology_creation(tmp_path: Path) -> None:
+    candidate = _exact_graphify_plan(tmp_path)
+    source = candidate.parent / "exact-graphify-source"
+    output = tmp_path / "cleared-prototype-output"
+    state = tmp_path / "cleared-prototype-state"
+
+    with pytest.raises(ValueError, match="prototype plan is not authorized"):
+        graphify_semantic_corpus_prototype.prepare_authorized_prototype(
+            candidate,
+            source,
+            output,
+            state,
+        )
+
+    assert not output.exists()
+    assert not state.exists()
+
+
+def test_corpus_adapter_observes_more_than_three_turns_without_rejecting_them() -> None:
+    envelope = {
+        "type": "result",
+        "subtype": "success",
+        "is_error": False,
+        "terminal_reason": "completed",
+        "stop_reason": "tool_use",
+        "num_turns": 4,
+        "structured_output": {"nodes": [], "edges": [], "hyperedges": []},
+        "modelUsage": {
+            "claude-haiku-4-5-20251001": {
+                "canonicalModel": "claude-haiku-4-5",
+                "provider": "firstParty",
+            }
+        },
+        "permission_denials": [],
+        "errors": [],
+    }
+
+    reasons = graphify_semantic_adapter.result_envelope_reasons(
+        envelope,
+        {"KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": "/retained/state/provider-boundary-start.json"},
+    )
+
+    assert reasons == ()
+    assert envelope["num_turns"] == 4
 
 
 def test_file_backed_authority_converges_without_changing_planner_bytes(tmp_path: Path) -> None:

@@ -678,3 +678,80 @@ sequenceDiagram
     State-->>Adapter: File and directory fsync complete
     Note over Adapter: No provider call in this fix round
 ```
+
+## 2026-08-14 — iteration KB-301-13
+
+- Prior goal digest: iteration KB-301-12, PR #309 merge
+  `e39a79fda8472084d6a9edb90ae810dc008cba88`, and the preserved first-attempt
+  `provider_inferences=unknown` audit.
+- Changed requirement: under fresh verbatim user authority, run exactly one corrected
+  max-size prototype through Max OAuth with no API key, no tools, a `$0.25` cap, a
+  120-second timeout, and no retry. Do not start the full corpus or issue #302.
+- Reason: the 57-chunk plan required one real maximum-size observation before any cold
+  run could be considered. Independent prelaunch review also found that a derived
+  three-turn claim was not enforceable because Claude Code 2.1.232 exposes no
+  `--max-turns` option; that claim was removed before the call.
+- Evidence: authorization v2 SHA `8c95677d...`; no-inference preflight v7 SHA
+  `a4c64df...`; reviewed plan manifest `41a39ffd...`; execution config `73b9ed95...`;
+  exact chunk 22/57 and prompt `4162fec1...`. The exclusive provider-boundary marker
+  records one provider-process-boundary invocation. Provider inference remains unknown.
+  The call ended after 35,524 ms with Claude CLI subprocess return code zero, zero
+  stderr, and a 53,947-byte stdout digest, but the adapter derived no typed
+  result envelope, model usage, or structured output. The public-safe terminal artifacts
+  are retained under `docs/agents/evidence/issue-301/corrected-max-chunk-terminal/`.
+- Affected tickets: #301 and coordination receipt #292. #302 remains unstarted.
+- Disposition: authority was consumed and no retry occurred. The stage failed closed;
+  this is classified as an adapter-observation contract failure with the underlying
+  provider/model outcome unresolved. Raw response bytes were intentionally not retained,
+  so invalid JSON and a non-object JSON top level cannot be distinguished after the fact.
+  Full-corpus execution remains blocked pending a separately reviewed no-call diagnostic
+  improvement and a new explicit authority decision.
+
+```mermaid
+sequenceDiagram
+    participant Authority as Fresh user authority
+    participant Preflight as No-inference preflight
+    participant Adapter as Claude adapter
+    participant CLI as Claude CLI boundary
+    participant Receipt as Typed evidence
+    Authority->>Preflight: One corrected call only
+    Preflight-->>Adapter: Exact roots and Max OAuth green
+    Adapter->>Receipt: Durable boundary marker
+    Adapter->>CLI: One subprocess invocation, no retry
+    CLI-->>Adapter: rc 0, stderr 0, 53,947 stdout bytes
+    Adapter->>Receipt: Failed typed envelope and stage
+    Note over Adapter,CLI: Provider inference unknown; full corpus remains blocked
+```
+
+## 2026-08-14 — iteration KB-301-14
+
+- Prior goal digest: iteration KB-301-13 and exact-head cold review of the retained
+  failed max-chunk evidence.
+- Changed requirement: revoke the consumed one-call authority from every executable
+  default path, and separate #301's observed turn metadata from #300's independently
+  accepted three-turn ceiling.
+- Reason: cold replay proved deleting the output and marker state could otherwise make
+  the historical authority runnable again. It also found that the shared envelope
+  validator still applied an unenforceable three-turn limit to #301 after the bound had
+  been removed from its reviewed authorization.
+- Evidence: active authority roots are empty; a freshly materialized exact plan remains
+  structurally complete but public verification returns `execution_authorized=false`
+  with `plan-authority-unset`, `cost-advisory-review-required`, and
+  `provisional-input-decisions`. A hostile prototype control fails before creating
+  output or state. The #301 boundary adapter accepts and retains an observed positive
+  four-turn envelope without an upper-bound claim; the unchanged #300 default still
+  rejects it. Historical terminal artifacts remain byte-identical, and the consumption
+  receipt classifies their old `turn-bound-exceeded` as a local post-parse reason.
+- Affected tickets: #301 and coordination receipt #292. #302 remains unstarted.
+- Disposition: the single-call authority is consumed and revoked. No retry, provider
+  call, full-corpus execution, or successor ticket is authorized.
+
+```mermaid
+flowchart LR
+    HIST["Historical accepted roots and one-call receipts"] --> USED["One boundary attempt"]
+    USED --> REVOKE["Executable authority roots empty"]
+    REVOKE --> VERIFY["Public verifier incomplete and unauthorized"]
+    VERIFY --> STOP["No retry or full-corpus run"]
+    TURNS["Observed num_turns metadata"] --> KB301["#301: positive count, no hard upper bound"]
+    TURNS --> KB300["#300: accepted three-turn ceiling"]
+```
