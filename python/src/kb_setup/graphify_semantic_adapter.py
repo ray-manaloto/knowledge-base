@@ -6,9 +6,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 
 import msgspec
@@ -16,6 +19,30 @@ import msgspec
 from kb_setup import atomic, graphify_semantic_slice
 
 _GRAPHIFY_ARG_COUNT = 8
+
+
+def open_directory_nofollow(directory: Path) -> int:
+    """Open every directory component without following a mutable symlink."""
+    if ".." in directory.parts:
+        raise ValueError("provider boundary marker destination is unavailable")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    parts = directory.parts
+    descriptor = os.open(os.sep if directory.is_absolute() else ".", flags)
+    try:
+        for part in parts[1:] if directory.is_absolute() else parts:
+            if part in ("", ".", os.sep):
+                continue
+            next_descriptor = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
 
 
 class ModelUsage(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -84,8 +111,76 @@ class MetadataInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     reasons: tuple[str, ...]
 
 
+class ProviderBoundaryStart(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Durable evidence written immediately before the real provider process starts."""
+
+    schema_id: str
+    phase: str
+    provider_process_invocations: int
+    provider_inferences: str
+    adapter_sha256: str
+    prompt_sha256: str
+    prompt_size: int
+    argv_sha256: str
+
+
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def write_provider_boundary_start(
+    destination: Path,
+    *,
+    adapter_sha256: str,
+    prompt: bytes,
+    argv: tuple[str, ...],
+) -> ProviderBoundaryStart:
+    """Atomically retain the exact provider-boundary crossing before invocation."""
+    try:
+        parent_descriptor = open_directory_nofollow(destination.parent)
+    except OSError as exc:
+        raise ValueError("provider boundary marker destination is unavailable") from exc
+    marker = ProviderBoundaryStart(
+        schema_id="graphify-claude-provider-boundary-start/v0",
+        phase="provider-boundary-started",
+        provider_process_invocations=1,
+        provider_inferences="unknown",
+        adapter_sha256=adapter_sha256,
+        prompt_sha256=_sha256(prompt),
+        prompt_size=len(prompt),
+        argv_sha256=_sha256(graphify_semantic_slice.encode_json(argv)),
+    )
+    raw = graphify_semantic_slice.encode_json(marker) + b"\n"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        if not stat.S_ISDIR(os.fstat(parent_descriptor).st_mode):
+            raise ValueError("provider boundary marker destination is unavailable")
+        try:
+            descriptor = os.open(destination.name, flags, 0o600, dir_fd=parent_descriptor)
+        except FileExistsError as exc:
+            raise ValueError("provider boundary marker already exists") from exc
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.fsync(parent_descriptor)
+        except BaseException:
+            with suppress(FileNotFoundError):
+                os.unlink(destination.name, dir_fd=parent_descriptor)
+            raise
+    finally:
+        os.close(parent_descriptor)
+    return marker
+
+
+def _provider_boundary_path(environment: Mapping[str, str]) -> Path:
+    raw = environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH", "")
+    if not raw:
+        raise ValueError("provider boundary marker path is unset")
+    return Path(raw)
 
 
 def _real_executable() -> Path:
@@ -297,6 +392,13 @@ def adapter_main() -> int:
     )
     started = time.monotonic_ns()
     try:
+        boundary_path = _provider_boundary_path(os.environ)
+        write_provider_boundary_start(
+            boundary_path,
+            adapter_sha256=graphify_semantic_slice.sha256_file(Path(__file__)),
+            prompt=prompt,
+            argv=real_args,
+        )
         completed = subprocess.run(
             real_args,
             input=prompt,
@@ -305,6 +407,9 @@ def adapter_main() -> int:
             env=environment,
             timeout=120,
         )
+    except (OSError, ValueError) as exc:
+        print(f"semantic adapter boundary marker failed: {exc}", file=sys.stderr)
+        return 2
     except subprocess.TimeoutExpired:
         print("semantic adapter inference timed out", file=sys.stderr)
         return 124

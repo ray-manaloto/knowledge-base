@@ -280,6 +280,11 @@ _ACCEPTED_EXECUTION_CONFIG = ExecutionConfig(
 )
 
 
+def accepted_graphify_runtime() -> RuntimeIdentity:
+    """Return the reviewed Graphify 0.9.42 runtime identity from issue #300."""
+    return _ACCEPTED_GRAPHIFY_RUNTIME
+
+
 def encode_json(value: object) -> bytes:
     """Encode one public evidence object canonically enough for hashing."""
     return msgspec.json.encode(value, order="sorted")
@@ -493,8 +498,27 @@ def _hyperedge_invalid(hyperedges: list[dict[str, object]], known_ids: set[str])
     return False
 
 
-def fragment_reasons(fragment: object, *, source_path: str) -> tuple[str, ...]:
-    """Validate structure, provenance, and referential integrity for one fragment."""
+def _fragment_source_reasons(
+    records: list[dict[str, object]], source_paths: tuple[str, ...]
+) -> list[str]:
+    accepted_paths = set(source_paths)
+    raw_observed_paths = [item.get("source_file") for item in records]
+    observed_paths = {path for path in raw_observed_paths if isinstance(path, str) and path}
+    invalid_scope = (
+        not source_paths
+        or len(accepted_paths) != len(source_paths)
+        or any(not isinstance(path, str) or not path for path in source_paths)
+        or any(not isinstance(path, str) or not path for path in raw_observed_paths)
+        or not observed_paths.issubset(accepted_paths)
+    )
+    reasons = ["fragment-source-scope-mismatch"] if invalid_scope else []
+    if observed_paths != accepted_paths:
+        reasons.append("fragment-source-coverage-mismatch")
+    return reasons
+
+
+def fragment_scope_reasons(fragment: object, *, source_paths: tuple[str, ...]) -> tuple[str, ...]:
+    """Validate structure, provenance, scope, and references for semantic records."""
     if not isinstance(fragment, dict):
         return ("fragment-invalid",)
     nodes = _records(fragment.get("nodes"))
@@ -515,8 +539,7 @@ def fragment_reasons(fragment: object, *, source_path: str) -> tuple[str, ...]:
     records = [*nodes, *edges, *hyperedges]
     if any(item.get("_origin") not in (None, "semantic") for item in records):
         reasons.append("fragment-origin-invalid")
-    if any(item.get("source_file") != source_path for item in records):
-        reasons.append("fragment-source-scope-mismatch")
+    reasons.extend(_fragment_source_reasons(records, source_paths))
     if any(
         not isinstance(edge.get("source"), str)
         or not isinstance(edge.get("target"), str)
@@ -528,6 +551,11 @@ def fragment_reasons(fragment: object, *, source_path: str) -> tuple[str, ...]:
     if _hyperedge_invalid(hyperedges, known_ids):
         reasons.append("unresolved-hyperedge-member")
     return tuple(dict.fromkeys(reasons))
+
+
+def fragment_reasons(fragment: object, *, source_path: str) -> tuple[str, ...]:
+    """Validate one-source fragment structure, provenance, scope, and references."""
+    return fragment_scope_reasons(fragment, source_paths=(source_path,))
 
 
 def expected_source_identity() -> SourceIdentity:
@@ -967,6 +995,11 @@ def _admit_source(repo_root: Path, destination: Path) -> tuple[Path, object]:
     ):
         raise ValueError("Graphify semantic source bytes drifted")
     return destination / SOURCE_PATH, inventory
+
+
+def admit_source(repo_root: Path, destination: Path) -> tuple[Path, object]:
+    """Materialize and verify the complete pinned Graphify source snapshot."""
+    return _admit_source(repo_root, destination)
 
 
 def _semantic_fragment(result: object) -> dict[str, object]:

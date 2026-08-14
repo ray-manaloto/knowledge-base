@@ -77,6 +77,7 @@ def _run(argv: list[str] | None = None) -> int:
             "cc | cc-doctor | eval [--live] [--slow] | "
             "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
             "graphify-semantic-slice preflight|run|verify [PATH] | "
+            "graphify-semantic-corpus plan|run|verify [PATH] | "
             "skillopt-contract | "
             "tool-sync <currency-tool-name> | "
             "skillopt-reviewed --packet P --target T --backend mock|handoff | "
@@ -138,6 +139,7 @@ def _run(argv: list[str] | None = None) -> int:
         "graphify-contract",
         "graphify-baseline",
         "graphify-semantic-slice",
+        "graphify-semantic-corpus",
         "skillopt-contract",
     }:
         return _dispatch_contract(repo_root, cmd, rest)
@@ -226,6 +228,10 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import graphify_semantic_slice
 
         return graphify_semantic_slice.semantic_main(repo_root, rest)
+    if cmd == "graphify-semantic-corpus":
+        from kb_setup import graphify_semantic_corpus
+
+        return graphify_semantic_corpus.corpus_main(repo_root, rest)
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)

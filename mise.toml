@@ -534,6 +534,10 @@ run = "uv run kb-setup graphify-baseline"
 description = "Preflight, run, or verify the pinned real-Claude Graphify semantic slice"
 run = "uv run kb-setup graphify-semantic-slice"
 
+[tasks.kb-graphify-semantic-corpus]
+description = "Plan, run, or verify complete pinned Graphify semantic coverage"
+run = "uv run kb-setup graphify-semantic-corpus"
+
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
 run = "uv run kb-setup skillopt-contract"
