@@ -20,8 +20,8 @@ from kb_setup import cli, graphify_sdk, graphify_semantic_slice
 _MODEL = "claude-haiku-4-5-20251001"
 
 
-def test_graphify_0942_semantic_sdk_contract_is_current() -> None:
-    assert graphify_sdk.semantic_contract_errors("0.9.42") == ()
+def test_graphify_0943_semantic_sdk_contract_is_current() -> None:
+    assert graphify_sdk.semantic_contract_errors("0.9.43") == ()
 
 
 def test_cli_dispatches_semantic_slice_without_gating_public_verify(
@@ -254,11 +254,19 @@ def test_missing_negative_coverage_field_is_not_treated_as_zero(name: str) -> No
     assert graphify_semantic_slice._result_integer({}, name) == -1
 
 
-def test_adapter_rejects_stream_envelope_even_when_last_entry_is_success() -> None:
+def test_adapter_normalizes_stream_when_exactly_one_result_is_final() -> None:
     from kb_setup import graphify_semantic_adapter
 
     payload = msgspec.json.encode([{"type": "error"}, _successful_envelope()])
-    assert graphify_semantic_adapter._result_envelope(payload) == {}
+    envelope, observation = graphify_semantic_adapter.parse_result_envelope(payload)
+
+    assert envelope == _successful_envelope()
+    assert observation.status == "accepted-result-array"
+    assert (observation.event_count, observation.result_count, observation.selected_index) == (
+        2,
+        1,
+        1,
+    )
 
 
 def _candidate_member(name: str, raw: bytes) -> graphify_semantic_slice.ArtifactMember:

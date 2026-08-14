@@ -807,3 +807,54 @@ flowchart LR
   JSON failures recorded a character offset. A multibyte malformed-JSON RED/GREEN fixture
   now binds the latter to the original response's UTF-8 byte index. All retained
   nonnegative offsets therefore have one documented unit; no response prefix is retained.
+
+## 2026-08-14 — iteration KB-301-16
+
+- Prior goal digest: iteration KB-301-15 plus its strict-decoder review corrections.
+- Changed requirement: refresh a critical dependency during the active goal, supersede
+  the current plan with Graphify 0.9.43 while preserving 0.9.42 evidence, normalize the
+  new streamed Claude result shape strictly, and restore a real three-turn command cap.
+- Reason: Graphify 0.9.43 added object-or-array Claude envelope normalization upstream.
+  The release arrived while #301 was still open, and the prior conclusion that Claude
+  Code 2.1.232 could not enforce a turn cap relied only on its incomplete short help.
+- Evidence: the exact v0.9.43 commit/tree is
+  `7281f27eac568f77f50910f59f84543458f5dfd1` /
+  `6ae1c399eb1beef4f51106bbeecf72ee035fbeb6`. Provider-free planning still produces
+  372 sources, 474 units, 470 provisional admissions, 57 chunks, and the same 19,985-
+  token max chunk. TDD copies Graphify's streamed result fixture and rejects empty,
+  non-object, result-free, duplicate-result, and trailing-event arrays. Sanitized v1
+  observations retain only shape counts/index plus parse status and response size/hash.
+  A control-armed parser probe proves `--max-turns` is supported without inference;
+  future #301 argv now includes `--max-turns 3`, and typed results above three turns fail.
+  The historical #300 17-argument receipt verifier remains unchanged. The deterministic
+  AST baseline keeps its historical v0.9.42 source authority while its separate runtime
+  identity now binds the pinned v0.9.43 wheel and source distribution. No provider call ran.
+- Independent identity review then replayed two transitive paths before accepting any
+  digest. Hostile semantic-policy replacement inherited an otherwise accepted plan
+  because `graphify_semantic_slice.py` bytes were not in the execution config, and the
+  tracked launcher reparsed streamed stdout with plain `json.loads`. The config now
+  binds the semantic-policy module, hostile drift yields `config-contract-mismatch`,
+  and the launcher reuses the strict adapter normalizer. A bounded exact-head re-review
+  passed both corrections and changed only the accepted prototype-contract and launcher
+  identity digests. The review did not set any plan, advisory, or exclusion root.
+- Currency evidence: two generated currency batches were byte-identical except for their
+  first-line timestamps. The later 19:42 batch was retained because the watch/baseline
+  state matches it; the classified 19:41 duplicates and their index rows were removed.
+- Affected tickets: #301 only. #302 remains unstarted.
+- Disposition: the v0.9.43 plan is structurally complete and unauthorized with exactly
+  `plan-authority-unset`, `cost-advisory-review-required`, and
+  `provisional-input-decisions`. The post-review no-inference receipt reports zero
+  provider inferences and exactly `plan-not-authorized`; its tracked copy is
+  `docs/agents/evidence/issue-301/no-inference-preflight-0943.json`. No content authority
+  roots, retry, full-corpus run, or provider call are authorized.
+
+```mermaid
+flowchart LR
+    OLD["Historical v0.9.42 evidence"] --> KEEP["Preserved unchanged"]
+    NEW["Pinned Graphify v0.9.43"] --> PLAN["Fresh provider-free plan"]
+    ARRAY["Strict object or final-result array"] --> SAFE["Content-free v1 observation"]
+    TURN["Parser-proven --max-turns 3"] --> SAFE
+    PLAN --> REVIEW["Independent code-identity review passed"]
+    SAFE --> REVIEW
+    REVIEW --> STOP["Authority empty; no provider call"]
+```

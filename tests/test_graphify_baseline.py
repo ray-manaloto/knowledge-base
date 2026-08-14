@@ -120,7 +120,7 @@ def _write_public_candidate(root: Path) -> Path:
             "status": "complete",
             "source_commit": _COMMIT,
             "source_tree": _TREE,
-            "runtime_version": "0.9.42",
+            "runtime_version": "0.9.43",
             "detected_count": 1,
             "extracted_count": 1,
             "node_count": 1,
@@ -143,15 +143,15 @@ def _write_public_candidate(root: Path) -> Path:
         },
         "runtime.json": {
             "schema_version": 1,
-            "version": "0.9.42",
-            "cli_version": "0.9.42",
-            "sdk_version": "0.9.42",
+            "version": "0.9.43",
+            "cli_version": "0.9.43",
+            "sdk_version": "0.9.43",
             "executable": ".venv/bin/graphify",
             "sdk_fingerprint_sha256": (
                 "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157"
             ),
-            "wheel_sha256": ("d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6"),
-            "sdist_sha256": ("a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b"),
+            "wheel_sha256": ("a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b"),
+            "sdist_sha256": ("7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3"),
         },
         "controls.json": {
             "schema_version": 1,
@@ -1029,14 +1029,14 @@ def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:
 
     identity = graphify_baseline.runtime_identity(repo)
 
-    assert identity.version == "0.9.42"
+    assert identity.version == "0.9.43"
     assert identity.cli_version == identity.sdk_version == identity.version
     assert identity.executable == ".venv/bin/graphify"
     assert identity.wheel_sha256 == (
-        "d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6"
+        "a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b"
     )
     assert identity.sdist_sha256 == (
-        "a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b"
+        "7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3"
     )
     assert len(identity.sdk_fingerprint_sha256) == 64
 

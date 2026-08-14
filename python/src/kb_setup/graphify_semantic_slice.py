@@ -359,7 +359,40 @@ def _completed_bytes(executable: Path, *args: str, environment: Mapping[str, str
     return completed.stdout
 
 
-def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> ClaudePreflight:
+def _assert_value_flag_supported(
+    executable: Path,
+    flag: str,
+    *,
+    environment: Mapping[str, str],
+) -> None:
+    """Prove a hidden value-taking CLI flag at parser time without inference."""
+    invalid_value = "not-an-integer"
+    completed = subprocess.run(
+        [str(executable), "-p", flag, invalid_value],
+        capture_output=True,
+        check=False,
+        env=dict(environment),
+        timeout=30,
+    )
+    diagnostic = completed.stderr
+    if (
+        completed.returncode != 1
+        or completed.stdout
+        or flag.encode() not in diagnostic
+        or invalid_value.encode() not in diagnostic
+        or b"is invalid" not in diagnostic
+        or b"must be a number" not in diagnostic
+    ):
+        raise ValueError(f"Claude {flag} parser probe failed")
+
+
+def preflight(
+    repo_root: Path,
+    environment: Mapping[str, str] | None = None,
+    *,
+    graphify_version: str = "0.9.42",
+    require_max_turns: bool = False,
+) -> ClaudePreflight:
     """Prove exact Graphify/Claude/auth/routing capability without inference."""
     from kb_setup import graphify_baseline, graphify_env, graphify_sdk
 
@@ -368,7 +401,7 @@ def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> 
     if overrides:
         raise ValueError("forbidden routing environment names: " + ", ".join(overrides))
     graphify_env.assert_pinned_graphify(repo_root)
-    graphify_sdk.assert_semantic_sdk("0.9.42")
+    graphify_sdk.assert_semantic_sdk(graphify_version)
     resolved = shutil.which("claude", path=current.get("PATH"))
     if not resolved:
         raise ValueError("Claude Code CLI is unavailable")
@@ -379,6 +412,10 @@ def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> 
     missing = tuple(flag for flag in _REQUIRED_CLAUDE_FLAGS if flag not in help_text)
     if missing:
         raise ValueError("Claude Code required flags are unavailable: " + ", ".join(missing))
+    required_flags = _REQUIRED_CLAUDE_FLAGS
+    if require_max_turns:
+        _assert_value_flag_supported(executable, "--max-turns", environment=child)
+        required_flags = (*required_flags, "--max-turns")
     version_raw = _completed_bytes(executable, "--version", environment=child)
     version_text = version_raw.decode("utf-8", errors="strict").strip()
     match = re.search(r"\b\d+\.\d+\.\d+\b", version_text)
@@ -391,7 +428,7 @@ def preflight(repo_root: Path, environment: Mapping[str, str] | None = None) -> 
         executable_sha256=sha256_file(executable),
         version=match.group(0),
         help_sha256=hashlib.sha256(help_raw).hexdigest(),
-        required_flags=_REQUIRED_CLAUDE_FLAGS,
+        required_flags=required_flags,
         auth=classify_auth(auth_raw),
         environment_names=tuple(sorted(child)),
         graphify_runtime=graphify_baseline.runtime_identity(repo_root),
@@ -712,7 +749,10 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
                 response_size=metadata.response_size,
             )
         )
-        if metadata.parse_observation.status != "accepted-object":
+        if metadata.parse_observation.status not in {
+            "accepted-object",
+            "accepted-result-array",
+        }:
             reasons.append("adapter-response-untyped")
     if len(metadata.model_usage) != 1:
         reasons.append("adapter-model-count-mismatch")

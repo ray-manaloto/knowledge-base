@@ -20,6 +20,7 @@ from kb_setup import atomic, graphify_semantic_slice
 
 _GRAPHIFY_ARG_COUNT = 8
 _SHA256_HEX_LENGTH = 64
+_MIN_MULTI_EVENT_COUNT = 2
 
 
 class _NonJsonConstantError(ValueError):
@@ -87,6 +88,9 @@ class EnvelopeParseObservation(msgspec.Struct, frozen=True, forbid_unknown_field
     utf8_valid: bool
     json_valid: bool
     top_level_kind: str
+    event_count: int
+    result_count: int
+    selected_index: int
     error_offset: int
     trailing_non_whitespace: bool
 
@@ -273,13 +277,16 @@ def parse_result_envelope(stdout: bytes) -> tuple[dict[str, object], EnvelopePar
         text = stdout.decode("utf-8", errors="strict")
     except UnicodeDecodeError as exc:
         return {}, EnvelopeParseObservation(
-            schema_id="graphify-claude-envelope-parse/v0",
+            schema_id="graphify-claude-envelope-parse/v1",
             status="invalid-utf8",
             response_sha256=response_sha256,
             response_size=response_size,
             utf8_valid=False,
             json_valid=False,
             top_level_kind="unknown",
+            event_count=0,
+            result_count=0,
+            selected_index=-1,
             error_offset=exc.start,
             trailing_non_whitespace=False,
         )
@@ -298,13 +305,16 @@ def parse_result_envelope(stdout: bytes) -> tuple[dict[str, object], EnvelopePar
             else "nesting-limit"
         )
         return {}, EnvelopeParseObservation(
-            schema_id="graphify-claude-envelope-parse/v0",
+            schema_id="graphify-claude-envelope-parse/v1",
             status=status,
             response_sha256=response_sha256,
             response_size=response_size,
             utf8_valid=True,
             json_valid=False,
             top_level_kind=_intended_top_level_kind(text),
+            event_count=0,
+            result_count=0,
+            selected_index=-1,
             error_offset=-1,
             trailing_non_whitespace=False,
         )
@@ -319,31 +329,64 @@ def parse_result_envelope(stdout: bytes) -> tuple[dict[str, object], EnvelopePar
             else "invalid-json"
         )
         return {}, EnvelopeParseObservation(
-            schema_id="graphify-claude-envelope-parse/v0",
+            schema_id="graphify-claude-envelope-parse/v1",
             status=status,
             response_sha256=response_sha256,
             response_size=response_size,
             utf8_valid=True,
             json_valid=False,
             top_level_kind=_intended_top_level_kind(text),
+            event_count=0,
+            result_count=0,
+            selected_index=-1,
             error_offset=byte_offset,
             trailing_non_whitespace=trailing,
         )
     kind = _top_level_kind(payload)
+    event_count = 1 if isinstance(payload, dict) else 0
+    result_count = int(isinstance(payload, dict) and payload.get("type") == "result")
+    selected_index = 0 if isinstance(payload, dict) else -1
+    status = "accepted-object" if isinstance(payload, dict) else "valid-non-object"
+    envelope: dict[str, object] = payload if isinstance(payload, dict) else {}
+    if isinstance(payload, list):
+        event_count = len(payload)
+        object_events = [event for event in payload if isinstance(event, dict)]
+        result_indices = [
+            index
+            for index, event in enumerate(payload)
+            if isinstance(event, dict) and event.get("type") == "result"
+        ]
+        result_count = len(result_indices)
+        if not payload:
+            status = "result-array-empty"
+        elif len(object_events) != event_count:
+            status = "result-array-non-object-event"
+        elif not result_indices:
+            status = "result-array-missing-final-result"
+        elif len(result_indices) != 1:
+            status = "result-array-ambiguous-result"
+        elif result_indices[0] != event_count - 1:
+            status = "result-array-trailing-event"
+            selected_index = result_indices[0]
+        else:
+            status = "accepted-result-array"
+            selected_index = result_indices[0]
+            envelope = object_events[selected_index]
     observation = EnvelopeParseObservation(
-        schema_id="graphify-claude-envelope-parse/v0",
-        status="accepted-object" if kind == "object" else "valid-non-object",
+        schema_id="graphify-claude-envelope-parse/v1",
+        status=status,
         response_sha256=response_sha256,
         response_size=response_size,
         utf8_valid=True,
         json_valid=True,
         top_level_kind=kind,
+        event_count=event_count,
+        result_count=result_count,
+        selected_index=selected_index,
         error_offset=-1,
         trailing_non_whitespace=False,
     )
-    if isinstance(payload, dict):
-        return payload, observation
-    return {}, observation
+    return envelope, observation
 
 
 def _result_envelope(stdout: bytes) -> dict[str, object]:
@@ -377,13 +420,79 @@ def parse_observation_reasons(
             observation.utf8_valid
             and observation.json_valid
             and observation.top_level_kind == "object"
+            and observation.event_count == 1
+            and observation.result_count in {0, 1}
+            and observation.selected_index == 0
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "accepted-result-array": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "array"
+            and observation.event_count >= 1
+            and observation.result_count == 1
+            and observation.selected_index == observation.event_count - 1
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "result-array-empty": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "array"
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "result-array-non-object-event": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "array"
+            and observation.event_count >= 1
+            and 0 <= observation.result_count <= observation.event_count
+            and observation.selected_index == -1
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "result-array-missing-final-result": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "array"
+            and observation.event_count >= 1
+            and observation.result_count == 0
+            and observation.selected_index == -1
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "result-array-ambiguous-result": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "array"
+            and observation.event_count >= _MIN_MULTI_EVENT_COUNT
+            and _MIN_MULTI_EVENT_COUNT <= observation.result_count <= observation.event_count
+            and observation.selected_index == -1
+            and observation.error_offset == -1
+            and not observation.trailing_non_whitespace
+        ),
+        "result-array-trailing-event": (
+            observation.utf8_valid
+            and observation.json_valid
+            and observation.top_level_kind == "array"
+            and observation.event_count >= _MIN_MULTI_EVENT_COUNT
+            and observation.result_count == 1
+            and 0 <= observation.selected_index < observation.event_count - 1
             and observation.error_offset == -1
             and not observation.trailing_non_whitespace
         ),
         "valid-non-object": (
             observation.utf8_valid
             and observation.json_valid
-            and observation.top_level_kind in {"array", "string", "number", "boolean", "null"}
+            and observation.top_level_kind in {"string", "number", "boolean", "null"}
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset == -1
             and not observation.trailing_non_whitespace
         ),
@@ -391,24 +500,36 @@ def parse_observation_reasons(
             not observation.utf8_valid
             and not observation.json_valid
             and observation.top_level_kind == "unknown"
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset >= 0
             and not observation.trailing_non_whitespace
         ),
         "truncated-json": (
             observation.utf8_valid
             and not observation.json_valid
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset >= 0
             and not observation.trailing_non_whitespace
         ),
         "trailing-data": (
             observation.utf8_valid
             and not observation.json_valid
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset >= 0
             and observation.trailing_non_whitespace
         ),
         "invalid-json": (
             observation.utf8_valid
             and not observation.json_valid
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset >= 0
             and not observation.trailing_non_whitespace
         ),
@@ -416,6 +537,9 @@ def parse_observation_reasons(
             observation.utf8_valid
             and not observation.json_valid
             and observation.top_level_kind in {"object", "array", "number"}
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset == -1
             and not observation.trailing_non_whitespace
         ),
@@ -423,6 +547,9 @@ def parse_observation_reasons(
             observation.utf8_valid
             and not observation.json_valid
             and observation.top_level_kind in {"object", "array", "number"}
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset == -1
             and not observation.trailing_non_whitespace
         ),
@@ -430,13 +557,16 @@ def parse_observation_reasons(
             observation.utf8_valid
             and not observation.json_valid
             and observation.top_level_kind in {"object", "array"}
+            and observation.event_count == 0
+            and observation.result_count == 0
+            and observation.selected_index == -1
             and observation.error_offset == -1
             and not observation.trailing_non_whitespace
         ),
     }
     checks = (
         (
-            observation.schema_id == "graphify-claude-envelope-parse/v0",
+            observation.schema_id == "graphify-claude-envelope-parse/v1",
             "parse-observation-schema-mismatch",
         ),
         (_is_sha256(digest), "parse-observation-digest-invalid"),
@@ -657,6 +787,8 @@ def adapter_main() -> int:
         "--no-chrome",
         "--max-budget-usd",
         "0.25",
+        "--max-turns",
+        "3",
     )
     started = time.monotonic_ns()
     try:
@@ -715,11 +847,9 @@ def adapter_main() -> int:
 
 def result_envelope_reasons(
     envelope: object,
-    environment: Mapping[str, str],
+    _environment: Mapping[str, str],
 ) -> tuple[str, ...]:
-    """Apply the bounded #300 policy or #301 observation-only turn policy."""
-    if environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH"):
-        return graphify_semantic_slice.envelope_reasons(envelope, max_turns=None)
+    """Apply the same bounded result policy at both semantic boundaries."""
     return graphify_semantic_slice.envelope_reasons(envelope)
 
 
