@@ -68,6 +68,15 @@ graphify-out/wiki/
 graphify-out/obsidian/
 graphify-out/GRAPH_REPORT.md
 graphify-out/.graphify_*
+# `.vocab.txt` is an 18,686-line derived word list and the ONE graphify artifact
+# that matches neither `.graphify_*` nor a literal name in `hk.pkl`'s `baseExclude`.
+# Untracked, hk therefore hands it to `typos`, which exits **2 with no output at
+# all** on it — so the step fails as `ERROR` with nothing to read, and the cause
+# is invisible. Measured 2026-08-15: `typos --force-exclude --diff` on it → rc=2,
+# 0 bytes stdout, 0 bytes stderr; the same command on `.mcp.json` → rc=0.
+# Ignoring it is enough because hk's file list is git-derived; `kb-query` does not
+# read it (verified: identical 49-node answer with the file moved aside).
+graphify-out/.vocab.txt
 # .currency-stamp.json fingerprints THIS machine's last build (version + artifact
 # stats), so it is per-clone state, not a shared input: committing it would make
 # every rebuild a diff and every parallel clone a conflict, and a fresh clone
