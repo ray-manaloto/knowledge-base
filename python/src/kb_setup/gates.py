@@ -490,11 +490,21 @@ def iter_run(
     writer in it has something left to skip.
 
     THAT CHANGES THE SHIP PATH, and the change is stated rather than left to be
-    discovered. `pr.run_gates` passes the four :data:`GATE_TASKS` with
-    ``stop_on_failure=True``, and all four are :data:`CONCURRENT_SAFE`, so they
-    form ONE batch and none of them is ever skipped now. A ship whose `lint`
-    fails used to stop at roughly 12s and now takes the full ~61s of the slowest
-    gate. It is still strictly better than what the flag was protecting against —
+    discovered. `pr.run_gates` passes :data:`GATE_TASKS` with
+    ``stop_on_failure=True``. Three of the four are :data:`CONCURRENT_SAFE` and
+    form ONE batch; `eval` left that set in #321 and is a batch of its own, so it
+    IS skipped — recorded `rc: None`, never a pass — when the first batch fails.
+    A ship whose `lint` fails used to stop at roughly 12s and now takes the full
+    ~61s of the slowest gate in that batch.
+
+    (This paragraph said "all four … and none of them is ever skipped now" until
+    2026-08-16, for one commit after `eval` was moved out. The constant's own
+    comment was updated and this docstring was not — the same file, the same
+    change. Found by the cold lane against the rule file that had been corrected;
+    `tool-currency-and-native-first.md` rule 5 is about exactly this, and being
+    in the same file is no protection.)
+
+    It is still strictly better than what the flag was protecting against —
     the sum was 249s — and it buys the thing `--stop` was giving up, which is
     every gate's state on a failing ship instead of only the first one's. But it
     is a real regression in the one case the flag was named for, and if a future
