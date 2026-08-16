@@ -810,7 +810,13 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
 )
 #: `LICENSE`, `LICENCE.md`, `License-Apache`, `LICENSE.BSD`, … one rule instead
 #: of the eleven spellings the census found across 67 sources.
-_LICENSE_PREFIXES = ("LICENSE", "LICENCE", "COPYING")
+#:
+#: Anchored, and requiring a NON-ALPHANUMERIC after the word, because a bare
+#: `startswith` also absorbs `LICENSEPLATE.py` and `LICENSED_users.rs` — real
+#: source, silently taken as a licence file and (unlike the counted class) never
+#: tallied. Found by the cold lane; the first version of this rule was a
+#: `.upper().startswith(...)`.
+_LICENSE_NAME = re.compile(r"(LICENSE|LICENCE|COPYING)($|[^A-Za-z0-9])", re.IGNORECASE)
 #: Vendored test fixtures — `gitleaks` ships fake `.git` trees, `typos` ships
 #: `*.in/` input dirs, `pkl` ships `.jva` goldens. These are inputs to somebody
 #: else's test suite, not corpus knowledge.
@@ -910,7 +916,7 @@ def classify_unclassified(
         if (
             name in _NON_SOURCE_NAMES
             or suffix in _NON_SOURCE_SUFFIXES
-            or name.upper().startswith(_LICENSE_PREFIXES)
+            or _LICENSE_NAME.match(name) is not None
             or _is_ignore_metadata_name(name)
         ):
             non_source.append(relative)

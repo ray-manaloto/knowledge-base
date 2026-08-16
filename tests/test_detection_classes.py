@@ -296,3 +296,35 @@ def test_a_symlink_to_a_directory_is_refused(tmp_path: Path) -> None:
         tmp_path, ("LICENSE",)
     )
     assert unresolved == ("LICENSE",)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # CONTROL ARM for the licence rule's BOUNDARY. A bare `startswith`
+        # absorbed all of these as licence files — real source, taken as
+        # non-source and, unlike the counted class, never tallied.
+        # Raised as LOW by the cold lane on f149ed62.
+        "LICENSEPLATE.py",
+        "LICENSED_users.rs",
+        "COPYINGCTL.c",
+        "licenceplate.go",
+    ],
+)
+def test_a_name_merely_starting_with_licence_still_blocks(tmp_path: Path, relative: str) -> None:
+    _write(tmp_path, relative)
+    non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert unresolved == (relative,)
+    assert non_source == ()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["LICENSE", "LICENCE.md", "License-Apache", "LICENSE.BSD", "COPYING.txt", "LICENSE_1_0.txt"],
+)
+def test_real_licence_spellings_are_still_absorbed(tmp_path: Path, relative: str) -> None:
+    """The other direction — otherwise the boundary fix only ever refuses."""
+    _write(tmp_path, relative)
+    non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == (relative,)
+    assert unresolved == ()
