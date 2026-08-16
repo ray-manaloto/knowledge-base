@@ -851,7 +851,7 @@ def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> No
     assert (snapshot / "subst.txt").read_text(encoding="utf-8") == "$Format:%H$\n"
     assert (snapshot / "tool").stat().st_mode & 0o111
     # INVERTED at graphify 0.9.44 (#2759), and the inversion is the point. This
-    # fixture force-adds `ignored/secret.txt`, so it is git-TRACKED while also
+    # fixture force-adds `ignored/design.txt`, so it is git-TRACKED while also
     # matching `.gitignore`. Up to 0.9.43 detection dropped it and this line
     # asserted that. 0.9.44 keeps it, matching git's own behaviour of never
     # un-tracking such a file — so the corpus stops silently losing committed
