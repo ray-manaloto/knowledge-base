@@ -430,8 +430,18 @@ def test_gate_claims_are_found_in_the_real_handoff_corpus():
         for p in plans
         for c in citations.gate_claims(p.read_text(encoding="utf-8", errors="replace"))
     }
-    assert ("lint", 0) in claimed
-    assert ("test", 0) in claimed
+    # Assert what the PARSER can do, not what the corpus happens to say. This
+    # used to demand `("test", 0)` and went red the day a handoff honestly
+    # recorded `test rc=2` — the parser was working perfectly and the test failed
+    # because a gate had failed, which is a fact about the repo rather than about
+    # the detector. A control arm that a truthful handoff can break is measuring
+    # the wrong thing.
+    #
+    # Still a real control arm: a parser that stopped matching the corpus finds
+    # no names and no zero at all, so both assertions go red together.
+    tasks = {task for task, _rc in claimed}
+    assert {"lint", "test"} <= tasks
+    assert any(rc == 0 for _task, rc in claimed)
 
 
 def test_a_table_cell_claim_is_read():

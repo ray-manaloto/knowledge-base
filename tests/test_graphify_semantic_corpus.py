@@ -1189,7 +1189,24 @@ def test_parse_observation_classifies_decoder_integer_limit() -> None:
 
 
 def test_parse_observation_classifies_decoder_nesting_limit() -> None:
-    raw = (b"[" * 50_000) + b"0" + (b"]" * 50_000)
+    """The nesting-limit branch, at a depth this interpreter actually recurses on.
+
+    The fixture was 50,000 and stopped reaching the branch: the classifier decodes
+    with the STDLIB `json`, and CPython 3.14 scans deep arrays iteratively, so
+    50,000 now decodes cleanly and the observation came back
+    `result-array-non-object-event` with `json_valid: True`. The branch was not
+    dead — the fixture had simply become too shallow for the interpreter (#317).
+
+    Re-measured on 3.14.7 rather than guessed: 100,000 decodes fine, 500,000 and
+    1,000,000 raise `RecursionError`, and a 200,000-deep OBJECT raises too. 500k
+    is used for the 5x margin over the last known-passing depth, because a fixture
+    sitting on the boundary would be flaky against stack size.
+
+    That margin is the only thing making this test stable, and it is a property of
+    the interpreter rather than of the code — so if this fails again, re-measure
+    the threshold before changing the classifier.
+    """
+    raw = (b"[" * 500_000) + b"0" + (b"]" * 500_000)
 
     envelope, observation = graphify_semantic_adapter.parse_result_envelope(raw)
 
@@ -1197,8 +1214,8 @@ def test_parse_observation_classifies_decoder_nesting_limit() -> None:
     assert msgspec.structs.asdict(observation) == {
         "schema_id": "graphify-claude-envelope-parse/v1",
         "status": "nesting-limit",
-        "response_sha256": ("00ed238197a55cf471748c8cfee32101b3c61ddb1137b72ca0e97fce847f6fe5"),
-        "response_size": 100_001,
+        "response_sha256": ("8742aa50eb17792747965876fb2216ddd8e0df9fe4c5cb44c1dfee3d755dca9d"),
+        "response_size": 1_000_001,
         "utf8_valid": True,
         "json_valid": False,
         "top_level_kind": "array",
