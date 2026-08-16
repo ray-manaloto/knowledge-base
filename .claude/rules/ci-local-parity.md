@@ -49,10 +49,28 @@ else gets a batch to itself. That default is fail-closed on purpose — a gate
 whose writes nobody characterised must not be raced — so adding a name to
 `GATE_TASKS` alone makes it correct and slow, which is the right way round. To
 make it fast, first establish what it writes (`find -newer <stamp>` across a real
-run is how the current four were cleared: `.rumdl_cache` and `.pytest_cache`,
-disjoint, no tracked files) and only then add it to `CONCURRENT_SAFE`.
+run is how `lint`, `test` and `brain-audit` were cleared: `.rumdl_cache` and
+`.pytest_cache`, disjoint, no tracked files) and only then add it to
+`CONCURRENT_SAFE`.
 `fmt`, `kb-build` and `kb-artifacts` rewrite tracked files and must never be in
 it — a `fmt` overlapping a `kb-build` is the 3h06m wedge of PR #244.
+
+**Membership needs TWO questions, and that sweep answers only one (#321).**
+`eval` was in the safe set until 2026-08-16 and had to come out: its
+`tier1.graph-answers` case runs `graphify query` against the ~771 MB graph under
+a 60s bound, and racing `test` under 12 xdist workers starved it past that bound
+— intermittently, across three `kb-gates` runs, passing every time it ran alone.
+
+Contention for CPU and IO is **not a write conflict**, so `find -newer` is
+structurally blind to it: the original characterisation was correct and could
+never have caught this. So ask both — *what does it write*, and *does it carry a
+wall-clock bound it can miss under load*. `eval` is the only one of the four with
+an internal timeout, which is why it is the only one that surfaced.
+
+One consequence, since the old text implied otherwise: with `eval` in its own
+batch, `stop_on_failure=True` **can** skip it on the ship path. That is correct —
+the refusal is already decided — but it is no longer true that the ship path
+never skips a gate.
 
 ## Rule 2: Every tool an hk step invokes must be pinned in `mise.toml`
 
