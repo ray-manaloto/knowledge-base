@@ -103,6 +103,7 @@ _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
     wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
     sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
 )
+_PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
 # Kept in step with `graphify_semantic_slice._ACCEPTED_CLAUDE_*`, which carries
@@ -123,6 +124,13 @@ _CLAUDE_REQUIRED_FLAGS = (
     "--strict-mcp-config",
     "--tools",
     "--max-turns",
+    # Appended in the same order `preflight` appends it, because
+    # `_provider_runtime_reasons` compares this tuple to the receipt's
+    # `required_flags` for EQUALITY, not membership. The corpus profile passes
+    # `--effort`, so the preflight proves it, so it lands in the receipt — and a
+    # config that omitted it would fail every real run as a capability-flag
+    # mismatch, which reads like a missing CLI feature rather than a stale list.
+    "--effort",
 )
 _EXTRACTION_USER_INSTRUCTION = (
     "\n\n---\n"
@@ -590,7 +598,12 @@ def _effective_config(
         graphify_ref=source.ref,
         graphify_commit=source.commit,
         graphify_tree=source.tree,
-        graphify_version="0.9.43",
+        # Read from the runtime identity rather than spelled again: this literal
+        # said "0.9.43" while `_ACCEPTED_GRAPHIFY_RUNTIME` next to it said 0.9.44,
+        # so every plan written since the pin bump recorded two different versions
+        # for one run. A version that is transcribed can disagree with the version
+        # that ran; a version that is READ cannot.
+        graphify_version=_ACCEPTED_GRAPHIFY_RUNTIME.version,
         graphify_runtime=_ACCEPTED_GRAPHIFY_RUNTIME,
         graphify_semantic_fingerprint_sha256=semantic_fingerprint,
         graphify_llm_sha256=graphify_llm_sha,
@@ -603,9 +616,9 @@ def _effective_config(
         claude_executable_sha256=_CLAUDE_EXECUTABLE_SHA256,
         claude_help_sha256=_CLAUDE_HELP_SHA256,
         claude_required_flags=_CLAUDE_REQUIRED_FLAGS,
-        claude_model=graphify_semantic_slice.CLAUDE_MODEL,
-        claude_canonical_model="claude-haiku-4-5",
-        resolved_model="claude-haiku-4-5",
+        claude_model=_PROFILE.model,
+        claude_canonical_model=_PROFILE.canonical_model,
+        resolved_model=_PROFILE.canonical_model,
         backend="claude-cli",
         auth_route="claude.ai:firstParty:max",
         endpoint_policy="subscription-default-no-api-endpoint",
@@ -613,17 +626,37 @@ def _effective_config(
         token_budget=token_budget,
         file_char_cap=_FILE_CHAR_CAP,
         timeout_seconds=120,
-        claude_max_output_tokens=4096,
-        claude_max_retries=0,
+        claude_max_output_tokens=int(_PROFILE.max_output_tokens),
+        claude_max_retries=int(_PROFILE.max_retries),
         structured_output_retries=1,
-        max_turns=3,
-        max_cost_usd=0.25,
-        graphify_max_retry_depth=0,
+        max_turns=int(_PROFILE.max_turns),
+        max_cost_usd=_PROFILE.max_cost_usd,
+        # 0 -> 2 alongside `claude_max_retries`: one blip over 57 chunks is likely
+        # rather than hypothetical, and a lost chunk is a hole in the corpus that
+        # nothing downstream reports as missing.
+        graphify_max_retry_depth=2,
         graphify_chunk_size=20,
-        graphify_no_incremental_cache=True,
+        # False (cache reads ENABLED) so a resumed or repeated run pays only for
+        # the chunks it has not already extracted. Under the previous cold policy
+        # every re-run re-bought the whole corpus, which made recovering from a
+        # single failed chunk cost the same as the original run.
+        graphify_no_incremental_cache=False,
+        # 1, and it is a MEASUREMENT of what the extractor will do rather than a
+        # preference (Ray, 2026-08-16, after the constraint was surfaced).
+        # `graphify/llm.py` force-serializes this backend —
+        # `if backend == "claude-cli" and GRAPHIFY_CLAUDE_CLI_PARALLEL != "1":
+        # max_concurrency = 1` — because parallel Claude subprocesses conflict
+        # over session state. Recording 4 here would have made the plan assert a
+        # concurrency no run could exhibit, and `_provider_config_reasons`
+        # compares this field against the receipt, so it would have failed as a
+        # provider mismatch pointing at the wrong thing.
+        #
+        # The override is deliberately NOT taken: the adapter writes its metadata
+        # and its O_EXCL boundary marker to single fixed paths, so concurrent
+        # chunks in one process collide on both regardless of what graphify allows.
         concurrency=1,
         deep_mode=True,
-        cache_policy="cold-no-read-atomic-per-chunk",
+        cache_policy="warm-read-atomic-per-chunk",
         source_inventory_sha256=inventory_sha256,
         exclusions_sha256=exclusions_sha256,
         chunk_ledger_sha256=ledger_sha256,
@@ -1547,6 +1580,17 @@ def verify_plan(
     return _verdict("complete", structural=True, authorized=True, reasons=())
 
 
+# Public surface for `graphify_semantic_corpus_run`, which is this module's
+# execution half rather than an outside consumer. Exported deliberately: the
+# alternative is the driver reaching into privates, and a digest helper that two
+# modules reach for by different names is how two spellings of "the same hash"
+# get written and then quietly disagree.
+encode_canonical = _encode
+sha256_bytes = _sha
+sha256_path = _sha_file
+fragment_counts = _fragment_counts
+
+
 def _chunk_dir(cache_root: Path, namespace: str, ordinal: int) -> Path:
     if not _valid_sha(namespace):
         raise ValueError("run namespace is not a lowercase SHA-256")
@@ -1810,6 +1854,13 @@ def _source_unit_size(unit: SourceUnit, source_root: Path) -> int:
     )
 
 
+# Exported for the execution driver on the same grounds as the digest helpers
+# above: it is the ONE definition of a unit's byte size, and the obvious
+# re-derivation (`slice_end - slice_start`) is a character count that silently
+# disagrees with it on any non-ASCII source — of which this corpus has plenty.
+source_unit_size = _source_unit_size
+
+
 def _argv_value(argv: tuple[str, ...], flag: str) -> str | None:
     try:
         index = argv.index(flag)
@@ -1854,27 +1905,13 @@ def _adapter_config_reasons(
     config: CorpusExecutionConfig,
 ) -> list[str]:
     schema = _argv_value(metadata.argv, "--json-schema")
-    expected_argv = (
-        "-p",
-        "--output-format",
-        "json",
-        "--no-session-persistence",
-        "--model",
-        config.claude_model,
-        "--json-schema",
-        schema or "",
-        "--safe-mode",
-        "--tools",
-        "",
-        "--strict-mcp-config",
-        "--permission-mode",
-        "dontAsk",
-        "--no-chrome",
-        "--max-budget-usd",
-        str(config.max_cost_usd),
-        "--max-turns",
-        str(config.max_turns),
-    )
+    # Built from the SAME function the adapter builds the real call with. The
+    # local copy this replaces rendered the budget as `str(config.max_cost_usd)`,
+    # which agreed with the adapter's literal only while the cap happened to be
+    # `0.25`: at 25.0 it renders "25.0" against an argv carrying "25.00", and the
+    # run would have failed as an argv-shape mismatch with nothing pointing at the
+    # formatting. The profile owns the literal precisely so it is never re-derived.
+    expected_argv = graphify_semantic_slice.expected_adapter_argv(_PROFILE, schema or "")
     usage_valid = (
         len(metadata.model_usage) == 1
         and metadata.model_usage[0].model == config.claude_model
@@ -2729,6 +2766,35 @@ def _abort(candidate: Path, reasons: tuple[str, ...]) -> int:
     return 2
 
 
+def _execute_authorized(repo_root: Path, output: Path) -> int:
+    """Spend against an already-authorized plan and report what it produced.
+
+    The source is re-admitted into a fresh temporary tree rather than reusing the
+    one ``verify_plan`` just checked: the verification proved the plan matches a
+    pristine snapshot, and extracting from a tree something else has since
+    touched would spend real tokens on bytes nobody verified. graphify's
+    ``detect()`` in particular writes converted sidecars INTO the tree it scans.
+
+    Returns non-zero unless every planned chunk completed. A partially-extracted
+    corpus is the failure mode that reads as success — the chunks that landed are
+    real and the graph is quietly short — so the count is the gate, not the
+    absence of an exception.
+    """
+    from kb_setup import graphify_semantic_corpus_run
+
+    with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-run-") as raw_source:
+        source_root = Path(raw_source) / "graphify"
+        admit_source(repo_root, source_root)
+        summary = graphify_semantic_corpus_run.execute(
+            output,
+            repo_root / "graphify-out/graphify-semantic-corpus-chunks",
+            source_root,
+            repo_root=repo_root,
+        )
+    print(_encode(summary).decode().rstrip())
+    return 0 if summary.completed == summary.chunk_total else 1
+
+
 def corpus_main(repo_root: Path, args: list[str]) -> int:
     """CLI boundary for provider-free planning and read-only verification."""
     if not args or args[0] not in {"plan", "run", "verify"} or len(args) > _MAX_ARGS:
@@ -2752,7 +2818,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             return 0 if verification.state == "complete" else 2
         if not verification.execution_authorized:
             return _abort(output, verification.reasons)
-        return _abort(output, ("provider-execution-not-implemented",))
+        return _execute_authorized(repo_root, output)
     with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-source-") as raw_source:
         source_root = Path(raw_source) / "graphify"
         source_pin = admit_source(repo_root, source_root)

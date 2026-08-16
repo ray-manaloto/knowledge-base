@@ -233,10 +233,13 @@ def _real_executable() -> Path:
     return path
 
 
-def _child_environment() -> dict[str, str]:
+def _child_environment(
+    profile: graphify_semantic_slice.ClaudeProfile | None = None,
+) -> dict[str, str]:
     return graphify_semantic_slice.claude_child_environment(
         os.environ,
         original_path=os.environ.get("KB_SEMANTIC_ORIGINAL_PATH", ""),
+        profile=profile,
     )
 
 
@@ -639,7 +642,7 @@ def _usage(envelope: dict[str, object]) -> tuple[ModelUsage, ...]:
     return tuple(usages)
 
 
-def _validate_incoming_args(args: list[str]) -> str:
+def _validate_incoming_args(args: list[str], profile: graphify_semantic_slice.ClaudeProfile) -> str:
     if graphify_semantic_slice.route_override_names(os.environ):
         raise ValueError("routing override reached semantic adapter")
     schema = args[7] if len(args) == _GRAPHIFY_ARG_COUNT else ""
@@ -649,7 +652,7 @@ def _validate_incoming_args(args: list[str]) -> str:
         "json",
         "--no-session-persistence",
         "--model",
-        graphify_semantic_slice.CLAUDE_MODEL,
+        profile.model,
         "--json-schema",
         schema,
     ]
@@ -755,32 +758,27 @@ def _runtime_identity(
 
 
 def _claude_invocation_args(
-    executable: Path, schema: str, environment: Mapping[str, str]
+    executable: Path,
+    schema: str,
+    environment: Mapping[str, str],
+    profile: graphify_semantic_slice.ClaudeProfile,
 ) -> tuple[str, ...]:
-    """Keep #300's historical argv while adding the reviewed cap only at #301's boundary."""
-    base = (
+    """Build the outgoing call from the SAME definition both verifiers check against.
+
+    Previously this tuple was spelled out here and again in the verifier, so the
+    two could drift into agreeing with each other about a call neither had seen.
+    `expected_adapter_argv` is now the one definition; the boundary marker still
+    gates `--max-turns`, so a launcher that configures no marker still gets the
+    historical #300 shape rather than silently acquiring a flag.
+    """
+    return (
         str(executable),
-        "-p",
-        "--output-format",
-        "json",
-        "--no-session-persistence",
-        "--model",
-        graphify_semantic_slice.CLAUDE_MODEL,
-        "--json-schema",
-        schema,
-        "--safe-mode",
-        "--tools",
-        "",
-        "--strict-mcp-config",
-        "--permission-mode",
-        "dontAsk",
-        "--no-chrome",
-        "--max-budget-usd",
-        "0.25",
+        *graphify_semantic_slice.expected_adapter_argv(
+            profile,
+            schema,
+            with_max_turns=bool(environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH")),
+        ),
     )
-    if environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH"):
-        return (*base, "--max-turns", "3")
-    return base
 
 
 def adapter_main() -> int:
@@ -790,14 +788,15 @@ def adapter_main() -> int:
     if args in (["--help"], ["--version"]):
         return _delegate_info(executable, args)
     try:
-        schema = _validate_incoming_args(args)
-        environment = _child_environment()
+        profile = graphify_semantic_slice.profile_for(os.environ)
+        schema = _validate_incoming_args(args, profile)
+        environment = _child_environment(profile)
         auth, version = _runtime_identity(executable, environment)
     except (OSError, subprocess.SubprocessError, UnicodeDecodeError, ValueError) as exc:
         print(f"semantic adapter preflight failed: {exc}", file=sys.stderr)
         return 2
     prompt = sys.stdin.buffer.read()
-    real_args = _claude_invocation_args(executable, schema, os.environ)
+    real_args = _claude_invocation_args(executable, schema, os.environ, profile)
     started = time.monotonic_ns()
     try:
         boundary_path = _provider_boundary_path(os.environ)

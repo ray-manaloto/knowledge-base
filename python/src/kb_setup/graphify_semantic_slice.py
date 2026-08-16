@@ -27,6 +27,12 @@ _CLAUDE_PROVIDER = "firstParty"
 _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR = 3
 _MAX_COST_USD = 0.25
 CLAUDE_MODEL = _CLAUDE_MODEL
+# Name of the ONE environment variable that selects a profile at the adapter
+# boundary. Its VALUE is allowlisted to the two reviewed profile names below —
+# never a model string, never a budget. A boundary whose model and spend cap can
+# be set to anything by an environment variable is not a fail-closed boundary,
+# so the env carries a choice between reviewed shapes and nothing else.
+PROFILE_ENV_NAME = "KB_SEMANTIC_PROFILE"
 GRAPHIFY_SCHEMA_SHA256 = "69d307d23913e0cccf5809316a3432b85210776bd5626a4ad0af1317d6113324"
 
 # Only the SNAPSHOT identity moves v0.9.42 -> v0.9.44. The file itself is
@@ -46,13 +52,6 @@ _ACCEPTED_CANDIDATE_MANIFEST_SHA256 = (
     "32579d766fd7c3950b0513fd94a7a49b65a973fb0d28e25987286d49d02c3bf9"
 )
 _MAX_SEMANTIC_ARGS = 2
-# 17 -> 19: the adapter appends `--max-turns 3` whenever the provider boundary
-# marker is configured, and this module now configures it (see
-# `_adapter_environment`). The count and `expected_argv` below must move together
-# — `schema = argv[7] if len(argv) == _RETAINED_CLAUDE_ARG_COUNT else ""` silently
-# yields an empty schema when they disagree, which then fails as a digest
-# mismatch rather than as the shape mismatch it really is.
-_RETAINED_CLAUDE_ARG_COUNT = 19
 _PROVIDER_BOUNDARY_MEMBER = "provider-boundary-start.json"
 _REQUIRED_MEMBERS = frozenset(
     {
@@ -221,6 +220,35 @@ class ExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     deep_mode: bool
 
 
+class ClaudeProfile(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """One reviewed provider shape: the model, its caps, and the argv it implies.
+
+    Every field that varies between the slice and the corpus lives here, so the
+    two shapes differ by DATA rather than by a second code path. The argv-literal
+    fields (``max_budget_usd``, ``effort``) are strings because they are compared
+    byte-for-byte against a recorded ``argv``: a float that renders as ``0.25``
+    here and ``0.25000000000000001`` after a round trip would fail as a shape
+    mismatch rather than as the formatting difference it really is.
+    """
+
+    name: str
+    model: str
+    canonical_model: str
+    max_budget_usd: str
+    # "" means the profile does not pass ``--effort`` at all, which is what keeps
+    # the slice's committed 19-argument evidence valid rather than merely similar.
+    effort: str
+    max_output_tokens: str
+    max_retries: str
+    max_turns: str
+    max_cost_usd: float
+
+    @property
+    def retained_argv_length(self) -> int:
+        """Length of the ``argv`` the adapter records (the executable is dropped)."""
+        return 19 + (2 if self.effort else 0)
+
+
 class SemanticReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Public receipt for exactly one real Graphify-to-Claude semantic call."""
 
@@ -329,6 +357,63 @@ _ACCEPTED_EXECUTION_CONFIG = ExecutionConfig(
 )
 
 
+# The shape #300 actually ran under. Every value here is transcribed from the
+# committed candidate, not chosen — this profile is a description of evidence, so
+# it may only change when the slice is re-run and its receipt re-committed.
+SLICE_PROFILE = ClaudeProfile(
+    name="slice",
+    model=_CLAUDE_MODEL,
+    canonical_model=_CLAUDE_CANONICAL_MODEL,
+    max_budget_usd="0.25",
+    effort="",
+    max_output_tokens="4096",
+    max_retries="0",
+    max_turns="3",
+    max_cost_usd=_MAX_COST_USD,
+)
+# The shape the whole-tree corpus run uses (Ray, 2026-08-16). Three of these
+# differ from the slice for reasons worth stating, because each looks like a
+# preference and is not:
+#
+# * `claude-opus-5` — the corpus is this project's core dependency and the graph
+#   every other agent queries, so the extraction is long-lived and expensive to
+#   redo. Opus is the tier chosen for that, deliberately, once.
+# * `max_output_tokens` 4096 -> 8192 — NOT a richness preference. Thinking is on
+#   by default on Opus 5 and shares this cap with the response text, so 4096
+#   against an ~18k-token markdown chunk truncates the structured extraction
+#   mid-object. The slice keeps 4096 because haiku at 4096 is what it measured.
+# * `max_retries` 0 -> 2 — 57 chunks make a single transient failure likely
+#   rather than hypothetical, and a lost chunk is a silent hole in the corpus.
+CORPUS_PROFILE = ClaudeProfile(
+    name="corpus",
+    model="claude-opus-5",
+    canonical_model="claude-opus-5",
+    max_budget_usd="25.00",
+    effort="high",
+    max_output_tokens="8192",
+    max_retries="2",
+    max_turns="3",
+    max_cost_usd=25.0,
+)
+_PROFILES = {profile.name: profile for profile in (SLICE_PROFILE, CORPUS_PROFILE)}
+
+
+def profile_for(environment: Mapping[str, str]) -> ClaudeProfile:
+    """Resolve the reviewed profile named by the environment, failing closed.
+
+    An absent variable selects the slice — the narrower shape — so a launcher that
+    simply FORGETS to name its profile cannot silently inherit the corpus's model
+    and spend cap. An unrecognized value is an error rather than a fallback, for
+    the same reason: quietly treating a typo as "slice" would report a run that
+    used one shape as evidence about another.
+    """
+    name = environment.get(PROFILE_ENV_NAME, SLICE_PROFILE.name)
+    profile = _PROFILES.get(name)
+    if profile is None:
+        raise ValueError(f"unknown semantic profile: {name}")
+    return profile
+
+
 def accepted_graphify_runtime() -> RuntimeIdentity:
     """Return the reviewed Graphify 0.9.42 runtime identity from issue #300."""
     return _ACCEPTED_GRAPHIFY_RUNTIME
@@ -352,8 +437,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def child_control_env(profile: ClaudeProfile) -> dict[str, str]:
+    """Return the control variables for one profile.
+
+    The NAMES are identical across profiles and only the values move, which is
+    what lets the receipt keep comparing ``environment_names`` unchanged while the
+    corpus raises its own caps.
+    """
+    return {
+        **_CHILD_CONTROL_ENV,
+        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": profile.max_output_tokens,
+        "CLAUDE_CODE_MAX_RETRIES": profile.max_retries,
+    }
+
+
 def claude_child_environment(
-    environment: Mapping[str, str], *, original_path: str | None = None
+    environment: Mapping[str, str],
+    *,
+    original_path: str | None = None,
+    profile: ClaudeProfile | None = None,
 ) -> dict[str, str]:
     """Build the fixed OAuth-compatible environment used for auth and inference."""
     child = {
@@ -362,8 +464,58 @@ def claude_child_environment(
         if environment.get(name) is not None
     }
     child["PATH"] = original_path if original_path is not None else environment.get("PATH", "")
-    child.update(_CHILD_CONTROL_ENV)
+    child.update(child_control_env(profile if profile is not None else SLICE_PROFILE))
     return child
+
+
+def expected_adapter_argv(
+    profile: ClaudeProfile, schema: str, *, with_max_turns: bool = True
+) -> tuple[str, ...]:
+    """Return the exact recorded ``argv`` one profile's boundary call must have.
+
+    ONE definition, three callers: the adapter builds the outgoing call from it,
+    and the slice and corpus verifiers each re-check a recorded ``argv`` against
+    it. Keeping them a single function is the point — a fourth spelling of this
+    tuple is how a shape check starts agreeing with itself instead of with the
+    call that actually ran.
+
+    ``with_max_turns`` exists only for the adapter's no-boundary-marker branch,
+    which yields the historical #300 shape. Both verifiers leave it at ``True``:
+    both launchers configure the marker, so a recorded run without those two
+    arguments is a real shape mismatch and must be reported as one.
+    """
+    return (
+        "-p",
+        "--output-format",
+        "json",
+        "--no-session-persistence",
+        "--model",
+        profile.model,
+        "--json-schema",
+        schema,
+        "--safe-mode",
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--permission-mode",
+        "dontAsk",
+        "--no-chrome",
+        "--max-budget-usd",
+        profile.max_budget_usd,
+        *(("--max-turns", profile.max_turns) if with_max_turns else ()),
+        *(("--effort", profile.effort) if profile.effort else ()),
+    )
+
+
+def recorded_schema(argv: tuple[str, ...], profile: ClaudeProfile) -> str:
+    """Return the schema argument, or ``""`` when the recorded shape is wrong.
+
+    The length guard is what makes the empty return meaningful: reading index 7
+    out of an argv of the wrong length would yield some OTHER argument and then
+    fail as a schema-digest mismatch, reporting a shape error in the vocabulary
+    of a content error.
+    """
+    return argv[7] if len(argv) == profile.retained_argv_length else ""
 
 
 def route_override_names(environment: Mapping[str, str]) -> tuple[str, ...]:
@@ -435,12 +587,58 @@ def _assert_value_flag_supported(
         raise ValueError(f"Claude {flag} parser probe failed")
 
 
+def _assert_effort_supported(
+    executable: Path,
+    level: str,
+    *,
+    environment: Mapping[str, str],
+) -> None:
+    """Prove ``--effort`` is parsed AND that ``level`` is one of its accepted values.
+
+    ``_assert_value_flag_supported`` cannot do this job: it asserts the parser
+    said "must be a number", and ``--effort`` takes a level name. Measured on the
+    installed 2.1.233, the three outcomes are distinguishable and the probe is
+    armed against all of them — an unknown FLAG says ``unknown option``, a valid
+    LEVEL emits no warning at all, and only an invalid level produces the
+    ``Unknown --effort value`` line that also enumerates the accepted set.
+
+    That enumeration is the reason this checks the level and not merely the flag.
+    An unrecognized value is **not** rejected: the CLI warns, discards it, and
+    runs at the DEFAULT effort. A profile with a typo'd level would therefore
+    produce a complete, plausible, fully-verified run at the wrong effort, with
+    the mistake visible only in a warning nothing reads.
+    """
+    completed = subprocess.run(
+        [str(executable), "-p", "--effort", "not-a-level"],
+        capture_output=True,
+        check=False,
+        env=dict(environment),
+        timeout=30,
+    )
+    diagnostic = completed.stderr.decode("utf-8", errors="strict")
+    marker = "Valid values:"
+    if (
+        completed.returncode != 1
+        or completed.stdout
+        or "Unknown --effort value" not in diagnostic
+        or marker not in diagnostic
+    ):
+        raise ValueError("Claude --effort parser probe failed")
+    accepted = {
+        item.strip().rstrip(".")
+        for item in diagnostic.split(marker, 1)[1].split("\n", 1)[0].split(",")
+    }
+    if level not in accepted:
+        raise ValueError(f"Claude --effort level is unavailable: {level}")
+
+
 def preflight(
     repo_root: Path,
     environment: Mapping[str, str] | None = None,
     *,
     graphify_version: str = "0.9.44",
     require_max_turns: bool = False,
+    profile: ClaudeProfile = SLICE_PROFILE,
 ) -> ClaudePreflight:
     """Prove exact Graphify/Claude/auth/routing capability without inference."""
     from kb_setup import graphify_baseline, graphify_env, graphify_sdk
@@ -455,7 +653,7 @@ def preflight(
     if not resolved:
         raise ValueError("Claude Code CLI is unavailable")
     executable = Path(resolved).resolve()
-    child = claude_child_environment(current)
+    child = claude_child_environment(current, profile=profile)
     help_raw = _completed_bytes(executable, "--help", environment=child)
     help_text = help_raw.decode("utf-8", errors="strict")
     missing = tuple(flag for flag in _REQUIRED_CLAUDE_FLAGS if flag not in help_text)
@@ -465,6 +663,12 @@ def preflight(
     if require_max_turns:
         _assert_value_flag_supported(executable, "--max-turns", environment=child)
         required_flags = (*required_flags, "--max-turns")
+    # Proven in the same run that will pass it, on `--max-turns`' precedent: a
+    # flag present in `--help` is not a flag the installed binary accepts with a
+    # value, and the corpus profile is the first thing here to pass `--effort`.
+    if profile.effort:
+        _assert_effort_supported(executable, profile.effort, environment=child)
+        required_flags = (*required_flags, "--effort")
     version_raw = _completed_bytes(executable, "--version", environment=child)
     version_text = version_raw.decode("utf-8", errors="strict").strip()
     match = re.search(r"\b\d+\.\d+\.\d+\b", version_text)
@@ -772,7 +976,7 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
         (_is_sha256(metadata.response_sha256), "adapter-response-digest-invalid"),
         (metadata.input_tokens > 0, "adapter-input-token-count-invalid"),
         (metadata.output_tokens > 0, "adapter-output-token-count-invalid"),
-        (0.0 <= metadata.total_cost_usd <= _MAX_COST_USD, "adapter-cost-invalid"),
+        (0.0 <= metadata.total_cost_usd <= SLICE_PROFILE.max_cost_usd, "adapter-cost-invalid"),
         (
             0
             < metadata.duration_api_ms
@@ -829,33 +1033,8 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
         ):
             reasons.append("adapter-token-count-mismatch")
     argv = metadata.argv
-    schema = argv[7] if len(argv) == _RETAINED_CLAUDE_ARG_COUNT else ""
-    expected_argv = (
-        "-p",
-        "--output-format",
-        "json",
-        "--no-session-persistence",
-        "--model",
-        _CLAUDE_MODEL,
-        "--json-schema",
-        schema,
-        "--safe-mode",
-        "--tools",
-        "",
-        "--strict-mcp-config",
-        "--permission-mode",
-        "dontAsk",
-        "--no-chrome",
-        "--max-budget-usd",
-        "0.25",
-        # Appended by `_claude_invocation_args` exactly when the provider boundary
-        # marker is configured. Pinned here rather than made conditional: this
-        # module always configures it, so a run WITHOUT these two is a real shape
-        # mismatch and must be reported as one.
-        "--max-turns",
-        "3",
-    )
-    if argv != expected_argv:
+    schema = recorded_schema(argv, SLICE_PROFILE)
+    if argv != expected_adapter_argv(SLICE_PROFILE, schema):
         reasons.append("adapter-argv-shape-mismatch")
     if hashlib.sha256(schema.encode()).hexdigest() != GRAPHIFY_SCHEMA_SHA256:
         reasons.append("adapter-schema-digest-mismatch")
@@ -1165,6 +1344,12 @@ def _semantic_fragment(result: object) -> dict[str, object]:
     return fragment
 
 
+# Exported for the corpus execution driver: one definition of "reduce a raw
+# provider result to the semantic fragment", shared by the slice and the corpus
+# so a second reduction cannot quietly disagree about what the model returned.
+semantic_fragment = _semantic_fragment
+
+
 def _fragment_counts(fragment: Mapping[str, object]) -> tuple[int, int, int]:
     counts: list[int] = []
     for field in ("nodes", "edges", "hyperedges"):
@@ -1181,6 +1366,7 @@ def _adapter_environment(
     metadata_path: Path,
     adapter_dir: Path,
     boundary_path: Path,
+    profile: ClaudeProfile = SLICE_PROFILE,
 ) -> dict[str, str]:
     original_path = os.environ.get("PATH", "")
     entrypoint = shutil.which("kb-semantic-claude", path=original_path)
@@ -1213,7 +1399,11 @@ def _adapter_environment(
         # in silence. Setting it here keeps the adapter fail-closed for everyone
         # and gives the slice the provider-call evidence it never had.
         "KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": str(boundary_path),
-        "GRAPHIFY_CLAUDE_CLI_MODEL": _CLAUDE_MODEL,
+        # Named explicitly even though the slice is the fail-closed default: a
+        # launcher that relies on the default is indistinguishable from one that
+        # forgot, and the adapter's rejection message should be able to say which.
+        PROFILE_ENV_NAME: profile.name,
+        "GRAPHIFY_CLAUDE_CLI_MODEL": profile.model,
         "GRAPHIFY_API_TIMEOUT": "120",
         "GRAPHIFY_NO_INCREMENTAL_CACHE": "1",
     }

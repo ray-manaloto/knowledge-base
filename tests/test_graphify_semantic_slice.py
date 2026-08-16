@@ -89,11 +89,15 @@ def test_enforcing_authority_never_widens_the_accepted_runtime_set(
 def test_adapter_keeps_historical_slice_argv_and_caps_only_301_boundary() -> None:
     from kb_setup import graphify_semantic_adapter
 
-    legacy = graphify_semantic_adapter._claude_invocation_args(Path("/real/claude"), "{}", {})
+    profile = graphify_semantic_slice.SLICE_PROFILE
+    legacy = graphify_semantic_adapter._claude_invocation_args(
+        Path("/real/claude"), "{}", {}, profile
+    )
     corpus = graphify_semantic_adapter._claude_invocation_args(
         Path("/real/claude"),
         "{}",
         {"KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": "/state/provider-start.json"},
+        profile,
     )
 
     assert len(legacy) == 18

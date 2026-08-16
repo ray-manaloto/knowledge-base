@@ -28,9 +28,36 @@ from kb_setup import (
     cli,
     graphify_semantic_adapter,
     graphify_semantic_corpus,
+    graphify_semantic_corpus_authority,
     graphify_semantic_corpus_prototype,
     graphify_semantic_slice,
 )
+
+_UNSET_AUTHORITY_JSON = (
+    b'{"advisories_sha256":"",'
+    b'"execution_config_sha256":"",'
+    b'"exclusions_sha256":"",'
+    b'"plan_manifest_sha256":"",'
+    b'"schema_version":1}\n'
+)
+
+
+@pytest.fixture
+def unset_authority(monkeypatch) -> None:
+    """Assert the un-authorized behaviour against an explicitly un-authorized root.
+
+    These tests describe what verification says when NOBODY has signed off on a
+    plan, and they used to get that state for free because the committed
+    `AUTHORITY_JSON` was empty. It is no longer empty — and because planning is
+    deterministic, a plan rebuilt from the same pinned source is byte-identical to
+    the authorized one, so the digests match and the tests silently began
+    describing the opposite case.
+
+    Setting the precondition here rather than inheriting it is the fix: a test
+    that depends on the ambient authorization state is measuring the repository's
+    mood, not the verifier.
+    """
+    monkeypatch.setattr(graphify_semantic_corpus_authority, "AUTHORITY_JSON", _UNSET_AUTHORITY_JSON)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -104,7 +131,7 @@ def test_cli_dispatches_semantic_corpus_verifier(monkeypatch, tmp_path: Path) ->
     assert calls == [(tmp_path, ["verify", "candidate"])]
 
 
-def test_plan_artifact_verifier_rehashes_real_source_bytes(tmp_path: Path) -> None:
+def test_plan_artifact_verifier_rehashes_real_source_bytes(unset_authority, tmp_path: Path) -> None:
     source = tmp_path / "source"
     commit, tree = _source(source)
     candidate = tmp_path / "candidate"
@@ -278,7 +305,9 @@ def test_verify_plan_requires_source_snapshot() -> None:
     assert parameter.default is inspect.Parameter.empty
 
 
-def test_public_cli_verify_recomputes_exact_pinned_snapshot(capsys, tmp_path: Path) -> None:
+def test_public_cli_verify_recomputes_exact_pinned_snapshot(
+    unset_authority, capsys, tmp_path: Path
+) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     candidate = _exact_graphify_plan(tmp_path)
 
@@ -702,6 +731,7 @@ def test_visual_exclusion_evidence_rejects_real_source_drift(
 
 
 def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation(
+    unset_authority,
     tmp_path: Path,
 ) -> None:
     """Regenerate and exercise the exact pinned #301 plan bytes."""
@@ -739,7 +769,39 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     )
 
 
-def test_consumed_authority_blocks_prototype_before_topology_creation(tmp_path: Path) -> None:
+def test_recorded_authority_authorizes_this_plan_and_only_this_plan(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Arm BOTH directions of the authorization gate on the real committed roots.
+
+    The positive half is the one that had no coverage: every existing test
+    asserted refusal, so a change that authorized everything would have passed
+    them all. The negative half deliberately corrupts ONE digest rather than
+    emptying all four, because that is the case the two reasons have to keep
+    apart — `mismatch` means the plan moved since it was reviewed, `unset` means
+    it never was, and only the first is fixed by re-authorizing.
+    """
+    candidate = _exact_graphify_plan(tmp_path)
+    source_root = candidate.parent / "exact-graphify-source"
+
+    authorized = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
+    assert authorized.execution_authorized is True
+    assert authorized.reasons == ()
+    assert authorized.state == "complete"
+
+    corrupted = graphify_semantic_corpus_authority.AUTHORITY_JSON.replace(b"1706edf9", b"0000dead")
+    assert corrupted != graphify_semantic_corpus_authority.AUTHORITY_JSON, "mutation was inert"
+    monkeypatch.setattr(graphify_semantic_corpus_authority, "AUTHORITY_JSON", corrupted)
+
+    refused = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
+    assert refused.execution_authorized is False
+    assert "plan-authority-mismatch" in refused.reasons
+    assert "plan-authority-unset" not in refused.reasons
+
+
+def test_consumed_authority_blocks_prototype_before_topology_creation(
+    unset_authority, tmp_path: Path
+) -> None:
     candidate = _exact_graphify_plan(tmp_path)
     source = candidate.parent / "exact-graphify-source"
     output = tmp_path / "cleared-prototype-output"
