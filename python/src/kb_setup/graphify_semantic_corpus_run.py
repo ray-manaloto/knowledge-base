@@ -12,23 +12,33 @@ Three properties are deliberate rather than incidental:
 * **Serial.** ``graphify/llm.py`` force-serializes the ``claude-cli`` backend
   because parallel Claude subprocesses conflict over session state, and this
   module does not set the override. A second reason survives even if that guard
-  is lifted: the adapter writes its metadata and its ``O_EXCL`` provider-boundary
-  marker to single fixed paths, so two chunks in one process collide on both.
+  is lifted: the adapter writes its metadata to one fixed path, so two chunks in
+  one process would race on it.
 * **One call, chunked by the plan.** The whole corpus goes through a single
   ``extract_corpus_parallel`` at the plan's ``token_budget``, because that is the
   function the PLANNER used to build the committed ledger — replaying it
   reproduces the grouping rather than approximating it. Per-chunk staging happens
   in the ``on_chunk_done`` callback as each call completes.
-* **Resumption is graphify's, not this module's.** Recovery across runs comes
-  from graphify's per-chunk incremental cache, which this profile enables by
-  OMITTING ``GRAPHIFY_NO_INCREMENTAL_CACHE``. There is deliberately no
-  skip-if-staged check here: a single extraction call decides its own chunking
-  internally, so this module never gets the chance to decline one chunk of it.
-  Stating otherwise would describe a guard that does not exist.
-* **Loud on partial completion.** ``RunSummary`` counts completed, failed, and
-  never-attempted chunks separately, and the caller returns non-zero unless every
-  planned chunk completed. A corpus missing a chunk looks exactly like a corpus
-  that never had one, so the count has to be checked rather than the exit path.
+* **Resumption is graphify's cache plus one local skip.** Recovery across runs
+  comes from graphify's per-chunk incremental cache, which this profile enables
+  by OMITTING ``GRAPHIFY_NO_INCREMENTAL_CACHE``. On top of that, a chunk whose
+  stage directory already exists is skipped rather than re-published, because
+  ``stage_chunk`` refuses an occupied destination and a resumed run would
+  otherwise abort on the first chunk it had already finished. Those chunks are
+  counted as ``resumed``, never as ``completed`` — this pass did not do that work.
+* **Loud on partial completion.** ``RunSummary`` keeps completed, resumed, failed
+  and never-attempted apart, and the caller returns non-zero unless every planned
+  chunk is staged with no failures. A corpus missing a chunk looks exactly like a
+  corpus that never had one, so the count is the gate, not the absence of an
+  exception.
+
+The boundary marker deserves its own note, because its plumbing changed for a
+reason that is easy to undo. The adapter is handed a DIRECTORY rather than a file
+path: each invocation writes its own uniquely-named marker, so ``O_EXCL`` still
+means one crossing per marker while a chunk whose call FAILED strands nothing.
+Under the single-path spelling such a chunk never reached the rotation, and every
+later chunk died on ``already exists`` — one recoverable error presenting as a
+whole-corpus failure that named the wrong cause.
 """
 
 from __future__ import annotations
@@ -102,20 +112,31 @@ class _RunContext(msgspec.Struct, frozen=True):
     preflight_receipt: graphify_semantic_slice.ClaudePreflight
     run_namespace: str
     metadata_path: Path
-    boundary_path: Path
+    boundary_dir: Path
 
 
 @contextmanager
-def _temporary_environment(overlay: Mapping[str, str]) -> Generator[None]:
+def _temporary_environment(overlay: Mapping[str, str | None]) -> Generator[None]:
     """Apply an environment overlay for one call and restore it exactly.
 
-    ``None`` is the restore sentinel for "was absent", which matters here more
-    than usual: `GRAPHIFY_NO_INCREMENTAL_CACHE` is read for TRUTHINESS by
-    graphify, so restoring an absent variable as `""` would leave it defined and
+    A ``None`` VALUE means "ensure this name is absent", not "leave it alone".
+    That distinction is the fix for a real gap: an overlay can only override
+    names it mentions, so a config with caching ENABLED simply omitted
+    ``GRAPHIFY_NO_INCREMENTAL_CACHE`` — and an ambient ``=1`` from the operator's
+    shell or a CI job then survived into the run. graphify reads that name for
+    truthiness, so every checkpoint was skipped while the execution receipt
+    recorded caching as enabled: a cold run wearing a warm run's evidence.
+
+    ``None`` is also the restore sentinel for "was absent", for the same reason
+    in reverse — restoring an absent name as ``""`` would leave it defined and
     falsy where it had been undefined. Same shape, different fact.
     """
     previous = {name: os.environ.get(name) for name in overlay}
-    os.environ.update(overlay)
+    for name, value in overlay.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
     try:
         yield
     finally:
@@ -150,7 +171,7 @@ def admitted_paths(
     return [source_root / path for path in seen]
 
 
-def _adapter_overlay(context: _RunContext, adapter_dir: Path) -> dict[str, str]:
+def _adapter_overlay(context: _RunContext, adapter_dir: Path) -> dict[str, str | None]:
     """Build the provider environment for the corpus profile."""
     runtime = context.preflight_receipt
     config = context.config
@@ -163,13 +184,13 @@ def _adapter_overlay(context: _RunContext, adapter_dir: Path) -> dict[str, str]:
     if graphify_semantic_slice.sha256_file(real_path) != runtime.executable_sha256:
         raise ValueError("Claude executable changed after preflight")
     (adapter_dir / "claude").symlink_to(Path(entrypoint).resolve())
-    overlay = {
+    overlay: dict[str, str | None] = {
         "PATH": f"{adapter_dir}{os.pathsep}{original_path}",
         "KB_SEMANTIC_REAL_CLAUDE": str(real_path),
         "KB_SEMANTIC_REAL_CLAUDE_SHA256": runtime.executable_sha256,
         "KB_SEMANTIC_ORIGINAL_PATH": original_path,
         "KB_SEMANTIC_METADATA_PATH": str(context.metadata_path),
-        "KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": str(context.boundary_path),
+        "KB_SEMANTIC_PROVIDER_BOUNDARY_DIR": str(context.boundary_dir),
         graphify_semantic_slice.PROFILE_ENV_NAME: _PROFILE.name,
         "GRAPHIFY_CLAUDE_CLI_MODEL": _PROFILE.model,
         "GRAPHIFY_API_TIMEOUT": str(config.timeout_seconds),
@@ -180,17 +201,21 @@ def _adapter_overlay(context: _RunContext, adapter_dir: Path) -> dict[str, str]:
 
 def incremental_cache_env(
     config: graphify_semantic_corpus.CorpusExecutionConfig,
-) -> dict[str, str]:
-    """Return the cache control variable, or nothing at all when caching is on.
+) -> dict[str, str | None]:
+    """Return the cache control variable, or an explicit REMOVAL when caching is on.
 
     Split out of the overlay so it is testable without a real Claude binary,
     because the thing it encodes is a trap rather than a setting. graphify reads
     the variable for TRUTHINESS — ``if os.environ.get("GRAPHIFY_NO_INCREMENTAL_CACHE")``
-    — so the string ``"0"`` reads as "yes, disable the cache". Enabling the cache
-    means OMITTING the name; a run configured with ``"0"`` would look warm in
-    every artifact and be cold in every invoice.
+    — so ``"0"`` reads as "yes, disable the cache". Enabling the cache means the
+    name must be ABSENT from the child environment.
+
+    ``None`` rather than an empty mapping, and that is the correction: omitting
+    the key left an ambient ``=1`` from the operator's shell or a CI job in
+    place, so the run skipped every checkpoint while its receipt recorded caching
+    as enabled. Absence has to be asserted, not assumed.
     """
-    return {"GRAPHIFY_NO_INCREMENTAL_CACHE": "1"} if config.graphify_no_incremental_cache else {}
+    return {"GRAPHIFY_NO_INCREMENTAL_CACHE": "1" if config.graphify_no_incremental_cache else None}
 
 
 def _extract_corpus(
@@ -198,7 +223,7 @@ def _extract_corpus(
     context: _RunContext,
     *,
     semantic_cache: Path,
-    environment: Mapping[str, str],
+    environment: Mapping[str, str | None],
     on_chunk_done: Callable[[int, int, object], None],
 ) -> dict[str, object]:
     """Run the whole corpus, staging each chunk through ``on_chunk_done``.
@@ -354,45 +379,40 @@ def _provider_execution_config(
     )
 
 
-def _rotate_evidence(metadata_path: Path, boundary_path: Path) -> bytes:
-    """Read this chunk's adapter evidence and free both paths for the next one.
+def _rotate_evidence(metadata_path: Path, boundary_dir: Path) -> bytes:
+    """Read this chunk's adapter metadata and clear the evidence for the next one.
 
-    The adapter writes its metadata to one fixed path and creates its provider
-    boundary marker with ``O_EXCL``, so a second chunk in the same run would find
-    the marker already present and refuse. Rotating here works only because the
-    run is serial: ``on_chunk_done`` fires after a chunk completes and before the
-    next call starts, so there is no window in which both exist.
+    Only the METADATA path still needs rotating. The boundary marker no longer
+    does: the driver hands the adapter a DIRECTORY, so each invocation writes its
+    own uniquely-named marker and ``O_EXCL`` still means one crossing per marker.
+    Under the previous single-path spelling a chunk whose provider call FAILED
+    never reached this function, stranding its marker and making every later
+    chunk die on ``already exists`` — one recoverable error becoming a
+    whole-corpus failure that named the wrong cause.
 
-    That coupling is the reason the marker is NOT simply made overwritable. Its
-    whole job is to prove a provider process started exactly once; an
-    overwrite-in-place marker could not distinguish one crossing from three.
+    Markers are cleared anyway, in a ``finally``, so a long run does not
+    accumulate one file per chunk in a directory nothing prunes.
     """
     try:
         metadata_raw = metadata_path.read_bytes()
     except OSError as exc:
         raise ValueError("semantic adapter metadata is unavailable") from exc
     finally:
-        # In a `finally`, so a chunk that fails to produce metadata still frees
-        # the marker. The marker is created `O_EXCL`, so leaving it behind turns
-        # ONE failed chunk into a run where every remaining chunk dies on
-        # `provider boundary marker already exists` — a single recoverable error
-        # cascading into a whole-corpus failure that names the wrong cause.
-        metadata_path.unlink(missing_ok=True)
-        boundary_path.unlink(missing_ok=True)
+        clear_stale_evidence(metadata_path, boundary_dir)
     return metadata_raw
 
 
-def clear_stale_evidence(metadata_path: Path, boundary_path: Path) -> None:
-    """Remove evidence left by a previous, abandoned run before the first call.
+def clear_stale_evidence(metadata_path: Path, boundary_dir: Path) -> None:
+    """Drop the metadata file and every marker currently in the boundary directory.
 
-    `_rotate_evidence` frees these paths between chunks within a run, but a run
-    killed mid-call (a timeout, a SIGKILL) never reaches it. Both paths live in a
-    per-run temporary directory today, so this is belt-and-braces rather than
-    load-bearing — it is here because the failure it prevents is silent and the
-    cost of preventing it is two unlinks.
+    Used before the first call as well as between chunks, because a run killed
+    mid-call (a timeout, a SIGKILL) leaves both behind. ``missing_ok`` throughout:
+    absence is the normal case and is not an error.
     """
     metadata_path.unlink(missing_ok=True)
-    boundary_path.unlink(missing_ok=True)
+    if boundary_dir.is_dir():
+        for marker in boundary_dir.glob("provider-boundary-*.json"):
+            marker.unlink(missing_ok=True)
 
 
 def _stage_completed_chunk(
@@ -410,7 +430,7 @@ def _stage_completed_chunk(
     # Bytes, unnormalized: `stage_chunk` digests exactly what the adapter wrote.
     # Decoding and re-encoding here would digest this module's serializer instead
     # of the provider's own evidence, and the two agree only by luck.
-    metadata_raw = _rotate_evidence(context.metadata_path, context.boundary_path)
+    metadata_raw = _rotate_evidence(context.metadata_path, context.boundary_dir)
     metadata = msgspec.json.decode(
         metadata_raw, type=graphify_semantic_adapter.AdapterMetadata, strict=True
     )
@@ -547,11 +567,11 @@ def execute(
             preflight_receipt=preflight_receipt,
             run_namespace=run_namespace,
             metadata_path=evidence / "adapter-metadata.json",
-            boundary_path=evidence / "provider-boundary-start.json",
+            boundary_dir=evidence,
         )
         overlay = _adapter_overlay(context, Path(bin_dir))
 
-        clear_stale_evidence(context.metadata_path, context.boundary_path)
+        clear_stale_evidence(context.metadata_path, context.boundary_dir)
         already_staged = {
             chunk.ordinal
             for chunk in ledger.chunks
@@ -573,9 +593,15 @@ def execute(
                 # Staged by an earlier run. `stage_chunk` REFUSES an existing
                 # destination — correctly, since silently overwriting published
                 # evidence is worse — so without this a resumed run aborts on the
-                # first chunk it had already completed. graphify serves the
-                # provider result from its incremental cache here, so nothing is
-                # re-paid; what is skipped is only the re-publication.
+                # first chunk it had already completed.
+                #
+                # The rotation is NOT skipped with the staging. Returning early
+                # without it leaves this chunk's metadata file and its O_EXCL
+                # boundary marker in place, so the very next chunk dies on
+                # `provider boundary marker already exists` — the same cascade
+                # this callback exists to prevent, reintroduced by the fix for a
+                # different finding.
+                clear_stale_evidence(context.metadata_path, context.boundary_dir)
                 resumed.append(chunk.ordinal)
                 return
             outcomes.append(_stage_completed_chunk(raw, chunk, context))

@@ -218,6 +218,29 @@ def write_provider_boundary_start(
 
 
 def _provider_boundary_path(environment: Mapping[str, str]) -> Path:
+    """Resolve where this invocation writes its provider-boundary marker.
+
+    Two spellings, and the second exists because the first cannot serve a
+    multi-call run. `…_PATH` is one fixed file: the marker is created `O_EXCL`,
+    so a caller that makes N calls must delete it between them, and a call that
+    FAILS never gets the chance — stranding the marker and making every later
+    call in that run die on `already exists`. One recoverable error became a
+    whole-corpus failure naming the wrong cause.
+
+    `…_DIR` gives each invocation its own file inside a caller-owned directory,
+    so `O_EXCL` still means what it says — one crossing per marker — while a
+    failed call strands nothing. The slice keeps using `…_PATH`: it makes exactly
+    one call, and its committed evidence names that exact member.
+
+    Neither set is still an error. Absence must never mean "skip the marker" —
+    nothing checks after the fact that one was written, so a launcher that merely
+    forgot would lose its provider-call evidence in silence.
+    """
+    directory = environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_DIR", "")
+    if directory:
+        # pid + monotonic ns: unique within a run without a shared counter, and
+        # without depending on wall-clock, which can repeat under adjustment.
+        return Path(directory) / f"provider-boundary-{os.getpid()}-{time.monotonic_ns()}.json"
     raw = environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH", "")
     if not raw:
         raise ValueError("provider boundary marker path is unset")
@@ -776,7 +799,14 @@ def _claude_invocation_args(
         *graphify_semantic_slice.expected_adapter_argv(
             profile,
             schema,
-            with_max_turns=bool(environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH")),
+            # EITHER spelling configures the marker, so either must gate the
+            # flag. Checking only `…_PATH` would drop `--max-turns` for every
+            # `…_DIR` caller and then fail them on an argv-shape mismatch — a
+            # marker-plumbing change surfacing as a turn-limit error.
+            with_max_turns=bool(
+                environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH")
+                or environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_DIR")
+            ),
         ),
     )
 
@@ -854,10 +884,18 @@ def adapter_main() -> int:
 
 def result_envelope_reasons(
     envelope: object,
-    _environment: Mapping[str, str],
+    environment: Mapping[str, str],
 ) -> tuple[str, ...]:
-    """Apply the same bounded result policy at both semantic boundaries."""
-    return graphify_semantic_slice.envelope_reasons(envelope)
+    """Apply the same bounded result policy at both semantic boundaries.
+
+    The environment is READ now rather than ignored: it selects the profile, and
+    the model check is per-profile. While it was `_environment` the policy was
+    "bounded" in the sense of pinned to the slice's model, so the corpus boundary
+    rejected its own correct responses.
+    """
+    return graphify_semantic_slice.envelope_reasons(
+        envelope, profile=graphify_semantic_slice.profile_for(environment)
+    )
 
 
 if __name__ == "__main__":

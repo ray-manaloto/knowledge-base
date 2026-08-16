@@ -730,13 +730,26 @@ def _structured_reasons(envelope: dict[str, object]) -> list[str]:
     return []
 
 
-def _model_reasons(envelope: dict[str, object]) -> list[str]:
+def _model_reasons(envelope: dict[str, object], profile: ClaudeProfile) -> list[str]:
+    """Check the envelope reports exactly the model this PROFILE asked for.
+
+    Profile-driven rather than pinned to the module constants, which is the
+    second instance of one class: the slice's identity leaking into a corpus code
+    path. Under `CORPUS_PROFILE` the response reports `claude-opus-5`, so the
+    hardcoded haiku comparison rejected it as `model-identity-invalid` and the
+    adapter refused every corpus chunk — a whole-corpus failure whose message
+    named the model rather than the check.
+
+    Still an exact single-model comparison: the point of the check is that ONE
+    reviewed model answered, and a response listing two is a routing surprise
+    whichever they are.
+    """
     model_usage = envelope.get("modelUsage")
-    if not isinstance(model_usage, dict) or tuple(model_usage) != (_CLAUDE_MODEL,):
+    if not isinstance(model_usage, dict) or tuple(model_usage) != (profile.model,):
         return ["model-identity-invalid"]
-    model = model_usage[_CLAUDE_MODEL]
+    model = model_usage[profile.model]
     if not isinstance(model, dict) or (model.get("canonicalModel"), model.get("provider")) != (
-        _CLAUDE_CANONICAL_MODEL,
+        profile.canonical_model,
         _CLAUDE_PROVIDER,
     ):
         return ["model-identity-invalid"]
@@ -765,6 +778,7 @@ def envelope_reasons(
     envelope: object,
     *,
     max_turns: int | None = _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR,
+    profile: ClaudeProfile = SLICE_PROFILE,
 ) -> tuple[str, ...]:
     """Explain why a redacted real Claude result envelope cannot be accepted."""
     if not isinstance(envelope, dict):
@@ -772,7 +786,7 @@ def envelope_reasons(
     reasons = [
         *_result_reasons(envelope, max_turns=max_turns),
         *_structured_reasons(envelope),
-        *_model_reasons(envelope),
+        *_model_reasons(envelope, profile),
         *_negative_evidence_reasons(envelope),
     ]
     return tuple(dict.fromkeys(reasons))

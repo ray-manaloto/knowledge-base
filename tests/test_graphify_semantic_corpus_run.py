@@ -12,6 +12,7 @@ import pytest
 from graphify import file_slice
 from graphify.file_slice import FileSlice, expand_oversized_files
 from kb_setup import (
+    graphify_semantic_adapter,
     graphify_semantic_corpus,
     graphify_semantic_corpus_authority,
     graphify_semantic_corpus_run,
@@ -91,13 +92,34 @@ def test_recorded_schema_returns_empty_on_a_wrong_length_argv() -> None:
 @pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
 def test_enabling_the_cache_omits_the_variable_rather_than_setting_zero() -> None:
     """`"0"` is truthy to graphify, so a warm cache means an ABSENT name."""
+    name = "GRAPHIFY_NO_INCREMENTAL_CACHE"
     config = _config()
     assert config.graphify_no_incremental_cache is False
-    assert graphify_semantic_corpus_run.incremental_cache_env(config) == {}
+    # None, NOT an absent key: an overlay can only override names it mentions, so
+    # omitting this one let an ambient `=1` survive and silently make a
+    # cache-enabled run cold while its receipt still said warm.
+    assert graphify_semantic_corpus_run.incremental_cache_env(config) == {name: None}
     cold = msgspec.structs.replace(config, graphify_no_incremental_cache=True)
-    assert graphify_semantic_corpus_run.incremental_cache_env(cold) == {
-        "GRAPHIFY_NO_INCREMENTAL_CACHE": "1"
-    }
+    assert graphify_semantic_corpus_run.incremental_cache_env(cold) == {name: "1"}
+
+
+def test_an_ambient_cache_disable_does_not_survive_into_a_warm_run() -> None:
+    """The end-to-end half: a hostile ambient value must actually be removed.
+
+    Asserting the mapping alone would pass even if `_temporary_environment`
+    ignored `None`, which is exactly how the defect existed in the first place —
+    the pieces were each defensible and the composition leaked.
+    """
+    name = "GRAPHIFY_NO_INCREMENTAL_CACHE"
+    os.environ[name] = "1"
+    try:
+        overlay = graphify_semantic_corpus_run.incremental_cache_env(_config())
+        with graphify_semantic_corpus_run._temporary_environment(overlay):
+            assert name not in os.environ, "an ambient cache-disable leaked into a warm run"
+        # And it is restored, because clearing it is scoped to the call.
+        assert os.environ[name] == "1"
+    finally:
+        os.environ.pop(name, None)
 
 
 def _multi_file_result() -> dict[str, object]:
@@ -182,7 +204,7 @@ def _run_context(tmp_path: Path) -> graphify_semantic_corpus_run._RunContext:
         preflight_receipt=preflight,
         run_namespace="a" * 64,
         metadata_path=tmp_path / "adapter-metadata.json",
-        boundary_path=tmp_path / "provider-boundary-start.json",
+        boundary_dir=tmp_path,
     )
 
 
@@ -209,6 +231,54 @@ def test_driver_reduces_without_asserting_the_slices_scope(tmp_path: Path) -> No
     # not match this pattern and fails the test.
     with pytest.raises(ValueError, match="adapter metadata is unavailable"):
         graphify_semantic_corpus_run._stage_completed_chunk(_multi_file_result(), chunk, context)
+
+
+def test_envelope_validation_follows_the_profile_that_was_invoked() -> None:
+    """A corpus response naming Opus must not be rejected as a model mismatch.
+
+    Round 2's P1: `_model_reasons` compared `modelUsage` to the slice's haiku
+    constants, so the adapter refused every corpus chunk with
+    `model-identity-invalid` — a whole-corpus failure whose message named the
+    model rather than the check. Both directions are asserted, so a profile-blind
+    implementation fails whichever constant it picks.
+    """
+
+    def envelope(model: str, canonical: str) -> dict[str, object]:
+        return {"modelUsage": {model: {"canonicalModel": canonical, "provider": "firstParty"}}}
+
+    corpus = graphify_semantic_slice.CORPUS_PROFILE
+    slice_profile = graphify_semantic_slice.SLICE_PROFILE
+    corpus_envelope = envelope(corpus.model, corpus.canonical_model)
+    slice_envelope = envelope(slice_profile.model, slice_profile.canonical_model)
+
+    assert "model-identity-invalid" not in graphify_semantic_slice.envelope_reasons(
+        corpus_envelope, profile=corpus
+    )
+    assert "model-identity-invalid" in graphify_semantic_slice.envelope_reasons(
+        corpus_envelope, profile=slice_profile
+    )
+    assert "model-identity-invalid" not in graphify_semantic_slice.envelope_reasons(
+        slice_envelope, profile=slice_profile
+    )
+    assert "model-identity-invalid" in graphify_semantic_slice.envelope_reasons(
+        slice_envelope, profile=corpus
+    )
+
+
+def test_adapter_reads_the_profile_from_the_environment_for_envelope_checks() -> None:
+    """The adapter boundary must carry the profile through, not drop it."""
+    corpus = graphify_semantic_slice.CORPUS_PROFILE
+    corpus_envelope = {
+        "modelUsage": {
+            corpus.model: {"canonicalModel": corpus.canonical_model, "provider": "firstParty"}
+        }
+    }
+    under_corpus = graphify_semantic_adapter.result_envelope_reasons(
+        corpus_envelope, {graphify_semantic_slice.PROFILE_ENV_NAME: corpus.name}
+    )
+    under_default = graphify_semantic_adapter.result_envelope_reasons(corpus_envelope, {})
+    assert "model-identity-invalid" not in under_corpus
+    assert "model-identity-invalid" in under_default
 
 
 def test_chunk_stage_dir_is_the_same_path_stage_chunk_refuses_to_overwrite() -> None:

@@ -40,8 +40,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # changed. Re-plan and re-record, and say what moved.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"1706edf9f9f5c4e15a200911316045e7181005e09c4081cfb4f11ddc239e748f",'
-    b'"execution_config_sha256":"ff40d8f82db2c3c35f279bbe460a62c38a763123c85d9d39efb9763673c3a892",'
+    b'"execution_config_sha256":"bab48b465f41a5d3d20c012d461a8152a71bf84ac94fae880fec92cda43db76f",'
     b'"exclusions_sha256":"72811bd83ceb77b5a15648fd07c401346ccbd34b16693b1446a0fc83af153175",'
-    b'"plan_manifest_sha256":"2d70a9ed343e5f1ac7abc83d15dfda32ae7600cd8b05a6f31ce7ff8877bc3c91",'
+    b'"plan_manifest_sha256":"8f7b15319395780fee28cccb056eb7b9de9b2f87364ea0aeac86312a160fe96d",'
     b'"schema_version":1}\n'
 )
