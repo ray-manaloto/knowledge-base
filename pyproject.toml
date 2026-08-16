@@ -175,3 +175,14 @@ exclude = ["**/_merge_docs.py"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+# The ONE place suppressions live, per `zero-skip-policy.md`. `typos` reads
+# `[tool.typos]` from pyproject natively, so this needs no second config file.
+#
+# `cpy` is the COBOL copybook extension, and it appears here because
+# `graphify_sdk._UNSUPPORTED_LANGUAGE_SUFFIXES` must name the real extension to
+# classify the copybooks vendored in the corpus. Dropping it to satisfy the
+# spell-checker would put those files back to blocking `kb-build`.
+# Approved by Ray, 2026-08-16.
+[tool.typos.default.extend-words]
+cpy = "cpy"

@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from enum import StrEnum
+from pathlib import PurePosixPath
 
 import msgspec
 
@@ -48,6 +50,20 @@ class GraphifyReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     unclassified_paths: tuple[str, ...] = ()
     zero_node_paths: tuple[str, ...] = ()
     ignored_paths: tuple[str, ...] = ()
+    #: Absorbed as a language Graphify cannot parse — retained so the count
+    #: survives into the census rather than disappearing into a green result.
+    unsupported_language_paths: tuple[str, ...] = ()
+    #: The paths that ACTUALLY block: unclassified minus everything a reviewed
+    #: class absorbed. Reported separately from `unclassified_paths` because a
+    #: failure message listing all 1,075 unclassified files — of which 1,070 are
+    #: absorbed and 5 are the problem — buries its own answer.
+    unresolved_paths: tuple[str, ...] = ()
+    #: Unbounded totals. The `*_paths` tuples above are display evidence capped
+    #: by `_bounded_paths`, so any count or tally MUST come from these fields —
+    #: a `len()` over the bounded tuples saturates at the display bound.
+    unresolved_count: int = 0
+    unsupported_language_count: int = 0
+    unsupported_language_tally: tuple[tuple[str, int], ...] = ()
     timed_out: bool = False
     approved_classifications: tuple[str, ...] = ()
     mode: str | None = None
@@ -64,6 +80,11 @@ class SourceCoveragePolicy(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     optional_unclassified_paths: tuple[str, ...] = ()
     optional_zero_node_paths: tuple[str, ...] = ()
     optional_ignored_paths: tuple[str, ...] = ()
+    #: Real source in a language Graphify cannot parse. Kept in its OWN field
+    #: rather than folded into `optional_unclassified_paths`, because these are
+    #: measurable corpus loss and the build reports them; a single allowlist
+    #: would make them indistinguishable from a LICENSE file.
+    unsupported_language_paths: tuple[str, ...] = ()
 
 
 class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -143,6 +164,15 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
     return reasons
 
 
+def _unresolved_unclassified(evidence: GraphifyEvidence) -> tuple[str, ...]:
+    """Unclassified paths no reviewed class absorbed — the ones that block."""
+    policy = evidence.coverage_policy
+    if policy is None:
+        return tuple(evidence.unclassified_paths)
+    absorbed = set(policy.optional_unclassified_paths) | set(policy.unsupported_language_paths)
+    return tuple(sorted(set(evidence.unclassified_paths) - absorbed))
+
+
 def _coverage_reasons(evidence: GraphifyEvidence) -> list[str]:
     reasons: list[str] = []
     required = set(evidence.coverage_policy.required_paths) if evidence.coverage_policy else set()
@@ -166,7 +196,10 @@ def _coverage_reasons(evidence: GraphifyEvidence) -> list[str]:
             reasons.append("required-source-unclassified")
         if required & zero_node:
             reasons.append("required-source-zero-nodes")
-        if unclassified - set(evidence.coverage_policy.optional_unclassified_paths):
+        absorbed = set(evidence.coverage_policy.optional_unclassified_paths) | set(
+            evidence.coverage_policy.unsupported_language_paths
+        )
+        if unclassified - absorbed:
             reasons.append("unclassified-files")
         if zero_node - set(evidence.coverage_policy.optional_zero_node_paths):
             reasons.append("zero-node-sources")
@@ -197,6 +230,10 @@ def assess(
         *_coverage_reasons(evidence),
         *_output_reasons(evidence),
     ]
+    unresolved = _unresolved_unclassified(evidence)
+    unsupported = (
+        evidence.coverage_policy.unsupported_language_paths if evidence.coverage_policy else ()
+    )
 
     state = GraphifyState.COMPLETE
     if evidence.returncode != 0:
@@ -219,6 +256,11 @@ def assess(
         unclassified_paths=_bounded_paths(evidence.unclassified_paths),
         zero_node_paths=_bounded_paths(evidence.zero_node_paths),
         ignored_paths=_bounded_paths(evidence.ignored_paths),
+        unresolved_paths=_bounded_paths(unresolved),
+        unsupported_language_paths=_bounded_paths(unsupported),
+        unresolved_count=len(unresolved),
+        unsupported_language_count=len(unsupported),
+        unsupported_language_tally=_language_tally(unsupported),
         timed_out=evidence.timed_out,
         approved_classifications=evidence.approved_classifications,
         mode=evidence.mode,
@@ -236,7 +278,12 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
         evidence: list[str] = []
         if receipt.source_name:
             evidence.append(f"source={receipt.source_name[:80]}")
-        if receipt.unclassified_paths:
+        if receipt.unresolved_paths:
+            # The blocking subset first, and on its own: these are the paths a
+            # reader has to act on. `unclassified` may be a thousand entries of
+            # which every one but these was absorbed by a reviewed class.
+            evidence.append(f"unresolved={list(receipt.unresolved_paths)!r}")
+        elif receipt.unclassified_paths:
             evidence.append(f"unclassified={list(receipt.unclassified_paths)!r}")
         if receipt.zero_node_paths:
             evidence.append(f"zero_nodes={list(receipt.zero_node_paths)!r}")
@@ -253,3 +300,9 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
 def _bounded_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
     """Retain enough path evidence to diagnose scope without unbounded exceptions."""
     return tuple(path[:160] for path in paths[:12])
+
+
+def _language_tally(paths: tuple[str, ...]) -> tuple[tuple[str, int], ...]:
+    """Per-extension totals over the FULL path set, never the display bound."""
+    tally = Counter(PurePosixPath(path).suffix or PurePosixPath(path).name for path in paths)
+    return tuple(sorted(tally.items()))
