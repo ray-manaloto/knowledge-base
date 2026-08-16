@@ -1066,6 +1066,10 @@ def _check_source_only(repo_root: Path, spec: ToolSpec) -> SyncStatus:
         return SyncStatus(tool=spec.name, pinned=ref, resolved="", findings=tuple(findings))
 
     findings.append(_check_source_clone(repo_root, spec, commit))
+    # A source-only tool has no pin and no binary, but it CAN still have code
+    # constants that re-state its revision — so the binding check applies here for
+    # the same reason the manifest check does.
+    findings.append(_check_ref_bindings(repo_root, spec))
     return SyncStatus(tool=spec.name, pinned=ref, resolved=commit[:12], findings=tuple(findings))
 
 
@@ -1306,6 +1310,124 @@ def _check_manifest_commit(repo_root: Path, spec: ToolSpec, ref: str) -> Finding
     return Finding("manifest", OK, f"{spec.manifest} tracks the installed {ref} at {commit[:12]}")
 
 
+def _check_ref_bindings(repo_root: Path, spec: ToolSpec) -> Finding:
+    """Does every code constant and committed artifact name the manifest's revision?
+
+    The manifest check answers "does the corpus describe the code we run". This
+    answers the question one layer in: **does the repo agree with itself about
+    which revision that is.** They are different questions, and on 2026-08-15 the
+    first was green while the second was two releases wrong — the pin, the
+    manifest, the clone and `graphify_semantic_corpus` all read v0.9.43 while
+    `graphify_baseline._ACCEPTED_GRAPHIFY_REF` and the committed disposition
+    catalog read v0.9.42. Nothing reported it, because nothing looked.
+
+    A binding whose pattern matches NOTHING is DRIFT, not SKIP. The anchor is a
+    literal in a source file, so a rename silently converts the check into a
+    no-op that still renders as declared — and a check that can only pass is not
+    a check (`probes-need-a-control-arm.md`). Saying "the anchor is gone" is the
+    honest answer and points straight at the repair.
+
+    Offline and subprocess-free: every input is a committed file in this repo.
+    """
+    if not spec.ref_bindings:
+        return Finding("ref-binding", SKIP, "this tool declares no revision bindings")
+    if not spec.manifest:
+        return Finding(
+            "ref-binding",
+            SKIP,
+            "bindings are declared but the tool pins no source manifest to compare them against",
+        )
+    expected = {
+        "ref": manifest_ref(repo_root, spec),
+        "commit": _manifest_field(repo_root, spec, "commit"),
+    }
+    findings: list[str] = []
+    for binding in spec.ref_bindings:
+        want = expected.get(binding.field, "")
+        if not want:
+            findings.append(f"{binding.label}: {spec.manifest} has no readable `{binding.field} =`")
+            continue
+        path = repo_root / binding.path
+        if not path.exists():
+            findings.append(f"{binding.label}: file is missing")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            findings.append(f"{binding.label}: unreadable ({exc})")
+            continue
+        found = re.search(binding.pattern, text)
+        if found is None:
+            findings.append(
+                f"{binding.label}: the declared anchor matched nothing, so this binding "
+                f"checked NOTHING — repair the pattern or the file"
+            )
+            continue
+        observed = found.group(1)
+        if observed != want:
+            findings.append(f"{binding.label}: reads {observed} but {spec.manifest} pins {want}")
+    if findings:
+        return Finding(
+            "ref-binding",
+            DRIFT,
+            "the repo disagrees with its own source manifest — " + "; ".join(findings),
+        )
+    return Finding(
+        "ref-binding",
+        OK,
+        f"all {len(spec.ref_bindings)} revision bindings agree with {spec.manifest}",
+    )
+
+
+def _check_skill_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
+    """Does the installed agent skill (#315) describe the version we actually run?
+
+    The fourth thing a bump has to carry, after the pin, the manifest and the
+    clone — and historically the one nothing moved. `currency.apply` refreshes it
+    on the bumps IT applies; every other route (a hand edit, a refresh that was
+    never run) left it behind with no report. The stamp is gitignored, so the
+    drift leaves no tracked trace for a reviewer to catch either.
+
+    A declared stamp that does not EXIST is DRIFT: the skill dir is installed, so
+    an absent stamp means the install predates stamping or was assembled by hand
+    — in both cases the skill's version is unknown, and unknown is never green
+    here. A skill dir that is itself absent is a different, honest SKIP: nothing
+    was installed, so nothing can be stale.
+    """
+    if not spec.skill_stamp:
+        return Finding("skill-stamp", SKIP, "this tool declares no skill version stamp")
+    if spec.skill_dir and not (repo_root / spec.skill_dir).exists():
+        return Finding(
+            "skill-stamp",
+            SKIP,
+            f"{spec.skill_dir} is not installed here, so its skill cannot be stale",
+        )
+    stamp = repo_root / spec.skill_stamp
+    if not stamp.exists():
+        return Finding(
+            "skill-stamp",
+            DRIFT,
+            f"{spec.skill_stamp} is missing, so the installed skill's version is UNKNOWN "
+            f"— run `mise run kb-skill-refresh`",
+        )
+    installed = stamp.read_text(encoding="utf-8").strip()
+    if not installed:
+        return Finding(
+            "skill-stamp",
+            DRIFT,
+            f"{spec.skill_stamp} is empty, so the installed skill's version is UNKNOWN "
+            f"— run `mise run kb-skill-refresh`",
+        )
+    if installed != pinned:
+        return Finding(
+            "skill-stamp",
+            DRIFT,
+            f"the installed skill was generated by {installed} but the pin is {pinned} — "
+            f"the skill documents a version we no longer run; run `mise run kb-skill-refresh`",
+        )
+    return Finding("skill-stamp", OK, f"the installed skill was generated by the pinned {pinned}")
+
+
 def _manifest_field(repo_root: Path, spec: ToolSpec, key: str) -> str:
     """One `<key> =` line from this tool's source manifest, or ""."""
     if not spec.manifest:
@@ -1489,6 +1611,8 @@ def check_sync(repo_root: Path, spec: ToolSpec, *, deep: bool = False) -> SyncSt
             _check_extras(spec, declared_extras),
             _check_extra_probes(repo_root, spec, deep=deep),
             _check_manifest(repo_root, spec, pinned),
+            _check_ref_bindings(repo_root, spec),
+            _check_skill_stamp(repo_root, spec, pinned),
             _check_stamp(repo_root, spec, pinned),
         ),
     )

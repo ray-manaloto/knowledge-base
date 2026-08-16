@@ -120,6 +120,32 @@ relay only rewrites JSON-RPC on the child's pipes, so it could not enforce the
 allowlist over a listener socket, and serving unfiltered under a "narrowed to N"
 banner is worse than not filtering.
 
+### The HOSTED server in `.mcp.json` is an INTERIM BRIDGE — delete it on the condition below
+
+`.mcp.json` registers `graphify` at `https://api.graphify.com/mcp` (Ray's self-hosted
+workspace, OAuth on first use, no key). It is **not** the server above and does not serve
+this corpus:
+
+| | `mise run kb-serve` | `.mcp.json` → `api.graphify.com` |
+|---|---|---|
+| content | the 71-source aggregate corpus | **this repository's own code** (9.2K nodes) |
+| tools | 10 + 6 resources | `query_graph`, `get_node`, `path`, `explain_style` |
+| built from | `graphify-out/graph.json` | the workspace's index of `main` |
+
+It exists because `graphify-out/graph.json` was missing and `kb-build` fails closed
+(#289), so the repo had no queryable graph at all. **Delete `.mcp.json` when
+`mise run kb-query` exits 0 against a freshly built graph** — that is the whole exit
+condition.
+
+Two things that make this safe to commit rather than hide: Claude Code **prompts** before
+using a project-scoped MCP server, so no clone is silently connected; and any machine can
+decline it via `disabledMcpjsonServers` in `.claude/settings.local.json` without touching
+the shared file. Nothing in the corpus pipeline may be built on it — it is scaffolding,
+and a tracked file means its removal is a reviewable commit rather than a silent one.
+
+Project scope, not `--scope local`: local writes to `~/.claude.json`, which `do-not.md`
+rule 11 forbids.
+
 ## The Python-3.14 scientific-stack gap (bit us twice)
 
 graspologic (`leiden`) needs `<3.13` and **transitively pulls scipy**. On 3.12,

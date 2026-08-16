@@ -788,13 +788,22 @@ def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> No
     (manifest.clone_dir / ".gitignore").write_text("ignored/\n", encoding="utf-8")
     ignored = manifest.clone_dir / "ignored"
     ignored.mkdir()
-    (ignored / "secret.txt").write_text("tracked but ignored\n", encoding="utf-8")
+    # RENAMED from `secret.txt`, and the reason is worth keeping: graphify 0.9.44
+    # skips a file whose NAME begins `secret.` regardless of gitignore, so the old
+    # fixture tripped a secrets filter rather than the behaviour under test.
+    # Invisible before 0.9.44 — the assertion then looked at the ignored DIRECTORY,
+    # never the file — and the first reading of the new failure was "0.9.44
+    # silently drops tracked+ignored files", which would have been a false and
+    # alarming claim about the release. Isolated by holding the directory, the
+    # `.gitignore` and the commit shape fixed and changing only the filename:
+    # `secret.{txt,md}` vanish, `design.{txt,md}` are both detected.
+    (ignored / "design.txt").write_text("tracked but ignored\n", encoding="utf-8")
     subprocess.run(
         ["git", "add", ".gitignore", ".gitattributes", "hidden.txt", "subst.txt", "tool"],
         cwd=manifest.clone_dir,
         check=True,
     )
-    subprocess.run(["git", "add", "-f", "ignored/secret.txt"], cwd=manifest.clone_dir, check=True)
+    subprocess.run(["git", "add", "-f", "ignored/design.txt"], cwd=manifest.clone_dir, check=True)
     subprocess.run(
         [
             "git",
@@ -841,7 +850,28 @@ def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> No
     assert (snapshot / "hidden.txt").read_text(encoding="utf-8") == "must remain\n"
     assert (snapshot / "subst.txt").read_text(encoding="utf-8") == "$Format:%H$\n"
     assert (snapshot / "tool").stat().st_mode & 0o111
-    assert any(Path(path).name == "ignored" for path in detected["ignored"])
+    # INVERTED at graphify 0.9.44 (#2759), and the inversion is the point. This
+    # fixture force-adds `ignored/design.txt`, so it is git-TRACKED while also
+    # matching `.gitignore`. Up to 0.9.43 detection dropped it and this line
+    # asserted that. 0.9.44 keeps it, matching git's own behaviour of never
+    # un-tracking such a file — so the corpus stops silently losing committed
+    # content, which is precisely what this repo lost two `docs/superpowers`
+    # documents to.
+    #
+    # The `ignored` bucket is NOT dead: an UNTRACKED path matching `.gitignore`
+    # still classifies as ignored, measured at 0.9.44 against a three-repo control
+    # (tracked+ignored → retained, untracked+ignored → ignored, no-.gitignore →
+    # neither). That case is armed in `graphify_baseline.certify_controls`'s
+    # `untracked-ignored-path`; here we pin the tracked half.
+    assert not any(Path(path).name == "ignored" for path in detected.get("ignored", []))
+    # Reaching detection at all is the property under test; WHICH bucket a `.txt`
+    # lands in is graphify's classification policy and not this test's business.
+    # Asserting a specific bucket would couple this to a policy that can change
+    # without the retention behaviour changing.
+    reached = {Path(path).name for group in detected["files"].values() for path in group} | {
+        Path(path).name for path in detected.get("unclassified", [])
+    }
+    assert "design.txt" in reached
     after = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
         cwd=manifest.clone_dir,

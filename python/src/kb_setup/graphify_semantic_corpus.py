@@ -82,26 +82,34 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_REF = "v0.9.43"
-_ACCEPTED_GRAPHIFY_COMMIT = "7281f27eac568f77f50910f59f84543458f5dfd1"
-_ACCEPTED_GRAPHIFY_TREE = "6ae1c399eb1beef4f51106bbeecf72ee035fbeb6"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.44"
+_ACCEPTED_GRAPHIFY_COMMIT = "4fca621532a23f84f69c31e397b75f8105cb5390"
+_ACCEPTED_GRAPHIFY_TREE = "faabe0fab532b763a76031acd61038a85e3bba00"
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "f839cca43889465bb43449f77880ec39a92f68bcee5d892ab8bfb18452a0690a"
+    "f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75"
 )
-_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "c51ea916eec10cee4e73ca8c9d565083a008ecd0"
+# `graphify/detect.py`'s git blob at the pinned commit. Control-armed before it
+# was trusted: the same derivation at v0.9.43 reproduces the c51ea916 this line
+# used to hold, so the method is right and the new value is not a guess.
+_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "f76a4259f6a7360872663fbe711c4738ecda4680"
 _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.43",
-    cli_version="0.9.43",
-    sdk_version="0.9.43",
+    version="0.9.44",
+    cli_version="0.9.44",
+    sdk_version="0.9.44",
     executable=".venv/bin/graphify",
+    # Unchanged, and MEASURED rather than carried forward — see
+    # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b",
-    sdist_sha256="7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3",
+    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
+    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
 )
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
-_CLAUDE_VERSION = "2.1.232"
-_CLAUDE_EXECUTABLE_SHA256 = "7b39c1588df919d001dea3ffd5651adb682f2451b5a0e18d42d4233296b53cc7"
+# Kept in step with `graphify_semantic_slice._ACCEPTED_CLAUDE_*`, which carries
+# the reasoning: the `--help` digest is unchanged across 2.1.232 -> 2.1.233, so
+# only the binary moved and the pinned flag contract did not.
+_CLAUDE_VERSION = "2.1.233"
+_CLAUDE_EXECUTABLE_SHA256 = "bc466b6cde63edafc773f471a1fb98787fabb31f52240c8616ce7e1f587b212d"
 _CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6da2882d3a5560fea6"
 _CLAUDE_REQUIRED_FLAGS = (
     "--json-schema",

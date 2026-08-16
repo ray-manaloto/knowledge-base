@@ -29,20 +29,41 @@ _MAX_COST_USD = 0.25
 CLAUDE_MODEL = _CLAUDE_MODEL
 GRAPHIFY_SCHEMA_SHA256 = "69d307d23913e0cccf5809316a3432b85210776bd5626a4ad0af1317d6113324"
 
-SOURCE_REF = "v0.9.42"
-SOURCE_COMMIT = "7fe58b0b0f3873be9a21c30106b8b8527c353aa6"
-SOURCE_TREE = "15ca81a8dbd3ded7083c4b573197140e62e95fcc"
+# Only the SNAPSHOT identity moves v0.9.42 -> v0.9.44. The file itself is
+# BYTE-IDENTICAL across those two releases — same blob object, same size, same
+# digest — so the three lines below it are unchanged, and that is a measurement,
+# not an assumption. The derivation discriminates: run against `uv.lock` over the
+# same two commits it returns two different objects.
+SOURCE_REF = "v0.9.44"
+SOURCE_COMMIT = "4fca621532a23f84f69c31e397b75f8105cb5390"
+SOURCE_TREE = "faabe0fab532b763a76031acd61038a85e3bba00"
 SOURCE_PATH = "docs/how-it-works.md"
 SOURCE_GIT_OBJECT = "e0e6e5275dfec50b25c38590f151ebd9e263f383"
 SOURCE_SHA256 = "cd4a67001704eddc557d67eaa783d0608cd200302fa1b89c3f1a4819497cdc26"
 SOURCE_SIZE = 5147
 _CANDIDATE_SCHEMA = "graphify-real-semantic-slice/v0"
 _ACCEPTED_CANDIDATE_MANIFEST_SHA256 = (
-    "8d3407f5cca4c2ddca54d9a4f25df0727cbd5fd2fd378754d48afced220e94a7"
+    "32579d766fd7c3950b0513fd94a7a49b65a973fb0d28e25987286d49d02c3bf9"
 )
 _MAX_SEMANTIC_ARGS = 2
-_RETAINED_CLAUDE_ARG_COUNT = 17
-_REQUIRED_MEMBERS = frozenset({"adapter-metadata.json", "receipt.json", "semantic-fragment.json"})
+# 17 -> 19: the adapter appends `--max-turns 3` whenever the provider boundary
+# marker is configured, and this module now configures it (see
+# `_adapter_environment`). The count and `expected_argv` below must move together
+# — `schema = argv[7] if len(argv) == _RETAINED_CLAUDE_ARG_COUNT else ""` silently
+# yields an empty schema when they disagree, which then fails as a digest
+# mismatch rather than as the shape mismatch it really is.
+_RETAINED_CLAUDE_ARG_COUNT = 19
+_PROVIDER_BOUNDARY_MEMBER = "provider-boundary-start.json"
+_REQUIRED_MEMBERS = frozenset(
+    {
+        "adapter-metadata.json",
+        "receipt.json",
+        "semantic-fragment.json",
+        # Retained as a candidate member rather than written to a temp dir: a
+        # boundary marker that is not kept is not evidence.
+        _PROVIDER_BOUNDARY_MEMBER,
+    }
+)
 
 _REQUIRED_CLAUDE_FLAGS = (
     "--json-schema",
@@ -247,26 +268,45 @@ class SemanticVerification(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
 
 
 _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.42",
-    cli_version="0.9.42",
-    sdk_version="0.9.42",
+    # Moved 0.9.42 -> 0.9.44 because the COMMITTED EVIDENCE moved: the slice was
+    # re-run at 0.9.44 in the same change. This constant is the authority for that
+    # receipt, so it may only advance when the receipt does — never as part of a
+    # pin bump on its own, which would assert an identity the evidence contradicts.
+    version="0.9.44",
+    cli_version="0.9.44",
+    sdk_version="0.9.44",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="d87bec57d5dbca1203ce719f4b4afb83ae5eb6cea1b4af2d62d0c10c1c3e26e6",
-    sdist_sha256="a45ff2d9517340a429d8e74a7dc7a74062d1bbc18019f26ec62b98b03863eb1b",
+    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
+    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
 )
+# The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above stays
+# at 0.9.42 on purpose: it is the authority for the COMMITTED receipt, which is
+# evidence about a run that happened, and evidence does not move when the pin does.
+#
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.42 -> 0.9.44, and that is a
+# measurement rather than a copy-forward: `semantic_api_fingerprint()` re-derived
+# at 0.9.44 hashes to 43122fca…, byte-identical to the 0.9.43 record. The one
+# signature the semantic path depends on — `llm.extract_corpus_parallel` — did not
+# change, which is what `assert_semantic_sdk`'s "review the release before
+# inference" gate is actually asking about.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.43",
-    cli_version="0.9.43",
-    sdk_version="0.9.43",
+    version="0.9.44",
+    cli_version="0.9.44",
+    sdk_version="0.9.44",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b",
-    sdist_sha256="7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3",
+    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
+    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
 )
-_ACCEPTED_CLAUDE_VERSION = "2.1.232"
+# 2.1.232 -> 2.1.233 (Claude Code self-updates; the currency engine flags it).
+# The BINARY digest moved and the `--help` digest did NOT: 71ad650f… is the same
+# value 2.1.232 recorded. That is the substantive review for this dependency —
+# every flag the semantic path requires is spelled identically, so the CLI
+# contract this module pins is unchanged and only the implementation moved.
+_ACCEPTED_CLAUDE_VERSION = "2.1.233"
 _ACCEPTED_CLAUDE_EXECUTABLE_SHA256 = (
-    "7b39c1588df919d001dea3ffd5651adb682f2451b5a0e18d42d4233296b53cc7"
+    "bc466b6cde63edafc773f471a1fb98787fabb31f52240c8616ce7e1f587b212d"
 )
 _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6da2882d3a5560fea6"
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (
@@ -399,7 +439,7 @@ def preflight(
     repo_root: Path,
     environment: Mapping[str, str] | None = None,
     *,
-    graphify_version: str = "0.9.43",
+    graphify_version: str = "0.9.44",
     require_max_turns: bool = False,
 ) -> ClaudePreflight:
     """Prove exact Graphify/Claude/auth/routing capability without inference."""
@@ -808,6 +848,12 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
         "--no-chrome",
         "--max-budget-usd",
         "0.25",
+        # Appended by `_claude_invocation_args` exactly when the provider boundary
+        # marker is configured. Pinned here rather than made conditional: this
+        # module always configures it, so a run WITHOUT these two is a real shape
+        # mismatch and must be reported as one.
+        "--max-turns",
+        "3",
     )
     if argv != expected_argv:
         reasons.append("adapter-argv-shape-mismatch")
@@ -818,11 +864,11 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
 
 def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> list[str]:
     accepted_graphify_pairs = (
-        ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.42"),)
+        ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.44"),)
         if enforce_authority
         else (
-            (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.42"),
-            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.43"),
+            (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.44"),
+            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.44"),
         )
     )
     accepted_graphify_runtimes = tuple(pair[0] for pair in accepted_graphify_pairs)
@@ -837,7 +883,13 @@ def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> li
             "receipt-claude-executable-digest-mismatch",
         ),
         (runtime.help_sha256 == _ACCEPTED_CLAUDE_HELP_SHA256, "receipt-claude-help-mismatch"),
-        (runtime.required_flags == _REQUIRED_CLAUDE_FLAGS, "receipt-cli-flags-mismatch"),
+        # `--max-turns` is proven by the preflight (`require_max_turns=True`) and
+        # therefore appears in the receipt's flag list, so the expectation carries
+        # it too. Comparing against the bare tuple would fail every real run.
+        (
+            runtime.required_flags == (*_REQUIRED_CLAUDE_FLAGS, "--max-turns"),
+            "receipt-cli-flags-mismatch",
+        ),
         (
             runtime.graphify_runtime in accepted_graphify_runtimes,
             "receipt-runtime-mismatch",
@@ -1124,7 +1176,11 @@ def _fragment_counts(fragment: Mapping[str, object]) -> tuple[int, int, int]:
 
 
 def _adapter_environment(
-    *, preflight_receipt: ClaudePreflight, metadata_path: Path, adapter_dir: Path
+    *,
+    preflight_receipt: ClaudePreflight,
+    metadata_path: Path,
+    adapter_dir: Path,
+    boundary_path: Path,
 ) -> dict[str, str]:
     original_path = os.environ.get("PATH", "")
     entrypoint = shutil.which("kb-semantic-claude", path=original_path)
@@ -1143,6 +1199,20 @@ def _adapter_environment(
         "KB_SEMANTIC_REAL_CLAUDE_SHA256": preflight_receipt.executable_sha256,
         "KB_SEMANTIC_ORIGINAL_PATH": original_path,
         "KB_SEMANTIC_METADATA_PATH": str(metadata_path),
+        # ONE adapter contract, both callers. graphify #309 made the provider
+        # boundary marker mandatory in `graphify_semantic_adapter.adapter_main`
+        # and migrated only the corpus launcher, so this path has failed with
+        # `provider boundary marker path is unset` ever since — undetected,
+        # because `verify` reads the artifacts #308 had already committed. A
+        # generator that no longer runs, behind a verifier reading yesterday's
+        # output.
+        #
+        # Deliberately NOT fixed by making the marker optional: nothing checks
+        # after the fact that it was written, so "absent means skip" would let a
+        # corpus run that merely FORGOT the variable lose its boundary evidence
+        # in silence. Setting it here keeps the adapter fail-closed for everyone
+        # and gives the slice the provider-call evidence it never had.
+        "KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": str(boundary_path),
         "GRAPHIFY_CLAUDE_CLI_MODEL": _CLAUDE_MODEL,
         "GRAPHIFY_API_TIMEOUT": "120",
         "GRAPHIFY_NO_INCREMENTAL_CACHE": "1",
@@ -1231,7 +1301,10 @@ def build_candidate(repo_root: Path, output: Path) -> CandidateManifest:
 
     if output.exists():
         raise ValueError(f"semantic output already exists: {output}")
-    preflight_receipt = preflight(repo_root)
+    # `require_max_turns` follows the boundary marker: the adapter adds
+    # `--max-turns 3` exactly when `KB_SEMANTIC_PROVIDER_BOUNDARY_PATH` is set,
+    # so the flag must be PROVEN supported in the same run that will pass it.
+    preflight_receipt = preflight(repo_root, require_max_turns=True)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="kb-graphify-semantic-source-") as source_dir:
         source_root = Path(source_dir) / "graphify"
@@ -1249,6 +1322,7 @@ def build_candidate(repo_root: Path, output: Path) -> CandidateManifest:
                 preflight_receipt=preflight_receipt,
                 metadata_path=metadata_path,
                 adapter_dir=Path(bin_dir),
+                boundary_path=candidate / _PROVIDER_BOUNDARY_MEMBER,
             )
             result, warning_text, observed_chunks = _extract_real_semantic(
                 source_path,

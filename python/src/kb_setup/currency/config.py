@@ -14,6 +14,7 @@ anything about a consumer.
 
 from __future__ import annotations
 
+import re
 import sys
 import tomllib
 from dataclasses import dataclass
@@ -49,6 +50,42 @@ class WatchItem:
     def key(self) -> str:
         """Stable identity used to diff this run's observation against the last."""
         return f"{self.kind}:{self.repo}#{self.ref}" if self.repo else f"{self.kind}:{self.ref}"
+
+
+@dataclass(frozen=True)
+class RefBinding:
+    """One place in the repo that must name the same source revision as the manifest.
+
+    A version bump is not one edit. `sources/<tool>.manifest` moves, and so does
+    every CODE CONSTANT and committed artifact that re-states the same revision —
+    and nothing checked the second set. Measured 2026-08-15: the manifest, the
+    pyproject pin, the installed binary and `graphify_semantic_corpus` all read
+    v0.9.43 while `graphify_baseline._ACCEPTED_GRAPHIFY_REF` and
+    `sources/graphify.dispositions.json` still read v0.9.42 — and
+    `kb-currency-check` reported NO graphify manifest drift, correctly, because
+    manifest == pin. The split was real, two releases wide, and invisible to
+    every existing check. That is the class issue #225 names.
+
+    `field` says which manifest line this binding must equal — `ref` for a tag
+    (`v0.9.44`) or `commit` for the 40-hex SHA. Both are declared because they
+    are independent: `_check_manifest_commit` already exists precisely because a
+    manifest can pin a correct ref beside the previous release's commit.
+
+    `pattern` is a regex with EXACTLY ONE capture group holding the revision. A
+    pattern that matches nothing is DRIFT, never a pass: a binding whose anchor a
+    refactor renamed has stopped checking anything, which is the SKIP-over-a-real-
+    drift shape this engine refuses everywhere else.
+    """
+
+    path: str
+    pattern: str
+    field: str = "ref"
+    note: str = ""
+
+    @property
+    def label(self) -> str:
+        """How this binding names itself in a finding."""
+        return f"{self.path} ({self.field})"
 
 
 @dataclass(frozen=True)
@@ -102,6 +139,24 @@ class ToolSpec:
     # human reviews rather than assembled at runtime where a refactor could drop it.
     skill_dir: str = ""
     skill_install: tuple[str, ...] = ()
+    # The file the skill installer stamps with the version it installed. Declared
+    # separately from `skill_dir` because the filename is the tool's, not the
+    # engine's (`.graphify_version`), and a config-not-code engine must not learn
+    # a tool name to find it.
+    #
+    # This is the REPORTER half of `skill_dir` (#315). `currency.apply` refreshes
+    # the skill on a bump, but nothing ever ASKED whether the stamp agreed with
+    # the pin — so a bump applied by any other route (a hand edit, a
+    # `kb-skill-refresh` that was never run) left a skill documenting a version we
+    # had stopped running, silently. It sat at 0.9.23 against a 0.9.32 pin for
+    # eight releases once, and on 2026-08-15 at 0.9.42 against 0.9.43.
+    #
+    # `.graphify_version` is gitignored, so the drift leaves NO tracked trace and
+    # a reviewer reading the diff cannot see it. That is exactly why it needs a
+    # check rather than a convention.
+    skill_stamp: str = ""
+    # Every other place in this repo that re-states the manifest's revision.
+    ref_bindings: tuple[RefBinding, ...] = ()
     # `artifact` is the PRIMARY build output — the one whose `built_at_commit` is
     # read for identity (graphify writes it only into graph.json). `artifacts` is
     # the wider set of GENERATED outputs (wiki/graphml/svg/GRAPH_REPORT.md) that
@@ -239,6 +294,63 @@ def _watch_items(raw: object) -> tuple[WatchItem, ...]:
     return tuple(items)
 
 
+_REF_BINDING_FIELDS = frozenset({"ref", "commit"})
+
+
+def _ref_binding(name: str, entry: object) -> RefBinding:
+    """Validate ONE `[[tool.<name>.ref_binding]]` row, or raise saying why.
+
+    Split out of `_ref_bindings` so the loop and the row-validation are separate
+    things to read: the caller says "every row, in order, all-or-nothing", and
+    this says what makes a row valid. Extracted after a code-health check
+    measured the combined function at cyclomatic complexity 10 — at this repo's
+    `max-complexity` limit, so ruff passed it and the shape was still worth
+    fixing on its own terms.
+
+    Every failure raises rather than skipping the row. A silently dropped binding
+    is a check that reports nothing while looking declared — the failure mode this
+    whole engine is built against — and unlike `watch`, a binding costs nothing to
+    state correctly.
+    """
+    where = f"{CONFIG_NAME}: [[tool.{name}.ref_binding]]"
+    if not isinstance(entry, dict):
+        raise TypeError(f"{where} must be a table")
+    fields = {str(k): v for k, v in entry.items()}
+    path = str(fields.get("path", ""))
+    pattern = str(fields.get("pattern", ""))
+    field = str(fields.get("field", "ref"))
+    if not path or not pattern:
+        raise ValueError(f"{where} needs both 'path' and 'pattern'")
+    if field not in _REF_BINDING_FIELDS:
+        raise ValueError(
+            f"{where} field must be one of {sorted(_REF_BINDING_FIELDS)}, got {field!r}"
+        )
+    _assert_one_capture_group(where, path, pattern)
+    return RefBinding(path=path, pattern=pattern, field=field, note=str(fields.get("note", "")))
+
+
+def _assert_one_capture_group(where: str, path: str, pattern: str) -> None:
+    """A binding's pattern must compile AND capture exactly the revision."""
+    try:
+        compiled = re.compile(pattern)
+    except re.error as exc:
+        raise ValueError(f"{where} pattern for {path} is not a valid regex: {exc}") from exc
+    if compiled.groups != 1:
+        raise ValueError(
+            f"{where} pattern for {path} must have exactly one capture group "
+            f"holding the revision, got {compiled.groups}"
+        )
+
+
+def _ref_bindings(name: str, raw: object) -> tuple[RefBinding, ...]:
+    """Parse every `[[tool.<name>.ref_binding]]` row, in order, all-or-nothing."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise TypeError(f"{CONFIG_NAME}: [tool.{name}] ref_binding must be a list of tables")
+    return tuple(_ref_binding(name, entry) for entry in raw)
+
+
 def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
     # One of the two must be present, and they are alternatives: `mise_key` says
     # "mise installs this, read the pin from mise.toml"; `expected` says "this
@@ -290,6 +402,8 @@ def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
         extra_probes=_tuple("extra_probes"),
         skill_dir=_str("skill_dir"),
         skill_install=_tuple("skill_install"),
+        skill_stamp=_str("skill_stamp"),
+        ref_bindings=_ref_bindings(name, table.get("ref_binding")),
         manifest=_str("manifest"),
         tag_prefix=_str("tag_prefix"),
         artifact=_str("artifact"),

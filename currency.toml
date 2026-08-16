@@ -54,6 +54,16 @@ skill_dir = ".claude/skills/graphify"
 # engine was written for (`sync.py`'s module docstring), reached through the one
 # path `graphify_env.graphify_exe` cannot cover: an argv in a config file.
 skill_install = ["uv", "run", "graphify", "install", "--project"]
+# The REPORTER half of `skill_dir` (#315). `currency.apply` refreshes the skill on
+# the bumps it applies; nothing ever asked whether the stamp AGREED with the pin,
+# so a bump applied by any other route left the skill behind in silence. Measured
+# both times it happened: 0.9.23 against a 0.9.32 pin (eight releases), and 0.9.42
+# against a 0.9.43 pin on 2026-08-15.
+#
+# This file is gitignored (`.gitignore:72`), so the drift leaves NO tracked trace
+# and no reviewer reading a diff can see it. That is the argument for a check
+# rather than a convention.
+skill_stamp = ".claude/skills/graphify/.graphify_version"
 # graphify stamps no version into its own output (`export.to_json()` writes only
 # `built_at_commit`), so the build task writes this sidecar instead — otherwise
 # "which version built this graph?" is unanswerable from the artifact.
@@ -116,6 +126,74 @@ stamp = "graphify-out/.currency-stamp.json"
 # NOT-APPLICABLE rather than fail: "cannot check here" and "checked and wrong"
 # are different answers.
 os = ["macos"]
+
+# ---- Every OTHER place in this repo that names the same revision -------------
+#
+# The manifest check asks "does the corpus describe the code we run". These ask
+# the question one layer in: **does the repo agree with itself about which
+# revision that is.** Different questions, and on 2026-08-15 the first was green
+# while the second was two releases wrong — pyproject, the manifest, the clone
+# and `graphify_semantic_corpus` all read v0.9.43 while `graphify_baseline` and
+# the committed disposition catalog still read v0.9.42. `kb-currency-check`
+# reported NO graphify manifest drift, entirely correctly, because manifest ==
+# pin. The split was simply outside everything that looked. That is issue #225's
+# class, and this table is the fix for the class rather than for the instance.
+#
+# A pattern that matches NOTHING is DRIFT, never a pass — a renamed anchor turns
+# a declared check into a silent no-op, which is the shape this engine refuses.
+
+[[tool.graphify.ref_binding]]
+path = "python/src/kb_setup/graphify_baseline.py"
+pattern = '_ACCEPTED_GRAPHIFY_REF = "([^"]+)"'
+field = "ref"
+note = "the deterministic AST baseline's accepted source tag"
+
+[[tool.graphify.ref_binding]]
+path = "python/src/kb_setup/graphify_baseline.py"
+pattern = '\n    source_commit="([0-9a-f]{40})",'
+field = "commit"
+note = """`_ACCEPTED_AUTHORITY.source_commit`. Bound SEPARATELY from the ref
+because the two are independent: `_check_manifest_commit` exists precisely
+because a manifest can pin a correct tag beside the previous release's commit,
+and the same split is available to a code constant. Anchored on the leading
+newline + indent so it matches the authority literal rather than the identically
+named struct FIELD in the `BaselineAuthority` definition above it."""
+
+[[tool.graphify.ref_binding]]
+path = "python/src/kb_setup/graphify_semantic_corpus.py"
+pattern = '_ACCEPTED_GRAPHIFY_REF = "([^"]+)"'
+field = "ref"
+note = "the semantic corpus's accepted source tag"
+
+[[tool.graphify.ref_binding]]
+path = "python/src/kb_setup/graphify_semantic_corpus.py"
+pattern = '_ACCEPTED_GRAPHIFY_COMMIT = "([0-9a-f]{40})"'
+field = "commit"
+
+[[tool.graphify.ref_binding]]
+path = "python/src/kb_setup/graphify_semantic_slice.py"
+pattern = '\nSOURCE_REF = "([^"]+)"'
+field = "ref"
+note = """Found only because the 0.9.44 resync tripped over it. The slice pins the
+SNAPSHOT its committed evidence came from, and it lagged two releases behind the
+manifest with nothing reporting it — a fifth copy of the same revision in a fifth
+place. Bound at module scope (leading newline) so it cannot match a local."""
+
+[[tool.graphify.ref_binding]]
+path = "python/src/kb_setup/graphify_semantic_slice.py"
+pattern = '\nSOURCE_COMMIT = "([0-9a-f]{40})"'
+field = "commit"
+
+[[tool.graphify.ref_binding]]
+path = "sources/graphify.dispositions.json"
+pattern = '"source_ref": "([^"]+)"'
+field = "ref"
+note = "the committed disposition catalog — an ARTIFACT, not code, and it drifted too"
+
+[[tool.graphify.ref_binding]]
+path = "sources/graphify.dispositions.json"
+pattern = '"source_commit": "([0-9a-f]{40})"'
+field = "commit"
 
 # ---- Step 4: what we are tracking upstream, and what we owe ourselves --------
 

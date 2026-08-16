@@ -20,8 +20,8 @@ from kb_setup import cli, graphify_sdk, graphify_semantic_slice
 _MODEL = "claude-haiku-4-5-20251001"
 
 
-def test_graphify_0943_semantic_sdk_contract_is_current() -> None:
-    assert graphify_sdk.semantic_contract_errors("0.9.43") == ()
+def test_graphify_0944_semantic_sdk_contract_is_current() -> None:
+    assert graphify_sdk.semantic_contract_errors("0.9.44") == ()
 
 
 def test_default_preflight_checks_the_current_graphify_runtime(
@@ -41,14 +41,26 @@ def test_default_preflight_checks_the_current_graphify_runtime(
     with pytest.raises(RuntimeError, match="version tripwire"):
         graphify_semantic_slice.preflight(tmp_path, environment={"PATH": "/usr/bin"})
 
-    assert checked == ["0.9.43"]
+    assert checked == ["0.9.44"]
 
 
-def test_historical_and_current_runtime_receipts_use_separate_authorities(
+def test_enforcing_authority_never_widens_the_accepted_runtime_set(
     tmp_path: Path,
 ) -> None:
-    from kb_setup import graphify_baseline
+    """The two-tier runtime check, stated as an invariant rather than a snapshot.
 
+    This test used to assert that the historical authority and the current
+    runtime were DIFFERENT versions, and it passed only while the committed
+    evidence lagged the pin. The v0.9.44 round re-ran the slice, so authority and
+    current are momentarily the SAME value and the old assertion could not hold —
+    not because the mechanism broke, but because it was asserting a transient
+    condition of the repo instead of a property of the code.
+
+    What is durable: `enforce_authority=True` accepts a SUBSET of what `False`
+    accepts, the committed receipt is accepted either way, and a runtime that is
+    neither authority nor current is rejected by both. That stays true whether or
+    not the two constants currently agree.
+    """
     candidate = tmp_path / "candidate"
     _copy_real_candidate(candidate)
     receipt = msgspec.json.decode(
@@ -56,18 +68,22 @@ def test_historical_and_current_runtime_receipts_use_separate_authorities(
         type=graphify_semantic_slice.SemanticReceipt,
         strict=True,
     )
-    historical = receipt.runtime
-    current = msgspec.structs.replace(
-        historical,
-        graphify_runtime=graphify_baseline.runtime_identity(Path(__file__).parent.parent),
-        graphify_version="0.9.43",
+    committed = receipt.runtime
+    foreign = msgspec.structs.replace(
+        committed,
+        graphify_runtime=msgspec.structs.replace(
+            committed.graphify_runtime, version="0.0.0-not-a-release"
+        ),
     )
 
-    assert graphify_semantic_slice._runtime_reasons(historical, enforce_authority=True) == []
-    assert graphify_semantic_slice._runtime_reasons(current, enforce_authority=False) == []
-    assert "receipt-runtime-mismatch" in graphify_semantic_slice._runtime_reasons(
-        current, enforce_authority=True
-    )
+    assert graphify_semantic_slice._runtime_reasons(committed, enforce_authority=True) == []
+    assert graphify_semantic_slice._runtime_reasons(committed, enforce_authority=False) == []
+    # Rejected in BOTH modes — the control arm. Without it, "enforcing rejects it"
+    # would be satisfied by a check that rejects everything.
+    for enforce in (True, False):
+        assert "receipt-runtime-mismatch" in graphify_semantic_slice._runtime_reasons(
+            foreign, enforce_authority=enforce
+        )
 
 
 def test_adapter_keeps_historical_slice_argv_and_caps_only_301_boundary() -> None:
@@ -125,7 +141,13 @@ def test_real_run_preflights_before_source_materialization(
 ) -> None:
     calls: list[str] = []
 
-    def stop_at_preflight(_repo_root: Path) -> graphify_semantic_slice.ClaudePreflight:
+    # `**_kwargs` because `build_candidate` now calls `preflight(repo_root,
+    # require_max_turns=True)`. A positional-only stub turns the signature change
+    # into a TypeError that masks what this test is actually about — and it was
+    # this test that caught the change, which is the stub earning its keep.
+    def stop_at_preflight(
+        _repo_root: Path, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
         calls.append("preflight")
         raise RuntimeError("preflight tripwire")
 

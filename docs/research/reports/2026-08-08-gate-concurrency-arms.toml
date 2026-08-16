@@ -30,8 +30,8 @@ suites = ["tests/test_gates.py"]
 id = "control"
 control = true
 file = "python/src/kb_setup/gates.py"
-old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})'
-new = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})  # inert control edit'
+old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit"})'
+new = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit"})  # inert control edit'
 
 # --- the safe set has to actually be consulted -------------------------------
 
@@ -43,7 +43,7 @@ new = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})  # i
 id = "safe-set-emptied"
 test = "test_concurrency_safe_gates_really_do_run_at_the_same_time"
 file = "python/src/kb_setup/gates.py"
-old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})'
+old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit"})'
 new = "CONCURRENT_SAFE = frozenset()"
 
 # The fail-CLOSED default, and the most valuable arm here. Treating every gate as
@@ -195,3 +195,22 @@ test = "test_only_a_shared_terminal_gets_mises_prefix"
 file = "python/src/kb_setup/gates.py"
 old = '    argv = ["mise", "run", "-o", "prefix", task] if prefix_output else ["mise", "run", task]'
 new = '    argv = ["mise", "run", "-o", "prefix", task]'
+
+# --- eval must STAY out of the safe set (#321) --------------------------------
+
+# The realistic regression: someone reads `CONCURRENT_SAFE` as a speed knob and
+# puts `eval` back, exactly as it was until 2026-08-16. Nothing about the
+# RESULTS changes — every gate still passes — so only a test that asserts the
+# BATCHING can see it. That is the whole reason the shape is asserted separately
+# from the outcomes.
+#
+# This arm cannot measure the thing that actually justifies the removal: that
+# `graphify query` misses its 60s bound when starved. That came from three
+# observed `kb-gates` runs, not from a test, and no green sweep here
+# re-establishes it (`mutation-arms-cannot-measure-the-premise`).
+[[arm]]
+id = "eval-put-back-into-the-safe-set"
+test = "test_the_shipped_gates_batch_exactly_as_concurrent_safe_declares"
+file = "python/src/kb_setup/gates.py"
+old = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit"})'
+new = 'CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})'

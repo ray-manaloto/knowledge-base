@@ -1,0 +1,64 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard search",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR:-.}/python\" kb-setup hookguard",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard read",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-currency-check",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" brain-transcript-audit -- --output .agent/brain-audit.md",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "mise run -C \"${CLAUDE_PROJECT_DIR:-.}\" kb-session-reflect -- --quiet",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -54,10 +54,16 @@ class DispositionCatalog(msgspec.Struct, frozen=True, forbid_unknown_fields=True
     """Exact omission policy bound to one immutable Graphify tree."""
 
     source: str
+    # REQUIRED, and it used to default to the literal "v0.9.42". A catalog
+    # constructed without a ref then silently CLAIMED that release, and
+    # `load_disposition_catalog`'s ref check would have believed it. Defaulting it
+    # to `_ACCEPTED_GRAPHIFY_REF` instead would be worse: the check becomes
+    # unfalsifiable, since a constructed catalog would always agree with whatever
+    # the code accepts. The only honest option is to make the caller say it.
+    source_ref: str
     source_commit: str
     source_tree: str
     entries: tuple[SourceDisposition, ...]
-    source_ref: str = "v0.9.42"
     schema_version: int = 1
 
 
@@ -217,10 +223,17 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.43"
-_ACCEPTED_GRAPHIFY_REF = "v0.9.42"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.44"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.44"
 _ACCEPTED_GRAPHIFY_EXECUTABLE = ".venv/bin/graphify"
 _ACCEPTED_GRAPHIFY_URL = "https://github.com/Graphify-Labs/graphify"
+# Deliberately NOT renamed at the 0.9.44 bump. The version in this string names
+# the release the defect was FIRST observed in, which is a stable identity; the
+# defect itself is still live — the 0.9.44 build receipt records this correction
+# applying with `rewritten_edges: 1`, so it was verified rather than assumed.
+# Re-versioning an identity every release would churn the receipt and lose the
+# one fact the name carries. The RANGE lives in the catalog's human-readable
+# `reason`, which is where a condition belongs.
 _LPK_CORRECTION_NAME = "graphify-0.9.42-lpk-file-unit-identity"
 _LPK_CORRECTION_PATH = "tests/fixtures/sample.lpk"
 _LPK_CORRECTION_SHA256 = "d35ab7cfc6b30910020239b7389a4e732b5545269fd4b1cd43d7459aa2c40e1f"
@@ -231,18 +244,38 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "a28b0b801ec93c406c7fc7985300663280dd3ab68f6f527a7692d4fcad4b400b",
-    "sdist_sha256": "7fdefd90a1c3d2496552a22c9bff27fece3cee1e1556cb51b6825b09e97816a3",
+    "wheel_sha256": "a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
+    "sdist_sha256": "09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="7fe58b0b0f3873be9a21c30106b8b8527c353aa6",
-    source_tree="15ca81a8dbd3ded7083c4b573197140e62e95fcc",
-    catalog_sha256="29fcee2712819af21150c8d2ef3c094cc4ef4c5092469dcf3e0ef105d3f40bf6",
-    source_manifest_sha256="da56d50eadb82b0889d8e9ad4b1260c98d4d8e6ab413e8abed5ddfcac0bdee68",
-    detected_count=410,
-    extracted_count=402,
+    source_commit="4fca621532a23f84f69c31e397b75f8105cb5390",
+    source_tree="faabe0fab532b763a76031acd61038a85e3bba00",
+    catalog_sha256="e908ab2ec469427d09704309ab06c41695aee5ef938364ee6df068086b255b60",
+    source_manifest_sha256="f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75",
+    # 410 -> 417 detected, 402 -> 409 extracted across v0.9.42 -> v0.9.44. Two of
+    # the seven are `docs/superpowers/*.md`, which graphify #2759 stopped dropping
+    # — files this corpus was silently losing and now has. The rest is ordinary
+    # upstream growth over two releases.
+    detected_count=417,
+    extracted_count=409,
 )
+# The ignored-path control's fixture: an UNTRACKED file under a directory the
+# pinned source's own `.gitignore` matches. Untracked is load-bearing.
+#
+# Until 0.9.44 this control force-ADDED the file (`git add -f`), making it
+# TRACKED, and asserted a `disposition-evidence-mismatch` — which came from the
+# tree digest moving, not from anything being ignored. graphify #2759 then
+# stopped treating a tracked ignored path as ignored at all (matching git, which
+# never un-tracks such a file), so that arm was one release away from measuring
+# nothing while still reporting green.
+#
+# Armed at 0.9.44 across three repos before this was rewritten: tracked+ignored
+# emits NO `ignored` key and lands in `files.document`; untracked+ignored emits
+# `ignored`; and a control repo with no `.gitignore` emits neither — so the probe
+# discriminates and the kind is measurably still live. The earlier plan to retire
+# `DispositionKind.IGNORED_TREE` outright was refuted by exactly that run.
+_CONTROL_IGNORED_PATH = "docs/superpowers/issue-299-control.md"
 _EXPECTED_CONTROL_RESULTS = {
     "clean": ("complete", ()),
     "unknown-file": ("failed", ("unclassified-files", "unknown.issue299")),
@@ -250,10 +283,7 @@ _EXPECTED_CONTROL_RESULTS = {
         "failed",
         ("disposition-evidence-mismatch:.dockerignore",),
     ),
-    "new-ignored-tracked-path": (
-        "failed",
-        ("disposition-evidence-mismatch:docs/superpowers",),
-    ),
+    "untracked-ignored-path": ("failed", ("ignored-paths",)),
     "post-admission-snapshot-drift": ("failed", ("source-snapshot-drift",)),
 }
 _REQUIRED_MEMBERS = frozenset(
@@ -1427,6 +1457,40 @@ def _failed_control(name: str, reasons: tuple[str, ...]) -> ControlOutcome:
     return ControlOutcome(name=name, expected="failed", observed="failed", reasons=reasons)
 
 
+def _assert_control_path_is_gitignored(clone: Path) -> None:
+    """Refuse to run the ignored-path control unless its fixture is really ignored.
+
+    The whole arm rests on `_CONTROL_IGNORED_PATH` matching a pattern in the
+    PINNED source's own `.gitignore`. That is an upstream fact, and upstream can
+    change it in any release — at which point the file would simply be ordinary
+    untracked source, detection would classify it as a document, and the control
+    would report `failed` with no `ignored-paths` reason. The receipt would then
+    say the arm ran while it measured nothing.
+
+    `git check-ignore` answers the question directly, so ask it rather than
+    assume it. Exit 0 means ignored, 1 means not ignored, anything else means the
+    probe itself failed — and all three are distinguished here, because "could
+    not ask" must never read as "asked and it was fine".
+    """
+    result = subprocess.run(
+        ["git", "-C", str(clone), "check-ignore", "--quiet", "--", _CONTROL_IGNORED_PATH],
+        check=False,
+        capture_output=True,
+        timeout=60,
+    )
+    if result.returncode == 0:
+        return
+    if result.returncode == 1:
+        raise ValueError(
+            f"ignored-path control fixture {_CONTROL_IGNORED_PATH} is no longer matched by the "
+            f"pinned source's .gitignore — the control would measure nothing; pick a new fixture"
+        )
+    raise ValueError(
+        f"could not determine whether {_CONTROL_IGNORED_PATH} is gitignored "
+        f"(git check-ignore exited {result.returncode}): {result.stderr.decode(errors='replace')}"
+    )
+
+
 def certify_controls(source: Path, catalog: DispositionCatalog) -> ControlsReceipt:
     """Run clean and opposite-direction controls against real Graphify source bytes."""
     from kb_setup import graphify_sdk
@@ -1480,19 +1544,19 @@ def certify_controls(source: Path, catalog: DispositionCatalog) -> ControlsRecei
         cases.append(_failed_control("changed-reviewed-file", changed_receipt.reasons))
 
         ignored_clone = _control_clone(source, controls_root / "ignored", catalog.source_commit)
-        ignored_entry = next(
-            entry for entry in catalog.entries if entry.kind is DispositionKind.IGNORED_TREE
+        _assert_control_path_is_gitignored(ignored_clone)
+        new_ignored = ignored_clone / _CONTROL_IGNORED_PATH
+        new_ignored.parent.mkdir(parents=True, exist_ok=True)
+        new_ignored.write_text("untracked ignored control\n", encoding="utf-8")
+        _, ignored_receipt = graphify_sdk.observe_detect(
+            ignored_clone,
+            source_name="graphify",
+            coverage_policy=SourceCoveragePolicy(
+                optional_unclassified_paths=unclassified,
+                optional_ignored_paths=ignored,
+            ),
         )
-        new_ignored = ignored_clone / ignored_entry.path / "issue-299-control.md"
-        new_ignored.write_text("tracked ignored control\n", encoding="utf-8")
-        subprocess.run(
-            ["git", "-C", str(ignored_clone), "add", "-f", "--", str(new_ignored)],
-            check=True,
-            capture_output=True,
-            timeout=60,
-        )
-        ignored_receipt = verify_catalog_bytes(ignored_clone, catalog)
-        cases.append(_failed_control("new-ignored-tracked-path", ignored_receipt.reasons))
+        cases.append(_failed_control("untracked-ignored-path", ignored_receipt.reasons))
 
         drift = _control_clone(source, controls_root / "drift", catalog.source_commit)
         drift_manifest = source_manifest(
@@ -1514,10 +1578,7 @@ def certify_controls(source: Path, catalog: DispositionCatalog) -> ControlsRecei
             "failed",
             (f"disposition-evidence-mismatch:{changed_entry.path}",),
         ),
-        "new-ignored-tracked-path": (
-            "failed",
-            (f"disposition-evidence-mismatch:{ignored_entry.path}",),
-        ),
+        "untracked-ignored-path": ("failed", ("ignored-paths",)),
         "post-admission-snapshot-drift": ("failed", ("source-snapshot-drift",)),
     }
     complete = all((case.observed, case.reasons) == expected.get(case.name) for case in cases)

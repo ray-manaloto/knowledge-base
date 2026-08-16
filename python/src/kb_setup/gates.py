@@ -142,7 +142,29 @@ GATE_TASKS = ("lint", "test", "brain-audit", "eval")
 #: one of them — a `mise run fmt` racing a `kb-build` wedged for 3h06m at 100%
 #: CPU (PR #244) — which is why the constraint is "sequential where a step writes
 #: files" rather than a general preference for caution.
-CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "eval"})
+#:
+#: `eval` WAS here and was removed 2026-08-16 (#321), after failing
+#: intermittently across three `kb-gates` runs and passing every time it ran
+#: alone. The captured case:
+#:
+#:     FAIL  tier1.graph-answers — graphify query rc=-1: timed out after 60s
+#:
+#: That case shells out to `graphify query` against the ~771 MB
+#: `graphify-out/graph.json` under a 60s bound. Alone it returns in good time;
+#: racing `test` under 12 xdist workers it is starved past the bound.
+#:
+#: THE MEASUREMENT ABOVE COULD NOT HAVE CAUGHT THIS, and that is the lesson worth
+#: keeping. It asked "what does each gate WRITE", answered it correctly, and
+#: cleared all four on disjoint caches. Contention for CPU and IO is not a write
+#: conflict, so a `find -newer` sweep is structurally blind to it. Membership
+#: needs BOTH questions: what does it write, and does it carry a wall-clock bound
+#: it can miss under load. `eval` is the only one of the four with an internal
+#: timeout, which is why it is the only one that surfaced.
+#:
+#: Raising the 60s bound was rejected: it trades a visible intermittent failure
+#: for a slower one, and the number would need re-guessing every time the graph
+#: grows. Running the gate alone needs no number.
+CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit"})
 
 
 @dataclass(frozen=True)
