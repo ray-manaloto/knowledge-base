@@ -70,8 +70,14 @@ class RunSummary(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     run_namespace_sha256: str
     chunk_total: int
     completed: int
-    skipped: int
+    # Staged by an earlier run and served from graphify's cache this time. Kept
+    # apart from `completed` because "58 completed" on a resumed run would claim
+    # this pass did work it did not do.
+    resumed: int
+    # Reached and lost: either the provider call raised, or the chunk staged with
+    # refusal reasons. Distinct from `skipped`, which is never-attempted.
     failed: int
+    skipped: int
     node_count: int
     edge_count: int
     hyperedge_count: int
@@ -365,9 +371,28 @@ def _rotate_evidence(metadata_path: Path, boundary_path: Path) -> bytes:
         metadata_raw = metadata_path.read_bytes()
     except OSError as exc:
         raise ValueError("semantic adapter metadata is unavailable") from exc
+    finally:
+        # In a `finally`, so a chunk that fails to produce metadata still frees
+        # the marker. The marker is created `O_EXCL`, so leaving it behind turns
+        # ONE failed chunk into a run where every remaining chunk dies on
+        # `provider boundary marker already exists` — a single recoverable error
+        # cascading into a whole-corpus failure that names the wrong cause.
+        metadata_path.unlink(missing_ok=True)
+        boundary_path.unlink(missing_ok=True)
+    return metadata_raw
+
+
+def clear_stale_evidence(metadata_path: Path, boundary_path: Path) -> None:
+    """Remove evidence left by a previous, abandoned run before the first call.
+
+    `_rotate_evidence` frees these paths between chunks within a run, but a run
+    killed mid-call (a timeout, a SIGKILL) never reaches it. Both paths live in a
+    per-run temporary directory today, so this is belt-and-braces rather than
+    load-bearing — it is here because the failure it prevents is silent and the
+    cost of preventing it is two unlinks.
+    """
     metadata_path.unlink(missing_ok=True)
     boundary_path.unlink(missing_ok=True)
-    return metadata_raw
 
 
 def _stage_completed_chunk(
@@ -377,7 +402,11 @@ def _stage_completed_chunk(
 ) -> ChunkOutcome:
     """Turn one completed provider call into staged, validated chunk evidence."""
     config = context.config
-    fragment = graphify_semantic_slice.semantic_fragment(raw)
+    # `normalize_fragment`, NOT `semantic_fragment`. The latter asserts the scope
+    # and raises, which for the corpus means one under-covered chunk aborts the
+    # whole extraction; `stage_chunk` below applies the same check per chunk and
+    # records it as a refusal reason, so the run survives to stage the other 57.
+    fragment = graphify_semantic_slice.normalize_fragment(raw)
     # Bytes, unnormalized: `stage_chunk` digests exactly what the adapter wrote.
     # Decoding and re-encoding here would digest this module's serializer instead
     # of the provider's own evidence, and the two agree only by luck.
@@ -496,6 +525,7 @@ def execute(
         repo_root, require_max_turns=True, profile=_PROFILE
     )
     outcomes: list[ChunkOutcome] = []
+    resumed: list[int] = []
     # Persistent, and keyed on the CACHE namespace rather than the run namespace:
     # the cache's whole value is surviving between runs, and a per-run directory
     # would make every resumed run a cold one while still looking warm.
@@ -521,6 +551,15 @@ def execute(
         )
         overlay = _adapter_overlay(context, Path(bin_dir))
 
+        clear_stale_evidence(context.metadata_path, context.boundary_path)
+        already_staged = {
+            chunk.ordinal
+            for chunk in ledger.chunks
+            if graphify_semantic_corpus.chunk_stage_dir(
+                cache_root, run_namespace, chunk.ordinal
+            ).exists()
+        }
+
         def on_chunk_done(index: int, total: int, raw: object) -> None:
             # The ledger's ordering IS graphify's, because the planner derived it
             # from the same packing function over the same inputs. Checked rather
@@ -529,9 +568,19 @@ def execute(
             # digest check would then confirm as internally consistent.
             if total != len(ledger.chunks) or not 0 <= index < len(ledger.chunks):
                 raise ValueError("provider chunk callback disagrees with the planned ledger")
-            outcomes.append(_stage_completed_chunk(raw, ledger.chunks[index], context))
+            chunk = ledger.chunks[index]
+            if chunk.ordinal in already_staged:
+                # Staged by an earlier run. `stage_chunk` REFUSES an existing
+                # destination — correctly, since silently overwriting published
+                # evidence is worse — so without this a resumed run aborts on the
+                # first chunk it had already completed. graphify serves the
+                # provider result from its incremental cache here, so nothing is
+                # re-paid; what is skipped is only the re-publication.
+                resumed.append(chunk.ordinal)
+                return
+            outcomes.append(_stage_completed_chunk(raw, chunk, context))
 
-        _extract_corpus(
+        result = _extract_corpus(
             admitted_paths(inventory, source_root),
             context,
             semantic_cache=semantic_cache,
@@ -540,17 +589,27 @@ def execute(
         )
 
     completed = tuple(item for item in outcomes if item.status == "complete")
-    failed = tuple(item for item in outcomes if item.status != "complete")
+    staged_failures = tuple(item for item in outcomes if item.status != "complete")
+    # graphify counts a chunk whose provider call raised; it never reaches the
+    # callback, so it leaves no outcome. Reading that count is what separates
+    # "the provider failed on it" from "it was never attempted" — the previous
+    # version folded both into `skipped`, which reported a paid, failed call as
+    # though the run had simply not got to it.
+    provider_failures = graphify_semantic_slice.result_integer(result, "failed_chunks")
+    provider_failures = max(provider_failures, 0)
+    accounted = len(outcomes) + len(resumed) + provider_failures
     return RunSummary(
         schema_id="graphify-semantic-corpus-run/v0",
         run_namespace_sha256=run_namespace,
         chunk_total=len(ledger.chunks),
         completed=len(completed),
-        # A chunk the ledger names and the provider never reported is neither
-        # completed nor failed — it was never attempted. Counting it as either
-        # would hide the one outcome that most needs to be visible.
-        skipped=len(ledger.chunks) - len(outcomes),
-        failed=len(failed),
+        resumed=len(resumed),
+        failed=len(staged_failures) + provider_failures,
+        # Only what the run genuinely never reached. A negative would mean more
+        # outcomes than planned chunks, which the callback's ledger check already
+        # refuses — clamping keeps a nonsense number out of a summary a human
+        # reads to decide whether the corpus is complete.
+        skipped=max(len(ledger.chunks) - accounted, 0),
         node_count=sum(item.node_count for item in completed),
         edge_count=sum(item.edge_count for item in completed),
         hyperedge_count=sum(item.hyperedge_count for item in completed),

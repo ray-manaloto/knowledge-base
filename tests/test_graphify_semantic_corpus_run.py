@@ -29,6 +29,14 @@ def _inventory() -> graphify_semantic_corpus.SourceInventory:
     )
 
 
+def _ledger() -> graphify_semantic_corpus.ChunkLedger:
+    return msgspec.json.decode(
+        (_PLAN / "chunk-ledger.json").read_bytes(),
+        type=graphify_semantic_corpus.ChunkLedger,
+        strict=True,
+    )
+
+
 def _config() -> graphify_semantic_corpus.CorpusExecutionConfig:
     return msgspec.json.decode(
         (_PLAN / "execution-config.json").read_bytes(),
@@ -80,6 +88,7 @@ def test_recorded_schema_returns_empty_on_a_wrong_length_argv() -> None:
     assert graphify_semantic_slice.recorded_schema(good[:-2], profile) == ""
 
 
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
 def test_enabling_the_cache_omits_the_variable_rather_than_setting_zero() -> None:
     """`"0"` is truthy to graphify, so a warm cache means an ABSENT name."""
     config = _config()
@@ -89,6 +98,127 @@ def test_enabling_the_cache_omits_the_variable_rather_than_setting_zero() -> Non
     assert graphify_semantic_corpus_run.incremental_cache_env(cold) == {
         "GRAPHIFY_NO_INCREMENTAL_CACHE": "1"
     }
+
+
+def _multi_file_result() -> dict[str, object]:
+    """A provider result citing two files — what every real corpus chunk returns."""
+    return {
+        "nodes": [
+            {"id": "n1", "source_file": "README.md", "_origin": "semantic"},
+            {"id": "n2", "source_file": "docs/how-it-works.md", "_origin": "semantic"},
+        ],
+        "edges": [{"source": "n1", "target": "n2", "source_file": "README.md"}],
+        "hyperedges": [],
+    }
+
+
+def test_corpus_reduction_does_not_scope_fragments_to_the_slices_one_file() -> None:
+    """The reduction the corpus uses must accept a multi-file chunk.
+
+    This is the arm for the cold lane's P1. `semantic_fragment` asserted the
+    fragment was scoped to `SOURCE_PATH` — the slice's single document — while
+    being exported for the corpus to share, so the first chunk of any real run
+    would have raised AFTER its provider call was paid for. Reverting to that
+    reduction makes the first assertion below fail, which is what makes this a
+    test of the fix rather than a description of it.
+    """
+    result = _multi_file_result()
+    fragment = graphify_semantic_slice.normalize_fragment(result)
+    nodes = fragment["nodes"]
+    assert isinstance(nodes, list)
+    assert [node["id"] for node in nodes] == ["n1", "n2"]
+
+    # And the slice's own behaviour is unchanged: scoped to one file, a fragment
+    # citing another is still a hard failure there.
+    with pytest.raises(ValueError, match="fragment failed"):
+        graphify_semantic_slice.semantic_fragment(result)
+
+
+def test_corpus_scope_failures_are_reasons_for_one_chunk_not_a_run_abort() -> None:
+    """An under-covered chunk must be refusable without killing the extraction.
+
+    `normalize_fragment` deliberately does not raise on scope, because the whole
+    corpus run happens inside ONE `extract_corpus_parallel` call: an exception in
+    the callback takes the other 57 chunks with it. The scope answer still exists
+    — as reasons, per chunk — which is what `stage_chunk` consumes.
+    """
+    fragment = graphify_semantic_slice.normalize_fragment(_multi_file_result())
+    covered = graphify_semantic_slice.fragment_scope_reasons(
+        fragment, source_paths=("README.md", "docs/how-it-works.md")
+    )
+    assert covered == ()
+    under_covered = graphify_semantic_slice.fragment_scope_reasons(
+        fragment, source_paths=("README.md",)
+    )
+    assert under_covered != (), "a fragment citing an unplanned file must be refused"
+
+
+def _run_context(tmp_path: Path) -> graphify_semantic_corpus_run._RunContext:
+    """Build a context good enough to reach the driver's reduction call."""
+    preflight = graphify_semantic_slice.ClaudePreflight(
+        executable="claude",
+        executable_sha256="0" * 64,
+        version="2.1.233",
+        help_sha256="0" * 64,
+        required_flags=(),
+        auth=graphify_semantic_slice.AuthIdentity(
+            logged_in=True,
+            auth_method="claude.ai",
+            api_provider="firstParty",
+            subscription_type="max",
+        ),
+        environment_names=(),
+        graphify_runtime=graphify_semantic_slice.accepted_graphify_runtime(),
+        graphify_version="0.9.44",
+        graphify_semantic_fingerprint_sha256="0" * 64,
+    )
+    return graphify_semantic_corpus_run._RunContext(
+        candidate=tmp_path / "plan",
+        cache_root=tmp_path / "cache",
+        source_root=tmp_path / "src",
+        inventory=_inventory(),
+        ledger=_ledger(),
+        config=_config(),
+        preflight_receipt=preflight,
+        run_namespace="a" * 64,
+        metadata_path=tmp_path / "adapter-metadata.json",
+        boundary_path=tmp_path / "provider-boundary-start.json",
+    )
+
+
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
+def test_driver_reduces_without_asserting_the_slices_scope(tmp_path: Path) -> None:
+    """THE arm for the P1 fix: it fails if the driver reverts to `semantic_fragment`.
+
+    The first attempt at arming this passed with the fix reverted, because the
+    other tests exercise the two reduction FUNCTIONS and never the driver's choice
+    between them. This one calls the driver and reads WHICH failure it reaches:
+
+    * with `normalize_fragment` (fixed) it gets past the reduction and dies on the
+      absent adapter metadata — "semantic adapter metadata is unavailable";
+    * with `semantic_fragment` (the defect) the multi-file fragment is rejected
+      first — "Graphify semantic fragment failed".
+
+    Two different messages from the same call, so the assertion discriminates
+    rather than merely passing.
+    """
+    context = _run_context(tmp_path)
+    chunk = context.ledger.chunks[0]
+    # `match=` IS the discrimination: with the fix reverted the call instead
+    # raises a fragment-failed error naming a source-scope mismatch, which does
+    # not match this pattern and fails the test.
+    with pytest.raises(ValueError, match="adapter metadata is unavailable"):
+        graphify_semantic_corpus_run._stage_completed_chunk(_multi_file_result(), chunk, context)
+
+
+def test_chunk_stage_dir_is_the_same_path_stage_chunk_refuses_to_overwrite() -> None:
+    """The resume check must ask about the directory staging actually uses."""
+    namespace = "a" * 64
+    root = Path("/cache")
+    assert graphify_semantic_corpus.chunk_stage_dir(
+        root, namespace, 7
+    ) == graphify_semantic_corpus._chunk_dir(root, namespace, 7)
+    assert graphify_semantic_corpus.chunk_stage_dir(root, namespace, 7).name == "0007"
 
 
 def test_temporary_environment_restores_an_absent_name_as_absent() -> None:

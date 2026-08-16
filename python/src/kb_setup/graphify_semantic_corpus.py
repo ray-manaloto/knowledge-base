@@ -289,6 +289,11 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     planner_sha256: str
     adapter_sha256: str
     semantic_slice_sha256: str
+    # The module that actually makes the calls. Bound here for the same reason as
+    # the three above, and it was the one missing: an authorization is a review of
+    # what a run WILL DO, and every other participant in that run was pinned while
+    # the driver could be rewritten under a still-valid authority.
+    runner_sha256: str
     prompt_contract_sha256: str
     structured_schema_sha256: str
     claude_version: str
@@ -610,6 +615,9 @@ def _effective_config(
         planner_sha256=_sha_file(Path(__file__)),
         adapter_sha256=_module_sha(graphify_semantic_adapter),
         semantic_slice_sha256=_module_sha(graphify_semantic_slice),
+        # Imported here rather than at module scope: the driver imports THIS
+        # module, so a top-level import would be circular.
+        runner_sha256=_sha_file(Path(__file__).with_name("graphify_semantic_corpus_run.py")),
         prompt_contract_sha256=prompt_contract_sha,
         structured_schema_sha256=graphify_semantic_slice.GRAPHIFY_SCHEMA_SHA256,
         claude_version=_CLAUDE_VERSION,
@@ -1595,6 +1603,13 @@ def _chunk_dir(cache_root: Path, namespace: str, ordinal: int) -> Path:
     if not _valid_sha(namespace):
         raise ValueError("run namespace is not a lowercase SHA-256")
     return cache_root / namespace / "chunks" / f"{ordinal:04d}"
+
+
+# Exported so the execution driver can ask "is this chunk already staged?" using
+# the SAME path `stage_chunk` will refuse to overwrite. Computing it separately
+# would be a second opinion about where evidence lives, and the two disagreeing
+# is a resumed run that either re-publishes or aborts.
+chunk_stage_dir = _chunk_dir
 
 
 def _provider_evidence_reasons(
@@ -2792,7 +2807,12 @@ def _execute_authorized(repo_root: Path, output: Path) -> int:
             repo_root=repo_root,
         )
     print(_encode(summary).decode().rstrip())
-    return 0 if summary.completed == summary.chunk_total else 1
+    # `completed + resumed`, not `completed`. On a resumed run the chunks staged
+    # by the earlier pass are not re-published, so gating on `completed` alone
+    # would report a fully-staged corpus as a failure and invite a re-run that
+    # could only produce the same answer.
+    staged = summary.completed + summary.resumed
+    return 0 if staged == summary.chunk_total and summary.failed == 0 else 1
 
 
 def corpus_main(repo_root: Path, args: list[str]) -> int:

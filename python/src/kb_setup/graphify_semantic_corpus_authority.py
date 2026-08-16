@@ -23,10 +23,25 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # These digests are of the plan's exact bytes, so ANY re-plan invalidates them
 # and `verify` reports `plan-authority-mismatch` rather than authorizing a plan
 # nobody read. That is the intended behaviour: re-authorize deliberately.
+# Re-recorded after `runner_sha256` was added to the execution config (cold-lane
+# finding: the authorization pinned the planner, adapter and slice but not the
+# module that actually makes the calls). The two digests that carry the REVIEWED
+# DECISIONS are byte-identical across every re-plan since — `advisories_sha256`
+# and `exclusions_sha256` below have never changed — so this re-records the same
+# judgement over a config that now pins strictly more. Only
+# `execution_config_sha256` and the manifest that contains it moved.
+#
+# The consequence is deliberate and worth knowing before it surprises someone:
+# editing the driver, the slice, the adapter or the planner now invalidates this
+# authorization, because their digests are inside the config it is a digest of.
+# `test_recorded_authority_authorizes_this_plan_and_only_this_plan` fails the
+# moment that happens, which is the intended behaviour rather than friction — an
+# authorization is a review of what a run WILL DO, and the code that will do it
+# changed. Re-plan and re-record, and say what moved.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"1706edf9f9f5c4e15a200911316045e7181005e09c4081cfb4f11ddc239e748f",'
-    b'"execution_config_sha256":"e39a03766bd6886a3f398aad9d7d602381182f46b750130417cd6493cab8761e",'
+    b'"execution_config_sha256":"ff40d8f82db2c3c35f279bbe460a62c38a763123c85d9d39efb9763673c3a892",'
     b'"exclusions_sha256":"72811bd83ceb77b5a15648fd07c401346ccbd34b16693b1446a0fc83af153175",'
-    b'"plan_manifest_sha256":"9f322401267dd1197ef73a5a8e421f907248ad5391485c260611091abbb57b2c",'
+    b'"plan_manifest_sha256":"2d70a9ed343e5f1ac7abc83d15dfda32ae7600cd8b05a6f31ce7ff8877bc3c91",'
     b'"schema_version":1}\n'
 )

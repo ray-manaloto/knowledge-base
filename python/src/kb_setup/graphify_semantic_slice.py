@@ -1324,7 +1324,19 @@ def admit_source(repo_root: Path, destination: Path) -> tuple[Path, object]:
     return _admit_source(repo_root, destination)
 
 
-def _semantic_fragment(result: object) -> dict[str, object]:
+def normalize_fragment(result: object) -> dict[str, object]:
+    """Reduce one raw provider result to a fragment, WITHOUT checking its scope.
+
+    Split out for the corpus driver, and the split is the substance of a cold-lane
+    finding. The scope assertion below was hardcoded to the slice's single
+    ``SOURCE_PATH``, so a corpus chunk citing any other file raised — after its
+    provider call was already paid for.
+
+    Scoping is not merely parameterised out, it is moved: the corpus's authority
+    for that question is ``stage_chunk``, which produces REASONS for one chunk.
+    Raising here instead would abort the entire extraction on a single chunk the
+    model under-covered, turning one refused chunk into a lost corpus.
+    """
     if not isinstance(result, dict):
         raise TypeError("Graphify semantic result is not an object")
     fragment: dict[str, object] = {}
@@ -1338,16 +1350,25 @@ def _semantic_fragment(result: object) -> dict[str, object]:
                 raise ValueError(f"Graphify semantic {field} origin drifted")
             exact.append(record)
         fragment[field] = exact
-    reasons = fragment_reasons(fragment, source_path=SOURCE_PATH)
+    return fragment
+
+
+def semantic_fragment(
+    result: object, *, source_paths: tuple[str, ...] = (SOURCE_PATH,)
+) -> dict[str, object]:
+    """Normalize one result and ASSERT it is scoped to ``source_paths``.
+
+    The slice's behaviour, unchanged: exactly one source, and anything outside it
+    is a hard failure of a run that was supposed to touch one document.
+    """
+    fragment = normalize_fragment(result)
+    reasons = fragment_scope_reasons(fragment, source_paths=source_paths)
     if reasons:
         raise ValueError("Graphify semantic fragment failed: " + ", ".join(reasons))
     return fragment
 
 
-# Exported for the corpus execution driver: one definition of "reduce a raw
-# provider result to the semantic fragment", shared by the slice and the corpus
-# so a second reduction cannot quietly disagree about what the model returned.
-semantic_fragment = _semantic_fragment
+_semantic_fragment = semantic_fragment
 
 
 def _fragment_counts(fragment: Mapping[str, object]) -> tuple[int, int, int]:
@@ -1463,9 +1484,18 @@ def _extract_real_semantic(
     return result, warning_text, tuple(observed_chunks)
 
 
-def _result_integer(result: Mapping[str, object], name: str) -> int:
+def result_integer(result: Mapping[str, object], name: str) -> int:
+    """Read one integer counter from a raw extraction result, or -1 if absent.
+
+    -1 rather than 0 on purpose, and public for the corpus driver: 0 is a real,
+    meaningful answer for `failed_chunks`, so a missing key and a clean run must
+    not reduce to the same number.
+    """
     value = result.get(name)
     return value if isinstance(value, int) and not isinstance(value, bool) else -1
+
+
+_result_integer = result_integer
 
 
 def _coverage_evidence(result: Mapping[str, object]) -> tuple[int, tuple[str, ...], int]:
