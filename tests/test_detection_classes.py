@@ -359,3 +359,29 @@ def test_real_licence_spellings_are_still_absorbed(tmp_path: Path, relative: str
     non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
     assert non_source == (relative,)
     assert unresolved == ()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        # CONTROL ARM for the UNDERSCORE half of the licence boundary, added by
+        # Ray/Codesmith on 9e6fa630. My first boundary treated `_` as a
+        # separator, so these were absorbed as licence files.
+        "LICENSE_KEYS.py",
+        "COPYING_utils.c",
+        "LICENCE_helpers.rs",
+    ],
+)
+def test_licence_followed_by_underscore_letter_still_blocks(tmp_path: Path, relative: str) -> None:
+    _write(tmp_path, relative)
+    non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert unresolved == (relative,)
+    assert non_source == ()
+
+
+def test_boost_style_licence_with_underscore_digits_still_absorbs(tmp_path: Path) -> None:
+    """The other direction: `_` followed by a DIGIT is Boost's licence spelling."""
+    relative = _write(tmp_path, "LICENSE_1_0.txt")
+    non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
+    assert non_source == (relative,)
+    assert unresolved == ()
