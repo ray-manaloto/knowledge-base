@@ -19,8 +19,9 @@ detail was specific and correct.
     (-0.7 vs -0.0 human)
 
 That reads as a complaint about WHO wrote the code, and the natural next thought
-was to classify the check as advisory the way CodeRabbit already is. It has zero
-annotations, so `gh api .../check-runs` gives nothing more.
+was to classify the check as advisory the way CodeRabbit already is. The
+`gh api .../check-runs` response for it carried zero annotations; the actionable
+finding turned out to live only on the check's detail page.
 
 The detail page named the actual finding: `currency/config.py` down 0.6, with
 `_ref_bindings` at cyclomatic complexity 10 — code added in that same PR, and
