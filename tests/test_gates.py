@@ -1017,16 +1017,33 @@ def _peak_stub(monkeypatch, *, hold: float = 0.05) -> dict[str, int]:
     return state
 
 
+#: The concurrency-safe members of `GATE_TASKS`, in requested order. DERIVED from
+#: `CONCURRENT_SAFE` rather than spelled out, so the barrier's party count cannot
+#: drift from the set it is proving things about — which is exactly what happened
+#: when `eval` left the set in #321 and a hard-coded count of four made the
+#: positive arm hang instead of pass.
+_CONCURRENT = tuple(t for t in gates.GATE_TASKS if t in gates.CONCURRENT_SAFE)
+
+
 def test_concurrency_safe_gates_really_do_run_at_the_same_time(monkeypatch, tmp_path):
-    """The positive arm: four gates must be in flight together, or this hangs out."""
-    root = _repo(tmp_path, _SAFE)
-    _barrier_stub(monkeypatch, len(_SAFE), timeout=_BARRIER_TIMEOUT)
+    """The positive arm: every concurrency-safe gate in flight together, or this hangs out.
+
+    The party count is `len(_CONCURRENT)`, not `len(_SAFE)`. Those were the same
+    number until #321 moved `eval` out of `CONCURRENT_SAFE`; keeping the old one
+    would demand a fourth party that can never arrive, turning the positive arm
+    into a timeout — a test that fails for a reason unrelated to what it checks.
+    """
+    root = _repo(tmp_path, _CONCURRENT)
+    _barrier_stub(monkeypatch, len(_CONCURRENT), timeout=_BARRIER_TIMEOUT)
     _pin_sha(monkeypatch)
 
-    results = gates.run(root, _SAFE, stop_on_failure=False)
+    results = gates.run(root, _CONCURRENT, stop_on_failure=False)
 
-    assert [r.task for r in results] == list(_SAFE)
+    assert [r.task for r in results] == list(_CONCURRENT)
     assert all(r.passed for r in results)
+    # Guards the derivation itself: if CONCURRENT_SAFE ever empties or collapses
+    # to one, this arm silently stops proving overlap.
+    assert len(_CONCURRENT) > 1
 
 
 def test_the_barrier_arm_can_fail(monkeypatch, tmp_path):
@@ -1136,8 +1153,14 @@ def test_only_a_shared_terminal_gets_mises_prefix(monkeypatch, tmp_path):
 
     Both directions, because either alone is satisfiable by a constant: always
     prefixing would change what `kb-gates -- lint` has always printed, and never
-    prefixing would let four concurrent gates interleave into unattributable
-    output.
+    prefixing would let concurrent gates interleave into unattributable output.
+
+    **A full `GATE_TASKS` run now exercises BOTH directions on its own**, which
+    it did not before #321: the three concurrency-safe gates share a terminal and
+    are prefixed, while `eval` runs alone in its own batch and is not. So the
+    assertion is per-batch rather than "every gate in the run" — the old form
+    read as a claim about the run, and was only ever true because every gate
+    happened to be in one batch.
     """
     seen: list = []
     _stub(monkeypatch, failing="__none__", seen=seen)
@@ -1148,8 +1171,12 @@ def test_only_a_shared_terminal_gets_mises_prefix(monkeypatch, tmp_path):
 
     seen.clear()
     gates.run(_repo(tmp_path / "batch", _SAFE), _SAFE, stop_on_failure=False)
-    for cmd, _kwargs in _mise(seen):
-        assert cmd[:4] == ["mise", "run", "-o", "prefix"]
+    prefixed = {cmd[-1] for cmd, _ in _mise(seen) if cmd[:4] == ["mise", "run", "-o", "prefix"]}
+    bare = {cmd[-1] for cmd, _ in _mise(seen) if cmd[:2] == ["mise", "run"] and "-o" not in cmd}
+
+    # Shared terminal -> prefixed. Alone -> bare. Both observed in one run.
+    assert prefixed == {"lint", "test", "brain-audit"}
+    assert bare == {"eval"}
 
 
 def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
@@ -1159,11 +1186,18 @@ def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
 
     This is the test that separates padding by multiset from padding by count,
     and nothing else in the suite can: with results arriving in requested order
-    the two agree exactly. Here `eval` — requested LAST — finishes first, so a
-    `tasks[len(results):]` slice pads from index 1 and produces a record with
-    `eval` twice and `lint` missing entirely. Both halves of that are the
-    failure: a gate that never ran is claimed, and a gate that was requested
-    vanishes.
+    the two agree exactly. It needs a gate requested LATE to finish FIRST, so a
+    `tasks[len(results):]` slice pads from the wrong index and produces a record
+    naming a gate that never ran while dropping one that was requested. Both
+    halves of that are the failure.
+
+    **The inversion now happens inside the concurrent batch**, because #321 moved
+    `eval` into a batch of its own and it can no longer finish first by any
+    arrangement of the mock. `brain-audit` — requested last of the three that
+    actually race — returns immediately, `test` interrupts, and `lint` is still
+    running when it does. The property under test is unchanged; only the gate
+    used to construct it moved, which is the kind of edit a fixture built around
+    a specific NAME forces and one built around a ROLE would not have.
     """
     root = _repo(tmp_path, _SAFE)
 
@@ -1171,9 +1205,9 @@ def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
         if cmd[0] != "mise":
             return subprocess.CompletedProcess(cmd, 0, "")
         task = cmd[-1]
-        if task == "eval":  # finishes first, inverting the requested order
+        if task == "brain-audit":  # finishes first, inverting the requested order
             return subprocess.CompletedProcess(cmd, 0, "")
-        if task == "brain-audit":
+        if task == "test":
             time.sleep(0.05)
             raise KeyboardInterrupt
         time.sleep(0.3)  # still running when the interrupt lands; finishes after
@@ -1189,9 +1223,16 @@ def test_an_interrupt_under_concurrency_pads_the_gates_that_really_did_not_run(
     written = json.loads(_written(root)[0].read_text(encoding="utf-8"))["gates"]
     # Every requested gate appears exactly once — no duplicate, no omission.
     assert sorted(row["task"] for row in written) == sorted(_SAFE)
-    # `brain-audit` is the ONLY gate that did not produce a result.
-    assert rows["brain-audit"]["rc"] is None
-    assert rows["eval"]["rc"] == 0
+    # `test` raised, so it produced no result; `eval` is a later batch and never
+    # started. Both are honestly `None` — the two distinct routes to "did not
+    # run", and neither may be padded into a pass.
+    assert rows["test"]["rc"] is None
+    assert rows["eval"]["rc"] is None
+    # `brain-audit` finished first and `lint` finished after the interrupt: both
+    # really ran, so both carry a real code. This is the half that fails if the
+    # padding is by COUNT — the slice would name the wrong gates here.
+    assert rows["brain-audit"]["rc"] == 0
+    assert rows["lint"]["rc"] == 0
 
 
 def test_a_sibling_that_finished_after_the_interrupt_is_not_recorded_as_unrun(
@@ -1244,9 +1285,17 @@ def test_a_sibling_that_finished_after_the_interrupt_is_not_recorded_as_unrun(
     rows = _rows(_written(root)[0])
     # The gates that really did run — asserted from the runner's own record of
     # completion, so this cannot drift into agreeing with the implementation.
-    assert sorted(finished) == ["eval", "lint", "test"]
+    #
+    # `eval` left this list when #321 moved it out of `CONCURRENT_SAFE`: it is a
+    # later batch, the interrupt propagates first, so it never starts. Note that
+    # only this one line needed changing — the loop below reads `finished`, so it
+    # followed the behaviour on its own. That is the design in the docstring
+    # working: an assertion tied to observed execution adapts, while one tied to
+    # a hard-coded shape would have had to be re-guessed.
+    assert sorted(finished) == ["lint", "test"]
     for task in finished:
         assert rows[task]["rc"] == 0, f"{task} ran to completion but was recorded {rows[task]}"
+    assert rows["eval"]["rc"] is None
 
 
 def test_a_gate_that_never_started_is_still_recorded_as_unrun(monkeypatch, tmp_path):
@@ -1273,20 +1322,39 @@ def test_a_gate_that_never_started_is_still_recorded_as_unrun(monkeypatch, tmp_p
     assert _rows(_written(root)[0])["brain-audit"]["rc"] is None
 
 
-def test_the_four_shipped_gates_form_a_single_batch():
-    """Pins the claim `iter_run`'s docstring makes about the ship path.
+def test_the_shipped_gates_batch_exactly_as_concurrent_safe_declares():
+    """Batching follows `CONCURRENT_SAFE`, and `eval` is deliberately outside it.
 
-    All four of `GATE_TASKS` being concurrency-safe is what makes them one batch,
-    and one batch is why `stop_on_failure=True` no longer skips anything on the
-    ship path. That is a real behaviour change, so it is asserted rather than
-    left as prose agreeing with itself.
+    This asserted "all four form ONE batch" until 2026-08-16, and it went red the
+    moment `eval` was removed from `CONCURRENT_SAFE` (#321) — which is the check
+    working, not breaking. `eval`'s `tier1.graph-answers` case runs
+    `graphify query` against the ~771 MB graph under a 60s bound and was starved
+    past it by a concurrent `test`, failing intermittently across three runs and
+    passing every time it ran alone.
 
-    If a gate is ever added to `GATE_TASKS` without being cleared for
-    `CONCURRENT_SAFE`, this goes red — which is the intended outcome, because the
-    docstring's statement about ship timing would have quietly stopped being true.
+    So the shape is asserted from the DECLARATION rather than hard-coded to a
+    count: consecutive concurrency-safe names group, anything else is isolated.
+    Written this way, the test keeps its original job — a gate added to
+    `GATE_TASKS` without being cleared lands in its own batch and is visible here
+    — without having to be rewritten again the next time membership changes.
+
+    **One real behaviour change comes with it.** `eval` now being a batch of its
+    own means `stop_on_failure=True` CAN skip it on the ship path when an earlier
+    batch fails. That is correct — a refusal is already decided — but it is no
+    longer true that the ship path never skips a gate, and the docstring of
+    `iter_run` should not be read as claiming so.
     """
-    assert list(gates._batches(gates.GATE_TASKS)) == [gates.GATE_TASKS]
-    assert set(gates.GATE_TASKS) <= gates.CONCURRENT_SAFE
+    batches = list(gates._batches(gates.GATE_TASKS))
+
+    assert [name for batch in batches for name in batch] == list(gates.GATE_TASKS)
+    for batch in batches:
+        if len(batch) > 1:
+            assert set(batch) <= gates.CONCURRENT_SAFE, batch
+        else:
+            assert batch[0] in gates.GATE_TASKS
+    # The measured fact this pins, stated directly: eval runs alone.
+    assert ("eval",) in batches
+    assert "eval" not in gates.CONCURRENT_SAFE
 
 
 def test_a_non_adjacent_repeat_keeps_its_first_requested_position(monkeypatch, tmp_path):
@@ -1343,7 +1411,12 @@ def test_results_arrive_in_completion_order_within_a_batch(monkeypatch, tmp_path
     rest on should be somebody's assertion.
     """
     root = _repo(tmp_path, _SAFE)
-    delays = {"eval": 0.0, "brain-audit": 0.05, "test": 0.10, "lint": 0.15}
+    # Ordered so the CONCURRENT batch inverts: brain-audit finishes first and
+    # lint last, against a requested order of lint, test, brain-audit. `eval` is
+    # a batch of its own since #321, so its delay cannot affect where it lands —
+    # it arrives last because it runs last, and giving it the shortest delay (as
+    # this fixture used to) would prove nothing about ordering at all.
+    delays = {"brain-audit": 0.0, "test": 0.05, "lint": 0.10, "eval": 0.0}
 
     def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
         if cmd[0] == "mise":
@@ -1355,8 +1428,10 @@ def test_results_arrive_in_completion_order_within_a_batch(monkeypatch, tmp_path
 
     arrived = [r.task for r in gates.iter_run(root, _SAFE, stop_on_failure=False)]
 
-    assert arrived == ["eval", "brain-audit", "test", "lint"]
+    assert arrived == ["brain-audit", "test", "lint", "eval"]
     assert arrived != list(_SAFE)  # the inversion is the point
+    # And it is an inversion WITHIN the batch, not just eval being appended.
+    assert arrived[:3] == ["brain-audit", "test", "lint"] != ["lint", "test", "brain-audit"]
 
 
 def test_an_interrupt_on_the_main_thread_still_collects_the_gates_that_finished(
@@ -1393,8 +1468,14 @@ def test_an_interrupt_on_the_main_thread_still_collects_the_gates_that_finished(
     monkeypatch.setattr(gates, "as_completed", interrupted)
 
     def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
-        if cmd[0] == "mise" and cmd[-1] != "eval":
-            time.sleep(0.2)  # still running when the interrupt lands
+        # `lint` returns immediately and is the one future handed over; its two
+        # batch-mates are still running when the interrupt lands, which is the
+        # state the sweep exists for. This used to single out `eval` as the fast
+        # one — it cannot any more, because #321 moved `eval` into a batch of its
+        # own, and a fixture naming a gate that is not in the batch under test
+        # would have quietly stopped constructing the scenario.
+        if cmd[0] == "mise" and cmd[-1] != "lint":
+            time.sleep(0.2)
         return subprocess.CompletedProcess(cmd, 0, "")
 
     monkeypatch.setattr(gates.subprocess, "run", run)
@@ -1404,9 +1485,12 @@ def test_an_interrupt_on_the_main_thread_still_collects_the_gates_that_finished(
         gates.run_and_record(root, _SAFE, stop_on_failure=False)
 
     rows = _rows(_written(root)[0])
-    # Every gate ran to completion — the pool waited for all of them — so every
-    # gate must carry a real exit code, not the "did not run" state.
-    assert [rows[t]["rc"] for t in _SAFE] == [0, 0, 0, 0]
+    # The CONCURRENT batch ran to completion — the pool waited for all of it — so
+    # each of its gates carries a real exit code, not the "did not run" state.
+    assert [rows[t]["rc"] for t in ("lint", "test", "brain-audit")] == [0, 0, 0]
+    # `eval` is a later batch and the interrupt propagates first, so it never
+    # starts. `rc: None` is the honest record of that, and is never a pass.
+    assert rows["eval"]["rc"] is None
 
 
 def test_an_unexpected_error_in_one_gate_does_not_discard_the_others(monkeypatch, tmp_path):
@@ -1422,6 +1506,15 @@ def test_an_unexpected_error_in_one_gate_does_not_discard_the_others(monkeypatch
 
     The error still surfaces — it is returned and re-raised, not swallowed.
     Losing the failure would be the mirror defect of losing the results.
+
+    **`eval` is asserted as NOT RUN, and that is the point rather than a
+    concession.** It left `CONCURRENT_SAFE` in #321, so it is now a batch of its
+    own AFTER the one that raises, and the re-raise means it is never reached.
+    Its row is therefore `rc: None` — the schema's explicit "did not run", which
+    `GateResult`'s docstring states is never a pass. The property under test is
+    unchanged: every gate that COMPLETED kept its evidence, and the one that did
+    not is recorded as not-run rather than as absent or as green. Asserting
+    `rc == 0` here would have been asserting a gate ran when it did not.
     """
     root = _repo(tmp_path, _SAFE)
 
@@ -1438,8 +1531,9 @@ def test_an_unexpected_error_in_one_gate_does_not_discard_the_others(monkeypatch
         gates.run_and_record(root, _SAFE, stop_on_failure=False)
 
     rows = _rows(_written(root)[0])
-    assert [rows[t]["rc"] for t in ("lint", "test", "eval")] == [0, 0, 0]
+    assert [rows[t]["rc"] for t in ("lint", "test")] == [0, 0]
     assert rows["brain-audit"]["rc"] is None
+    assert rows["eval"]["rc"] is None
 
 
 # --- §2 R5 tranche 4: the `Result` boundary ---------------------------------
