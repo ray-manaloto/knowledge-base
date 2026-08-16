@@ -200,6 +200,31 @@ def test_absorbed_classes_clear_the_unclassified_reason(tmp_path: Path) -> None:
     assert receipt.unsupported_language_paths == ("benchmark/hk.pkl",)
 
 
+def test_counts_and_tallies_survive_the_display_bound(tmp_path: Path) -> None:
+    """The `*_paths` tuples are display evidence capped at 12; totals are not.
+
+    A `len()` over the bounded tuples saturated both the unsupported-language
+    and unresolved counts at 12, silently under-reporting corpus loss.
+    """
+    unsupported = tuple(_write(tmp_path, f"benchmark/hk_{index:02d}.pkl") for index in range(15))
+    unresolved = tuple(_write(tmp_path, f"src/mystery_{index:02d}.zzz") for index in range(14))
+    paths = (*unsupported, *unresolved)
+    widened = graphify_sdk._apply_detection_classes(
+        tmp_path, paths, graphify_health.SourceCoveragePolicy()
+    )
+    receipt = graphify_health.assess(
+        graphify_health.GraphifyOperation.DETECT,
+        graphify_health.GraphifyEvidence(
+            observed=True, unclassified_paths=paths, coverage_policy=widened
+        ),
+    )
+    assert len(receipt.unsupported_language_paths) == 12
+    assert len(receipt.unresolved_paths) == 12
+    assert receipt.unsupported_language_count == 15
+    assert receipt.unresolved_count == 14
+    assert receipt.unsupported_language_tally == ((".pkl", 15),)
+
+
 def test_one_unknown_file_still_blocks_a_source_full_of_known_ones(tmp_path: Path) -> None:
     """CONTROL ARM. The classes are per-file; they never whitelist a source."""
     paths = (
@@ -309,6 +334,12 @@ def test_a_symlink_to_a_directory_is_refused(tmp_path: Path) -> None:
         "LICENSED_users.rs",
         "COPYINGCTL.c",
         "licenceplate.go",
+        # CONTROL ARM for the UNDERSCORE boundary specifically. `_` is
+        # non-alphanumeric, so the first boundary fix still absorbed all of
+        # these — the rule refuses `_` only when a letter follows it.
+        "LICENSE_KEYS.py",
+        "LICENCE_manager.rs",
+        "COPYING_utils.c",
     ],
 )
 def test_a_name_merely_starting_with_licence_still_blocks(tmp_path: Path, relative: str) -> None:

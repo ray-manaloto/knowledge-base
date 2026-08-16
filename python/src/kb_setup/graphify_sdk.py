@@ -816,7 +816,14 @@ _UNSUPPORTED_LANGUAGE_SUFFIXES = frozenset(
 #: source, silently taken as a licence file and (unlike the counted class) never
 #: tallied. Found by the cold lane; the first version of this rule was a
 #: `.upper().startswith(...)`.
-_LICENSE_NAME = re.compile(r"(LICENSE|LICENCE|COPYING)($|[^A-Za-z0-9])", re.IGNORECASE)
+#:
+#: An underscore counts as a boundary ONLY when no letter follows it: the same
+#: failure class recurs as `LICENSE_KEYS.py` and `COPYING_utils.c`, which are
+#: real source, while `LICENSE_1_0.txt` (Boost's spelling) is a licence file
+#: and must keep matching.
+_LICENSE_NAME = re.compile(
+    r"(LICENSE|LICENCE|COPYING)($|[^A-Za-z0-9_]|_(?![A-Za-z]))", re.IGNORECASE
+)
 #: Vendored test fixtures — `gitleaks` ships fake `.git` trees, `typos` ships
 #: `*.in/` input dirs, `pkl` ships `.jva` goldens. These are inputs to somebody
 #: else's test suite, not corpus knowledge.

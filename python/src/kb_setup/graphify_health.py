@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from enum import StrEnum
+from pathlib import PurePosixPath
 
 import msgspec
 
@@ -56,6 +58,12 @@ class GraphifyReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     #: failure message listing all 1,075 unclassified files — of which 1,070 are
     #: absorbed and 5 are the problem — buries its own answer.
     unresolved_paths: tuple[str, ...] = ()
+    #: Unbounded totals. The `*_paths` tuples above are display evidence capped
+    #: by `_bounded_paths`, so any count or tally MUST come from these fields —
+    #: a `len()` over the bounded tuples saturates at the display bound.
+    unresolved_count: int = 0
+    unsupported_language_count: int = 0
+    unsupported_language_tally: tuple[tuple[str, int], ...] = ()
     timed_out: bool = False
     approved_classifications: tuple[str, ...] = ()
     mode: str | None = None
@@ -222,6 +230,10 @@ def assess(
         *_coverage_reasons(evidence),
         *_output_reasons(evidence),
     ]
+    unresolved = _unresolved_unclassified(evidence)
+    unsupported = (
+        evidence.coverage_policy.unsupported_language_paths if evidence.coverage_policy else ()
+    )
 
     state = GraphifyState.COMPLETE
     if evidence.returncode != 0:
@@ -244,10 +256,11 @@ def assess(
         unclassified_paths=_bounded_paths(evidence.unclassified_paths),
         zero_node_paths=_bounded_paths(evidence.zero_node_paths),
         ignored_paths=_bounded_paths(evidence.ignored_paths),
-        unresolved_paths=_bounded_paths(_unresolved_unclassified(evidence)),
-        unsupported_language_paths=_bounded_paths(
-            evidence.coverage_policy.unsupported_language_paths if evidence.coverage_policy else ()
-        ),
+        unresolved_paths=_bounded_paths(unresolved),
+        unsupported_language_paths=_bounded_paths(unsupported),
+        unresolved_count=len(unresolved),
+        unsupported_language_count=len(unsupported),
+        unsupported_language_tally=_language_tally(unsupported),
         timed_out=evidence.timed_out,
         approved_classifications=evidence.approved_classifications,
         mode=evidence.mode,
@@ -287,3 +300,9 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
 def _bounded_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
     """Retain enough path evidence to diagnose scope without unbounded exceptions."""
     return tuple(path[:160] for path in paths[:12])
+
+
+def _language_tally(paths: tuple[str, ...]) -> tuple[tuple[str, int], ...]:
+    """Per-extension totals over the FULL path set, never the display bound."""
+    tally = Counter(PurePosixPath(path).suffix or PurePosixPath(path).name for path in paths)
+    return tuple(sorted(tally.items()))

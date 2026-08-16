@@ -12,8 +12,8 @@ outcome: "useful"
 
 graphify's `detect()` WRITES INTO THE TREE IT SCANS — and the version pin is not what reaches your shell.
 
-Two corpus facts from clearing #289, both of which cost real time to find and
-neither of which is in any doc.
+Three corpus facts from clearing #289, all of which cost real time to find and
+none of which is in any doc.
 
 **1. `detect()` is not read-only.** Given an Office or Google-Workspace document
 under the scan root, it converts it and writes the markdown sidecar to

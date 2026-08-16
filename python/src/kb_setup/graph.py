@@ -30,7 +30,7 @@ import time
 from collections import Counter, deque
 from dataclasses import dataclass, replace
 from multiprocessing.process import BaseProcess
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
 import msgspec
@@ -87,6 +87,8 @@ class SourceCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
     #: absorbed, so a failure report that shows only `unclassified` hides its own
     #: answer behind the display bound.
     unresolved: tuple[str, ...] = ()
+    #: Unbounded total behind the display-bounded `unresolved` tuple above.
+    unresolved_count: int = 0
     unclassified: tuple[SourcePathEvidence, ...] = ()
     ignored: tuple[SourcePathEvidence, ...] = ()
     stderr: str = ""
@@ -418,8 +420,6 @@ def _source_census_receipt(
 ) -> SourceCensusReceipt:
     unclassified_paths = graphify_sdk_paths(root, result.get("unclassified", []))
     ignored_paths = graphify_sdk_paths(root, result.get("ignored", []))
-    unsupported = receipt.unsupported_language_paths
-    tally = Counter(PurePosixPath(path).suffix or PurePosixPath(path).name for path in unsupported)
     return SourceCensusReceipt(
         source=source_name,
         kind="code",
@@ -428,9 +428,12 @@ def _source_census_receipt(
         detected_count=receipt.detected_sources,
         unclassified_count=len(unclassified_paths),
         ignored_count=len(ignored_paths),
-        unsupported_language_count=len(unsupported),
-        unsupported_language_tally=tuple(sorted(tally.items())),
+        # The receipt's `*_paths` tuples are display-bounded at 12 entries, so
+        # counts and tallies come from its unbounded fields, never from len().
+        unsupported_language_count=receipt.unsupported_language_count,
+        unsupported_language_tally=receipt.unsupported_language_tally,
         unresolved=receipt.unresolved_paths,
+        unresolved_count=receipt.unresolved_count,
         unclassified=tuple(
             _source_path_evidence(root, path)
             for path in unclassified_paths[:_CENSUS_MAX_PATHS_PER_CLASS]
@@ -544,7 +547,7 @@ def _source_census_failure_detail(receipt: SourceCensusReceipt) -> str:
     categories = ", ".join(receipt.categories) or receipt.status
     evidence: list[str] = []
     if receipt.unresolved:
-        evidence.append(f"unresolved({len(receipt.unresolved)})={list(receipt.unresolved[:12])!r}")
+        evidence.append(f"unresolved({receipt.unresolved_count})={list(receipt.unresolved[:12])!r}")
     elif receipt.unclassified:
         evidence.append(f"unclassified={[item.path for item in receipt.unclassified[:12]]!r}")
     if receipt.ignored:
