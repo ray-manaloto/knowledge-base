@@ -191,7 +191,7 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.43",
+            ref="v0.9.44",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -201,14 +201,14 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
     assert advisories["entries"] == [
         {
             "code": "graphify-large-corpus-token-cost",
-            "detector_git_object": "c51ea916eec10cee4e73ca8c9d565083a008ecd0",
+            "detector_git_object": "f76a4259f6a7360872663fbe711c4738ecda4680",
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 786 files · ~1,379,183 words. Semantic extraction will be "
+                "Large corpus: 791 files · ~1,391,691 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 786,
-            "observed_words": 1_379_183,
+            "observed_files": 791,
+            "observed_words": 1_391_691,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }
@@ -254,7 +254,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.43",
+            ref="v0.9.44",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -263,7 +263,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
     advisory = json.loads(advisory_path.read_text(encoding="utf-8"))
     advisory["entries"][0]["observed_files"] += 1
     advisory["entries"][0]["message"] = advisory["entries"][0]["message"].replace(
-        "786 files", "787 files"
+        "791 files", "792 files"
     )
     advisory_path.write_bytes(_canonical(advisory))
     _rehash_plan(candidate)
@@ -710,17 +710,17 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
-    assert inventory["source_ref"] == "v0.9.43"
-    assert inventory["source_commit"] == "7281f27eac568f77f50910f59f84543458f5dfd1"
-    assert inventory["source_tree"] == "6ae1c399eb1beef4f51106bbeecf72ee035fbeb6"
-    assert inventory["detected_source_count"] == 372
-    assert inventory["discovered_unit_count"] == 474
-    assert inventory["admitted_unit_count"] == 470
+    assert inventory["source_ref"] == "v0.9.44"
+    assert inventory["source_commit"] == "4fca621532a23f84f69c31e397b75f8105cb5390"
+    assert inventory["source_tree"] == "faabe0fab532b763a76031acd61038a85e3bba00"
+    assert inventory["detected_source_count"] == 374
+    assert inventory["discovered_unit_count"] == 478
+    assert inventory["admitted_unit_count"] == 474
     assert (
         inventory["source_manifest_sha256"]
-        == "f839cca43889465bb43449f77880ec39a92f68bcee5d892ab8bfb18452a0690a"
+        == "f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75"
     )
-    assert len(ledger["chunks"]) == 57
+    assert len(ledger["chunks"]) == 58
     assert config["max_turns"] == 3
     assert (
         config["semantic_slice_sha256"]
@@ -2038,7 +2038,7 @@ def test_execution_namespace_contract_accepts_fresh_variance_and_rejects_reuse(
         binding.cache_namespace_sha256,
         "a" * 64,
         "b" * 64,
-        (16, 14, 2),
+        (12, 11, 2),
     )
     cold = _execution_evidence(candidate, common)
     variance = _execution_evidence(
@@ -2110,7 +2110,7 @@ def test_semantic_graph_is_rebuilt_from_retained_real_fragment_bytes(tmp_path: P
 
     assert reasons == []
     assert rebuilt is not None
-    assert graphify_semantic_corpus._graph_counts(rebuilt) == (16, 14, 2)
+    assert graphify_semantic_corpus._graph_counts(rebuilt) == (12, 11, 2)
     assert (
         graphify_semantic_corpus._semantic_graph_integrity_reasons(
             rebuilt, {"docs/how-it-works.md"}

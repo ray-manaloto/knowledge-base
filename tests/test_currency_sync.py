@@ -826,6 +826,11 @@ def test_a_present_ffmpeg_is_in_sync_with_no_manifest_or_stamp(tmp_path, monkeyp
         "extras",
         "extra-probes",
         "manifest",
+        # ffmpeg declares no revision bindings and ships no agent skill, so both
+        # of the 2026-08-15 checks are inapplicable here — which is SKIP, exactly
+        # like the three above it. See `test_currency_ref_bindings.py`.
+        "ref-binding",
+        "skill-stamp",
         "build-stamp",
     }
 
