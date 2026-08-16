@@ -297,51 +297,58 @@ def _watch_items(raw: object) -> tuple[WatchItem, ...]:
 _REF_BINDING_FIELDS = frozenset({"ref", "commit"})
 
 
-def _ref_bindings(name: str, raw: object) -> tuple[RefBinding, ...]:
-    """Parse `[[tool.<name>.ref_binding]]` rows, refusing one that cannot check.
+def _ref_binding(name: str, entry: object) -> RefBinding:
+    """Validate ONE `[[tool.<name>.ref_binding]]` row, or raise saying why.
 
-    Every malformed row raises rather than being dropped. A silently skipped
-    binding is a check that reports nothing while looking declared — the failure
-    mode this whole engine is built against — and unlike `watch`, a binding costs
-    nothing to state correctly.
+    Split out of `_ref_bindings` so the loop and the row-validation are separate
+    things to read: the caller says "every row, in order, all-or-nothing", and
+    this says what makes a row valid. Extracted after a code-health check
+    measured the combined function at cyclomatic complexity 10 — at this repo's
+    `max-complexity` limit, so ruff passed it and the shape was still worth
+    fixing on its own terms.
+
+    Every failure raises rather than skipping the row. A silently dropped binding
+    is a check that reports nothing while looking declared — the failure mode this
+    whole engine is built against — and unlike `watch`, a binding costs nothing to
+    state correctly.
     """
+    where = f"{CONFIG_NAME}: [[tool.{name}.ref_binding]]"
+    if not isinstance(entry, dict):
+        raise TypeError(f"{where} must be a table")
+    fields = {str(k): v for k, v in entry.items()}
+    path = str(fields.get("path", ""))
+    pattern = str(fields.get("pattern", ""))
+    field = str(fields.get("field", "ref"))
+    if not path or not pattern:
+        raise ValueError(f"{where} needs both 'path' and 'pattern'")
+    if field not in _REF_BINDING_FIELDS:
+        raise ValueError(
+            f"{where} field must be one of {sorted(_REF_BINDING_FIELDS)}, got {field!r}"
+        )
+    _assert_one_capture_group(where, path, pattern)
+    return RefBinding(path=path, pattern=pattern, field=field, note=str(fields.get("note", "")))
+
+
+def _assert_one_capture_group(where: str, path: str, pattern: str) -> None:
+    """A binding's pattern must compile AND capture exactly the revision."""
+    try:
+        compiled = re.compile(pattern)
+    except re.error as exc:
+        raise ValueError(f"{where} pattern for {path} is not a valid regex: {exc}") from exc
+    if compiled.groups != 1:
+        raise ValueError(
+            f"{where} pattern for {path} must have exactly one capture group "
+            f"holding the revision, got {compiled.groups}"
+        )
+
+
+def _ref_bindings(name: str, raw: object) -> tuple[RefBinding, ...]:
+    """Parse every `[[tool.<name>.ref_binding]]` row, in order, all-or-nothing."""
     if raw is None:
         return ()
     if not isinstance(raw, list):
         raise TypeError(f"{CONFIG_NAME}: [tool.{name}] ref_binding must be a list of tables")
-    bindings: list[RefBinding] = []
-    for entry in raw:
-        if not isinstance(entry, dict):
-            raise TypeError(f"{CONFIG_NAME}: [[tool.{name}.ref_binding]] must be a table")
-        fields = {str(k): v for k, v in entry.items()}
-        path = str(fields.get("path", ""))
-        pattern = str(fields.get("pattern", ""))
-        field = str(fields.get("field", "ref"))
-        if not path or not pattern:
-            raise ValueError(
-                f"{CONFIG_NAME}: [[tool.{name}.ref_binding]] needs both 'path' and 'pattern'"
-            )
-        if field not in _REF_BINDING_FIELDS:
-            raise ValueError(
-                f"{CONFIG_NAME}: [[tool.{name}.ref_binding]] field must be one of "
-                f"{sorted(_REF_BINDING_FIELDS)}, got {field!r}"
-            )
-        try:
-            compiled = re.compile(pattern)
-        except re.error as exc:
-            raise ValueError(
-                f"{CONFIG_NAME}: [[tool.{name}.ref_binding]] pattern for {path} "
-                f"is not a valid regex: {exc}"
-            ) from exc
-        if compiled.groups != 1:
-            raise ValueError(
-                f"{CONFIG_NAME}: [[tool.{name}.ref_binding]] pattern for {path} must have "
-                f"exactly one capture group holding the revision, got {compiled.groups}"
-            )
-        bindings.append(
-            RefBinding(path=path, pattern=pattern, field=field, note=str(fields.get("note", "")))
-        )
-    return tuple(bindings)
+    return tuple(_ref_binding(name, entry) for entry in raw)
 
 
 def _tool_spec(name: str, table: dict[str, object]) -> ToolSpec:
