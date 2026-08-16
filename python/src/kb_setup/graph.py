@@ -30,7 +30,7 @@ import time
 from collections import Counter, deque
 from dataclasses import dataclass, replace
 from multiprocessing.process import BaseProcess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Protocol, cast
 
 import msgspec
@@ -77,6 +77,16 @@ class SourceCensusReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
     detected_count: int | None = None
     unclassified_count: int = 0
     ignored_count: int = 0
+    #: Files absorbed as a language Graphify cannot parse. Counted, and tallied
+    #: per extension, so this stays measurable corpus loss instead of becoming
+    #: an invisible allowlist entry.
+    unsupported_language_count: int = 0
+    unsupported_language_tally: tuple[tuple[str, int], ...] = ()
+    #: The unclassified paths no reviewed class absorbed — the ones that block.
+    #: `unclassified` below can be a thousand entries of which all but these are
+    #: absorbed, so a failure report that shows only `unclassified` hides its own
+    #: answer behind the display bound.
+    unresolved: tuple[str, ...] = ()
     unclassified: tuple[SourcePathEvidence, ...] = ()
     ignored: tuple[SourcePathEvidence, ...] = ()
     stderr: str = ""
@@ -408,6 +418,8 @@ def _source_census_receipt(
 ) -> SourceCensusReceipt:
     unclassified_paths = graphify_sdk_paths(root, result.get("unclassified", []))
     ignored_paths = graphify_sdk_paths(root, result.get("ignored", []))
+    unsupported = receipt.unsupported_language_paths
+    tally = Counter(PurePosixPath(path).suffix or PurePosixPath(path).name for path in unsupported)
     return SourceCensusReceipt(
         source=source_name,
         kind="code",
@@ -416,6 +428,9 @@ def _source_census_receipt(
         detected_count=receipt.detected_sources,
         unclassified_count=len(unclassified_paths),
         ignored_count=len(ignored_paths),
+        unsupported_language_count=len(unsupported),
+        unsupported_language_tally=tuple(sorted(tally.items())),
+        unresolved=receipt.unresolved_paths,
         unclassified=tuple(
             _source_path_evidence(root, path)
             for path in unclassified_paths[:_CENSUS_MAX_PATHS_PER_CLASS]
@@ -528,7 +543,9 @@ def _source_census_failure_detail(receipt: SourceCensusReceipt) -> str:
         return f"TimeoutError: {receipt.stderr}"
     categories = ", ".join(receipt.categories) or receipt.status
     evidence: list[str] = []
-    if receipt.unclassified:
+    if receipt.unresolved:
+        evidence.append(f"unresolved({len(receipt.unresolved)})={list(receipt.unresolved[:12])!r}")
+    elif receipt.unclassified:
         evidence.append(f"unclassified={[item.path for item in receipt.unclassified[:12]]!r}")
     if receipt.ignored:
         evidence.append(f"ignored={[item.path for item in receipt.ignored[:12]]!r}")
@@ -663,13 +680,46 @@ def _assert_disposable_clone_identity(clone_dir: Path, provenance: SourceGitProv
         text=True,
         timeout=60,
     ).stdout
-    if (
-        head != provenance.resolved_commit
-        or tree != provenance.tree_digest
-        or symbolic.returncode == 0
-        or status
-    ):
-        raise RuntimeError("disposable clone identity, detached state, or cleanliness changed")
+    # Name WHICH invariant broke. The single undifferentiated message this
+    # replaces cost a whole investigation to get behind: four distinct failures
+    # — a rewritten commit, a changed tree, a re-attached HEAD, and a detector
+    # that wrote into its own input — all surfaced as one sentence that named
+    # none of them, and the only way to tell them apart was to edit this line.
+    drift: list[str] = []
+    if head != provenance.resolved_commit:
+        drift.append(f"commit {provenance.resolved_commit[:12]}->{head[:12]}")
+    if tree != provenance.tree_digest:
+        drift.append(f"tree {provenance.tree_digest[:12]}->{tree[:12]}")
+    if symbolic.returncode == 0:
+        drift.append("HEAD re-attached to a branch")
+    entries = [line for line in status.splitlines() if not _is_detector_sidecar(line)]
+    if entries:
+        drift.append(f"{len(entries)} dirty path(s): {entries[:8]}")
+    if drift:
+        raise RuntimeError(f"disposable clone changed during detection: {'; '.join(drift)}")
+
+
+#: Graphify's detector is not read-only: when a tree contains an Office or
+#: Google-Workspace document it converts it and writes the markdown sidecar to
+#: `<root>/graphify-out/converted/`. That path is HARDCODED in `detect.py`
+#: (`converted_dir = root / GRAPHIFY_OUT / "converted"`); `cache_root` redirects
+#: only the word-count cache, so there is no native knob to move it. `cognee`
+#: ships `example.docx` and `example.pptx`, which is why it alone drifted.
+_DETECTOR_OUTPUT_PREFIX = "graphify-out/"
+
+
+def _is_detector_sidecar(status_line: str) -> bool:
+    """True only for an UNTRACKED entry under Graphify's own output directory.
+
+    Deliberately narrow. `??` is git's untracked code, so a MODIFIED or DELETED
+    tracked file under `graphify-out/` still counts as drift — a source that
+    tracks that directory must not get a free pass, and the point of this check
+    is that the detector never alters its input's *content*.
+    """
+    if not status_line.startswith("?? "):
+        return False
+    path = status_line[3:].strip().strip('"')
+    return path.startswith(_DETECTOR_OUTPUT_PREFIX)
 
 
 def materialize_source_snapshot(manifest: mf.Manifest, destination: Path) -> SourceGitProvenance:
@@ -801,13 +851,22 @@ def _require_post_detection_clone_identity(
         provenance = verified[name]
         try:
             _assert_disposable_clone_identity(root, provenance)
-        except OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired:
+        except (
+            OSError,
+            RuntimeError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+        ) as exc:
             replacements[name] = SourceCensusReceipt(
                 source=name,
                 kind="code",
                 status="provenance-failed",
                 categories=("snapshot-drift",),
-                stderr="disposable clone identity or cleanliness changed during detection",
+                # Carry the exception's own detail. A fixed string here threw
+                # away the only description of what actually drifted, so every
+                # cause reported identically and none could be diagnosed
+                # without editing this file.
+                stderr=_bounded_identity(f"{type(exc).__name__}: {exc}", _CENSUS_MAX_STDERR_LENGTH),
             )
     if not replacements:
         return received
@@ -1019,6 +1078,7 @@ def _detect_preflight(manifests: list[mf.Manifest]) -> None:
     ]
     failures.extend(("<census>", f"RuntimeError: {error}") for error in census.integrity_errors)
     failures.sort()
+    _report_unsupported_languages(census)
     if failures:
         categorized = [
             (_detect_failure_categories(detail), name, detail) for name, detail in failures
@@ -1030,7 +1090,11 @@ def _detect_preflight(manifests: list[mf.Manifest]) -> None:
             f"{category}: {category_counts[category]}" for category in sorted(category_counts)
         )
         lines = [
-            f"  {name}: {'+'.join(categories)}: {detail[:240]}"
+            # 240 was right when the payload was a raw unclassified dump nobody
+            # could act on anyway. Now the payload leads with `unresolved`, a
+            # bounded list of exactly the paths a reader must fix, so truncating
+            # it re-hides the answer this message exists to give.
+            f"  {name}: {'+'.join(categories)}: {detail[:900]}"
             for categories, name, detail in categorized
         ]
         raise SystemExit(
@@ -1038,6 +1102,32 @@ def _detect_preflight(manifests: list[mf.Manifest]) -> None:
             f"categories={{{summary}}}; no aggregate artifact or stamp was mutated:\n"
             + "\n".join(lines)
         )
+
+
+def _report_unsupported_languages(census: DetectionCensusReceipt) -> None:
+    """Print the corpus loss the build is proceeding over, every run.
+
+    This is the half of the class policy that keeps it honest. Absorbing a
+    language Graphify cannot parse is what lets `kb-build` finish at all; saying
+    nothing about it is how a green build comes to bury real loss (#231). The
+    tally is unconditional and goes to stderr, so it survives a piped stdout.
+    """
+    tally: Counter[str] = Counter()
+    sources = 0
+    for source in census.sources:
+        if not source.unsupported_language_count:
+            continue
+        sources += 1
+        tally.update(dict(source.unsupported_language_tally))
+    if not tally:
+        return
+    ranked = ", ".join(f"{suffix}={count}" for suffix, count in tally.most_common(12))
+    print(
+        f"[kb-build] unsupported-language corpus loss: {sum(tally.values())} file(s) "
+        f"across {sources} source(s), absorbed so detection can proceed. "
+        f"Graphify cannot parse these: {ranked}",
+        file=sys.stderr,
+    )
 
 
 def _detect_failure_categories(detail: str) -> tuple[str, ...]:
