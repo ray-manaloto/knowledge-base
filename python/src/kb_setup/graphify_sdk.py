@@ -920,24 +920,45 @@ def classify_unclassified(
             unresolved.append(relative)
             continue
         name, suffix = target
-        if (
-            name in _NON_SOURCE_NAMES
-            or suffix in _NON_SOURCE_SUFFIXES
-            or _LICENSE_NAME.match(name) is not None
-            or _is_ignore_metadata_name(name)
-        ):
+        if _is_non_source(name, suffix):
             non_source.append(relative)
-        elif (
-            name in _UNSUPPORTED_LANGUAGE_NAMES
-            or suffix in _UNSUPPORTED_LANGUAGE_SUFFIXES
-            or name.split(".")[0] in _UNSUPPORTED_LANGUAGE_STEMS
-            or _FIXTURE_SEGMENTS.search(relative) is not None
-            or relative.endswith(f"{_SERVICE_LOADER_DIR}{name}")
-        ):
+        elif _is_unsupported_language(relative, name, suffix):
             unsupported.append(relative)
         else:
             unresolved.append(relative)
     return tuple(sorted(non_source)), tuple(sorted(unsupported)), tuple(sorted(unresolved))
+
+
+def _is_non_source(name: str, suffix: str) -> bool:
+    """Repo bookkeeping, packaging data or a binary artifact — never graph source.
+
+    Absorbed SILENTLY, which is why this predicate is the conservative one: a
+    file that lands here is not counted anywhere, so anything arguable belongs
+    in `_is_unsupported_language` instead.
+    """
+    return (
+        name in _NON_SOURCE_NAMES
+        or suffix in _NON_SOURCE_SUFFIXES
+        or _LICENSE_NAME.match(name) is not None
+        or _is_ignore_metadata_name(name)
+    )
+
+
+def _is_unsupported_language(relative: str, name: str, suffix: str) -> bool:
+    """Real source, a schema, or a vendored fixture Graphify has no parser for.
+
+    Absorbed but COUNTED, and tallied per extension on every build. Takes
+    `relative` as well as the name because two of its five rules are about where
+    a file sits rather than what it is called: a fixture directory, and the
+    `META-INF/services/` tables whose filenames are the interfaces they register.
+    """
+    return (
+        name in _UNSUPPORTED_LANGUAGE_NAMES
+        or suffix in _UNSUPPORTED_LANGUAGE_SUFFIXES
+        or name.split(".", maxsplit=1)[0] in _UNSUPPORTED_LANGUAGE_STEMS
+        or _FIXTURE_SEGMENTS.search(relative) is not None
+        or relative.endswith(f"{_SERVICE_LOADER_DIR}{name}")
+    )
 
 
 def _classifiable_name(root: Path, relative: str) -> tuple[str, str] | None:
