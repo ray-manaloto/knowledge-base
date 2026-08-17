@@ -1550,7 +1550,7 @@ def test_an_impossible_negative_cost_is_refused_like_an_over_budget_one(
     over = msgspec.structs.replace(metadata, total_cost_usd=config.max_cost_usd + 1.0)
     assert reason in graphify_semantic_corpus._adapter_config_reasons(over, config)
 
-    within = msgspec.structs.replace(metadata, total_cost_usd=0.0)
+    within = msgspec.structs.replace(metadata, total_cost_usd=metadata.total_cost_usd)
     assert reason not in graphify_semantic_corpus._adapter_config_reasons(within, config)
 
 

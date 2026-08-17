@@ -120,7 +120,7 @@ process probe cannot distinguish *dead* from *thinking*.
 ## 3. The doctor is the setup check — and it was green the whole time
 
 ```bash
-bash "/Users/rmanaloto/.claude/plugins/cache/fable-orchestrator/fable-orchestrator/1.21.0/scripts/doctor.sh"
+bash "$HOME/.claude/plugins/cache/fable-orchestrator/fable-orchestrator/1.21.0/scripts/doctor.sh"
 ```
 
 Also reachable as the `fable-orchestrator:doctor` skill.
