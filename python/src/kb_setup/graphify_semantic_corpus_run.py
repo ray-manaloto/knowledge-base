@@ -602,9 +602,24 @@ def execute(
         def on_chunk_done(index: int, total: int, raw: object) -> None:
             # The ledger's ordering IS graphify's, because the planner derived it
             # from the same packing function over the same inputs. Checked rather
-            # than assumed: if the two ever diverge, the failure this catches is
-            # evidence filed against the WRONG chunk, which every downstream
-            # digest check would then confirm as internally consistent.
+            # than assumed: a divergence would file evidence against the WRONG
+            # chunk, and this is the cheapest place to notice.
+            #
+            # It is NOT the only place, and the previous version of this comment
+            # claimed it was — it said every downstream digest check would
+            # "confirm as internally consistent" what this one missed. That is
+            # backwards, and a cold lane traced why: `_provider_chunk_reasons`
+            # recomputes `expected_prompt_sha256` from the ASSUMED chunk's members
+            # and compares it against `metadata.prompt_sha256`, which the ADAPTER
+            # wrote from the bytes actually dispatched. That digest is ground
+            # truth this driver cannot influence, so a real ordering divergence
+            # surfaces as `provider-prompt-bytes-mismatch` whether or not the
+            # check below fires.
+            #
+            # The correction matters more than the guard: a comment overstating
+            # what a check carries is what stops the next reader from looking for
+            # the one that actually carries it. This check earns its place by
+            # failing EARLY and by name, not by being the last line of defence.
             if total != len(ledger.chunks) or not 0 <= index < len(ledger.chunks):
                 raise ValueError("provider chunk callback disagrees with the planned ledger")
             chunk = ledger.chunks[index]
