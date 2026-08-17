@@ -1,0 +1,130 @@
+# Mutation arms for the per-warning extract-stderr accounting added for #328.
+#
+# WHY THIS SPEC EXISTS. The change RELAXES a gate in the literal sense — stderr
+# that used to block now passes — and a relaxation is the shape a clean sweep is
+# least able to vindicate (`a-clean-mutation-sweep-on-a-relaxation-proves-nothing`).
+# So these arms are aimed at the relaxation itself: every one of them makes the
+# approver accept something it must not, and each must turn the suite red.
+#
+# WHAT THE CHANGE ACTUALLY DID, so a reader can judge whether the arms cover it:
+#   1. The #1666 warning is now PARSED rather than reconstructed, because
+#      graphify truncates its name list at five and the reconstruction joined all
+#      of them — unsatisfiable for the eight-file source that motivated #328.
+#   2. Approval moved from whole-stderr (one token approved everything the
+#      subprocess printed) to per-warning, with a `residual_stderr` that blocks.
+#   3. A reviewed partial extraction carries a MEASURED node count, checked
+#      against the sub-graph graphify just wrote.
+#
+# WHAT A CLEAN SWEEP HERE DOES NOT MEAN. It says nothing about whether the 25
+# lost symbols in `website/src/pages/index.astro` are the right number — that is
+# a measurement recorded in `graph._EXPECTED_PARTIAL_EXTRACTION`, re-derived from
+# the file at pin 34a52ce09db1, and no mutation can check it. It also says
+# nothing about `kb-build` end to end; that arm is the build run itself.
+
+suites = ["tests/test_graphify_sdk.py", "tests/test_graphify_health.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "    classifications: list[str] = []\n    residual: list[str] = []"
+new = "    classifications: list[str] = []  # inert control edit\n    residual: list[str] = []"
+
+# --------------------------------------------------------------------------
+# The relaxation itself: an unaccounted warning must still block
+# --------------------------------------------------------------------------
+
+# The whole point of the residual. Dropping unrecognised lines instead of
+# retaining them restores the old whole-stderr rubber stamp by the back door:
+# every warning graphify prints would be approved by one registration.
+[[arm]]
+id = "unrecognised-warnings-are-silently-dropped"
+test = "test_an_unreviewed_third_warning_still_blocks"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "        else:\n            residual.append(line)"
+new = "        else:\n            pass"
+
+# The consuming half of the same property, one module over. If health stops
+# reading the residual, the accounting still runs and is still correct — and
+# nothing acts on it.
+[[arm]]
+id = "health-ignores-the-residual"
+test = "test_classification_token_alone_never_approves_stderr"
+file = "python/src/kb_setup/graphify_health.py"
+old = "    unaccounted = evidence.stderr if evidence.residual_stderr is None else evidence.residual_stderr\n    if unaccounted.strip():"
+new = "    unaccounted = evidence.stderr if evidence.residual_stderr is None else evidence.residual_stderr\n    if unaccounted.strip() and not evidence.approved_classifications:"
+
+# The fail-closed default. `residual_stderr is None` means nobody computed one,
+# and treating that as "nothing left over" would make every caller that has not
+# been migrated silently stop checking stderr at all.
+[[arm]]
+id = "an-uncomputed-residual-reads-as-clean"
+test = "test_success_with_stderr_is_incomplete"
+file = "python/src/kb_setup/graphify_health.py"
+old = "    unaccounted = evidence.stderr if evidence.residual_stderr is None else evidence.residual_stderr"
+new = "    unaccounted = evidence.residual_stderr or \"\""
+
+# --------------------------------------------------------------------------
+# The truncation arithmetic — the fix that unblocked the build
+# --------------------------------------------------------------------------
+
+# Trusting the "(+N more)" suffix instead of deriving it. A warning whose suffix
+# disagrees with its own total is one we do not understand, and understanding is
+# the only thing separating this from approving arbitrary text.
+[[arm]]
+id = "more-suffix-is-not-checked-against-the-total"
+test = "test_truncated_zero_node_warning_mutations_do_not_approve"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "    if more != max(0, len(warned) - _ZERO_NODE_SHOWN_LIMIT):\n        return False"
+new = "    if False:\n        return False"
+
+# The count is what makes a NINTH zero-node file break the approval. Without it
+# the reviewed set no longer has to describe what graphify actually found.
+[[arm]]
+id = "the-file-count-no-longer-has-to-match"
+test = "test_truncated_zero_node_warning_mutations_do_not_approve"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "    if int(match.group(\"count\")) != len(warned):\n        return False"
+new = "    if False:\n        return False"
+
+# Set instead of multiset. Three different directories each hold a `plugin.json`
+# in the source that motivated this, and the warning shows basenames only — so a
+# set comparison accepts a warning naming one file three times.
+[[arm]]
+id = "shown-names-compared-as-a-set-not-a-multiset"
+test = "test_truncated_zero_node_warning_mutations_do_not_approve"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "    available = Counter(PurePosixPath(item.relative_path).name for item in warned)\n    return not (Counter(shown) - available)"
+new = "    available = {PurePosixPath(item.relative_path).name for item in warned}\n    return set(shown) <= available"
+
+# --------------------------------------------------------------------------
+# The partial extraction: a COUNT, not an assertion
+# --------------------------------------------------------------------------
+
+# Drop the check against the sub-graph and `extracted_nodes` becomes decoration —
+# a number in a struct that nothing compares to anything. That is precisely the
+# #231 shape the entry exists to avoid.
+[[arm]]
+id = "the-measured-node-count-is-never-verified"
+test = "test_reviewed_partial_extraction_expires_when_the_parser_recovers_more"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "    return review.extracted_nodes_by_path.get(entry.relative_path) == entry.extracted_nodes"
+new = "    return True"
+
+# The bytes are what scope the approval to the file we measured. Without the
+# hash the approval survives any rewrite of the source at a later pin.
+[[arm]]
+id = "the-reviewed-bytes-stop-scoping-the-approval"
+test = "test_partial_extraction_refuses_when_the_reviewed_bytes_moved"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "        if _sha256_file(root / entry.relative_path) != entry.content_sha256:\n            return False"
+new = "        if False:\n            return False"
+
+# Approving a #2551 warning for a path nobody registered — the direct route to
+# approving unmeasured loss in a file that has never been looked at.
+[[arm]]
+id = "any-path-satisfies-the-partial-entry"
+test = "test_partial_extraction_mutations_do_not_approve"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = "    entry = next((item for item in inventory if item.relative_path == named), None)"
+new = "    entry = next(iter(inventory), None)"

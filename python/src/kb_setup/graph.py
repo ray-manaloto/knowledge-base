@@ -151,6 +151,44 @@ _EXPECTED_UNCLASSIFIED = (
     ),
 )
 
+# `Attacca` emits EIGHT metadata-only JSON files, which is why the truncation
+# handling in `graphify_sdk._zero_node_warning_matches` exists: graphify shows
+# five names then "(+3 more)", so the old whole-name reconstruction could never
+# have matched this source however correctly it was registered.
+#
+# The set is closed, not sampled. 18 files on disk carry a code extension;
+# `website/package-lock.json` is in graphify's `detect.py:_SKIP_FILES` so it is
+# never scanned, which is graphify's own "found 17 code"; 9 of those 17 produce
+# nodes; 17 - 9 = the 8 below. Hashes taken at pin 34a52ce09db1.
+_ATTACCA_METADATA_ONLY_PATHS = (
+    (".claude/settings.json", "546fd30432a10ecb0f9001b81d4dc1eeaacadf30895a1bff489a215cac443e58"),
+    (
+        ".claude-plugin/marketplace.json",
+        "2cbb15ef62c4b5786e52658e9e1f3231c8544206907529c1e4355f925348363d",
+    ),
+    (
+        "plugins/attacca-core/.claude-plugin/plugin.json",
+        "bc3467422688bff8f3c6ccfd156a65bff7ae81bdf95c7f369cf24706168bc519",
+    ),
+    (
+        "plugins/attacca-core/hooks/hooks.json",
+        "f77693d5fd143fe932754dac3703b02d1c703bb3f5af353c57e96e46657e11a1",
+    ),
+    (
+        "plugins/attacca-init/.claude-plugin/plugin.json",
+        "3d1388fe93229e64cd652f9588ffc2f4fe24665223ebbdc847f53d85a6295bb5",
+    ),
+    (
+        "plugins/attacca-security/.claude-plugin/plugin.json",
+        "321eb2e27ae8ed992c84dbe9f327eb3c091728d0c11b3adf5f6e9db0484f7393",
+    ),
+    (
+        "plugins/attacca-security/hooks/hooks.json",
+        "1fcf319836784f10d6639cb991978388bf1238fa5837032a475fca0df50cfc50",
+    ),
+    ("template/settings.json", "20a9b142dd55131bf2968632b84bdf63a9a7359e238bf6a5ff46d94e2008a3a1"),
+)
+
 _EXPECTED_METADATA_ONLY = (
     graphify_health.ExpectedMetadataOnly(
         source_name="10x-Team",
@@ -175,6 +213,51 @@ _EXPECTED_METADATA_ONLY = (
         relative_path="gemini-extension.json",
         content_sha256="a2dff2cfbac3d49bbe87501ccb93460b8f3e8a4c0d39787fd4d933cea2318608",
         skipped_disposition="data json (not a config/manifest)",
+    ),
+    # All eight are object-rooted JSON that `json_config._is_config_json` declines,
+    # which is the ONLY route to a zero-node JSON with an object root — the other
+    # skip ("data json (non-object root)") cannot apply to any of them.
+    *(
+        graphify_health.ExpectedMetadataOnly(
+            source_name="Attacca",
+            relative_path=relative_path,
+            content_sha256=content_sha256,
+            skipped_disposition="data json (not a config/manifest)",
+        )
+        for relative_path, content_sha256 in _ATTACCA_METADATA_ONLY_PATHS
+    ),
+)
+
+# `website/src/pages/index.astro`, the ONE reviewed partial extraction (#328).
+#
+# MEASURED, because the warning states no count and a remedy chosen without one
+# is chosen blind: the file yields exactly 1 node — its own file stub — and none
+# of its 25 named symbols. Enumerated from the file at this pin: 5 frontmatter
+# consts (GITHUB_URL, BRANCH, plugins, SKILLS, FEATURED), 7 named functions in
+# the inline <script> (copyInstall, appendLine, appendEcho, appendAgent,
+# runCommand, updateSuggestions, openPluginModal) and 13 script-level bindings.
+# Control arm: `scripts/validate-plugins.mjs` in the same source yields 9 symbol
+# nodes, so graphify's JS extractor works here and the loss is `.astro`-specific.
+#
+# Root cause is NOT the generic parse-recovery of #2551. `graphify/extract.py`
+# `extract_astro` parses the WHOLE file as JS — its own docstring says that
+# "produces a top-level ERROR node because the template is not valid JS" — and
+# then regex-rescues IMPORTS only. `extract_vue`, 70 lines further down the same
+# file, masks the non-<script> regions and recovers "imports, symbols, and type
+# refs". This file has no imports at all, so the rescue recovers nothing.
+# Upstream #2551 is watched in `currency.toml` so its close surfaces as movement.
+_EXPECTED_PARTIAL_EXTRACTION = (
+    graphify_health.ExpectedPartialExtraction(
+        source_name="Attacca",
+        relative_path="website/src/pages/index.astro",
+        content_sha256="355b3510c6b9b7ecba2e23a70eeebbc73edf8c372a91cba74d497479540aa942",
+        first_error_line=1,
+        extracted_nodes=1,
+        lost_symbols=25,
+        reason=(
+            "graphify extract_astro parses the whole .astro file as JS and "
+            "regex-rescues imports only; this file has none (#2551)"
+        ),
     ),
 )
 
@@ -295,6 +378,23 @@ def _rev_parse(clone_dir: Path, revision: str) -> str:
     return identity
 
 
+def _nodes_by_source_file(nodes: list[object]) -> dict[str, int]:
+    """Per-file node totals from the sub-graph graphify just wrote.
+
+    This is what turns a reviewed partial-extraction entry from an assertion into
+    a measurement: the entry states how many nodes the file contributes, and the
+    approval is checked against what actually landed.
+    """
+    counts: Counter[str] = Counter()
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        source_file = node.get("source_file")
+        if isinstance(source_file, str) and source_file:
+            counts[source_file] += 1
+    return dict(counts)
+
+
 def _extract_code(repo_root: Path, name: str) -> bool:
     """AST-extract one source's code into its own sub-graph; True iff it made nodes.
 
@@ -329,11 +429,16 @@ def _extract_code(repo_root: Path, name: str) -> bool:
     if isinstance(raw_nodes, list):
         nodes = raw_nodes
     inventory = tuple(item for item in _EXPECTED_METADATA_ONLY if item.source_name == name)
-    approved = graphify_sdk.approve_metadata_zero_node_warning(
+    partial = tuple(item for item in _EXPECTED_PARTIAL_EXTRACTION if item.source_name == name)
+    approved, residual = graphify_sdk.account_for_extract_stderr(
         source_root,
-        name,
         proc.stderr or "",
-        inventory,
+        graphify_sdk.ExtractWarningReview(
+            source_name=name,
+            metadata_inventory=inventory,
+            partial_inventory=partial,
+            extracted_nodes_by_path=_nodes_by_source_file(nodes),
+        ),
     )
     receipt = graphify_health.assess(
         graphify_health.GraphifyOperation.EXTRACT,
@@ -343,6 +448,7 @@ def _extract_code(repo_root: Path, name: str) -> bool:
             stdout=proc.stdout or "",
             stderr=proc.stderr or "",
             approved_classifications=approved,
+            residual_stderr=residual,
             detected_sources=1,
             extracted_sources=1 if nodes else 0,
             zero_node_sources=0 if nodes else 1,

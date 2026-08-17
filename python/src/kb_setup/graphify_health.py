@@ -11,6 +11,7 @@ from pathlib import PurePosixPath
 import msgspec
 
 APPROVED_METADATA_ZERO_NODE_WARNING = "approved-reviewed-metadata-zero-node"
+APPROVED_PARTIAL_EXTRACTION_WARNING = "approved-reviewed-partial-extraction"
 
 
 class GraphifyOperation(StrEnum):
@@ -66,6 +67,9 @@ class GraphifyReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     unsupported_language_tally: tuple[tuple[str, int], ...] = ()
     timed_out: bool = False
     approved_classifications: tuple[str, ...] = ()
+    #: Retained so a reader can see WHICH stderr blocked, not merely that some
+    #: did — the reason string is one word and the raw stderr may be pages.
+    residual_stderr: str | None = None
     mode: str | None = None
     expected_artifacts: tuple[str, ...] = ()
     produced_artifacts: tuple[str, ...] = ()
@@ -94,6 +98,30 @@ class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     relative_path: str
     content_sha256: str
     skipped_disposition: str
+
+
+class ExpectedPartialExtraction(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Reviewed file Graphify's parser only recovers partially, with the loss COUNTED.
+
+    Graphify's #2551 warning says "may be partially extracted" and states no
+    count, so registering one of these without a number would approve an unknown
+    quantity of corpus loss — the #231 shape. `extracted_nodes` is therefore
+    checked against the sub-graph at build time, and `lost_symbols` records the
+    reviewed measurement of what is missing.
+    """
+
+    source_name: str
+    relative_path: str
+    content_sha256: str
+    #: The line the warning names. Pinned so a parser whose failure MOVES stops
+    #: matching this entry rather than silently reusing its approval.
+    first_error_line: int
+    #: Nodes the file actually contributes. VERIFIED against the emitted
+    #: sub-graph, never trusted from this file.
+    extracted_nodes: int
+    #: Named symbols absent from the graph — the reviewed measurement.
+    lost_symbols: int
+    reason: str
 
 
 class ExpectedUnclassifiedFile(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -127,6 +155,17 @@ class GraphifyEvidence(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     coverage_policy: SourceCoveragePolicy | None = None
     timed_out: bool = False
     approved_classifications: tuple[str, ...] = ()
+    #: Stderr left over after every REVIEWED warning block was removed by name.
+    #: `None` means no caller computed it, and then the full `stderr` blocks —
+    #: absence of a residual is never absence of a problem.
+    #:
+    #: This exists because approval used to be whole-stderr: one recognised
+    #: token approved everything the subprocess printed. One source can emit two
+    #: independent warnings (measured on `Attacca`: an 8-file zero-node warning
+    #: AND a #2551 partial-extraction warning), and under whole-stderr approval
+    #: registering either one could never approve the pair — while a single
+    #: token would have approved an unrelated third warning for free.
+    residual_stderr: str | None = None
     mode: str | None = None
     deep_required: bool = False
     reflection_expected: bool = False
@@ -143,9 +182,13 @@ def _basic_reasons(evidence: GraphifyEvidence) -> list[str]:
         reasons.append("evidence-missing")
     if evidence.timed_out:
         reasons.append("timeout")
-    if evidence.stderr.strip() and (
-        evidence.approved_classifications != (APPROVED_METADATA_ZERO_NODE_WARNING,)
-    ):
+    # Approval is per WARNING, never per subprocess. `residual_stderr` is what a
+    # caller could not account for by name; when it was never computed, the whole
+    # of stderr is unaccounted for. A classification token records WHY something
+    # was approved — it has never been sufficient on its own, and is deliberately
+    # not consulted here, so a token can no longer approve text nobody read.
+    unaccounted = evidence.stderr if evidence.residual_stderr is None else evidence.residual_stderr
+    if unaccounted.strip():
         reasons.append("stderr")
     if "truncated" in f"{evidence.stdout}\n{evidence.stderr}".casefold():
         reasons.append("truncated")
@@ -263,6 +306,7 @@ def assess(
         unsupported_language_tally=_language_tally(unsupported),
         timed_out=evidence.timed_out,
         approved_classifications=evidence.approved_classifications,
+        residual_stderr=evidence.residual_stderr,
         mode=evidence.mode,
         expected_artifacts=evidence.expected_artifacts,
         produced_artifacts=evidence.produced_artifacts,
@@ -289,6 +333,13 @@ def require_complete(receipt: GraphifyReceipt) -> GraphifyReceipt:
             evidence.append(f"zero_nodes={list(receipt.zero_node_paths)!r}")
         if receipt.ignored_paths:
             evidence.append(f"ignored={list(receipt.ignored_paths)!r}")
+        if "stderr" in receipt.reasons:
+            # The line(s) nobody accounted for, bounded. `stderr` on its own sent
+            # a reader to re-run the build to find out WHICH warning blocked.
+            unaccounted = (
+                receipt.stderr if receipt.residual_stderr is None else receipt.residual_stderr
+            )
+            evidence.append(f"unaccounted_stderr={unaccounted.strip()[:400]!r}")
         suffix = f"; {'; '.join(evidence)}" if evidence else ""
         raise IncompleteGraphifyOperationError(
             f"Graphify {receipt.operation.value} failed closed "
