@@ -140,3 +140,63 @@ test = "test_the_installed_graphify_classifies_our_truncation_hint_as_retryable"
 file = "python/src/kb_setup/graphify_semantic_slice.py"
 old = "    \"the model stopped at max_completion_tokens: this chunk's prompt is too long \"\n    \"for one response and must be extracted in halves\""
 new = "    \"the model stopped early and the chunk must be extracted in halves\""
+
+# ==========================================================================
+# ROUND 2 — the cold codex lane's findings on the fix commit itself
+#
+# The first round's fixes went to a real `codex exec` cross-family lane (verified
+# by process tree, not by a label). It returned 5 findings, 1 HIGH, on the FIX
+# COMMIT — which is the shape `.claude/rules` keeps naming: a fix is the
+# least-reviewed code in a diff, and one of these was CAUSED by a fix above.
+#
+# The HIGH deserves its own note. graphify's adaptive retry bisects a chunk into
+# N provider calls and merges them into ONE callback, so the adapter's
+# single-path metadata ends up describing the last leaf while the fragment covers
+# the whole chunk. That was already unstageable — but it was refused as
+# `provider-prompt-bytes-mismatch`, a reason meaning the retained bytes are not
+# what was sent, when the truth was that the evidence was partial. The
+# `truncation-hint` fix above WIDENED the path into it, by making truncation
+# trigger a bisect where it previously failed the chunk outright.
+#
+# What is NOT armed here, stated rather than implied:
+#
+#   * that a bisected chunk can now stage. It cannot, and the fix does not claim
+#     to make it. Per-call metadata plus a proof that the leaves' prompts cover
+#     the chunk's members would be needed. The fix converts a wrong diagnosis
+#     into a right one and makes `attempts` stop lying.
+#   * the `cache_policy` string or the `accepted_graphify_runtime` docstring.
+#     Both are values, not behaviour; the plan digest covers the first and
+#     nothing can mutate the second into a failure.
+#   * the graphify serialization tripwire. Killing it means mutating the pinned
+#     package inside `.venv`, which no arm here will do.
+# ==========================================================================
+
+# The HIGH, reverted: stop counting the markers. A bisected chunk goes back to
+# being refused for the wrong reason, after paying for every leaf.
+[[arm]]
+id = "multi-call-evidence-goes-unnoticed"
+test = "test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "    if provider_calls > 1:"
+new = "    if False:"
+
+# The false-red twin, and the failure mode a count-based guard invites: refuse
+# the ordinary single-call chunk too. This is what the test's control half is
+# for, and without it the arm above could pass against a guard that refuses
+# everything.
+[[arm]]
+id = "single-call-chunk-refused-as-multi-call"
+test = "test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "    if provider_calls > 1:"
+new = "    if provider_calls > 0:"
+
+# The marker count is read BEFORE `clear_stale_evidence` wipes the directory.
+# Moving it after is the natural tidy-up — one glob beside the other — and it
+# silently makes the count always zero.
+[[arm]]
+id = "marker-count-taken-after-the-rotation"
+test = "test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "    markers = (\n        len(tuple(boundary_dir.glob(\"provider-boundary-*.json\"))) if boundary_dir.is_dir() else 0\n    )\n    try:"
+new = "    markers = 0\n    try:"

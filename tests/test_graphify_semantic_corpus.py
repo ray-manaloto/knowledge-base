@@ -1513,6 +1513,47 @@ def test_corpus_refuses_provider_evidence_without_bound_parse_observation() -> N
     )
 
 
+def test_an_impossible_negative_cost_is_refused_like_an_over_budget_one(
+    tmp_path: Path,
+) -> None:
+    """The cost check bounds BOTH ends, because only one end was a real bound.
+
+    It checked `cost <= max` alone, so `total_cost_usd = -1.0` passed — an
+    impossible cost, and exactly the shape a missing-value sentinel takes, which
+    means an adapter that failed to observe the cost sailed through the check
+    that exists to observe it. The slice validator has always checked
+    `0.0 <= cost <= max`; this was the corpus copy of one rule drifting looser.
+
+    Three arms off ONE real committed fixture: negative refused, over-budget
+    refused, and the fixture's own cost accepted. The last is the control — the
+    first two would both pass against a check that refuses everything.
+    """
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "docs/agents/evidence/issue-301/corrected-max-chunk-terminal"
+    )
+    metadata = msgspec.json.decode(
+        (root / "adapter-metadata.json").read_bytes(),
+        type=graphify_semantic_adapter.AdapterMetadata,
+        strict=True,
+    )
+    config = msgspec.json.decode(
+        (_exact_graphify_plan(tmp_path) / "execution-config.json").read_bytes(),
+        type=graphify_semantic_corpus.CorpusExecutionConfig,
+        strict=True,
+    )
+    reason = "provider-adapter-cost-bound-exceeded"
+
+    negative = msgspec.structs.replace(metadata, total_cost_usd=-1.0)
+    assert reason in graphify_semantic_corpus._adapter_config_reasons(negative, config)
+
+    over = msgspec.structs.replace(metadata, total_cost_usd=config.max_cost_usd + 1.0)
+    assert reason in graphify_semantic_corpus._adapter_config_reasons(over, config)
+
+    within = msgspec.structs.replace(metadata, total_cost_usd=0.0)
+    assert reason not in graphify_semantic_corpus._adapter_config_reasons(within, config)
+
+
 def test_file_backed_authority_converges_without_changing_planner_bytes(tmp_path: Path) -> None:
     source = tmp_path / "source"
     commit, tree = _source(source)

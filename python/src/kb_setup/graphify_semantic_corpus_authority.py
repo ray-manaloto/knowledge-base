@@ -75,12 +75,19 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # same workload — this is the code-identity case this file's doctrine above
 # describes, and it was verified rather than asserted.
 #
-# WHAT MOVED: exactly five fields of `execution-config.json`, and the manifest
+# WHAT MOVED: exactly six fields of `execution-config.json`, and the manifest
 # containing it. Four are the digests of the files this round edited —
 # `runner_sha256`, `semantic_slice_sha256`, `adapter_sha256`, `planner_sha256` —
-# and the fifth, `cache_namespace_sha256`, is derived from them. Diffed field by
-# field: NO behavioural field moved. Same model, same `--effort high`, same
-# budget, same concurrency of 1, same retry depth, same chunk size.
+# and `cache_namespace_sha256` is derived from them.
+#
+# The sixth is the one that is NOT mere identity, and it is a CORRECTION rather
+# than a change of intent: `cache_policy` was `warm-read-atomic-per-chunk` and is
+# now `checkpoint-write-atomic-per-chunk`. The old value asserted a cache READ
+# this call path never performs — measured, not assumed — so the field described
+# behaviour the run could not exhibit. Nothing about what the run DOES changed;
+# what changed is that the record stopped being false. Same model, same
+# `--effort high`, same budget, same concurrency of 1, same retry depth, same
+# chunk size.
 #
 # WHAT DID NOT: `advisories.json`, `exclusions.json`, `source-inventory.json` and
 # `chunk-ledger.json` all came back BYTE-IDENTICAL, at the same source commit
@@ -99,8 +106,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # after.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"a219f4bc6700254d441141e9768b011e6122a2b9426c522d6b1beea49e5c0c06",'
+    b'"execution_config_sha256":"760157f30c6024d1b75bad9008224538035d5047f0645baeaa7e0a72dd7c3662",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"2e7af8b291515d10abcd1a41da3b72509732a5fe7b59f79781af9cb931afbb73",'
+    b'"plan_manifest_sha256":"14160136c9faffc48a34b729dfae500e1c738afa487796809f3158da91ee9c54",'
     b'"schema_version":1}\n'
 )

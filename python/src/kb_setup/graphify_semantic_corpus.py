@@ -688,7 +688,13 @@ def _effective_config(
         # chunks in one process collide on both regardless of what graphify allows.
         concurrency=1,
         deep_mode=True,
-        cache_policy="warm-read-atomic-per-chunk",
+        # "checkpoint-write", not "warm-read-atomic-per-chunk". The old value
+        # asserted a cache READ this path never performs, and it is the same
+        # falsehood as the `graphify_no_incremental_cache` comment above —
+        # corrected there in prose while this, the MACHINE-READABLE field, kept
+        # saying it. A reader who checks the config rather than the comment gets
+        # the wrong answer, which is the worse of the two places to leave it.
+        cache_policy="checkpoint-write-atomic-per-chunk",
         source_inventory_sha256=inventory_sha256,
         exclusions_sha256=exclusions_sha256,
         chunk_ledger_sha256=ledger_sha256,
@@ -1971,7 +1977,16 @@ def _adapter_config_reasons(
         ),
         (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
         (not forbidden_environment, "provider-adapter-endpoint-policy-mismatch"),
-        (metadata.total_cost_usd <= config.max_cost_usd, "provider-adapter-cost-bound-exceeded"),
+        # BOTH bounds. The upper one alone accepted `total_cost_usd = -1.0` — an
+        # impossible cost, and exactly the shape a missing-value sentinel takes,
+        # so an adapter that failed to observe the cost would have passed the
+        # check that exists to observe it. The slice validator has always checked
+        # `0.0 <= cost <= max` (`graphify_semantic_slice.py`); this is the corpus
+        # copy of one rule drifting from it in the looser direction.
+        (
+            0.0 <= metadata.total_cost_usd <= config.max_cost_usd,
+            "provider-adapter-cost-bound-exceeded",
+        ),
         (usage_valid, "provider-adapter-model-usage-mismatch"),
     )
     return [reason for accepted, reason in checks if not accepted]

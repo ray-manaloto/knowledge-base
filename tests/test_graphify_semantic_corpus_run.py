@@ -411,12 +411,42 @@ def test_graphify_still_force_serializes_the_claude_cli_backend() -> None:
     release lifts the clamp — so the concurrency decision gets re-made rather
     than staying at 1 forever. Behind the plan guard it went quiet on exactly the
     machines that had not generated a plan, which is most of them.
+
+    Asserted STRUCTURALLY, against the clamp's own statement. It used to assert
+    that the strings `backend == "claude-cli"` and `GRAPHIFY_CLAUDE_CLI_PARALLEL`
+    both appeared somewhere in a file of several thousand lines, which stays true
+    if the assignment they guard is deleted — the tripwire would keep passing
+    through exactly the release it exists to catch. Both strings survive in the
+    docstring of the function itself, so this was not a hypothetical margin.
     """
+    import ast
+    import inspect
+
     import graphify.llm
 
-    source = Path(graphify.llm.__file__).read_text(encoding="utf-8")
-    assert 'backend == "claude-cli"' in source
-    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" in source
+    tree = ast.parse(inspect.getsource(graphify.llm.extract_corpus_parallel))
+    clamps = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.If)
+        and "claude-cli" in ast.dump(node.test)
+        and any(
+            isinstance(stmt, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "max_concurrency" for t in stmt.targets)
+            and isinstance(stmt.value, ast.Constant)
+            and stmt.value.value == 1
+            for stmt in node.body
+        )
+    ]
+    assert clamps, (
+        "graphify no longer clamps max_concurrency to 1 for the claude-cli backend "
+        "inside extract_corpus_parallel — the plan records concurrency=1 as a "
+        "MEASUREMENT of this clamp, so that decision must be re-made"
+    )
+    # The opt-out is what makes the clamp conditional rather than absolute, so a
+    # release that kept the clamp but dropped the escape hatch is also a change
+    # worth noticing.
+    assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" in ast.dump(clamps[0].test)
 
 
 @pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
@@ -565,6 +595,63 @@ def test_a_stage_directory_that_is_not_this_chunks_evidence_is_a_failure(
     assert all(
         reason.startswith("chunk-stage-unverifiable: ") for reason in summary.outcomes[0].reasons
     ), summary.outcomes[0].reasons
+
+
+@_needs_driver
+def test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """N provider calls for one chunk must be diagnosed, not mistaken for corruption.
+
+    graphify's `_extract_with_adaptive_retry` recurses on halves and merges, then
+    fires ONE callback — so a bisected chunk leaves N boundary markers and a
+    metadata file overwritten down to the LAST leaf, against a fragment covering
+    the whole chunk. The prompt digests then cannot agree, and the chunk was
+    refused as `provider-prompt-bytes-mismatch`: a reason meaning "the retained
+    bytes are not what was sent", for a run whose bytes were fine and merely
+    partial. The markers proving how many calls happened were being deleted
+    unexamined.
+
+    The control arm is the second half — ONE marker is the ordinary case and must
+    still stage — or this would pass against an implementation that refused every
+    chunk, which is the failure mode a count-based guard invites.
+    """
+    calls: list[int] = []
+
+    def driver_bisected(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        # Exactly what a bisected chunk leaves behind: three crossings, one
+        # metadata file, one callback.
+        for index in range(3):
+            (context.boundary_dir / f"provider-boundary-{index}.json").write_text("{}")
+        context.metadata_path.write_bytes(b"{}")
+        calls.append(1)
+        on_chunk_done(0, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver_bisected, result={"failed_chunks": 0})
+    summary = _execute(tmp_path)
+
+    assert summary.failed == 1
+    assert calls == [1], "the callback fired more than once; this is not the bisect shape"
+    reasons = summary.outcomes[0].reasons
+    assert any("provider-multi-call-evidence" in reason for reason in reasons), reasons
+    assert any("3 provider calls" in reason for reason in reasons), reasons
+
+    def driver_single(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        (context.boundary_dir / "provider-boundary-0.json").write_text("{}")
+        context.metadata_path.write_bytes(b"{}")
+        on_chunk_done(0, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver_single, result={"failed_chunks": 0})
+    single = _execute(tmp_path)
+    assert not any(
+        "provider-multi-call-evidence" in reason
+        for outcome in single.outcomes
+        for reason in outcome.reasons
+    ), "a single-call chunk was refused as multi-call, so the count is not discriminating"
 
 
 @_needs_driver

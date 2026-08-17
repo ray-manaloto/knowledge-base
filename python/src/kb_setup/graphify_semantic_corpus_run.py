@@ -398,8 +398,8 @@ def _provider_execution_config(
     )
 
 
-def _rotate_evidence(metadata_path: Path, boundary_dir: Path) -> bytes:
-    """Read this chunk's adapter metadata and clear the evidence for the next one.
+def _rotate_evidence(metadata_path: Path, boundary_dir: Path) -> tuple[bytes, int]:
+    """Read this chunk's adapter metadata, COUNT its provider calls, and rotate.
 
     Only the METADATA path still needs rotating. The boundary marker no longer
     does: the driver hands the adapter a DIRECTORY, so each invocation writes its
@@ -411,14 +411,31 @@ def _rotate_evidence(metadata_path: Path, boundary_dir: Path) -> bytes:
 
     Markers are cleared anyway, in a ``finally``, so a long run does not
     accumulate one file per chunk in a directory nothing prunes.
+
+    THE COUNT IS THE POINT, and it used to be thrown away. graphify's
+    ``_extract_with_adaptive_retry`` recurses on halves and merges, then
+    ``on_chunk_done`` fires ONCE — so a retried chunk makes N provider calls and
+    yields one merged fragment, while the adapter's metadata lives at a single
+    fixed path that every call overwrites. The callback therefore reads the LAST
+    LEAF's metadata against the WHOLE CHUNK's fragment, and the prompt digests
+    cannot agree. The chunk was already refused for that, but as
+    ``provider-prompt-bytes-mismatch`` — a reason describing corrupted evidence,
+    for a run whose evidence was merely incomplete — and the receipt still
+    recorded ``attempts=1`` after three calls.
+    ``_DIR`` mode exists precisely because "``…_PATH`` cannot serve a multi-call
+    run", so the markers proving N calls were being collected all along and
+    deleted unexamined. Counting them is what turns that into a diagnosis.
     """
+    markers = (
+        len(tuple(boundary_dir.glob("provider-boundary-*.json"))) if boundary_dir.is_dir() else 0
+    )
     try:
         metadata_raw = metadata_path.read_bytes()
     except OSError as exc:
         raise ValueError("semantic adapter metadata is unavailable") from exc
     finally:
         clear_stale_evidence(metadata_path, boundary_dir)
-    return metadata_raw
+    return metadata_raw, markers
 
 
 def clear_stale_evidence(metadata_path: Path, boundary_dir: Path) -> None:
@@ -449,7 +466,24 @@ def _stage_completed_chunk(
     # Bytes, unnormalized: `stage_chunk` digests exactly what the adapter wrote.
     # Decoding and re-encoding here would digest this module's serializer instead
     # of the provider's own evidence, and the two agree only by luck.
-    metadata_raw = _rotate_evidence(context.metadata_path, context.boundary_dir)
+    metadata_raw, provider_calls = _rotate_evidence(context.metadata_path, context.boundary_dir)
+    if provider_calls > 1:
+        # graphify bisected this chunk. Refused HERE, by name, rather than left to
+        # surface downstream as a prompt-digest mismatch: the digests really do
+        # disagree, but they disagree because this chunk's evidence covers one
+        # leaf of a split — not because anything was corrupted, which is what
+        # that reason says. Raising a `ValueError` puts it on the callback's
+        # existing per-chunk failure path, so the other 57 still run.
+        #
+        # This does NOT make a retried chunk stageable, and is not meant to. The
+        # adapter would have to write per-call metadata and the driver prove the
+        # leaves' prompts cover the chunk's members before that could be true.
+        # What it removes is the false report: a wrong cause, and an `attempts`
+        # count of 1 that this number contradicts.
+        raise ValueError(
+            f"provider-multi-call-evidence: {provider_calls} provider calls for one chunk, "
+            "so the retained metadata covers only the last; a bisected chunk cannot stage"
+        )
     metadata = msgspec.json.decode(
         metadata_raw, type=graphify_semantic_adapter.AdapterMetadata, strict=True
     )
