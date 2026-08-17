@@ -33,7 +33,7 @@ SWAPPED the reason on `attempts > 1`, so a genuinely corrupt chunk following a
 failed one was renamed a bisect. Fixed by making it ADDITIVE: the prompt
 mismatch is always true and always reported; the count only ever appends an
 explanation. Nothing available can separate a real bisect from
-corruption-plus-carry-over, so a reason claiming to over-asserts.
+corruption-plus-carry-over, so a reason claiming either cause over-asserts.
 
 The two low findings were both this session overstating its own prose: a
 docstring that named version numbers in the sentence declaring it named none
