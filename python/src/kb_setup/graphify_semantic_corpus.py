@@ -1874,8 +1874,12 @@ def _provider_chunk_reasons(
     if metadata.prompt_sha256 != expected_prompt_sha256 or any(
         item.prompt_sha256 != expected_prompt_sha256 for item in provider.chunks
     ):
-        # WHICH mismatch, because the remedies are opposite. Both land here, and
-        # the reason used to name only the first:
+        # The mismatch is ALWAYS reported, because it is always true: the retained
+        # prompt bytes are not the ones this chunk's members produce. What the
+        # observed call count adds is a possible EXPLANATION, and it is appended
+        # rather than substituted.
+        #
+        # Two things land here with opposite remedies:
         #
         # * corrupted — the retained bytes are not what was sent. Investigate the
         #   adapter, the evidence tree, the disk.
@@ -1884,16 +1888,22 @@ def _provider_chunk_reasons(
         #   therefore describes only the last leaf. Nothing is corrupt; the
         #   evidence covers a fraction of the chunk. Re-plan with smaller chunks.
         #
-        # `attempts` is the observed provider-call count and separates them. It
-        # is only trusted HERE, where the prompt comparison has already
-        # established that this chunk's evidence is wrong — the count alone is
-        # not chunk-scoped (a failed chunk strands its marker for the next one),
-        # so using it as the primary signal produced false refusals.
-        reasons.append(
-            "provider-multi-call-evidence"
-            if provider.attempts > 1
-            else "provider-prompt-bytes-mismatch"
-        )
+        # An earlier version SWAPPED the reason on `attempts > 1`, and a cold lane
+        # showed why that is wrong: `attempts` counts boundary markers, and that
+        # directory is not chunk-scoped — a chunk whose provider call FAILS never
+        # reaches the callback that clears it, so its marker lands in the next
+        # chunk's count. A genuinely CORRUPT chunk following a failed one was
+        # therefore renamed a bisect and handed the wrong remedy. Demonstrated:
+        # `corrupt_plus_stray_reasons == ['provider-multi-call-evidence']`.
+        #
+        # Additive keeps every case honest. Corruption always says so; a bisect
+        # says so too and carries the count that explains it; the compound case
+        # says both, which is exactly what is known. Nothing here can distinguish
+        # a bisect from corruption-plus-carry-over, and a reason that claimed to
+        # would be asserting more than the evidence supports.
+        reasons.append("provider-prompt-bytes-mismatch")
+        if provider.attempts > 1:
+            reasons.append("provider-multi-call-evidence")
     if any(item.prompt_sha256 != metadata.prompt_sha256 for item in provider.chunks):
         reasons.append("provider-prompt-identity-mismatch")
     schema = _argv_value(metadata.argv, "--json-schema")

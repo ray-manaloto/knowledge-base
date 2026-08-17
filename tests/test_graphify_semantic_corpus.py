@@ -1835,25 +1835,27 @@ def test_chunk_stage_rejects_coherently_rehashed_runtime_and_prompt_identity(
 
 
 def test_a_bisected_chunk_is_named_partial_not_corrupt(tmp_path: Path) -> None:
-    """One prompt mismatch, two causes, opposite remedies — `attempts` separates them.
+    """A prompt mismatch is always reported; the call count only EXPLAINS it.
 
     A chunk whose prompt digest disagrees with the plan is either CORRUPT (the
     retained bytes are not what was sent — investigate the adapter and the disk)
     or PARTIAL (graphify bisected it into N provider calls and merged them into
     one callback, so the adapter's single-path metadata describes only the last
-    leaf — re-plan with smaller chunks). Both landed on
-    `provider-prompt-bytes-mismatch`, which asserts the first.
+    leaf — re-plan with smaller chunks). Both used to land on
+    `provider-prompt-bytes-mismatch` alone, which asserts the first.
 
     Both arms are the SAME forged mismatch and differ only in `attempts`, so this
-    tests the discrimination rather than the mismatch. An implementation that
-    always says one word fails whichever arm it does not say.
+    tests the explanation rather than the mismatch.
 
-    `attempts` is deliberately only consulted HERE, where the prompt comparison
-    has already established the evidence is wrong. It is a count of boundary
-    markers, and that directory is not chunk-scoped — a chunk whose provider call
-    FAILS never reaches the callback that clears it, so its marker lands in the
-    next chunk's count. A guard keyed on the count alone falsely refused good
-    single-call chunks; that is why the count is a tie-breaker and not a trigger.
+    ADDITIVE rather than a swap, and that distinction is a fix in its own right.
+    An earlier version SUBSTITUTED the multi-call reason when `attempts > 1`, and
+    a cold lane refuted it: `attempts` counts boundary markers, and that
+    directory is not chunk-scoped — a chunk whose provider call FAILS never
+    reaches the callback that clears it, so its marker lands in the next chunk's
+    count. A genuinely corrupt chunk following a failed one was renamed a bisect
+    and handed the wrong remedy. Nothing available here can tell a real bisect
+    from corruption-plus-carry-over, so the mismatch is stated unconditionally
+    and the count is offered as the additional fact it actually is.
     """
     repo_root = Path(__file__).parent.parent
     candidate = _execution_plan(tmp_path, repo_root)
@@ -1879,9 +1881,11 @@ def test_a_bisected_chunk_is_named_partial_not_corrupt(tmp_path: Path) -> None:
         )
         return receipt
 
+    # ADDITIVE, not a swap. The mismatch is always true and is always reported;
+    # the call count only ever ADDS an explanation for it.
     bisected = stage(3, "bisected")
+    assert "provider-prompt-bytes-mismatch" in bisected.reasons
     assert "provider-multi-call-evidence" in bisected.reasons
-    assert "provider-prompt-bytes-mismatch" not in bisected.reasons
 
     corrupt = stage(1, "corrupt")
     assert "provider-prompt-bytes-mismatch" in corrupt.reasons

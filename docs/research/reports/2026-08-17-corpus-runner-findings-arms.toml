@@ -189,21 +189,32 @@ file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
 old = "    markers = (\n        len(tuple(boundary_dir.glob(\"provider-boundary-*.json\"))) if boundary_dir.is_dir() else 0\n    )\n    try:"
 new = "    markers = 0\n    try:"
 
-# `attempts` goes back to the hardcoded 1 it was, which is the false number this
-# whole thread started from.
+# The discriminator branch is deleted, so a bisect stops being NAMED even though
+# the count that explains it was observed.
+#
+# NAMED FOR WHAT IT MEASURES, which is narrower than an earlier id claimed. It
+# was called `attempts-hardcoded-instead-of-observed`, and a cold lane pointed
+# out that it does not touch `attempts=provider_calls` at all — reverting that
+# production wiring to a literal `1` leaves BOTH tests green, because the
+# rotation test checks the count in isolation and the corpus test forges
+# `attempts` into its own fixture. So the count-to-receipt composition is
+# UNARMED, and is recorded here as unarmed rather than implied to be covered by
+# an arm whose name promised it. Observing it needs a staged chunk over a real
+# source tree, which this harness does not have.
 [[arm]]
-id = "attempts-hardcoded-instead-of-observed"
+id = "bisect-explanation-never-appended"
 test = "test_a_bisected_chunk_is_named_partial_not_corrupt"
 file = "python/src/kb_setup/graphify_semantic_corpus.py"
-old = "            \"provider-multi-call-evidence\"\n            if provider.attempts > 1\n            else \"provider-prompt-bytes-mismatch\""
-new = "            \"provider-prompt-bytes-mismatch\""
+old = "        if provider.attempts > 1:\n            reasons.append(\"provider-multi-call-evidence\")"
+new = "        if False:\n            reasons.append(\"provider-multi-call-evidence\")"
 
-# The opposite error: every prompt mismatch is called a bisect, so genuine
-# CORRUPTION is reported as a chunk that merely needs re-planning — the wrong
-# remedy, confidently named.
+# The reason is SWAPPED rather than appended — the exact shape a cold lane
+# refuted. A corrupt chunk following a failed one inherits the stray marker, so
+# `attempts > 1` renames real corruption a bisect and hands over the wrong
+# remedy. The mismatch must always be reported; the count only ever explains it.
 [[arm]]
-id = "every-prompt-mismatch-called-a-bisect"
+id = "explanation-substituted-for-the-mismatch"
 test = "test_a_bisected_chunk_is_named_partial_not_corrupt"
 file = "python/src/kb_setup/graphify_semantic_corpus.py"
-old = "            \"provider-multi-call-evidence\"\n            if provider.attempts > 1\n            else \"provider-prompt-bytes-mismatch\""
-new = "            \"provider-multi-call-evidence\""
+old = "        reasons.append(\"provider-prompt-bytes-mismatch\")\n        if provider.attempts > 1:"
+new = "        if provider.attempts <= 1:\n            reasons.append(\"provider-prompt-bytes-mismatch\")\n        if provider.attempts > 1:"

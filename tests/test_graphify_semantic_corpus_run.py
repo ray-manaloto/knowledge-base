@@ -617,8 +617,15 @@ def test_rotation_counts_the_provider_crossings_before_it_clears_them(
 
     The count is taken BEFORE the rotation and that ordering is the whole fix —
     `clear_stale_evidence` empties the directory, so a count taken afterwards is
-    always zero. The zero arm is the control: a stubbed counter returns a
-    constant and would pass the other two.
+    always zero.
+
+    The zero arm's job, stated accurately: it pins the ABSENT case to 0 rather
+    than to 1. The 1 and 3 arms already exclude every constant between them, so
+    the zero arm is not the control against a stubbed counter — an earlier
+    version of this docstring claimed it was, which is arithmetically false. What
+    it does exclude is a `max(1, count)`-style floor, the natural way someone
+    "fixes" an empty directory, and that would silently report one provider call
+    for a chunk that made none.
 
     What this does NOT establish: that a count above 1 REFUSES the chunk. It does
     not, and must not. This directory is not chunk-scoped — a chunk whose
