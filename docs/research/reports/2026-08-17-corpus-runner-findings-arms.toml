@@ -48,6 +48,13 @@
 suites = [
   "tests/test_graphify_semantic_corpus_run.py",
   "tests/test_graphify_semantic_slice.py",
+  # A NODE ID, not the file. `suites` is passed straight to pytest, and naming
+  # the whole file would pull in
+  # `test_recorded_authority_authorizes_this_plan_and_only_this_plan`, which
+  # fails under ANY byte change to the modules these arms mutate — breaking the
+  # CONTROL rather than adding a row. This selects only the test the arms below
+  # target.
+  "tests/test_graphify_semantic_corpus.py::test_a_bisected_chunk_is_named_partial_not_corrupt",
 ]
 
 [[arm]]
@@ -171,32 +178,32 @@ new = "    \"the model stopped early and the chunk must be extracted in halves\"
 #     package inside `.venv`, which no arm here will do.
 # ==========================================================================
 
-# The HIGH, reverted: stop counting the markers. A bisected chunk goes back to
-# being refused for the wrong reason, after paying for every leaf.
-[[arm]]
-id = "multi-call-evidence-goes-unnoticed"
-test = "test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence"
-file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
-old = "    if provider_calls > 1:"
-new = "    if False:"
-
-# The false-red twin, and the failure mode a count-based guard invites: refuse
-# the ordinary single-call chunk too. This is what the test's control half is
-# for, and without it the arm above could pass against a guard that refuses
-# everything.
-[[arm]]
-id = "single-call-chunk-refused-as-multi-call"
-test = "test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence"
-file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
-old = "    if provider_calls > 1:"
-new = "    if provider_calls > 0:"
-
-# The marker count is read BEFORE `clear_stale_evidence` wipes the directory.
-# Moving it after is the natural tidy-up — one glob beside the other — and it
-# silently makes the count always zero.
+# The count is taken BEFORE `clear_stale_evidence` empties the directory. Moving
+# it after is the natural tidy-up — one glob beside the other — and it silently
+# makes every count zero, so `attempts` goes back to being a constant that
+# happens to be wrong less often.
 [[arm]]
 id = "marker-count-taken-after-the-rotation"
-test = "test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence"
+test = "test_rotation_counts_the_provider_crossings_before_it_clears_them"
 file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
 old = "    markers = (\n        len(tuple(boundary_dir.glob(\"provider-boundary-*.json\"))) if boundary_dir.is_dir() else 0\n    )\n    try:"
 new = "    markers = 0\n    try:"
+
+# `attempts` goes back to the hardcoded 1 it was, which is the false number this
+# whole thread started from.
+[[arm]]
+id = "attempts-hardcoded-instead-of-observed"
+test = "test_a_bisected_chunk_is_named_partial_not_corrupt"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = "            \"provider-multi-call-evidence\"\n            if provider.attempts > 1\n            else \"provider-prompt-bytes-mismatch\""
+new = "            \"provider-prompt-bytes-mismatch\""
+
+# The opposite error: every prompt mismatch is called a bisect, so genuine
+# CORRUPTION is reported as a chunk that merely needs re-planning — the wrong
+# remedy, confidently named.
+[[arm]]
+id = "every-prompt-mismatch-called-a-bisect"
+test = "test_a_bisected_chunk_is_named_partial_not_corrupt"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = "            \"provider-multi-call-evidence\"\n            if provider.attempts > 1\n            else \"provider-prompt-bytes-mismatch\""
+new = "            \"provider-multi-call-evidence\""

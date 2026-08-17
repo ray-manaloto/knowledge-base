@@ -1874,7 +1874,26 @@ def _provider_chunk_reasons(
     if metadata.prompt_sha256 != expected_prompt_sha256 or any(
         item.prompt_sha256 != expected_prompt_sha256 for item in provider.chunks
     ):
-        reasons.append("provider-prompt-bytes-mismatch")
+        # WHICH mismatch, because the remedies are opposite. Both land here, and
+        # the reason used to name only the first:
+        #
+        # * corrupted — the retained bytes are not what was sent. Investigate the
+        #   adapter, the evidence tree, the disk.
+        # * PARTIAL — graphify bisected this chunk into N provider calls, merged
+        #   them into one callback, and the adapter's single-path metadata
+        #   therefore describes only the last leaf. Nothing is corrupt; the
+        #   evidence covers a fraction of the chunk. Re-plan with smaller chunks.
+        #
+        # `attempts` is the observed provider-call count and separates them. It
+        # is only trusted HERE, where the prompt comparison has already
+        # established that this chunk's evidence is wrong — the count alone is
+        # not chunk-scoped (a failed chunk strands its marker for the next one),
+        # so using it as the primary signal produced false refusals.
+        reasons.append(
+            "provider-multi-call-evidence"
+            if provider.attempts > 1
+            else "provider-prompt-bytes-mismatch"
+        )
     if any(item.prompt_sha256 != metadata.prompt_sha256 for item in provider.chunks):
         reasons.append("provider-prompt-identity-mismatch")
     schema = _argv_value(metadata.argv, "--json-schema")

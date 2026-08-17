@@ -434,13 +434,16 @@ def profile_for(environment: Mapping[str, str]) -> ClaudeProfile:
 
 
 def accepted_graphify_runtime() -> RuntimeIdentity:
-    """Return the reviewed Graphify runtime identity, currently 0.9.45.
+    """Return the reviewed Graphify runtime identity from ``_ACCEPTED_GRAPHIFY_RUNTIME``.
 
-    The version is deliberately no longer written into this sentence. It said
-    0.9.42 through the 0.9.44 and 0.9.45 advances — a docstring naming a constant
-    it does not read, which stays true-looking for exactly as long as nobody
-    checks. The constant itself (originally reviewed under issue #300) is the
-    only place the version belongs; ask it, not this line.
+    No version number appears in this docstring, deliberately. It named 0.9.42
+    through both the 0.9.44 and 0.9.45 advances — a docstring restating a
+    constant it does not read, which stays true-looking for exactly as long as
+    nobody checks. The first repair merely re-stated the CURRENT number and
+    claimed in the next breath to have stopped doing that, so the fix
+    contradicted itself and had reinstated the drift mechanism it described.
+    The constant (originally reviewed under issue #300) is the only place the
+    version belongs; ask it, not this line.
     """
     return _ACCEPTED_GRAPHIFY_RUNTIME
 

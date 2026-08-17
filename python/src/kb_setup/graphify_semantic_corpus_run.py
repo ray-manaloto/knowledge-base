@@ -467,23 +467,6 @@ def _stage_completed_chunk(
     # Decoding and re-encoding here would digest this module's serializer instead
     # of the provider's own evidence, and the two agree only by luck.
     metadata_raw, provider_calls = _rotate_evidence(context.metadata_path, context.boundary_dir)
-    if provider_calls > 1:
-        # graphify bisected this chunk. Refused HERE, by name, rather than left to
-        # surface downstream as a prompt-digest mismatch: the digests really do
-        # disagree, but they disagree because this chunk's evidence covers one
-        # leaf of a split — not because anything was corrupted, which is what
-        # that reason says. Raising a `ValueError` puts it on the callback's
-        # existing per-chunk failure path, so the other 57 still run.
-        #
-        # This does NOT make a retried chunk stageable, and is not meant to. The
-        # adapter would have to write per-call metadata and the driver prove the
-        # leaves' prompts cover the chunk's members before that could be true.
-        # What it removes is the false report: a wrong cause, and an `attempts`
-        # count of 1 that this number contradicts.
-        raise ValueError(
-            f"provider-multi-call-evidence: {provider_calls} provider calls for one chunk, "
-            "so the retained metadata covers only the last; a bisected chunk cannot stage"
-        )
     metadata = msgspec.json.decode(
         metadata_raw, type=graphify_semantic_adapter.AdapterMetadata, strict=True
     )
@@ -510,7 +493,24 @@ def _stage_completed_chunk(
             counts=counts,
         ),
         execution_config=_provider_execution_config(config),
-        attempts=1,
+        # OBSERVED, not asserted. This was a hardcoded `1`, which was false for
+        # every chunk graphify bisected — three provider calls reported as one
+        # attempt, in committed evidence.
+        #
+        # It is deliberately NOT a refusal on its own. The count comes from the
+        # boundary directory, and that directory is not chunk-scoped: a chunk
+        # whose provider call FAILS never reaches this callback (graphify's
+        # serial path does `if exc is not None: ... continue`), so its marker is
+        # never cleared and lands in the NEXT chunk's count. A guard keyed on
+        # this number alone therefore turned one failure into two and misnamed
+        # the second — the exact defect it was written to remove.
+        #
+        # `_provider_chunk_reasons` owns the discrimination instead, because it
+        # already holds the signal that is actually chunk-scoped: whether the
+        # retained metadata's prompt digest matches the prompt rebuilt from THIS
+        # chunk's full member list. A bisect fails that; a stray marker does not
+        # affect it.
+        attempts=provider_calls,
         backend="claude-cli",
         model=_PROFILE.model,
         max_concurrency=config.concurrency,

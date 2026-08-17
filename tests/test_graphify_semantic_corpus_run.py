@@ -27,6 +27,11 @@ from kb_setup import (
 # suite ran from anywhere but the repo root — coverage disappearing without a
 # single failing test to say so.
 _PLAN = Path(__file__).resolve().parents[1] / "graphify-out/graphify-semantic-corpus"
+# The real committed slice evidence, which `test_graphify_semantic_corpus.py`
+# also reads. Used where a test needs adapter metadata that actually DECODES —
+# a `{}` placeholder makes staging fail on a missing field, which looks like the
+# arm passing when it never reached the behaviour it names.
+_SLICE_EVIDENCE = Path(__file__).resolve().parents[1] / "graphify-out/graphify-semantic-slice"
 
 
 def _inventory() -> graphify_semantic_corpus.SourceInventory:
@@ -597,61 +602,46 @@ def test_a_stage_directory_that_is_not_this_chunks_evidence_is_a_failure(
     ), summary.outcomes[0].reasons
 
 
-@_needs_driver
-def test_a_bisected_chunk_is_refused_by_name_rather_than_as_corrupt_evidence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(("markers", "expected"), [(0, 0), (1, 1), (3, 3)])
+def test_rotation_counts_the_provider_crossings_before_it_clears_them(
+    tmp_path: Path, markers: int, expected: int
 ) -> None:
-    """N provider calls for one chunk must be diagnosed, not mistaken for corruption.
+    """`_rotate_evidence` reports how many provider calls this chunk's turn made.
 
     graphify's `_extract_with_adaptive_retry` recurses on halves and merges, then
-    fires ONE callback — so a bisected chunk leaves N boundary markers and a
-    metadata file overwritten down to the LAST leaf, against a fragment covering
-    the whole chunk. The prompt digests then cannot agree, and the chunk was
-    refused as `provider-prompt-bytes-mismatch`: a reason meaning "the retained
-    bytes are not what was sent", for a run whose bytes were fine and merely
-    partial. The markers proving how many calls happened were being deleted
-    unexamined.
+    fires ONE callback, so a bisected chunk makes N provider calls and yields a
+    single callback. The receipt hardcoded `attempts=1`, which was false in
+    committed evidence for every chunk graphify ever bisected. The boundary
+    markers recording those crossings were already being collected here and then
+    deleted unexamined.
 
-    The control arm is the second half — ONE marker is the ordinary case and must
-    still stage — or this would pass against an implementation that refused every
-    chunk, which is the failure mode a count-based guard invites.
+    The count is taken BEFORE the rotation and that ordering is the whole fix —
+    `clear_stale_evidence` empties the directory, so a count taken afterwards is
+    always zero. The zero arm is the control: a stubbed counter returns a
+    constant and would pass the other two.
+
+    What this does NOT establish: that a count above 1 REFUSES the chunk. It does
+    not, and must not. This directory is not chunk-scoped — a chunk whose
+    provider call fails never reaches the callback that clears it, so its marker
+    lands in the next chunk's count. The refusal lives in
+    `_provider_chunk_reasons`, where a chunk-scoped signal exists, and is armed by
+    `test_graphify_semantic_corpus.py::test_a_bisected_chunk_is_named_partial_not_corrupt`.
     """
-    calls: list[int] = []
+    boundary = tmp_path / "boundary"
+    boundary.mkdir()
+    metadata = tmp_path / "adapter-metadata.json"
+    metadata.write_bytes(b"{}")
+    for index in range(markers):
+        (boundary / f"provider-boundary-{index}.json").write_text("{}")
 
-    def driver_bisected(
-        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
-    ) -> None:
-        # Exactly what a bisected chunk leaves behind: three crossings, one
-        # metadata file, one callback.
-        for index in range(3):
-            (context.boundary_dir / f"provider-boundary-{index}.json").write_text("{}")
-        context.metadata_path.write_bytes(b"{}")
-        calls.append(1)
-        on_chunk_done(0, len(context.ledger.chunks), {})
+    raw, counted = graphify_semantic_corpus_run._rotate_evidence(metadata, boundary)
 
-    _stub_extraction(monkeypatch, driver_bisected, result={"failed_chunks": 0})
-    summary = _execute(tmp_path)
-
-    assert summary.failed == 1
-    assert calls == [1], "the callback fired more than once; this is not the bisect shape"
-    reasons = summary.outcomes[0].reasons
-    assert any("provider-multi-call-evidence" in reason for reason in reasons), reasons
-    assert any("3 provider calls" in reason for reason in reasons), reasons
-
-    def driver_single(
-        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
-    ) -> None:
-        (context.boundary_dir / "provider-boundary-0.json").write_text("{}")
-        context.metadata_path.write_bytes(b"{}")
-        on_chunk_done(0, len(context.ledger.chunks), {})
-
-    _stub_extraction(monkeypatch, driver_single, result={"failed_chunks": 0})
-    single = _execute(tmp_path)
-    assert not any(
-        "provider-multi-call-evidence" in reason
-        for outcome in single.outcomes
-        for reason in outcome.reasons
-    ), "a single-call chunk was refused as multi-call, so the count is not discriminating"
+    assert raw == b"{}"
+    assert counted == expected
+    # Rotated: the next chunk starts from an empty directory, which is what makes
+    # the count belong to one chunk's turn rather than to the whole run.
+    assert not tuple(boundary.glob("provider-boundary-*.json"))
+    assert not metadata.exists()
 
 
 @_needs_driver

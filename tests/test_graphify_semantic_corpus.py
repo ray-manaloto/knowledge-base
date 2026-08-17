@@ -1834,6 +1834,60 @@ def test_chunk_stage_rejects_coherently_rehashed_runtime_and_prompt_identity(
     assert "provider-prompt-bytes-mismatch" in receipt.reasons
 
 
+def test_a_bisected_chunk_is_named_partial_not_corrupt(tmp_path: Path) -> None:
+    """One prompt mismatch, two causes, opposite remedies — `attempts` separates them.
+
+    A chunk whose prompt digest disagrees with the plan is either CORRUPT (the
+    retained bytes are not what was sent — investigate the adapter and the disk)
+    or PARTIAL (graphify bisected it into N provider calls and merged them into
+    one callback, so the adapter's single-path metadata describes only the last
+    leaf — re-plan with smaller chunks). Both landed on
+    `provider-prompt-bytes-mismatch`, which asserts the first.
+
+    Both arms are the SAME forged mismatch and differ only in `attempts`, so this
+    tests the discrimination rather than the mismatch. An implementation that
+    always says one word fails whichever arm it does not say.
+
+    `attempts` is deliberately only consulted HERE, where the prompt comparison
+    has already established the evidence is wrong. It is a count of boundary
+    markers, and that directory is not chunk-scoped — a chunk whose provider call
+    FAILS never reaches the callback that clears it, so its marker lands in the
+    next chunk's count. A guard keyed on the count alone falsely refused good
+    single-call chunks; that is why the count is a tie-breaker and not a trigger.
+    """
+    repo_root = Path(__file__).parent.parent
+    candidate = _execution_plan(tmp_path, repo_root)
+    forged = "b" * 64
+
+    def stage(attempts: int, cache: str) -> graphify_semantic_corpus.ChunkStageReceipt:
+        provider_raw, metadata_raw = _real_provider_evidence(repo_root)
+        provider = json.loads(provider_raw)
+        metadata = json.loads(metadata_raw)
+        metadata["prompt_sha256"] = forged
+        provider["chunks"][0]["prompt_sha256"] = forged
+        provider["attempts"] = attempts
+        changed_metadata = _canonical(metadata)
+        provider["adapter_metadata_sha256"] = hashlib.sha256(changed_metadata).hexdigest()
+        receipt, _, _ = _stage_real(
+            candidate,
+            tmp_path / cache,
+            repo_root,
+            _StageOverrides(
+                provider_raw=_canonical(provider),
+                metadata_raw=changed_metadata,
+            ),
+        )
+        return receipt
+
+    bisected = stage(3, "bisected")
+    assert "provider-multi-call-evidence" in bisected.reasons
+    assert "provider-prompt-bytes-mismatch" not in bisected.reasons
+
+    corrupt = stage(1, "corrupt")
+    assert "provider-prompt-bytes-mismatch" in corrupt.reasons
+    assert "provider-multi-call-evidence" not in corrupt.reasons
+
+
 def test_stage_distinguishes_config_cache_namespace_from_fresh_run_namespace(
     tmp_path: Path,
 ) -> None:

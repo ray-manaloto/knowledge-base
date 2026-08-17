@@ -106,8 +106,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # after.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"760157f30c6024d1b75bad9008224538035d5047f0645baeaa7e0a72dd7c3662",'
+    b'"execution_config_sha256":"bc1d0f10cf3563ce42a91e7de384792581534eade844a442a679fb5ab8f5bb88",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"14160136c9faffc48a34b729dfae500e1c738afa487796809f3158da91ee9c54",'
+    b'"plan_manifest_sha256":"10d50419c6bb8177e4ae67eac9fa87611c8d036f09aa49e76b7976aa9f64debb",'
     b'"schema_version":1}\n'
 )
