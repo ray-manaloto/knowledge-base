@@ -811,6 +811,46 @@ def _claude_invocation_args(
     )
 
 
+def _completion_reasons(
+    envelope: dict[str, object],
+    environment: Mapping[str, str],
+    completed: subprocess.CompletedProcess[bytes],
+) -> tuple[str, ...]:
+    """Collect every refusal reason for one completed provider call, first-seen order.
+
+    The process-level reasons live beside the envelope-level ones rather than in
+    `adapter_main`, so the refusal policy is one readable unit and the caller
+    holds only the decision it makes with the result.
+    """
+    reasons = list(result_envelope_reasons(envelope, environment))
+    if completed.returncode != 0:
+        reasons.append("claude-returncode-nonzero")
+    if completed.stderr:
+        reasons.append("claude-stderr-present")
+    return tuple(dict.fromkeys(reasons))
+
+
+def _report_rejection(reasons: tuple[str, ...]) -> int:
+    """Print a refusal to stderr — with the truncation hint when it applies — and fail.
+
+    The refusal stands — a truncated structured output is not evidence and is
+    never passed through. What changes is that graphify can now TELL truncation
+    from every other refusal.
+
+    It reads this process's failure as `RuntimeError("claude -p exited 1:
+    <stderr>")` and classifies it by substring, so a refusal worded only as
+    `stop-reason-invalid` matched none of its context-overflow markers and the
+    chunk was dropped whole. That made the plan's `graphify_max_retry_depth=2`
+    inert for truncation — the one failure it exists to survive. With the hint,
+    adaptive retry bisects the chunk.
+    """
+    print("semantic adapter rejected result: " + ", ".join(reasons), file=sys.stderr)
+    hint = graphify_semantic_slice.truncation_retry_hint(reasons)
+    if hint:
+        print(hint, file=sys.stderr)
+    return 1
+
+
 def adapter_main() -> int:
     """Forward one validated Graphify call to real Claude and retain safe evidence."""
     executable = _real_executable()
@@ -852,11 +892,7 @@ def adapter_main() -> int:
         return 124
     elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
     envelope, parse_observation = parse_result_envelope(completed.stdout)
-    reasons = list(result_envelope_reasons(envelope, os.environ))
-    if completed.returncode != 0:
-        reasons.append("claude-returncode-nonzero")
-    if completed.stderr:
-        reasons.append("claude-stderr-present")
+    reasons = _completion_reasons(envelope, os.environ, completed)
     metadata = _metadata(
         MetadataInputs(
             executable=executable,
@@ -871,26 +907,12 @@ def adapter_main() -> int:
             envelope=envelope,
             parse_observation=parse_observation,
             elapsed_ms=elapsed_ms,
-            reasons=tuple(dict.fromkeys(reasons)),
+            reasons=reasons,
         )
     )
     _write_metadata(metadata)
     if metadata.reasons:
-        print("semantic adapter rejected result: " + ", ".join(metadata.reasons), file=sys.stderr)
-        # The refusal stands — a truncated structured output is not evidence and
-        # is never passed through. What changes is that graphify can now TELL
-        # truncation from every other refusal.
-        #
-        # It reads this process's failure as `RuntimeError("claude -p exited 1:
-        # <stderr>")` and classifies it by substring, so a refusal worded only as
-        # `stop-reason-invalid` matched none of its context-overflow markers and
-        # the chunk was dropped whole. That made the plan's
-        # `graphify_max_retry_depth=2` inert for truncation — the one failure it
-        # exists to survive. With the hint, adaptive retry bisects the chunk.
-        hint = graphify_semantic_slice.truncation_retry_hint(metadata.reasons)
-        if hint:
-            print(hint, file=sys.stderr)
-        return 1
+        return _report_rejection(metadata.reasons)
     sys.stdout.buffer.write(completed.stdout)
     return 0
 

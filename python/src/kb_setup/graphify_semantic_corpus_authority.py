@@ -104,10 +104,33 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # driver, slice, adapter or planner after the re-plan un-authorizes it, and a
 # green `verify` is evidence about the tree at the moment it ran and nothing
 # after.
+#
+# RE-RECORDED 2026-08-17 (b), after a pure-readability refactor of the adapter
+# that carries no behavioural change: `adapter_main` lost its inline reason
+# collection and its inline rejection reporting to two module-level helpers,
+# `_completion_reasons` and `_report_rejection`. It was done because the third
+# party health check on PR #331 attributed the ENTIRE health regression of this
+# round to one function — `adapter_main` at cyclomatic 9 with three nested
+# blocks at the same level — and the remedy for a complexity finding is to
+# reduce the complexity, not to reclassify the check. Measured both ways with a
+# second, independent probe: ruff C901 read the same 9 before and reads 6 after,
+# below the 8 this function carried at `df4001df`, the last commit at which the
+# check passed.
+#
+# WHAT MOVED: exactly two fields of `execution-config.json`, and the manifest
+# containing it. `adapter_sha256` is the digest of the file that was edited, and
+# `cache_namespace_sha256` is derived from it. Nothing else in the config
+# differs — diffed field by field against the previous plan rather than assumed.
+#
+# WHAT DID NOT: `advisories.json`, `exclusions.json`, `source-inventory.json`
+# and `chunk-ledger.json` came back BYTE-IDENTICAL at the same source commit
+# 0738af37, so both digests carrying a reviewed DECISION are unchanged and the
+# workload is the same 474 units / 58 chunks. This asks for no judgement Ray has
+# not already given.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"88aa1d6f1f58322712964ce2a2c60b2e4299271f97a4cb06fd6fbe1dc8d50a76",'
+    b'"execution_config_sha256":"848fc020a7cd49a96109738664eb3941cb07dd49b933a532b889226a0250c93b",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"9327615956916737dc7f9389c692e823808bf8e362499aeec9be9836bb2e7e98",'
+    b'"plan_manifest_sha256":"03642ac4bf08e4572a369f028ff0025787afaac2483038f05e82110a8c7d6eab",'
     b'"schema_version":1}\n'
 )

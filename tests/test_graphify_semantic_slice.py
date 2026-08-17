@@ -355,6 +355,62 @@ def test_only_a_truncation_refusal_earns_the_retry_hint() -> None:
     )
 
 
+def test_the_adapter_wires_the_hint_into_the_refusal_it_actually_prints(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Arm the adapter's WIRING, not only the decision it delegates.
+
+    `truncation_retry_hint` is armed directly above, but nothing asserted that
+    the adapter's refusal path CALLS it. That branch lived inline in
+    `adapter_main`, which no test invokes, so deleting the call left the whole
+    suite green — the decision was armed and its one consumer was not.
+    `_report_rejection` exists as a named function so this test can reach it.
+
+    Both directions, for the reason the sibling test gives: no hint on a
+    truncated chunk and graphify drops it instead of bisecting; a hint on an
+    ordinary refusal and graphify burns `max_retry_depth` bisecting halves that
+    fail identically.
+    """
+    from kb_setup import graphify_semantic_adapter
+
+    assert (
+        graphify_semantic_adapter._report_rejection(
+            (graphify_semantic_slice.TRUNCATED_STOP_REASON,)
+        )
+        == 1
+    )
+    truncated = capsys.readouterr().err
+    assert (
+        "semantic adapter rejected result: " + graphify_semantic_slice.TRUNCATED_STOP_REASON
+    ) in truncated
+    assert graphify_semantic_slice.TRUNCATION_RETRY_HINT in truncated
+
+    assert graphify_semantic_adapter._report_rejection(("stop-reason-invalid",)) == 1
+    ordinary = capsys.readouterr().err
+    assert "semantic adapter rejected result: stop-reason-invalid" in ordinary
+    assert graphify_semantic_slice.TRUNCATION_RETRY_HINT not in ordinary
+
+
+def test_process_level_refusals_join_the_envelope_reasons_in_first_seen_order() -> None:
+    """A non-zero exit and any stderr are refusals in their own right.
+
+    Armed with a control: the same envelope through a clean process must yield
+    NO reasons, or this test would pass for a collector that refuses everything.
+    """
+    import subprocess
+
+    from kb_setup import graphify_semantic_adapter
+
+    failed = subprocess.CompletedProcess(args=(), returncode=1, stdout=b"", stderr=b"boom")
+    assert graphify_semantic_adapter._completion_reasons(_successful_envelope(), {}, failed) == (
+        "claude-returncode-nonzero",
+        "claude-stderr-present",
+    )
+
+    clean = subprocess.CompletedProcess(args=(), returncode=0, stdout=b"", stderr=b"")
+    assert graphify_semantic_adapter._completion_reasons(_successful_envelope(), {}, clean) == ()
+
+
 def test_tool_use_is_accepted_only_with_the_full_proven_success_envelope() -> None:
     assert graphify_semantic_slice.envelope_reasons(_successful_envelope()) == ()
 
