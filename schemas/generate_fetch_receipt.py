@@ -26,7 +26,22 @@ FILE_HEADER = '''# Copyright (c) 2026 Raymond Manaloto
 # asking question: not "is the right tool on PATH" (which this prefix settles)
 # but "does the locked version still match the one this generator's flags and
 # committed output were reviewed against" — which a lockfile bump can break.
-_CODEGEN = ("uv", "run", "--group", "codegen", "datamodel-codegen")
+# `--project` and `--locked` close the two remaining escape hatches: without
+# `--project`, `uv run` discovers a project from the CALLER's cwd, so invoking
+# this script from another directory can resolve a different project entirely
+# (`--project` only fixes discovery; it does not change the cwd). Without
+# `--locked`, a stale `uv.lock` is silently rewritten as a side effect of
+# generating code; with it, staleness is an error a human has to look at.
+_CODEGEN = (
+    "uv",
+    "run",
+    "--project",
+    str(ROOT),
+    "--locked",
+    "--group",
+    "codegen",
+    "datamodel-codegen",
+)
 
 
 def generate(output: Path = OUTPUT) -> None:

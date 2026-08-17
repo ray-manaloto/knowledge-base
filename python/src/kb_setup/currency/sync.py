@@ -936,6 +936,25 @@ def _installed_direct_url_commit(repo_root: Path, spec: ToolSpec) -> str:
     return ""
 
 
+def _redacted_path(found: str, repo_root: Path) -> str:
+    """Collapse host-specific path prefixes so committed reports carry no username.
+
+    These strings land verbatim in `docs/currency/runs/` pages, which are
+    committed; an absolute path there publishes the username and the machine's
+    checkout layout. The repository checkout and the home directory are the two
+    prefixes that vary per host, so they are the two replaced with stable
+    placeholders. Checkout first: it usually lives under home, and `~/dev/…`
+    would still leak the layout.
+    """
+    path = Path(found)
+    for prefix, label in ((repo_root, "<repo>"), (Path.home(), "~")):
+        try:
+            return f"{label}/{path.relative_to(prefix).as_posix()}"
+        except ValueError:
+            continue
+    return found
+
+
 def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
     """Step 1 for a tool that bootstraps the toolchain and pins nothing.
 
@@ -996,7 +1015,7 @@ def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
                 Finding(
                     "version",
                     BLIND,
-                    f"could not read a version from {found}"
+                    f"could not read a version from {_redacted_path(found, repo_root)}"
                     + (f" using pattern {spec.version_pattern!r}" if spec.version_pattern else ""),
                 ),
             ),
@@ -1028,7 +1047,12 @@ def _check_self_managed(repo_root: Path, spec: ToolSpec) -> SyncStatus:
         pinned=spec.expected,
         resolved=running,
         findings=(
-            Finding("version", OK, f"{spec.binary} on PATH is the reviewed {running} ({found})"),
+            Finding(
+                "version",
+                OK,
+                f"{spec.binary} on PATH is the reviewed {running} "
+                f"({_redacted_path(found, repo_root)})",
+            ),
             manifest,
         ),
     )

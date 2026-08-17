@@ -650,12 +650,16 @@ def execute(
                 return
             try:
                 outcomes.append(_stage_completed_chunk(raw, chunk, context))
-            except (TypeError, ValueError, msgspec.DecodeError) as exc:
-                # One unusable chunk must not take the other 57 with it. Three
-                # reachable paths raise from `_stage_completed_chunk` —
+            except (TypeError, ValueError, OSError) as exc:
+                # One unusable chunk must not take the other 57 with it. Four
+                # reachable paths raise from `_stage_completed_chunk`:
                 # `normalize_fragment` on a malformed result, `_rotate_evidence`
-                # on absent adapter metadata, and the metadata decode — and each
-                # propagated out through `extract_corpus_parallel` and out of
+                # on absent adapter metadata, the metadata decode (a
+                # `msgspec.DecodeError`, which subclasses `ValueError` at the
+                # pinned msgspec 0.21.1, so naming it here would be redundant),
+                # and `stage_chunk`'s filesystem writes, whose `mkdir`,
+                # `write_text` and `replace` raise `OSError`. Any of them
+                # propagates out through `extract_corpus_parallel` and out of
                 # `execute`, past the caller's `print`. The chunks already staged
                 # survived on disk, but the summary naming them never printed, so
                 # the operator lost the one artifact that says what landed.

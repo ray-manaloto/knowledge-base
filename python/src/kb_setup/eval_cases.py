@@ -863,10 +863,11 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # the same whole graph, so it has the same cost profile and was
             # simply missed when the retrieval arms got their headroom.
             #
-            # It went unnoticed because the default was adequate when written.
-            # The comment on RETRIEVAL_TIMEOUT still says "~350 MB"; the graph is
-            # 499 MB (measured 2026-08-05), and under `-n auto` this probe
-            # competes with eleven other workers. Measured: it fails at 60s
+            # It went unnoticed because the default was adequate when written,
+            # against the ~350 MB graph RETRIEVAL_TIMEOUT's comment records as
+            # its original condition; the graph is 499 MB (measured 2026-08-05),
+            # and under `-n auto` this probe competes with eleven other workers.
+            # Measured: it fails at 60s
             # inside `mise run test` and passes run alone, twice each — so the
             # bound, not the query, is what moved.
             #
@@ -940,8 +941,10 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # explicit `--slow` run. `kb-ship`'s eval gate does not pass --slow,
             # so this case is SKIPPED on every PR (its logs read `4 passed, 2
             # skipped`) and SHIP DOES NOT CHECK RETRIEVAL. Gating alone changed
-            # nothing on the ship path. That is accepted — the slow arm reloads a
-            # ~350 MB graph 18 times for ~4 minutes, and a gate that slow is one
+            # nothing on the ship path. That is accepted — the slow arm reloads
+            # the whole graph 18 times for ~4 minutes (measured when it was
+            # ~350 MB; it is 499 MB as of 2026-08-05 and only grows, so that
+            # figure is a floor), and a gate that slow is one
             # people route around — on the condition that it is stated wherever
             # the floor is described, which is what this paragraph is for. A
             # floor everyone believes is enforced per-PR and is not would be
@@ -950,8 +953,10 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             gated=True,
             # 18 queries per arm plus a `diagnose` per corpus: ~4 minutes,
             # essentially all of it the unscoped arm (each of its queries
-            # reloads a ~350 MB graph at ~10s; the 2.4 MB prose graph answers in
-            # ~0.3s, and the fused arm pays a second pass over it).
+            # reloads the whole graph at ~10s, measured when it was ~350 MB and
+            # a floor now that it is 499 MB as of 2026-08-05; the 2.4 MB prose
+            # graph answers in ~0.3s, and the fused arm pays a second pass over
+            # it).
             slow=True,
             precondition=lambda: _retrieval_precondition(repo_root),
         ),

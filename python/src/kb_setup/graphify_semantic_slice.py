@@ -319,11 +319,13 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
     wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
     sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 )
-# The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above stays
-# at 0.9.42 on purpose: it is the authority for the COMMITTED receipt, which is
-# evidence about a run that happened, and evidence does not move when the pin does.
+# The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above now
+# reads 0.9.45 because the COMMITTED receipt was re-produced at 0.9.45 in the
+# same change: it is the authority for that receipt, which is evidence about a
+# run that happened, and it moved because the evidence moved, never because the
+# pin did.
 #
-# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.42 -> 0.9.45, and that is a
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.44 -> 0.9.45, and that is a
 # measurement rather than a copy-forward, re-derived against the INSTALLED 0.9.45:
 # `public_api_fingerprint()` hashes to b10406f9… and `semantic_api_fingerprint()`
 # to 43122fca…, both byte-identical to the 0.9.44 records. The one signature the
@@ -1083,13 +1085,17 @@ def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> li
         ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),)
         if enforce_authority
         else (
-            # The AUTHORITY pair stays at 0.9.44 because the committed slice
-            # evidence was produced there; advancing it on a pin bump alone would
-            # assert an identity the receipt on disk contradicts. The CURRENT pair
-            # moves with the pin, and its version string has to move WITH its
-            # runtime — the two are checked as a pair, so leaving the literal at
-            # 0.9.44 beside a 0.9.45 runtime makes the pair unmatchable and the
-            # non-authority path rejects every run under the installed version.
+            # Both pairs now read 0.9.45: the AUTHORITY pair advanced because
+            # the committed slice evidence was re-produced at 0.9.45 (never on a
+            # pin bump alone, which would assert an identity the receipt on disk
+            # contradicts), and the CURRENT pair moves with the pin. The two
+            # entries are therefore currently EQUAL, which is expected rather
+            # than a duplication mistake; they diverge again the moment the pin
+            # moves ahead of the committed receipt. Each version string has to
+            # move WITH its runtime (the two are checked as a pair), so a
+            # literal left beside a newer runtime makes the pair unmatchable and
+            # the non-authority path rejects every run under the installed
+            # version.
             (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),
             (_CURRENT_GRAPHIFY_RUNTIME, "0.9.45"),
         )

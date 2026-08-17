@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] hk`
-#   pinned here:    1.54.0
+#   pinned here:    1.54.1
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
