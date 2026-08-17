@@ -789,6 +789,44 @@ def _metadata(inputs: MetadataInputs) -> AdapterMetadata:
     )
 
 
+#: The ceiling this adapter falls back to when no graphify timeout is configured.
+#: It is the historical hardcoded value, kept as the default deliberately: a launcher
+#: that configures nothing should get the OLD, SHORTER bound rather than an unbounded
+#: wait. Fail-closed for a timeout means shorter, not longer.
+_FALLBACK_INFERENCE_TIMEOUT_SECONDS = 120
+
+
+def inference_timeout_seconds(environment: Mapping[str, str] | None = None) -> float:
+    """How long this adapter may wait for one real provider call.
+
+    Read from `GRAPHIFY_API_TIMEOUT` — the variable the corpus driver ALREADY sets
+    from `config.timeout_seconds` for graphify's own use — rather than from a second
+    variable of its own. That is the point: this ceiling used to be a hardcoded
+    `timeout=120` reachable from no configuration at all, so raising the plan's
+    `timeout_seconds` moved which of two 120-second limits killed the call instead of
+    lengthening it (#335). One variable with two consumers cannot drift; two
+    variables asserted to agree can, and nothing was asserting it.
+
+    Measured 2026-08-17, which is why 120 was never going to work: one median corpus
+    chunk (7 members, 18,218 estimated tokens) took **659.5 s at rc=0** — and that
+    was on graphify's argv, WITHOUT the `--effort high` the adapter adds.
+
+    Equality with graphify's ceiling is intentional rather than sloppy. graphify
+    starts the shim and the shim starts Claude, so graphify's clock starts first and
+    its timeout fires first at the same nominal value. The outer bound stays the
+    governing one and this remains a backstop — which is the right relationship,
+    because graphify's failure carries the chunk context and this one does not.
+    """
+    raw = (os.environ if environment is None else environment).get("GRAPHIFY_API_TIMEOUT", "")
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return _FALLBACK_INFERENCE_TIMEOUT_SECONDS
+    if parsed <= 0:
+        return _FALLBACK_INFERENCE_TIMEOUT_SECONDS
+    return parsed
+
+
 def _write_metadata(value: AdapterMetadata) -> None:
     path = Path(os.environ.get("KB_SEMANTIC_METADATA_PATH", ""))
     if not path.parent.is_dir():
@@ -933,7 +971,7 @@ def adapter_main() -> int:
             capture_output=True,
             check=False,
             env=environment,
-            timeout=120,
+            timeout=inference_timeout_seconds(),
         )
     except (OSError, ValueError) as exc:
         print(f"semantic adapter boundary marker failed: {exc}", file=sys.stderr)

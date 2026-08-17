@@ -55,6 +55,18 @@ graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/
 graphify-out/graphify-semantic-corpus/
+# The merge step's intermediate per-chunk files. Unambiguously derived: every byte
+# of it is re-produced from the staged chunk evidence by
+# `kb-graphify-semantic-corpus-merge`, and the artifact that matters is the
+# committed `sources/extractions/<name>-docs.json` it assembles them into.
+#
+# `graphify-out/graphify-semantic-corpus-chunks/` is DELIBERATELY NOT listed. That
+# tree is the retained provider evidence for a run that cost real tokens, and
+# whether it should be committed is the open question in #317 (the corpus is
+# ignored while the slice is tracked). Adding it here would settle that question
+# silently, in a file nobody reads during review, so it is left visible as
+# untracked instead.
+graphify-out/graphify-semantic-corpus-assembly/
 graphify-out/graphify-semantic-corpus-prototype/
 graphify-out/graphify-semantic-corpus-prototype-corrected/
 graphify-out/graphify-semantic-corpus-prototype-corrected-state/

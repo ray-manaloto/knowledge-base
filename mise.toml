@@ -572,6 +572,10 @@ run = "uv run kb-setup graphify-semantic-slice"
 description = "Plan, run, or verify complete pinned Graphify semantic coverage"
 run = "uv run kb-setup graphify-semantic-corpus"
 
+[tasks.kb-graphify-semantic-corpus-merge]
+description = "Assemble staged Graphify semantic-corpus chunks into one committed doc chunk"
+run = "uv run kb-setup graphify-semantic-corpus-merge"
+
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
 run = "uv run kb-setup skillopt-contract"

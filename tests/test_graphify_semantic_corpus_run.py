@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import errno
 import itertools
 import os
 import shutil
@@ -57,6 +58,192 @@ def _config() -> graphify_semantic_corpus.CorpusExecutionConfig:
         type=graphify_semantic_corpus.CorpusExecutionConfig,
         strict=True,
     )
+
+
+def test_the_adapter_ceiling_is_the_configured_one_not_a_second_number() -> None:
+    """One number, two consumers — #335.
+
+    The adapter's inference ceiling used to be a hardcoded `timeout=120` reachable
+    from no configuration, so raising the plan's `timeout_seconds` changed only WHICH
+    120-second limit killed the call. It now reads `GRAPHIFY_API_TIMEOUT`, which is
+    the variable the driver already sets from the same config field, so the two
+    cannot disagree.
+    """
+    assert graphify_semantic_adapter.inference_timeout_seconds({"GRAPHIFY_API_TIMEOUT": "900"}) == (
+        900
+    )
+
+
+def test_the_adapter_ceiling_falls_back_short_when_nothing_configures_it() -> None:
+    """Fail-closed for a timeout means SHORTER, never unbounded.
+
+    A launcher that configures no graphify timeout must get the historical bound, not
+    an unlimited wait. Absent, empty, unparsable and non-positive all take the
+    fallback — each spelled out, because "unparsable" silently becoming "no limit" is
+    the failure this default exists to prevent.
+    """
+    # The literal 120, NOT `_FALLBACK_INFERENCE_TIMEOUT_SECONDS`. Asserting against the
+    # constant made this test self-referential: a mutation raising the fallback to 900
+    # moved both sides of the comparison and SURVIVED. A test that reads the value it
+    # is checking cannot check it.
+    for environment in ({}, {"GRAPHIFY_API_TIMEOUT": ""}, {"GRAPHIFY_API_TIMEOUT": "soon"}):
+        assert graphify_semantic_adapter.inference_timeout_seconds(environment) == 120
+    for hostile in ("0", "-1", "-900"):
+        assert (
+            graphify_semantic_adapter.inference_timeout_seconds({"GRAPHIFY_API_TIMEOUT": hostile})
+            == 120
+        )
+    # And the relationship that makes it a FAIL-CLOSED default rather than just a
+    # number: an unconfigured launcher must never inherit the long corpus ceiling.
+    assert graphify_semantic_adapter._FALLBACK_INFERENCE_TIMEOUT_SECONDS < 900
+
+
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
+def test_the_driver_publishes_the_configured_ceiling_to_the_adapter() -> None:
+    """The WIRING: the overlay must actually carry the number the adapter reads.
+
+    Reads the plan ON DISK rather than the planner constant, which is the whole value
+    of it: the constant and the authorized plan are two different artifacts, and this
+    is what catches a constant raised without a re-plan. It failed exactly that way on
+    first run (`assert 120 == 900`) before the re-plan, which is the check working.
+    """
+    config = _config()
+    assert config.timeout_seconds == 900, "the authorized ceiling moved without this test"
+    # The CONSTANT against the PLAN. Without this line the test read only the plan on
+    # disk, so a mutation lowering the planner constant SURVIVED — the plan still said
+    # 900 and nothing compared the two. This is the drift the test exists to catch:
+    # editing the constant without re-planning.
+    assert config.timeout_seconds == graphify_semantic_corpus._INFERENCE_TIMEOUT_SECONDS
+    # The overlay is what the adapter's environment is built from; asserting the key by
+    # name is the point, since the adapter looks that exact name up.
+    assert graphify_semantic_adapter.inference_timeout_seconds(
+        {"GRAPHIFY_API_TIMEOUT": str(config.timeout_seconds)}
+    ) == float(config.timeout_seconds)
+
+
+def test_the_evidence_dir_is_canonicalised_so_the_boundary_marker_can_be_written(
+    tmp_path: Path,
+) -> None:
+    """The defect that failed 58 of 58 chunks, and cost nothing to find.
+
+    `write_provider_boundary_start` opens every component of the evidence directory
+    with `O_NOFOLLOW`, so one symlink anywhere in the path refuses the marker before
+    the provider is ever invoked. `$TMPDIR` on macOS is `/var/folders/…` and `/var`
+    is a symlink, so the unresolved `tempfile` spelling failed every chunk.
+
+    The symlink here is CONSTRUCTED rather than borrowed from the platform. A test
+    that compared `Path(td)` with `Path(td).resolve()` would pass vacuously on any
+    host whose temp path happens to be canonical already — i.e. on exactly the
+    platform where this bug is invisible — which is the bound that let it ship.
+    """
+    real = tmp_path / "real-evidence"
+    real.mkdir()
+    link = tmp_path / "via-link"
+    link.symlink_to(real, target_is_directory=True)
+    through_link = link / "inner"
+    through_link.mkdir()
+
+    # ARM: the raw spelling, which is what the driver used to pass. The errno is
+    # asserted rather than just the type, because "some OSError" would also be
+    # satisfied by a typo in the fixture path — ENOTDIR is what a symlink component
+    # under O_NOFOLLOW actually produces, and ELOOP is its spelling on other hosts.
+    with pytest.raises(OSError, match=r"Errno") as refused:
+        os.close(graphify_semantic_adapter.open_directory_nofollow(through_link))
+    assert refused.value.errno in {errno.ENOTDIR, errno.ELOOP}
+
+    # The fix: canonicalised, the same directory opens.
+    canonical = graphify_semantic_corpus_run.trusted_evidence_dir(str(through_link))
+    descriptor = graphify_semantic_adapter.open_directory_nofollow(canonical)
+    os.close(descriptor)
+    assert canonical == through_link.resolve()
+
+    # And the marker itself — the thing that actually failed — now writes.
+    graphify_semantic_adapter.write_provider_boundary_start(
+        canonical / "provider-boundary-probe.json",
+        adapter_sha256="a" * 64,
+        prompt=b"probe",
+        argv=("claude", "-p"),
+    )
+    assert (real / "inner" / "provider-boundary-probe.json").is_file()
+
+
+def test_a_non_canonical_evidence_location_is_refused_where_it_is_received(
+    tmp_path: Path,
+) -> None:
+    """The wiring guard: `trusted_evidence_dir` has exactly one consumer, untested.
+
+    `execute` is not invoked by any test, so deleting its one `trusted_evidence_dir`
+    call would leave the whole suite green while every chunk failed at the boundary
+    marker again. `assert_canonical_evidence` — called from
+    `_RunContext.__post_init__` — is what makes that break loud, and this reaches it
+    without needing the gitignored plan on disk.
+    """
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="boundary_dir is not canonical"):
+        graphify_semantic_corpus_run.assert_canonical_evidence(link, link / "adapter-metadata.json")
+    # The metadata path is checked through its PARENT, and separately: a canonical
+    # boundary dir with the metadata written through a symlink is the same failure.
+    with pytest.raises(ValueError, match="metadata_path parent is not canonical"):
+        graphify_semantic_corpus_run.assert_canonical_evidence(
+            real.resolve(), link / "adapter-metadata.json"
+        )
+    # Control: the canonical spelling of the same directory is accepted, so the two
+    # refusals are about the symlink and not about the fixture.
+    graphify_semantic_corpus_run.assert_canonical_evidence(
+        real.resolve(), real.resolve() / "adapter-metadata.json"
+    )
+
+
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
+def test_the_run_context_actually_calls_the_canonicality_guard(tmp_path: Path) -> None:
+    """The WIRING, one level up from the property.
+
+    `assert_canonical_evidence` is tested directly above, but a `__post_init__` that
+    stops calling it would leave that test green — the same unarmed-consumer shape
+    the guard exists to close, recurring one layer higher. This closes it by building
+    a real context, which needs the plan on disk, hence the skip. The property test
+    above always runs; this one covers the wiring where the plan exists.
+    """
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(ValueError, match="boundary_dir is not canonical"):
+        graphify_semantic_corpus_run._RunContext(
+            candidate=tmp_path / "plan",
+            cache_root=tmp_path / "cache",
+            source_root=tmp_path / "src",
+            inventory=_inventory(),
+            ledger=_ledger(),
+            config=_config(),
+            preflight_receipt=_run_context(tmp_path).preflight_receipt,
+            run_namespace="a" * 64,
+            metadata_path=link / "adapter-metadata.json",
+            boundary_dir=link,
+        )
+
+
+def test_open_directory_nofollow_still_refuses_a_symlink_it_is_handed(
+    tmp_path: Path,
+) -> None:
+    """The primitive must NOT be the thing that resolves.
+
+    The fix deliberately lives in the caller. If `open_directory_nofollow` ever
+    starts canonicalising internally it would silently stop guarding every caller
+    whose path components are not trusted — so this asserts the guard survives the
+    fix rather than being quietly relocated into it.
+    """
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(OSError, match=r"Errno") as refused:
+        os.close(graphify_semantic_adapter.open_directory_nofollow(link))
+    assert refused.value.errno in {errno.ENOTDIR, errno.ELOOP}
 
 
 def test_profile_selection_fails_closed_and_rejects_unknown_values() -> None:

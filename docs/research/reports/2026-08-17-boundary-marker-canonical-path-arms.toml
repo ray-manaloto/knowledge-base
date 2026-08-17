@@ -1,0 +1,144 @@
+# Mutation arms for the fix that made the Graphify semantic corpus extractable AT
+# ALL: canonicalising the driver's own temporary evidence directory.
+#
+# THE DEFECT, measured rather than reasoned. The first run of
+# `mise run kb-graphify-semantic-corpus -- run` against the real 474-unit / 58-chunk
+# plan failed **58 of 58** chunks, every one identically:
+#
+#   claude -p exited 2: semantic adapter boundary marker failed:
+#   provider boundary marker destination is unavailable
+#
+# `execute` passed its evidence directory as `tempfile` spells it, unresolved.
+# `write_provider_boundary_start` opens every component of that directory with
+# `O_NOFOLLOW`, and `$TMPDIR` on macOS is `/var/folders/…` where **`/var` is a
+# symlink to `private/var`** — so the marker was refused before any provider call.
+# Control-armed three ways: the tempfile path as given FAILED with
+# `NotADirectoryError [Errno 20]: 'var'`, the same path resolved OPENED, and the
+# semantic SLICE's in-repo evidence directory OPENED. That third arm is why this was
+# never seen: the slice writes to `graphify-out/graphify-semantic-slice/`, a path
+# with no symlink component, and the slice was the only path that had ever run.
+#
+# It cost nothing to find. The marker is written BEFORE the provider invocation, so
+# the shim exited 2 without calling a model.
+#
+# WHERE THE FIX LIVES, and why not one layer down. `open_directory_nofollow` must
+# keep refusing symlinks — resolving inside it would silently weaken every caller,
+# including ones whose path components an attacker could swap. The caller owns its
+# temp directory and knows it is trusted, so the caller is what canonicalises.
+#
+# THE UNARMED-CONSUMER PROBLEM, and how far it is closed. `trusted_evidence_dir` has
+# exactly ONE consumer — `execute`, which no test invokes — so deleting that call
+# would have left the suite green and every chunk failing again. The invariant is
+# therefore also enforced where the value is RECEIVED:
+# `_RunContext.__post_init__` calls `assert_canonical_evidence`, which is armed here
+# at both levels (the property, and the `__post_init__` wiring that calls it).
+#
+# WHAT IS STILL NOT ARMED, stated rather than papered over: no test invokes
+# `execute`, so nothing catches the deletion of its `trusted_evidence_dir` call
+# itself. There is deliberately no arm for it — a predicted survival is the most
+# dangerous row a spec can carry, so the gap is named instead. What the guard buys
+# is that the deletion now raises at context construction rather than failing 58
+# chunks silently. #332 is the sibling ticket for `execute` having no test at all.
+#
+# WHAT A CLEAN SWEEP HERE DOES NOT MEAN. It says nothing about whether the
+# extraction produces good content, and nothing about the platform assumption
+# itself: on a host whose `$TMPDIR` is already canonical the original code worked,
+# which is exactly why the fixtures below construct their own symlink instead of
+# borrowing one from the platform.
+
+suites = ["tests/test_graphify_semantic_corpus_run.py"]
+
+# NOTE ON THE SUITE LIST — this is the authority-digest trap, and it is why
+# `tests/test_graphify_semantic_corpus.py` is absent. `runner_sha256` is a digest of
+# the file every arm below mutates, it lives inside `execution-config.json`, and
+# `AUTHORITY_JSON` is a digest of that. So
+# `test_recorded_authority_authorizes_this_plan_and_only_this_plan` fails under ANY
+# byte change to this file — the control's own inert comment included — which would
+# break the CONTROL and make every other row unreadable. The run suite's own
+# authority test (`test_recorded_authority_digests_match_the_plan_on_disk`) compares
+# the recorded digests to the plan ON DISK, which no mutation moves, so it is stable
+# here.
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "def trusted_evidence_dir(raw: str) -> Path:"
+new = "def trusted_evidence_dir(raw: str) -> Path:  # inert control edit"
+
+# --------------------------------------------------------------------------
+# The fix itself
+# --------------------------------------------------------------------------
+
+# The defect, reintroduced exactly. This is the line as it stood, and it is what
+# failed 58 of 58 chunks.
+[[arm]]
+id = "the-evidence-dir-is-not-canonicalised"
+test = "test_the_evidence_dir_is_canonicalised_so_the_boundary_marker_can_be_written"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "    return Path(raw).resolve()"
+new = "    return Path(raw)"
+
+# `resolve()` is not `absolute()`. The distinction is the whole bug: an absolute
+# path can still contain a symlink component, and `/var/folders/…` is exactly that
+# shape — absolute and still refused.
+[[arm]]
+id = "absolute-is-mistaken-for-canonical"
+test = "test_the_evidence_dir_is_canonicalised_so_the_boundary_marker_can_be_written"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "    return Path(raw).resolve()"
+new = "    return Path(raw).absolute()"
+
+# --------------------------------------------------------------------------
+# The receiving guard — the property, then the wiring that calls it
+# --------------------------------------------------------------------------
+
+[[arm]]
+id = "the-canonicality-guard-never-refuses"
+test = "test_a_non_canonical_evidence_location_is_refused_where_it_is_received"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "        if directory != directory.resolve():"
+new = "        if False:"
+
+# The guard checks BOTH locations, and they are independent: a canonical boundary
+# dir with metadata written through a symlink is the same failure. Dropping the
+# second row leaves the first passing and half the invariant unguarded.
+[[arm]]
+id = "only-the-boundary-dir-is-checked"
+test = "test_a_non_canonical_evidence_location_is_refused_where_it_is_received"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "        (\"metadata_path parent\", metadata_path.parent),\n    ):"
+new = "    ):"
+
+# THERE IS NO ARM FOR PARENT-VS-LEAF ON THE METADATA PATH, and the reason is a
+# corrected claim rather than an omission. The guard's first comment asserted that
+# checking `metadata_path` itself would be wrong because the file does not exist yet.
+# The arm for it SURVIVED, and the arm was right: `Path.resolve()` is non-strict, so
+# for a leaf that does not exist it returns the same canonical path as its parent
+# would resolve to, and the two spellings are equivalent for every case reachable
+# here. The comment was fixed to stop claiming a distinction the code does not make.
+# A justification that no mutation can distinguish is a justification to re-check.
+
+# The wiring, one level up. A `__post_init__` that stops calling the guard leaves
+# every property test above green — the unarmed-consumer shape recurring one layer
+# higher, which is why it has its own arm and its own test.
+[[arm]]
+id = "the-context-stops-calling-the-guard"
+test = "test_the_run_context_actually_calls_the_canonicality_guard"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "        assert_canonical_evidence(self.boundary_dir, self.metadata_path)"
+new = "        return"
+
+# --------------------------------------------------------------------------
+# The primitive must NOT absorb the fix
+# --------------------------------------------------------------------------
+
+# The tempting wrong fix: canonicalise inside `open_directory_nofollow`. Every test
+# about the corpus would pass, and the primitive would stop guarding every caller
+# whose path components are not trusted.
+[[arm]]
+id = "the-nofollow-primitive-resolves-internally"
+test = "test_open_directory_nofollow_still_refuses_a_symlink_it_is_handed"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    parts = directory.parts"
+new = "    directory = directory.resolve()\n    parts = directory.parts"

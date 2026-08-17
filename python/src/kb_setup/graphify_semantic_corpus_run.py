@@ -190,6 +190,43 @@ def observed_spend_usd(boundary_dir: Path) -> float:
     return total
 
 
+def assert_canonical_evidence(boundary_dir: Path, metadata_path: Path) -> None:
+    """Refuse an evidence location the provider boundary marker cannot be written to.
+
+    Called from `_RunContext.__post_init__`, which is the point of it.
+    `trusted_evidence_dir` is the fix for the unresolved-`$TMPDIR` defect and is
+    exhaustively armed — but its only consumer is `execute`, which no test invokes,
+    so deleting that one call would leave every test green and every chunk failing
+    again. An armed decision with an unarmed consumer is a shape this repo has
+    shipped before, so the invariant is enforced where the value is RECEIVED rather
+    than trusted to the caller that produced it: a symlinked or relative spelling is
+    rejected when the context is built, before any provider call is attempted.
+
+    A standalone function rather than the body of `__post_init__` so it is reachable
+    from a test without constructing a whole context — which would need the real
+    plan on disk, and the real plan is gitignored, so that test would SKIP on a
+    fresh clone and the guard would be uncovered exactly where it matters.
+
+    `metadata_path` is checked through its PARENT because the property is about the
+    DIRECTORY components the marker walk traverses. Stated precisely, because the
+    first version of this comment claimed the leaf spelling would be wrong and a
+    mutation proved otherwise: `Path.resolve()` is non-strict, so for a leaf that
+    does not exist yet it returns the same canonical path either way, and the two
+    spellings are equivalent for every case reachable here. The parent form is kept
+    because it says what is meant, not because it catches something the other misses.
+    """
+    for label, directory in (
+        ("boundary_dir", boundary_dir),
+        ("metadata_path parent", metadata_path.parent),
+    ):
+        if directory != directory.resolve():
+            raise ValueError(
+                f"{label} is not canonical: {directory} — the provider boundary "
+                "marker is opened with O_NOFOLLOW, so any symlink component refuses "
+                "it (see trusted_evidence_dir)"
+            )
+
+
 class _RunContext(msgspec.Struct, frozen=True):
     """Everything fixed for the duration of one execution pass.
 
@@ -209,6 +246,10 @@ class _RunContext(msgspec.Struct, frozen=True):
     run_namespace: str
     metadata_path: Path
     boundary_dir: Path
+
+    def __post_init__(self) -> None:
+        """Refuse a non-canonical evidence directory at the type boundary."""
+        assert_canonical_evidence(self.boundary_dir, self.metadata_path)
 
 
 @contextmanager
@@ -265,6 +306,17 @@ def admitted_paths(
     for unit in inventory.units:
         seen.setdefault(unit.path, None)
     return [source_root / path for path in seen]
+
+
+def trusted_evidence_dir(raw: str) -> Path:
+    """Canonicalise this driver's OWN temporary evidence directory.
+
+    A function rather than an inline `.resolve()` so the property has somewhere to
+    be tested: on Linux a `tempfile` path usually has no symlink component, so a
+    test that merely compared the two spellings would pass vacuously on the very
+    platform where the bug is invisible. See `execute` for the measurement.
+    """
+    return Path(raw).resolve()
 
 
 def _adapter_overlay(context: _RunContext, adapter_dir: Path) -> dict[str, str | None]:
@@ -889,7 +941,26 @@ def execute(
         tempfile.TemporaryDirectory(prefix="kb-corpus-adapter-") as bin_dir,
         tempfile.TemporaryDirectory(prefix="kb-corpus-evidence-") as evidence_dir,
     ):
-        evidence = Path(evidence_dir)
+        # RESOLVED via `trusted_evidence_dir`, and that one call is the difference
+        # between a corpus that can
+        # be extracted and one that cannot. `write_provider_boundary_start` opens
+        # every component of this directory with `O_NOFOLLOW`, so a single symlink
+        # anywhere in the path refuses the marker — and `$TMPDIR` on macOS is
+        # `/var/folders/…`, where **`/var` is a symlink to `private/var`**. Passing
+        # the path as `tempfile` spells it therefore failed EVERY chunk with
+        # `provider boundary marker destination is unavailable`: measured 58/58 on
+        # 2026-08-17, the first time this driver was run on a real plan.
+        #
+        # The fix is here rather than in `open_directory_nofollow`, which must keep
+        # refusing symlinks: resolving inside that primitive would silently weaken
+        # it for every caller, including the ones whose path components an attacker
+        # could swap. This caller owns its temp directory and knows it is trusted,
+        # so it is the one that may canonicalise it.
+        #
+        # Why it was never seen: the semantic SLICE writes its evidence to
+        # `graphify-out/graphify-semantic-slice/`, an in-repo path with no symlink
+        # component, and the slice is the only path that had ever run.
+        evidence = trusted_evidence_dir(evidence_dir)
         context = _RunContext(
             candidate=candidate,
             cache_root=cache_root,

@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
 
 # The exact node/edge shape graphify's doc merge (`_merge_docs.py` -> build_merge)
@@ -718,13 +720,14 @@ def assembly_overlaps(chunk_paths: list[Path]) -> list[str]:
     unique = list(dict.fromkeys(p.resolve() for p in chunk_paths))
     if len(unique) < _MIN_CHUNKS_FOR_COLLISION:
         return []
+    labels = _labels(unique)
     owners: dict[str, list[Path]] = {}
     for p in unique:
         per_file, _ = chunk_claims(p)
         for sf in per_file:
             owners.setdefault(sf, []).append(p)
     return [
-        f"duplicate claim: {', '.join(sorted(q.name for q in holders))} all claim "
+        f"duplicate claim: {', '.join(sorted(labels[q] for q in holders))} all claim "
         f"source_file {sf!r}; assembly CONCATENATES, so every one of those node "
         f"sets lands in the combined chunk — a duplication, not a supersession. "
         f"Adding {sf!r} to a '{_SUPERSEDES}' list does NOT fix this: that only "
@@ -733,6 +736,39 @@ def assembly_overlaps(chunk_paths: list[Path]) -> list[str]:
         for sf, holders in sorted(owners.items())
         if len(holders) >= _MIN_CHUNKS_FOR_COLLISION
     ]
+
+
+def _labels(chunk_paths: Sequence[Path]) -> dict[Path, str]:
+    """Map each chunk's RESOLVED path to a display label that is unique in the batch.
+
+    `p.name` alone was the label AND the identity for `assemble`'s id-collision
+    map, which made that gate blind to its whole class on any batch of same-named
+    inputs. The semantic-corpus runner stages every chunk as
+    `<chunk-dir>/semantic-fragment.json`, so all 58 shared one label: `seen[nid]
+    != p.name` was False for every cross-chunk collision. Measured 2026-08-17 on
+    two chunks sharing a node id with different `source_file` claims and distinct
+    hyperedge ids — the realistic corpus shape, so neither `assembly_overlaps` nor
+    the hyperedge check covered for it: identical basenames assembled CLEAN, 26
+    nodes written with 13 duplicate ids and 0 problems reported, while the same
+    two chunks under distinct basenames were refused with all 13 collisions. A
+    gate that only fires when the caller happens to name its inputs differently is
+    not a gate.
+
+    So identity is the resolved path (below, in `assemble`) and this function owns
+    only the DISPLAY side: the bare name while names are unique in the batch —
+    which is every committed chunk and every message this repo has emitted so far
+    — and `<parent>/<name>` once they are not, which is the smallest suffix that
+    distinguishes the runner's per-ordinal chunk directories.
+
+    Deliberately NOT addressed: the same path passed twice still counts as one
+    chunk here (as it does in `assembly_overlaps`, which dedups on `resolve()`),
+    so its nodes concatenate without an id-collision problem. That is unchanged
+    behaviour, not a hole this fix opened, and `assembly_overlaps`' duplicate-claim
+    message is what fires on it.
+    """
+    resolved = [p.resolve() for p in chunk_paths]
+    names = Counter(p.name for p in dict.fromkeys(resolved))
+    return {p: (p.name if names[p.name] == 1 else f"{p.parent.name}/{p.name}") for p in resolved}
 
 
 def _out_path(repo_root: Path, name: str) -> Path:
@@ -783,17 +819,23 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     nodes: list = []
     edges: list = []
     hyperedges: list = []
-    seen: dict[str, str] = {}
+    seen: dict[str, Path] = {}
     problems: list[str] = []
     declared_supersedes: set[str] = set()
+    # Identity is the RESOLVED path, never the label: see `_labels` for the
+    # measurement. `seen` therefore answers "did a DIFFERENT FILE already claim
+    # this id", which is the question this gate was always meant to ask.
+    labels = _labels(chunk_paths)
 
-    for p in chunk_paths:
+    for raw_path in chunk_paths:
+        p = raw_path.resolve()
+        label = labels[p]
         try:
             chunk = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
-            problems.append(f"{p.name}: unreadable/invalid JSON: {e}")
+            problems.append(f"{label}: unreadable/invalid JSON: {e}")
             continue
-        problems.extend(validate(chunk, label=p.name))
+        problems.extend(validate(chunk, label=label))
         if not isinstance(chunk, dict):
             # `validate()` already recorded the type-mismatch problem above (the
             # `problems` check below will raise on it) — but `chunk.get(...)`
@@ -806,9 +848,9 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
         for n in chunk.get("nodes", []):
             nid = n.get("id") if isinstance(n, dict) else None
             if isinstance(nid, str) and nid:
-                if nid in seen and seen[nid] != p.name:
-                    problems.append(f"id collision {nid!r} ({p.name} vs {seen[nid]})")
-                seen[nid] = p.name
+                if nid in seen and seen[nid] != p:
+                    problems.append(f"id collision {nid!r} ({label} vs {labels[seen[nid]]})")
+                seen[nid] = p
             nodes.append(n)
         edges.extend(chunk.get("edges", []))
         hyperedges.extend(chunk.get("hyperedges") or [])

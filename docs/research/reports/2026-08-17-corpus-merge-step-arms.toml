@@ -1,0 +1,183 @@
+# Mutation arms for `kb_setup.graphify_semantic_corpus_merge`, the step that
+# carries staged semantic-corpus chunks into a committed extraction chunk.
+#
+# WHY THIS SPEC EXISTS. Every one of this module's checks is a REFUSAL, and a
+# refusal path is the shape that rots invisibly: the happy path keeps working, the
+# guard stops guarding, and the only symptom is a corpus that merged cleanly and is
+# quietly short. Nothing downstream would notice — `kb-merge` reports what it was
+# handed, not what it should have been handed.
+#
+# WHAT THE MODULE DOES, so a reader can judge the coverage:
+#   1. Stamps `_origin="semantic"` on every node (nodes only, the committed
+#      convention). Without it graphify infers the tier from `source_location` and
+#      drops the node from `graph-prose.json`.
+#   2. Discovers the run namespace BY CONTENT — a staged directory is this plan's
+#      run when its receipts agree with this plan's manifest, execution config and
+#      chunk packing — and refuses rather than choosing when two bind.
+#   3. Refuses a short corpus unless `--partial` is asked for explicitly.
+#   4. Writes each chunk under an ordinal-bearing name before `chunks.assemble`.
+#
+# WHAT A CLEAN SWEEP HERE DOES NOT MEAN. It says nothing about whether the
+# extracted CONTENT is any good — that is a judgment no mutation can make — and
+# nothing about the merge itself, whose arm is merging one real chunk and reading
+# the `[merge]` line's node arithmetic. It also cannot speak for
+# `verify_staged_chunk`, the exhaustive check this module deliberately does not
+# duplicate.
+
+suites = ["tests/test_graphify_semantic_corpus_merge.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    stamped = 0\n    nodes = fragment.get(\"nodes\")"
+new = "    stamped = 0  # inert control edit\n    nodes = fragment.get(\"nodes\")"
+
+# --------------------------------------------------------------------------
+# 1 — the `_origin` stamp
+# --------------------------------------------------------------------------
+
+# The whole reason this module exists. Not stamping is not a crash: the chunk
+# assembles, `kb-merge` reports a node count, and the nodes are absent from
+# `graph-prose.json`, which is the surface a prose query reads.
+[[arm]]
+id = "origin-is-never-stamped"
+test = "test_assemble_stamps_semantic_origin_on_every_node"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "            node[\"_origin\"] = \"semantic\"\n            stamped += 1"
+new = "            stamped += 1"
+
+# Stamping the wrong tier is the same loss by another route — and worse, because it
+# looks deliberate to the next reader.
+[[arm]]
+id = "origin-is-stamped-as-ast"
+test = "test_assemble_stamps_semantic_origin_on_every_node"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "            node[\"_origin\"] = \"semantic\""
+new = "            node[\"_origin\"] = \"ast\""
+
+# The stamp must reach EVERY node, not the first. A fragment is many nodes and a
+# partial stamp loses the rest silently.
+[[arm]]
+id = "only-the-first-node-is-stamped"
+test = "test_assembled_chunk_passes_the_chunk_validator"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    for node in nodes:\n        if isinstance(node, dict) and node.get(\"_origin\") is None:"
+new = "    for node in nodes[:0]:\n        if isinstance(node, dict) and node.get(\"_origin\") is None:"
+
+# --------------------------------------------------------------------------
+# 2 — the plan binding, which is also the namespace discovery
+# --------------------------------------------------------------------------
+
+# The digest that ties staged evidence to THIS ledger's packing. Dropping it
+# accepts a chunk staged against a superseded plan: same ordinal, different member
+# list, so the corpus is assembled out of calls that covered other files.
+[[arm]]
+id = "the-chunk-packing-digest-is-not-checked"
+test = "test_a_chunk_staged_against_another_plan_is_refused"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "        if receipt.chunk_sha256 != sha256_bytes(encode_canonical(chunk)):\n            reasons.append(\"chunk-digest-mismatch\")"
+new = "        if False:\n            reasons.append(\"chunk-digest-mismatch\")"
+
+# The fragment digest is what makes the staged bytes EVIDENCE rather than a file
+# that happens to sit in the right directory.
+[[arm]]
+id = "the-fragment-digest-is-not-checked"
+test = "test_a_tampered_fragment_is_refused"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    if sha256_bytes(fragment_raw) != receipt.fragment_sha256:\n        reasons.append(\"fragment-digest-mismatch\")"
+new = "    if False:\n        reasons.append(\"fragment-digest-mismatch\")"
+
+# A chunk the RUN judged failed is not a chunk to merge. `status` is the run's own
+# verdict, and ignoring it merges the corpus the run refused to publish.
+[[arm]]
+id = "a-failed-chunk-status-is-ignored"
+test = "test_a_failed_chunk_is_never_assembled"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    if receipt.status != \"complete\":\n        reasons.append(f\"chunk-status-{receipt.status}\")"
+new = "    if receipt.status not in {\"complete\", \"failed\"}:\n        reasons.append(f\"chunk-status-{receipt.status}\")"
+
+# The directory name must agree with what the receipt says its run was. Without it
+# a stage directory copied to another namespace passes as that namespace's run.
+[[arm]]
+id = "the-namespace-directory-is-not-cross-checked"
+test = "test_a_staged_dir_whose_receipt_names_another_namespace_is_refused"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "            if receipt.run_namespace_sha256 != namespace:"
+new = "            if False:"
+
+# Two namespaces binding to one plan is ambiguity, and picking one is the failure
+# this arm names: `next(iter(...))` would silently choose whichever sorted first,
+# so a resumed-and-abandoned run could supply the corpus.
+[[arm]]
+id = "an-ambiguous-run-is-chosen-between"
+test = "test_two_run_namespaces_binding_to_one_plan_are_refused_not_chosen_between"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    if len(grouped) > 1:"
+new = "    if False:"
+
+# --------------------------------------------------------------------------
+# 3 — the short corpus, the failure that reads as success
+# --------------------------------------------------------------------------
+
+# 1 chunk of 58 assembling without a word is precisely the shape Ray's standing
+# hold is about. `--partial` exists so that saying so is a deliberate act.
+[[arm]]
+id = "a-short-corpus-assembles-silently"
+test = "test_a_short_run_is_refused_unless_partial_is_asked_for"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    if len(accepted) != planned_total and not allow_partial:"
+new = "    if False:"
+
+# Zero staged chunks must be a refusal, not an empty chunk written to
+# `sources/extractions/`. An empty committed chunk merges cleanly, adds nothing,
+# and looks like a completed ingestion in the git log.
+[[arm]]
+id = "an-empty-run-yields-an-empty-chunk"
+test = "test_an_empty_cache_root_is_a_refusal_not_an_empty_chunk"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    if not grouped:\n        reasons.append(\"no staged chunk binds to this plan\")\n        return [], reasons"
+new = "    if not grouped:\n        return [], reasons"
+
+# --------------------------------------------------------------------------
+# 4 — the CLI boundary
+# --------------------------------------------------------------------------
+
+# An unrecognised flag must not be swallowed. `--force` silently ignored is the
+# shape where an operator believes they overrode a gate and did not.
+[[arm]]
+id = "an-unknown-flag-is-swallowed"
+test = "test_merge_main_rejects_an_unknown_flag"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    if not positional or len(positional) > max_positional or flags - {\"--partial\"}:"
+new = "    if not positional or len(positional) > max_positional:"
+
+# The printed arithmetic is what a reader checks the subsequent `kb-merge` against;
+# reporting the chunk COUNT where the node count belongs makes the two agree by
+# construction and the check vacuous.
+# The staging directory must describe THIS artifact. A prior merge's
+# `chunk-NNNN.json` files change no output — only this run's paths are assembled —
+# but a directory holding two runs' intermediates leaves the next reader unable to
+# tell which files the committed chunk was built from.
+[[arm]]
+id = "prior-intermediates-are-left-behind"
+test = "test_a_prior_merges_intermediates_are_cleared"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    for stale in staging.glob(\"chunk-[0-9][0-9][0-9][0-9].json\"):\n        stale.unlink()"
+new = "    for stale in staging.glob(\"chunk-nothing-matches-this.json\"):\n        stale.unlink()"
+
+# The converse: the clear is scoped to the ordinal-named files this module owns, so a
+# file someone else put there survives. A `glob(\"*\")` would delete it.
+[[arm]]
+id = "the-clear-is-unscoped"
+test = "test_a_prior_merges_intermediates_are_cleared"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    for stale in staging.glob(\"chunk-[0-9][0-9][0-9][0-9].json\"):"
+new = "    for stale in staging.glob(\"*\"):"
+
+[[arm]]
+id = "the-reported-node-count-is-the-chunk-count"
+test = "test_merge_main_reports_the_arithmetic_it_assembled"
+file = "python/src/kb_setup/graphify_semantic_corpus_merge.py"
+old = "    nodes = sum(c.node_count for c in accepted)"
+new = "    nodes = len(accepted)"
