@@ -19,24 +19,31 @@ Three properties are deliberate rather than incidental:
   function the PLANNER used to build the committed ledger — replaying it
   reproduces the grouping rather than approximating it. Per-chunk staging happens
   in the ``on_chunk_done`` callback as each call completes.
-* **Resumption is graphify's cache plus one local skip.** Recovery across runs
-  comes from graphify's per-chunk incremental cache, which this profile enables
-  by OMITTING ``GRAPHIFY_NO_INCREMENTAL_CACHE``. On top of that, a chunk whose
-  stage directory already exists is skipped rather than re-published, because
-  ``stage_chunk`` refuses an occupied destination and a resumed run would
-  otherwise abort on the first chunk it had already finished. Those chunks are
-  counted as ``resumed``, never as ``completed`` — this pass did not do that work.
-  The local skip cannot PREVENT the call, only the re-publication: it runs in the
-  callback, which graphify reaches only once a result for the chunk exists. So
-  ``resumed`` means free ONLY when the cache served it, and that is checked per
-  chunk rather than assumed — a chunk the provider was re-invoked for is counted
-  as ``repaid`` instead. The cache tree and the stage tree are separate, and a
-  prune of one that leaves the other is enough to make them disagree.
-* **Loud on partial completion.** ``RunSummary`` keeps completed, resumed, failed
+* **Resumption is a local skip, and it is NOT free.** A chunk whose stage
+  directory already holds VERIFIED evidence for that chunk is skipped rather than
+  re-published, because ``stage_chunk`` refuses an occupied destination and a
+  resumed run would otherwise abort on the first chunk it had already finished.
+  Those chunks are counted as ``repaid``, never as ``completed`` — this pass did
+  not publish that work — and ``repaid`` is the only such category because the
+  skip cannot PREVENT the provider call, only the re-publication: it runs in the
+  callback, which graphify reaches only once a result for the chunk exists.
+  Nothing upstream of the callback avoids the cost either. ``extract_corpus_parallel``
+  has no cache read anywhere in its call chain at the pinned 0.9.45 — the
+  incremental cache is written from that entry point and never consulted — so a
+  re-run re-buys every chunk at full price. Treat an interrupted run as costing
+  its whole remaining corpus again, not its remainder.
+* **A stage directory is verified, never trusted.** "Already staged" means
+  ``verify_staged_chunk`` returned ``complete``: the four published members
+  present and regular, and every payload's digest and byte length matching the
+  receipt the writer left. A directory that exists but fails that check is a
+  FAILURE naming its reasons, not a completed chunk — an unverified existence
+  check let an unrelated directory stand in for all 58 stages and still exit 0.
+* **Loud on partial completion.** ``RunSummary`` keeps completed, repaid, failed
   and never-attempted apart, and the caller returns non-zero unless every planned
   chunk is staged with no failures. A corpus missing a chunk looks exactly like a
   corpus that never had one, so the count is the gate, not the absence of an
-  exception.
+  exception. Each callback is admitted at most once, so those counts stay a
+  bijection onto the ledger rather than a tally of events.
 
 The boundary marker deserves its own note, because its plumbing changed for a
 reason that is easy to undo. The adapter is handed a DIRECTORY rather than a file
@@ -86,21 +93,15 @@ class RunSummary(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     run_namespace_sha256: str
     chunk_total: int
     completed: int
-    # Staged by an earlier run and served from graphify's cache this time. Kept
-    # apart from `completed` because "58 completed" on a resumed run would claim
-    # this pass did work it did not do.
+    # Staged by an earlier run, verified as that chunk's real evidence, and PAID
+    # FOR AGAIN this pass. Kept apart from `completed` because "58 completed" on
+    # a resumed run would claim this pass published work it did not publish.
     #
-    # FREE, and that is checked rather than assumed — see `repaid`.
-    resumed: int
-    # Staged by an earlier run, but the provider was invoked again anyway and the
-    # tokens WERE spent. Folding these into `resumed` is the expensive lie: the
-    # comment above would then be false for exactly the chunks that cost money,
-    # and the operator reading a resumed run's summary would conclude the pass
-    # was free. The two states are distinguishable because the adapter writes its
-    # metadata only after the real `claude` subprocess returns, so the file's
-    # presence in the callback means graphify's semantic cache did NOT serve this
-    # chunk. It happens whenever the cache and the stage tree diverge — they are
-    # separate directories, and a cache prune that leaves stages behind is enough.
+    # There is deliberately no `resumed` counterpart. One existed, meaning
+    # "served free from graphify's cache", and it was measured to be unreachable:
+    # `extract_corpus_parallel` has no cache read anywhere in its call chain at
+    # the pinned 0.9.45, so a re-run re-buys every chunk. Naming a free category
+    # that cannot occur told the operator a resumed run was cheap; it is not.
     repaid: int
     # Reached and lost: either the provider call raised, or the chunk staged with
     # refusal reasons. Distinct from `skipped`, which is never-attempted.
@@ -563,11 +564,12 @@ def execute(
         repo_root, require_max_turns=True, profile=_PROFILE
     )
     outcomes: list[ChunkOutcome] = []
-    resumed: list[int] = []
     repaid: list[int] = []
-    # Persistent, and keyed on the CACHE namespace rather than the run namespace:
-    # the cache's whole value is surviving between runs, and a per-run directory
-    # would make every resumed run a cold one while still looking warm.
+    # Persistent, and keyed on the CACHE namespace rather than the run namespace,
+    # so checkpoints accumulate across runs in one tree instead of one tree per
+    # run. That is where graphify WRITES them; it does not read them back on this
+    # entry point, so this buys durability for other consumers of the cache, not
+    # a discount for the next run.
     semantic_cache = cache_root / config.cache_namespace_sha256 / "semantic-cache"
     semantic_cache.mkdir(parents=True, exist_ok=True)
 
@@ -591,13 +593,47 @@ def execute(
         overlay = _adapter_overlay(context, Path(bin_dir))
 
         clear_stale_evidence(context.metadata_path, context.boundary_dir)
-        already_staged = {
-            chunk.ordinal
-            for chunk in ledger.chunks
-            if graphify_semantic_corpus.chunk_stage_dir(
+        # VERIFIED, not merely present. This used to be a set comprehension over
+        # `chunk_stage_dir(...).exists()`, and a cold cross-family lane showed
+        # exactly what that bought: substituting an unrelated directory for every
+        # stage produced "58 accounted, 0 failed, success". Existence is a claim
+        # about the filesystem; the driver needs a claim about the EVIDENCE.
+        #
+        # `verify_staged_chunk` is not new code written for this fix — it already
+        # existed in `graphify_semantic_corpus`, rehashing every payload against
+        # the digests and byte lengths the writer itself recorded, refusing a
+        # symlinked or non-regular directory, and refusing an entry set that is
+        # not exactly the four published members. The defect was never a missing
+        # verifier. It was that nothing on this path CALLED the one that was
+        # already there, which is the only reason a validator can be thorough and
+        # still gate nothing.
+        staged: dict[int, tuple[str, ...]] = {}
+        for chunk in ledger.chunks:
+            destination = graphify_semantic_corpus.chunk_stage_dir(
                 cache_root, run_namespace, chunk.ordinal
-            ).exists()
-        }
+            )
+            # `lstat`, via `is_symlink`, so a dangling or redirected stage is a
+            # candidate for verification rather than invisible: `exists()` follows
+            # the link and answers about the TARGET.
+            if not destination.exists() and not destination.is_symlink():
+                continue
+            verification = graphify_semantic_corpus.verify_staged_chunk(
+                cache_root,
+                graphify_semantic_corpus.ChunkStageReference(
+                    candidate=candidate,
+                    source_root=source_root,
+                    cache_namespace=config.cache_namespace_sha256,
+                    run_namespace=run_namespace,
+                    chunk=chunk,
+                ),
+            )
+            staged[chunk.ordinal] = () if verification.state == "complete" else verification.reasons
+        # Ordinals seen so far, so a repeated callback cannot be counted twice.
+        # The range check below is necessary and was never sufficient: accounting
+        # counts EVENTS, and `skipped` clamps its own negative, so two callbacks
+        # for one index silently absorbed an index that never arrived. That is a
+        # hole in the corpus reported as `skipped=0`.
+        visited: set[int] = set()
 
         def on_chunk_done(index: int, total: int, raw: object) -> None:
             # The ledger's ordering IS graphify's, because the planner derived it
@@ -622,8 +658,15 @@ def execute(
             # failing EARLY and by name, not by being the last line of defence.
             if total != len(ledger.chunks) or not 0 <= index < len(ledger.chunks):
                 raise ValueError("provider chunk callback disagrees with the planned ledger")
+            # Range says the index is ADDRESSABLE; uniqueness says the run is
+            # still a bijection onto the ledger. Raising rather than tolerating,
+            # because a duplicate means the driver's model of graphify's fan-out
+            # is wrong, and every count downstream is derived from that model.
+            if index in visited:
+                raise ValueError(f"provider chunk callback repeated index {index}")
+            visited.add(index)
             chunk = ledger.chunks[index]
-            if chunk.ordinal in already_staged:
+            if chunk.ordinal in staged:
                 # Staged by an earlier run. `stage_chunk` REFUSES an existing
                 # destination — correctly, since silently overwriting published
                 # evidence is worse — so without this a resumed run aborts on the
@@ -635,18 +678,45 @@ def execute(
                 # `provider boundary marker already exists` — the same cascade
                 # this callback exists to prevent, reintroduced by the fix for a
                 # different finding.
-                #
-                # Whether this pass PAID for the chunk is answerable, so it is
-                # answered rather than assumed. The adapter writes its metadata
-                # only after the real `claude` subprocess returns, and the file is
-                # rotated away after every chunk, so its presence HERE means this
-                # chunk's provider call happened despite the stage directory
-                # already existing — the cache did not serve it and the tokens
-                # are gone. `resumed` claims this pass did no work for the chunk;
-                # that claim is only true in the other branch.
-                was_paid = context.metadata_path.exists()
                 clear_stale_evidence(context.metadata_path, context.boundary_dir)
-                (repaid if was_paid else resumed).append(chunk.ordinal)
+                reasons = staged[chunk.ordinal]
+                if reasons:
+                    # A directory is sitting where this chunk's evidence belongs
+                    # and it is not this chunk's evidence. There is no repair path
+                    # from here — `stage_chunk` refuses the occupied destination —
+                    # so the only honest disposition is a failure that names what
+                    # is wrong and lets the operator remove it. Counting it as
+                    # done is the exact behaviour this fix removes.
+                    outcomes.append(
+                        ChunkOutcome(
+                            ordinal=chunk.ordinal,
+                            total=chunk.total,
+                            status="failed",
+                            node_count=0,
+                            edge_count=0,
+                            hyperedge_count=0,
+                            reasons=tuple(f"chunk-stage-unverifiable: {r}" for r in reasons),
+                        )
+                    )
+                    return
+                # REPAID, with no "resumed" alternative, and that is a measurement
+                # rather than a simplification. The driver calls
+                # `extract_corpus_parallel`, and an AST walk of the pinned 0.9.45
+                # finds no cache read anywhere in its call chain
+                # (`_run_one` -> `_extract_with_adaptive_retry` ->
+                # `extract_files_direct`); `load_cached` is reached only from
+                # `graphify/extract.py`, an entry point this driver never uses.
+                # The probe discriminates — it does find `_checkpoint_chunk`, the
+                # WRITER, on this path.
+                #
+                # So graphify's semantic cache is write-only from here, every
+                # already-staged chunk is paid for again, and the former `resumed`
+                # branch described a state the real system cannot reach. Its test
+                # manufactured that state by omitting adapter metadata, which is
+                # why a free arm ever passed. If a future graphify serves this
+                # entry point from cache, re-derive this comment before adding the
+                # branch back — do not restore it on the strength of the name.
+                repaid.append(chunk.ordinal)
                 return
             try:
                 outcomes.append(_stage_completed_chunk(raw, chunk, context))
@@ -706,13 +776,12 @@ def execute(
         # provider failures and inflated `skipped`, in the summary a human reads
         # to decide whether the corpus is whole.
         raise ValueError("graphify result omitted failed_chunks")
-    accounted = len(outcomes) + len(resumed) + len(repaid) + provider_failures
+    accounted = len(outcomes) + len(repaid) + provider_failures
     return RunSummary(
         schema_id="graphify-semantic-corpus-run/v0",
         run_namespace_sha256=run_namespace,
         chunk_total=len(ledger.chunks),
         completed=len(completed),
-        resumed=len(resumed),
         repaid=len(repaid),
         failed=len(staged_failures) + provider_failures,
         # Only what the run genuinely never reached. A negative would mean more

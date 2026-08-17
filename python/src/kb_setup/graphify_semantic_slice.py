@@ -719,18 +719,60 @@ def _list_is_empty(value: object) -> bool:
     return isinstance(value, list) and not value
 
 
+# The reason a TRUNCATED result earns, kept apart from `stop-reason-invalid`.
+# Both are refusals — a truncated structured output is not evidence — but only
+# this one is RECOVERABLE, by extracting the chunk in halves. Collapsing them
+# left the plan's `graphify_max_retry_depth=2` inert for the single failure it
+# was raised to survive, because the adapter refused the envelope before
+# graphify could translate `stop_reason=max_tokens` into `finish_reason=length`
+# and bisect. See `TRUNCATION_RETRY_HINT`.
+TRUNCATED_STOP_REASON = "stop-reason-truncated"
+
+# Emitted on stderr alongside the refusal so graphify's `_looks_like_context_exceeded`
+# classifies our non-zero exit as a context overflow and its adaptive retry
+# bisects the chunk instead of dropping it.
+#
+# Substring matching against that helper's marker list is graphify's OWN
+# extension point, not a private detail being reached into: it matches on
+# stringified-exception substrings precisely "so the retry layer can recover
+# without depending on a specific SDK class" (`graphify/llm.py`). It is still
+# coupling, so a test asserts the pinned graphify actually classifies this
+# string — if upstream rewords its markers, that test fails rather than this
+# recovery going quietly dead.
+TRUNCATION_RETRY_HINT = (
+    "the model stopped at max_completion_tokens: this chunk's prompt is too long "
+    "for one response and must be extracted in halves"
+)
+
+
+def truncation_retry_hint(reasons: tuple[str, ...]) -> str | None:
+    """Return the stderr line that makes a truncation refusal legible, else None.
+
+    A function rather than an inline conditional in the adapter because that is
+    the only form of this decision a test can reach: the adapter's own copy lives
+    between a subprocess call and a `sys.exit`, so nothing covered it, and a
+    mutation that simply deleted the print would have survived every arm while
+    silently restoring the defect.
+    """
+    return TRUNCATION_RETRY_HINT if TRUNCATED_STOP_REASON in reasons else None
+
+
 def _result_reasons(
     envelope: dict[str, object],
     *,
     max_turns: int | None = _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR,
 ) -> list[str]:
     reasons = []
+    stop_reason = envelope.get("stop_reason")
     checks = (
         (envelope.get("type") == "result", "result-type-invalid"),
         (envelope.get("subtype") == "success", "result-subtype-invalid"),
         (envelope.get("is_error") is False, "result-error"),
         (envelope.get("terminal_reason") == "completed", "terminal-state-invalid"),
-        (envelope.get("stop_reason") in {"end_turn", "tool_use"}, "stop-reason-invalid"),
+        (
+            stop_reason in {"end_turn", "tool_use"},
+            TRUNCATED_STOP_REASON if stop_reason == "max_tokens" else "stop-reason-invalid",
+        ),
     )
     reasons.extend(reason for accepted, reason in checks if not accepted)
     turns = envelope.get("num_turns")

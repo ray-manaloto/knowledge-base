@@ -656,10 +656,22 @@ def _effective_config(
         # nothing downstream reports as missing.
         graphify_max_retry_depth=2,
         graphify_chunk_size=20,
-        # False (cache reads ENABLED) so a resumed or repeated run pays only for
-        # the chunks it has not already extracted. Under the previous cold policy
-        # every re-run re-bought the whole corpus, which made recovering from a
-        # single failed chunk cost the same as the original run.
+        # False, which leaves graphify's per-chunk checkpoint WRITES enabled.
+        #
+        # It was justified here as buying a discount — "a resumed or repeated run
+        # pays only for the chunks it has not already extracted" — and that was
+        # never true on this path. An AST walk of the pinned 0.9.45 finds no cache
+        # read anywhere in `extract_corpus_parallel`'s call chain
+        # (`_run_one` -> `_extract_with_adaptive_retry` -> `extract_files_direct`);
+        # `load_cached` is reached only from `graphify/extract.py`, which this
+        # driver never calls. The probe discriminates: the same walk does find
+        # `_checkpoint_chunk`, the writer, on this path.
+        #
+        # So a re-run re-buys the whole corpus regardless of this flag, and the
+        # value it does buy is durable checkpoints for anything that reads the
+        # cache by another route. Kept False for that, and because a cold policy
+        # would discard the checkpoints too. Budget an interrupted run at full
+        # price; the driver's `repaid` count is the measurement of that.
         graphify_no_incremental_cache=False,
         # 1, and it is a MEASUREMENT of what the extractor will do rather than a
         # preference (Ray, 2026-08-16, after the constraint was surfaced).
@@ -2827,14 +2839,19 @@ def _execute_authorized(repo_root: Path, output: Path) -> int:
             repo_root=repo_root,
         )
     print(_encode(summary).decode().rstrip())
-    # `completed + resumed + repaid`, not `completed`. On a resumed run the chunks
-    # staged by the earlier pass are not re-published, so gating on `completed`
-    # alone would report a fully-staged corpus as a failure and invite a re-run
-    # that could only produce the same answer. `repaid` is the same disposition —
-    # staged, not re-published — and differs only in having cost money this pass;
-    # that distinction belongs in the printed summary, not in the completeness
-    # gate, which asks whether the corpus is whole.
-    staged = summary.completed + summary.resumed + summary.repaid
+    # `completed + repaid`, not `completed`. On a resumed run the chunks staged by
+    # the earlier pass are not re-published, so gating on `completed` alone would
+    # report a fully-staged corpus as a failure and invite a re-run that could
+    # only produce the same answer. `repaid` is the same DISPOSITION — staged,
+    # not re-published — and differs only in having cost money this pass; that
+    # distinction belongs in the printed summary, not in the completeness gate,
+    # which asks whether the corpus is whole.
+    #
+    # `repaid` now carries only chunks whose stage directory VERIFIED as that
+    # chunk's evidence. Before that check this sum was the whole exit-0 story for
+    # a directory nobody had looked inside, which is how a substituted directory
+    # reported a complete corpus.
+    staged = summary.completed + summary.repaid
     return 0 if staged == summary.chunk_total and summary.failed == 0 else 1
 
 

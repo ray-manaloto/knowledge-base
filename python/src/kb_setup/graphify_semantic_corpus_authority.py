@@ -70,10 +70,37 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # moment that happens, which is the intended behaviour rather than friction — an
 # authorization is a review of what a run WILL DO, and the code that will do it
 # changed. Re-plan and re-record, and say what moved.
+# RE-RECORDED 2026-08-17, after the round that closed a cold cross-family lane's
+# four HIGH findings in the driver, the slice and the adapter. Same judgement,
+# same workload — this is the code-identity case this file's doctrine above
+# describes, and it was verified rather than asserted.
+#
+# WHAT MOVED: exactly five fields of `execution-config.json`, and the manifest
+# containing it. Four are the digests of the files this round edited —
+# `runner_sha256`, `semantic_slice_sha256`, `adapter_sha256`, `planner_sha256` —
+# and the fifth, `cache_namespace_sha256`, is derived from them. Diffed field by
+# field: NO behavioural field moved. Same model, same `--effort high`, same
+# budget, same concurrency of 1, same retry depth, same chunk size.
+#
+# WHAT DID NOT: `advisories.json`, `exclusions.json`, `source-inventory.json` and
+# `chunk-ledger.json` all came back BYTE-IDENTICAL, at the same source commit
+# 0738af37 — so both digests carrying a reviewed DECISION are unchanged, and the
+# workload is the same 474 units / 58 chunks over the same 370 admitted paths.
+# Nothing here asks for a judgement Ray has not already given; a moved advisory
+# or exclusion digest would, and would be escalated rather than re-recorded.
+#
+# RE-PLANNED TWICE this round, and the second time is the lesson. The first
+# re-plan verified `execution_authorized: true`, and a later edit to the slice
+# and the adapter — made to close the same round's findings — moved their digests
+# again and silently invalidated it. `verify` had already said yes, so the stale
+# authorization surfaced only when the suite ran. RE-PLAN LAST: any edit to the
+# driver, slice, adapter or planner after the re-plan un-authorizes it, and a
+# green `verify` is evidence about the tree at the moment it ran and nothing
+# after.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"2c98e9d7b8fe2c90a697896171c2c7f973eaaf7c480b55f9f824fc1759a80545",'
+    b'"execution_config_sha256":"a219f4bc6700254d441141e9768b011e6122a2b9426c522d6b1beea49e5c0c06",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"89e16486e43779c8232c0ca2fb4e06a59cc9f4b00e5f7383f17c84ecc0f929fd",'
+    b'"plan_manifest_sha256":"2e7af8b291515d10abcd1a41da3b72509732a5fe7b59f79781af9cb931afbb73",'
     b'"schema_version":1}\n'
 )

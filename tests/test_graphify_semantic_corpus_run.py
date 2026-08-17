@@ -389,42 +389,18 @@ def test_recorded_authority_digests_match_the_plan_on_disk() -> None:
         assert recorded == graphify_semantic_corpus.sha256_path(_PLAN / name), name
 
 
-def test_an_unset_authority_is_distinguishable_from_a_wrong_one() -> None:
-    """`unset` and `mismatch` are different failures and must stay different.
-
-    Collapsing them would report "nobody reviewed this" and "the plan changed
-    since review" with one word, and only the second is recoverable by
-    re-authorizing rather than by reviewing from scratch.
-    """
-    empty = msgspec.json.decode(
-        b'{"advisories_sha256":"","execution_config_sha256":"","exclusions_sha256":"",'
-        b'"plan_manifest_sha256":"","schema_version":1}',
-        type=graphify_semantic_corpus.AuthorityRoots,
-        strict=True,
-    )
-    populated = msgspec.json.decode(
-        graphify_semantic_corpus_authority.AUTHORITY_JSON,
-        type=graphify_semantic_corpus.AuthorityRoots,
-        strict=True,
-    )
-    # `verify_plan` treats "configured" as all four digests being non-empty, then
-    # compares them. These two cases are what drive the two different reasons.
-    assert not all(
-        (
-            empty.plan_manifest_sha256,
-            empty.execution_config_sha256,
-            empty.advisories_sha256,
-            empty.exclusions_sha256,
-        )
-    )
-    assert all(
-        (
-            populated.plan_manifest_sha256,
-            populated.execution_config_sha256,
-            populated.advisories_sha256,
-            populated.exclusions_sha256,
-        )
-    )
+# The `unset`-versus-mismatch distinction is armed in
+# `tests/test_graphify_semantic_corpus.py`, by
+# `test_recorded_authority_authorizes_this_plan_and_only_this_plan`, which calls
+# `verify_plan` against the real committed roots in both directions.
+#
+# A test lived HERE claiming the same coverage and never called `verify_plan` at
+# all: it decoded two `AuthorityRoots` and asserted that one had empty digests
+# and the other did not — a property of its own fixtures, true no matter what the
+# verifier did with them. A cold lane proved the point by replacing `verify_plan`
+# with a function that always raises; the test still passed. It is deleted rather
+# than repaired because repairing it would only duplicate the sibling above, and
+# two tests of one behaviour drift until they disagree about which is right.
 
 
 def test_graphify_still_force_serializes_the_claude_cli_backend() -> None:
@@ -528,43 +504,105 @@ def test_a_chunk_that_fails_to_stage_does_not_abort_the_run(
 
 
 @_needs_driver
-def test_an_already_staged_chunk_the_provider_was_re_invoked_for_is_not_resumed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "corrupt",
+    [
+        pytest.param(lambda stage: stage.mkdir(parents=True), id="empty-directory"),
+        pytest.param(
+            lambda stage: (
+                stage.mkdir(parents=True),
+                (stage / "receipt.json").write_text("{}"),
+            ),
+            id="partial-members",
+        ),
+        pytest.param(
+            lambda stage: (
+                stage.parent.mkdir(parents=True, exist_ok=True),
+                stage.symlink_to(stage.parent),
+            ),
+            id="symlinked-stage",
+        ),
+    ],
+)
+def test_a_stage_directory_that_is_not_this_chunks_evidence_is_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, corrupt: Callable
 ) -> None:
-    """`resumed` claims the pass was free for that chunk; prove it only says so when true.
+    """An unverified stage directory used to count as done and exit 0.
 
-    Both arms run over the SAME already-staged chunk and differ in one byte of
-    state — whether the adapter left its metadata behind, which it writes only
-    after the real `claude` subprocess returns. A profile-blind implementation
-    that just counts `resumed` fails the paid arm, and one that counts everything
-    as paid fails the free arm, so the pair discriminates rather than merely
-    passing.
+    The driver decided "already staged" from `chunk_stage_dir(...).exists()`, so
+    a cold cross-family lane substituted an unrelated directory for every stage
+    and got "58 accounted, 0 failed, success" — silent corpus loss wearing a
+    green result. Existence is a claim about the filesystem; what the driver
+    needs is a claim about the evidence.
+
+    The three arms are the three shapes that predicate could not tell from a real
+    stage: nothing in the directory, some of the four members, and a symlink
+    (which `exists()` answers about the TARGET). Each must land as a FAILURE
+    naming its reason, because there is no repair path — `stage_chunk` refuses
+    the occupied destination — so the operator has to be told to remove it.
+
+    Deliberately asserts `repaid == 0` too. A fix that merely ADDED a failure
+    while still counting the chunk as staged would satisfy `failed == 1` and
+    leave the completeness gate green, which is the defect rather than the fix.
     """
     cache_root = tmp_path / "cache"
     config = _config()
     namespace = graphify_semantic_corpus_run._run_namespace(_PLAN, config.cache_namespace_sha256)
     ordinal = _ledger().chunks[0].ordinal
-    graphify_semantic_corpus.chunk_stage_dir(cache_root, namespace, ordinal).mkdir(parents=True)
+    corrupt(graphify_semantic_corpus.chunk_stage_dir(cache_root, namespace, ordinal))
 
-    def driver_paid(
-        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
-    ) -> None:
+    def driver(context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable) -> None:
         # Exactly what a real provider call leaves behind before the callback runs.
         context.metadata_path.write_bytes(b"{}")
         on_chunk_done(0, len(context.ledger.chunks), {})
 
-    def driver_free(
+    _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
+    summary = _execute(tmp_path)
+
+    assert summary.repaid == 0, "an unverifiable stage directory was counted as staged"
+    assert summary.failed == 1
+    assert summary.outcomes[0].reasons
+    assert all(
+        reason.startswith("chunk-stage-unverifiable: ") for reason in summary.outcomes[0].reasons
+    ), summary.outcomes[0].reasons
+
+
+@_needs_driver
+def test_one_callback_per_chunk_is_enforced_rather_than_assumed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A repeated callback index must raise, not quietly absorb an unvisited chunk.
+
+    The guard checked only that the index was in RANGE. Accounting counts events
+    and `skipped` clamps its own negative, so two callbacks for one index made a
+    chunk that never arrived report as `skipped=0` — a hole in the corpus behind
+    a clean summary.
+
+    The control arm is the second half: the same driver visiting two DISTINCT
+    indices must not raise, or this would pass against a guard that rejects every
+    second callback for any reason at all.
+    """
+
+    def driver_duplicate(
         context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
     ) -> None:
+        context.metadata_path.write_bytes(b"{}")
+        on_chunk_done(0, len(context.ledger.chunks), {})
         on_chunk_done(0, len(context.ledger.chunks), {})
 
-    _stub_extraction(monkeypatch, driver_paid, result={"failed_chunks": 0})
-    paid = _execute(tmp_path)
-    assert (paid.repaid, paid.resumed) == (1, 0), "a re-invoked chunk was reported as free"
+    _stub_extraction(monkeypatch, driver_duplicate, result={"failed_chunks": 0})
+    with pytest.raises(ValueError, match="repeated index 0"):
+        _execute(tmp_path)
 
-    _stub_extraction(monkeypatch, driver_free, result={"failed_chunks": 0})
-    free = _execute(tmp_path)
-    assert (free.repaid, free.resumed) == (0, 1), "a cache-served chunk was reported as paid"
+    def driver_distinct(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        for index in (0, 1):
+            context.metadata_path.write_bytes(b"{}")
+            on_chunk_done(index, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver_distinct, result={"failed_chunks": 0})
+    assert _execute(tmp_path).chunk_total == len(_ledger().chunks)
 
 
 @_needs_driver

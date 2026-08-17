@@ -877,6 +877,19 @@ def adapter_main() -> int:
     _write_metadata(metadata)
     if metadata.reasons:
         print("semantic adapter rejected result: " + ", ".join(metadata.reasons), file=sys.stderr)
+        # The refusal stands — a truncated structured output is not evidence and
+        # is never passed through. What changes is that graphify can now TELL
+        # truncation from every other refusal.
+        #
+        # It reads this process's failure as `RuntimeError("claude -p exited 1:
+        # <stderr>")` and classifies it by substring, so a refusal worded only as
+        # `stop-reason-invalid` matched none of its context-overflow markers and
+        # the chunk was dropped whole. That made the plan's
+        # `graphify_max_retry_depth=2` inert for truncation — the one failure it
+        # exists to survive. With the hint, adaptive retry bisects the chunk.
+        hint = graphify_semantic_slice.truncation_retry_hint(metadata.reasons)
+        if hint:
+            print(hint, file=sys.stderr)
         return 1
     sys.stdout.buffer.write(completed.stdout)
     return 0

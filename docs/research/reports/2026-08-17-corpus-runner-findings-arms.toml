@@ -1,0 +1,142 @@
+# Mutation arms for the eight cold cross-family findings closed on #331.
+#
+# WHY THESE EXIST AND NOT JUST THE SUITE. Every test armed below was written by
+# the same session, in the same turn, as the fix it covers — the shape
+# `.claude/rules/probes-need-a-control-arm.md` rule 2 names as least-reviewed. A
+# test written alongside its own fix routinely cannot fail, and reading it cannot
+# tell you so. These arms revert each fix and check the suite goes red NAMING the
+# right test.
+#
+# THE SUITE LIST IS DELIBERATELY MISSING `tests/test_graphify_semantic_corpus.py`,
+# and that is not an oversight. `runner_sha256`, `semantic_slice_sha256` and
+# `adapter_sha256` are digests of the very files these arms mutate, and they live
+# inside `execution-config.json`, which `AUTHORITY_JSON` is a digest of. So ANY
+# byte change to those modules — including the control arm's inert comment —
+# invalidates the authorization and fails
+# `test_recorded_authority_authorizes_this_plan_and_only_this_plan`. Including
+# that suite does not add a row; it breaks the CONTROL, which makes every other
+# row unreadable. Measured on 2026-08-16, recorded, and obeyed here.
+#
+# The cost of that split, stated rather than hidden: no arm below says anything
+# about whether the authorization notices a code change. One dedicated test
+# already covers exactly that, and it is the test this split excludes.
+#
+# WHAT A CLEAN SWEEP HERE WOULD AND WOULD NOT MEAN. It is a statement about the
+# TESTS, never about the premise. Specifically it does NOT establish:
+#
+#   * that finding 3's remedy is right. Collapsing `resumed` into `repaid` rests
+#     on a MEASUREMENT of the pinned graphify — that `extract_corpus_parallel`
+#     has no cache read in its call chain — and no mutation of this repo can
+#     confirm or refute a fact about a dependency. If graphify adds a cache read,
+#     every arm below still passes and the accounting silently becomes wrong
+#     again in the other direction.
+#   * that the truncation hint will keep working. That rests on graphify's
+#     private marker list, and the only thing guarding it is
+#     `test_the_installed_graphify_classifies_our_truncation_hint_as_retryable`,
+#     which is armed here for its own logic but cannot predict an upstream
+#     reword.
+#   * anything about findings 6 or 8. Finding 6 was two stale version stamps
+#     (data, not code) and finding 8 a false comment; neither has a mutation.
+#     Their evidence is the refreshed stamp files and the corrected comment, and
+#     saying so beats an arm that pretends to cover them.
+#
+# EVERY ARM IS A REALISTIC BREAK. The recurring temptation across these fixes is
+# "this check is redundant, the next layer catches it" — which is precisely the
+# reasoning that left the original verifier uncalled. A renamed symbol is never
+# used: it leaves the original as a substring and proves nothing.
+
+suites = [
+  "tests/test_graphify_semantic_corpus_run.py",
+  "tests/test_graphify_semantic_slice.py",
+]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "    outcomes: list[ChunkOutcome] = []"
+new = "    outcomes: list[ChunkOutcome] = []  # inert control edit"
+
+# --------------------------------------------------------------------------
+# Finding 1 — a stage directory was trusted because it EXISTED
+# --------------------------------------------------------------------------
+
+# The original defect, restored exactly: decide "already staged" from the
+# filesystem rather than from the evidence. This is what let an unrelated
+# directory stand in for all 58 stages and still exit 0.
+[[arm]]
+id = "stage-existence-replaces-verification"
+test = "test_a_stage_directory_that_is_not_this_chunks_evidence_is_a_failure"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "            staged[chunk.ordinal] = () if verification.state == \"complete\" else verification.reasons"
+new = "            staged[chunk.ordinal] = ()"
+
+# The HALF-FIX, and the more likely one to be written by someone tidying up: the
+# failure is still recorded, but the chunk also counts as staged. `failed == 1`
+# passes, and the completeness gate goes green over a hole in the corpus. This is
+# why the test asserts `repaid == 0` and not merely that a failure appeared.
+[[arm]]
+id = "unverifiable-stage-recorded-as-failed-and-still-counted"
+test = "test_a_stage_directory_that_is_not_this_chunks_evidence_is_a_failure"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "                    return\n                # REPAID, with no \"resumed\" alternative"
+new = "                    repaid.append(chunk.ordinal)\n                    return\n                # REPAID, with no \"resumed\" alternative"
+
+# --------------------------------------------------------------------------
+# Finding 2 — the callback guard checked RANGE, not ordinal uniqueness
+# --------------------------------------------------------------------------
+
+# Delete the uniqueness check and keep the range check, which is the exact state
+# the cold lane found: 58 callbacks over 57 unique indices reporting
+# `skipped=0, failed=0, success`.
+[[arm]]
+id = "callback-uniqueness-check-removed"
+test = "test_one_callback_per_chunk_is_enforced_rather_than_assumed"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = "            if index in visited:\n                raise ValueError(f\"provider chunk callback repeated index {index}\")\n            visited.add(index)"
+new = "            visited.add(index)"
+
+# --------------------------------------------------------------------------
+# Finding 4 — adaptive retries were inert for truncation
+# --------------------------------------------------------------------------
+
+# Collapse truncation back into the generic refusal. graphify then cannot tell a
+# too-long chunk from a malformed one, and `graphify_max_retry_depth=2` goes
+# inert for the single failure it was raised to survive.
+[[arm]]
+id = "truncation-collapsed-into-the-generic-refusal"
+test = "test_success_envelope_fails_closed_one_field_at_a_time"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = "            TRUNCATED_STOP_REASON if stop_reason == \"max_tokens\" else \"stop-reason-invalid\","
+new = "            \"stop-reason-invalid\","
+
+# The hint stops being emitted while the reason survives. Nothing about the
+# refusal changes — only graphify's ability to classify it — so this is the
+# quietest available way to reintroduce the finding, and it is why the decision
+# was pulled out of the adapter into a function a test can reach at all.
+[[arm]]
+id = "truncation-hint-never-emitted"
+test = "test_only_a_truncation_refusal_earns_the_retry_hint"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = "    return TRUNCATION_RETRY_HINT if TRUNCATED_STOP_REASON in reasons else None"
+new = "    return None"
+
+# The opposite error, and the more expensive one: hint on EVERY refusal, so
+# graphify bisects chunks whose halves fail identically and burns the retry
+# budget to reach the same answer.
+[[arm]]
+id = "truncation-hint-emitted-for-every-refusal"
+test = "test_only_a_truncation_refusal_earns_the_retry_hint"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = "    return TRUNCATION_RETRY_HINT if TRUNCATED_STOP_REASON in reasons else None"
+new = "    return TRUNCATION_RETRY_HINT"
+
+# The coupling test itself, armed. It is the only thing standing between an
+# upstream reword and this recovery dying silently, so a version of it that
+# cannot fail is worse than none — it would report the coupling as guarded.
+[[arm]]
+id = "graphify-classification-probe-cannot-discriminate"
+test = "test_the_installed_graphify_classifies_our_truncation_hint_as_retryable"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = "    \"the model stopped at max_completion_tokens: this chunk's prompt is too long \"\n    \"for one response and must be extracted in halves\""
+new = "    \"the model stopped early and the chunk must be extracted in halves\""

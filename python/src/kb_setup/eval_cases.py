@@ -871,9 +871,14 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # inside `mise run test` and passes run alone, twice each — so the
             # bound, not the query, is what moved.
             #
-            # `_broken_graph_canary` deliberately keeps the default: the control
-            # must fail FAST, and giving it three minutes to do so would slow
-            # every clean run to buy nothing.
+            # `_broken_graph_canary` deliberately passes an explicit 30s — HALF
+            # the 60s default, not the default itself, which is what this comment
+            # claimed on the day the timeout was written beside it. The reasoning
+            # was right and the fact was wrong: the control must fail FAST, and
+            # giving it three minutes to do so would slow every clean run to buy
+            # nothing. Stated as the number rather than as "the default" so it
+            # stays checkable, since a comment naming a value it does not use is
+            # indistinguishable from one that is simply stale.
             probe=lambda: evals.graphify_canary(
                 repo_root, CANARY_QUESTION, timeout=RETRIEVAL_TIMEOUT
             ),
