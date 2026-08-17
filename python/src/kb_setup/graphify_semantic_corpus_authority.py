@@ -23,6 +23,20 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # 474 units and 58 chunks. The +1 file lives in the advisory's whole-tree census,
 # not in anything that will be sent to a provider.
 #
+# RE-RECORDED again at 31c63d4d, and the reason is this mechanism demonstrating
+# itself: that commit changed nothing but a COMMENT in
+# `graphify_semantic_corpus_run.py`, and a comment moves the file's bytes, so
+# `runner_sha256` moved, so `execution-config.json` moved, so this authorization
+# was stale and `kb-ship` refused. Documented one commit earlier and walked into
+# anyway — recorded here because the surprise is the useful part: "no executable
+# line changed" is NOT the same predicate as "the digest did not move".
+#
+# The re-plan is the cleanest available evidence that only the CODE identity
+# moved: `advisories_sha256` (ce1da16e) and `exclusions_sha256` (9aeb4c1b) came
+# back BYTE-IDENTICAL, and only `execution_config_sha256` and the manifest
+# containing it changed. The reviewed decisions are untouched, so this re-records
+# the same judgement rather than asking for a new one.
+#
 # Prior authorization: 2026-08-16 at 0.9.44 (source commit 4fca6215), 791 files /
 # ~1,391,691 words, same 474 units / 58 chunks.
 #
@@ -58,8 +72,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # changed. Re-plan and re-record, and say what moved.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"ee4250552529958245695b6487a1c4c14fe621ed087e5652ecf3ef295e9a6117",'
+    b'"execution_config_sha256":"2c98e9d7b8fe2c90a697896171c2c7f973eaaf7c480b55f9f824fc1759a80545",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"d15d6cc52a483267b512aa79ef2bae22531f7dfe7a574e2fcf01e13881a95253",'
+    b'"plan_manifest_sha256":"89e16486e43779c8232c0ca2fb4e06a59cc9f4b00e5f7383f17c84ecc0f929fd",'
     b'"schema_version":1}\n'
 )

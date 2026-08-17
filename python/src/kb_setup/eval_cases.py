@@ -403,9 +403,15 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
 #: from the LAST `[src=` on the line.
 _NODE_LINE = re.compile(r"^NODE .*\[src=(?P<src>.*?) loc=")
 
-#: A retrieval query reloads the whole ~350 MB graph, measured at ~10s each. The
-#: 60s default is for reachability probes; this needs its own headroom without
-#: being unbounded.
+#: A retrieval query reloads the whole graph, measured at ~10s each when this was
+#: written against a **~350 MB** graph. That size is stated because it is the
+#: CONDITION, not decoration: the graph is **499 MB** as of 2026-08-05 and only
+#: grows, so the ~10s figure is a floor that has already moved once.
+#:
+#: The 60s default is for probes that do not load the graph. Anything that runs a
+#: real `graphify query` belongs here — including `tier1.graph-answers`, which
+#: was left on the default until it started failing under `-n auto` and passing
+#: when run alone.
 RETRIEVAL_TIMEOUT = 180
 
 
@@ -850,7 +856,26 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
                 "(rc=0 with empty output is a corpus that reads as healthy and "
                 "knows nothing)"
             ),
-            probe=lambda: evals.graphify_canary(repo_root, CANARY_QUESTION),
+            # RETRIEVAL_TIMEOUT, not the 60s default, and this is applying an
+            # existing justified constant rather than widening a bound to make a
+            # gate pass. That constant's own comment says why: a retrieval query
+            # "reloads the whole graph". This canary IS a `graphify query` over
+            # the same whole graph, so it has the same cost profile and was
+            # simply missed when the retrieval arms got their headroom.
+            #
+            # It went unnoticed because the default was adequate when written.
+            # The comment on RETRIEVAL_TIMEOUT still says "~350 MB"; the graph is
+            # 499 MB (measured 2026-08-05), and under `-n auto` this probe
+            # competes with eleven other workers. Measured: it fails at 60s
+            # inside `mise run test` and passes run alone, twice each — so the
+            # bound, not the query, is what moved.
+            #
+            # `_broken_graph_canary` deliberately keeps the default: the control
+            # must fail FAST, and giving it three minutes to do so would slow
+            # every clean run to buy nothing.
+            probe=lambda: evals.graphify_canary(
+                repo_root, CANARY_QUESTION, timeout=RETRIEVAL_TIMEOUT
+            ),
             control=_broken_graph_canary,
             precondition=_graphify_installed,
         ),
