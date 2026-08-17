@@ -4,9 +4,27 @@
 PROTOTYPE_CONTRACT_SHA256 = "b7a41ea639efc28a714e1f1faa47dcdc69c6d5b8cdf17719c7a78fffaa583848"
 PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88ec4577cd9fb428"
 
-# Authorized by Ray, 2026-08-16, against the plan regenerated at graphify 0.9.44
-# (source commit 4fca6215): 791 files / ~1,391,691 words -> 474 units / 58 chunks,
-# extracted by `claude-opus-5` at `--effort high`.
+# RE-AUTHORIZED by Ray, 2026-08-16, against the plan regenerated at graphify
+# 0.9.45 (source commit 0738af37): 792 files / ~1,394,475 words -> 474 units / 58
+# chunks, extracted by `claude-opus-5` at `--effort high`.
+#
+# WHAT MOVED, and what did not — the paragraph below used to say the two
+# decision-bearing digests "have never changed", and at 0.9.45 both did. They were
+# diffed rather than re-recorded on that assurance, and the assurance survives in
+# substance: `exclusions.json` differs ONLY in `source_commit`/`source_tree` (the
+# same four entries, unchanged), and `advisories.json` differs only in those two
+# fields plus the observed census. Same advisory code, same thresholds, same
+# decision. So the digests moved for IDENTITY and CENSUS reasons, and no reviewed
+# judgement changed.
+#
+# The extraction workload is also unchanged, which is the fact that made this a
+# re-record rather than a fresh review: the admitted inventory is the same 370
+# unique paths — zero added, zero removed, checked as sets — yielding the same
+# 474 units and 58 chunks. The +1 file lives in the advisory's whole-tree census,
+# not in anything that will be sent to a provider.
+#
+# Prior authorization: 2026-08-16 at 0.9.44 (source commit 4fca6215), 791 files /
+# ~1,391,691 words, same 474 units / 58 chunks.
 #
 # What was reviewed, because four digests record THAT a review happened and not
 # WHAT it concluded:
@@ -39,9 +57,9 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # authorization is a review of what a run WILL DO, and the code that will do it
 # changed. Re-plan and re-record, and say what moved.
 AUTHORITY_JSON = (
-    b'{"advisories_sha256":"1706edf9f9f5c4e15a200911316045e7181005e09c4081cfb4f11ddc239e748f",'
-    b'"execution_config_sha256":"bab48b465f41a5d3d20c012d461a8152a71bf84ac94fae880fec92cda43db76f",'
-    b'"exclusions_sha256":"72811bd83ceb77b5a15648fd07c401346ccbd34b16693b1446a0fc83af153175",'
-    b'"plan_manifest_sha256":"8f7b15319395780fee28cccb056eb7b9de9b2f87364ea0aeac86312a160fe96d",'
+    b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
+    b'"execution_config_sha256":"ee4250552529958245695b6487a1c4c14fe621ed087e5652ecf3ef295e9a6117",'
+    b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
+    b'"plan_manifest_sha256":"d15d6cc52a483267b512aa79ef2bae22531f7dfe7a574e2fcf01e13881a95253",'
     b'"schema_version":1}\n'
 )

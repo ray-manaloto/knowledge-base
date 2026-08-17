@@ -21,7 +21,7 @@ _CONSTANT = '_ACCEPTED_GRAPHIFY_REF = "([^"]+)"'
 
 def _repo(tmp_path, *, bindings: str = "", skill_stamp: str = "") -> config.ToolSpec:
     (tmp_path / "mise.toml").write_text(
-        '[tools]\n"pipx:graphifyy" = { version = "0.9.44" }\n', encoding="utf-8"
+        '[tools]\n"pipx:graphifyy" = { version = "0.9.45" }\n', encoding="utf-8"
     )
     (tmp_path / "currency.toml").write_text(
         "[tool.graphify]\n"
@@ -35,7 +35,7 @@ def _repo(tmp_path, *, bindings: str = "", skill_stamp: str = "") -> config.Tool
     return config.load(tmp_path)[0]
 
 
-def _manifest(root, *, ref: str = "v0.9.44", commit: str = "a" * 40) -> None:
+def _manifest(root, *, ref: str = "v0.9.45", commit: str = "a" * 40) -> None:
     path = root / "sources" / "graphify.manifest"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"url = https://example/x\nref = {ref}\ncommit = {commit}\n", encoding="utf-8")
@@ -58,7 +58,7 @@ def _binding(path: str, pattern: str, field: str = "ref") -> str:
 def test_binding_agreeing_with_the_manifest_is_ok(tmp_path):
     spec = _repo(tmp_path, bindings=_binding("code.py", _CONSTANT))
     _manifest(tmp_path)
-    (tmp_path / "code.py").write_text('_ACCEPTED_GRAPHIFY_REF = "v0.9.44"\n', encoding="utf-8")
+    (tmp_path / "code.py").write_text('_ACCEPTED_GRAPHIFY_REF = "v0.9.45"\n', encoding="utf-8")
 
     finding = sync._check_ref_bindings(tmp_path, spec)
 
@@ -67,7 +67,7 @@ def test_binding_agreeing_with_the_manifest_is_ok(tmp_path):
 
 
 def test_binding_naming_an_older_release_is_drift(tmp_path):
-    """The live 2026-08-15 defect, reduced: manifest v0.9.44, constant v0.9.42."""
+    """The live 2026-08-15 defect, reduced: manifest v0.9.45, constant v0.9.42."""
     spec = _repo(tmp_path, bindings=_binding("code.py", _CONSTANT))
     _manifest(tmp_path)
     (tmp_path / "code.py").write_text('_ACCEPTED_GRAPHIFY_REF = "v0.9.42"\n', encoding="utf-8")
@@ -76,7 +76,7 @@ def test_binding_naming_an_older_release_is_drift(tmp_path):
 
     assert finding.status == sync.DRIFT
     assert "reads v0.9.42" in finding.detail
-    assert "pins v0.9.44" in finding.detail
+    assert "pins v0.9.45" in finding.detail
 
 
 def test_commit_binding_is_checked_independently_of_the_ref(tmp_path):
@@ -92,9 +92,9 @@ def test_commit_binding_is_checked_independently_of_the_ref(tmp_path):
             + _binding("code.py", 'source_commit="([0-9a-f]{40})"', field="commit")
         ),
     )
-    _manifest(tmp_path, ref="v0.9.44", commit="a" * 40)
+    _manifest(tmp_path, ref="v0.9.45", commit="a" * 40)
     (tmp_path / "code.py").write_text(
-        f'_ACCEPTED_GRAPHIFY_REF = "v0.9.44"\nsource_commit="{"b" * 40}"\n', encoding="utf-8"
+        f'_ACCEPTED_GRAPHIFY_REF = "v0.9.45"\nsource_commit="{"b" * 40}"\n', encoding="utf-8"
     )
 
     finding = sync._check_ref_bindings(tmp_path, spec)
@@ -110,7 +110,7 @@ def test_a_pattern_that_matches_nothing_is_drift_not_a_pass(tmp_path):
     """A renamed anchor is a check that stopped checking — never render it green."""
     spec = _repo(tmp_path, bindings=_binding("code.py", _CONSTANT))
     _manifest(tmp_path)
-    (tmp_path / "code.py").write_text('_RENAMED_ACCEPTED_REF = "v0.9.44"\n', encoding="utf-8")
+    (tmp_path / "code.py").write_text('_RENAMED_ACCEPTED_REF = "v0.9.45"\n', encoding="utf-8")
 
     finding = sync._check_ref_bindings(tmp_path, spec)
 
@@ -142,7 +142,7 @@ def test_an_unreadable_manifest_field_does_not_pass(tmp_path):
     spec = _repo(tmp_path, bindings=_binding("code.py", "x = ([0-9a-f]{40})", field="commit"))
     path = tmp_path / "sources" / "graphify.manifest"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("url = https://example/x\nref = v0.9.44\n", encoding="utf-8")
+    path.write_text("url = https://example/x\nref = v0.9.45\n", encoding="utf-8")
     (tmp_path / "code.py").write_text(f"x = {'a' * 40}\n", encoding="utf-8")
 
     finding = sync._check_ref_bindings(tmp_path, spec)
@@ -192,9 +192,9 @@ def _install_skill(tmp_path, version: str | None) -> None:
 
 def test_skill_stamp_matching_the_pin_is_ok(tmp_path):
     spec = _repo(tmp_path, skill_stamp=_STAMP)
-    _install_skill(tmp_path, "0.9.44")
+    _install_skill(tmp_path, "0.9.45")
 
-    assert sync._check_skill_stamp(tmp_path, spec, "0.9.44").status == sync.OK
+    assert sync._check_skill_stamp(tmp_path, spec, "0.9.45").status == sync.OK
 
 
 def test_skill_stamp_behind_the_pin_is_drift(tmp_path):
@@ -214,7 +214,7 @@ def test_an_installed_skill_with_no_stamp_is_drift_not_skip(tmp_path):
     spec = _repo(tmp_path, skill_stamp=_STAMP)
     _install_skill(tmp_path, None)
 
-    finding = sync._check_skill_stamp(tmp_path, spec, "0.9.44")
+    finding = sync._check_skill_stamp(tmp_path, spec, "0.9.45")
 
     assert finding.status == sync.DRIFT
     assert "UNKNOWN" in finding.detail
@@ -224,20 +224,20 @@ def test_an_empty_stamp_is_drift(tmp_path):
     spec = _repo(tmp_path, skill_stamp=_STAMP)
     _install_skill(tmp_path, "")
 
-    assert sync._check_skill_stamp(tmp_path, spec, "0.9.44").status == sync.DRIFT
+    assert sync._check_skill_stamp(tmp_path, spec, "0.9.45").status == sync.DRIFT
 
 
 def test_an_uninstalled_skill_is_skip(tmp_path):
     """Nothing installed cannot be stale — that is SKIP, and it is honest."""
     spec = _repo(tmp_path, skill_stamp=_STAMP)
 
-    assert sync._check_skill_stamp(tmp_path, spec, "0.9.44").status == sync.SKIP
+    assert sync._check_skill_stamp(tmp_path, spec, "0.9.45").status == sync.SKIP
 
 
 def test_no_declared_skill_stamp_is_skip(tmp_path):
     spec = _repo(tmp_path)
 
-    assert sync._check_skill_stamp(tmp_path, spec, "0.9.44").status == sync.SKIP
+    assert sync._check_skill_stamp(tmp_path, spec, "0.9.45").status == sync.SKIP
 
 
 # --------------------------------------------------------------------------

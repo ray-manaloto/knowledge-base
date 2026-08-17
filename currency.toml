@@ -277,7 +277,25 @@ byte-identical to 0.9.42 (Git blob `46a4785d32b2a9236346d7f95ded1c92e18545a7`).
 Counts remain `_EXTRACTION_JSON_SCHEMA` x2, `def label_communities` x1, and
 label-side schema x0. Control arm on the same release diff: four changed paths
 under `graphify/build.py` or `graphify/extractors/`. No label code moved, so the
-backend-dependent 42-batch probe remains unwarranted. The gap is STILL PRESENT."""
+backend-dependent 42-batch probe remains unwarranted. The gap is STILL PRESENT.
+
+RE-PROBED 2026-08-16 for 0.9.45, and deliberately spanning **0.9.43...0.9.45**
+rather than only the newest bump: the last recorded probe here was 0.9.43 while
+the repo was already pinned at 0.9.44, so probing one release would have left
+that gap unexamined while looking complete. `gh api .../compare/v0.9.43...v0.9.45`
+lists 30 changed paths and `graphify/llm.py` is **not among them** — 0 matches
+against a 30-file control, so the zero is an absence and not a broken filter.
+No label-touching line moved across either release, so the gap provably cannot
+have moved and the backend-dependent 42-batch probe stays unwarranted. STILL
+PRESENT on 0.9.45.
+
+METHOD NOTE, recorded because it produced a false negative first: this item's
+recorded method says to diff from the pinned clone, and the first attempt ran
+`git -C sources/graphify diff` from a shell whose cwd was ALREADY inside
+`sources/graphify`. That path does not exist from there, so git printed
+`fatal: cannot change to ...` and the label grep returned **0** — a broken probe
+wearing the exact shape of a clean answer. It was caught only because the
+control arm errored identically. Prefer the compare API, or assert the cwd."""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -383,7 +401,18 @@ RE-PROBED 2026-08-14 for 0.9.43. The exact tag still declares `mcp>=1,<3`
 twice, for both `mcp` and `all`. Neither `graphify/serve.py` nor
 `tests/test_mcp_serve.py` changed from 0.9.42; the same-diff control finds four
 changed build/extractor paths. Per the recorded method, no live server probe is
-owed. Remains RESOLVED."""
+owed. Remains RESOLVED.
+
+RE-PROBED 2026-08-16 for 0.9.45, spanning 0.9.43...0.9.45 to close the same
+unprobed-0.9.44 gap noted above. `pyproject.toml` at tag v0.9.45 declares
+`mcp>=1,<3` twice — the `mcp` extra (:59) and `all` (:91). Control on the same
+file: a bogus `mcp>=9` returns 0, so the grep discriminates. Neither
+`graphify/serve.py` nor `tests/test_mcp_serve.py` appears in the 30-file
+compare, so per the recorded method no live server probe is owed. Remains
+RESOLVED.
+
+(Read this item's OPENING sentence with its version condition attached — it
+describes 0.9.30, not today. That trap has now caught one reader.)"""
 
 [[tool.graphify.watch]]
 kind = "local"
@@ -470,7 +499,14 @@ changes Graphify itself but does not produce a comparable all-source determinist
 build: the strict source-classification boundary still blocks that build. The
 0.9.43 release notes do not claim to resolve data-only JSON extraction, so no
 resolution is inferred. Repeat only after the classification debt permits a
-same-source-set build."""
+same-source-set build.
+
+RE-PROBE 2026-08-16 for 0.9.45 remains UNKNOWN, for the same unchanged reason:
+the strict source-classification boundary still prevents a same-source-set
+deterministic build, so no comparable zero-node warning inventory exists to
+count. Neither the 0.9.44 nor the 0.9.45 release notes claim anything about
+data-only JSON extraction, so no resolution is inferred from them. Repeat only
+after the classification debt permits that build."""
 
 # 2484/2485: the two hyperedge issues THIS repo filed (merge-graphs loss;
 # nested-slot read gap). Fixed in 0.9.34 — verified on the installed binary

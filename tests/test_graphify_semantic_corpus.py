@@ -218,7 +218,7 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.44",
+            ref="v0.9.45",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -231,11 +231,11 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
             "detector_git_object": "f76a4259f6a7360872663fbe711c4738ecda4680",
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 791 files · ~1,391,691 words. Semantic extraction will be "
+                "Large corpus: 792 files · ~1,394,475 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 791,
-            "observed_words": 1_391_691,
+            "observed_files": 792,
+            "observed_words": 1_394_475,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }
@@ -281,7 +281,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.44",
+            ref="v0.9.45",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -290,7 +290,13 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
     advisory = json.loads(advisory_path.read_text(encoding="utf-8"))
     advisory["entries"][0]["observed_files"] += 1
     advisory["entries"][0]["message"] = advisory["entries"][0]["message"].replace(
-        "791 files", "792 files"
+        # 792 -> 793, tracking `observed_files += 1` above. These two must stay in
+        # step: the mutation is only a mutation while the written value DIFFERS
+        # from the recomputed one, so leaving "791 files" here after the corpus
+        # grew would rewrite nothing and the test would assert a mismatch it
+        # never actually created.
+        "792 files",
+        "793 files",
     )
     advisory_path.write_bytes(_canonical(advisory))
     _rehash_plan(candidate)
@@ -740,15 +746,15 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
-    assert inventory["source_ref"] == "v0.9.44"
-    assert inventory["source_commit"] == "4fca621532a23f84f69c31e397b75f8105cb5390"
-    assert inventory["source_tree"] == "faabe0fab532b763a76031acd61038a85e3bba00"
+    assert inventory["source_ref"] == "v0.9.45"
+    assert inventory["source_commit"] == "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+    assert inventory["source_tree"] == "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
     assert inventory["detected_source_count"] == 374
     assert inventory["discovered_unit_count"] == 478
     assert inventory["admitted_unit_count"] == 474
     assert (
         inventory["source_manifest_sha256"]
-        == "f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75"
+        == "980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911"
     )
     assert len(ledger["chunks"]) == 58
     assert config["max_turns"] == 3
@@ -789,8 +795,18 @@ def test_recorded_authority_authorizes_this_plan_and_only_this_plan(
     assert authorized.reasons == ()
     assert authorized.state == "complete"
 
-    corrupted = graphify_semantic_corpus_authority.AUTHORITY_JSON.replace(b"1706edf9", b"0000dead")
-    assert corrupted != graphify_semantic_corpus_authority.AUTHORITY_JSON, "mutation was inert"
+    # The mutated prefix is READ from the constant rather than written here as a
+    # literal. The literal version named `1706edf9`, the advisories digest of the
+    # plan reviewed at 0.9.44; the 0.9.45 re-authorization replaced that digest,
+    # so `.replace` matched nothing and the corruption became a no-op — the exact
+    # shape where a negative arm keeps passing while testing nothing. Its own
+    # `mutation was inert` assertion is what caught that, and it is kept below
+    # because deriving the prefix makes inertness unreachable rather than merely
+    # unlikely, and an unreachable case still deserves the arm that says so.
+    authority = graphify_semantic_corpus_authority.AUTHORITY_JSON
+    advisories_digest = json.loads(authority)["advisories_sha256"].encode()
+    corrupted = authority.replace(advisories_digest[:8], b"0000dead")
+    assert corrupted != authority, "mutation was inert"
     monkeypatch.setattr(graphify_semantic_corpus_authority, "AUTHORITY_JSON", corrupted)
 
     refused = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
@@ -2117,7 +2133,7 @@ def test_execution_namespace_contract_accepts_fresh_variance_and_rejects_reuse(
         binding.cache_namespace_sha256,
         "a" * 64,
         "b" * 64,
-        (12, 11, 2),
+        (13, 8, 1),
     )
     cold = _execution_evidence(candidate, common)
     variance = _execution_evidence(
@@ -2189,7 +2205,7 @@ def test_semantic_graph_is_rebuilt_from_retained_real_fragment_bytes(tmp_path: P
 
     assert reasons == []
     assert rebuilt is not None
-    assert graphify_semantic_corpus._graph_counts(rebuilt) == (12, 11, 2)
+    assert graphify_semantic_corpus._graph_counts(rebuilt) == (13, 8, 1)
     assert (
         graphify_semantic_corpus._semantic_graph_integrity_reasons(
             rebuilt, {"docs/how-it-works.md"}

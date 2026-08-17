@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -19,7 +20,13 @@ from kb_setup import (
     graphify_semantic_slice,
 )
 
-_PLAN = Path("graphify-out/graphify-semantic-corpus")
+# Anchored to the repository root resolved from this file, the way
+# `test_graphify_semantic_corpus.py` already does it. As a RELATIVE path it
+# resolved against pytest's working directory, so every `skipif(not
+# _PLAN.is_dir())` in this module silently became "skip everything" when the
+# suite ran from anywhere but the repo root — coverage disappearing without a
+# single failing test to say so.
+_PLAN = Path(__file__).resolve().parents[1] / "graphify-out/graphify-semantic-corpus"
 
 
 def _inventory() -> graphify_semantic_corpus.SourceInventory:
@@ -103,6 +110,7 @@ def test_enabling_the_cache_omits_the_variable_rather_than_setting_zero() -> Non
     assert graphify_semantic_corpus_run.incremental_cache_env(cold) == {name: "1"}
 
 
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
 def test_an_ambient_cache_disable_does_not_survive_into_a_warm_run() -> None:
     """The end-to-end half: a hostile ambient value must actually be removed.
 
@@ -156,6 +164,7 @@ def test_corpus_reduction_does_not_scope_fragments_to_the_slices_one_file() -> N
         graphify_semantic_slice.semantic_fragment(result)
 
 
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
 def test_corpus_scope_failures_are_reasons_for_one_chunk_not_a_run_abort() -> None:
     """An under-covered chunk must be refusable without killing the extraction.
 
@@ -191,7 +200,7 @@ def _run_context(tmp_path: Path) -> graphify_semantic_corpus_run._RunContext:
         ),
         environment_names=(),
         graphify_runtime=graphify_semantic_slice.accepted_graphify_runtime(),
-        graphify_version="0.9.44",
+        graphify_version="0.9.45",
         graphify_semantic_fingerprint_sha256="0" * 64,
     )
     return graphify_semantic_corpus_run._RunContext(
@@ -418,18 +427,163 @@ def test_an_unset_authority_is_distinguishable_from_a_wrong_one() -> None:
     )
 
 
-@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
-def test_planned_concurrency_matches_what_the_extractor_will_actually_do() -> None:
-    """Graphify force-serializes claude-cli; the plan must not claim otherwise.
+def test_graphify_still_force_serializes_the_claude_cli_backend() -> None:
+    """Graphify force-serializes claude-cli; assert that against INSTALLED source.
 
-    Asserted against the INSTALLED source rather than against a remembered fact,
-    so a graphify release that lifts the clamp fails here and the concurrency
-    decision gets re-made deliberately instead of staying at 1 forever.
+    Deliberately UNGUARDED. This asks a question about the pinned dependency, not
+    about this repo's plan, and it is the half that must fail when a graphify
+    release lifts the clamp — so the concurrency decision gets re-made rather
+    than staying at 1 forever. Behind the plan guard it went quiet on exactly the
+    machines that had not generated a plan, which is most of them.
     """
     import graphify.llm
 
     source = Path(graphify.llm.__file__).read_text(encoding="utf-8")
     assert 'backend == "claude-cli"' in source
     assert "GRAPHIFY_CLAUDE_CLI_PARALLEL" in source
-    # The clamp is what makes 1 the only honest value to record.
+
+
+@pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
+def test_planned_concurrency_matches_what_the_extractor_will_actually_do() -> None:
+    """The clamp above is what makes 1 the only honest value for the plan to record."""
     assert _config().concurrency == 1
+
+
+def _stub_extraction(
+    monkeypatch: pytest.MonkeyPatch,
+    driver: Callable[[graphify_semantic_corpus_run._RunContext, Callable[..., None]], None],
+    *,
+    result: dict[str, object],
+) -> None:
+    """Replace the provider call with a driver that fires the callback directly.
+
+    Stubbing `_extract_corpus` rather than a lower seam is deliberate: every one
+    of the three defects armed below lived in `execute`'s COMPOSITION — the
+    callback's control flow, and what `execute` did with graphify's returned
+    counters — not in a function a unit test could call on its own.
+    """
+
+    def fake(
+        paths: list[Path],
+        context: graphify_semantic_corpus_run._RunContext,
+        *,
+        semantic_cache: Path,
+        environment: object,
+        on_chunk_done: Callable[..., None],
+    ) -> dict[str, object]:
+        driver(context, on_chunk_done)
+        return result
+
+    monkeypatch.setattr(graphify_semantic_corpus_run, "_extract_corpus", fake)
+    # The preflight is stubbed, but `executable_sha256` is the REAL binary's:
+    # `_adapter_overlay` re-hashes it and refuses a mismatch, and satisfying that
+    # check with a truthful digest keeps the overlay's own guard live in these
+    # tests instead of stubbing past it.
+    real_claude = shutil.which("claude")
+    assert real_claude is not None
+    receipt = msgspec.structs.replace(
+        _run_context(Path("/nonexistent")).preflight_receipt,
+        executable_sha256=graphify_semantic_slice.sha256_file(Path(real_claude).resolve()),
+    )
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", lambda *_args, **_kwargs: receipt)
+
+
+_PROVIDER_BINARIES_PRESENT = bool(shutil.which("claude") and shutil.which("kb-semantic-claude"))
+_needs_driver = pytest.mark.skipif(
+    not (_PLAN.is_dir() and _PROVIDER_BINARIES_PRESENT),
+    reason="corpus plan or the provider binaries are unavailable here",
+)
+
+
+def _execute(tmp_path: Path) -> graphify_semantic_corpus_run.RunSummary:
+    return graphify_semantic_corpus_run.execute(
+        _PLAN,
+        tmp_path / "cache",
+        tmp_path / "src",
+        repo_root=tmp_path,
+    )
+
+
+@_needs_driver
+def test_a_chunk_that_fails_to_stage_does_not_abort_the_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One unusable chunk must become an outcome, not an exception past the summary.
+
+    `_stage_completed_chunk` has three reachable raise paths, and every one of
+    them propagated out of `execute` — leaving the chunks already staged on disk
+    with no summary naming them, which is the artifact an operator reads to
+    decide what to do next. The arm drives a malformed provider result through
+    the real callback and asserts a SUMMARY comes back.
+    """
+
+    def driver(context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable) -> None:
+        on_chunk_done(0, len(context.ledger.chunks), {"nodes": "not-a-list"})
+
+    _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
+    summary = _execute(tmp_path)
+    assert summary.failed == 1
+    assert summary.completed == 0
+    assert summary.outcomes[0].reasons[0].startswith("chunk-staging-failed")
+
+
+@_needs_driver
+def test_an_already_staged_chunk_the_provider_was_re_invoked_for_is_not_resumed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`resumed` claims the pass was free for that chunk; prove it only says so when true.
+
+    Both arms run over the SAME already-staged chunk and differ in one byte of
+    state — whether the adapter left its metadata behind, which it writes only
+    after the real `claude` subprocess returns. A profile-blind implementation
+    that just counts `resumed` fails the paid arm, and one that counts everything
+    as paid fails the free arm, so the pair discriminates rather than merely
+    passing.
+    """
+    cache_root = tmp_path / "cache"
+    config = _config()
+    namespace = graphify_semantic_corpus_run._run_namespace(_PLAN, config.cache_namespace_sha256)
+    ordinal = _ledger().chunks[0].ordinal
+    graphify_semantic_corpus.chunk_stage_dir(cache_root, namespace, ordinal).mkdir(parents=True)
+
+    def driver_paid(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        # Exactly what a real provider call leaves behind before the callback runs.
+        context.metadata_path.write_bytes(b"{}")
+        on_chunk_done(0, len(context.ledger.chunks), {})
+
+    def driver_free(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        on_chunk_done(0, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver_paid, result={"failed_chunks": 0})
+    paid = _execute(tmp_path)
+    assert (paid.repaid, paid.resumed) == (1, 0), "a re-invoked chunk was reported as free"
+
+    _stub_extraction(monkeypatch, driver_free, result={"failed_chunks": 0})
+    free = _execute(tmp_path)
+    assert (free.repaid, free.resumed) == (0, 1), "a cache-served chunk was reported as paid"
+
+
+@_needs_driver
+def test_a_missing_failed_chunks_counter_is_an_error_not_a_clean_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The -1 sentinel exists so absent and zero differ; it must not be clamped away.
+
+    The control arm is the second half: the SAME call with the counter present
+    and zero returns a summary, so this asserts the sentinel is read rather than
+    that the function raises for some unrelated reason.
+    """
+
+    def driver(context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable) -> None:
+        return None
+
+    _stub_extraction(monkeypatch, driver, result={})
+    with pytest.raises(ValueError, match="omitted failed_chunks"):
+        _execute(tmp_path)
+
+    _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
+    assert _execute(tmp_path).failed == 0

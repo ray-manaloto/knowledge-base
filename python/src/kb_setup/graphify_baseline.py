@@ -223,8 +223,8 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.44"
-_ACCEPTED_GRAPHIFY_REF = "v0.9.44"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.45"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.45"
 _ACCEPTED_GRAPHIFY_EXECUTABLE = ".venv/bin/graphify"
 _ACCEPTED_GRAPHIFY_URL = "https://github.com/Graphify-Labs/graphify"
 # Deliberately NOT renamed at the 0.9.44 bump. The version in this string names
@@ -244,21 +244,23 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
-    "sdist_sha256": "09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
+    "wheel_sha256": "134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
+    "sdist_sha256": "ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="4fca621532a23f84f69c31e397b75f8105cb5390",
-    source_tree="faabe0fab532b763a76031acd61038a85e3bba00",
-    catalog_sha256="e908ab2ec469427d09704309ab06c41695aee5ef938364ee6df068086b255b60",
-    source_manifest_sha256="f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75",
-    # 410 -> 417 detected, 402 -> 409 extracted across v0.9.42 -> v0.9.44. Two of
-    # the seven are `docs/superpowers/*.md`, which graphify #2759 stopped dropping
-    # — files this corpus was silently losing and now has. The rest is ordinary
-    # upstream growth over two releases.
-    detected_count=417,
-    extracted_count=409,
+    source_commit="0738af373af9cf5c95f862cc5f3327fd96b4ea23",
+    source_tree="e0e089a404dd0b9f6d01273b869c80197c0cc03c",
+    catalog_sha256="2510886162c52c58c7d977c24cca962473cb4cf77867077d5c42d105f4df5af5",
+    source_manifest_sha256="980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911",
+    # 417 -> 418 detected, 409 -> 410 extracted across v0.9.44 -> v0.9.45. Both
+    # RE-DERIVED by a real build against the installed 0.9.45, never carried
+    # forward: the same run reproduced `source_tree` independently of the GitHub
+    # API derivation above, which is what makes these counts a measurement.
+    # +1/+1 is ordinary upstream growth — the release adds one test module net of
+    # the files it touches, and no warning was emitted.
+    detected_count=418,
+    extracted_count=410,
 )
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.

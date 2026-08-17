@@ -26,6 +26,12 @@ Three properties are deliberate rather than incidental:
   ``stage_chunk`` refuses an occupied destination and a resumed run would
   otherwise abort on the first chunk it had already finished. Those chunks are
   counted as ``resumed``, never as ``completed`` — this pass did not do that work.
+  The local skip cannot PREVENT the call, only the re-publication: it runs in the
+  callback, which graphify reaches only once a result for the chunk exists. So
+  ``resumed`` means free ONLY when the cache served it, and that is checked per
+  chunk rather than assumed — a chunk the provider was re-invoked for is counted
+  as ``repaid`` instead. The cache tree and the stage tree are separate, and a
+  prune of one that leaves the other is enough to make them disagree.
 * **Loud on partial completion.** ``RunSummary`` keeps completed, resumed, failed
   and never-attempted apart, and the caller returns non-zero unless every planned
   chunk is staged with no failures. A corpus missing a chunk looks exactly like a
@@ -83,7 +89,19 @@ class RunSummary(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     # Staged by an earlier run and served from graphify's cache this time. Kept
     # apart from `completed` because "58 completed" on a resumed run would claim
     # this pass did work it did not do.
+    #
+    # FREE, and that is checked rather than assumed — see `repaid`.
     resumed: int
+    # Staged by an earlier run, but the provider was invoked again anyway and the
+    # tokens WERE spent. Folding these into `resumed` is the expensive lie: the
+    # comment above would then be false for exactly the chunks that cost money,
+    # and the operator reading a resumed run's summary would conclude the pass
+    # was free. The two states are distinguishable because the adapter writes its
+    # metadata only after the real `claude` subprocess returns, so the file's
+    # presence in the callback means graphify's semantic cache did NOT serve this
+    # chunk. It happens whenever the cache and the stage tree diverge — they are
+    # separate directories, and a cache prune that leaves stages behind is enough.
+    repaid: int
     # Reached and lost: either the provider call raised, or the chunk staged with
     # refusal reasons. Distinct from `skipped`, which is never-attempted.
     failed: int
@@ -546,6 +564,7 @@ def execute(
     )
     outcomes: list[ChunkOutcome] = []
     resumed: list[int] = []
+    repaid: list[int] = []
     # Persistent, and keyed on the CACHE namespace rather than the run namespace:
     # the cache's whole value is surviving between runs, and a per-run directory
     # would make every resumed run a cold one while still looking warm.
@@ -601,10 +620,47 @@ def execute(
                 # `provider boundary marker already exists` — the same cascade
                 # this callback exists to prevent, reintroduced by the fix for a
                 # different finding.
+                #
+                # Whether this pass PAID for the chunk is answerable, so it is
+                # answered rather than assumed. The adapter writes its metadata
+                # only after the real `claude` subprocess returns, and the file is
+                # rotated away after every chunk, so its presence HERE means this
+                # chunk's provider call happened despite the stage directory
+                # already existing — the cache did not serve it and the tokens
+                # are gone. `resumed` claims this pass did no work for the chunk;
+                # that claim is only true in the other branch.
+                was_paid = context.metadata_path.exists()
                 clear_stale_evidence(context.metadata_path, context.boundary_dir)
-                resumed.append(chunk.ordinal)
+                (repaid if was_paid else resumed).append(chunk.ordinal)
                 return
-            outcomes.append(_stage_completed_chunk(raw, chunk, context))
+            try:
+                outcomes.append(_stage_completed_chunk(raw, chunk, context))
+            except (TypeError, ValueError, msgspec.DecodeError) as exc:
+                # One unusable chunk must not take the other 57 with it. Three
+                # reachable paths raise from `_stage_completed_chunk` —
+                # `normalize_fragment` on a malformed result, `_rotate_evidence`
+                # on absent adapter metadata, and the metadata decode — and each
+                # propagated out through `extract_corpus_parallel` and out of
+                # `execute`, past the caller's `print`. The chunks already staged
+                # survived on disk, but the summary naming them never printed, so
+                # the operator lost the one artifact that says what landed.
+                #
+                # The evidence is rotated on the way out so the next chunk starts
+                # clean; skipping that is how a single recoverable error became
+                # `provider boundary marker already exists` for every chunk after
+                # it.
+                clear_stale_evidence(context.metadata_path, context.boundary_dir)
+                outcomes.append(
+                    ChunkOutcome(
+                        ordinal=chunk.ordinal,
+                        total=chunk.total,
+                        status="failed",
+                        node_count=0,
+                        edge_count=0,
+                        hyperedge_count=0,
+                        reasons=(f"chunk-staging-failed: {exc}",),
+                    )
+                )
 
         result = _extract_corpus(
             admitted_paths(inventory, source_root),
@@ -622,14 +678,23 @@ def execute(
     # version folded both into `skipped`, which reported a paid, failed call as
     # though the run had simply not got to it.
     provider_failures = graphify_semantic_slice.result_integer(result, "failed_chunks")
-    provider_failures = max(provider_failures, 0)
-    accounted = len(outcomes) + len(resumed) + provider_failures
+    if provider_failures < 0:
+        # `result_integer` returns -1 for a MISSING key, and its docstring says
+        # that sentinel exists precisely so absent and zero do not reduce to the
+        # same number. Clamping it to 0 here reduced them to the same number —
+        # the sentinel was created and then discarded one line later. A graphify
+        # release that stopped emitting `failed_chunks` would have reported zero
+        # provider failures and inflated `skipped`, in the summary a human reads
+        # to decide whether the corpus is whole.
+        raise ValueError("graphify result omitted failed_chunks")
+    accounted = len(outcomes) + len(resumed) + len(repaid) + provider_failures
     return RunSummary(
         schema_id="graphify-semantic-corpus-run/v0",
         run_namespace_sha256=run_namespace,
         chunk_total=len(ledger.chunks),
         completed=len(completed),
         resumed=len(resumed),
+        repaid=len(repaid),
         failed=len(staged_failures) + provider_failures,
         # Only what the run genuinely never reached. A negative would mean more
         # outcomes than planned chunks, which the callback's ledger check already

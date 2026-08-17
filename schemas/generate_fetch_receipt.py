@@ -13,12 +13,26 @@ OUTPUT = ROOT / "python" / "src" / "kb_setup" / "generated" / "fetch_receipt.py"
 TEMPLATES = ROOT / "schemas" / "templates"
 FILE_HEADER = '''# Copyright (c) 2026 Raymond Manaloto
 """Generated fetch-receipt models; edit the schema and rerun the generator."""'''
+# Resolve the generator from the LOCKED `codegen` dependency group, not from
+# `$PATH`. A bare `datamodel-codegen` is whatever the machine happens to expose,
+# and on this host that was an unpinned mise-global
+# `pipx-datamodel-code-generator/0.73.0` shadowing the `==0.72.4` in
+# `pyproject.toml` — so the version guard below failed on a host whose lockfile
+# was perfectly correct, and would have kept failing until someone changed the
+# machine. `uv run --group` reads `pyproject.toml`/`uv.lock` and cannot drift,
+# which is the same reason nothing else here shells out to a bare interpreter.
+#
+# The guard is KEPT rather than deleted. It now asks a different and still worth
+# asking question: not "is the right tool on PATH" (which this prefix settles)
+# but "does the locked version still match the one this generator's flags and
+# committed output were reviewed against" — which a lockfile bump can break.
+_CODEGEN = ("uv", "run", "--group", "codegen", "datamodel-codegen")
 
 
 def generate(output: Path = OUTPUT) -> None:
     """Generate the checked-in model with the reviewed generator contract."""
     version = subprocess.run(
-        ["datamodel-codegen", "--version"],
+        [*_CODEGEN, "--version"],
         check=True,
         capture_output=True,
         text=True,
@@ -29,7 +43,7 @@ def generate(output: Path = OUTPUT) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            "datamodel-codegen",
+            *_CODEGEN,
             "--input",
             str(SCHEMA),
             "--input-file-type",

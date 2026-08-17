@@ -20,8 +20,8 @@ from kb_setup import cli, graphify_sdk, graphify_semantic_slice
 _MODEL = "claude-haiku-4-5-20251001"
 
 
-def test_graphify_0944_semantic_sdk_contract_is_current() -> None:
-    assert graphify_sdk.semantic_contract_errors("0.9.44") == ()
+def test_graphify_0945_semantic_sdk_contract_is_current() -> None:
+    assert graphify_sdk.semantic_contract_errors("0.9.45") == ()
 
 
 def test_default_preflight_checks_the_current_graphify_runtime(
@@ -41,7 +41,7 @@ def test_default_preflight_checks_the_current_graphify_runtime(
     with pytest.raises(RuntimeError, match="version tripwire"):
         graphify_semantic_slice.preflight(tmp_path, environment={"PATH": "/usr/bin"})
 
-    assert checked == ["0.9.44"]
+    assert checked == ["0.9.45"]
 
 
 def test_enforcing_authority_never_widens_the_accepted_runtime_set(
@@ -51,7 +51,7 @@ def test_enforcing_authority_never_widens_the_accepted_runtime_set(
 
     This test used to assert that the historical authority and the current
     runtime were DIFFERENT versions, and it passed only while the committed
-    evidence lagged the pin. The v0.9.44 round re-ran the slice, so authority and
+    evidence lagged the pin. The v0.9.45 round re-ran the slice, so authority and
     current are momentarily the SAME value and the old assertion could not hold —
     not because the mechanism broke, but because it was asserting a transient
     condition of the repo instead of a property of the code.

@@ -82,26 +82,38 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_REF = "v0.9.44"
-_ACCEPTED_GRAPHIFY_COMMIT = "4fca621532a23f84f69c31e397b75f8105cb5390"
-_ACCEPTED_GRAPHIFY_TREE = "faabe0fab532b763a76031acd61038a85e3bba00"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.45"
+_ACCEPTED_GRAPHIFY_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+_ACCEPTED_GRAPHIFY_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+# The digest of the baseline's GENERATED `source-manifest.json` member, not of
+# `sources/graphify.manifest`. Worth stating: the two are both "the source
+# manifest" in English, the committed file is the obvious reading, and it is the
+# wrong one — this value is re-derived by `graphify-baseline build` and read from
+# its candidate, which is what makes it a measurement rather than a guess that
+# happens to be 64 hex characters.
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75"
+    "980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911"
 )
 # `graphify/detect.py`'s git blob at the pinned commit. Control-armed before it
 # was trusted: the same derivation at v0.9.43 reproduces the c51ea916 this line
 # used to hold, so the method is right and the new value is not a guess.
+#
+# UNCHANGED at v0.9.45, and that is a measurement with two independent routes
+# agreeing: the blob API at the 0.9.45 commit returns this same f76a4259…, and
+# `graphify/detect.py` does not appear in `compare/v0.9.44...v0.9.45` at all. The
+# tree digest above moved in the same derivation, which is what proves the probe
+# can return a different value rather than echoing its input.
 _ACCEPTED_GRAPHIFY_DETECT_OBJECT = "f76a4259f6a7360872663fbe711c4738ecda4680"
 _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.44",
-    cli_version="0.9.44",
-    sdk_version="0.9.44",
+    version="0.9.45",
+    cli_version="0.9.45",
+    sdk_version="0.9.45",
     executable=".venv/bin/graphify",
     # Unchanged, and MEASURED rather than carried forward — see
     # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
-    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
+    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
+    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 )
 _PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000
@@ -2802,16 +2814,27 @@ def _execute_authorized(repo_root: Path, output: Path) -> int:
         admit_source(repo_root, source_root)
         summary = graphify_semantic_corpus_run.execute(
             output,
-            repo_root / "graphify-out/graphify-semantic-corpus-chunks",
+            # DERIVED from the plan the operator named, not from `repo_root`.
+            # Planning is deterministic, so a plan regenerated into a temporary
+            # directory is byte-identical to the committed one and passes the
+            # authority check unchanged — after which a hardcoded repo-root path
+            # wrote that run's chunk evidence into the repository tree while the
+            # operator had named a directory outside it. For the default plan
+            # location the two spellings produce the same path, so this changes
+            # only the case that was wrong.
+            output.parent / f"{output.name}-chunks",
             source_root,
             repo_root=repo_root,
         )
     print(_encode(summary).decode().rstrip())
-    # `completed + resumed`, not `completed`. On a resumed run the chunks staged
-    # by the earlier pass are not re-published, so gating on `completed` alone
-    # would report a fully-staged corpus as a failure and invite a re-run that
-    # could only produce the same answer.
-    staged = summary.completed + summary.resumed
+    # `completed + resumed + repaid`, not `completed`. On a resumed run the chunks
+    # staged by the earlier pass are not re-published, so gating on `completed`
+    # alone would report a fully-staged corpus as a failure and invite a re-run
+    # that could only produce the same answer. `repaid` is the same disposition —
+    # staged, not re-published — and differs only in having cost money this pass;
+    # that distinction belongs in the printed summary, not in the completeness
+    # gate, which asks whether the corpus is whole.
+    staged = summary.completed + summary.resumed + summary.repaid
     return 0 if staged == summary.chunk_total and summary.failed == 0 else 1
 
 
