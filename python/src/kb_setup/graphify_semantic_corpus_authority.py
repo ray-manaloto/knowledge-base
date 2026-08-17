@@ -113,9 +113,17 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # round to one function — `adapter_main` at cyclomatic 9 with three nested
 # blocks at the same level — and the remedy for a complexity finding is to
 # reduce the complexity, not to reclassify the check. Measured both ways with a
-# second, independent probe: ruff C901 read the same 9 before and reads 6 after,
-# below the 8 this function carried at `df4001df`, the last commit at which the
-# check passed.
+# second, independent probe: `ruff check --select C901` read the same 9 before
+# and reads 6 after, below the 8 this function carried at `df4001df`, the last
+# commit at which the check passed.
+#
+# THAT PROBE'S CONDITION, because the number is meaningless without it: it was
+# run at `--config "lint.mccabe.max-complexity=5"`, NOT at this repo's
+# configured limit of 10. This function has never failed our own ruff gate, at
+# either complexity, and this refactor did not make a red gate green. The
+# lowered threshold exists only to make ruff report the same METRIC the external
+# check reports, so the two could be compared — and they agreed exactly at 9,
+# which is what made the external finding actionable instead of a black box.
 #
 # WHAT MOVED: exactly two fields of `execution-config.json`, and the manifest
 # containing it. `adapter_sha256` is the digest of the file that was edited, and
