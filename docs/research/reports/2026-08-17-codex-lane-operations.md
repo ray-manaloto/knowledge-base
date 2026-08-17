@@ -9,7 +9,23 @@ Every claim below is either cited to where it came from, re-measured while
 writing this document (marked **re-verified 2026-08-17**), or labelled
 `UNVERIFIED`.
 
----
+> **STATUS UPDATE, later on 2026-08-17.** Two things in this document have since
+> moved, and the body below is kept as the point-in-time analysis rather than
+> rewritten:
+>
+> 1. **§5's sandbox limitation is SOLVED** — see that section. `-s
+>    workspace-write` plus `--add-dir` lets codex run `mise`, `pytest` and
+>    `kb-arms`. The "source was fallback authority" bound was environmental.
+> 2. **All eight findings in §6's table are CLOSED**, across three further codex
+>    rounds on PR #331 (`39aeac7a` → `07c751c3`). Rounds 2 and 3 each found a
+>    defect created by the PREVIOUS round's fix rather than a pre-existing one —
+>    which is why the review ran to three rounds against the skill's bound of
+>    two. Receipts and per-round reports are keyed by commit under
+>    `.agent/kb/review/reports/` (gitignored).
+>
+> A third item is unchanged and still true: **verify the lane by process tree.**
+> `pgrep -f "codex exec"` is better than `pgrep -f codex` and is still not
+> sufficient — it matched the wrapping zsh, whose argv contains the string.
 
 ## 1. The headline failure: a lane that claimed codex and was not codex
 
@@ -252,23 +268,59 @@ That is a real bound on the evidence. It does not weaken what it demonstrated by
 construction, but a codex review under this sandbox has **not** run your tests,
 and should never be read as if it had.
 
-### Granting a writable temp dir — options, both UNTESTED
+### Granting a writable temp dir — SOLVED 2026-08-17, and it takes two flags
 
-- `-s workspace-write` — advertised in `--help`
-  (`--sandbox <SANDBOX_MODE>`). Would permit temp writes, but **loses the
-  read-only guarantee**: pair it with an explicit "do not modify tracked files"
-  instruction and check `git status --short` afterwards. (The failed same-family
-  lane *did* mutate and restore files cleanly, so a mutating reviewer is
-  workable — it just has to be verified.)
-- `-c 'sandbox_permissions=[…]'` — the `--help` example shows
-  `["disk-full-read-access"]`, which is a **read** permission and would not fix
-  temp writes.
-- A `writable_roots`-style key is **not advertised in `--help`**
-  (**re-verified 2026-08-17**: zero matches). Do not assume it exists; probe
-  before relying on it.
+**Superseded.** This section previously listed three options, all UNTESTED, and
+concluded that a `writable_roots`-style key was not advertised. That last claim
+was true and *misleading*: the key does not exist, but a **flag** does, and it is
+plainly in `codex exec --help`.
 
-Whichever is chosen, **probe it with a throwaway run before a real review** —
-discovering the sandbox blocked your tests after a 280k-token pass is expensive.
+The working invocation, probed in two stages before any real review:
+
+```bash
+codex exec --ephemeral --sandbox workspace-write \
+  --add-dir "$HOME/Library/Caches/uv" --add-dir "$HOME/.cache" \
+  -c model_reasoning_effort=high -o /path/to/answer.md -
+```
+
+Both stages were needed, and finding the second is the whole lesson:
+
+1. `-s workspace-write` alone fixed the `DARWIN_USER_TEMP_DIR` failure — `mise`
+   ran. It then failed **one layer further out**, on `uv`'s cache at
+   `~/Library/Caches/uv`, which is outside the workspace:
+   `Failed to initialize cache at … Operation not permitted (os error 1)`.
+2. `--add-dir` (`"Additional directories that should be writable alongside the
+   primary workspace"`) fixed that.
+
+Result: `mise run kb-check` ran to completion **inside codex** — ruff, format,
+ty and pytest all `rc=0`. Three subsequent review rounds ran the repo's gates,
+`uv run pytest`, and `mise run kb-arms` unaided.
+
+So the "source was fallback authority" bound recorded above was
+**environmental, not inherent**. A codex review on this machine can run the
+suite.
+
+Two things worth carrying:
+
+- **The earlier probe searched for a config KEY and concluded a capability was
+  absent.** `grep writable_roots` returning zero was a true measurement of the
+  wrong thing; `codex exec --help | grep -B4 "Additional directories"` names
+  `--add-dir` immediately. When a capability "does not exist", check whether you
+  probed the only spelling it could have had.
+- **Fixing the first sandbox error just moves it.** The uv-cache failure was
+  invisible until the temp-dir failure was gone, so a single probe would have
+  reported "still broken" and taught nothing. Re-probe after each fix.
+
+`workspace-write` does lose the read-only guarantee. Pair it with an explicit
+"do not modify tracked files" instruction and verify `git status --short`
+afterwards — across three rounds it came back clean every time, including rounds
+that ran `kb-arms`, which mutates tracked files and restores them.
+
+`-c 'sandbox_permissions=[…]'` remains unhelpful here: the `--help` example
+shows `["disk-full-read-access"]`, a **read** permission.
+
+**Still probe with a throwaway run before a real review** — discovering the
+sandbox blocked your tests after a 280k-token pass is expensive.
 
 ---
 
