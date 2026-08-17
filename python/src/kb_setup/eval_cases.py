@@ -403,9 +403,15 @@ GOLDEN_QUERIES: tuple[evals.GoldenQuery, ...] = (
 #: from the LAST `[src=` on the line.
 _NODE_LINE = re.compile(r"^NODE .*\[src=(?P<src>.*?) loc=")
 
-#: A retrieval query reloads the whole ~350 MB graph, measured at ~10s each. The
-#: 60s default is for reachability probes; this needs its own headroom without
-#: being unbounded.
+#: A retrieval query reloads the whole graph, measured at ~10s each when this was
+#: written against a **~350 MB** graph. That size is stated because it is the
+#: CONDITION, not decoration: the graph is **499 MB** as of 2026-08-05 and only
+#: grows, so the ~10s figure is a floor that has already moved once.
+#:
+#: The 60s default is for probes that do not load the graph. Anything that runs a
+#: real `graphify query` belongs here — including `tier1.graph-answers`, which
+#: was left on the default until it started failing under `-n auto` and passing
+#: when run alone.
 RETRIEVAL_TIMEOUT = 180
 
 
@@ -850,7 +856,32 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
                 "(rc=0 with empty output is a corpus that reads as healthy and "
                 "knows nothing)"
             ),
-            probe=lambda: evals.graphify_canary(repo_root, CANARY_QUESTION),
+            # RETRIEVAL_TIMEOUT, not the 60s default, and this is applying an
+            # existing justified constant rather than widening a bound to make a
+            # gate pass. That constant's own comment says why: a retrieval query
+            # "reloads the whole graph". This canary IS a `graphify query` over
+            # the same whole graph, so it has the same cost profile and was
+            # simply missed when the retrieval arms got their headroom.
+            #
+            # It went unnoticed because the default was adequate when written,
+            # against the ~350 MB graph RETRIEVAL_TIMEOUT's comment records as
+            # its original condition; the graph is 499 MB (measured 2026-08-05),
+            # and under `-n auto` this probe competes with eleven other workers.
+            # Measured: it fails at 60s
+            # inside `mise run test` and passes run alone, twice each — so the
+            # bound, not the query, is what moved.
+            #
+            # `_broken_graph_canary` deliberately passes an explicit 30s — HALF
+            # the 60s default, not the default itself, which is what this comment
+            # claimed on the day the timeout was written beside it. The reasoning
+            # was right and the fact was wrong: the control must fail FAST, and
+            # giving it three minutes to do so would slow every clean run to buy
+            # nothing. Stated as the number rather than as "the default" so it
+            # stays checkable, since a comment naming a value it does not use is
+            # indistinguishable from one that is simply stale.
+            probe=lambda: evals.graphify_canary(
+                repo_root, CANARY_QUESTION, timeout=RETRIEVAL_TIMEOUT
+            ),
             control=_broken_graph_canary,
             precondition=_graphify_installed,
         ),
@@ -915,8 +946,10 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             # explicit `--slow` run. `kb-ship`'s eval gate does not pass --slow,
             # so this case is SKIPPED on every PR (its logs read `4 passed, 2
             # skipped`) and SHIP DOES NOT CHECK RETRIEVAL. Gating alone changed
-            # nothing on the ship path. That is accepted — the slow arm reloads a
-            # ~350 MB graph 18 times for ~4 minutes, and a gate that slow is one
+            # nothing on the ship path. That is accepted — the slow arm reloads
+            # the whole graph 18 times for ~4 minutes (measured when it was
+            # ~350 MB; it is 499 MB as of 2026-08-05 and only grows, so that
+            # figure is a floor), and a gate that slow is one
             # people route around — on the condition that it is stated wherever
             # the floor is described, which is what this paragraph is for. A
             # floor everyone believes is enforced per-PR and is not would be
@@ -925,8 +958,10 @@ def cases(repo_root: Path, *, doctor_script: Path | None = None) -> list[evals.C
             gated=True,
             # 18 queries per arm plus a `diagnose` per corpus: ~4 minutes,
             # essentially all of it the unscoped arm (each of its queries
-            # reloads a ~350 MB graph at ~10s; the 2.4 MB prose graph answers in
-            # ~0.3s, and the fused arm pays a second pass over it).
+            # reloads the whole graph at ~10s, measured when it was ~350 MB and
+            # a floor now that it is 499 MB as of 2026-08-05; the 2.4 MB prose
+            # graph answers in ~0.3s, and the fused arm pays a second pass over
+            # it).
             slow=True,
             precondition=lambda: _retrieval_precondition(repo_root),
         ),

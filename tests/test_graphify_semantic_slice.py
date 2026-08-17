@@ -20,8 +20,8 @@ from kb_setup import cli, graphify_sdk, graphify_semantic_slice
 _MODEL = "claude-haiku-4-5-20251001"
 
 
-def test_graphify_0944_semantic_sdk_contract_is_current() -> None:
-    assert graphify_sdk.semantic_contract_errors("0.9.44") == ()
+def test_graphify_0945_semantic_sdk_contract_is_current() -> None:
+    assert graphify_sdk.semantic_contract_errors("0.9.45") == ()
 
 
 def test_default_preflight_checks_the_current_graphify_runtime(
@@ -41,7 +41,7 @@ def test_default_preflight_checks_the_current_graphify_runtime(
     with pytest.raises(RuntimeError, match="version tripwire"):
         graphify_semantic_slice.preflight(tmp_path, environment={"PATH": "/usr/bin"})
 
-    assert checked == ["0.9.44"]
+    assert checked == ["0.9.45"]
 
 
 def test_enforcing_authority_never_widens_the_accepted_runtime_set(
@@ -51,7 +51,7 @@ def test_enforcing_authority_never_widens_the_accepted_runtime_set(
 
     This test used to assert that the historical authority and the current
     runtime were DIFFERENT versions, and it passed only while the committed
-    evidence lagged the pin. The v0.9.44 round re-ran the slice, so authority and
+    evidence lagged the pin. The v0.9.45 round re-ran the slice, so authority and
     current are momentarily the SAME value and the old assertion could not hold —
     not because the mechanism broke, but because it was asserting a transient
     condition of the repo instead of a property of the code.
@@ -89,11 +89,15 @@ def test_enforcing_authority_never_widens_the_accepted_runtime_set(
 def test_adapter_keeps_historical_slice_argv_and_caps_only_301_boundary() -> None:
     from kb_setup import graphify_semantic_adapter
 
-    legacy = graphify_semantic_adapter._claude_invocation_args(Path("/real/claude"), "{}", {})
+    profile = graphify_semantic_slice.SLICE_PROFILE
+    legacy = graphify_semantic_adapter._claude_invocation_args(
+        Path("/real/claude"), "{}", {}, profile
+    )
     corpus = graphify_semantic_adapter._claude_invocation_args(
         Path("/real/claude"),
         "{}",
         {"KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": "/state/provider-start.json"},
+        profile,
     )
 
     assert len(legacy) == 18
@@ -263,7 +267,11 @@ def test_auth_classification_rejects_each_non_max_route(field: str, value: objec
         ("subtype", "error_max_structured_output_retries", "result-subtype-invalid"),
         ("is_error", True, "result-error"),
         ("terminal_reason", "structured_output_retry_exhausted", "terminal-state-invalid"),
-        ("stop_reason", "max_tokens", "stop-reason-invalid"),
+        # Still refused, but under its OWN reason: truncation is the one refusal
+        # graphify can recover from by bisecting the chunk, and it could not tell
+        # it from the rest while both were `stop-reason-invalid`.
+        ("stop_reason", "max_tokens", graphify_semantic_slice.TRUNCATED_STOP_REASON),
+        ("stop_reason", "refusal", "stop-reason-invalid"),
         ("num_turns", 4, "turn-bound-exceeded"),
         ("structured_output", None, "structured-output-missing"),
         ("permission_denials", ["denied"], "permission-denial-present"),
@@ -281,6 +289,126 @@ def test_success_envelope_fails_closed_one_field_at_a_time(
     envelope[field] = value
 
     assert reason in graphify_semantic_slice.envelope_reasons(envelope)
+
+
+def test_the_installed_graphify_classifies_our_truncation_hint_as_retryable() -> None:
+    """The truncation hint only works if the PINNED graphify agrees it is one.
+
+    The adapter refuses a truncated envelope and exits non-zero; graphify wraps
+    that as `RuntimeError("claude -p exited 1: <stderr>")` and decides whether to
+    bisect the chunk by substring-matching the stringified exception. So the
+    recovery rests on a string agreeing with a marker list this repo does not
+    own, and a reworded marker upstream would disable it with nothing failing.
+
+    Asserted against graphify's OWN helper rather than against a copy of its
+    markers, because a copy would keep agreeing with itself after upstream moved.
+    The control arm is the second assertion: an ordinary refusal must NOT be
+    classified as retryable, or this test would pass for a helper that says yes
+    to everything.
+    """
+    from graphify.llm import _looks_like_context_exceeded
+
+    truncated = RuntimeError(
+        "claude -p exited 1: semantic adapter rejected result: "
+        f"{graphify_semantic_slice.TRUNCATED_STOP_REASON}\n"
+        f"{graphify_semantic_slice.TRUNCATION_RETRY_HINT}"
+    )
+    assert _looks_like_context_exceeded(truncated), (
+        "graphify no longer classifies the truncation hint as a context overflow, "
+        "so adaptive retry will drop truncated chunks instead of bisecting them"
+    )
+
+    ordinary = RuntimeError(
+        "claude -p exited 1: semantic adapter rejected result: stop-reason-invalid"
+    )
+    assert not _looks_like_context_exceeded(ordinary), (
+        "an ordinary refusal is being read as retryable, so this probe cannot "
+        "discriminate and proves nothing about the hint"
+    )
+
+
+def test_only_a_truncation_refusal_earns_the_retry_hint() -> None:
+    """The hint must reach stderr for truncation and for nothing else.
+
+    Both directions matter and they fail in opposite ways. Without the hint on a
+    truncated chunk, adaptive retry never bisects and the chunk is lost. With the
+    hint on an ordinary refusal, graphify bisects a chunk whose halves will fail
+    exactly the same way — burning `max_retry_depth` calls to reach the same
+    answer, which is the more expensive mistake of the two.
+    """
+    assert (
+        graphify_semantic_slice.truncation_retry_hint(
+            (graphify_semantic_slice.TRUNCATED_STOP_REASON,)
+        )
+        == graphify_semantic_slice.TRUNCATION_RETRY_HINT
+    )
+    assert graphify_semantic_slice.truncation_retry_hint(("stop-reason-invalid",)) is None
+    assert graphify_semantic_slice.truncation_retry_hint(()) is None
+    # Truncation alongside other refusals still earns it: a truncated response
+    # routinely trips the structured-output checks too, and reading only the
+    # first reason would drop the hint for every realistic truncation.
+    assert (
+        graphify_semantic_slice.truncation_retry_hint(
+            ("structured-output-missing", graphify_semantic_slice.TRUNCATED_STOP_REASON)
+        )
+        == graphify_semantic_slice.TRUNCATION_RETRY_HINT
+    )
+
+
+def test_the_adapter_wires_the_hint_into_the_refusal_it_actually_prints(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Arm the adapter's WIRING, not only the decision it delegates.
+
+    `truncation_retry_hint` is armed directly above, but nothing asserted that
+    the adapter's refusal path CALLS it. That branch lived inline in
+    `adapter_main`, which no test invokes, so deleting the call left the whole
+    suite green — the decision was armed and its one consumer was not.
+    `_report_rejection` exists as a named function so this test can reach it.
+
+    Both directions, for the reason the sibling test gives: no hint on a
+    truncated chunk and graphify drops it instead of bisecting; a hint on an
+    ordinary refusal and graphify burns `max_retry_depth` bisecting halves that
+    fail identically.
+    """
+    from kb_setup import graphify_semantic_adapter
+
+    assert (
+        graphify_semantic_adapter._report_rejection(
+            (graphify_semantic_slice.TRUNCATED_STOP_REASON,)
+        )
+        == 1
+    )
+    truncated = capsys.readouterr().err
+    assert (
+        "semantic adapter rejected result: " + graphify_semantic_slice.TRUNCATED_STOP_REASON
+    ) in truncated
+    assert graphify_semantic_slice.TRUNCATION_RETRY_HINT in truncated
+
+    assert graphify_semantic_adapter._report_rejection(("stop-reason-invalid",)) == 1
+    ordinary = capsys.readouterr().err
+    assert "semantic adapter rejected result: stop-reason-invalid" in ordinary
+    assert graphify_semantic_slice.TRUNCATION_RETRY_HINT not in ordinary
+
+
+def test_process_level_refusals_join_the_envelope_reasons_in_first_seen_order() -> None:
+    """A non-zero exit and any stderr are refusals in their own right.
+
+    Armed with a control: the same envelope through a clean process must yield
+    NO reasons, or this test would pass for a collector that refuses everything.
+    """
+    import subprocess
+
+    from kb_setup import graphify_semantic_adapter
+
+    failed = subprocess.CompletedProcess(args=(), returncode=1, stdout=b"", stderr=b"boom")
+    assert graphify_semantic_adapter._completion_reasons(_successful_envelope(), {}, failed) == (
+        "claude-returncode-nonzero",
+        "claude-stderr-present",
+    )
+
+    clean = subprocess.CompletedProcess(args=(), returncode=0, stdout=b"", stderr=b"")
+    assert graphify_semantic_adapter._completion_reasons(_successful_envelope(), {}, clean) == ()
 
 
 def test_tool_use_is_accepted_only_with_the_full_proven_success_envelope() -> None:

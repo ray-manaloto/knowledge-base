@@ -82,27 +82,40 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_REF = "v0.9.44"
-_ACCEPTED_GRAPHIFY_COMMIT = "4fca621532a23f84f69c31e397b75f8105cb5390"
-_ACCEPTED_GRAPHIFY_TREE = "faabe0fab532b763a76031acd61038a85e3bba00"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.45"
+_ACCEPTED_GRAPHIFY_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+_ACCEPTED_GRAPHIFY_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+# The digest of the baseline's GENERATED `source-manifest.json` member, not of
+# `sources/graphify.manifest`. Worth stating: the two are both "the source
+# manifest" in English, the committed file is the obvious reading, and it is the
+# wrong one — this value is re-derived by `graphify-baseline build` and read from
+# its candidate, which is what makes it a measurement rather than a guess that
+# happens to be 64 hex characters.
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75"
+    "980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911"
 )
 # `graphify/detect.py`'s git blob at the pinned commit. Control-armed before it
 # was trusted: the same derivation at v0.9.43 reproduces the c51ea916 this line
 # used to hold, so the method is right and the new value is not a guess.
+#
+# UNCHANGED at v0.9.45, and that is a measurement with two independent routes
+# agreeing: the blob API at the 0.9.45 commit returns this same f76a4259…, and
+# `graphify/detect.py` does not appear in `compare/v0.9.44...v0.9.45` at all. The
+# tree digest above moved in the same derivation, which is what proves the probe
+# can return a different value rather than echoing its input.
 _ACCEPTED_GRAPHIFY_DETECT_OBJECT = "f76a4259f6a7360872663fbe711c4738ecda4680"
 _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.44",
-    cli_version="0.9.44",
-    sdk_version="0.9.44",
+    version="0.9.45",
+    cli_version="0.9.45",
+    sdk_version="0.9.45",
     executable=".venv/bin/graphify",
     # Unchanged, and MEASURED rather than carried forward — see
     # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
-    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
+    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
+    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 )
+_PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
 # Kept in step with `graphify_semantic_slice._ACCEPTED_CLAUDE_*`, which carries
@@ -123,6 +136,13 @@ _CLAUDE_REQUIRED_FLAGS = (
     "--strict-mcp-config",
     "--tools",
     "--max-turns",
+    # Appended in the same order `preflight` appends it, because
+    # `_provider_runtime_reasons` compares this tuple to the receipt's
+    # `required_flags` for EQUALITY, not membership. The corpus profile passes
+    # `--effort`, so the preflight proves it, so it lands in the receipt — and a
+    # config that omitted it would fail every real run as a capability-flag
+    # mismatch, which reads like a missing CLI feature rather than a stale list.
+    "--effort",
 )
 _EXTRACTION_USER_INSTRUCTION = (
     "\n\n---\n"
@@ -281,6 +301,11 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     planner_sha256: str
     adapter_sha256: str
     semantic_slice_sha256: str
+    # The module that actually makes the calls. Bound here for the same reason as
+    # the three above, and it was the one missing: an authorization is a review of
+    # what a run WILL DO, and every other participant in that run was pinned while
+    # the driver could be rewritten under a still-valid authority.
+    runner_sha256: str
     prompt_contract_sha256: str
     structured_schema_sha256: str
     claude_version: str
@@ -590,22 +615,30 @@ def _effective_config(
         graphify_ref=source.ref,
         graphify_commit=source.commit,
         graphify_tree=source.tree,
-        graphify_version="0.9.43",
+        # Read from the runtime identity rather than spelled again: this literal
+        # said "0.9.43" while `_ACCEPTED_GRAPHIFY_RUNTIME` next to it said 0.9.44,
+        # so every plan written since the pin bump recorded two different versions
+        # for one run. A version that is transcribed can disagree with the version
+        # that ran; a version that is READ cannot.
+        graphify_version=_ACCEPTED_GRAPHIFY_RUNTIME.version,
         graphify_runtime=_ACCEPTED_GRAPHIFY_RUNTIME,
         graphify_semantic_fingerprint_sha256=semantic_fingerprint,
         graphify_llm_sha256=graphify_llm_sha,
         planner_sha256=_sha_file(Path(__file__)),
         adapter_sha256=_module_sha(graphify_semantic_adapter),
         semantic_slice_sha256=_module_sha(graphify_semantic_slice),
+        # Imported here rather than at module scope: the driver imports THIS
+        # module, so a top-level import would be circular.
+        runner_sha256=_sha_file(Path(__file__).with_name("graphify_semantic_corpus_run.py")),
         prompt_contract_sha256=prompt_contract_sha,
         structured_schema_sha256=graphify_semantic_slice.GRAPHIFY_SCHEMA_SHA256,
         claude_version=_CLAUDE_VERSION,
         claude_executable_sha256=_CLAUDE_EXECUTABLE_SHA256,
         claude_help_sha256=_CLAUDE_HELP_SHA256,
         claude_required_flags=_CLAUDE_REQUIRED_FLAGS,
-        claude_model=graphify_semantic_slice.CLAUDE_MODEL,
-        claude_canonical_model="claude-haiku-4-5",
-        resolved_model="claude-haiku-4-5",
+        claude_model=_PROFILE.model,
+        claude_canonical_model=_PROFILE.canonical_model,
+        resolved_model=_PROFILE.canonical_model,
         backend="claude-cli",
         auth_route="claude.ai:firstParty:max",
         endpoint_policy="subscription-default-no-api-endpoint",
@@ -613,17 +646,55 @@ def _effective_config(
         token_budget=token_budget,
         file_char_cap=_FILE_CHAR_CAP,
         timeout_seconds=120,
-        claude_max_output_tokens=4096,
-        claude_max_retries=0,
+        claude_max_output_tokens=int(_PROFILE.max_output_tokens),
+        claude_max_retries=int(_PROFILE.max_retries),
         structured_output_retries=1,
-        max_turns=3,
-        max_cost_usd=0.25,
-        graphify_max_retry_depth=0,
+        max_turns=int(_PROFILE.max_turns),
+        max_cost_usd=_PROFILE.max_cost_usd,
+        # 0 -> 2 alongside `claude_max_retries`: one blip over 57 chunks is likely
+        # rather than hypothetical, and a lost chunk is a hole in the corpus that
+        # nothing downstream reports as missing.
+        graphify_max_retry_depth=2,
         graphify_chunk_size=20,
-        graphify_no_incremental_cache=True,
+        # False, which leaves graphify's per-chunk checkpoint WRITES enabled.
+        #
+        # It was justified here as buying a discount — "a resumed or repeated run
+        # pays only for the chunks it has not already extracted" — and that was
+        # never true on this path. An AST walk of the pinned 0.9.45 finds no cache
+        # read anywhere in `extract_corpus_parallel`'s call chain
+        # (`_run_one` -> `_extract_with_adaptive_retry` -> `extract_files_direct`);
+        # `load_cached` is reached only from `graphify/extract.py`, which this
+        # driver never calls. The probe discriminates: the same walk does find
+        # `_checkpoint_chunk`, the writer, on this path.
+        #
+        # So a re-run re-buys the whole corpus regardless of this flag, and the
+        # value it does buy is durable checkpoints for anything that reads the
+        # cache by another route. Kept False for that, and because a cold policy
+        # would discard the checkpoints too. Budget an interrupted run at full
+        # price; the driver's `repaid` count is the measurement of that.
+        graphify_no_incremental_cache=False,
+        # 1, and it is a MEASUREMENT of what the extractor will do rather than a
+        # preference (Ray, 2026-08-16, after the constraint was surfaced).
+        # `graphify/llm.py` force-serializes this backend —
+        # `if backend == "claude-cli" and GRAPHIFY_CLAUDE_CLI_PARALLEL != "1":
+        # max_concurrency = 1` — because parallel Claude subprocesses conflict
+        # over session state. Recording 4 here would have made the plan assert a
+        # concurrency no run could exhibit, and `_provider_config_reasons`
+        # compares this field against the receipt, so it would have failed as a
+        # provider mismatch pointing at the wrong thing.
+        #
+        # The override is deliberately NOT taken: the adapter writes its metadata
+        # and its O_EXCL boundary marker to single fixed paths, so concurrent
+        # chunks in one process collide on both regardless of what graphify allows.
         concurrency=1,
         deep_mode=True,
-        cache_policy="cold-no-read-atomic-per-chunk",
+        # "checkpoint-write", not "warm-read-atomic-per-chunk". The old value
+        # asserted a cache READ this path never performs, and it is the same
+        # falsehood as the `graphify_no_incremental_cache` comment above —
+        # corrected there in prose while this, the MACHINE-READABLE field, kept
+        # saying it. A reader who checks the config rather than the comment gets
+        # the wrong answer, which is the worse of the two places to leave it.
+        cache_policy="checkpoint-write-atomic-per-chunk",
         source_inventory_sha256=inventory_sha256,
         exclusions_sha256=exclusions_sha256,
         chunk_ledger_sha256=ledger_sha256,
@@ -1547,10 +1618,28 @@ def verify_plan(
     return _verdict("complete", structural=True, authorized=True, reasons=())
 
 
+# Public surface for `graphify_semantic_corpus_run`, which is this module's
+# execution half rather than an outside consumer. Exported deliberately: the
+# alternative is the driver reaching into privates, and a digest helper that two
+# modules reach for by different names is how two spellings of "the same hash"
+# get written and then quietly disagree.
+encode_canonical = _encode
+sha256_bytes = _sha
+sha256_path = _sha_file
+fragment_counts = _fragment_counts
+
+
 def _chunk_dir(cache_root: Path, namespace: str, ordinal: int) -> Path:
     if not _valid_sha(namespace):
         raise ValueError("run namespace is not a lowercase SHA-256")
     return cache_root / namespace / "chunks" / f"{ordinal:04d}"
+
+
+# Exported so the execution driver can ask "is this chunk already staged?" using
+# the SAME path `stage_chunk` will refuse to overwrite. Computing it separately
+# would be a second opinion about where evidence lives, and the two disagreeing
+# is a resumed run that either re-publishes or aborts.
+chunk_stage_dir = _chunk_dir
 
 
 def _provider_evidence_reasons(
@@ -1785,7 +1874,36 @@ def _provider_chunk_reasons(
     if metadata.prompt_sha256 != expected_prompt_sha256 or any(
         item.prompt_sha256 != expected_prompt_sha256 for item in provider.chunks
     ):
+        # The mismatch is ALWAYS reported, because it is always true: the retained
+        # prompt bytes are not the ones this chunk's members produce. What the
+        # observed call count adds is a possible EXPLANATION, and it is appended
+        # rather than substituted.
+        #
+        # Two things land here with opposite remedies:
+        #
+        # * corrupted — the retained bytes are not what was sent. Investigate the
+        #   adapter, the evidence tree, the disk.
+        # * PARTIAL — graphify bisected this chunk into N provider calls, merged
+        #   them into one callback, and the adapter's single-path metadata
+        #   therefore describes only the last leaf. Nothing is corrupt; the
+        #   evidence covers a fraction of the chunk. Re-plan with smaller chunks.
+        #
+        # An earlier version SWAPPED the reason on `attempts > 1`, and a cold lane
+        # showed why that is wrong: `attempts` counts boundary markers, and that
+        # directory is not chunk-scoped — a chunk whose provider call FAILS never
+        # reaches the callback that clears it, so its marker lands in the next
+        # chunk's count. A genuinely CORRUPT chunk following a failed one was
+        # therefore renamed a bisect and handed the wrong remedy. Demonstrated:
+        # `corrupt_plus_stray_reasons == ['provider-multi-call-evidence']`.
+        #
+        # Additive keeps every case honest. Corruption always says so; a bisect
+        # says so too and carries the count that explains it; the compound case
+        # says both, which is exactly what is known. Nothing here can distinguish
+        # a bisect from corruption-plus-carry-over, and a reason that claimed to
+        # would be asserting more than the evidence supports.
         reasons.append("provider-prompt-bytes-mismatch")
+        if provider.attempts > 1:
+            reasons.append("provider-multi-call-evidence")
     if any(item.prompt_sha256 != metadata.prompt_sha256 for item in provider.chunks):
         reasons.append("provider-prompt-identity-mismatch")
     schema = _argv_value(metadata.argv, "--json-schema")
@@ -1808,6 +1926,13 @@ def _source_unit_size(unit: SourceUnit, source_root: Path) -> int:
             )
         ).encode("utf-8")
     )
+
+
+# Exported for the execution driver on the same grounds as the digest helpers
+# above: it is the ONE definition of a unit's byte size, and the obvious
+# re-derivation (`slice_end - slice_start`) is a character count that silently
+# disagrees with it on any non-ASCII source — of which this corpus has plenty.
+source_unit_size = _source_unit_size
 
 
 def _argv_value(argv: tuple[str, ...], flag: str) -> str | None:
@@ -1854,27 +1979,13 @@ def _adapter_config_reasons(
     config: CorpusExecutionConfig,
 ) -> list[str]:
     schema = _argv_value(metadata.argv, "--json-schema")
-    expected_argv = (
-        "-p",
-        "--output-format",
-        "json",
-        "--no-session-persistence",
-        "--model",
-        config.claude_model,
-        "--json-schema",
-        schema or "",
-        "--safe-mode",
-        "--tools",
-        "",
-        "--strict-mcp-config",
-        "--permission-mode",
-        "dontAsk",
-        "--no-chrome",
-        "--max-budget-usd",
-        str(config.max_cost_usd),
-        "--max-turns",
-        str(config.max_turns),
-    )
+    # Built from the SAME function the adapter builds the real call with. The
+    # local copy this replaces rendered the budget as `str(config.max_cost_usd)`,
+    # which agreed with the adapter's literal only while the cap happened to be
+    # `0.25`: at 25.0 it renders "25.0" against an argv carrying "25.00", and the
+    # run would have failed as an argv-shape mismatch with nothing pointing at the
+    # formatting. The profile owns the literal precisely so it is never re-derived.
+    expected_argv = graphify_semantic_slice.expected_adapter_argv(_PROFILE, schema or "")
     usage_valid = (
         len(metadata.model_usage) == 1
         and metadata.model_usage[0].model == config.claude_model
@@ -1895,7 +2006,16 @@ def _adapter_config_reasons(
         ),
         (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
         (not forbidden_environment, "provider-adapter-endpoint-policy-mismatch"),
-        (metadata.total_cost_usd <= config.max_cost_usd, "provider-adapter-cost-bound-exceeded"),
+        # BOTH bounds. The upper one alone accepted `total_cost_usd = -1.0` — an
+        # impossible cost, and exactly the shape a missing-value sentinel takes,
+        # so an adapter that failed to observe the cost would have passed the
+        # check that exists to observe it. The slice validator has always checked
+        # `0.0 <= cost <= max` (`graphify_semantic_slice.py`); this is the corpus
+        # copy of one rule drifting from it in the looser direction.
+        (
+            0.0 <= metadata.total_cost_usd <= config.max_cost_usd,
+            "provider-adapter-cost-bound-exceeded",
+        ),
         (usage_valid, "provider-adapter-model-usage-mismatch"),
     )
     return [reason for accepted, reason in checks if not accepted]
@@ -2729,6 +2849,56 @@ def _abort(candidate: Path, reasons: tuple[str, ...]) -> int:
     return 2
 
 
+def _execute_authorized(repo_root: Path, output: Path) -> int:
+    """Spend against an already-authorized plan and report what it produced.
+
+    The source is re-admitted into a fresh temporary tree rather than reusing the
+    one ``verify_plan`` just checked: the verification proved the plan matches a
+    pristine snapshot, and extracting from a tree something else has since
+    touched would spend real tokens on bytes nobody verified. graphify's
+    ``detect()`` in particular writes converted sidecars INTO the tree it scans.
+
+    Returns non-zero unless every planned chunk completed. A partially-extracted
+    corpus is the failure mode that reads as success — the chunks that landed are
+    real and the graph is quietly short — so the count is the gate, not the
+    absence of an exception.
+    """
+    from kb_setup import graphify_semantic_corpus_run
+
+    with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-run-") as raw_source:
+        source_root = Path(raw_source) / "graphify"
+        admit_source(repo_root, source_root)
+        summary = graphify_semantic_corpus_run.execute(
+            output,
+            # DERIVED from the plan the operator named, not from `repo_root`.
+            # Planning is deterministic, so a plan regenerated into a temporary
+            # directory is byte-identical to the committed one and passes the
+            # authority check unchanged — after which a hardcoded repo-root path
+            # wrote that run's chunk evidence into the repository tree while the
+            # operator had named a directory outside it. For the default plan
+            # location the two spellings produce the same path, so this changes
+            # only the case that was wrong.
+            output.parent / f"{output.name}-chunks",
+            source_root,
+            repo_root=repo_root,
+        )
+    print(_encode(summary).decode().rstrip())
+    # `completed + repaid`, not `completed`. On a resumed run the chunks staged by
+    # the earlier pass are not re-published, so gating on `completed` alone would
+    # report a fully-staged corpus as a failure and invite a re-run that could
+    # only produce the same answer. `repaid` is the same DISPOSITION — staged,
+    # not re-published — and differs only in having cost money this pass; that
+    # distinction belongs in the printed summary, not in the completeness gate,
+    # which asks whether the corpus is whole.
+    #
+    # `repaid` now carries only chunks whose stage directory VERIFIED as that
+    # chunk's evidence. Before that check this sum was the whole exit-0 story for
+    # a directory nobody had looked inside, which is how a substituted directory
+    # reported a complete corpus.
+    staged = summary.completed + summary.repaid
+    return 0 if staged == summary.chunk_total and summary.failed == 0 else 1
+
+
 def corpus_main(repo_root: Path, args: list[str]) -> int:
     """CLI boundary for provider-free planning and read-only verification."""
     if not args or args[0] not in {"plan", "run", "verify"} or len(args) > _MAX_ARGS:
@@ -2752,7 +2922,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             return 0 if verification.state == "complete" else 2
         if not verification.execution_authorized:
             return _abort(output, verification.reasons)
-        return _abort(output, ("provider-execution-not-implemented",))
+        return _execute_authorized(repo_root, output)
     with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-source-") as raw_source:
         source_root = Path(raw_source) / "graphify"
         source_pin = admit_source(repo_root, source_root)

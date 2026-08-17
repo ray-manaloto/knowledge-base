@@ -19,8 +19,8 @@ from kb_setup.graphify_health import (
 )
 
 
-def test_graphify_0944_public_sdk_contract_is_current() -> None:
-    assert graphify_sdk.contract_errors("0.9.44") == ()
+def test_graphify_0945_public_sdk_contract_is_current() -> None:
+    assert graphify_sdk.contract_errors("0.9.45") == ()
 
 
 def test_graphify_0943_watch_conclusions_are_structured_notes() -> None:

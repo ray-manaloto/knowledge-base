@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "v0.9.44",
-  "source_commit": "4fca621532a23f84f69c31e397b75f8105cb5390",
-  "source_tree": "faabe0fab532b763a76031acd61038a85e3bba00",
+  "source_ref": "v0.9.45",
+  "source_commit": "0738af373af9cf5c95f862cc5f3327fd96b4ea23",
+  "source_tree": "e0e089a404dd0b9f6d01273b869c80197c0cc03c",
   "entries": [
     {
       "path": ".dockerignore",
@@ -32,7 +32,7 @@
     {
       "path": "Dockerfile",
       "kind": "unsupported-file",
-      "reason": "extensionless container build definition is unsupported by Graphify detection 0.9.42 through 0.9.44",
+      "reason": "extensionless container build definition is unsupported by Graphify detection 0.9.42 through 0.9.45",
       "sha256": "ef964d5fa34394fc13525e3857b60437f623d2ef081a997e42255eb5f9d494b0",
       "size": 881,
       "file_type": "regular"
@@ -80,7 +80,7 @@
     {
       "path": "tools/skillgen/platforms.toml",
       "kind": "unsupported-file",
-      "reason": "build-time skill-generation configuration is unsupported by Graphify detection 0.9.42 through 0.9.44",
+      "reason": "build-time skill-generation configuration is unsupported by Graphify detection 0.9.42 through 0.9.45",
       "sha256": "3cf4f6e8375eb979fc45473d3a4bd5819720661c114d03b18d078b02ffbd14ed",
       "size": 12264,
       "file_type": "regular"
@@ -88,8 +88,8 @@
     {
       "path": "uv.lock",
       "kind": "unsupported-file",
-      "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.44",
-      "sha256": "20f4a3484de7fd811b0647a6d65f90eea6bf5a8c197ccf076559f4375d5addd6",
+      "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.45",
+      "sha256": "97a38aa147cc7c4d567aa9952da85366c8b0c23a49196ea39e66971b16a9532e",
       "size": 1011447,
       "file_type": "regular"
     },
@@ -141,7 +141,7 @@
     {
       "path": "worked/rsl-siege-manager/graph.json",
       "kind": "excluded-ast-fixture",
-      "reason": "Graphify 0.9.42 through 0.9.44 rejects this generated graph at its JSON indexing safety cap; parser errors cannot certify a zero-node admission",
+      "reason": "Graphify 0.9.42 through 0.9.45 rejects this generated graph at its JSON indexing safety cap; parser errors cannot certify a zero-node admission",
       "sha256": "face5bc9eaf2d299747179382843d7a341c4c71acd44379cb8c2acdc13ab5c34",
       "size": 1991261,
       "file_type": "regular",
@@ -150,7 +150,7 @@
     {
       "path": "tests/fixtures/sample.lpk",
       "kind": "compatibility-correction",
-      "reason": "Graphify 0.9.42 through 0.9.44 assigns one ID to the distinct Lazarus package file and referenced sample.pas unit; an exact-shape pre-build correction preserves both entities and their role-proven edges",
+      "reason": "Graphify 0.9.42 through 0.9.45 assigns one ID to the distinct Lazarus package file and referenced sample.pas unit; an exact-shape pre-build correction preserves both entities and their role-proven edges",
       "sha256": "d35ab7cfc6b30910020239b7389a4e732b5545269fd4b1cd43d7459aa2c40e1f",
       "size": 609,
       "file_type": "regular",
@@ -159,7 +159,7 @@
     {
       "path": "tests/fixtures/sample.luau",
       "kind": "excluded-ast-fixture",
-      "reason": "intentional Luau parser-recovery fixture emits a Graphify 0.9.42 through 0.9.44 partial-syntax warning and cannot certify a warning-free AST baseline",
+      "reason": "intentional Luau parser-recovery fixture emits a Graphify 0.9.42 through 0.9.45 partial-syntax warning and cannot certify a warning-free AST baseline",
       "sha256": "c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
       "size": 664,
       "file_type": "regular",
@@ -168,7 +168,7 @@
     {
       "path": "tests/fixtures/sample.dmf",
       "kind": "excluded-ast-fixture",
-      "reason": "Graphify 0.9.42 through 0.9.44 DMF fixture node identities embed the random snapshot root and cannot certify byte-reproducible output",
+      "reason": "Graphify 0.9.42 through 0.9.45 DMF fixture node identities embed the random snapshot root and cannot certify byte-reproducible output",
       "sha256": "a3a37c5f568c27497b39c8834b6108419b4d28265c7e89c448d159f35a200617",
       "size": 898,
       "file_type": "regular",

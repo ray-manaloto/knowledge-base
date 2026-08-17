@@ -14,8 +14,8 @@ import msgspec
 import pytest
 from kb_setup import graph, graphify_baseline, graphify_env
 
-_COMMIT = "4fca621532a23f84f69c31e397b75f8105cb5390"
-_TREE = "faabe0fab532b763a76031acd61038a85e3bba00"
+_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
 _REVIEWED_SHA = "f" * 64
 _LPK_PATH = "tests/fixtures/sample.lpk"
 _LPK_SHA = "d35ab7cfc6b30910020239b7389a4e732b5545269fd4b1cd43d7459aa2c40e1f"
@@ -120,7 +120,7 @@ def _write_public_candidate(root: Path) -> Path:
             "status": "complete",
             "source_commit": _COMMIT,
             "source_tree": _TREE,
-            "runtime_version": "0.9.44",
+            "runtime_version": "0.9.45",
             "detected_count": 1,
             "extracted_count": 1,
             "node_count": 1,
@@ -143,15 +143,15 @@ def _write_public_candidate(root: Path) -> Path:
         },
         "runtime.json": {
             "schema_version": 1,
-            "version": "0.9.44",
-            "cli_version": "0.9.44",
-            "sdk_version": "0.9.44",
+            "version": "0.9.45",
+            "cli_version": "0.9.45",
+            "sdk_version": "0.9.45",
             "executable": ".venv/bin/graphify",
             "sdk_fingerprint_sha256": (
                 "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157"
             ),
-            "wheel_sha256": ("a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f"),
-            "sdist_sha256": ("09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986"),
+            "wheel_sha256": ("134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663"),
+            "sdist_sha256": ("ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7"),
         },
         "controls.json": {
             "schema_version": 1,
@@ -171,7 +171,7 @@ def _write_public_candidate(root: Path) -> Path:
         "dispositions.json": {
             "schema_version": 1,
             "source": "graphify",
-            "source_ref": "v0.9.44",
+            "source_ref": "v0.9.45",
             "source_commit": _COMMIT,
             "source_tree": _TREE,
             "entries": [
@@ -203,7 +203,7 @@ def _write_public_candidate(root: Path) -> Path:
     manifest = {
         "schema_id": "graphify-deterministic-baseline/v0",
         "source": "graphify",
-        "source_ref": "v0.9.44",
+        "source_ref": "v0.9.45",
         "source_commit": _COMMIT,
         "source_tree": _TREE,
         "catalog_sha256": hashlib.sha256(payloads["dispositions.json"]).hexdigest(),
@@ -218,7 +218,7 @@ def _write_public_candidate(root: Path) -> Path:
     )
     source_manifest_sha256 = hashlib.sha256(payloads["source-manifest.json"]).hexdigest()
     _FIXTURE_AUTHORITIES[root] = graphify_baseline.BaselineAuthority(
-        source_ref="v0.9.44",
+        source_ref="v0.9.45",
         source_commit=_COMMIT,
         source_tree=_TREE,
         catalog_sha256=hashlib.sha256(payloads["dispositions.json"]).hexdigest(),
@@ -240,7 +240,7 @@ def _refresh_fixture_authority(candidate: Path) -> None:
     source_member = next(item for item in members if item["name"] == "source-manifest.json")
     build = json.loads((candidate / "build-receipt.json").read_bytes())
     _FIXTURE_AUTHORITIES[candidate] = graphify_baseline.BaselineAuthority(
-        source_ref="v0.9.44",
+        source_ref="v0.9.45",
         source_commit=_COMMIT,
         source_tree=_TREE,
         catalog_sha256=str(manifest["catalog_sha256"]),
@@ -967,9 +967,9 @@ def test_committed_graphify_disposition_catalog_is_typed_and_exact() -> None:
     catalog = graphify_baseline.load_disposition_catalog(repo)
 
     assert catalog.source == "graphify"
-    assert catalog.source_commit == "4fca621532a23f84f69c31e397b75f8105cb5390"
-    assert catalog.source_tree == "faabe0fab532b763a76031acd61038a85e3bba00"
-    # 21 -> 20: `docs/superpowers` lost its `ignored-tree` disposition at 0.9.44.
+    assert catalog.source_commit == "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+    assert catalog.source_tree == "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+    # 21 -> 20: `docs/superpowers` lost its `ignored-tree` disposition at 0.9.45.
     # graphify #2759 stopped dropping a git-tracked file that also matches a
     # `.gitignore` pattern, matching git's own behaviour, so those two markdown
     # docs are ordinary detected source now — content this corpus had been
@@ -1033,14 +1033,14 @@ def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:
 
     identity = graphify_baseline.runtime_identity(repo)
 
-    assert identity.version == "0.9.44"
+    assert identity.version == "0.9.45"
     assert identity.cli_version == identity.sdk_version == identity.version
     assert identity.executable == ".venv/bin/graphify"
     assert identity.wheel_sha256 == (
-        "a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f"
+        "134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663"
     )
     assert identity.sdist_sha256 == (
-        "09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986"
+        "ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7"
     )
     assert len(identity.sdk_fingerprint_sha256) == 64
 
@@ -1062,14 +1062,14 @@ def test_historical_baseline_source_does_not_reuse_current_manifest_pin(
 
     historical = graphify_baseline.historical_graphify_manifest(
         tmp_path,
-        ref="v0.9.44",
-        commit="4fca621532a23f84f69c31e397b75f8105cb5390",
+        ref="v0.9.45",
+        commit="0738af373af9cf5c95f862cc5f3327fd96b4ea23",
     )
 
     assert (historical.url, historical.ref, historical.commit) == (
         current.url,
-        "v0.9.44",
-        "4fca621532a23f84f69c31e397b75f8105cb5390",
+        "v0.9.45",
+        "0738af373af9cf5c95f862cc5f3327fd96b4ea23",
     )
     assert (current.ref, current.commit) == (
         "v0.9.43",

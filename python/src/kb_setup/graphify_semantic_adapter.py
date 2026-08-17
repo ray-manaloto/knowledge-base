@@ -218,6 +218,29 @@ def write_provider_boundary_start(
 
 
 def _provider_boundary_path(environment: Mapping[str, str]) -> Path:
+    """Resolve where this invocation writes its provider-boundary marker.
+
+    Two spellings, and the second exists because the first cannot serve a
+    multi-call run. `…_PATH` is one fixed file: the marker is created `O_EXCL`,
+    so a caller that makes N calls must delete it between them, and a call that
+    FAILS never gets the chance — stranding the marker and making every later
+    call in that run die on `already exists`. One recoverable error became a
+    whole-corpus failure naming the wrong cause.
+
+    `…_DIR` gives each invocation its own file inside a caller-owned directory,
+    so `O_EXCL` still means what it says — one crossing per marker — while a
+    failed call strands nothing. The slice keeps using `…_PATH`: it makes exactly
+    one call, and its committed evidence names that exact member.
+
+    Neither set is still an error. Absence must never mean "skip the marker" —
+    nothing checks after the fact that one was written, so a launcher that merely
+    forgot would lose its provider-call evidence in silence.
+    """
+    directory = environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_DIR", "")
+    if directory:
+        # pid + monotonic ns: unique within a run without a shared counter, and
+        # without depending on wall-clock, which can repeat under adjustment.
+        return Path(directory) / f"provider-boundary-{os.getpid()}-{time.monotonic_ns()}.json"
     raw = environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH", "")
     if not raw:
         raise ValueError("provider boundary marker path is unset")
@@ -233,10 +256,13 @@ def _real_executable() -> Path:
     return path
 
 
-def _child_environment() -> dict[str, str]:
+def _child_environment(
+    profile: graphify_semantic_slice.ClaudeProfile | None = None,
+) -> dict[str, str]:
     return graphify_semantic_slice.claude_child_environment(
         os.environ,
         original_path=os.environ.get("KB_SEMANTIC_ORIGINAL_PATH", ""),
+        profile=profile,
     )
 
 
@@ -639,7 +665,7 @@ def _usage(envelope: dict[str, object]) -> tuple[ModelUsage, ...]:
     return tuple(usages)
 
 
-def _validate_incoming_args(args: list[str]) -> str:
+def _validate_incoming_args(args: list[str], profile: graphify_semantic_slice.ClaudeProfile) -> str:
     if graphify_semantic_slice.route_override_names(os.environ):
         raise ValueError("routing override reached semantic adapter")
     schema = args[7] if len(args) == _GRAPHIFY_ARG_COUNT else ""
@@ -649,7 +675,7 @@ def _validate_incoming_args(args: list[str]) -> str:
         "json",
         "--no-session-persistence",
         "--model",
-        graphify_semantic_slice.CLAUDE_MODEL,
+        profile.model,
         "--json-schema",
         schema,
     ]
@@ -755,32 +781,74 @@ def _runtime_identity(
 
 
 def _claude_invocation_args(
-    executable: Path, schema: str, environment: Mapping[str, str]
+    executable: Path,
+    schema: str,
+    environment: Mapping[str, str],
+    profile: graphify_semantic_slice.ClaudeProfile,
 ) -> tuple[str, ...]:
-    """Keep #300's historical argv while adding the reviewed cap only at #301's boundary."""
-    base = (
+    """Build the outgoing call from the SAME definition both verifiers check against.
+
+    Previously this tuple was spelled out here and again in the verifier, so the
+    two could drift into agreeing with each other about a call neither had seen.
+    `expected_adapter_argv` is now the one definition; the boundary marker still
+    gates `--max-turns`, so a launcher that configures no marker still gets the
+    historical #300 shape rather than silently acquiring a flag.
+    """
+    return (
         str(executable),
-        "-p",
-        "--output-format",
-        "json",
-        "--no-session-persistence",
-        "--model",
-        graphify_semantic_slice.CLAUDE_MODEL,
-        "--json-schema",
-        schema,
-        "--safe-mode",
-        "--tools",
-        "",
-        "--strict-mcp-config",
-        "--permission-mode",
-        "dontAsk",
-        "--no-chrome",
-        "--max-budget-usd",
-        "0.25",
+        *graphify_semantic_slice.expected_adapter_argv(
+            profile,
+            schema,
+            # EITHER spelling configures the marker, so either must gate the
+            # flag. Checking only `…_PATH` would drop `--max-turns` for every
+            # `…_DIR` caller and then fail them on an argv-shape mismatch — a
+            # marker-plumbing change surfacing as a turn-limit error.
+            with_max_turns=bool(
+                environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH")
+                or environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_DIR")
+            ),
+        ),
     )
-    if environment.get("KB_SEMANTIC_PROVIDER_BOUNDARY_PATH"):
-        return (*base, "--max-turns", "3")
-    return base
+
+
+def _completion_reasons(
+    envelope: dict[str, object],
+    environment: Mapping[str, str],
+    completed: subprocess.CompletedProcess[bytes],
+) -> tuple[str, ...]:
+    """Collect every refusal reason for one completed provider call, first-seen order.
+
+    The process-level reasons live beside the envelope-level ones rather than in
+    `adapter_main`, so the refusal policy is one readable unit and the caller
+    holds only the decision it makes with the result.
+    """
+    reasons = list(result_envelope_reasons(envelope, environment))
+    if completed.returncode != 0:
+        reasons.append("claude-returncode-nonzero")
+    if completed.stderr:
+        reasons.append("claude-stderr-present")
+    return tuple(dict.fromkeys(reasons))
+
+
+def _report_rejection(reasons: tuple[str, ...]) -> int:
+    """Print a refusal to stderr — with the truncation hint when it applies — and fail.
+
+    The refusal stands — a truncated structured output is not evidence and is
+    never passed through. What changes is that graphify can now TELL truncation
+    from every other refusal.
+
+    It reads this process's failure as `RuntimeError("claude -p exited 1:
+    <stderr>")` and classifies it by substring, so a refusal worded only as
+    `stop-reason-invalid` matched none of its context-overflow markers and the
+    chunk was dropped whole. That made the plan's `graphify_max_retry_depth=2`
+    inert for truncation — the one failure it exists to survive. With the hint,
+    adaptive retry bisects the chunk.
+    """
+    print("semantic adapter rejected result: " + ", ".join(reasons), file=sys.stderr)
+    hint = graphify_semantic_slice.truncation_retry_hint(reasons)
+    if hint:
+        print(hint, file=sys.stderr)
+    return 1
 
 
 def adapter_main() -> int:
@@ -790,14 +858,15 @@ def adapter_main() -> int:
     if args in (["--help"], ["--version"]):
         return _delegate_info(executable, args)
     try:
-        schema = _validate_incoming_args(args)
-        environment = _child_environment()
+        profile = graphify_semantic_slice.profile_for(os.environ)
+        schema = _validate_incoming_args(args, profile)
+        environment = _child_environment(profile)
         auth, version = _runtime_identity(executable, environment)
     except (OSError, subprocess.SubprocessError, UnicodeDecodeError, ValueError) as exc:
         print(f"semantic adapter preflight failed: {exc}", file=sys.stderr)
         return 2
     prompt = sys.stdin.buffer.read()
-    real_args = _claude_invocation_args(executable, schema, os.environ)
+    real_args = _claude_invocation_args(executable, schema, os.environ, profile)
     started = time.monotonic_ns()
     try:
         boundary_path = _provider_boundary_path(os.environ)
@@ -823,11 +892,7 @@ def adapter_main() -> int:
         return 124
     elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
     envelope, parse_observation = parse_result_envelope(completed.stdout)
-    reasons = list(result_envelope_reasons(envelope, os.environ))
-    if completed.returncode != 0:
-        reasons.append("claude-returncode-nonzero")
-    if completed.stderr:
-        reasons.append("claude-stderr-present")
+    reasons = _completion_reasons(envelope, os.environ, completed)
     metadata = _metadata(
         MetadataInputs(
             executable=executable,
@@ -842,23 +907,30 @@ def adapter_main() -> int:
             envelope=envelope,
             parse_observation=parse_observation,
             elapsed_ms=elapsed_ms,
-            reasons=tuple(dict.fromkeys(reasons)),
+            reasons=reasons,
         )
     )
     _write_metadata(metadata)
     if metadata.reasons:
-        print("semantic adapter rejected result: " + ", ".join(metadata.reasons), file=sys.stderr)
-        return 1
+        return _report_rejection(metadata.reasons)
     sys.stdout.buffer.write(completed.stdout)
     return 0
 
 
 def result_envelope_reasons(
     envelope: object,
-    _environment: Mapping[str, str],
+    environment: Mapping[str, str],
 ) -> tuple[str, ...]:
-    """Apply the same bounded result policy at both semantic boundaries."""
-    return graphify_semantic_slice.envelope_reasons(envelope)
+    """Apply the same bounded result policy at both semantic boundaries.
+
+    The environment is READ now rather than ignored: it selects the profile, and
+    the model check is per-profile. While it was `_environment` the policy was
+    "bounded" in the sense of pinned to the slice's model, so the corpus boundary
+    rejected its own correct responses.
+    """
+    return graphify_semantic_slice.envelope_reasons(
+        envelope, profile=graphify_semantic_slice.profile_for(environment)
+    )
 
 
 if __name__ == "__main__":

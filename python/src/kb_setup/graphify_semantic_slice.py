@@ -27,6 +27,12 @@ _CLAUDE_PROVIDER = "firstParty"
 _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR = 3
 _MAX_COST_USD = 0.25
 CLAUDE_MODEL = _CLAUDE_MODEL
+# Name of the ONE environment variable that selects a profile at the adapter
+# boundary. Its VALUE is allowlisted to the two reviewed profile names below —
+# never a model string, never a budget. A boundary whose model and spend cap can
+# be set to anything by an environment variable is not a fail-closed boundary,
+# so the env carries a choice between reviewed shapes and nothing else.
+PROFILE_ENV_NAME = "KB_SEMANTIC_PROFILE"
 GRAPHIFY_SCHEMA_SHA256 = "69d307d23913e0cccf5809316a3432b85210776bd5626a4ad0af1317d6113324"
 
 # Only the SNAPSHOT identity moves v0.9.42 -> v0.9.44. The file itself is
@@ -34,25 +40,24 @@ GRAPHIFY_SCHEMA_SHA256 = "69d307d23913e0cccf5809316a3432b85210776bd5626a4ad0af13
 # digest — so the three lines below it are unchanged, and that is a measurement,
 # not an assumption. The derivation discriminates: run against `uv.lock` over the
 # same two commits it returns two different objects.
-SOURCE_REF = "v0.9.44"
-SOURCE_COMMIT = "4fca621532a23f84f69c31e397b75f8105cb5390"
-SOURCE_TREE = "faabe0fab532b763a76031acd61038a85e3bba00"
+SOURCE_REF = "v0.9.45"
+SOURCE_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+SOURCE_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
 SOURCE_PATH = "docs/how-it-works.md"
+# UNCHANGED across v0.9.44 -> v0.9.45, so the slice's INPUT is byte-identical and
+# the re-run only re-attests it under the new runtime. Measured by three routes
+# that agree: the contents API at each of the two commits, and `git hash-object`
+# on the local clone. `SOURCE_TREE` above moved in the same derivation, which is
+# what shows these probes can return a different value rather than echoing back
+# whatever they were asked about.
 SOURCE_GIT_OBJECT = "e0e6e5275dfec50b25c38590f151ebd9e263f383"
 SOURCE_SHA256 = "cd4a67001704eddc557d67eaa783d0608cd200302fa1b89c3f1a4819497cdc26"
 SOURCE_SIZE = 5147
 _CANDIDATE_SCHEMA = "graphify-real-semantic-slice/v0"
 _ACCEPTED_CANDIDATE_MANIFEST_SHA256 = (
-    "32579d766fd7c3950b0513fd94a7a49b65a973fb0d28e25987286d49d02c3bf9"
+    "4621b26e2e5c4d4a0e24764289d1acc5c7deea0e0473ea623ee3bd2aad7db7b2"
 )
 _MAX_SEMANTIC_ARGS = 2
-# 17 -> 19: the adapter appends `--max-turns 3` whenever the provider boundary
-# marker is configured, and this module now configures it (see
-# `_adapter_environment`). The count and `expected_argv` below must move together
-# — `schema = argv[7] if len(argv) == _RETAINED_CLAUDE_ARG_COUNT else ""` silently
-# yields an empty schema when they disagree, which then fails as a digest
-# mismatch rather than as the shape mismatch it really is.
-_RETAINED_CLAUDE_ARG_COUNT = 19
 _PROVIDER_BOUNDARY_MEMBER = "provider-boundary-start.json"
 _REQUIRED_MEMBERS = frozenset(
     {
@@ -221,6 +226,35 @@ class ExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     deep_mode: bool
 
 
+class ClaudeProfile(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """One reviewed provider shape: the model, its caps, and the argv it implies.
+
+    Every field that varies between the slice and the corpus lives here, so the
+    two shapes differ by DATA rather than by a second code path. The argv-literal
+    fields (``max_budget_usd``, ``effort``) are strings because they are compared
+    byte-for-byte against a recorded ``argv``: a float that renders as ``0.25``
+    here and ``0.25000000000000001`` after a round trip would fail as a shape
+    mismatch rather than as the formatting difference it really is.
+    """
+
+    name: str
+    model: str
+    canonical_model: str
+    max_budget_usd: str
+    # "" means the profile does not pass ``--effort`` at all, which is what keeps
+    # the slice's committed 19-argument evidence valid rather than merely similar.
+    effort: str
+    max_output_tokens: str
+    max_retries: str
+    max_turns: str
+    max_cost_usd: float
+
+    @property
+    def retained_argv_length(self) -> int:
+        """Length of the ``argv`` the adapter records (the executable is dropped)."""
+        return 19 + (2 if self.effort else 0)
+
+
 class SemanticReceipt(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Public receipt for exactly one real Graphify-to-Claude semantic call."""
 
@@ -268,36 +302,49 @@ class SemanticVerification(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
 
 
 _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    # Moved 0.9.42 -> 0.9.44 because the COMMITTED EVIDENCE moved: the slice was
-    # re-run at 0.9.44 in the same change. This constant is the authority for that
+    # Moved 0.9.44 -> 0.9.45 because the COMMITTED EVIDENCE moved: the slice was
+    # re-run at 0.9.45 in the same change. This constant is the authority for that
     # receipt, so it may only advance when the receipt does — never as part of a
     # pin bump on its own, which would assert an identity the evidence contradicts.
-    version="0.9.44",
-    cli_version="0.9.44",
-    sdk_version="0.9.44",
+    # The ORDER that condition implies is load-bearing and was followed: the pin
+    # moved, the slice re-ran and produced a 0.9.45 receipt, `verify` reported
+    # `candidate-authority-mismatch` against this still-0.9.44 value, and only
+    # then did this advance. Advancing it first would have made that check pass
+    # by construction and proved nothing.
+    version="0.9.45",
+    cli_version="0.9.45",
+    sdk_version="0.9.45",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
-    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
+    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
+    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 )
-# The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above stays
-# at 0.9.42 on purpose: it is the authority for the COMMITTED receipt, which is
-# evidence about a run that happened, and evidence does not move when the pin does.
+# The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above now
+# reads 0.9.45 because the COMMITTED receipt was re-produced at 0.9.45 in the
+# same change: it is the authority for that receipt, which is evidence about a
+# run that happened, and it moved because the evidence moved, never because the
+# pin did.
 #
-# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.42 -> 0.9.44, and that is a
-# measurement rather than a copy-forward: `semantic_api_fingerprint()` re-derived
-# at 0.9.44 hashes to 43122fca…, byte-identical to the 0.9.43 record. The one
-# signature the semantic path depends on — `llm.extract_corpus_parallel` — did not
-# change, which is what `assert_semantic_sdk`'s "review the release before
-# inference" gate is actually asking about.
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.44 -> 0.9.45, and that is a
+# measurement rather than a copy-forward, re-derived against the INSTALLED 0.9.45:
+# `public_api_fingerprint()` hashes to b10406f9… and `semantic_api_fingerprint()`
+# to 43122fca…, both byte-identical to the 0.9.44 records. The one signature the
+# semantic path depends on — `llm.extract_corpus_parallel` — did not change, which
+# is what `assert_semantic_sdk`'s "review the release before inference" gate is
+# actually asking about. Cross-checked against the release diff: `graphify/llm.py`
+# does not appear in `compare/v0.9.43...v0.9.45` at all, against a 30-file control.
+#
+# The wheel/sdist digests DID move, because the distribution is a new build; they
+# are read from `uv.lock`, which is the same source `graphify_baseline` derives
+# them from rather than a second opinion about the same artifact.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.44",
-    cli_version="0.9.44",
-    sdk_version="0.9.44",
+    version="0.9.45",
+    cli_version="0.9.45",
+    sdk_version="0.9.45",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="a22e5feef23cb1a34d81e29701de25858c28b892c3c94ad17db0a9916dd2634f",
-    sdist_sha256="09b93aa74efd2310e11e69414d3eca89aa1a87de20b6d4de4147a05761d28986",
+    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
+    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 )
 # 2.1.232 -> 2.1.233 (Claude Code self-updates; the currency engine flags it).
 # The BINARY digest moved and the `--help` digest did NOT: 71ad650f… is the same
@@ -329,8 +376,73 @@ _ACCEPTED_EXECUTION_CONFIG = ExecutionConfig(
 )
 
 
+# The shape #300 actually ran under. Every value here is transcribed from the
+# committed candidate, not chosen — this profile is a description of evidence, so
+# it may only change when the slice is re-run and its receipt re-committed.
+SLICE_PROFILE = ClaudeProfile(
+    name="slice",
+    model=_CLAUDE_MODEL,
+    canonical_model=_CLAUDE_CANONICAL_MODEL,
+    max_budget_usd="0.25",
+    effort="",
+    max_output_tokens="4096",
+    max_retries="0",
+    max_turns="3",
+    max_cost_usd=_MAX_COST_USD,
+)
+# The shape the whole-tree corpus run uses (Ray, 2026-08-16). Three of these
+# differ from the slice for reasons worth stating, because each looks like a
+# preference and is not:
+#
+# * `claude-opus-5` — the corpus is this project's core dependency and the graph
+#   every other agent queries, so the extraction is long-lived and expensive to
+#   redo. Opus is the tier chosen for that, deliberately, once.
+# * `max_output_tokens` 4096 -> 8192 — NOT a richness preference. Thinking is on
+#   by default on Opus 5 and shares this cap with the response text, so 4096
+#   against an ~18k-token markdown chunk truncates the structured extraction
+#   mid-object. The slice keeps 4096 because haiku at 4096 is what it measured.
+# * `max_retries` 0 -> 2 — 57 chunks make a single transient failure likely
+#   rather than hypothetical, and a lost chunk is a silent hole in the corpus.
+CORPUS_PROFILE = ClaudeProfile(
+    name="corpus",
+    model="claude-opus-5",
+    canonical_model="claude-opus-5",
+    max_budget_usd="25.00",
+    effort="high",
+    max_output_tokens="8192",
+    max_retries="2",
+    max_turns="3",
+    max_cost_usd=25.0,
+)
+_PROFILES = {profile.name: profile for profile in (SLICE_PROFILE, CORPUS_PROFILE)}
+
+
+def profile_for(environment: Mapping[str, str]) -> ClaudeProfile:
+    """Resolve the reviewed profile named by the environment, failing closed.
+
+    An absent variable selects the slice — the narrower shape — so a launcher that
+    simply FORGETS to name its profile cannot silently inherit the corpus's model
+    and spend cap. An unrecognized value is an error rather than a fallback, for
+    the same reason: quietly treating a typo as "slice" would report a run that
+    used one shape as evidence about another.
+    """
+    name = environment.get(PROFILE_ENV_NAME, SLICE_PROFILE.name)
+    profile = _PROFILES.get(name)
+    if profile is None:
+        raise ValueError(f"unknown semantic profile: {name}")
+    return profile
+
+
 def accepted_graphify_runtime() -> RuntimeIdentity:
-    """Return the reviewed Graphify 0.9.42 runtime identity from issue #300."""
+    """Return the reviewed Graphify runtime identity from ``_ACCEPTED_GRAPHIFY_RUNTIME``.
+
+    Ask the constant for the version. This docstring names none, deliberately:
+    it used to restate one, went stale across two releases, and both attempts to
+    repair it wrote fresh version numbers into the sentence declaring that it
+    contained none — so each fix was self-refuting on the line below its own
+    claim, and the second reinstated the drift it described. The constant
+    (originally reviewed under issue #300) is the single place the version lives.
+    """
     return _ACCEPTED_GRAPHIFY_RUNTIME
 
 
@@ -352,8 +464,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def child_control_env(profile: ClaudeProfile) -> dict[str, str]:
+    """Return the control variables for one profile.
+
+    The NAMES are identical across profiles and only the values move, which is
+    what lets the receipt keep comparing ``environment_names`` unchanged while the
+    corpus raises its own caps.
+    """
+    return {
+        **_CHILD_CONTROL_ENV,
+        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": profile.max_output_tokens,
+        "CLAUDE_CODE_MAX_RETRIES": profile.max_retries,
+    }
+
+
 def claude_child_environment(
-    environment: Mapping[str, str], *, original_path: str | None = None
+    environment: Mapping[str, str],
+    *,
+    original_path: str | None = None,
+    profile: ClaudeProfile | None = None,
 ) -> dict[str, str]:
     """Build the fixed OAuth-compatible environment used for auth and inference."""
     child = {
@@ -362,8 +491,58 @@ def claude_child_environment(
         if environment.get(name) is not None
     }
     child["PATH"] = original_path if original_path is not None else environment.get("PATH", "")
-    child.update(_CHILD_CONTROL_ENV)
+    child.update(child_control_env(profile if profile is not None else SLICE_PROFILE))
     return child
+
+
+def expected_adapter_argv(
+    profile: ClaudeProfile, schema: str, *, with_max_turns: bool = True
+) -> tuple[str, ...]:
+    """Return the exact recorded ``argv`` one profile's boundary call must have.
+
+    ONE definition, three callers: the adapter builds the outgoing call from it,
+    and the slice and corpus verifiers each re-check a recorded ``argv`` against
+    it. Keeping them a single function is the point — a fourth spelling of this
+    tuple is how a shape check starts agreeing with itself instead of with the
+    call that actually ran.
+
+    ``with_max_turns`` exists only for the adapter's no-boundary-marker branch,
+    which yields the historical #300 shape. Both verifiers leave it at ``True``:
+    both launchers configure the marker, so a recorded run without those two
+    arguments is a real shape mismatch and must be reported as one.
+    """
+    return (
+        "-p",
+        "--output-format",
+        "json",
+        "--no-session-persistence",
+        "--model",
+        profile.model,
+        "--json-schema",
+        schema,
+        "--safe-mode",
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--permission-mode",
+        "dontAsk",
+        "--no-chrome",
+        "--max-budget-usd",
+        profile.max_budget_usd,
+        *(("--max-turns", profile.max_turns) if with_max_turns else ()),
+        *(("--effort", profile.effort) if profile.effort else ()),
+    )
+
+
+def recorded_schema(argv: tuple[str, ...], profile: ClaudeProfile) -> str:
+    """Return the schema argument, or ``""`` when the recorded shape is wrong.
+
+    The length guard is what makes the empty return meaningful: reading index 7
+    out of an argv of the wrong length would yield some OTHER argument and then
+    fail as a schema-digest mismatch, reporting a shape error in the vocabulary
+    of a content error.
+    """
+    return argv[7] if len(argv) == profile.retained_argv_length else ""
 
 
 def route_override_names(environment: Mapping[str, str]) -> tuple[str, ...]:
@@ -435,12 +614,64 @@ def _assert_value_flag_supported(
         raise ValueError(f"Claude {flag} parser probe failed")
 
 
+def _assert_effort_supported(
+    executable: Path,
+    level: str,
+    *,
+    environment: Mapping[str, str],
+) -> None:
+    """Prove ``--effort`` is parsed AND that ``level`` is one of its accepted values.
+
+    ``_assert_value_flag_supported`` cannot do this job: it asserts the parser
+    said "must be a number", and ``--effort`` takes a level name. Measured on the
+    installed 2.1.233, the three outcomes are distinguishable and the probe is
+    armed against all of them — an unknown FLAG says ``unknown option``, a valid
+    LEVEL emits no warning at all, and only an invalid level produces the
+    ``Unknown --effort value`` line that also enumerates the accepted set.
+
+    That enumeration is the reason this checks the level and not merely the flag.
+    An unrecognized value is **not** rejected: the CLI warns, discards it, and
+    runs at the DEFAULT effort. A profile with a typo'd level would therefore
+    produce a complete, plausible, fully-verified run at the wrong effort, with
+    the mistake visible only in a warning nothing reads.
+    """
+    completed = subprocess.run(
+        [str(executable), "-p", "--effort", "not-a-level"],
+        capture_output=True,
+        check=False,
+        env=dict(environment),
+        timeout=30,
+    )
+    diagnostic = completed.stderr.decode("utf-8", errors="strict")
+    marker = "Valid values:"
+    if (
+        completed.returncode != 1
+        or completed.stdout
+        or "Unknown --effort value" not in diagnostic
+        or marker not in diagnostic
+    ):
+        raise ValueError("Claude --effort parser probe failed")
+    accepted = {
+        item.strip().rstrip(".")
+        for item in diagnostic.split(marker, 1)[1].split("\n", 1)[0].split(",")
+    }
+    if level not in accepted:
+        raise ValueError(f"Claude --effort level is unavailable: {level}")
+
+
 def preflight(
     repo_root: Path,
     environment: Mapping[str, str] | None = None,
     *,
-    graphify_version: str = "0.9.44",
+    # A TENTH restatement of the pinned revision, and the only one that is a
+    # function default rather than a module constant — which is why no
+    # `ref_binding` row reaches it and why it lagged silently. It feeds
+    # `assert_semantic_sdk`, so a stale value asks "is the semantic API the one
+    # 0.9.44 shipped?" while 0.9.45 is installed: a version gate checking the
+    # wrong version, which passes for exactly as long as nothing moves.
+    graphify_version: str = "0.9.45",
     require_max_turns: bool = False,
+    profile: ClaudeProfile = SLICE_PROFILE,
 ) -> ClaudePreflight:
     """Prove exact Graphify/Claude/auth/routing capability without inference."""
     from kb_setup import graphify_baseline, graphify_env, graphify_sdk
@@ -455,7 +686,7 @@ def preflight(
     if not resolved:
         raise ValueError("Claude Code CLI is unavailable")
     executable = Path(resolved).resolve()
-    child = claude_child_environment(current)
+    child = claude_child_environment(current, profile=profile)
     help_raw = _completed_bytes(executable, "--help", environment=child)
     help_text = help_raw.decode("utf-8", errors="strict")
     missing = tuple(flag for flag in _REQUIRED_CLAUDE_FLAGS if flag not in help_text)
@@ -465,6 +696,12 @@ def preflight(
     if require_max_turns:
         _assert_value_flag_supported(executable, "--max-turns", environment=child)
         required_flags = (*required_flags, "--max-turns")
+    # Proven in the same run that will pass it, on `--max-turns`' precedent: a
+    # flag present in `--help` is not a flag the installed binary accepts with a
+    # value, and the corpus profile is the first thing here to pass `--effort`.
+    if profile.effort:
+        _assert_effort_supported(executable, profile.effort, environment=child)
+        required_flags = (*required_flags, "--effort")
     version_raw = _completed_bytes(executable, "--version", environment=child)
     version_text = version_raw.decode("utf-8", errors="strict").strip()
     match = re.search(r"\b\d+\.\d+\.\d+\b", version_text)
@@ -490,18 +727,60 @@ def _list_is_empty(value: object) -> bool:
     return isinstance(value, list) and not value
 
 
+# The reason a TRUNCATED result earns, kept apart from `stop-reason-invalid`.
+# Both are refusals — a truncated structured output is not evidence — but only
+# this one is RECOVERABLE, by extracting the chunk in halves. Collapsing them
+# left the plan's `graphify_max_retry_depth=2` inert for the single failure it
+# was raised to survive, because the adapter refused the envelope before
+# graphify could translate `stop_reason=max_tokens` into `finish_reason=length`
+# and bisect. See `TRUNCATION_RETRY_HINT`.
+TRUNCATED_STOP_REASON = "stop-reason-truncated"
+
+# Emitted on stderr alongside the refusal so graphify's `_looks_like_context_exceeded`
+# classifies our non-zero exit as a context overflow and its adaptive retry
+# bisects the chunk instead of dropping it.
+#
+# Substring matching against that helper's marker list is graphify's OWN
+# extension point, not a private detail being reached into: it matches on
+# stringified-exception substrings precisely "so the retry layer can recover
+# without depending on a specific SDK class" (`graphify/llm.py`). It is still
+# coupling, so a test asserts the pinned graphify actually classifies this
+# string — if upstream rewords its markers, that test fails rather than this
+# recovery going quietly dead.
+TRUNCATION_RETRY_HINT = (
+    "the model stopped at max_completion_tokens: this chunk's prompt is too long "
+    "for one response and must be extracted in halves"
+)
+
+
+def truncation_retry_hint(reasons: tuple[str, ...]) -> str | None:
+    """Return the stderr line that makes a truncation refusal legible, else None.
+
+    A function rather than an inline conditional in the adapter because that is
+    the only form of this decision a test can reach: the adapter's own copy lives
+    between a subprocess call and a `sys.exit`, so nothing covered it, and a
+    mutation that simply deleted the print would have survived every arm while
+    silently restoring the defect.
+    """
+    return TRUNCATION_RETRY_HINT if TRUNCATED_STOP_REASON in reasons else None
+
+
 def _result_reasons(
     envelope: dict[str, object],
     *,
     max_turns: int | None = _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR,
 ) -> list[str]:
     reasons = []
+    stop_reason = envelope.get("stop_reason")
     checks = (
         (envelope.get("type") == "result", "result-type-invalid"),
         (envelope.get("subtype") == "success", "result-subtype-invalid"),
         (envelope.get("is_error") is False, "result-error"),
         (envelope.get("terminal_reason") == "completed", "terminal-state-invalid"),
-        (envelope.get("stop_reason") in {"end_turn", "tool_use"}, "stop-reason-invalid"),
+        (
+            stop_reason in {"end_turn", "tool_use"},
+            TRUNCATED_STOP_REASON if stop_reason == "max_tokens" else "stop-reason-invalid",
+        ),
     )
     reasons.extend(reason for accepted, reason in checks if not accepted)
     turns = envelope.get("num_turns")
@@ -526,13 +805,26 @@ def _structured_reasons(envelope: dict[str, object]) -> list[str]:
     return []
 
 
-def _model_reasons(envelope: dict[str, object]) -> list[str]:
+def _model_reasons(envelope: dict[str, object], profile: ClaudeProfile) -> list[str]:
+    """Check the envelope reports exactly the model this PROFILE asked for.
+
+    Profile-driven rather than pinned to the module constants, which is the
+    second instance of one class: the slice's identity leaking into a corpus code
+    path. Under `CORPUS_PROFILE` the response reports `claude-opus-5`, so the
+    hardcoded haiku comparison rejected it as `model-identity-invalid` and the
+    adapter refused every corpus chunk — a whole-corpus failure whose message
+    named the model rather than the check.
+
+    Still an exact single-model comparison: the point of the check is that ONE
+    reviewed model answered, and a response listing two is a routing surprise
+    whichever they are.
+    """
     model_usage = envelope.get("modelUsage")
-    if not isinstance(model_usage, dict) or tuple(model_usage) != (_CLAUDE_MODEL,):
+    if not isinstance(model_usage, dict) or tuple(model_usage) != (profile.model,):
         return ["model-identity-invalid"]
-    model = model_usage[_CLAUDE_MODEL]
+    model = model_usage[profile.model]
     if not isinstance(model, dict) or (model.get("canonicalModel"), model.get("provider")) != (
-        _CLAUDE_CANONICAL_MODEL,
+        profile.canonical_model,
         _CLAUDE_PROVIDER,
     ):
         return ["model-identity-invalid"]
@@ -561,6 +853,7 @@ def envelope_reasons(
     envelope: object,
     *,
     max_turns: int | None = _MAX_TURNS_WITH_ONE_STRUCTURED_REPAIR,
+    profile: ClaudeProfile = SLICE_PROFILE,
 ) -> tuple[str, ...]:
     """Explain why a redacted real Claude result envelope cannot be accepted."""
     if not isinstance(envelope, dict):
@@ -568,7 +861,7 @@ def envelope_reasons(
     reasons = [
         *_result_reasons(envelope, max_turns=max_turns),
         *_structured_reasons(envelope),
-        *_model_reasons(envelope),
+        *_model_reasons(envelope, profile),
         *_negative_evidence_reasons(envelope),
     ]
     return tuple(dict.fromkeys(reasons))
@@ -772,7 +1065,7 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
         (_is_sha256(metadata.response_sha256), "adapter-response-digest-invalid"),
         (metadata.input_tokens > 0, "adapter-input-token-count-invalid"),
         (metadata.output_tokens > 0, "adapter-output-token-count-invalid"),
-        (0.0 <= metadata.total_cost_usd <= _MAX_COST_USD, "adapter-cost-invalid"),
+        (0.0 <= metadata.total_cost_usd <= SLICE_PROFILE.max_cost_usd, "adapter-cost-invalid"),
         (
             0
             < metadata.duration_api_ms
@@ -829,33 +1122,8 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
         ):
             reasons.append("adapter-token-count-mismatch")
     argv = metadata.argv
-    schema = argv[7] if len(argv) == _RETAINED_CLAUDE_ARG_COUNT else ""
-    expected_argv = (
-        "-p",
-        "--output-format",
-        "json",
-        "--no-session-persistence",
-        "--model",
-        _CLAUDE_MODEL,
-        "--json-schema",
-        schema,
-        "--safe-mode",
-        "--tools",
-        "",
-        "--strict-mcp-config",
-        "--permission-mode",
-        "dontAsk",
-        "--no-chrome",
-        "--max-budget-usd",
-        "0.25",
-        # Appended by `_claude_invocation_args` exactly when the provider boundary
-        # marker is configured. Pinned here rather than made conditional: this
-        # module always configures it, so a run WITHOUT these two is a real shape
-        # mismatch and must be reported as one.
-        "--max-turns",
-        "3",
-    )
-    if argv != expected_argv:
+    schema = recorded_schema(argv, SLICE_PROFILE)
+    if argv != expected_adapter_argv(SLICE_PROFILE, schema):
         reasons.append("adapter-argv-shape-mismatch")
     if hashlib.sha256(schema.encode()).hexdigest() != GRAPHIFY_SCHEMA_SHA256:
         reasons.append("adapter-schema-digest-mismatch")
@@ -864,11 +1132,22 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
 
 def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> list[str]:
     accepted_graphify_pairs = (
-        ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.44"),)
+        ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),)
         if enforce_authority
         else (
-            (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.44"),
-            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.44"),
+            # Both pairs now read 0.9.45: the AUTHORITY pair advanced because
+            # the committed slice evidence was re-produced at 0.9.45 (never on a
+            # pin bump alone, which would assert an identity the receipt on disk
+            # contradicts), and the CURRENT pair moves with the pin. The two
+            # entries are therefore currently EQUAL, which is expected rather
+            # than a duplication mistake; they diverge again the moment the pin
+            # moves ahead of the committed receipt. Each version string has to
+            # move WITH its runtime (the two are checked as a pair), so a
+            # literal left beside a newer runtime makes the pair unmatchable and
+            # the non-authority path rejects every run under the installed
+            # version.
+            (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),
+            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.45"),
         )
     )
     accepted_graphify_runtimes = tuple(pair[0] for pair in accepted_graphify_pairs)
@@ -1145,7 +1424,19 @@ def admit_source(repo_root: Path, destination: Path) -> tuple[Path, object]:
     return _admit_source(repo_root, destination)
 
 
-def _semantic_fragment(result: object) -> dict[str, object]:
+def normalize_fragment(result: object) -> dict[str, object]:
+    """Reduce one raw provider result to a fragment, WITHOUT checking its scope.
+
+    Split out for the corpus driver, and the split is the substance of a cold-lane
+    finding. The scope assertion below was hardcoded to the slice's single
+    ``SOURCE_PATH``, so a corpus chunk citing any other file raised — after its
+    provider call was already paid for.
+
+    Scoping is not merely parameterised out, it is moved: the corpus's authority
+    for that question is ``stage_chunk``, which produces REASONS for one chunk.
+    Raising here instead would abort the entire extraction on a single chunk the
+    model under-covered, turning one refused chunk into a lost corpus.
+    """
     if not isinstance(result, dict):
         raise TypeError("Graphify semantic result is not an object")
     fragment: dict[str, object] = {}
@@ -1159,10 +1450,25 @@ def _semantic_fragment(result: object) -> dict[str, object]:
                 raise ValueError(f"Graphify semantic {field} origin drifted")
             exact.append(record)
         fragment[field] = exact
-    reasons = fragment_reasons(fragment, source_path=SOURCE_PATH)
+    return fragment
+
+
+def semantic_fragment(
+    result: object, *, source_paths: tuple[str, ...] = (SOURCE_PATH,)
+) -> dict[str, object]:
+    """Normalize one result and ASSERT it is scoped to ``source_paths``.
+
+    The slice's behaviour, unchanged: exactly one source, and anything outside it
+    is a hard failure of a run that was supposed to touch one document.
+    """
+    fragment = normalize_fragment(result)
+    reasons = fragment_scope_reasons(fragment, source_paths=source_paths)
     if reasons:
         raise ValueError("Graphify semantic fragment failed: " + ", ".join(reasons))
     return fragment
+
+
+_semantic_fragment = semantic_fragment
 
 
 def _fragment_counts(fragment: Mapping[str, object]) -> tuple[int, int, int]:
@@ -1181,6 +1487,7 @@ def _adapter_environment(
     metadata_path: Path,
     adapter_dir: Path,
     boundary_path: Path,
+    profile: ClaudeProfile = SLICE_PROFILE,
 ) -> dict[str, str]:
     original_path = os.environ.get("PATH", "")
     entrypoint = shutil.which("kb-semantic-claude", path=original_path)
@@ -1213,7 +1520,11 @@ def _adapter_environment(
         # in silence. Setting it here keeps the adapter fail-closed for everyone
         # and gives the slice the provider-call evidence it never had.
         "KB_SEMANTIC_PROVIDER_BOUNDARY_PATH": str(boundary_path),
-        "GRAPHIFY_CLAUDE_CLI_MODEL": _CLAUDE_MODEL,
+        # Named explicitly even though the slice is the fail-closed default: a
+        # launcher that relies on the default is indistinguishable from one that
+        # forgot, and the adapter's rejection message should be able to say which.
+        PROFILE_ENV_NAME: profile.name,
+        "GRAPHIFY_CLAUDE_CLI_MODEL": profile.model,
         "GRAPHIFY_API_TIMEOUT": "120",
         "GRAPHIFY_NO_INCREMENTAL_CACHE": "1",
     }
@@ -1273,9 +1584,18 @@ def _extract_real_semantic(
     return result, warning_text, tuple(observed_chunks)
 
 
-def _result_integer(result: Mapping[str, object], name: str) -> int:
+def result_integer(result: Mapping[str, object], name: str) -> int:
+    """Read one integer counter from a raw extraction result, or -1 if absent.
+
+    -1 rather than 0 on purpose, and public for the corpus driver: 0 is a real,
+    meaningful answer for `failed_chunks`, so a missing key and a clean run must
+    not reduce to the same number.
+    """
     value = result.get(name)
     return value if isinstance(value, int) and not isinstance(value, bool) else -1
+
+
+_result_integer = result_integer
 
 
 def _coverage_evidence(result: Mapping[str, object]) -> tuple[int, tuple[str, ...], int]:

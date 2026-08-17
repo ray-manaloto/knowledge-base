@@ -788,11 +788,11 @@ def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> No
     (manifest.clone_dir / ".gitignore").write_text("ignored/\n", encoding="utf-8")
     ignored = manifest.clone_dir / "ignored"
     ignored.mkdir()
-    # RENAMED from `secret.txt`, and the reason is worth keeping: graphify 0.9.44
+    # RENAMED from `secret.txt`, and the reason is worth keeping: graphify 0.9.45
     # skips a file whose NAME begins `secret.` regardless of gitignore, so the old
     # fixture tripped a secrets filter rather than the behaviour under test.
-    # Invisible before 0.9.44 — the assertion then looked at the ignored DIRECTORY,
-    # never the file — and the first reading of the new failure was "0.9.44
+    # Invisible before 0.9.45 — the assertion then looked at the ignored DIRECTORY,
+    # never the file — and the first reading of the new failure was "0.9.45
     # silently drops tracked+ignored files", which would have been a false and
     # alarming claim about the release. Isolated by holding the directory, the
     # `.gitignore` and the commit shape fixed and changing only the filename:
@@ -850,16 +850,16 @@ def test_snapshot_preserves_source_and_gitignore_semantics(tmp_path: Path) -> No
     assert (snapshot / "hidden.txt").read_text(encoding="utf-8") == "must remain\n"
     assert (snapshot / "subst.txt").read_text(encoding="utf-8") == "$Format:%H$\n"
     assert (snapshot / "tool").stat().st_mode & 0o111
-    # INVERTED at graphify 0.9.44 (#2759), and the inversion is the point. This
+    # INVERTED at graphify 0.9.45 (#2759), and the inversion is the point. This
     # fixture force-adds `ignored/design.txt`, so it is git-TRACKED while also
     # matching `.gitignore`. Up to 0.9.43 detection dropped it and this line
-    # asserted that. 0.9.44 keeps it, matching git's own behaviour of never
+    # asserted that. 0.9.45 keeps it, matching git's own behaviour of never
     # un-tracking such a file — so the corpus stops silently losing committed
     # content, which is precisely what this repo lost two `docs/superpowers`
     # documents to.
     #
     # The `ignored` bucket is NOT dead: an UNTRACKED path matching `.gitignore`
-    # still classifies as ignored, measured at 0.9.44 against a three-repo control
+    # still classifies as ignored, measured at 0.9.45 against a three-repo control
     # (tracked+ignored → retained, untracked+ignored → ignored, no-.gitignore →
     # neither). That case is armed in `graphify_baseline.certify_controls`'s
     # `untracked-ignored-path`; here we pin the tracked half.

@@ -28,9 +28,36 @@ from kb_setup import (
     cli,
     graphify_semantic_adapter,
     graphify_semantic_corpus,
+    graphify_semantic_corpus_authority,
     graphify_semantic_corpus_prototype,
     graphify_semantic_slice,
 )
+
+_UNSET_AUTHORITY_JSON = (
+    b'{"advisories_sha256":"",'
+    b'"execution_config_sha256":"",'
+    b'"exclusions_sha256":"",'
+    b'"plan_manifest_sha256":"",'
+    b'"schema_version":1}\n'
+)
+
+
+@pytest.fixture
+def unset_authority(monkeypatch) -> None:
+    """Assert the un-authorized behaviour against an explicitly un-authorized root.
+
+    These tests describe what verification says when NOBODY has signed off on a
+    plan, and they used to get that state for free because the committed
+    `AUTHORITY_JSON` was empty. It is no longer empty — and because planning is
+    deterministic, a plan rebuilt from the same pinned source is byte-identical to
+    the authorized one, so the digests match and the tests silently began
+    describing the opposite case.
+
+    Setting the precondition here rather than inheriting it is the fix: a test
+    that depends on the ambient authorization state is measuring the repository's
+    mood, not the verifier.
+    """
+    monkeypatch.setattr(graphify_semantic_corpus_authority, "AUTHORITY_JSON", _UNSET_AUTHORITY_JSON)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -104,7 +131,7 @@ def test_cli_dispatches_semantic_corpus_verifier(monkeypatch, tmp_path: Path) ->
     assert calls == [(tmp_path, ["verify", "candidate"])]
 
 
-def test_plan_artifact_verifier_rehashes_real_source_bytes(tmp_path: Path) -> None:
+def test_plan_artifact_verifier_rehashes_real_source_bytes(unset_authority, tmp_path: Path) -> None:
     source = tmp_path / "source"
     commit, tree = _source(source)
     candidate = tmp_path / "candidate"
@@ -191,7 +218,7 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.44",
+            ref="v0.9.45",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -204,11 +231,11 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
             "detector_git_object": "f76a4259f6a7360872663fbe711c4738ecda4680",
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 791 files · ~1,391,691 words. Semantic extraction will be "
+                "Large corpus: 792 files · ~1,394,475 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 791,
-            "observed_words": 1_391_691,
+            "observed_files": 792,
+            "observed_words": 1_394_475,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }
@@ -254,7 +281,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.44",
+            ref="v0.9.45",
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -263,7 +290,13 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
     advisory = json.loads(advisory_path.read_text(encoding="utf-8"))
     advisory["entries"][0]["observed_files"] += 1
     advisory["entries"][0]["message"] = advisory["entries"][0]["message"].replace(
-        "791 files", "792 files"
+        # 792 -> 793, tracking `observed_files += 1` above. These two must stay in
+        # step: the mutation is only a mutation while the written value DIFFERS
+        # from the recomputed one, so leaving "791 files" here after the corpus
+        # grew would rewrite nothing and the test would assert a mismatch it
+        # never actually created.
+        "792 files",
+        "793 files",
     )
     advisory_path.write_bytes(_canonical(advisory))
     _rehash_plan(candidate)
@@ -278,7 +311,9 @@ def test_verify_plan_requires_source_snapshot() -> None:
     assert parameter.default is inspect.Parameter.empty
 
 
-def test_public_cli_verify_recomputes_exact_pinned_snapshot(capsys, tmp_path: Path) -> None:
+def test_public_cli_verify_recomputes_exact_pinned_snapshot(
+    unset_authority, capsys, tmp_path: Path
+) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     candidate = _exact_graphify_plan(tmp_path)
 
@@ -702,6 +737,7 @@ def test_visual_exclusion_evidence_rejects_real_source_drift(
 
 
 def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation(
+    unset_authority,
     tmp_path: Path,
 ) -> None:
     """Regenerate and exercise the exact pinned #301 plan bytes."""
@@ -710,15 +746,15 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
-    assert inventory["source_ref"] == "v0.9.44"
-    assert inventory["source_commit"] == "4fca621532a23f84f69c31e397b75f8105cb5390"
-    assert inventory["source_tree"] == "faabe0fab532b763a76031acd61038a85e3bba00"
+    assert inventory["source_ref"] == "v0.9.45"
+    assert inventory["source_commit"] == "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
+    assert inventory["source_tree"] == "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
     assert inventory["detected_source_count"] == 374
     assert inventory["discovered_unit_count"] == 478
     assert inventory["admitted_unit_count"] == 474
     assert (
         inventory["source_manifest_sha256"]
-        == "f6c185795e7113ec6357898af8db5129b772399955fd4219de242808a18e9d75"
+        == "980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911"
     )
     assert len(ledger["chunks"]) == 58
     assert config["max_turns"] == 3
@@ -739,7 +775,49 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     )
 
 
-def test_consumed_authority_blocks_prototype_before_topology_creation(tmp_path: Path) -> None:
+def test_recorded_authority_authorizes_this_plan_and_only_this_plan(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Arm BOTH directions of the authorization gate on the real committed roots.
+
+    The positive half is the one that had no coverage: every existing test
+    asserted refusal, so a change that authorized everything would have passed
+    them all. The negative half deliberately corrupts ONE digest rather than
+    emptying all four, because that is the case the two reasons have to keep
+    apart — `mismatch` means the plan moved since it was reviewed, `unset` means
+    it never was, and only the first is fixed by re-authorizing.
+    """
+    candidate = _exact_graphify_plan(tmp_path)
+    source_root = candidate.parent / "exact-graphify-source"
+
+    authorized = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
+    assert authorized.execution_authorized is True
+    assert authorized.reasons == ()
+    assert authorized.state == "complete"
+
+    # The mutated prefix is READ from the constant rather than written here as a
+    # literal. The literal version named `1706edf9`, the advisories digest of the
+    # plan reviewed at 0.9.44; the 0.9.45 re-authorization replaced that digest,
+    # so `.replace` matched nothing and the corruption became a no-op — the exact
+    # shape where a negative arm keeps passing while testing nothing. Its own
+    # `mutation was inert` assertion is what caught that, and it is kept below
+    # because deriving the prefix makes inertness unreachable rather than merely
+    # unlikely, and an unreachable case still deserves the arm that says so.
+    authority = graphify_semantic_corpus_authority.AUTHORITY_JSON
+    advisories_digest = json.loads(authority)["advisories_sha256"].encode()
+    corrupted = authority.replace(advisories_digest[:8], b"0000dead")
+    assert corrupted != authority, "mutation was inert"
+    monkeypatch.setattr(graphify_semantic_corpus_authority, "AUTHORITY_JSON", corrupted)
+
+    refused = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
+    assert refused.execution_authorized is False
+    assert "plan-authority-mismatch" in refused.reasons
+    assert "plan-authority-unset" not in refused.reasons
+
+
+def test_consumed_authority_blocks_prototype_before_topology_creation(
+    unset_authority, tmp_path: Path
+) -> None:
     candidate = _exact_graphify_plan(tmp_path)
     source = candidate.parent / "exact-graphify-source"
     output = tmp_path / "cleared-prototype-output"
@@ -1435,6 +1513,47 @@ def test_corpus_refuses_provider_evidence_without_bound_parse_observation() -> N
     )
 
 
+def test_an_impossible_negative_cost_is_refused_like_an_over_budget_one(
+    tmp_path: Path,
+) -> None:
+    """The cost check bounds BOTH ends, because only one end was a real bound.
+
+    It checked `cost <= max` alone, so `total_cost_usd = -1.0` passed — an
+    impossible cost, and exactly the shape a missing-value sentinel takes, which
+    means an adapter that failed to observe the cost sailed through the check
+    that exists to observe it. The slice validator has always checked
+    `0.0 <= cost <= max`; this was the corpus copy of one rule drifting looser.
+
+    Three arms off ONE real committed fixture: negative refused, over-budget
+    refused, and the fixture's own cost accepted. The last is the control — the
+    first two would both pass against a check that refuses everything.
+    """
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "docs/agents/evidence/issue-301/corrected-max-chunk-terminal"
+    )
+    metadata = msgspec.json.decode(
+        (root / "adapter-metadata.json").read_bytes(),
+        type=graphify_semantic_adapter.AdapterMetadata,
+        strict=True,
+    )
+    config = msgspec.json.decode(
+        (_exact_graphify_plan(tmp_path) / "execution-config.json").read_bytes(),
+        type=graphify_semantic_corpus.CorpusExecutionConfig,
+        strict=True,
+    )
+    reason = "provider-adapter-cost-bound-exceeded"
+
+    negative = msgspec.structs.replace(metadata, total_cost_usd=-1.0)
+    assert reason in graphify_semantic_corpus._adapter_config_reasons(negative, config)
+
+    over = msgspec.structs.replace(metadata, total_cost_usd=config.max_cost_usd + 1.0)
+    assert reason in graphify_semantic_corpus._adapter_config_reasons(over, config)
+
+    within = msgspec.structs.replace(metadata, total_cost_usd=metadata.total_cost_usd)
+    assert reason not in graphify_semantic_corpus._adapter_config_reasons(within, config)
+
+
 def test_file_backed_authority_converges_without_changing_planner_bytes(tmp_path: Path) -> None:
     source = tmp_path / "source"
     commit, tree = _source(source)
@@ -1713,6 +1832,64 @@ def test_chunk_stage_rejects_coherently_rehashed_runtime_and_prompt_identity(
     assert "provider-graphify-runtime-mismatch" in receipt.reasons
     assert "provider-semantic-fingerprint-mismatch" in receipt.reasons
     assert "provider-prompt-bytes-mismatch" in receipt.reasons
+
+
+def test_a_bisected_chunk_is_named_partial_not_corrupt(tmp_path: Path) -> None:
+    """A prompt mismatch is always reported; the call count only EXPLAINS it.
+
+    A chunk whose prompt digest disagrees with the plan is either CORRUPT (the
+    retained bytes are not what was sent — investigate the adapter and the disk)
+    or PARTIAL (graphify bisected it into N provider calls and merged them into
+    one callback, so the adapter's single-path metadata describes only the last
+    leaf — re-plan with smaller chunks). Both used to land on
+    `provider-prompt-bytes-mismatch` alone, which asserts the first.
+
+    Both arms are the SAME forged mismatch and differ only in `attempts`, so this
+    tests the explanation rather than the mismatch.
+
+    ADDITIVE rather than a swap, and that distinction is a fix in its own right.
+    An earlier version SUBSTITUTED the multi-call reason when `attempts > 1`, and
+    a cold lane refuted it: `attempts` counts boundary markers, and that
+    directory is not chunk-scoped — a chunk whose provider call FAILS never
+    reaches the callback that clears it, so its marker lands in the next chunk's
+    count. A genuinely corrupt chunk following a failed one was renamed a bisect
+    and handed the wrong remedy. Nothing available here can tell a real bisect
+    from corruption-plus-carry-over, so the mismatch is stated unconditionally
+    and the count is offered as the additional fact it actually is.
+    """
+    repo_root = Path(__file__).parent.parent
+    candidate = _execution_plan(tmp_path, repo_root)
+    forged = "b" * 64
+
+    def stage(attempts: int, cache: str) -> graphify_semantic_corpus.ChunkStageReceipt:
+        provider_raw, metadata_raw = _real_provider_evidence(repo_root)
+        provider = json.loads(provider_raw)
+        metadata = json.loads(metadata_raw)
+        metadata["prompt_sha256"] = forged
+        provider["chunks"][0]["prompt_sha256"] = forged
+        provider["attempts"] = attempts
+        changed_metadata = _canonical(metadata)
+        provider["adapter_metadata_sha256"] = hashlib.sha256(changed_metadata).hexdigest()
+        receipt, _, _ = _stage_real(
+            candidate,
+            tmp_path / cache,
+            repo_root,
+            _StageOverrides(
+                provider_raw=_canonical(provider),
+                metadata_raw=changed_metadata,
+            ),
+        )
+        return receipt
+
+    # ADDITIVE, not a swap. The mismatch is always true and is always reported;
+    # the call count only ever ADDS an explanation for it.
+    bisected = stage(3, "bisected")
+    assert "provider-prompt-bytes-mismatch" in bisected.reasons
+    assert "provider-multi-call-evidence" in bisected.reasons
+
+    corrupt = stage(1, "corrupt")
+    assert "provider-prompt-bytes-mismatch" in corrupt.reasons
+    assert "provider-multi-call-evidence" not in corrupt.reasons
 
 
 def test_stage_distinguishes_config_cache_namespace_from_fresh_run_namespace(
@@ -2055,7 +2232,7 @@ def test_execution_namespace_contract_accepts_fresh_variance_and_rejects_reuse(
         binding.cache_namespace_sha256,
         "a" * 64,
         "b" * 64,
-        (12, 11, 2),
+        (13, 8, 1),
     )
     cold = _execution_evidence(candidate, common)
     variance = _execution_evidence(
@@ -2127,7 +2304,7 @@ def test_semantic_graph_is_rebuilt_from_retained_real_fragment_bytes(tmp_path: P
 
     assert reasons == []
     assert rebuilt is not None
-    assert graphify_semantic_corpus._graph_counts(rebuilt) == (12, 11, 2)
+    assert graphify_semantic_corpus._graph_counts(rebuilt) == (13, 8, 1)
     assert (
         graphify_semantic_corpus._semantic_graph_integrity_reasons(
             rebuilt, {"docs/how-it-works.md"}

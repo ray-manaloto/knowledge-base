@@ -1,0 +1,84 @@
+# Mutation arms for the adapter refusal helpers extracted on PR #331.
+#
+# WHY THIS SPEC EXISTS. The extraction of `_completion_reasons` and
+# `_report_rejection` out of `adapter_main` was made to answer a third-party
+# health check, and a refactor made for a metric is exactly the change most
+# likely to be waved through: it "changes nothing", so nobody arms it. These
+# arms establish that the two helpers are load-bearing — that breaking either
+# turns the suite red naming the right test.
+#
+# The secondary gain is the one worth stating. Before the extraction NO test
+# reached the adapter's refusal path at all: `truncation_retry_hint` was armed
+# as a decision while its only consumer sat inline in `adapter_main`, which no
+# test invokes. Deleting the call left the suite green. Two arms below are
+# precisely that deletion, and they now fail.
+#
+# THE SUITE LIST EXCLUDES `tests/test_graphify_semantic_corpus.py` for the
+# reason the sibling spec records: `adapter_sha256` is a digest of the file
+# every arm here mutates, and it lives inside `execution-config.json`, which
+# `AUTHORITY_JSON` is a digest of. Any byte change — the control's inert comment
+# included — fails
+# `test_recorded_authority_authorizes_this_plan_and_only_this_plan`. Naming that
+# file would break the CONTROL rather than add a row.
+#
+# WHAT A CLEAN SWEEP HERE DOES NOT MEAN. It says nothing about whether
+# `adapter_main` still composes the two helpers correctly — no test invokes
+# `adapter_main`, so that composition remains unarmed and is recorded as
+# unarmed. It is the same gap as #332, one layer up.
+
+suites = ["tests/test_graphify_semantic_slice.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    reasons = list(result_envelope_reasons(envelope, environment))"
+new = "    reasons = list(result_envelope_reasons(envelope, environment))  # inert control edit"
+
+# --------------------------------------------------------------------------
+# `_report_rejection` — the wiring that had no test until it was extracted
+# --------------------------------------------------------------------------
+
+# The realistic break, and the historical one: delete the CALL, not the
+# definition. `truncation_retry_hint` stays exactly as armed by its own test;
+# graphify simply never receives the hint and drops truncated chunks instead of
+# bisecting them. Before the extraction this mutation was invisible to the suite.
+[[arm]]
+id = "rejection-never-consults-the-hint"
+test = "test_the_adapter_wires_the_hint_into_the_refusal_it_actually_prints"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    hint = graphify_semantic_slice.truncation_retry_hint(reasons)\n    if hint:\n        print(hint, file=sys.stderr)\n    return 1"
+new = "    return 1"
+
+# The opposite error and the more expensive one, per the sibling spec: hint on
+# every refusal, so graphify bisects chunks whose halves fail identically.
+[[arm]]
+id = "rejection-hints-every-refusal"
+test = "test_the_adapter_wires_the_hint_into_the_refusal_it_actually_prints"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    hint = graphify_semantic_slice.truncation_retry_hint(reasons)\n    if hint:\n        print(hint, file=sys.stderr)"
+new = "    print(graphify_semantic_slice.TRUNCATION_RETRY_HINT, file=sys.stderr)"
+
+# --------------------------------------------------------------------------
+# `_completion_reasons` — the process-level half of the refusal policy
+# --------------------------------------------------------------------------
+
+# A non-zero exit stops counting as a refusal. This is the tidy-up that reads as
+# redundant — "the envelope checks already caught it" — which is the reasoning
+# that left the original verifier uncalled.
+[[arm]]
+id = "a-nonzero-exit-stops-being-a-refusal"
+test = "test_process_level_refusals_join_the_envelope_reasons_in_first_seen_order"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    if completed.returncode != 0:\n        reasons.append(\"claude-returncode-nonzero\")"
+new = "    if False:\n        reasons.append(\"claude-returncode-nonzero\")"
+
+# The control direction of the same policy: refuse on stderr unconditionally, so
+# every clean call is rejected. Armed because a collector that says no to
+# everything would pass the first assertion of that test on its own.
+[[arm]]
+id = "every-call-refused-on-stderr"
+test = "test_process_level_refusals_join_the_envelope_reasons_in_first_seen_order"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    if completed.stderr:\n        reasons.append(\"claude-stderr-present\")"
+new = "    reasons.append(\"claude-stderr-present\")"
