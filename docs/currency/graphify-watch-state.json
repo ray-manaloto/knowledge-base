@@ -41,6 +41,12 @@
     "title": "build_from_json reads only the top-level hyperedges key, so label/cluster-only silently deletes a merged graph's hyperedges \u2014 and a revalidation wipeout is written back as a durable []",
     "updated_at": "2026-08-05T21:19:10Z"
   },
+  "issue:2551": {
+    "comments": 1,
+    "state": "closed",
+    "title": "Kotlin: bundled grammar rejects one-line type bodies (class C { val v = 1 }) \u2014 21/541 files partially extracted, exit 0, no warning",
+    "updated_at": "2026-08-08T22:44:13Z"
+  },
   "local:data-only-json-produces-zero-nodes": {
     "comments": 0,
     "state": "local",

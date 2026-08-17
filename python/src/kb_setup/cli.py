@@ -65,6 +65,7 @@ def _run(argv: list[str] | None = None) -> int:
             "arms <spec.toml> [--dry-run] | "
             "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
             "graph-counts [--by-source] [name...] | "
+            "model-limits [--write] [--observed-at DATE] [model...] | "
             "md-budget | skill-lint | "
             "skill-score [--write] [skill...] | skill-refresh | "
             "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
@@ -147,7 +148,7 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import skillopt_reviewed
 
         return skillopt_reviewed.reviewed_main(repo_root, rest)
-    if cmd in {"source-groups-check", "artifact-download"}:
+    if cmd in {"source-groups-check", "artifact-download", "model-limits"}:
         return _dispatch_registry(repo_root, cmd, rest)
     if cmd == "ecosystem-discovery-plan":
         from kb_setup import ecosystem_discovery
@@ -238,11 +239,23 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
 
 def _dispatch_registry(repo_root: Path, cmd: str, rest: list[str]) -> int:
-    """Run one typed registry or immutable artifact boundary."""
+    """Run one typed registry or immutable artifact boundary.
+
+    `model-limits` belongs here rather than with the advisory analysers: it is a
+    typed registry of an EXTERNAL fact (a model's output ceiling) with a
+    committed snapshot as its record, and it fails closed rather than reporting
+    an empty result as clean.
+    """
     if cmd == "source-groups-check":
         from kb_setup import source_groups
 
         return source_groups.check_main(repo_root, rest)
+    if cmd == "model-limits":
+        import os
+
+        from kb_setup import model_limits
+
+        return model_limits.main(repo_root, rest, os.environ)
     from kb_setup import artifact_download
 
     return artifact_download.main(repo_root, rest)

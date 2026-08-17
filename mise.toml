@@ -332,6 +332,17 @@ description = "Check every SKILL.md instructs mise tasks, not raw commands (#128
 # for working on a skill without running the whole suite.
 run = "uv run kb-setup skill-lint"
 
+[tasks.kb-model-limits]
+description = "Resolve Claude models' max output tokens (+ --write --observed-at DATE)"
+# A literal `max_output_tokens = "8192"` in CORPUS_PROFILE truncated every corpus
+# extraction against a measured 31,887-token need — the API said so in its own
+# words. Opus 5's real ceiling is 128,000, and no literal can follow a model
+# change. Resolution order is Models API -> docs `.md` -> committed snapshot,
+# then it RAISES: a hardcoded default here would be the defect it exists to
+# remove. `--write` re-baselines `docs/model-limits/snapshot.json` and prints the
+# delta, on `kb-skill-score`'s precedent — a record nobody diffs ages silently.
+run = "uv run kb-setup model-limits {{arg(name='args', var=true, default='')}}"
+
 [tasks.kb-graph-counts]
 description = "Print graph.json's node/link/hyperedge counts (+ --by-source)"
 # The seam `kb_setup.graph_counts` never had. It had callers and a ledger but no
