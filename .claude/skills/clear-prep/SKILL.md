@@ -46,6 +46,15 @@ Then ask the losing-nothing question directly: *if I `/clear` right now and the
 next session has only auto-memory + the handoff + the persisted reports, can it
 continue with no gaps?* If the answer is no, fix that before step 7.
 
+**Read the newest `docs/direction/*-ray-directives.md` before you frame that
+question.** It holds Ray's directives VERBATIM and is the standing brief the
+round is measured against, so a "next task" chosen without it can be locally
+sensible and off the brief. Until 2026-08-17 **nothing read this directory** —
+the only tracked references to it were two lines in `hk.pkl` about a formatter
+exclusion — so a directive could be filed carefully and never consulted again,
+which is the failure this step now closes. `docs/goals/` has both a Layout row
+and a reader; this now has both too.
+
 ## 1. Snapshot the working state
 
 Gather, don't recall — **one task, not four commands** (#144):

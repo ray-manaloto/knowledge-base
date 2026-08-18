@@ -6,8 +6,8 @@ every other graphify feature. Built on
 [graphify](https://github.com/Graphify-Labs/graphify) (local, deterministic AST
 parsing; every edge tagged EXTRACTED/INFERRED; no vector store).
 
-Claude-only by design — one self-contained `CLAUDE.md`, no `AGENTS.md` stub.
-`.claude/CLAUDE.md` holds graphify's skill pointer (auto-loaded).
+`AGENTS.md` DOES exist (tracked, 51 lines, codex's minimum) — a sibling, not an
+`@import` stub, so no budget counts it. `.claude/CLAUDE.md` is auto-loaded.
 
 ## Invariants (do NOT violate)
 
@@ -170,7 +170,7 @@ mise run kb-currency          # the full loop; writes docs/currency/
 | `python/` | `kb_setup` (build/update/artifacts/manifest/chunks/env — thin helpers, zero-bash-logic) + `kb_setup.currency`, the tool-currency engine dotfiles also depends on. |
 | `currency.toml` | Per-tool currency config (`[tool.<name>]`): pin, extras, source manifest, build stamp, tracked issues. |
 | `docs/currency/` | Committed run log: `README.md` (one row per run) + `runs/<date>-<tool>.md` (detail, only when a run found something). |
-| `docs/goals/` | Committed goal+rider PAIRS — one round of agent work each. `*-goal.md` is the ≤4,000-char `/goal` payload (its bytes ARE the artifact, so it is excluded from hk's md builtins); `*-rider.md` is the unbounded detail. Audit with `kb-goal-check`; record how a round went with `kb-goal-outcome`. |
+| `docs/goals/` · `docs/direction/` | **goals**: committed goal+rider PAIRS, one round each — `*-goal.md` is the ≤4,000-char `/goal` payload (its bytes ARE the artifact, so it is excluded from hk's md builtins), `*-rider.md` the unbounded detail; audit with `kb-goal-check`, record the outcome with `kb-goal-outcome`. **direction**: Ray's directives VERBATIM, the standing brief every round is measured against — `clear-prep` reads the newest one, and until 2026-08-17 nothing did, so a directive could be filed and never consulted. |
 | `.claude/workflows/` | Saved Claude workflows the skills compose — `kb-extract.js` (host-agent extraction fan-out). |
 | `tests/` | Pytest (`uv run pytest tests/`); config in the root `pyproject.toml`. |
 | `mise.toml` | Tool pins + tasks: `kb-build`/`kb-prose`/`kb-update`/`kb-query`/`kb-serve`/`kb-add`/`kb-manifest-add`/`kb-assemble`/`kb-validate-chunks`/`kb-artifacts`/`kb-ensure-deps`/`kb-handoff-check`/`kb-gates`/`kb-session-state`/`kb-goal-check`/`kb-goal-outcome`/`kb-review-receipt`/`kb-skill-score`/`kb-skill-lint`/`kb-distill`/`kb-arms` (mutation arms from a TOML spec — never hand-write the harness, #160)/`kb-affected`/`kb-insights`/`kb-check` (the DEV LOOP: ruff+format+ty+those paths' own tests over named paths, real exit codes — `check` is whole-repo and `kb-gates` is the ship gates, so nothing answered "are these two files clean?" and it got answered 35 times in one session by a pipe that discards the rc). |

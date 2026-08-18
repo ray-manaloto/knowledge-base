@@ -178,7 +178,37 @@ exclude = baseExclude
 // Findings 1 and 3 are the cold lane's, rounds 1 and 2.
 local proseExclude = baseExclude
   + List("graphify-out/memory/**", "docs/research/**", "docs/goals/*-goal.md", "docs/direction/**",
+      "sources/**",
       "**/graphify-out/.*.tmp")
+// `sources/**` — approved by Ray, 2026-08-17, over the narrower
+// `sources/extractions/**`. FORMATTERS AND typos ONLY, per the asymmetry above:
+// gitleaks, `detect_private_key` and the structural checks still read every one
+// of these files, which is what keeps an exclusion this wide tolerable.
+//
+// The measurement that prompted it: `typos` reports 618 errors across 8
+// committed extraction chunks, and every one is a node-ID fragment rather than
+// prose — one three-letter source prefix accounts for 430 of them on its own,
+// and four fragments cover 607. THE TOKENS ARE NOT NAMED HERE, and that is not
+// coyness: `hk.pkl` is not on this list, so writing them re-breaks this very
+// step. The warning above says so, and this comment's first draft did it anyway
+// — measured, twice now. Read the offenders from `typos sources/` instead.
+// Editing them is not available: `sources/**`
+// records what a source said at ingestion time, and
+// `agent-artifact-conventions.md` forbids rewriting corpus content to satisfy a
+// linter, because the provenance a manifest guarantees is the thing being
+// falsified.
+//
+// WIDER THAN THE FAILURE, deliberately. `sources/extractions/**` would have
+// cleared today's red and left the next source type to rediscover it: a chunk is
+// generated, a vendored transcript is someone else's words, and a manifest is a
+// pinned fact — none of the three is ours to correct. The cost is real and worth
+// stating rather than discovering: `sources/media/` transcripts ARE prose a
+// spell-checker could legitimately help with, and they are no longer checked.
+//
+// The alternative — teaching `typos` that those four fragments are words — was
+// rejected as recurring by construction: it is a repo-wide vocabulary change
+// made to satisfy one generated file, and the next extraction round invents new
+// identifiers.
 
 // Toolset — most efficient/optimized tool per job; rust-native preferred, Go/others
 // fine when they're the best option (Ray, 2026-07-22):

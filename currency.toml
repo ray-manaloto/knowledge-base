@@ -806,7 +806,33 @@ setting, and task/lockfile/python fixes."""
 # `expected` (self-managed, like mise) rather than `mise_key`: pinning the
 # harness that runs the session is not a thing this repo can or should do. Bump
 # it after reviewing the release notes — that act IS the gap analysis.
-expected = "2.1.226"
+# 2.1.226 -> 2.1.234, reviewed 2026-08-17 (Ray asked for the review after
+# restarting the terminal onto the new build). Eight releases; five items touch
+# this repo, and one of them is the reason this bump is not merely bookkeeping:
+#
+# * **Todo tools are gone on Opus 4.8 / Sonnet 5 / Fable 5 / Mythos 5** (2.1.233),
+#   restorable with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`. Opus 5 is NOT in that list,
+#   so nothing here changes today — recorded because the next model bump could
+#   make it bite silently.
+# * **Subagent forking is on by default** and non-teammate spawns run in the
+#   background (2.1.232) — the `kb-extract` fan-out and the `kb-review` lanes both
+#   spawn agents.
+# * **`CLAUDE_CODE_PROJECT_DIR_NAME`** (2.1.234) lets a host rename the
+#   per-project transcript directory — the exact path `kb_setup.distill` and the
+#   session-review workflow read. Unset here; it would break them if it were set.
+# * **`/goal` hardening** (2.1.234): it clears itself when a turn dies
+#   unrecoverably, and checks in on background tasks after 30 min
+#   (`CLAUDE_CODE_GOAL_CHECKIN_MINUTES=0` opts out). `docs/goals/` and the
+#   `goal-engineering` skill rest on this page.
+# * The built-in `claude-api` skill dropped ~200k -> ~25k tokens of context.
+#
+# THE CLI CONTRACT DID NOT MOVE, and that was measured rather than assumed:
+# `claude --help` hashes to 71ad650f… at 2.1.234, byte-identical to the value
+# 2.1.233 recorded. That is what makes `graphify_semantic_slice`'s
+# `_ACCEPTED_CLAUDE_VERSION` advance a mechanical bump instead of a new review —
+# every flag the semantic path requires is spelled the same and only the
+# implementation changed.
+expected = "2.1.234"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted

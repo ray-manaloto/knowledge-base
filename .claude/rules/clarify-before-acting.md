@@ -33,6 +33,12 @@ ask; this governs **how**, and it admits no exceptions:
   `SendUserMessage` does **not** count.
 - `SendUserMessage` may carry the findings and context around a question. The
   question itself lives in the tool, never only in the prose.
+- **In PLAN MODE, render the options** — pros and cons per option, multi-select
+  where the choices are not mutually exclusive, and always leave the free-text
+  escape. Ray has stated this **twice**, which is why it is recorded rather than
+  remembered: a plan presented as prose asks the reader to reconstruct the
+  alternatives before they can choose between them, and the answer that comes
+  back is then about the summary rather than about the options.
 - Bundle related questions into ONE call (it takes up to four) rather than
   several round trips.
 
