@@ -191,7 +191,13 @@ def _command_word(tokens: list[str]) -> list[str]:
             # `env -- ruff check .` — the separator ends the wrapper's own
             # options; what follows is the command. Checked BEFORE the flag
             # branch below, because `_consume_flags` cannot consume it.
+            #
+            # BREAK rather than continue: `--` means everything after it is the
+            # command, so a command that itself starts with `-` must not be
+            # mistaken for another wrapper option. Looping on kept `saw_a_prefix`
+            # true and would have eaten it. (Cold lane NIT, review-2b7bd6ca.)
             words.pop(0)
+            break
         elif saw_a_prefix and words[0].startswith("-"):
             # `env -i ruff check .` — the wrapper's own options.
             words = _consume_flags(words)

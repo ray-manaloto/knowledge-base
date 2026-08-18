@@ -367,12 +367,19 @@ const lanes = sweeps.filter(Boolean)
 //   * `(l.coverage?.never_reached || '')` turned a MISSING coverage object into
 //     the empty string, i.e. into "clean" — the default pointing the wrong way
 //     on the one lane that told you least.
-const SAYS_NOTHING = new Set(['', 'none', 'n/a', 'nothing'])
+// An EXPLICIT "nothing was left unreached". Note what is no longer in this set:
+// the empty string. `''` is not a lane saying "none", it is a lane saying
+// nothing at all — and treating silence as an all-clear is the same default,
+// pointing the same wrong way, that this file already fixed once for a missing
+// coverage OBJECT. Fixing it there and leaving it here made the guarantee depend
+// on whether a lane omitted the field or emitted it blank.
+// (Cold lane, P2, review-2b7bd6ca-cold.md.)
+const SAYS_NOTHING = new Set(['none', 'n/a', 'nothing'])
 const stated = (value) => (typeof value === 'string' ? value.trim() : '')
 const isPartial = (lane) => {
   if (!lane.coverage) return true // said nothing at all — never clean
   return [lane.coverage.never_reached, lane.coverage.opened_not_finished].some(
-    (field) => stated(field) && !SAYS_NOTHING.has(stated(field).toLowerCase()),
+    (field) => !SAYS_NOTHING.has(stated(field).toLowerCase()),
   )
 }
 
@@ -431,6 +438,11 @@ if (notTriaged.length) {
   log(`${notTriaged.length} of ${live.length} live findings were NOT cross-checked (cap ${MAX_REFUTERS})`)
 }
 
+// Identical for every refuter in a run, so it sits in the shared prefix rather
+// than varying per agent. Claims only — the evidence would multiply the payload
+// by the very factor the lean contract just removed.
+const otherClaims = live.map((f, i) => `  ${i + 1}. [${f.lane}] ${f.claim}`).join('\n')
+
 const verdicts = await parallel(
   behavioural.map((f) => () =>
     agent(
@@ -442,10 +454,15 @@ Default to refuted=true if you cannot confirm it. Check specifically whether the
 original probe could only have produced the answer it gave — a bound, a token
 spelling, a redirect, a parse error read as a "no".
 
-Also say whether any OTHER finding in the set contradicts it; two probes of one
-fact disagreeing is a finding in its own right, and the defect is usually in a probe.
+Say whether any OTHER finding below contradicts this one; two probes of one fact
+disagreeing is a finding in its own right, and the defect is usually in a probe.
 
-FINDING (lane ${f.lane}): ${f.claim}
+EVERY OTHER LIVE FINDING THIS ROUND, claim only — this is the "set" above, and it
+is listed because instructing you to compare against a set you were never given
+is an instruction that cannot be followed:
+${otherClaims}
+
+THE FINDING YOU ARE JUDGING (lane ${f.lane}): ${f.claim}
 EVIDENCE OFFERED: ${f.evidence}`,
       {
         label: `refute:${f.lane}`,
@@ -458,10 +475,26 @@ EVIDENCE OFFERED: ${f.evidence}`,
         schema: {
           type: 'object',
           additionalProperties: false,
-          required: ['refuted', 'why'],
+          // `probe` and `control_arm` are here because `additionalProperties:
+          // false` with only {refuted, why, contradicts} STRIPPED them —
+          // `kb-adversarial-verifier`'s whole method is "restate the claim as a
+          // probe that could return either answer, run the control arm first",
+          // and the schema was discarding exactly that evidence on the way out.
+          //
+          // It matters beyond tidiness: one run refuted 13 of 14 findings, and
+          // with no probe recorded there is no way to tell a claim that was
+          // FALSE from one that was merely hard to re-derive — which is issue
+          // #343's open question, unanswerable because of this schema.
+          // (Cold lane, P2, review-2b7bd6ca-cold.md.)
+          required: ['refuted', 'why', 'probe'],
           properties: {
             refuted: { type: 'boolean' },
             why: { type: 'string' },
+            probe: { type: 'string', description: 'the exact command or read that settled it' },
+            control_arm: {
+              type: 'string',
+              description: 'the probe proving the check could have returned the other answer',
+            },
             contradicts: { type: 'string' },
           },
         },
@@ -470,7 +503,23 @@ EVIDENCE OFFERED: ${f.evidence}`,
   ),
 )
 
-const checked = verdicts.filter(Boolean)
+// A thunk that THREW — as opposed to an agent that returned null — makes
+// `parallel()` substitute a bare `null` for that slot. `filter(Boolean)` then
+// dropped it, and the finding vanished from `confirmed`, `refuted` AND
+// `unverified` alike: silent loss past the gate, which is this repo's signature
+// defect class and the exact thing the comment below congratulates itself on
+// having fixed. It fixed the null-VERDICT case and left the null-ENTRY case open.
+//
+// Re-derive from the index, exactly as `kb-tool-review.js:160-172` already does
+// for its own fan-out — the pattern existed in the sibling workflow and not here.
+//
+// Counted UNVERIFIED, not refuted. That differs from the sibling deliberately:
+// it has no unverified bucket, so refuted is its safe default, while here
+// "nobody returned an answer" has its own state and using it is the honest read.
+// (Cold lane, P1, review-2b7bd6ca-cold.md.)
+const threw = verdicts.reduce((n, v) => n + (v ? 0 : 1), 0)
+if (threw) log(`WARNING: ${threw} cross-check thunk(s) threw — counted as UNVERIFIED, not dropped`)
+const checked = verdicts.map((v, i) => v ?? { finding: behavioural[i], verdict: null })
 const confirmed = checked.filter((c) => c.verdict && !c.verdict.refuted).map((c) => c.finding)
 const refuted = checked.filter((c) => c.verdict && c.verdict.refuted)
 // A cross-check agent that DIED returns a null verdict, which satisfies neither
