@@ -52,7 +52,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from kb_setup import citations, gates, resolve, review
+from kb_setup import citations, gates, handoff_reconcile, resolve, review
 from kb_setup.result import Err, Ok, Rc, Result, exit_code
 
 #: The checks a `` `path` (absent) `` marker can be written on. A gate claim
@@ -801,7 +801,15 @@ def check_handoff(args: list[str], repo_root: Path) -> Result[Checked]:
             return Err("no handoff found under .agent/plans/ — pass a path explicitly")
         target = found
 
-    findings = check(repo_root, target.read_text(encoding="utf-8", errors="replace"))
+    text = target.read_text(encoding="utf-8", errors="replace")
+    findings = check(repo_root, text)
+    # Reconciliation is done HERE and not inside `check`, and the split is the
+    # contract rather than convenience: `check` grades a document against the
+    # repo and takes only `text`, while this needs to know WHICH handoff it is
+    # looking at in order to find the one before it. Folding it into `check`
+    # would mean either passing a path into a text-only function or guessing the
+    # predecessor from content. (#344's second half.)
+    findings.extend(_reconcile_findings(repo_root, target, text))
     try:
         shown = str(target.relative_to(repo_root))
     except ValueError:
@@ -811,6 +819,59 @@ def check_handoff(args: list[str], repo_root: Path) -> Result[Checked]:
         Checked(tuple(findings), shown),
         rc=Rc.FINDINGS if failed else Rc.OK,
     )
+
+
+def _reconcile_findings(repo_root: Path, target: Path, text: str) -> list[Finding]:
+    """What ``target`` dropped from the handoff before it, as Findings (#344).
+
+    A dropped COMMITMENT is a FAIL — the gate doing its job, exit 1. A dropped
+    GOTCHA is AMBIGUOUS, reported at exit 0, because matching a standing trap is
+    inherently looser than matching a commitment. Having no earlier handoff is
+    UNVERIFIABLE, never OK: the first handoff in a fresh clone has nothing to
+    reconcile against, and a check that never asked the question has not
+    answered it (#147's distinction, applied to a new check).
+    """
+    done = handoff_reconcile.reconcile(repo_root, target, text)
+    previous = done.previous
+    if previous is None or not done.checked:
+        # Two ways to have asked nothing, kept apart in the DETAIL and together
+        # in the VERDICT. Both are UNVERIFIABLE rather than OK, because "no
+        # earlier handoff" and "an earlier handoff that named nothing checkable"
+        # are each a check that found no question — and rendering either as a
+        # pass is how a green gate comes to mean nothing.
+        why = (
+            "no earlier handoff under .agent/plans/ to reconcile against"
+            if previous is None
+            else f"{previous.name} names no checkable commitment — nothing to reconcile"
+        )
+        return [
+            Finding(
+                check="reconcile",
+                verdict=Verdict.UNVERIFIABLE,
+                claim="the previous handoff's backlog",
+                line=1,
+                detail=why,
+            )
+        ]
+    return [
+        Finding(
+            check="reconcile",
+            verdict=(
+                Verdict.FAIL
+                if handoff_reconcile.is_commitment(d.commitment.heading)
+                else Verdict.AMBIGUOUS
+            ),
+            claim=", ".join(d.commitment.tokens),
+            line=d.commitment.line,
+            detail=(
+                f"{previous.name} owed this under '{d.commitment.heading}' and this "
+                f"handoff never names it. Say CARRIED, DONE (with the commit or issue), "
+                f"or DROPPED (with the reason) — naming it is what clears this. "
+                f"Was: {d.commitment.context}"
+            ),
+        )
+        for d in done.dropped
+    ]
 
 
 def main(args: list[str], repo_root: Path) -> int:
