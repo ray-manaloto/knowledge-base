@@ -37,22 +37,42 @@
 // carry-the-condition failure and this file's own lesson L8: a confident false
 // comment is what stops the next reader checking.
 //
-// THE REAL REASON, which survives the refutation and is narrower. An SDK fan-out
-// is a SECOND, SEPARATELY AUTHENTICATED CLIENT. Anthropic's own docs forbid it
-// reusing this session's login — "Anthropic does not allow third party developers
-// to offer claude.ai login or rate limits for their products, including agents
-// built on the Claude Agent SDK. Use the API key authentication methods…"
-// (`agent-sdk__overview.md:41-44`), and the SDK hard-requires `ANTHROPIC_API_KEY`
-// (`agent-sdk__quickstart.md:100-106`). So it would run on per-token metered
-// billing ALONGSIDE the subscription this session already pays, with no shared
-// prompt cache, no shared session budget and no shared permission mode. The
-// in-session fan-out gets all four free.
+// THE REASON THAT REPLACED IT WAS ALSO WRONG, and the second correction is worth
+// more than the first. This comment then said an SDK fan-out must be a separately
+// BILLED client — that Anthropic's ToS forbade reusing this session's login and
+// the SDK hard-required `ANTHROPIC_API_KEY`. Ray challenged that too, naming
+// `claude setup-token`, and he was right on both halves:
 //
-// It is also not installed and would not be cheap to install: `claude_agent_sdk`
-// is absent from `pyproject.toml` and `uv.lock` (0 hits; control-armed — the same
-// grep for `anthropic` hits `pyproject.toml:31`, so it discriminates), and
-// adopting it means provisioning exactly the class of secret `graphify_env.clean_env()`
-// and `do-not.md` rule 4 exist to keep out of this repo's subprocesses.
+//   * `CLAUDE_CODE_OAUTH_TOKEN` authenticates against the SUBSCRIPTION, not an
+//     API key — `env-vars.md:296` calls it "Alternative to /login for SDK and
+//     automated environments", naming the SDK, and `authentication.md:188-197`
+//     says the token "authenticates with your Claude subscription".
+//   * The ToS line quoted here covered third-party developers offering claude.ai
+//     login "for their products" — reselling subscription access to OTHER end
+//     users. It never covered the token owner running their own automation, and
+//     the docs affirmatively recommend that case for CI and scripts.
+//
+// So there is no billing wall. Twice now this comment has justified the right
+// decision with a fact that was not true, which is `a-correction-repeats-the-
+// error-it-corrects` exactly: the replacement sentence was written with the same
+// confidence and the same lack of a probe as the sentence it replaced.
+//
+// WHAT ACTUALLY REMAINS, and it is a TRADE-OFF for Ray to weigh rather than a
+// blocked path — say so plainly rather than dressing it up as a constraint:
+//
+//   * No shared prompt cache. A separate subprocess is a separate conversation
+//     and the cache is prefix-keyed, so nothing matches.
+//   * The budget is SHARED AND CONTENDED, not separate — same account, same
+//     subscription ceiling. That is worse for a concurrent fan-out than separate
+//     billing would have been, not better. (Inferred from the auth mechanism; no
+//     verbatim corpus line on the reset-window mechanics was found.)
+//   * No permission-mode inheritance — `ClaudeAgentOptions.permission_mode` is
+//     set fresh per `query()`.
+//   * `claude_agent_sdk` is not a dependency here (0 hits in `pyproject.toml`
+//     and `uv.lock`; control-armed — the same grep for `anthropic` hits
+//     `pyproject.toml:31`), so this is a new dependency and a new
+//     process-management surface for something the in-session `Agent` tool
+//     already provides.
 //
 // Same reason `kb-extract` is a workflow. `kb-session-reflect` (the task) counts
 // what a transcript DID; this counts what the round should have done and did not,
