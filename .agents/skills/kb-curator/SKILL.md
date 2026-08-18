@@ -90,6 +90,30 @@ union-merged. **Cross-project dedup is disabled by design** — a `main` in repo
 is not repo B's — so merges never dedup across repos (`merge-graphs` for code;
 `dedup=False` for the doc path). Do not fight this; it is correct.
 
+## The graph has a CEILING, and this skill is what walks it toward one
+
+Every ingestion makes `graph.json` bigger and nothing here makes it smaller.
+Above the cap, **graphify refuses to read the file** — the corpus stops being
+queryable for every consumer, not just for you.
+
+Run **`mise run graph-size`** before starting a large ingestion, and read the
+headroom rather than the verdict:
+
+- Whose number is whose — **512 MiB is graphify's** stock cap; **1 GiB is ours**,
+  raised via `GRAPHIFY_MAX_GRAPH_BYTES` in `mise.toml`, which says outright that
+  the raise is a **ratchet, not a fix**; the **80% warning line is ours** and is
+  the only chosen number.
+- **Do not raise the cap again to make room for a source.** That is the ratchet.
+  The written exits are **#130** (federate across per-source graphs) and **#120**
+  (the duplicated `repo::` prefix inflating the aggregate) — both still open.
+- The gate is on the ship path (`kb-gates`), so an ingestion that crosses the
+  ceiling blocks its own PR. Finding that out at `kb-ship` is late; the point of
+  checking first is that a **T2 code-AST pin or a deferred T3 registration** is a
+  decision you can still make cheaply.
+
+`mise run kb-insights` prints the same size among its other figures. It is a
+report; `graph-size` is the gate. Reading the report is not checking.
+
 ## Pick the ingestion path by source type
 
 | Source | Path | Cost |

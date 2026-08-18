@@ -123,7 +123,12 @@ SHA_ABBREV = 12
 #: Carried across the move verbatim rather than condensed. The first draft of the
 #: move dropped the `--live`/`--slow` sentences, which is how a comment that took
 #: two review rounds to get right decays into a summary of itself.
-GATE_TASKS = ("lint", "test", "brain-audit", "eval")
+#: `graph-size` joined 2026-08-17 on Ray's ruling. It is the cheapest gate here by
+#: an order of magnitude — one `stat` against a ceiling graphify resolves — and it
+#: is the only one that can fail for a reason no code change causes: the corpus
+#: grew. That is exactly why it belongs on the ship path rather than in a report,
+#: which is where the same number sat while the graph reached ~72% of its cap.
+GATE_TASKS = ("lint", "test", "brain-audit", "eval", "graph-size")
 
 #: Gates that may run CONCURRENTLY with each other. Everything not named here
 #: runs EXCLUSIVE — alone, with nothing else in flight — and that default is the
@@ -164,7 +169,14 @@ GATE_TASKS = ("lint", "test", "brain-audit", "eval")
 #: Raising the 60s bound was rejected: it trades a visible intermittent failure
 #: for a slower one, and the number would need re-guessing every time the graph
 #: grows. Running the gate alone needs no number.
-CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit"})
+#:
+#: `graph-size` is admitted on BOTH questions this set now requires. What it
+#: writes: nothing — it `stat`s one file and prints. Whether it carries a
+#: wall-clock bound it can miss under load: it has none, which is the property
+#: `eval` lacked. It deliberately does not READ `graph.json`; a gate that had to
+#: stream ~771 MB to report its size would be the slowest thing here instead of
+#: the fastest.
+CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "graph-size"})
 
 
 @dataclass(frozen=True)

@@ -46,6 +46,15 @@ Then ask the losing-nothing question directly: *if I `/clear` right now and the
 next session has only auto-memory + the handoff + the persisted reports, can it
 continue with no gaps?* If the answer is no, fix that before step 7.
 
+**Read the newest `docs/direction/*-ray-directives.md` before you frame that
+question.** It holds Ray's directives VERBATIM and is the standing brief the
+round is measured against, so a "next task" chosen without it can be locally
+sensible and off the brief. Until 2026-08-17 **nothing read this directory** —
+the only tracked references to it were two lines in `hk.pkl` about a formatter
+exclusion — so a directive could be filed carefully and never consulted again,
+which is the failure this step now closes. `docs/goals/` has both a Layout row
+and a reader; this now has both too.
+
 ## 1. Snapshot the working state
 
 Gather, don't recall — **one task, not four commands** (#144):
@@ -168,7 +177,7 @@ the rule for which of those three layers a lead actually earns.
 For everything this session changed (uncommitted **and** commits not yet
 reflected in docs):
 
-1. **Root `AGENTS.md`** for cross-cutting changes — new tasks, changed
+1. **Root `CLAUDE.md`** for cross-cutting changes — new tasks, changed
    invariants, a new derived artifact. It sits near its 200-line budget, so any
    addition needs an offsetting trim; prefer collapsing duplication into a
    pointer over deleting a load-bearing fact.
@@ -280,7 +289,7 @@ nothing behind it once the session ends.
 Then the conditional rows, by hand:
 
 ```bash
-mise run lint-docs                  # AGENTS.md / .claude/** touched
+mise run lint-docs                  # CLAUDE.md / .claude/** touched
 mise run kb-skill-score             # .claude/skills/** touched (advisory)
 mise run kb-currency-check          # mise.toml pins touched
 mise run kb-build                   # sources/** touched — reproduce from committed inputs

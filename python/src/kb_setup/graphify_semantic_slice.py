@@ -346,16 +346,47 @@ _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
     wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
     sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
 )
-# 2.1.232 -> 2.1.233 (Claude Code self-updates; the currency engine flags it).
-# The BINARY digest moved and the `--help` digest did NOT: 71ad650f… is the same
-# value 2.1.232 recorded. That is the substantive review for this dependency —
-# every flag the semantic path requires is spelled identically, so the CLI
-# contract this module pins is unchanged and only the implementation moved.
+# The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
+# authority for it — `_receipt_reasons` compares the retained receipt against
+# these three. Exactly the discipline `_ACCEPTED_GRAPHIFY_RUNTIME` states one
+# constant above: it may only advance when the EVIDENCE does, never on a version
+# bump alone, which would assert an identity the receipt on disk contradicts.
+#
+# THIS WAS ADVANCED TO 2.1.234 AND REVERTED IN THE SAME ROUND, which is the
+# useful part. Claude Code self-updated, so bumping "the accepted version" looked
+# like ordinary currency work; it turned the committed slice candidate from
+# `unapproved` to `failed`, because that evidence was produced at 2.1.233 and no
+# edit here can change what already ran. The corpus planner's need is a DIFFERENT
+# question — what will run next — and it now reads `_CURRENT_CLAUDE_*` below.
+# Two constants, because there are two questions.
 _ACCEPTED_CLAUDE_VERSION = "2.1.233"
 _ACCEPTED_CLAUDE_EXECUTABLE_SHA256 = (
     "bc466b6cde63edafc773f471a1fb98787fabb31f52240c8616ce7e1f587b212d"
 )
 _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6da2882d3a5560fea6"
+
+# The version a NEW run may use — what the corpus plan pins and what its preflight
+# will meet. The `_ACCEPTED_`/`_CURRENT_` pair mirrors the graphify one above, for
+# the same reason: one describes evidence that exists, the other declares what is
+# allowed to happen next, and collapsing them makes a currency bump silently
+# invalidate committed evidence.
+#
+# 2.1.233 -> 2.1.234. Third consecutive advance with the same shape, and the shape
+# IS the review: the BINARY digest moved and the `--help` digest did NOT —
+# 71ad650f… is the value 2.1.232 and 2.1.233 both recorded, so every required
+# flag is spelled identically and only the implementation moved. Measured rather
+# than carried forward: `--help` was re-hashed against the INSTALLED 2.1.234
+# through this module's own `claude_child_environment`, so the digest compared is
+# the one a real preflight computes rather than a shell's.
+#
+# The 2.1.226 -> 2.1.234 release review lives in `currency.toml`'s
+# `[tool.claude-code]` block. Nothing in those eight releases touches the flags,
+# the argv shape or the envelope this path depends on.
+_CURRENT_CLAUDE_VERSION = "2.1.234"
+_CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
+    "08d8700313697cbe730a25420c908a299ce52d56f0eb2cf4fac94cab5109bc57"
+)
+_CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (
     "43122fca6fdda78fa16630a89ede645f06b7fdbded00377cd27188f627d371d9"
 )
@@ -433,6 +464,43 @@ def profile_for(environment: Mapping[str, str]) -> ClaudeProfile:
     return profile
 
 
+class ClaudeIdentity(msgspec.Struct, frozen=True):
+    """A reviewed Claude Code identity, as one value rather than three literals."""
+
+    version: str
+    executable_sha256: str
+    help_sha256: str
+
+
+def current_claude() -> ClaudeIdentity:
+    """Return the Claude Code identity a NEW run may use.
+
+    Not `_ACCEPTED_CLAUDE_*`, and the difference is the whole point. Those three
+    are the authority for the COMMITTED slice receipt — evidence about a run that
+    already happened, which no edit here can change. This is a declaration about
+    what is allowed to happen next, which is what the corpus planner pins.
+    Reading the wrong one turned the committed slice candidate from `unapproved`
+    to `failed` during this round's currency bump.
+
+    Public because `graphify_semantic_corpus` needs these values and used to
+    TRANSCRIBE them — three literals here, three more there, bound only by a
+    comment saying "kept in step". That module has already paid for that pattern
+    once: a transcribed `graphify_version` read 0.9.43 while the runtime constant
+    beside it read 0.9.44, so every plan written after that pin bump recorded two
+    different versions for one run.
+
+    A struct rather than a 3-tuple because all three fields are `str` and two are
+    hex digests: unpacked positionally, the executable and help digests could be
+    transposed without a type error, and the resulting plan would pin a contract
+    nobody reviewed while verifying as internally consistent.
+    """
+    return ClaudeIdentity(
+        version=_CURRENT_CLAUDE_VERSION,
+        executable_sha256=_CURRENT_CLAUDE_EXECUTABLE_SHA256,
+        help_sha256=_CURRENT_CLAUDE_HELP_SHA256,
+    )
+
+
 def accepted_graphify_runtime() -> RuntimeIdentity:
     """Return the reviewed Graphify runtime identity from ``_ACCEPTED_GRAPHIFY_RUNTIME``.
 
@@ -464,16 +532,47 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def child_control_env(profile: ClaudeProfile) -> dict[str, str]:
+MAX_OUTPUT_TOKENS_ENV_NAME = "KB_SEMANTIC_MAX_OUTPUT_TOKENS"
+
+
+def resolved_max_output_tokens(environment: Mapping[str, str], profile: ClaudeProfile) -> str:
+    """Return the plan's pinned output cap, or the profile's own literal.
+
+    The corpus driver exports the value its PLAN recorded, resolved once from the
+    model's real ceiling; the profile literal is what a launcher with no plan
+    behind it gets. The profile's value is the LOWER of the two, so falling back
+    to it can only under-spend — the safe direction for an absent variable.
+
+    A malformed value RAISES rather than falling back, because a typo silently
+    reverting to the literal is exactly the failure this replaces: an
+    unnoticed low cap truncates a structured extraction mid-object, and the run
+    reports a refusal whose cause is nowhere in the evidence.
+    """
+    raw = environment.get(MAX_OUTPUT_TOKENS_ENV_NAME, "")
+    if not raw:
+        return profile.max_output_tokens
+    if not raw.isdigit() or int(raw) <= 0:
+        raise ValueError(f"{MAX_OUTPUT_TOKENS_ENV_NAME} is not a positive integer")
+    return raw
+
+
+def child_control_env(
+    profile: ClaudeProfile, max_output_tokens: str | None = None
+) -> dict[str, str]:
     """Return the control variables for one profile.
 
     The NAMES are identical across profiles and only the values move, which is
     what lets the receipt keep comparing ``environment_names`` unchanged while the
-    corpus raises its own caps.
+    corpus raises its own caps. That property is why the pinned output cap arrives
+    as a VALUE override here rather than as a new variable: a new name in the
+    child environment would move ``environment_names`` and invalidate the
+    committed slice evidence, for a fact the plan already records.
     """
     return {
         **_CHILD_CONTROL_ENV,
-        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": profile.max_output_tokens,
+        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": (
+            profile.max_output_tokens if max_output_tokens is None else max_output_tokens
+        ),
         "CLAUDE_CODE_MAX_RETRIES": profile.max_retries,
     }
 
@@ -491,7 +590,8 @@ def claude_child_environment(
         if environment.get(name) is not None
     }
     child["PATH"] = original_path if original_path is not None else environment.get("PATH", "")
-    child.update(child_control_env(profile if profile is not None else SLICE_PROFILE))
+    selected = profile if profile is not None else SLICE_PROFILE
+    child.update(child_control_env(selected, resolved_max_output_tokens(environment, selected)))
     return child
 
 

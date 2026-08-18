@@ -39,6 +39,11 @@ _MUST_SCAN = (
     "brain/graphify-out/memory/query_20260101_000000_a_note.md",
     "docs/goals/README.md",
     "python/src/kb_setup/review.py",
+    # The REST of `.agent/` stays scanned — the telemetry exclusion is narrowed
+    # to one subdirectory, and this is the arm that keeps it narrow. Agent
+    # reports and review receipts routinely quote probe output.
+    ".agent/kb/reports/agents/a-report.md",
+    ".agent/notepad.md",
 )
 
 #: Paths that must STAY allowlisted — derived artifacts whose content-hashes and
@@ -56,6 +61,11 @@ _MUST_SKIP = (
     "raw/fetched.md",
     ".self-graph/graphify-out/cache/stat-index.json",
     ".self-graph/graphify-out/graph.json",
+    # The raw-API-body telemetry sink: a verbatim copy of the conversation, so a
+    # finding there is about what was said rather than about this repository, and
+    # `gitleaks dir` walks directories so it landed in scope the moment it
+    # existed (86 findings, ~500 MB scanned). Gitignored and pinned as such.
+    ".agent/telemetry/ff431a36-b0bf-4af8-9f00-12cac7a6abe2.request.json",
 )
 
 

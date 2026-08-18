@@ -1,0 +1,6 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Claude Code as a python library (query/ClaudeAgentOptions/SessionStore/fold_session_summary). Candidate replacement for the JS session-review workflow and for hand-parsed transcript JSONL.
+url = https://github.com/anthropics/claude-agent-sdk-python
+ref = main
+commit = 671fd3aa571243cd40810a645a4c4c5ee0fce11f
+kind = code

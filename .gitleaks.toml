@@ -57,6 +57,23 @@ paths = [
   # If anything authored is ever put here, narrow this the way graphify-out was.
   '''^\.self-graph/''',
   '''^raw/''',
+  # The raw-API-body telemetry sink (Ray, 2026-08-17, approved with the cost
+  # stated). `OTEL_LOG_RAW_API_BODIES=file:.agent/telemetry/` writes the ENTIRE
+  # conversation on every request, so these files are a verbatim copy of what was
+  # said — and `gitleaks dir` scans directories rather than tracked files, so the
+  # sink landed in scope the moment it existed: **86 findings and ~500 MB scanned
+  # (17.7 s), growing**, turning `mise run lint` red on every run.
+  #
+  # A finding here is about the CONVERSATION, not about the repository, and the
+  # bytes can never be committed — `.agent/` is gitignored and
+  # `test_the_sink_is_gitignored` pins that against the real `.gitignore`.
+  #
+  # THE COST, stated rather than discovered later: if a real secret is ever
+  # pasted into a session, the copy in this sink is no longer flagged. The
+  # ORIGINAL still is, wherever it actually lives — which is the file anyone
+  # would need to fix. Narrowed to `telemetry/` alone, so the rest of `.agent/`
+  # (including agent reports and receipts) stays scanned.
+  '''^\.agent/telemetry/''',
   '''^graphify-out/[^/]+\.[A-Za-z0-9_]+$''',
   '''^graphify-out/(cache|converted|obsidian|reflections|transcripts|wiki)/''',
   '''^graphify-out/[0-9]{4}-[0-9]{2}-[0-9]{2}/''',

@@ -217,6 +217,57 @@ def write_provider_boundary_start(
     return marker
 
 
+class ProviderSpendRecord(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """What ONE provider call cost, written where the caller can sum it.
+
+    ``AdapterMetadata`` already carries ``total_cost_usd``, and this is not a
+    second opinion about the same number — it is the same number at a
+    granularity the metadata file cannot express. The metadata path is ONE fixed
+    file that every call overwrites, so a chunk graphify bisected into four leaf
+    calls leaves only the last leaf's cost behind. A caller summing metadata
+    therefore undercounts exactly the expensive chunks, which is the wrong
+    direction for a spend cap to be wrong in.
+
+    One file per call, in the caller's boundary directory, sums correctly across
+    bisected chunks and across a chunk whose provider call FAILED after spending
+    — that call writes its record and never reaches the caller's callback, so its
+    cost lands in the next chunk's read rather than vanishing.
+    """
+
+    schema_id: str
+    total_cost_usd: float
+
+
+def write_provider_spend(directory: Path, total_cost_usd: float) -> Path:
+    """Record one call's cost beside its boundary marker, or raise.
+
+    Raising is deliberate: the caller's cumulative cap is only as real as its
+    ability to observe spend, so a run that cannot write this record must stop
+    rather than continue uncounted. The slice never reaches here — it configures
+    ``…_PATH`` and no directory — so the strictness costs it nothing.
+    """
+    destination = directory / f"provider-spend-{os.getpid()}-{time.monotonic_ns()}.json"
+    record = ProviderSpendRecord(
+        schema_id="graphify-claude-provider-spend/v0",
+        total_cost_usd=total_cost_usd,
+    )
+    raw = graphify_semantic_slice.encode_json(record) + b"\n"
+    parent_descriptor = open_directory_nofollow(destination.parent)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(destination.name, flags, 0o600, dir_fd=parent_descriptor)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.fsync(parent_descriptor)
+    finally:
+        os.close(parent_descriptor)
+    return destination
+
+
 def _provider_boundary_path(environment: Mapping[str, str]) -> Path:
     """Resolve where this invocation writes its provider-boundary marker.
 
@@ -910,10 +961,35 @@ def adapter_main() -> int:
             reasons=reasons,
         )
     )
+    return _retain_and_report(metadata, completed.stdout)
+
+
+def _retain_and_report(metadata: AdapterMetadata, stdout: bytes) -> int:
+    """Persist this call's evidence, then decide what the caller sees.
+
+    Split out of ``adapter_main`` so the spend record could be added without the
+    entry point growing a seventh exit. The order is load-bearing: metadata, then
+    spend, then the verdict — the caller's cumulative cap reads the spend record,
+    so a call that reported its result before recording its cost would let the
+    next chunk start against a stale total.
+    """
     _write_metadata(metadata)
+    # Unconditionally on the directory path — a REJECTED call still spent money,
+    # so recording the cost only for accepted results would hide precisely the
+    # calls a cap exists to stop.
+    spend_directory = os.environ.get("KB_SEMANTIC_PROVIDER_BOUNDARY_DIR", "")
+    if spend_directory:
+        try:
+            write_provider_spend(Path(spend_directory), metadata.total_cost_usd)
+        except (OSError, ValueError) as exc:
+            # Fail the call. The caller's cap is only as real as its ability to
+            # observe spend, so a run that cannot record what it just spent must
+            # stop rather than continue uncounted.
+            print(f"semantic adapter spend record failed: {exc}", file=sys.stderr)
+            return 2
     if metadata.reasons:
         return _report_rejection(metadata.reasons)
-    sys.stdout.buffer.write(completed.stdout)
+    sys.stdout.buffer.write(stdout)
     return 0
 
 

@@ -71,6 +71,29 @@ fnox = "1.32.0"
 # `sources/doppler.manifest`; credentials/config remain user-owned and are not
 # stored in this repository.
 doppler = "3.76.1"
+# gh: the GitHub CLI `kb-ship` and `kb-land` are BUILT ON — `pr.py` alone holds
+# 19 `"gh"` literals, and it backs PR creation (`pr.py:372`) and the merge
+# (`pr.py:233`). Until 2026-08-17 it was pinned NOWHERE in this repo and resolved
+# only from Ray's user config, so on a fresh clone — a new machine, a CI runner,
+# anyone else — `mise run kb-ship` fails at the tool it needs most, and fails
+# late, after the gates have already run.
+#
+# This is Ray's standing "we should not rely on tools managed by
+# `~/.config/mise/mise.toml`" applied to the one unpinned tool that could break
+# shipping. Pinned to the version this repo has actually been shipping with.
+gh = "2.97.0"
+# NO `git` PIN, and that is a measurement rather than an omission. mise's registry
+# has **no `git` entry at all** — `mise registry | grep '^git '` returns nothing,
+# against a control of `gh` on the line above, which returns
+# `aqua:cli/cli asdf:...`. So the probe discriminates and the answer is real; a
+# hand-written `aqua:git-scm/git` was tried and fails outright with
+# `no aqua-registry found`. Pinning git here is not a thing that can be done.
+#
+# It is also not a thing that should be: every host already has one (macOS ships
+# Apple Git 2.50.1), and replacing it would swap the user's configured credential
+# helpers and commit signing for a mise build. What a floor WOULD have guarded is
+# a host old enough to lack a porcelain flag `kb_setup` uses — accepted as
+# unguarded, because the alternative does not exist.
 
 # Cross-vendor executor-lane CLIs for the adopted Fable-5 orchestrator plugin
 # (mar3co/fable-orchestrator, in `codex` mode) + the antigravity plugin
@@ -331,6 +354,17 @@ description = "Check every SKILL.md instructs mise tasks, not raw commands (#128
 # Also an hk step, so `mise run lint` covers it; this task is the direct handle
 # for working on a skill without running the whole suite.
 run = "uv run kb-setup skill-lint"
+
+[tasks.kb-model-limits]
+description = "Resolve Claude models' max output tokens (+ --write --observed-at DATE)"
+# A literal `max_output_tokens = "8192"` in CORPUS_PROFILE truncated every corpus
+# extraction against a measured 31,887-token need — the API said so in its own
+# words. Opus 5's real ceiling is 128,000, and no literal can follow a model
+# change. Resolution order is Models API -> docs `.md` -> committed snapshot,
+# then it RAISES: a hardcoded default here would be the defect it exists to
+# remove. `--write` re-baselines `docs/model-limits/snapshot.json` and prints the
+# delta, on `kb-skill-score`'s precedent — a record nobody diffs ages silently.
+run = "uv run kb-setup model-limits {{arg(name='args', var=true, default='')}}"
 
 [tasks.kb-graph-counts]
 description = "Print graph.json's node/link/hyperedge counts (+ --by-source)"
@@ -629,6 +663,53 @@ description = 'Print what the graph already computed: surprises, questions, god 
 # audit is computed by STREAMING graph.json scoped to the `links` array, because a
 # whole-file count of `"confidence":` over-counts — five AST nodes carry the field.
 run = "uv run kb-setup insights"
+
+[tasks.kb-telemetry-prune]
+description = "Bound the raw-API-body telemetry sink (.agent/telemetry/) by size, then age"
+# The other half of enabling `OTEL_LOG_RAW_API_BODIES` (Ray, 2026-08-17: maximum
+# capture). That sink writes the ENTIRE conversation on EVERY request and nothing
+# in Claude Code rotates it, so a long round costs O(n^2) bytes in one day.
+#
+# SIZE first, age second — an age-only rule cannot see a single round that wrote
+# gigabytes today. `kb-reclaim` cannot own this: it refuses by design to act
+# inside the repository, and that refusal is worth keeping.
+#
+# Wired into SessionSTART, not SessionEnd, and that is not a preference. Every
+# SessionEnd hook shares ONE budget — "the overall budget is automatically raised
+# to the highest per-hook timeout configured in settings files, up to 60 seconds"
+# (hooks.md:2948, re-probed live at 2.1.234, control: `SessionEnd` x15 on the
+# same page). It is 60 s across ALL of them, not 60 s each, and
+# `currency.toml`'s `sessionend-hooks-share-a-1.5s-budget` calls that number
+# load-bearing for the transcript audit. A third consumer would have competed
+# with the audit for it, and a killed SessionEnd hook is SILENT — the failure
+# mode is an audit that quietly stops existing.
+#
+# Start is also the better moment on its own merits: the sink writes DURING a
+# session, so reaping first bounds the directory ahead of the growth rather than
+# after it.
+#
+# Always exits 0: a hook that can fail a session over disk tidiness is a hook
+# people turn off.
+run = "uv run kb-setup telemetry-prune"
+
+[tasks.graph-size]
+description = "Gate: is graph.json still small enough for graphify to READ it?"
+# A SHIP GATE, not a report, and that is the whole change (Ray, 2026-08-17).
+# `kb_setup.insights` computed this number for a while and only PRINTED it, so
+# the figure lived in a report nobody runs on the way to a merge while the graph
+# climbed to roughly three quarters of its ceiling.
+#
+# Whose number is whose: 512 MiB is graphify's stock cap, above which it REFUSES
+# to read the file; 1 GiB is OURS, raised by `GRAPHIFY_MAX_GRAPH_BYTES` above,
+# where the comment says plainly that the raise is a ratchet and the durable
+# answer is #130 (federate) or #120 (the duplicated `repo::` prefix). Both open.
+# The 80% warning line is ours and is the only chosen number — a gate that fires
+# only AT the ceiling forces the decision when there is no headroom left to act.
+#
+# The effective ceiling comes from graphify's OWN resolver, never a second parser
+# here: its `GB` suffix means GiB, so a hand-rolled reading agrees on the string
+# and disagrees on the number by 7%.
+run = "uv run kb-setup graph-size"
 
 [tasks.kb-serve]
 description = "Start the read-only MCP server pinned to THIS graph (stdio)"

@@ -50,44 +50,57 @@ def main(argv: list[str] | None = None) -> int:
         return _run(argv)
 
 
+def _print_usage() -> int:
+    """Print the subcommand list and return 0.
+
+    Extracted from `_run` rather than left inline: this dispatcher is a long
+    if-chain by design (one lazy import per branch, so `kb-setup <one command>`
+    never pays for the other forty), and the usage text is the one block in it
+    that is not dispatch. Moving it keeps the chain the only thing `_run` does.
+    """
+    print(
+        "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
+        "affected <symbol> [--depth N] | insights [--top N] | graph-size | "
+        "telemetry-prune | serve | "
+        "merge <chunk> | label | "
+        "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
+        "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
+        "arms <spec.toml> [--dry-run] | "
+        "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
+        "graph-counts [--by-source] [name...] | "
+        "model-limits [--write] [--observed-at DATE] [model...] | "
+        "md-budget | skill-lint | "
+        "skill-score [--write] [skill...] | skill-refresh | "
+        "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
+        "session-state [--no-pr] | "
+        "remember --question Q [--answer A|--answer-file F] "
+        "[--outcome useful|dead_end|corrected] "
+        "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
+        "goal-check <path|--text ...> | "
+        "goal-outcome <pair> --result R [--turns N] [--note ...] | "
+        "cc | cc-doctor | eval [--live] [--slow] | "
+        "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
+        "graphify-semantic-slice preflight|run|verify [PATH] | "
+        "graphify-semantic-corpus plan|run|verify [PATH] | "
+        "skillopt-contract | "
+        "tool-sync <currency-tool-name> | "
+        "skillopt-reviewed --packet P --target T --backend mock|handoff | "
+        "ecosystem-discovery-plan [alternative...] | "
+        "detect-census [--output .agent/<path>.json] | "
+        "source-groups-check [path] | "
+        "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
+        "ensure-deps | version"
+    )
+    return 0
+
+
 def _run(argv: list[str] | None = None) -> int:
     """Dispatch a kb-setup subcommand; returns the process exit code."""
     args = sys.argv[1:] if argv is None else argv
     repo_root = Path.cwd()
 
     if not args:
-        print(
-            "kb-setup: build | update <name> | watch | prose | query <question> [--prose] | "
-            "affected <symbol> [--depth N] | insights [--top N] | serve | "
-            "merge <chunk> | label | "
-            "transcribe <audio> | artifacts | currency [check|run|stamp|docs-reviewed] | "
-            "brain [record|reflect|audit] | distill | session-reflect [--sessions N] | "
-            "arms <spec.toml> [--dry-run] | "
-            "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
-            "graph-counts [--by-source] [name...] | "
-            "md-budget | skill-lint | "
-            "skill-score [--write] [skill...] | skill-refresh | "
-            "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
-            "session-state [--no-pr] | "
-            "remember --question Q [--answer A|--answer-file F] "
-            "[--outcome useful|dead_end|corrected] "
-            "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
-            "goal-check <path|--text ...> | "
-            "goal-outcome <pair> --result R [--turns N] [--note ...] | "
-            "cc | cc-doctor | eval [--live] [--slow] | "
-            "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
-            "graphify-semantic-slice preflight|run|verify [PATH] | "
-            "graphify-semantic-corpus plan|run|verify [PATH] | "
-            "skillopt-contract | "
-            "tool-sync <currency-tool-name> | "
-            "skillopt-reviewed --packet P --target T --backend mock|handoff | "
-            "ecosystem-discovery-plan [alternative...] | "
-            "detect-census [--output .agent/<path>.json] | "
-            "source-groups-check [path] | "
-            "artifact-download --provider P --source O/R --revision SHA --destination PATH | "
-            "ensure-deps | version"
-        )
-        return 0
+        return _print_usage()
 
     cmd, rest = args[0], args[1:]
     if cmd in {"-V", "--version", "version"}:
@@ -147,7 +160,7 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import skillopt_reviewed
 
         return skillopt_reviewed.reviewed_main(repo_root, rest)
-    if cmd in {"source-groups-check", "artifact-download"}:
+    if cmd in {"source-groups-check", "artifact-download", "model-limits"}:
         return _dispatch_registry(repo_root, cmd, rest)
     if cmd == "ecosystem-discovery-plan":
         from kb_setup import ecosystem_discovery
@@ -157,10 +170,8 @@ def _run(argv: list[str] | None = None) -> int:
         from kb_setup import graphify_ops
 
         return graphify_ops.affected(repo_root, rest)
-    if cmd == "insights":
-        from kb_setup import insights
-
-        return insights.report(repo_root, rest)
+    if cmd in {"insights", "graph-size", "telemetry-prune"}:
+        return _dispatch_graph_hygiene(repo_root, cmd, rest)
     if cmd == "serve":
         from kb_setup import mcp_serve
 
@@ -237,12 +248,47 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
     return skillopt_contract.contract_main(repo_root)
 
 
+def _dispatch_graph_hygiene(repo_root: Path, cmd: str, rest: list[str]) -> int:
+    """Report on, or bound, what the graph and its telemetry have grown into.
+
+    Grouped on `_dispatch_registry`'s precedent rather than left as three arms of
+    the main chain, which had reached its statement ceiling. They belong together
+    on more than length: each answers "how big has this got, and is that still
+    all right" — `insights` reports, `graph-size` gates the ceiling graphify will
+    refuse to read past, and `telemetry-prune` bounds the raw-body sink nothing
+    else rotates.
+    """
+    if cmd == "insights":
+        from kb_setup import insights
+
+        return insights.report(repo_root, rest)
+    if cmd == "graph-size":
+        from kb_setup import graph_size
+
+        return graph_size.main(repo_root)
+    from kb_setup import telemetry
+
+    return telemetry.main(repo_root)
+
+
 def _dispatch_registry(repo_root: Path, cmd: str, rest: list[str]) -> int:
-    """Run one typed registry or immutable artifact boundary."""
+    """Run one typed registry or immutable artifact boundary.
+
+    `model-limits` belongs here rather than with the advisory analysers: it is a
+    typed registry of an EXTERNAL fact (a model's output ceiling) with a
+    committed snapshot as its record, and it fails closed rather than reporting
+    an empty result as clean.
+    """
     if cmd == "source-groups-check":
         from kb_setup import source_groups
 
         return source_groups.check_main(repo_root, rest)
+    if cmd == "model-limits":
+        import os
+
+        from kb_setup import model_limits
+
+        return model_limits.main(repo_root, rest, os.environ)
     from kb_setup import artifact_download
 
     return artifact_download.main(repo_root, rest)

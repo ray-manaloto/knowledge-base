@@ -72,7 +72,26 @@ _OK_BUCKETS = frozenset({"pass", "skipping", "neutral"})
 #: runs four local lenses and `ship_main` refuses to push without its receipt.
 #: Relaxing the remote gate and adding the local one are one change, not two —
 #: dropping only the first would leave the repo with no review at all.
-_ADVISORY_CHECKS = frozenset({"CodeRabbit"})
+#: `Repowise / code health` joined 2026-08-17 on Ray's ruling, and it is a
+#: DIFFERENT argument from CodeRabbit's — recorded because the two look alike and
+#: are not. CodeRabbit is advisory because it is usually *unavailable*; Repowise
+#: is advisory because of what it MEASURES. Its verdict on PR #336 was
+#: "AI-authored files account for the larger share of this PR's regression (-0.5
+#: vs -0.0 human)": a delta on a composite score, attributed by authorship rather
+#: than by defect. That is a signal worth reading and not a statement that
+#: anything is wrong, and a gate whose failure names no defect cannot be
+#: actioned — only appeased.
+#:
+#: THE COST, stated rather than discovered later: no PR blocks on code health
+#: again. A real complexity regression now has to be caught by review or by the
+#: `C901`/`PLR0915` ruff rules, which are binding and did fire on this very round
+#: (three times, each fixed by extraction rather than by raising a threshold).
+#:
+#: Its detail page needs a browser login — measured, 307 with a github.com
+#: control at 200 — so the summary above is the whole of what an agent can read.
+#: A blocking gate whose evidence is unreachable from here is one nobody can
+#: discharge without a human, which is the practical half of the argument.
+_ADVISORY_CHECKS = frozenset({"CodeRabbit", "Repowise / code health"})
 
 #: How long `land` gives the checks to reach a terminal state before treating
 #: the delay as QUOTA rather than review.

@@ -1479,6 +1479,10 @@ url = "https://github.com/jdx/fnox/releases/download/v1.32.0/fnox-x86_64-pc-wind
 url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/497823892"
 provenance = "github-attestations"
 
+[[tools.gh]]
+version = "2.97.0"
+backend = "aqua:cli/cli"
+
 [[tools."github:agent-sh/agnix"]]
 version = "0.46.0"
 backend = "github:agent-sh/agnix"
