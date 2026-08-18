@@ -520,6 +520,18 @@ ref = "2484"
 kind = "issue"
 ref = "2485"
 
+# 2551: the partial-extraction warning `graph._EXPECTED_PARTIAL_EXTRACTION`
+# registers. Watched because the registration records a MEASURED loss (25 named
+# symbols in one .astro file, 0 recovered) and that number stops being true the
+# moment upstream fixes it — the approval is checked against the sub-graph, so a
+# fix turns the build red rather than silently keeping a stale count. The real
+# gap is narrower than the issue: `extract_astro` parses the whole file as JS and
+# regex-rescues imports only, while `extract_vue` masks non-<script> regions and
+# recovers symbols.
+[[tool.graphify.watch]]
+kind = "issue"
+ref = "2551"
+
 [[tool.graphify.watch]]
 kind = "issue"
 ref = "2308"

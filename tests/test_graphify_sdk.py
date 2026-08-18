@@ -12,6 +12,7 @@ from kb_setup import graphify_sdk
 from kb_setup.currency import config as currency_config
 from kb_setup.graphify_health import (
     ExpectedMetadataOnly,
+    ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
     GraphifyState,
     IncompleteGraphifyOperationError,
@@ -365,6 +366,18 @@ _WARNING = (
     "plugin.json. A re-run will retry them (empties are no longer cached); if it persists, "
     "please report the file(s) (#1666).\n"
 )
+#: Graphify truncates the name list at five and appends "(+N more)"
+#: (`extract.py:5511`). Reproduced verbatim here because the previous approver
+#: reconstructed the warning by joining EVERY reviewed name, so it could never
+#: match a source with more than five metadata-only files — which is exactly the
+#: shape `Attacca` has, and why `kb-build` could not be unblocked by registration
+#: alone (#328).
+_TRUNCATED_WARNING = (
+    "  warning: 8 source file(s) produced zero nodes and are absent from the graph: "
+    "marketplace.json, settings.json, plugin.json, hooks.json, plugin.json (+3 more). "
+    "A re-run will retry them (empties are no longer cached); if it persists, "
+    "please report the file(s) (#1666).\n"
+)
 
 
 def _metadata_inventory(
@@ -398,6 +411,297 @@ def test_exact_reviewed_metadata_skip_approves_and_retains_warning(
     )
 
     assert approved == ("approved-reviewed-metadata-zero-node",)
+
+
+def _eight_file_inventory(directory: Path) -> tuple[ExpectedMetadataOnly, ...]:
+    """The Attacca shape: eight reviewed files, so graphify truncates at five."""
+    import hashlib
+
+    # Distinct paths, DUPLICATE basenames — the real Attacca shape, where three
+    # different directories each hold a `plugin.json`. The warning only ever
+    # shows basenames, so a checker comparing them as a set rather than a
+    # multiset would accept a warning naming one file three times.
+    relative_paths = (
+        ".claude-plugin/marketplace.json",
+        ".claude/settings.json",
+        "plugins/core/.claude-plugin/plugin.json",
+        "plugins/core/hooks/hooks.json",
+        "plugins/init/.claude-plugin/plugin.json",
+        "plugins/security/hooks/hooks.json",
+        "plugins/security/.claude-plugin/plugin.json",
+        "template/settings.json",
+    )
+    inventory = []
+    for index, relative_path in enumerate(relative_paths):
+        path = directory / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f'{{"n":{index}}}\n', encoding="utf-8")
+        inventory.append(
+            ExpectedMetadataOnly(
+                source_name="reviewed-source",
+                relative_path=relative_path,
+                content_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                skipped_disposition=_SKIPPED,
+            )
+        )
+    return tuple(inventory)
+
+
+def test_truncated_zero_node_warning_over_five_files_approves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The regression #328 turned on: >5 reviewed files could never be approved."""
+    inventory = _eight_file_inventory(tmp_path)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "extract_json",
+        lambda _path: {"nodes": [], "edges": [], "skipped": _SKIPPED},
+    )
+
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        tmp_path, "reviewed-source", _TRUNCATED_WARNING, inventory
+    )
+
+    assert approved == ("approved-reviewed-metadata-zero-node",)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "warning"),
+    [
+        # A ninth zero-node file appears: the count moves, so the reviewed set no
+        # longer describes what graphify found.
+        ("count", _TRUNCATED_WARNING.replace("8 source file(s)", "9 source file(s)")),
+        # "+N more" that disagrees with the total is a warning we do not
+        # understand, and an unrecognised warning is never approved.
+        ("more-arithmetic", _TRUNCATED_WARNING.replace("(+3 more)", "(+4 more)")),
+        # A shown name nobody registered.
+        ("unknown-name", _TRUNCATED_WARNING.replace("marketplace.json", "stranger.json")),
+        # The warning names ONE file more often than the reviewed set contains
+        # it. There is exactly one `marketplace.json`, so a second mention means
+        # graphify counted something we did not register. Caught only by a
+        # MULTISET comparison — a set comparison accepts this, and did: the arm
+        # `shown-names-compared-as-a-set-not-a-multiset` SURVIVED until this row
+        # existed, because every other case here duplicates `plugin.json`, which
+        # the inventory genuinely holds three of.
+        (
+            "name-shown-more-often-than-registered",
+            _TRUNCATED_WARNING.replace(
+                "marketplace.json, settings.json", "marketplace.json, marketplace.json"
+            ),
+        ),
+        # Truncation dropped: five names are expected when the total exceeds five.
+        (
+            "no-truncation",
+            _TRUNCATED_WARNING.replace(
+                "marketplace.json, settings.json, plugin.json, hooks.json, plugin.json (+3 more)",
+                "marketplace.json, settings.json, plugin.json",
+            ),
+        ),
+        # A second, unrelated warning rides along on the first one's approval.
+        ("extra-warning", _TRUNCATED_WARNING + "  warning: something else entirely\n"),
+    ],
+)
+def test_truncated_zero_node_warning_mutations_do_not_approve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str, warning: str
+) -> None:
+    inventory = _eight_file_inventory(tmp_path)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "extract_json",
+        lambda _path: {"nodes": [], "edges": [], "skipped": _SKIPPED},
+    )
+
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        tmp_path, "reviewed-source", warning, inventory
+    )
+
+    assert approved == (), mutation
+
+
+_ASTRO_PATH = "website/src/pages/index.astro"
+_PARTIAL_WARNING = (
+    f"  warning: 1 file(s) had syntax errors and may be partially extracted: "
+    f"{_ASTRO_PATH} (first error at line 1) (#2551)\n"
+)
+
+
+def _partial_review(
+    directory: Path, *, extracted_nodes: int = 1
+) -> graphify_sdk.ExtractWarningReview:
+    import hashlib
+
+    path = directory / _ASTRO_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("---\nconst a = 1;\n---\n<p>markup</p>\n", encoding="utf-8")
+    return graphify_sdk.ExtractWarningReview(
+        source_name="reviewed-source",
+        partial_inventory=(
+            ExpectedPartialExtraction(
+                source_name="reviewed-source",
+                relative_path=_ASTRO_PATH,
+                content_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                first_error_line=1,
+                extracted_nodes=extracted_nodes,
+                lost_symbols=25,
+                reason="extract_astro parses the whole file as JS (#2551)",
+            ),
+        ),
+        extracted_nodes_by_path={_ASTRO_PATH: 1},
+    )
+
+
+def test_reviewed_partial_extraction_approves_when_the_count_still_holds(
+    tmp_path: Path,
+) -> None:
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), _partial_review(tmp_path)
+    )
+
+    assert approved == ("approved-reviewed-partial-extraction",)
+
+
+def test_a_reviewed_file_that_recovered_nothing_can_still_be_approved(tmp_path: Path) -> None:
+    """The worst case this inventory records is the one it could not express.
+
+    `_nodes_by_source_file` builds its map from a `Counter`, so a file that
+    produced ZERO nodes is ABSENT from it rather than present as `0`. A bare
+    `.get(path)` therefore returned `None`, and `None == 0` is False — so a
+    reviewed entry recording a total loss could never be approved, no matter how
+    correctly it was registered. Latent when found (every committed entry is >= 1),
+    which is why it needs a test rather than a comment. Cold lane, PR #338.
+    """
+    review = _partial_review(tmp_path, extracted_nodes=0)
+    review = graphify_sdk.ExtractWarningReview(
+        source_name=review.source_name,
+        metadata_inventory=review.metadata_inventory,
+        partial_inventory=review.partial_inventory,
+        extracted_nodes_by_path={},
+    )
+
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    )
+
+    assert approved == ("approved-reviewed-partial-extraction",)
+
+
+def test_a_file_that_recovered_nodes_does_not_match_a_zero_entry(tmp_path: Path) -> None:
+    """CONTROL ARM on the default: absent-means-zero must not mean always-matches."""
+    review = _partial_review(tmp_path, extracted_nodes=0)
+
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    )
+
+    assert approved == ()
+
+
+def test_reviewed_partial_extraction_expires_when_the_parser_recovers_more(
+    tmp_path: Path,
+) -> None:
+    """A FIX upstream must invalidate the approval too, not only a regression.
+
+    The reviewed entry records a measured loss. If graphify starts recovering
+    symbols from this file, the recorded number stops describing reality, and an
+    approval that survived that would be approving a measurement nobody took.
+    """
+    review = _partial_review(tmp_path, extracted_nodes=26)
+
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    )
+
+    assert approved == ()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "line"),
+    [
+        ("other-path", _PARTIAL_WARNING.replace(_ASTRO_PATH, "website/src/pages/other.astro")),
+        ("other-line", _PARTIAL_WARNING.replace("line 1", "line 42")),
+        ("more-files", _PARTIAL_WARNING.replace("1 file(s)", "2 file(s)")),
+        ("not-this-warning", "  warning: something else entirely\n"),
+    ],
+)
+def test_partial_extraction_mutations_do_not_approve(
+    tmp_path: Path, mutation: str, line: str
+) -> None:
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, line.rstrip(), _partial_review(tmp_path)
+    )
+
+    assert approved == (), mutation
+
+
+def test_partial_extraction_refuses_when_the_reviewed_bytes_moved(tmp_path: Path) -> None:
+    review = _partial_review(tmp_path)
+    (tmp_path / _ASTRO_PATH).write_text("---\nconst a = 2;\n---\n", encoding="utf-8")
+
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    )
+
+    assert approved == ()
+
+
+def test_two_independent_warnings_in_one_stderr_are_both_accounted_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The #328 case itself: `Attacca` prints a zero-node AND a #2551 warning.
+
+    Under whole-stderr approval this was unreachable — registering either warning
+    could not approve the pair, and there was no spelling of "both are reviewed".
+    """
+    inventory = _eight_file_inventory(tmp_path)
+    partial = _partial_review(tmp_path)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "extract_json",
+        lambda _path: {"nodes": [], "edges": [], "skipped": _SKIPPED},
+    )
+    review = graphify_sdk.ExtractWarningReview(
+        source_name="reviewed-source",
+        metadata_inventory=inventory,
+        partial_inventory=partial.partial_inventory,
+        extracted_nodes_by_path=partial.extracted_nodes_by_path,
+    )
+
+    approved, residual = graphify_sdk.account_for_extract_stderr(
+        tmp_path, _TRUNCATED_WARNING + _PARTIAL_WARNING, review
+    )
+
+    assert set(approved) == {
+        "approved-reviewed-metadata-zero-node",
+        "approved-reviewed-partial-extraction",
+    }
+    assert residual == ""
+
+
+def test_an_unreviewed_third_warning_still_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two approvals must not buy a third warning a free pass."""
+    inventory = _eight_file_inventory(tmp_path)
+    partial = _partial_review(tmp_path)
+    monkeypatch.setattr(
+        graphify_sdk,
+        "extract_json",
+        lambda _path: {"nodes": [], "edges": [], "skipped": _SKIPPED},
+    )
+    review = graphify_sdk.ExtractWarningReview(
+        source_name="reviewed-source",
+        metadata_inventory=inventory,
+        partial_inventory=partial.partial_inventory,
+        extracted_nodes_by_path=partial.extracted_nodes_by_path,
+    )
+    stranger = "  warning: 3 .sql file(s) contributed nothing to the graph (#1745)\n"
+
+    approved, residual = graphify_sdk.account_for_extract_stderr(
+        tmp_path, _TRUNCATED_WARNING + stranger + _PARTIAL_WARNING, review
+    )
+
+    assert len(approved) == 2
+    assert residual == stranger.rstrip()
 
 
 @pytest.mark.parametrize(

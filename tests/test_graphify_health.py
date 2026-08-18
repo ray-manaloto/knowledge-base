@@ -32,19 +32,59 @@ def test_success_with_stderr_is_incomplete(stderr: str) -> None:
     assert "stderr" in receipt.reasons
 
 
-def test_approved_metadata_warning_is_retained_with_classification() -> None:
+def test_fully_accounted_stderr_is_retained_with_classification() -> None:
     warning = "upstream zero-node warning"
     receipt = assess(
         GraphifyOperation.EXTRACT,
         GraphifyEvidence(
             observed=True,
             stderr=warning,
+            residual_stderr="",
             approved_classifications=(APPROVED_METADATA_ZERO_NODE_WARNING,),
         ),
     )
     assert receipt.state is GraphifyState.COMPLETE
     assert receipt.stderr == warning
     assert receipt.approved_classifications == (APPROVED_METADATA_ZERO_NODE_WARNING,)
+
+
+def test_classification_token_alone_never_approves_stderr() -> None:
+    """The token records WHY something was approved; it is not itself approval.
+
+    Before #328 this shape passed: one recognised token approved everything the
+    subprocess printed, so a second, unrelated warning rode in on the first one's
+    approval. Approval is now per warning, and an empty residual is the only
+    thing that clears stderr.
+    """
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="upstream zero-node warning\nan entirely different warning",
+            approved_classifications=(APPROVED_METADATA_ZERO_NODE_WARNING,),
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    assert "stderr" in receipt.reasons
+
+
+def test_residual_stderr_blocks_and_is_named_in_the_failure() -> None:
+    receipt = assess(
+        GraphifyOperation.EXTRACT,
+        GraphifyEvidence(
+            observed=True,
+            stderr="  warning: reviewed\n  warning: NOT reviewed",
+            residual_stderr="  warning: NOT reviewed",
+            approved_classifications=(APPROVED_METADATA_ZERO_NODE_WARNING,),
+        ),
+    )
+    assert receipt.state is GraphifyState.INCOMPLETE
+    with pytest.raises(IncompleteGraphifyOperationError) as raised:
+        require_complete(receipt)
+    # The reason is one word; the message has to name WHICH line blocked, or a
+    # reader has to re-run the build to find out.
+    assert "NOT reviewed" in str(raised.value)
+    assert "warning: reviewed" not in str(raised.value)
 
 
 def test_extract_refuses_unclassified_zero_node_and_partial_coverage() -> None:

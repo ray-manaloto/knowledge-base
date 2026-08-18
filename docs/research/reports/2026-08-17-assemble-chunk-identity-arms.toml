@@ -1,0 +1,128 @@
+# Mutation arms for keying `chunks.assemble`'s id-collision gate on the chunk's
+# resolved PATH rather than its basename.
+#
+# WHY THIS SPEC EXISTS. The defect was a gate that could not fire, not a gate
+# that fired wrongly, so the pre-fix suite was fully green over it — 12 assemble
+# tests, none of which passed two same-named inputs. That is the shape a mutation
+# sweep is most useful on and least able to be trusted about by eye: the fix's own
+# test was written alongside the fix, so these arms exist to prove the test can
+# actually go red, and to pin the two properties the fix rests on separately.
+#
+# WHAT THE CHANGE ACTUALLY DID:
+#   1. `seen` is now keyed to `Path` (the resolved path) instead of `str`
+#      (`p.name`), so "did a DIFFERENT FILE claim this id" is asked of the file
+#      and not of its label.
+#   2. `_labels` supplies the DISPLAY label: the bare name while names are unique
+#      in the batch (every message this repo has emitted so far), `<parent>/<name>`
+#      once they are not. Without it the refusal names one file twice and reads as
+#      a chunk colliding with itself.
+#   3. `validate(..., label=)` and `assembly_overlaps`' duplicate-claim message
+#      take the same label, so no message in this module can be ambiguous.
+#
+# WHAT A CLEAN SWEEP HERE DOES NOT MEAN. It says nothing about whether the
+# semantic-corpus merge path is correct end to end — that arm is merging one real
+# chunk and reading the node arithmetic. It also cannot see the case this fix
+# deliberately left alone: the SAME path passed twice still counts as one chunk,
+# as it does in `assembly_overlaps`, which dedups on `resolve()`.
+
+suites = ["tests/test_chunks.py"]
+
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/chunks.py"
+old = "    resolved = [p.resolve() for p in chunk_paths]"
+new = "    resolved = [p.resolve() for p in chunk_paths]  # inert control edit"
+
+# --------------------------------------------------------------------------
+# Property 1 — identity is the path, not the label
+# --------------------------------------------------------------------------
+
+# The defect itself, reintroduced exactly as it stood before the fix — both the
+# recorded value and the comparison revert to `p.name`. This is what 58
+# identically-named staged chunks walked straight through.
+#
+# It has to mutate BOTH LINES, and the first attempt here did not: mutating only
+# the comparison to `labels[seen[nid]] != labels[p]` SURVIVED, because `_labels`
+# now disambiguates, so comparing labels is equivalent to comparing paths. An
+# inert mutant, and it read as a coverage gap for a full sweep. Two properties
+# were tangled in the original defect — an ambiguous label AND identity taken from
+# it — and reverting one at a time reverts nothing.
+[[arm]]
+id = "identity-reverts-to-the-basename"
+test = "test_assemble_sees_an_id_collision_between_identically_named_chunks"
+file = "python/src/kb_setup/chunks.py"
+old = "                if nid in seen and seen[nid] != p:\n                    problems.append(f\"id collision {nid!r} ({label} vs {labels[seen[nid]]})\")\n                seen[nid] = p"
+new = "                if nid in seen and seen[nid].name != p.name:\n                    problems.append(f\"id collision {nid!r} ({label} vs {labels[seen[nid]]})\")\n                seen[nid] = p"
+
+# THERE IS DELIBERATELY NO SEPARATE VALUE-SIDE ARM, and the reason is a property
+# of the gate rather than an omission. The comparison is `seen[nid] != p` against
+# the CURRENT chunk, so any value the mutation records that is not equal to `p`
+# still fires — `next(iter(labels))`, a constant `Path()`, the first path in the
+# batch: all three were tried and all three SURVIVED as inert mutants, because the
+# recorded value only decides WHICH chunk gets named, never WHETHER a collision is
+# seen. The single value that suppresses detection is one derived from `p` and
+# equal across chunks — which is `p.name`, i.e. the paired arm above. Value side
+# and comparison side are one property here, and splitting them measures nothing.
+
+# `p = raw_path.resolve()` is what makes `labels[p]` resolvable for a caller that
+# passes a relative path — which the merge step does.
+#
+# This arm SURVIVED on its first run against the two tests above, and the survival
+# was a bound in the fixture, not coverage: both hand in absolute paths, so
+# dropping the resolve changes nothing they can see. Hence its own test.
+[[arm]]
+id = "paths-are-compared-unresolved"
+test = "test_assemble_resolves_relative_chunk_paths"
+file = "python/src/kb_setup/chunks.py"
+old = "    for raw_path in chunk_paths:\n        p = raw_path.resolve()"
+new = "    for raw_path in chunk_paths:\n        p = raw_path"
+
+# --------------------------------------------------------------------------
+# Property 2 — the label must disambiguate, and only when it must
+# --------------------------------------------------------------------------
+
+# A label that never disambiguates. The gate still FIRES, so a test asserting
+# only "raises ValueError" would stay green — the message is the part that tells a
+# reader which two chunks collided, and naming one file twice is worse than
+# useless.
+[[arm]]
+id = "the-label-never-disambiguates"
+test = "test_assemble_sees_an_id_collision_between_identically_named_chunks"
+file = "python/src/kb_setup/chunks.py"
+old = "    return {p: (p.name if names[p.name] == 1 else f\"{p.parent.name}/{p.name}\") for p in resolved}"
+new = "    return {p: p.name for p in resolved}"
+
+# The converse, which is why the label is conditional rather than always
+# qualified: every pre-existing message in this module — and every one a reader
+# has ever seen — is a bare basename, and unconditionally prefixing the parent
+# directory changes all of them.
+[[arm]]
+id = "the-label-always-qualifies"
+test = "test_assemble_labels_stay_bare_while_basenames_are_unique"
+file = "python/src/kb_setup/chunks.py"
+old = "    return {p: (p.name if names[p.name] == 1 else f\"{p.parent.name}/{p.name}\") for p in resolved}"
+new = "    return {p: f\"{p.parent.name}/{p.name}\" for p in resolved}"
+
+# The uniqueness count is taken over DEDUPED paths. Counting the raw list instead
+# makes one path passed twice look like a name clash, so a single-chunk batch
+# handed in duplicate starts qualifying its labels.
+[[arm]]
+id = "uniqueness-counted-over-duplicates"
+test = "test_assemble_labels_stay_bare_while_basenames_are_unique"
+file = "python/src/kb_setup/chunks.py"
+old = "    names = Counter(p.name for p in dict.fromkeys(resolved))"
+new = "    names = Counter(p.name for p in [*resolved, *resolved])"
+
+# --------------------------------------------------------------------------
+# Property 3 — no false positive
+# --------------------------------------------------------------------------
+
+# Distinguishing the chunks must not invent a collision. A gate armed only on its
+# FAIL direction is how a fix ships that refuses every clean batch.
+[[arm]]
+id = "every-repeated-id-is-a-collision"
+test = "test_assemble_accepts_a_clean_batch_of_identically_named_chunks"
+file = "python/src/kb_setup/chunks.py"
+old = "                if nid in seen and seen[nid] != p:"
+new = "                if nid in seen or True:"

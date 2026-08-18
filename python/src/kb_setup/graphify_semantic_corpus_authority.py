@@ -203,10 +203,131 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # workload is the same 474 units / 58 chunks over the same 370 admitted paths, so
 # nothing here re-opens the scope question — only the spend bounds are new, and
 # both were ruled explicitly.
+# RE-RECORDED 2026-08-17 (c), after the one-line fix that made this corpus
+# extractable AT ALL. Same judgement, same workload, and the narrowest re-plan this
+# file has yet recorded.
+#
+# WHY: the driver passed its temporary evidence directory to the adapter as
+# `tempfile` spells it, unresolved. `write_provider_boundary_start` opens every
+# component of that directory with `O_NOFOLLOW`, and `$TMPDIR` on macOS is
+# `/var/folders/…` where `/var` is a symlink to `private/var` — so the marker was
+# refused before any provider call. Measured, not inferred: the first run against
+# this plan failed **58 of 58** chunks with `provider boundary marker destination is
+# unavailable`, and it cost nothing, because the marker is written BEFORE the
+# invocation. The semantic SLICE never hit it: its evidence lives in
+# `graphify-out/graphify-semantic-slice/`, an in-repo path with no symlink
+# component, and until now the slice was the only path that had ever run.
+#
+# The fix is `trusted_evidence_dir`, in the CALLER. It is deliberately not in
+# `open_directory_nofollow`, which must keep refusing symlinks for callers whose
+# path components are not trusted; a test asserts that guard survived rather than
+# being quietly relocated into the primitive.
+#
+# WHAT MOVED: exactly TWO of the 43 fields of `execution-config.json`, diffed field
+# by field rather than assumed — `runner_sha256` (the edited file) and
+# `cache_namespace_sha256` (derived from it) — plus the manifest containing it.
+#
+# WHAT DID NOT: `advisories.json`, `exclusions.json`, `source-inventory.json` and
+# `chunk-ledger.json` all came back BYTE-IDENTICAL at the same source commit
+# 0738af37, so both digests carrying a reviewed DECISION are unchanged. Workload
+# re-derived from the new plan rather than carried forward: **474 units / 58 chunks
+# over 370 unique admitted paths**. This asks for no judgement Ray has not given.
+#
+# RE-PLANNED TWICE AGAIN, and the doctrine above earned its place a second time.
+# The first re-plan of this round verified `execution_authorized: true`, and then the
+# guard work landed — `assert_canonical_evidence`, the `__post_init__` that calls it,
+# and a comment corrected after a mutation refuted it — all in the same driver file,
+# so `runner_sha256` moved again and `verify` went to `config-contract-mismatch`.
+# RE-PLAN LAST is not advice about tidiness: a green `verify` is evidence about the
+# tree at the instant it ran and nothing after it. The second re-plan moved exactly
+# the same two fields (`runner_sha256`, `cache_namespace_sha256`) of 43 and left all
+# four decision-bearing files byte-identical.
+# AUTHORIZED ANEW 2026-08-17 (d), and this one is NOT a re-record. Every prior entry
+# in this file moved only code-identity digests and could honestly say "same judgement";
+# this changes WHAT THE RUN DOES, so it rests on a decision Ray gave explicitly.
+#
+# THE DECISION: `timeout_seconds` 120 -> 900. Ray chose 900 s from three measured
+# options on 2026-08-17, and chose to KEEP `concurrency = 1`.
+#
+# THE MEASUREMENT it rests on, because a timeout picked by feel is how the old one got
+# there. Chunk 1 — 7 members, 18,218 estimated tokens, a MEDIAN chunk of the 58 (range
+# 13,067 to 19,989) — completed in **659.5 s at rc=0**, returning 434 KB, against a
+# 900 s probe ceiling. So 120 s was off by ~5.5x. That figure is a LOWER BOUND: it was
+# taken on graphify's own argv, which omits the `--effort high` and `--max-turns 3` the
+# adapter adds, and 900 s is 1.36x it precisely to cover that gap.
+#
+# WHY 120 SURVIVED THIS LONG: an unresolved `$TMPDIR` one layer down had failed all 58
+# chunks before any model was called, so the timeout had never once been exercised.
+# The two defects were discovered in the same hour, in that order.
+#
+# WHAT ELSE CHANGED, and it is part of the same fix: the adapter's inference ceiling was
+# a hardcoded `timeout=120` reachable from no configuration (#335), so raising this
+# field alone would have changed only WHICH 120-second limit killed the call. It now
+# reads `GRAPHIFY_API_TIMEOUT` — the variable the driver already sets from this field —
+# so the two cannot drift. One number, two consumers.
+#
+# THE COST, stated so nobody is surprised by it: at ~11 minutes a chunk and
+# `concurrency = 1`, 58 chunks is **~10.6 h**. Chunking differently does not change
+# that total; only concurrency would, and concurrency stays 1.
+#
+# WHAT MOVED: 4 of 43 config fields, diffed field by field — `timeout_seconds` (the
+# decision), `planner_sha256` and `adapter_sha256` (the two edited files), and
+# `cache_namespace_sha256` (derived). WHAT DID NOT: `advisories.json`,
+# `exclusions.json`, `source-inventory.json` and `chunk-ledger.json` are BYTE-IDENTICAL
+# at source commit 0738af37, so both digests carrying a reviewed exclusion/advisory
+# decision are untouched and the workload is the same 474 units / 58 chunks.
+#
+# RE-RECORDED 2026-08-17 (e), after this branch was rebased onto `main` at
+# `e8f7f4ea`. **No new judgement.** Both of the entries above were written on
+# branches that could not see each other — the spend rulings landed on `main` via
+# PR #336 while the timeout and `$TMPDIR` work sat here — so each recorded a plan
+# that was true of its own tree and of no tree that would ever run. The rebase is
+# the first time all three of Ray's rulings hold at once, and re-planning is what
+# makes the authority describe that tree rather than either parent.
+#
+# WHAT MOVED, diffed field by field against the pre-rebase plan rather than
+# assumed — FIVE of 43:
+#
+# * `timeout_seconds` 120 -> 900. NOT a new decision: it is the (d) ruling above,
+#   arriving in a plan generated from a tree that also carries the spend caps. The
+#   120 it replaces is the number the (c) block explains as a foreign plan's value
+#   standing in for this branch's, now resolved in the other direction.
+# * `planner_sha256`, `runner_sha256`, `adapter_sha256` — the three files the
+#   merge touched, and `cache_namespace_sha256` derived from them. Ordinary code
+#   identity, the case this file's doctrine describes.
+#
+# THE TWO FIELDS THE MERGE HAD TO CHOOSE BETWEEN, both verified in the regenerated
+# config rather than reasoned about: `claude_max_output_tokens` is **64000**, the
+# value #336 RESOLVES at plan time, not the `_PROFILE` literal this branch read;
+# and `max_total_cost_usd` is **100.0**, present at all only because the rebase
+# brought it. A merge that silently kept this branch's side of either would have
+# produced a plan that looks authorized and spends without a cumulative bound.
+#
+# WHAT DID NOT MOVE: `advisories.json`, `exclusions.json`, `source-inventory.json`
+# and `chunk-ledger.json` are BYTE-IDENTICAL at the same source commit 0738af37,
+# so both digests carrying a reviewed DECISION are unchanged and the workload is
+# the same 474 units / 58 chunks. Nothing here re-opens the scope question.
+# RE-RECORDED 2026-08-17 (f), after the cold review of PR #338. **No new
+# judgement**, and the narrowest re-plan in this file: exactly TWO of 43 fields,
+# `adapter_sha256` and the `cache_namespace_sha256` derived from it. Every
+# decision field — both spend caps, the output ceiling, the timeout, concurrency
+# — is unchanged, and all four decision-bearing plan files are BYTE-IDENTICAL at
+# source commit 0738af37, so the workload is still 474 units / 58 chunks.
+#
+# WHY THE ADAPTER MOVED: `inference_timeout_seconds` rejected `0` and negatives
+# but passed `inf` and `nan` straight through, because both PASS an ordering test
+# — so a non-finite `GRAPHIFY_API_TIMEOUT` reached `subprocess.run` and disabled
+# the deadline entirely. That is the unbounded wait the fallback exists to
+# prevent, arriving through the guard meant to prevent it, on the one path where
+# an unbounded wait costs money. `math.isfinite` now gates it.
+#
+# This is the third re-plan of this branch and the doctrine holds a third time:
+# a REVIEW ROUND is a code change here, so it belongs before the re-plan however
+# much it feels like a separate activity.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"beb0e7a7d2c7108512e54a823fd1f81eb1f45dd5a01b76079348b94270f44be2",'
+    b'"execution_config_sha256":"7d4f3d861656f60b58342b879e2fb6cf6171fbfeffcdaf90a393cde56796de18",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"0d086979cd811e2262a6b882611eec05ea3539f655b5710d6ed70b7abeedfc34",'
+    b'"plan_manifest_sha256":"c1fb5e07c5f454a666f877865cc14b0d2796e03e1415e1f3235ee6bcc9ed161e",'
     b'"schema_version":1}\n'
 )

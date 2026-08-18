@@ -157,6 +157,77 @@ def test_assemble_raises_on_cross_chunk_id_collision(tmp_path) -> None:
         chunks.assemble(tmp_path, "clash", [c1, c2])
 
 
+def test_assemble_sees_an_id_collision_between_identically_named_chunks(tmp_path) -> None:
+    """The gate must key on the chunk's PATH, not its basename (2026-08-17).
+
+    `seen[nid] != p.name` made this whole class invisible whenever a batch's inputs
+    shared a filename — which is exactly the semantic-corpus runner's output, 58
+    chunks all staged as `<chunk-dir>/semantic-fragment.json`. The two other
+    cross-chunk gates do not cover for it: `source_file` differs per chunk here, so
+    `assembly_overlaps` stays quiet, and the hyperedge ids differ too. Measured
+    before the fix: assembled CLEAN, both node sets written, 0 problems.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    paths = []
+    for i, source_file in enumerate(("a.md", "b.md"), start=1):
+        p = tmp_path / f"chunk-{i:04d}" / "semantic-fragment.json"
+        p.parent.mkdir(parents=True)
+        p.write_text(json.dumps(_chunk([_node("dup", source_file=source_file)], [])))
+        paths.append(p)
+    with pytest.raises(ValueError, match="id collision 'dup'") as excinfo:
+        chunks.assemble(tmp_path, "clash", paths)
+    # The label must DISAMBIGUATE, or the message names one file twice and reads as
+    # a chunk colliding with itself.
+    assert "chunk-0001/semantic-fragment.json" in str(excinfo.value)
+    assert "chunk-0002/semantic-fragment.json" in str(excinfo.value)
+
+
+def test_assemble_accepts_a_clean_batch_of_identically_named_chunks(tmp_path) -> None:
+    """The other direction: distinguishing the chunks must not invent a collision."""
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    paths = []
+    for i, (prefix, source_file) in enumerate((("x", "a.md"), ("y", "b.md")), start=1):
+        p = tmp_path / f"chunk-{i:04d}" / "semantic-fragment.json"
+        p.parent.mkdir(parents=True)
+        p.write_text(json.dumps(_chunk([_node(f"{prefix}_a", source_file=source_file)], [])))
+        paths.append(p)
+    out = chunks.assemble(tmp_path, "clean", paths)
+    assert len(json.loads(out.read_text())["nodes"]) == 2
+
+
+def test_assemble_resolves_relative_chunk_paths(tmp_path, monkeypatch) -> None:
+    """`resolve()` is load-bearing for a caller that passes relative paths.
+
+    `_labels` keys on the resolved path, so the loop must resolve too or the label
+    lookup misses. Added because a mutation dropping the `resolve()` SURVIVED: the
+    two tests above hand in absolute paths, so no fixture there could exhibit it —
+    a bound in the probe, not coverage of the property.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    paths = []
+    for i, source_file in enumerate(("a.md", "b.md"), start=1):
+        p = tmp_path / f"chunk-{i:04d}" / "semantic-fragment.json"
+        p.parent.mkdir(parents=True)
+        p.write_text(json.dumps(_chunk([_node("dup", source_file=source_file)], [])))
+        paths.append(Path(p.relative_to(tmp_path)))
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match="id collision 'dup'"):
+        chunks.assemble(tmp_path, "clash", paths)
+
+
+def test_assemble_labels_stay_bare_while_basenames_are_unique(tmp_path) -> None:
+    """Every existing message keeps its wording — the suffix appears only on a clash."""
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    c1 = tmp_path / "left" / "c1.json"
+    c2 = tmp_path / "right" / "c2.json"
+    for p in (c1, c2):
+        p.parent.mkdir(parents=True)
+    c1.write_text(json.dumps(_chunk([_node("dup")], [])))
+    c2.write_text(json.dumps(_chunk([_node("dup", source_file="other.md")], [])))
+    with pytest.raises(ValueError, match=r"id collision 'dup' \(c2\.json vs c1\.json\)"):
+        chunks.assemble(tmp_path, "clash", [c1, c2])
+
+
 def test_assemble_refuses_two_chunks_claiming_one_source_file(tmp_path) -> None:
     """#198 item 2. The ids DO NOT collide — which is the whole point.
 
@@ -838,6 +909,66 @@ def test_assemble_handles_a_null_hyperedges_key(tmp_path) -> None:
     out = chunks.assemble(tmp_path, "nullhyper", [c])
     got = json.loads(out.read_text())
     assert got["hyperedges"] == []
+
+
+def test_the_same_chunk_passed_twice_is_refused(tmp_path) -> None:
+    """A file never collides with itself, so the id gate cannot see this at all.
+
+    Measured before the fix: `assemble(root, 'dupe', [p, p])` returned 0 problems
+    and wrote TWO nodes carrying one id. `assembly_overlaps` could not cover for
+    it either — it dedups on `resolve()` BEFORE its two-chunk minimum, so `[p, p]`
+    collapses to one path and it returns `[]`, which is what the docstring
+    claiming otherwise had made nobody check.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    p = tmp_path / "p.json"
+    p.write_text(json.dumps(_chunk([_node("n1")], [])))
+
+    assert chunks.assembly_overlaps([p, p]) == [], (
+        "PRECONDITION: assembly_overlaps is silent here, which is why assemble must not be"
+    )
+    with pytest.raises(ValueError, match="passed more than once"):
+        chunks.assemble(tmp_path, "dupe", [p, p])
+
+
+def test_a_repeat_is_refused_by_its_spelling_not_its_string(tmp_path) -> None:
+    """CONTROL on the identity: two spellings of one file are still one file.
+
+    Comparing the raw arguments would miss this and let the duplicate through,
+    which is the same too-narrow identity the `_labels` fix was about.
+
+    The second spelling uses `..` and NOT `.`, and that is the whole test. A `.`
+    component is removed by `PurePath` at construction, so `tmp_path / "." /
+    "p.json"` is already EQUAL to `tmp_path / "p.json"` and a raw-argument
+    comparison would pass — the first version of this arm used it, the mutation
+    survived, and the mutant was inert rather than the code being covered. `..`
+    cannot be normalised without touching the filesystem, so only `resolve()`
+    collapses it, which is exactly the property under test.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    (tmp_path / "sub").mkdir()
+    p = tmp_path / "p.json"
+    p.write_text(json.dumps(_chunk([_node("n1")], [])))
+    detour = tmp_path / "sub" / ".." / "p.json"
+    assert detour != p, "PRECONDITION: the two spellings must differ before resolve()"
+    assert detour.resolve() == p.resolve()
+
+    with pytest.raises(ValueError, match="passed more than once"):
+        chunks.assemble(tmp_path, "dupe", [p, detour])
+
+
+def test_two_different_chunks_are_still_assembled(tmp_path) -> None:
+    """CONTROL ARM: the refusal must not have made ordinary assembly refuse."""
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    p = tmp_path / "p.json"
+    q = tmp_path / "q.json"
+    # Distinct `source_file` values, or `assembly_overlaps` refuses for its own
+    # (correct) reason and this arm would pass without testing the new refusal.
+    p.write_text(json.dumps(_chunk([_node("n1", source_file="one.md")], [])))
+    q.write_text(json.dumps(_chunk([_node("n2", source_file="two.md")], [])))
+
+    out = chunks.assemble(tmp_path, "twochunks", [p, q])
+    assert sorted(n["id"] for n in json.loads(out.read_text())["nodes"]) == ["n1", "n2"]
 
 
 # --- replay_order: capture-date supersession, not the alphabet (#186) ---------

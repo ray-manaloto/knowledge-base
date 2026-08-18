@@ -19,11 +19,12 @@ import re
 import signal
 import tempfile
 import warnings
-from collections.abc import Callable
+from collections import Counter
+from collections.abc import Callable, Mapping
 from contextlib import redirect_stderr
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import metadata
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 import msgspec
@@ -37,7 +38,9 @@ from graphify.reflect import build_learning_overlay, reflect
 
 from kb_setup.graphify_health import (
     APPROVED_METADATA_ZERO_NODE_WARNING,
+    APPROVED_PARTIAL_EXTRACTION_WARNING,
     ExpectedMetadataOnly,
+    ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
     GraphifyEvidence,
     GraphifyOperation,
@@ -363,19 +366,27 @@ def extract_checked(
     if not nodes and not failed:
         failed = tuple(_relative_paths(root, paths))
     raw_stderr = stream.getvalue()
-    approved = approve_metadata_zero_node_warning(
+    approved, residual = account_for_extract_stderr(
         root,
-        admission.source_name if admission else "",
         raw_stderr,
-        admission.metadata_inventory if admission else (),
+        ExtractWarningReview(
+            source_name=admission.source_name if admission else "",
+            metadata_inventory=admission.metadata_inventory if admission else (),
+        ),
     )
+    # `caught` warnings are never approved by name, so they always land in the
+    # residual. Previously an approval blanked ALL of stderr, which took these
+    # with it — an approved zero-node warning silently swallowed any unrelated
+    # Python warning raised in the same call.
     warning_text = "\n".join(
-        part
-        for part in (
-            "" if approved else raw_stderr.strip(),
-            *(str(item.message) for item in caught),
-        )
-        if part
+        part for part in (residual.strip(), *(str(item.message) for item in caught)) if part
+    )
+    # `stderr` keeps everything that was said; `residual_stderr` keeps what
+    # nobody accounted for. Collapsing the two — which the pre-#328 code did by
+    # blanking stderr on approval — destroys the evidence that a warning was
+    # printed at all, so a receipt could not later be audited for what it let by.
+    observed_stderr = "\n".join(
+        part for part in (raw_stderr.strip(), *(str(item.message) for item in caught)) if part
     )
     accepted_zero_nodes = (
         bool(approved)
@@ -387,13 +398,14 @@ def extract_checked(
         GraphifyEvidence(
             observed=True,
             source_name=admission.source_name if admission else None,
-            stderr=warning_text,
+            stderr=observed_stderr,
             detected_sources=len(paths),
             extracted_sources=len(paths) if accepted_zero_nodes else len(paths) - len(failed),
             zero_node_sources=len(failed),
             zero_node_paths=failed,
             coverage_policy=admission.coverage_policy if admission else None,
             approved_classifications=approved,
+            residual_stderr=warning_text,
             mode="ast",
         ),
     )
@@ -505,7 +517,12 @@ def approve_metadata_zero_node_warning(
     stderr: str,
     inventory: tuple[ExpectedMetadataOnly, ...],
 ) -> tuple[str, ...]:
-    """Approve only the reviewed warning backed by exact path/bytes/disposition."""
+    """Approve only the reviewed warning backed by exact path/bytes/disposition.
+
+    `stderr` is ONE warning line — approval is per warning, not per subprocess.
+    Passing whole multi-line stderr still works and still refuses, because an
+    unrecognised second line prevents the match.
+    """
     if not inventory or any(item.source_name != source_name for item in inventory):
         return ()
     valid = True
@@ -528,15 +545,151 @@ def approve_metadata_zero_node_warning(
             valid = False
             break
     warned = tuple(item for item in inventory if not item.skipped_disposition.startswith("error:"))
-    names = ", ".join(Path(item.relative_path).name for item in warned)
-    expected = (
-        f"  warning: {len(warned)} source file(s) produced zero nodes and are absent "
-        f"from the graph: {names}. A re-run will retry them (empties are no longer "
-        "cached); if it persists, please report the file(s) (#1666).\n"
-    )
-    if not valid or stderr != expected:
+    # rstrip, never strip: the warning's two LEADING spaces are part of the text
+    # graphify prints and part of what is matched.
+    if not valid or not _zero_node_warning_matches(stderr.rstrip(), warned):
         return ()
     return (APPROVED_METADATA_ZERO_NODE_WARNING,)
+
+
+#: Graphify shows at most this many names before "(+N more)" (`extract.py:5511`).
+_ZERO_NODE_SHOWN_LIMIT = 5
+
+_ZERO_NODE_WARNING = re.compile(
+    r"\A {2}warning: (?P<count>\d+) source file\(s\) produced zero nodes and are absent "
+    r"from the graph: (?P<shown>.+?)"
+    r"(?: \(\+(?P<more>\d+) more\))?"
+    r"\. A re-run will retry them \(empties are no longer cached\); if it persists, "
+    r"please report the file\(s\) \(#1666\)\.\Z"
+)
+
+_PARTIAL_EXTRACTION_WARNING = re.compile(
+    r"\A {2}warning: (?P<count>\d+) file\(s\) had syntax errors and may be partially "
+    r"extracted: (?P<path>[^()]+?) \(first error at line (?P<line>\d+)\) \(#2551\)\.?\Z"
+)
+
+
+def _zero_node_warning_matches(line: str, warned: tuple[ExpectedMetadataOnly, ...]) -> bool:
+    """True iff this #1666 warning is fully accounted for by the reviewed inventory.
+
+    Graphify TRUNCATES the name list at five and appends "(+N more)", so the
+    warning cannot be reconstructed by joining every reviewed name — the previous
+    implementation did exactly that and therefore could never approve a source
+    with more than five metadata-only files, no matter how correctly they were
+    registered. (Measured on `Attacca`: eight files, so graphify prints five names
+    plus "(+3 more)" while the reconstruction printed all eight and no suffix.)
+
+    Identity still comes from the INVENTORY, which pins every path to its bytes and
+    its skipped disposition; this function's job is only to confirm the warning
+    graphify actually printed describes that same set — same total, and every name
+    it does show accounted for. A ninth zero-node file moves `count` and is refused.
+    """
+    if not warned:
+        return False
+    match = _ZERO_NODE_WARNING.match(line)
+    if match is None:
+        return False
+    if int(match.group("count")) != len(warned):
+        return False
+    shown = [name.strip() for name in match.group("shown").split(",")]
+    more = int(match.group("more") or 0)
+    # Reproduce graphify's own truncation arithmetic rather than trusting either
+    # half of it: a "(+N more)" that disagrees with the total is a warning we do
+    # not understand, and an unrecognised warning is never approved.
+    if len(shown) != min(len(warned), _ZERO_NODE_SHOWN_LIMIT):
+        return False
+    if more != max(0, len(warned) - _ZERO_NODE_SHOWN_LIMIT):
+        return False
+    available = Counter(PurePosixPath(item.relative_path).name for item in warned)
+    return not (Counter(shown) - available)
+
+
+@dataclass(frozen=True)
+class ExtractWarningReview:
+    """Everything a reviewer registered about ONE source's extract warnings."""
+
+    source_name: str
+    metadata_inventory: tuple[ExpectedMetadataOnly, ...] = ()
+    partial_inventory: tuple[ExpectedPartialExtraction, ...] = ()
+    #: Per-file node totals from the sub-graph graphify just wrote. A reviewed
+    #: partial extraction is checked against THIS, never against its own claim.
+    extracted_nodes_by_path: Mapping[str, int] = field(default_factory=dict)
+
+
+def _partial_extraction_is_reviewed(root: Path, line: str, review: ExtractWarningReview) -> bool:
+    """True iff this #2551 warning matches a reviewed entry AND the measured loss."""
+    inventory = review.partial_inventory
+    if not inventory or any(item.source_name != review.source_name for item in inventory):
+        return False
+    match = _PARTIAL_EXTRACTION_WARNING.match(line)
+    if match is None or int(match.group("count")) != len(inventory):
+        return False
+    named = match.group("path").strip()
+    entry = next((item for item in inventory if item.relative_path == named), None)
+    if entry is None or int(match.group("line")) != entry.first_error_line:
+        return False
+    try:
+        if _sha256_file(root / entry.relative_path) != entry.content_sha256:
+            return False
+    except OSError:
+        return False
+    # `.get(..., 0)`, not `.get(...)`: `_nodes_by_source_file` is a Counter cast to
+    # a dict, so a file that produced NO nodes is ABSENT rather than zero. Without
+    # the default, a reviewed entry recording `extracted_nodes=0` — a file whose
+    # partial extraction recovered nothing at all, the worst case this inventory
+    # exists to record — compares `None == 0` and can never be approved.
+    return review.extracted_nodes_by_path.get(entry.relative_path, 0) == entry.extracted_nodes
+
+
+def approve_partial_extraction_warning(
+    root: Path, line: str, review: ExtractWarningReview
+) -> tuple[str, ...]:
+    """Approve one reviewed #2551 warning, with the loss re-counted from the graph.
+
+    Graphify's wording is "may be partially extracted" and carries NO count, so
+    approving it on the strength of the text alone would approve an unmeasured
+    quantity of corpus loss — the #231 shape. The reviewed entry states how many
+    nodes the file contributes, and that number is checked against the sub-graph
+    graphify just wrote, so the approval expires the moment the parser's
+    behaviour changes in EITHER direction: a regression to zero nodes and a fix
+    that recovers the symbols both stop matching, and both are worth a look.
+
+    Deliberately handles ONE partially-extracted file per source. Graphify
+    comma-joins a second one (and truncates at five, like the #1666 warning), and
+    that form does not match here — so a newly-partial file blocks the build with
+    its warning named in the residual, rather than inheriting the first file's
+    review. Widen this only alongside a measurement of the new file's loss; the
+    count is the whole point of the entry.
+    """
+    if not _partial_extraction_is_reviewed(root, line, review):
+        return ()
+    return (APPROVED_PARTIAL_EXTRACTION_WARNING,)
+
+
+def account_for_extract_stderr(
+    root: Path, stderr: str, review: ExtractWarningReview
+) -> tuple[tuple[str, ...], str]:
+    """Account for each warning line BY NAME; return (classifications, residual).
+
+    One graphify extract can print several independent warnings, so approval is
+    per line. A line no reviewer registered stays in the residual and blocks —
+    `graphify_health._basic_reasons` refuses any non-empty residual — which is
+    what keeps this from being the whole-stderr rubber stamp it replaces.
+    """
+    classifications: list[str] = []
+    residual: list[str] = []
+    for raw in stderr.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            continue
+        approved = approve_metadata_zero_node_warning(
+            root, review.source_name, line, review.metadata_inventory
+        ) or approve_partial_extraction_warning(root, line, review)
+        if approved:
+            classifications.extend(approved)
+        else:
+            residual.append(line)
+    return tuple(dict.fromkeys(classifications)), "\n".join(residual)
 
 
 def _sha256_file(path: Path) -> str:

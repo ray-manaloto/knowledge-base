@@ -1704,11 +1704,21 @@ def build_from_snapshot(
         node_count, edge_count, hyperedge_count = (
             len(graph_payload.get(name, [])) for name in ("nodes", "links", "hyperedges")
         )
+        # What no reviewer accounted for BY NAME. Reading `residual_stderr` and
+        # not "stderr unless something was approved" matters even though a
+        # non-empty residual cannot reach here (`require_complete` raised): the
+        # old spelling let ONE approval hide every other warning on the same
+        # receipt, and correctness that depends on an invariant enforced two
+        # modules away stops holding the moment either module moves.
         warnings = tuple(
             warning
             for receipt in (detection_receipt, extraction_receipt, build_receipt, artifact_receipt)
-            for warning in (receipt.stderr.strip(),)
-            if warning and not receipt.approved_classifications
+            for warning in (
+                (
+                    receipt.stderr if receipt.residual_stderr is None else receipt.residual_stderr
+                ).strip(),
+            )
+            if warning
         )
         build = BaselineBuildReceipt(
             status="complete",

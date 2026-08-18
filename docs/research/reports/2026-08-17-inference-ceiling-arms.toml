@@ -1,0 +1,130 @@
+# Mutation arms for collapsing the corpus call's TWO independent 120-second ceilings
+# into one configured number, and raising it to the measured 900 s (#335).
+#
+# THE DEFECT. One provider call was bounded twice at 120 s: `GRAPHIFY_API_TIMEOUT`,
+# set from `config.timeout_seconds` and reachable from the plan, AND a hardcoded
+# `timeout=120` in `graphify_semantic_adapter.py` reachable from nothing. Raising the
+# config alone would not have lengthened the call — it would have moved which limit
+# killed it, from graphify's `Command '[claude, -p, …]' timed out after 120.0 seconds`
+# to `semantic adapter inference timed out` (rc 124), and read as a new bug.
+#
+# THE FIX is not "raise both". It is to leave ONE number with two consumers:
+# `inference_timeout_seconds` reads `GRAPHIFY_API_TIMEOUT`, the variable the driver
+# already sets from the same config field. Two values asserted to agree can drift and
+# nothing was asserting it; one value cannot.
+#
+# THE NUMBER, measured rather than chosen. Chunk 1 — 7 members, 18,218 estimated
+# tokens, a MEDIAN chunk of the 58 (range 13,067 to 19,989) — completed in **659.5 s
+# at rc=0**, returning 434 KB. 120 s was off by ~5.5x. 900 s is 1.36x the measurement,
+# and the headroom is not arbitrary: the figure is a LOWER BOUND, taken on graphify's
+# argv, which omits the `--effort high` and `--max-turns 3` the adapter adds.
+#
+# WHY IT SURVIVED SO LONG: an unresolved `$TMPDIR` one layer down failed all 58 chunks
+# before any model was called, so this ceiling had never once been exercised. See
+# `2026-08-17-boundary-marker-canonical-path-arms.toml`.
+#
+# WHAT A CLEAN SWEEP HERE DOES NOT MEAN. It cannot tell you whether 900 is the RIGHT
+# number — that is the measurement above, and no mutation can check it. It also says
+# nothing about the ~10.6 h the run now takes at `concurrency = 1`, which is a cost
+# Ray accepted, not a defect.
+
+suites = ["tests/test_graphify_semantic_corpus_run.py"]
+
+# The suite list excludes `tests/test_graphify_semantic_corpus.py` for the
+# authority-digest reason documented in the boundary-marker spec: `adapter_sha256` and
+# `planner_sha256` are digests of two files mutated below, so ANY byte change to
+# either — the control's inert comment included — fails
+# `test_recorded_authority_authorizes_this_plan_and_only_this_plan` and breaks the
+# CONTROL rather than producing a reading.
+
+# The control edit is a whole added line, not a trailing comment on an existing one.
+# The first attempt appended `  # inert control edit` after `def
+# inference_timeout_seconds(` — whose signature is a SINGLE line, so the comment
+# swallowed the parameter list and the suite went red on a SyntaxError. `kb-arms`
+# reported CONTROL BROKEN and refused to read the other rows, which is the harness
+# doing its job: an "inert" edit that is not inert makes every row below it meaningless.
+[[arm]]
+id = "control"
+control = true
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    raw = (os.environ if environment is None else environment)"
+new = "    # inert control edit\n    raw = (os.environ if environment is None else environment)"
+
+# --------------------------------------------------------------------------
+# One number, two consumers
+# --------------------------------------------------------------------------
+
+# The defect itself: the adapter goes back to a number of its own. The call still has
+# a ceiling, so nothing crashes — it just stops being the one anybody configured.
+[[arm]]
+id = "the-adapter-keeps-its-own-ceiling"
+test = "test_the_adapter_ceiling_is_the_configured_one_not_a_second_number"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    raw = (os.environ if environment is None else environment).get(\"GRAPHIFY_API_TIMEOUT\", \"\")"
+new = "    raw = \"120\""
+
+# Reading a DIFFERENT variable is the same defect wearing a configurable costume: the
+# driver sets `GRAPHIFY_API_TIMEOUT`, so any other name silently takes the fallback.
+[[arm]]
+id = "the-adapter-reads-a-name-nobody-sets"
+test = "test_the_adapter_ceiling_is_the_configured_one_not_a_second_number"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "\"GRAPHIFY_API_TIMEOUT\", \"\")"
+new = "\"KB_SEMANTIC_INFERENCE_TIMEOUT\", \"\")"
+
+# --------------------------------------------------------------------------
+# Fail-closed means SHORTER, never unbounded
+# --------------------------------------------------------------------------
+
+# `None` is no timeout at all. An unparseable value becoming an unlimited wait is the
+# precise failure the fallback exists to prevent — and it is the one that would be
+# hardest to notice, because it never errors, it just never returns.
+[[arm]]
+id = "an-unparseable-ceiling-becomes-unbounded"
+test = "test_the_adapter_ceiling_falls_back_short_when_nothing_configures_it"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    except ValueError:\n        return _FALLBACK_INFERENCE_TIMEOUT_SECONDS"
+new = "    except ValueError:\n        return float(\"inf\")"
+
+# A non-positive value must not be honoured. `subprocess.run(timeout=0)` does not mean
+# "no limit", it means expire immediately — and a negative one is nonsense the caller
+# should never be able to inject through an environment variable.
+[[arm]]
+id = "a-non-positive-ceiling-is-honoured"
+test = "test_the_adapter_ceiling_falls_back_short_when_nothing_configures_it"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "    if parsed <= 0:\n        return _FALLBACK_INFERENCE_TIMEOUT_SECONDS"
+new = "    if False:\n        return _FALLBACK_INFERENCE_TIMEOUT_SECONDS"
+
+# The fallback must stay SHORT. Raising it to the new ceiling would mean an
+# unconfigured launcher silently inherits a 15-minute wait it never asked for.
+[[arm]]
+id = "the-fallback-is-raised-to-the-new-ceiling"
+test = "test_the_adapter_ceiling_falls_back_short_when_nothing_configures_it"
+file = "python/src/kb_setup/graphify_semantic_adapter.py"
+old = "_FALLBACK_INFERENCE_TIMEOUT_SECONDS = 120"
+new = "_FALLBACK_INFERENCE_TIMEOUT_SECONDS = 900"
+
+# --------------------------------------------------------------------------
+# The wiring: the constant and the AUTHORIZED PLAN are two different artifacts
+# --------------------------------------------------------------------------
+
+# `test_the_driver_publishes_the_configured_ceiling_to_the_adapter` reads the plan ON
+# DISK, not the planner constant, so it catches a constant raised without a re-plan —
+# which is exactly how it failed on its first run (`assert 120 == 900`). Mutating the
+# constant alone leaves the authorized plan at 900 and the two disagreeing.
+[[arm]]
+id = "the-planner-constant-drifts-from-the-authorized-plan"
+test = "test_the_driver_publishes_the_configured_ceiling_to_the_adapter"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = "_INFERENCE_TIMEOUT_SECONDS = 900"
+new = "_INFERENCE_TIMEOUT_SECONDS = 120"
+
+# NOT ARMED, and the reason is a real coverage boundary rather than an oversight.
+# Mutating the CALL SITE instead — `timeout_seconds=_INFERENCE_TIMEOUT_SECONDS` back to
+# a literal `120` — SURVIVED, and correctly: that expression is evaluated only when a
+# plan is GENERATED, the on-disk plan still said 900, and no test generates a plan
+# (doing so needs a pinned clone). The arm above mutates the constant, which is the
+# break that actually happens — someone lowers the number and does not re-plan — and
+# the test catches it by comparing the constant to the authorized plan. A re-plan's own
+# output is checked by `verify`, not by the suite.

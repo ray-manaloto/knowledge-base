@@ -50,6 +50,27 @@ from kb_setup import (
 _SCHEMA = "graphify-semantic-corpus-plan/v0"
 _ABORT_SCHEMA = "graphify-semantic-corpus-abort/v0"
 _FILE_CHAR_CAP = 20_000
+
+#: How long ONE provider call may take, in seconds. Authorized by Ray 2026-08-17 at
+#: 900 s, from a measurement rather than a guess: chunk 1 (7 members, 18,218 estimated
+#: tokens — a MEDIAN chunk, since the 58 range 13,067 to 19,989) completed in
+#: **659.5 s at rc=0**, returning 434 KB. That measurement is a LOWER BOUND, taken on
+#: graphify's own argv, which omits the `--effort high` and `--max-turns 3` the adapter
+#: adds; 900 s is 1.36x it, which is the headroom that gap needs.
+#:
+#: The previous value was 120 s — off by roughly 5.5x — and it failed chunk 1 the first
+#: time this driver ever reached a provider. It survived that long because a defect one
+#: layer down (an unresolved `$TMPDIR`, see `graphify_semantic_corpus_run`) had failed
+#: every chunk before any model was called, so the timeout had never been exercised.
+#:
+#: `graphify_semantic_adapter.inference_timeout_seconds` reads this same number out of
+#: `GRAPHIFY_API_TIMEOUT` rather than restating it. It used to be hardcoded there too,
+#: which meant raising this constant alone would have changed only WHICH 120-second
+#: ceiling killed the call (#335).
+#:
+#: At `concurrency = 1` — kept, a reviewed decision — 58 chunks at ~11 minutes each is
+#: ~10.6 h. Chunking differently does not change that total; only concurrency would.
+_INFERENCE_TIMEOUT_SECONDS = 900
 _DEFAULT_TOKEN_BUDGET = 20_000
 # Ray's ruling, 2026-08-17. The whole-run authority, in dollars, against a
 # projected corpus cost of roughly 65 — so it is headroom for a run that goes
@@ -704,7 +725,9 @@ def _effective_config(
         tools=(),
         token_budget=token_budget,
         file_char_cap=_FILE_CHAR_CAP,
-        timeout_seconds=120,
+        timeout_seconds=_INFERENCE_TIMEOUT_SECONDS,
+        # RESOLVED by the caller (#336), not read off `_PROFILE`: the ceiling is
+        # a property of the model that will actually run, not of the plan text.
         claude_max_output_tokens=max_output_tokens,
         claude_max_retries=int(_PROFILE.max_retries),
         structured_output_retries=1,
