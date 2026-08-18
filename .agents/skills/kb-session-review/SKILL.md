@@ -1,6 +1,6 @@
 ---
 name: kb-session-review
-description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
+description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts, the ignored bot reviews, the pending work stranded on worktrees and branches — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
 argument-hint: "[since-date, e.g. 2026-08-15; defaults to the newest directive's date]"
 ---
 
@@ -72,8 +72,12 @@ agents agree on 14 files, which is what made the scope trustworthy.
 Workflow({ name: 'session-review', args: { transcriptDir, since, directive, handoffs, answered } })
 ```
 
-Six lanes sweep independently, every live finding is adversarially refuted, then
-one ranked synthesis. It returns findings; it changes nothing.
+Eight lanes sweep independently, every live finding is adversarially refuted,
+then one ranked synthesis. It returns findings; it changes nothing. The two
+lanes the 2026-08-18 directive added carry their own preflight needs:
+`bot-reviews` discovers the window's PRs itself with `gh`, and `pending-work`
+checks a backup directory only if the preflight named one — so settle that
+path (or its absence) in the interview rather than letting the lane guess.
 
 ### 4. Read the coverage before the findings
 

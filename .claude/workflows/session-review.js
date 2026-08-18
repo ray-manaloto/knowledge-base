@@ -184,6 +184,37 @@ skill, mise task, or python module — and what evidence supports it. Be sceptic
 propose nothing that a single existing task already does with the right arguments,
 and say plainly which existing tools should be FIXED before anything is added.`,
   },
+  {
+    key: 'bot-reviews',
+    prompt: `Find IGNORED BOT REVIEWS — Ray's 2026-08-18 directive (the verbatim
+record lives in docs/direction/): enforce reviewing all PR reviews from bots
+instead of ignoring them. For every
+PR the window touched (merged AND still open), fetch every review and inline
+comment left by a bot account (coderabbitai, graphify-labs, any other [bot]) via
+gh api repos/{owner}/{repo}/pulls/NUMBER/reviews and .../comments — cite the
+exact command per finding. For each bot finding, determine whether it was ever
+DISPOSITIONED: fixed by a later commit, filed as an issue, or explicitly
+adjudicated false with evidence, anywhere — commits, issues, review reports,
+handoffs, the transcripts. An un-dispositioned finding is YOUR finding, with the
+bot's severity attached. Also report the inverse so nobody re-verifies: findings
+already adjudicated false, with where that was recorded. Note bots whose review
+never ran at all (a missing review is not an empty one).`,
+  },
+  {
+    key: 'pending-work',
+    prompt: `Find PENDING WORK AT RISK — Ray's 2026-08-18 directive (the verbatim
+record lives in docs/direction/): ensure no pending work is lost on git
+worktrees, branches, or the backup directory.
+Enumerate every git worktree (git worktree list), every local branch
+with its ahead/behind against origin/main (git for-each-ref with a format naming
+upstream and HEAD distance), anything in git stash, and the backup directory if
+the ALREADY SETTLED block names one. For each: does its unique work exist on
+main, is it superseded (say by what), or is it pending — and if pending, what is
+it and how many commits. A branch whose delta is already merged is bookkeeping;
+unlanded unique commits are the finding. Work from git commands run inside the
+repo — do not walk external directory trees except a backup directory the
+settled block names. Cite the exact commands.`,
+  },
 ]
 
 phase('Sweep')
@@ -197,7 +228,10 @@ const sweeps = await parallel(
         additionalProperties: false,
         required: ['lane', 'findings', 'coverage'],
         properties: {
-          lane: { type: 'string' },
+          // Pinned to THIS lane's key: the missing-lane accounting below
+          // compares self-reported keys, and a typo would count one lane as
+          // missing while its findings ride under a name nothing tracks.
+          lane: { type: 'string', const: lane.key },
           coverage: {
             type: 'object',
             additionalProperties: false,
