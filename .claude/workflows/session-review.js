@@ -376,11 +376,30 @@ const lanes = sweeps.filter(Boolean)
 // (Cold lane, P2, review-2b7bd6ca-cold.md.)
 const SAYS_NOTHING = new Set(['none', 'n/a', 'nothing'])
 const stated = (value) => (typeof value === 'string' ? value.trim() : '')
+
+// These fields are FREE PROSE, so an exact-match set could not read them. On the
+// first real run all SEVEN returning lanes were classified partial — including
+// `unpinned`, whose field literally read "None — this lane is scoped and
+// complete." A signal that fires for every lane carries no information, and it
+// would have made the synthesis call a finished review partial forever.
+//
+// So compare the field's FIRST CLAUSE, not the whole string. "None — complete."
+// and "none." are an explicit nothing; "None of the telemetry was reached" is a
+// real gap and must stay partial, which is why the split is on a separator: that
+// phrase has none before "of", so it never collapses to "none".
+//
+// `''` remains PARTIAL. Silence is not an answer, and the round-2 lane's claim
+// that lanes emit "" was checked against the run and is false here — 0 of 7 did.
+// (Cold lane round 1 P2 for the empty string; round 2 flagged the fragility, and
+// the live data named the real trigger.)
+const FIRST_CLAUSE = /^[^—\-.;:,]+/
+const saysNothing = (field) => {
+  const text = stated(field).toLowerCase()
+  return SAYS_NOTHING.has((text.match(FIRST_CLAUSE)?.[0] ?? text).trim())
+}
 const isPartial = (lane) => {
   if (!lane.coverage) return true // said nothing at all — never clean
-  return [lane.coverage.never_reached, lane.coverage.opened_not_finished].some(
-    (field) => !SAYS_NOTHING.has(stated(field).toLowerCase()),
-  )
+  return [lane.coverage.never_reached, lane.coverage.opened_not_finished].some((f) => !saysNothing(f))
 }
 
 const interrupted = lanes.filter(isPartial)
