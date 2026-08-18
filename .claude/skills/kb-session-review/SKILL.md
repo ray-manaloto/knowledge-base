@@ -72,12 +72,34 @@ agents agree on 14 files, which is what made the scope trustworthy.
 Workflow({ name: 'session-review', args: { transcriptDir, since, directive, handoffs, answered } })
 ```
 
-Eight lanes sweep independently, every live finding is adversarially refuted,
-then one ranked synthesis. It returns findings; it changes nothing. The two
-lanes the 2026-08-18 directive added carry their own preflight needs:
+Eight lanes sweep independently, the highest-cost findings are adversarially
+refuted, then one ranked synthesis. It returns findings; it changes nothing. The
+two lanes the 2026-08-18 directive added carry their own preflight needs:
 `bot-reviews` discovers the window's PRs itself with `gh`, and `pending-work`
 checks a backup directory only if the preflight named one — so settle that
 path (or its absence) in the interview rather than letting the lane guess.
+
+**What each phase runs on**, because a run that inherits the session model puts
+every agent on the most expensive tier available — which is exactly how one run
+spent 78 agents and died before writing its report:
+
+| Phase / lane | Runs on |
+|---|---|
+| `context`, `unpinned` | `haiku` / `medium` — registry lookups and counting jq |
+| `forgotten`, `bot-reviews`, `pending-work`, `tooling-gap`, `contradicted` | `sonnet` / `high` |
+| `circles` | `opus` / `high` — the round's highest-value lane, and judgment-heavy |
+| Cross-check | `kb-adversarial-verifier` (the roster's own refuter, opus/high) |
+| Synthesise | `kb-synthesist` on **`fable`**, falling back to `opus`/`xhigh` |
+
+The fallback is reported as `synthesis_ran_on` in the return value. **It heals
+model exhaustion only** — a session or weekly limit is shared across models, so
+switching cannot escape it.
+
+**The cross-check is capped** at `MAX_REFUTERS` (14) findings, ranked by
+`cost_rank`, which keeps the whole run under the 25-agent advisory ceiling.
+Anything past the cap is returned as **`not_triaged`** — a fourth state beside
+`confirmed`, `refuted` and `unverified`, and logged per finding. Read it: it
+means the review did not look, not that it looked and found nothing.
 
 ### 4. Read the coverage before the findings
 
@@ -112,7 +134,7 @@ in the shape it does. Write it, in the report, before you close.
 
 ## What this does not claim
 
-Six lanes of an LLM reading a round. `NO FINDINGS` from a lane means that lane
+Eight lanes of an LLM reading a round. `NO FINDINGS` from a lane means that lane
 found nothing — never that the area is sound. The cross-check refutes findings;
 it cannot manufacture the ones nobody looked for. Its value is the *routes* it
 takes, not a proof of completeness.
