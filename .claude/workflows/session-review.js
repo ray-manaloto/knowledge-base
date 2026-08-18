@@ -260,9 +260,13 @@ const interrupted = lanes.filter(isPartial)
 const missing = LANES.map((l) => l.key).filter((key) => !lanes.some((l) => l.lane === key))
 
 for (const l of interrupted) {
+  // Only report a field that SAYS something — `isPartial` already treats "none"
+  // as silence, and printing "never reached none" beside a real gap reads as a
+  // second gap.
+  const says = (v) => stated(v) && !SAYS_NOTHING.has(stated(v).toLowerCase()) && stated(v)
   const why = [
-    stated(l.coverage?.never_reached) && `never reached ${l.coverage.never_reached}`,
-    stated(l.coverage?.opened_not_finished) && `opened but unfinished: ${l.coverage.opened_not_finished}`,
+    says(l.coverage?.never_reached) && `never reached ${says(l.coverage.never_reached)}`,
+    says(l.coverage?.opened_not_finished) && `opened but unfinished: ${says(l.coverage.opened_not_finished)}`,
   ].filter(Boolean).join('; ')
   log(`PARTIAL COVERAGE — ${l.lane}: ${why || 'returned no coverage statement'}`)
 }
@@ -309,7 +313,14 @@ ${CONTRACT}`,
 const checked = verdicts.filter(Boolean)
 const confirmed = checked.filter((c) => c.verdict && !c.verdict.refuted).map((c) => c.finding)
 const refuted = checked.filter((c) => c.verdict && c.verdict.refuted)
-log(`${confirmed.length} confirmed, ${refuted.length} refuted of ${behavioural.length} live findings`)
+// A cross-check agent that DIED returns a null verdict, which satisfies neither
+// filter above — so the finding fell out of `confirmed` AND `refuted` and reached
+// the synthesis in neither. Silent loss past the gate, and the same shape as the
+// coverage bug this file was already fixed for. An unchecked finding is not a
+// refuted one; it is a finding nobody verified, and it is reported as that.
+const unverified = checked.filter((c) => !c.verdict).map((c) => c.finding)
+for (const f of unverified) log(`CROSS-CHECK DID NOT RETURN — ${f.lane}: "${f.claim}" is UNVERIFIED, not refuted`)
+log(`${confirmed.length} confirmed, ${refuted.length} refuted, ${unverified.length} unverified of ${behavioural.length} live findings`)
 
 phase('Synthesise')
 const report = await agent(
@@ -331,6 +342,10 @@ arguments. Say which existing tools should be FIXED first.
 
 CONFIRMED FINDINGS:
 ${JSON.stringify(confirmed, null, 1)}
+
+UNVERIFIED — the cross-check agent did not return, so these are NOT refuted and
+NOT confirmed. Report them as unverified rather than dropping them:
+${JSON.stringify(unverified, null, 1)}
 
 REFUTED, with the refutation:
 ${JSON.stringify(refuted.map((r) => ({ claim: r.finding.claim, why: r.verdict.why, contradicts: r.verdict.contradicts })), null, 1)}
@@ -354,5 +369,6 @@ return {
   lanes_that_did_not_return: missing,
   confirmed,
   refuted: refuted.map((r) => ({ claim: r.finding.claim, why: r.verdict.why })),
+  unverified,
   report,
 }

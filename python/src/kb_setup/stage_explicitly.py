@@ -105,6 +105,14 @@ def _is_blanket_add(words: list[str]) -> bool:
     if index >= len(words) or words[index] != "add":
         return False
     arguments = words[index + 1 :]
+    # `-u` WINS OVER ANY PATHSPEC. `git add -u .` updates tracked modifications
+    # under the current directory and cannot introduce an untracked path, so it
+    # is the safe form this guard's own message recommends — denying it was a
+    # false positive of exactly the class the docstring forbids, found by the
+    # cold lane on PR #339. Checked before the pathspec test, not after, because
+    # the pathspec is what would otherwise convict it.
+    if any(argument in {"-u", "--update"} for argument in arguments):
+        return False
     if any(argument in _BLANKET_FLAGS for argument in arguments):
         return True
     # A bundled short-flag cluster: `-Av`, `-vA`. Split so `-A` is not missed
