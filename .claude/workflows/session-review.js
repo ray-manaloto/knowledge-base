@@ -83,18 +83,25 @@
 // BEFORE this (a workflow cannot ask), then applies what comes back.
 //
 // Invoke:
+//   mise run kb-session-select -- --last 3        # or --current / --since / --sessions
 //   Workflow({ name: 'session-review', args: {
-//     transcriptDir: '/abs/path/to/projects/<slug>',   // REQUIRED
-//     since: '2026-08-15',                             // REQUIRED, no default
-//     directive: 'docs/direction/2026-08-17-ray-directives.md',  // newest, read in full
-//     handoffs: ['.agent/plans/session-2026-08-17-g.md', ...],   // REQUIRED, see L5
+//     sessions: [ ...that command's `sessions` array... ],        // REQUIRED
+//     output: 'report' | 'handoff',                              // default 'report'
+//     lanes: ['circles', 'forgotten'],                           // optional override
+//     directive: 'docs/direction/2026-08-18-ray-directives.md',  // newest, read in full
+//     handoffs: ['.agent/plans/session-2026-08-18-b.md', ...],   // REQUIRED, see L3
+//     handoffOut: '.agent/plans/session-<date>-<letter>.md',     // when output='handoff'
 //     reportDir: '.agent/kb/reports/agents',
 //     answered: { ... },   // whatever the skill's preflight settled, so no lane re-hunts it
 //   }})
 //
-// `since` has NO DEFAULT on `kb-extract`'s precedent: `Date.now()` and
-// `new Date()` THROW inside a Workflow script, so a default would either be a
-// hardcoded lie or a crash. Passed in, or it stops here.
+// `sessions` has NO DEFAULT and is not a directory plus a date any more.
+// `Date.now()` and `new Date()` THROW inside a Workflow script, so a window was
+// always computed outside — which meant in the head of the calling session.
+// `mise run kb-session-select` is that outside, made deterministic: it resolves
+// `--current` / `--since..--until` / `--sessions` / `--last N` against BIRTHTIME
+// cross-checked with each transcript's own first timestamp, and refuses an empty
+// result rather than returning one.
 //
 // ── THE FIVE LESSONS THE LAST RUN OWED ITSELF (its own §7), now enforced ──
 //
@@ -157,11 +164,12 @@ if (typeof cfg === 'string') {
   }
 }
 
-// TWO MODES, one pipeline.
+// TWO OUTPUTS, one pipeline.
 //
-//   'round'   (default) — the whole round, all 8 lanes, ends in a ranked report.
-//   'handoff' — ONE session, the 5 lanes whose questions a handoff actually needs,
-//               ending in a handoff document instead of a report.
+//   'report'  (default) — a ranked review of the round.
+//   'handoff' — the next session's brief instead of a report.
+//
+// The LANE SET is a separate argument (`lanes`) that merely DEFAULTS from this.
 //
 // WHY handoff mode exists. `clear-prep/SKILL.md` says it outright: "The handoff is
 // written from memory." A session at the end of its context recollecting its own
@@ -178,24 +186,66 @@ if (typeof cfg === 'string') {
 // input, never the only one; the lanes write incrementally so a death leaves a
 // partial draft; and the caller validates with `mise run kb-handoff-check`,
 // which is what turns this from a nicer draft into a checked one.
-const MODE = cfg.mode === 'handoff' ? 'handoff' : 'round'
+// `output` DECIDES THE ARTIFACT. `lanes` decides the work. They were ONE flag
+// (`mode`) until now, and conflating them cost a real capability: there was no
+// way to ask for a full eight-lane sweep that ends in a handoff, or a three-lane
+// quick report. The lane set is now a DEFAULT of the output shape, not a
+// consequence of it.
+//
+// AN UNKNOWN VALUE THROWS. The previous form was `cfg.mode === 'handoff' ?
+// 'handoff' : 'round'`, which silently accepted `mode: 'handof'` and produced a
+// full round — a contract that lies about what it accepted, which is the same
+// defect class as a gate claiming a blast radius it does not have.
+const OUTPUT = cfg.output ?? 'report'
+if (OUTPUT !== 'report' && OUTPUT !== 'handoff') {
+  throw new Error(
+    `session-review: output must be 'report' or 'handoff', got ${JSON.stringify(cfg.output)}. ` +
+      "(This argument was called `mode` with values 'round'/'handoff' until 2026-08-18; " +
+      'it was renamed because it silently decided the LANE SET as well as the artifact.)',
+  )
+}
 
-// The five whose output a handoff is actually made of: what was asked and
-// dropped, what is unlanded, what got redone, what drifted, and what a bot
-// flagged that nobody actioned. `unpinned`, `context` and `tooling-gap` are
-// round-level questions and are not worth a session-end agent each.
+// The five a handoff is actually made of: what was asked and dropped, what is
+// unlanded, what got redone, what drifted, and what a bot flagged that nobody
+// actioned. `unpinned`, `context` and `tooling-gap` are round-level questions
+// and are not worth a session-end agent each. A DEFAULT now — pass `lanes` to
+// override in either direction.
 const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews'])
 
-for (const required of ['transcriptDir', 'since', 'handoffs']) {
+// `sessions` REPLACES `transcriptDir` + `since`, and comes from
+// `mise run kb-session-select` rather than from whoever is typing the call.
+//
+// WHY THE CHANGE. `Date.now()` throws in a workflow script, so the window was
+// always computed outside — which meant "in the head of the calling session",
+// unvalidated. Worse, `CONTRACT` then told every lane to re-derive the scope
+// itself with `mtime >= since`, and mtime is not when a session ran: 20 of 238
+// transcripts carry a birth-to-mtime gap over 24h (worst 119.6h), and this
+// round's own run EXCLUDED session 6b974f05 — 675 of 1,693 tool calls — because
+// its UTC records and local mtime straddle midnight. An explicit resolved list
+// removes both the transcription surface and the re-derivation.
+for (const required of ['sessions', 'handoffs']) {
   if (!cfg[required] || (Array.isArray(cfg[required]) && !cfg[required].length)) {
     throw new Error(
       `session-review: '${required}' is REQUIRED and has no default. ` +
         (required === 'handoffs'
           ? 'A glob that matches nothing looks exactly like a round with no handoffs (L3).'
-          : 'A computed default would be a hardcoded lie — Date.now() throws in a workflow.'),
+          : "Run `mise run kb-session-select -- <selector>` and pass its `sessions` array. " +
+            'A computed default would be a hardcoded lie — Date.now() throws in a workflow.'),
     )
   }
 }
+
+// The resolved list, rendered once for every lane. PATHS, not a directory and a
+// date — so a lane cannot re-derive a different scope than the caller settled,
+// which is what `answered` exists to prevent everywhere else.
+//
+// `started_at` and `time_source` are shown rather than hidden: a lane reading
+// `content` knows the filesystem disagreed with the transcript about when that
+// session began, which is exactly the fact an mtime scope was silently getting
+// wrong.
+const SESSIONS = cfg.sessions
+  .map((s) => `  - ${s.path || s}` + (s.started_at ? `  (started ${s.started_at}, by ${s.time_source})` : ''))
+  .join('\n')
 
 const reportDir = cfg.reportDir || '.agent/kb/reports/agents'
 const answered = JSON.stringify(cfg.answered || {}, null, 1)
@@ -203,7 +253,12 @@ const directive = cfg.directive || '(none supplied — say so in your coverage l
 
 // Every lane carries this. It is the difference between a report and a claim.
 const CONTRACT = `
-SCOPE: transcripts in ${cfg.transcriptDir} with mtime >= ${cfg.since}.
+SCOPE — these transcripts, and ONLY these. The list is already resolved by
+\`mise run kb-session-select\`; do NOT re-derive it, and do NOT filter by mtime.
+Modification time is not when a session ran: 20 of 238 transcripts carry a
+birth-to-mtime gap over 24 hours (worst 119.6h), and an earlier run of THIS
+review dropped a session holding 675 of the round's 1,693 tool calls that way.
+${SESSIONS}
 Ray's standing directive: ${directive} — read it IN FULL before you conclude anything.
 Round handoffs, which are where the real instructions live — read every one:
 ${(cfg.handoffs || []).map((h) => '  - ' + h).join('\n')}
@@ -385,8 +440,33 @@ settled block names. Cite the exact commands.`,
 // rather than `LANES` — otherwise handoff mode reports three lanes as
 // "did not return" when they were never dispatched, which is precisely the
 // never-ran-vs-ran-and-found-nothing conflation this file exists to refuse.
-const ACTIVE_LANES = MODE === 'handoff' ? LANES.filter((l) => HANDOFF_LANES.has(l.key)) : LANES
-log(`mode=${MODE}: ${ACTIVE_LANES.length} lane(s) — ${ACTIVE_LANES.map((l) => l.key).join(', ')}`)
+// LANES are chosen INDEPENDENTLY of the output shape. `cfg.lanes` wins; failing
+// that, a handoff defaults to HANDOFF_LANES and a report to all eight.
+//
+// An unknown lane name THROWS rather than silently narrowing the sweep — a
+// review that ran four lanes because one was misspelled reports as confidently
+// as one that ran five, which is the never-ran-vs-ran-and-found-nothing
+// conflation this whole file refuses.
+const REQUESTED = Array.isArray(cfg.lanes) && cfg.lanes.length ? new Set(cfg.lanes) : null
+if (REQUESTED) {
+  const unknown = [...REQUESTED].filter((k) => !LANES.some((l) => l.key === k))
+  if (unknown.length) {
+    throw new Error(
+      `session-review: unknown lane(s): ${unknown.join(', ')}. ` +
+        `Known lanes: ${LANES.map((l) => l.key).join(', ')}.`,
+    )
+  }
+}
+const ACTIVE_LANES = REQUESTED
+  ? LANES.filter((l) => REQUESTED.has(l.key))
+  : OUTPUT === 'handoff'
+    ? LANES.filter((l) => HANDOFF_LANES.has(l.key))
+    : LANES
+log(
+  `output=${OUTPUT}, lanes=${REQUESTED ? 'explicit' : 'default'}: ` +
+    `${ACTIVE_LANES.length} lane(s) — ${ACTIVE_LANES.map((l) => l.key).join(', ')} ` +
+    `over ${cfg.sessions.length} session(s)`,
+)
 
 phase('Sweep')
 const sweeps = await parallel(
@@ -847,8 +927,8 @@ ${JSON.stringify(lanes.map((l) => ({ lane: l.lane, coverage: l.coverage })), nul
 PARTIAL LANES: ${JSON.stringify(interrupted.map((l) => l.lane))}
 LANES THAT DID NOT RETURN AT ALL (they cover NOTHING): ${JSON.stringify(missing)}`
 
-const synthesised = await judge(MODE === 'handoff' ? HANDOFF_PROMPT : REPORT_PROMPT, {
-  label: MODE === 'handoff' ? 'compose-handoff' : 'synthesise',
+const synthesised = await judge(OUTPUT === 'handoff' ? HANDOFF_PROMPT : REPORT_PROMPT, {
+  label: OUTPUT === 'handoff' ? 'compose-handoff' : 'synthesise',
   phase: 'Synthesise',
   agentType: 'kb-synthesist',
 })

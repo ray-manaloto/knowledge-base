@@ -1,7 +1,7 @@
 ---
 name: kb-session-review
 description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts, the ignored bot reviews, the pending work stranded on worktrees and branches — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
-argument-hint: "[since-date, e.g. 2026-08-15; defaults to the newest directive's date]"
+argument-hint: "[a kb-session-select selector, e.g. --last 3 | --current | --since 2026-08-15]"
 ---
 
 # kb-session-review
@@ -48,29 +48,57 @@ item is still wanted, and what the window is.
 is its own failure (`clarify-before-acting.md` rule 3). Ask only what a probe
 cannot settle.
 
-### 2. Collect the arguments the workflow refuses to default
+### 2. Resolve the sessions with a task, not by hand
 
-`transcriptDir`, `since` and `handoffs` are REQUIRED and have no defaults.
+`sessions` and `handoffs` are REQUIRED and have no defaults.
 
-- `since` cannot be computed — `Date.now()` throws inside a workflow, so a
-  default would be a hardcoded lie.
-- `handoffs` is passed explicitly rather than globbed, because `.agent/` is
+**`sessions` comes from `mise run kb-session-select`** — never typed:
+
+```bash
+mise run kb-session-select -- --current            # this session (for a handoff)
+mise run kb-session-select -- --last 3             # the last three
+mise run kb-session-select -- --since 2026-08-15   # a datetime range
+mise run kb-session-select -- --sessions <id> <id> # named explicitly
+```
+
+Pass its `sessions` array straight through. It resolves `started_at` from
+**birthtime cross-checked against each transcript's own first timestamp**, and
+says which clock it used — because mtime is not when a session ran. Measured: 20
+of 238 transcripts carry a birth-to-mtime gap over 24h (worst 119.6h), and a run
+of THIS review dropped a session holding **675 of the round's 1,693 tool calls**
+because its UTC records and local mtime straddled midnight.
+
+It **refuses rather than returning nothing**: an empty window exits 127 and says
+how many transcripts it examined; an unknown id exits 2 naming it, never a
+partial list.
+
+- `handoffs` is still passed explicitly rather than globbed, because `.agent/` is
   gitignored and **a glob that matches nothing looks exactly like a round with no
-  handoffs**.
+  handoffs**. In handoff mode it is also the BACKLOG the composer reconciles
+  against, so a short list is a short memory.
 
-`$ARGUMENTS` is the `since` date when the user gave one; with none, propose the
-newest `docs/direction/*.md` date and confirm it in the preflight question rather
+`$ARGUMENTS` is the selector when the user gave one; with none, propose
+`--since <newest docs/direction date>` and confirm it in the preflight rather
 than assuming it.
 
-Arm the window before you use it: `ls -lt` the transcript dir and confirm the
-file just outside `since` really is older. The last run had four independent
-agents agree on 14 files, which is what made the scope trustworthy.
+**Do not hand-arm the window any more.** The old instruction here was to `ls -lt`
+the transcript dir and eyeball whether the file just outside `since` was really
+older — a check performed by the same context that chose the bound. The selector
+does it instead, and reports `started_at` with the clock that produced it, so the
+scope is a resolved artifact you can paste rather than a judgement you made.
 
 ### 3. Run the workflow
 
 ```text
-Workflow({ name: 'session-review', args: { transcriptDir, since, directive, handoffs, answered } })
+Workflow({ name: 'session-review', args: { sessions, handoffs, directive, answered } })
 ```
+
+`output` (`'report'` | `'handoff'`, default `report`) decides the ARTIFACT;
+`lanes` decides the WORK and merely defaults from it. They were one flag until
+2026-08-18, which meant there was no way to ask for a full eight-lane sweep
+ending in a handoff. An unknown value for either now THROWS rather than silently
+falling back — a run that swept four lanes because one was misspelled reports as
+confidently as one that swept five.
 
 Eight lanes sweep independently, the highest-cost findings are adversarially
 refuted, then one ranked synthesis. It returns findings; it changes nothing. The
@@ -158,10 +186,11 @@ reading git, the gates JSON, the issue tracker and the transcripts do not
 recollect; they read.
 
 ```text
+mise run kb-session-select -- --current
 Workflow({ name: 'session-review', args: {
-  mode: 'handoff',            // 5 lanes instead of 8, scoped to THIS session
+  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the five below
   handoffOut: '.agent/plans/session-<date>-<letter>.md',
-  transcriptDir, since, handoffs, answered,
+  sessions, handoffs, answered,
 }})
 ```
 
