@@ -151,6 +151,21 @@ class SpendLedger(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     schema_version: int = 1
 
 
+def read_spend_ledger_record(namespace_dir: Path) -> SpendLedger:
+    """The whole durable record, not just its total.
+
+    `charges` travels with `total_usd` because a ledger that reports
+    `{"total_usd": 6.0, "charges": 1}` after three charges across two processes
+    is a record that contradicts itself — and this file is the only place a
+    finished run can be audited for what it spent. Cold lane, PR #339.
+    """
+    path = namespace_dir / SPEND_LEDGER
+    try:
+        return msgspec.json.decode(path.read_bytes(), type=SpendLedger, strict=True)
+    except OSError, msgspec.DecodeError, msgspec.ValidationError:
+        return SpendLedger(total_usd=0.0, charges=0)
+
+
 def read_spend_ledger(namespace_dir: Path) -> float:
     """The spend already charged against this plan, across every previous run.
 
@@ -162,11 +177,7 @@ def read_spend_ledger(namespace_dir: Path) -> float:
     alternative — refusing to run at all on a stray byte — would make a
     resumable run unresumable, which is the failure this ledger exists to fix.
     """
-    path = namespace_dir / SPEND_LEDGER
-    try:
-        return msgspec.json.decode(path.read_bytes(), type=SpendLedger, strict=True).total_usd
-    except OSError, msgspec.DecodeError, msgspec.ValidationError:
-        return 0.0
+    return read_spend_ledger_record(namespace_dir).total_usd
 
 
 class _Spend:
@@ -193,9 +204,17 @@ class _Spend:
     def __init__(self, limit_usd: float, ledger_dir: Path | None = None) -> None:
         self.limit_usd = limit_usd
         self.ledger_dir = ledger_dir
-        self.carried_usd = read_spend_ledger(ledger_dir) if ledger_dir is not None else 0.0
-        self.total_usd = self.carried_usd
-        self.charges = 0
+        carried = (
+            read_spend_ledger_record(ledger_dir)
+            if ledger_dir is not None
+            else SpendLedger(total_usd=0.0, charges=0)
+        )
+        self.carried_usd = carried.total_usd
+        self.total_usd = carried.total_usd
+        # Seeded, not reset. `charges` is the ledger's own audit field, and a
+        # resumed run that rewrote it as 1 after three charges made the record
+        # contradict its own total.
+        self.charges = carried.charges
 
     def charge(self, amount: float) -> None:
         self.total_usd += amount

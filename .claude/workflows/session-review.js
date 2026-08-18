@@ -231,8 +231,42 @@ const sweeps = await parallel(
 )
 
 const lanes = sweeps.filter(Boolean)
-const interrupted = lanes.filter((l) => (l.coverage?.never_reached || '').trim() && l.coverage.never_reached.toLowerCase() !== 'none')
-for (const l of interrupted) log(`PARTIAL COVERAGE — ${l.lane}: never reached ${l.coverage.never_reached}`)
+
+// A lane is COMPLETE only if it says so. Everything else is partial, including
+// the two cases the first version of this filter called clean — both found by
+// the cold lane on PR #339, in the code whose own L6 says "a lane with no
+// coverage line is treated as partial, never as clean":
+//
+//   * it read `never_reached` and IGNORED `opened_not_finished`, so a lane cut
+//     off mid-analysis ("3 items opened", "never_reached: none") reported clean.
+//     Read-but-unanalysed is the harder half to spot, which is exactly why L6
+//     asks for the field.
+//   * `(l.coverage?.never_reached || '')` turned a MISSING coverage object into
+//     the empty string, i.e. into "clean" — the default pointing the wrong way
+//     on the one lane that told you least.
+const SAYS_NOTHING = new Set(['', 'none', 'n/a', 'nothing'])
+const stated = (value) => (typeof value === 'string' ? value.trim() : '')
+const isPartial = (lane) => {
+  if (!lane.coverage) return true // said nothing at all — never clean
+  return [lane.coverage.never_reached, lane.coverage.opened_not_finished].some(
+    (field) => stated(field) && !SAYS_NOTHING.has(stated(field).toLowerCase()),
+  )
+}
+
+const interrupted = lanes.filter(isPartial)
+// A lane that DIED — usage limit, refusal, exception — returns null and is
+// filtered out of `lanes` entirely, so it can never appear in `interrupted`.
+// That is the loudest possible partial coverage and it was the quietest.
+const missing = LANES.map((l) => l.key).filter((key) => !lanes.some((l) => l.lane === key))
+
+for (const l of interrupted) {
+  const why = [
+    stated(l.coverage?.never_reached) && `never reached ${l.coverage.never_reached}`,
+    stated(l.coverage?.opened_not_finished) && `opened but unfinished: ${l.coverage.opened_not_finished}`,
+  ].filter(Boolean).join('; ')
+  log(`PARTIAL COVERAGE — ${l.lane}: ${why || 'returned no coverage statement'}`)
+}
+for (const key of missing) log(`LANE DID NOT RETURN — ${key}: treat as covering NOTHING`)
 log(`${lanes.length}/${LANES.length} lanes returned; ${lanes.reduce((n, l) => n + l.findings.length, 0)} raw findings`)
 
 // A barrier IS correct here: the cross-check needs the whole set, because two
@@ -301,8 +335,11 @@ ${JSON.stringify(confirmed, null, 1)}
 REFUTED, with the refutation:
 ${JSON.stringify(refuted.map((r) => ({ claim: r.finding.claim, why: r.verdict.why, contradicts: r.verdict.contradicts })), null, 1)}
 
-LANE COVERAGE:
+LANE COVERAGE (partial lanes are listed again below — do not let them read as clean):
 ${JSON.stringify(lanes.map((l) => ({ lane: l.lane, coverage: l.coverage })), null, 1)}
+
+PARTIAL LANES: ${JSON.stringify(interrupted.map((l) => l.lane))}
+LANES THAT DID NOT RETURN AT ALL (they cover NOTHING): ${JSON.stringify(missing)}
 
 Write it to ${reportDir}/session-review-synthesis.md and end with the
 "## GitHub repos touched" section this repo's rules require.`,
@@ -311,7 +348,10 @@ Write it to ${reportDir}/session-review-synthesis.md and end with the
 
 return {
   lanes: lanes.map((l) => ({ lane: l.lane, findings: l.findings.length, coverage: l.coverage })),
+  // Both kinds of incomplete, kept apart: a lane that ran and did not finish,
+  // and one that never reported. Collapsing them would hide the worse case.
   partial_coverage: interrupted.map((l) => l.lane),
+  lanes_that_did_not_return: missing,
   confirmed,
   refuted: refuted.map((r) => ({ claim: r.finding.claim, why: r.verdict.why })),
   report,

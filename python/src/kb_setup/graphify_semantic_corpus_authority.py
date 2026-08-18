@@ -364,6 +364,12 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 #    it needs a graphify-side prompt hook or a post-hoc decision, and that is a
 #    judgement for Ray, not something to infer from two samples.
 #
+# RE-RECORDED once more the same day, after a cold review of the ledger itself
+# found `charges` resetting on resume while `total_usd` carried — so the record
+# reported `{total_usd: 6.0, charges: 1}` after three charges, contradicting its
+# own total in the one file a finished run can be audited from. `runner_sha256`
+# and the derived namespace moved; nothing else did.
+#
 # WHAT DID NOT MOVE: `advisories.json`, `exclusions.json`, `source-inventory.json`
 # and `chunk-ledger.json` are BYTE-IDENTICAL at source commit 0738af37, so both
 # digests carrying a reviewed DECISION are unchanged and the workload is the same
@@ -371,8 +377,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # thing that was defeating it.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"d006a76e7cc2a58c51a559fc3ece6f0ea6055c7561cea860b2ae9ae91655d190",'
+    b'"execution_config_sha256":"bc44b4e86c6442099127db277a19e89a3f287b8defa16832f25bef7bd035a461",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"460c2d1a6844c7a9506094a89bf380c269129b3d9abeec64b21c709513679044",'
+    b'"plan_manifest_sha256":"10b2b4b0006601ebeb947c1b022e58363870ef29e475ec3d9079ecb9662d0044",'
     b'"schema_version":1}\n'
 )

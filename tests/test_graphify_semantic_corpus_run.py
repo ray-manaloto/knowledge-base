@@ -1260,6 +1260,18 @@ def test_spend_survives_a_restart(tmp_path: Path) -> None:
     assert second.carried_usd == 10.0
     assert second.total_usd == 10.0
 
+    # And it must keep ACCUMULATING, not merely start from the right number. The
+    # first version of this test asserted only at construction, so a resumed run
+    # that seeded correctly and then wrote its own total over the carried one
+    # would have passed. Cold lane, PR #339.
+    second.charge(5.0)
+
+    assert second.total_usd == 15.0
+    assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path) == 15.0
+    # `charges` is the ledger's own audit field and must survive the restart too:
+    # two charges in the first process plus one here is three, not one.
+    assert graphify_semantic_corpus_run.read_spend_ledger_record(tmp_path).charges == 3
+
 
 def test_spend_is_persisted_on_every_charge_not_at_the_end(tmp_path: Path) -> None:
     """A total that is only durable once the run finishes is not durable.
