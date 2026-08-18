@@ -205,6 +205,18 @@ if (OUTPUT !== 'report' && OUTPUT !== 'handoff') {
   )
 }
 
+// A handoff MUST say where it goes. Without this, the synthesiser is told to
+// write to the literal placeholder path 'session-<UTC-date>-<letter>.md', and
+// every run of this mode then overwrites the same placeholder artifact —
+// which is the accepted-but-lying contract shape the OUTPUT check above refuses.
+if (OUTPUT === 'handoff' && !(typeof cfg.handoffOut === 'string' && cfg.handoffOut.trim())) {
+  throw new Error(
+    "session-review: output 'handoff' REQUIRES 'handoffOut', the path the handoff " +
+      `is written to, got ${JSON.stringify(cfg.handoffOut)}. There is no default: ` +
+      'a computed date would need Date.now(), which throws in a workflow.',
+  )
+}
+
 // The five a handoff is actually made of: what was asked and dropped, what is
 // unlanded, what got redone, what drifted, and what a bot flagged that nobody
 // actioned. `unpinned`, `context` and `tooling-gap` are round-level questions
@@ -447,6 +459,18 @@ settled block names. Cite the exact commands.`,
 // review that ran four lanes because one was misspelled reports as confidently
 // as one that ran five, which is the never-ran-vs-ran-and-found-nothing
 // conflation this whole file refuses.
+//
+// A NON-ARRAY `lanes` THROWS by the same rule. `lanes: "circles"` or `lanes: {}`
+// used to fall through `Array.isArray` to null and run the DEFAULT set — a
+// targeted request silently widened into a full sweep, which is the accepted-
+// but-lying contract shape the OUTPUT check above refuses. An empty array still
+// means "no explicit request" and takes the default, as before.
+if (cfg.lanes != null && !Array.isArray(cfg.lanes)) {
+  throw new Error(
+    `session-review: lanes must be an ARRAY of lane keys, got ${JSON.stringify(cfg.lanes)}. ` +
+      `Known lanes: ${LANES.map((l) => l.key).join(', ')}.`,
+  )
+}
 const REQUESTED = Array.isArray(cfg.lanes) && cfg.lanes.length ? new Set(cfg.lanes) : null
 if (REQUESTED) {
   const unknown = [...REQUESTED].filter((k) => !LANES.some((l) => l.key === k))
@@ -494,13 +518,13 @@ const sweeps = await parallel(
           // begins) could never engage, and reordering the prompt above would
           // have bought nothing.
           //
-          // The typo it guarded against is still CAUGHT: `missing` below
-          // compares self-reported keys against LANES. What is lost is
-          // ATTRIBUTION — a wrong key surfaces as a missing lane rather than
-          // being rejected outright, and its findings ride under that wrong name
-          // through `behavioural` and into the report. That is the real trade,
-          // and it is made knowingly: a whole-fan-out caching loss every run
-          // outweighs a typo that this accounting still reports.
+          // Attribution is NOT trusted to this field either: the `.then` on the
+          // dispatch below overwrites it with the lane key the prompt was built
+          // from, after the schema has done its cache-key job. Trusting the
+          // self-report cost both halves at once — a `circles` worker answering
+          // "forgotten" rode its findings under the wrong name through
+          // `behavioural` and into the report, while `circles` was logged as a
+          // lane that never returned.
           lane: { type: 'string' },
           coverage: {
             type: 'object',
@@ -530,7 +554,9 @@ const sweeps = await parallel(
           },
         },
       },
-    }),
+      // Bound to the DISPATCHED lane, not the model's self-report — see the
+      // `lane` schema comment above. A null (the agent died) stays null.
+    }).then((result) => (result ? { ...result, lane: lane.key } : null)),
   ),
 )
 
@@ -693,7 +719,11 @@ EVIDENCE OFFERED: ${f.evidence}`,
           // FALSE from one that was merely hard to re-derive — which is issue
           // #343's open question, unanswerable because of this schema.
           // (Cold lane, P2, review-2b7bd6ca-cold.md.)
-          required: ['refuted', 'why', 'probe'],
+          // `control_arm` is REQUIRED, not merely permitted: a verdict without
+          // the arm proving the probe could have answered the other way is the
+          // exact evidence gap that made #343's 13-of-14 refutation run
+          // unanswerable, and optional fields are what the model omits first.
+          required: ['refuted', 'why', 'probe', 'control_arm'],
           properties: {
             refuted: { type: 'boolean' },
             why: { type: 'string' },
@@ -881,7 +911,7 @@ material below. Its reader has NONE of this context and must be able to act
 without asking anyone. You are replacing a handoff that was written from memory,
 which is why requirements have been getting lost between sessions.
 
-Write it to ${cfg.handoffOut || '.agent/plans/session-<UTC-date>-<letter>.md'}.
+Write it to ${cfg.handoffOut}.
 
 MANDATORY SHAPE — \`mise run kb-handoff-check\` parses this and the caller runs it:
 * The LEAD (before the first \`##\`) must name the BRANCH in a backticked
