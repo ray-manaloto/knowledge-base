@@ -1,5 +1,23 @@
 // session-review — what a round looks like from OUTSIDE the session.
 //
+// ── HOW TO SYNTAX-CHECK THIS FILE. `node --check` IS A PROBE THAT CANNOT FAIL. ──
+//
+//   { echo '(async () => {'; sed 's/^export const meta/const meta/' THIS_FILE; \
+//     echo '})()'; } | node --check
+//
+// A bare `node --check` on this file returns **0 on syntactically broken code**,
+// because the file starts with `export`: the CJS parser bails at the export and
+// reports success. Measured — the identical break returns rc=1 without the export
+// line and rc=0 with it. Every "syntax OK" from that command is worthless here,
+// and one such false green was reported four times in one session before a
+// control arm caught it.
+//
+// `node --input-type=module --check` is not the fix either: it rejects the
+// TOP-LEVEL `return` at the end of this file, which is legal in a workflow script
+// because the runtime wraps the body in an async function. The command above
+// models exactly that wrapping, and it is control-armed both ways — a valid
+// workflow (export + top-level return) passes, a broken one fails.
+//
 // The 2026-08-17 review ran as an inline five-agent fan-out and found things no
 // task can see: 10 of 10 sessions over the 200K context target with zero
 // compactions, `gh` pinned nowhere while `kb-ship` calls it, a `CLAUDE.md` line
@@ -91,6 +109,35 @@ if (typeof cfg === 'string') {
     throw new Error('session-review: args arrived as an unparsable string: ' + e.message)
   }
 }
+
+// TWO MODES, one pipeline.
+//
+//   'round'   (default) — the whole round, all 8 lanes, ends in a ranked report.
+//   'handoff' — ONE session, the 5 lanes whose questions a handoff actually needs,
+//               ending in a handoff document instead of a report.
+//
+// WHY handoff mode exists. `clear-prep/SKILL.md` says it outright: "The handoff is
+// written from memory." A session at the end of its context recollecting its own
+// round is where wrong, missing and vague come from, and it is Ray's directive
+// item 1 — requirements getting lost between sessions. Fresh subagents reading
+// git, the gates JSON, the issue tracker and the transcripts do not recollect;
+// they read. That is the whole change.
+//
+// THE OBJECTION THIS MUST ANSWER, because it is a good one: `/clear-prep` fires
+// when the session budget is most depleted, and a session limit is NOT
+// model-scoped — `judge()`'s fable->opus fallback cannot save it. A workflow
+// handoff that dies leaves NOTHING, which is worse than an imperfect remembered
+// one. So the CALLER must keep the manual path and use this as the preferred
+// input, never the only one; the lanes write incrementally so a death leaves a
+// partial draft; and the caller validates with `mise run kb-handoff-check`,
+// which is what turns this from a nicer draft into a checked one.
+const MODE = cfg.mode === 'handoff' ? 'handoff' : 'round'
+
+// The five whose output a handoff is actually made of: what was asked and
+// dropped, what is unlanded, what got redone, what drifted, and what a bot
+// flagged that nobody actioned. `unpinned`, `context` and `tooling-gap` are
+// round-level questions and are not worth a session-end agent each.
+const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews'])
 
 for (const required of ['transcriptDir', 'since', 'handoffs']) {
   if (!cfg[required] || (Array.isArray(cfg[required]) && !cfg[required].length)) {
@@ -287,9 +334,16 @@ settled block names. Cite the exact commands.`,
   },
 ]
 
+// Filtered ONCE, here, and every downstream count derives from `ACTIVE_LANES`
+// rather than `LANES` — otherwise handoff mode reports three lanes as
+// "did not return" when they were never dispatched, which is precisely the
+// never-ran-vs-ran-and-found-nothing conflation this file exists to refuse.
+const ACTIVE_LANES = MODE === 'handoff' ? LANES.filter((l) => HANDOFF_LANES.has(l.key)) : LANES
+log(`mode=${MODE}: ${ACTIVE_LANES.length} lane(s) — ${ACTIVE_LANES.map((l) => l.key).join(', ')}`)
+
 phase('Sweep')
 const sweeps = await parallel(
-  LANES.map((lane) => () =>
+  ACTIVE_LANES.map((lane) => () =>
     // CONTRACT FIRST, lane prompt second. The shared part leads so every lane
     // presents the same prefix; with the varying part first (as this was until
     // now) no cache can span two lanes.
@@ -406,7 +460,7 @@ const interrupted = lanes.filter(isPartial)
 // A lane that DIED — usage limit, refusal, exception — returns null and is
 // filtered out of `lanes` entirely, so it can never appear in `interrupted`.
 // That is the loudest possible partial coverage and it was the quietest.
-const missing = LANES.map((l) => l.key).filter((key) => !lanes.some((l) => l.lane === key))
+const missing = ACTIVE_LANES.map((l) => l.key).filter((key) => !lanes.some((l) => l.lane === key))
 
 for (const l of interrupted) {
   // Only report a field that SAYS something — `isPartial` already treats "none"
@@ -420,7 +474,7 @@ for (const l of interrupted) {
   log(`PARTIAL COVERAGE — ${l.lane}: ${why || 'returned no coverage statement'}`)
 }
 for (const key of missing) log(`LANE DID NOT RETURN — ${key}: treat as covering NOTHING`)
-log(`${lanes.length}/${LANES.length} lanes returned; ${lanes.reduce((n, l) => n + l.findings.length, 0)} raw findings`)
+log(`${lanes.length}/${ACTIVE_LANES.length} lanes returned; ${lanes.reduce((n, l) => n + l.findings.length, 0)} raw findings`)
 
 // A barrier IS correct here: the cross-check needs the whole set, because two
 // lanes disagreeing about one fact is itself the highest-value finding — that is
@@ -585,8 +639,7 @@ async function judge(prompt, opts) {
 }
 
 phase('Synthesise')
-const synthesised = await judge(
-  `Write ONE ranked review from the material below. Rank by COST OF LEAVING IT
+const REPORT_PROMPT = `Write ONE ranked review from the material below. Rank by COST OF LEAVING IT
 UNFIXED, not by count or by tidiness — the top items must be the circles, and
 everything that is bookkeeping must be visibly below them.
 
@@ -625,9 +678,75 @@ PARTIAL LANES: ${JSON.stringify(interrupted.map((l) => l.lane))}
 LANES THAT DID NOT RETURN AT ALL (they cover NOTHING): ${JSON.stringify(missing)}
 
 Write it to ${reportDir}/session-review-synthesis.md and end with the
-"## GitHub repos touched" section this repo's rules require.`,
-  { label: 'synthesise', phase: 'Synthesise', agentType: 'kb-synthesist' },
-)
+"## GitHub repos touched" section this repo's rules require.`
+
+// In handoff mode the same verified material is written as the NEXT SESSION'S
+// BRIEF instead of a review. Same findings, same verdicts, different reader: one
+// who knows nothing and has to act.
+//
+// The shape below is not style — it is what `mise run kb-handoff-check` parses.
+// A handoff that fails that check is the artifact this mode exists to replace, so
+// the requirements are stated as requirements rather than suggestions.
+const HANDOFF_PROMPT = `Write the SESSION HANDOFF for the next session from the
+material below. Its reader has NONE of this context and must be able to act
+without asking anyone. You are replacing a handoff that was written from memory,
+which is why requirements have been getting lost between sessions.
+
+Write it to ${cfg.handoffOut || '.agent/plans/session-<UTC-date>-<letter>.md'}.
+
+MANDATORY SHAPE — \`mise run kb-handoff-check\` parses this and the caller runs it:
+* The LEAD (before the first \`##\`) must name the BRANCH in a backticked
+  \`- **branch**: \` bullet. \`kb-ship\` re-runs this check and skips a handoff whose
+  lead names no branch.
+* EVERY gate claim carries its commit IN THE SAME BULLET, sha backticked —
+  \`- Gates on \\\`<sha>\\\`: lint rc=0 …\`. A claim naming no commit cannot be looked
+  up and is reported UNVER. A branch name is not a commit.
+* EVERY path you cite must exist. If you cite one BECAUSE it is absent, write
+  \`\\\`path\\\` (absent)\` — that exact marker, checked both ways.
+* EVERY number must have been measured this session, or be labelled inherited
+  and unverified.
+
+CONTENT, in this order:
+1. State at handoff: branch, commits ahead, whether a review receipt and gates
+   artifact exist for HEAD, and whether the tree is clean.
+2. THE NEXT TASK, in the user's own words where you have them.
+3. What shipped, one line per commit.
+4. Open issues this round filed or touched, by number.
+5. **Gotchas** — the probes that MISLED someone this session, since that is what
+   the next session would otherwise repeat. Take these from the circles lane.
+6. What is owed and not done.
+
+Do NOT include: a ranked review, tier tables, or anything a reader cannot act on.
+A handoff is a brief, not a report.
+
+Then, SEPARATELY, propose MEMORY.md index lines for anything durable enough to
+outlive this round — one line each, in the existing style. Do not write MEMORY.md
+yourself; the caller decides what lands.
+
+CONFIRMED FINDINGS (cross-checked and survived):
+${JSON.stringify(confirmed, null, 1)}
+
+NOT TRIAGED — the budget ran out before these; nobody looked. They are neither
+confirmed nor refuted, and the handoff must say so rather than omit them:
+${JSON.stringify(notTriaged, null, 1)}
+
+UNVERIFIED — an agent was dispatched and did not return:
+${JSON.stringify(unverified, null, 1)}
+
+REFUTED, with the refutation — these are evidence about the PROBES, and the
+misleading ones belong in the gotchas section:
+${JSON.stringify(refuted.map(refutedWhole), null, 1)}
+
+LANE COVERAGE — a lane that did not finish must not read as one that found nothing:
+${JSON.stringify(lanes.map((l) => ({ lane: l.lane, coverage: l.coverage })), null, 1)}
+PARTIAL LANES: ${JSON.stringify(interrupted.map((l) => l.lane))}
+LANES THAT DID NOT RETURN AT ALL (they cover NOTHING): ${JSON.stringify(missing)}`
+
+const synthesised = await judge(MODE === 'handoff' ? HANDOFF_PROMPT : REPORT_PROMPT, {
+  label: MODE === 'handoff' ? 'compose-handoff' : 'synthesise',
+  phase: 'Synthesise',
+  agentType: 'kb-synthesist',
+})
 
 return {
   lanes: lanes.map((l) => ({ lane: l.lane, findings: l.findings.length, coverage: l.coverage })),

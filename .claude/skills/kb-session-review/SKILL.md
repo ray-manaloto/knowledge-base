@@ -145,3 +145,45 @@ takes, not a proof of completeness.
 - `kb-session-reflect` — the per-transcript counter; run it too, with its arguments.
 - `docs/research/reports/2026-08-17-session-review.md` — the first run, verbatim.
 - `.claude/rules/probes-need-a-control-arm.md` — every lane's negative needs one.
+
+## `mode: 'handoff'` — this workflow prepares `/clear-prep`'s handoff
+
+Ray, 2026-08-18: *"it should be the session review workflow that is performing the
+handoff preparation for /clear-prep since that is what we are building."*
+
+`clear-prep/SKILL.md` states the problem outright — **"The handoff is written from
+memory."** A session at the end of its context recollecting its own round is where
+wrong, missing and vague come from, and that is directive item 1. Fresh subagents
+reading git, the gates JSON, the issue tracker and the transcripts do not
+recollect; they read.
+
+```text
+Workflow({ name: 'session-review', args: {
+  mode: 'handoff',            // 5 lanes instead of 8, scoped to THIS session
+  handoffOut: '.agent/plans/session-<date>-<letter>.md',
+  transcriptDir, since, handoffs, answered,
+}})
+```
+
+Lanes in handoff mode: `forgotten` (what was asked and dropped), `pending-work`
+(unlanded branches/worktrees), `circles` (the gotchas the next session would
+repeat), `contradicted` (docs that drifted), `bot-reviews` (findings nobody
+actioned). `unpinned`, `context` and `tooling-gap` are round-level and stand down.
+
+The composer is told the shape `kb-handoff-check` parses — branch in the lead,
+every gate claim carrying its commit with the sha backticked, `(absent)` on any
+path cited because it does not exist — so the existing check becomes an **arm on a
+derived artifact** rather than a spellcheck on a remembered one. It also proposes
+MEMORY.md index lines; it never writes MEMORY.md.
+
+### Two rules the caller MUST keep
+
+1. **Never make this the only path.** `/clear-prep` fires when the session budget
+   is most depleted, and a session limit is **not model-scoped** — `judge()`'s
+   fable→opus fallback cannot save it. A workflow handoff that dies leaves
+   NOTHING, which is worse than an imperfect remembered one. Keep the manual
+   handoff as the fallback and treat this as the preferred input.
+2. **Always run `mise run kb-handoff-check` on the result.** That is what turns a
+   nicer draft into a checked one. It has already caught, on a hand-written
+   handoff: a cited path that did not exist, gate claims with no artifact, and
+   gates that had run against a dirty tree.
