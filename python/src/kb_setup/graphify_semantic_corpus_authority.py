@@ -135,10 +135,72 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # 0738af37, so both digests carrying a reviewed DECISION are unchanged and the
 # workload is the same 474 units / 58 chunks. This asks for no judgement Ray has
 # not already given.
+# RE-RECORDED 2026-08-17 (c), after Ray's two spend rulings of the same day. This
+# is the first re-record in this file that changes what the run is AUTHORIZED TO
+# SPEND, rather than only which bytes will do the spending — so it is a new
+# judgement being recorded, not the same one re-signed, and it says so plainly.
+#
+# WHAT MOVED, and why each one moved:
+#
+# * `max_total_cost_usd` — a NEW field, absent -> 100.0. Ray's ruling. Nothing in
+#   the plan bounded the WHOLE run: `max_cost_usd` is per chunk and
+#   `--max-budget-usd` is per provider invocation, so 58 chunks each individually
+#   within authority could spend an unbounded total (chunk 1 measured 1.12 USD,
+#   the corpus projects to about 65, the per-chunk ceiling permits about 1,450).
+#   The field has NO DEFAULT, so a plan written before it existed is refused
+#   rather than run uncapped.
+# * `claude_max_output_tokens` — 8192 -> 64000. Ray's ruling: resolve the model's
+#   real ceiling at PLAN TIME and pin half of it. 8192 was a literal chosen when
+#   nothing here could resolve a ceiling; Opus 5's real ceiling is 128,000, and
+#   half leaves roughly 2x the measured ~31,887-token need while still being a
+#   bound. `model_limits` RAISES rather than falling back to a literal, so a
+#   resolution failure cannot silently reinstate the number this removes.
+# * `adapter_sha256`, `planner_sha256`, `runner_sha256`, `semantic_slice_sha256`
+#   — the four modules this round edited, and `cache_namespace_sha256` is derived
+#   from them. Ordinary code identity, the case this file's doctrine describes.
+# * `claude_version` 2.1.233 -> 2.1.234, and `claude_executable_sha256` with it.
+#   Claude Code self-updated under the session. The `--help` digest did NOT move
+#   (71ad650f…, the same value 2.1.232 and 2.1.233 both recorded), re-hashed
+#   against the INSTALLED binary through the slice's own child environment — so
+#   every required flag, the argv shape and the envelope this path pins are
+#   unchanged and only the implementation moved. Without this advance the run
+#   would have refused at preflight, correctly, on a version nobody had reviewed.
+#
+# RE-PLANNED FOUR TIMES this round, each one caused by an edit to a digested
+# module after the previous plan. RE-PLAN LAST is the rule; what this round adds
+# is that a CURRENCY REVIEW is a code change here, so it belongs before the
+# re-plan however unrelated it feels.
+#
+# The fourth re-plan is worth its own sentence, because it was a real defect
+# rather than sequencing. Advancing "the accepted Claude version" to match the
+# self-updated binary turned the COMMITTED SLICE CANDIDATE from `unapproved` to
+# `failed`: `_ACCEPTED_CLAUDE_*` is the authority for evidence that already
+# exists, and no edit can change what already ran. The corpus planner needs the
+# opposite thing — what a run WILL use — so the slice now carries an
+# `_ACCEPTED_`/`_CURRENT_` pair for Claude exactly as it already did for graphify,
+# and this plan reads `current_claude()`. The suite caught it; reading the diff
+# had not.
+#
+# ONE MORE FIELD MOVED AND IT IS NOT THIS ROUND'S DOING, which is worth recording
+# because it looks like an unexplained change: `timeout_seconds` 900 -> 120. The
+# plan that was on disk had been generated on ANOTHER BRANCH
+# (`fix-328-extraction-warning-accounting`, where the timeout work lives) and
+# never matched this branch's planner, whose value has been 120 throughout. The
+# re-plan did not lower a timeout; it stopped a foreign plan from standing in for
+# this branch's. That stale plan is also why the authority-digest test was red
+# before any of this round's edits.
+#
+# WHAT DID NOT MOVE: `advisories.json` and `exclusions.json` came back
+# BYTE-IDENTICAL (ce1da16e and 9aeb4c1b, the same values recorded above), as did
+# `source-inventory.json` and `chunk-ledger.json`, at the same source commit
+# 0738af37. Both digests carrying a reviewed DECISION are unchanged and the
+# workload is the same 474 units / 58 chunks over the same 370 admitted paths, so
+# nothing here re-opens the scope question — only the spend bounds are new, and
+# both were ruled explicitly.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"848fc020a7cd49a96109738664eb3941cb07dd49b933a532b889226a0250c93b",'
+    b'"execution_config_sha256":"1734ea9811158c16864366a9e03925903caa2a50f249906eb979a354b8bb5246",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"03642ac4bf08e4572a369f028ff0025787afaac2483038f05e82110a8c7d6eab",'
+    b'"plan_manifest_sha256":"ba6874fa6b0cb0a32923753beb7219588fd20439ad50ec4441cb3cf560f0fb42",'
     b'"schema_version":1}\n'
 )

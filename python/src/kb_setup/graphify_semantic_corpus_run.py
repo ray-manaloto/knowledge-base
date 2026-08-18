@@ -110,7 +110,84 @@ class RunSummary(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     node_count: int
     edge_count: int
     hyperedge_count: int
+    # Every provider call this pass could observe, summed. Not "what the corpus
+    # cost": a chunk whose call died before writing its record contributes
+    # nothing, so read this as a floor on spend, never as a receipt.
+    spend_usd: float
+    # Empty when the run reached the end of the ledger. Otherwise the reason it
+    # stopped early, which is the only thing that tells a reader the counts below
+    # are a partial accounting rather than a complete one.
+    halted: str
     outcomes: tuple[ChunkOutcome, ...]
+
+
+class _SpendCapError(Exception):
+    """Raised from the chunk callback to stop a run that has spent its authority.
+
+    An exception is the whole mechanism available: ``extract_corpus_parallel``
+    exposes no cancellation, and its serial loop calls ``on_chunk_done`` bare —
+    no ``try`` wraps the call — so a raise there propagates out of the extractor.
+    That was verified against the pinned source rather than assumed, with the
+    control being the branch immediately above it, which DOES swallow a failed
+    chunk (``if exc is not None: … continue``); the callback has no such guard.
+
+    ``execute`` catches this rather than letting it escape, because the summary
+    naming what did land is the artifact an operator needs most on the run that
+    stopped early.
+    """
+
+
+class _Spend:
+    """Running provider spend for one pass, against the plan's cumulative cap.
+
+    Mutable and un-frozen on purpose — it is the one thing in this module that
+    accumulates. It exists because nothing summed anything: the plan capped
+    ``max_cost_usd`` PER CHUNK and ``--max-budget-usd`` per provider invocation,
+    so 58 chunks each individually within authority could spend far past any
+    total anyone had approved.
+    """
+
+    def __init__(self, limit_usd: float) -> None:
+        self.limit_usd = limit_usd
+        self.total_usd = 0.0
+
+    def charge(self, amount: float) -> None:
+        self.total_usd += amount
+
+    @property
+    def exceeded(self) -> bool:
+        return self.total_usd > self.limit_usd
+
+
+def observed_spend_usd(boundary_dir: Path) -> float:
+    """Sum every per-call spend record currently in the boundary directory.
+
+    Per CALL, not per chunk, and that distinction is the reason this reads the
+    records rather than the adapter metadata. graphify's adaptive retry bisects a
+    chunk and merges, firing ONE callback for N calls, while the metadata file is
+    a single fixed path each call overwrites — so summing metadata undercounts
+    exactly the chunks that cost the most.
+
+    A malformed or unreadable record is skipped rather than raised on. The
+    alternative is a run that dies on a stray file in a directory it does not own
+    exclusively; the cap's job is to stop overspending, and an unreadable record
+    can only make the total too LOW, which the cap then handles by not firing
+    early rather than by firing wrongly.
+    """
+    if not boundary_dir.is_dir():
+        return 0.0
+    total = 0.0
+    for record_path in sorted(boundary_dir.glob("provider-spend-*.json")):
+        try:
+            record = msgspec.json.decode(
+                record_path.read_bytes(),
+                type=graphify_semantic_adapter.ProviderSpendRecord,
+                strict=True,
+            )
+        except OSError, msgspec.DecodeError, msgspec.ValidationError:
+            continue
+        total += record.total_cost_usd
+    return total
 
 
 class _RunContext(msgspec.Struct, frozen=True):
@@ -210,6 +287,13 @@ def _adapter_overlay(context: _RunContext, adapter_dir: Path) -> dict[str, str |
         "KB_SEMANTIC_ORIGINAL_PATH": original_path,
         "KB_SEMANTIC_METADATA_PATH": str(context.metadata_path),
         "KB_SEMANTIC_PROVIDER_BOUNDARY_DIR": str(context.boundary_dir),
+        # The PLAN's cap, not the profile's literal. The profile still carries one
+        # as the floor for a launcher with no plan behind it; this is the value a
+        # human authorized, resolved once at plan time from the model's real
+        # ceiling. It reaches the child as a VALUE for an existing variable, so
+        # `environment_names` — the only environment fact the receipt compares —
+        # is unchanged.
+        graphify_semantic_slice.MAX_OUTPUT_TOKENS_ENV_NAME: str(config.claude_max_output_tokens),
         graphify_semantic_slice.PROFILE_ENV_NAME: _PROFILE.name,
         "GRAPHIFY_CLAUDE_CLI_MODEL": _PROFILE.model,
         "GRAPHIFY_API_TIMEOUT": str(config.timeout_seconds),
@@ -447,8 +531,13 @@ def clear_stale_evidence(metadata_path: Path, boundary_dir: Path) -> None:
     """
     metadata_path.unlink(missing_ok=True)
     if boundary_dir.is_dir():
-        for marker in boundary_dir.glob("provider-boundary-*.json"):
-            marker.unlink(missing_ok=True)
+        # Spend records are cleared alongside the markers, and every caller of
+        # this function charges them FIRST. Clearing them here rather than in
+        # their own function is what keeps that pairing visible: a record that
+        # survived a rotation would be charged again by the next chunk.
+        for pattern in ("provider-boundary-*.json", "provider-spend-*.json"):
+            for stale in boundary_dir.glob(pattern):
+                stale.unlink(missing_ok=True)
 
 
 def _stage_completed_chunk(
@@ -552,6 +641,195 @@ def _stage_completed_chunk(
     )
 
 
+class _Accounting(msgspec.Struct, frozen=True):
+    """What one pass observed, gathered so the summary can be derived from it.
+
+    A struct rather than six parameters for the same reason ``_RunContext`` is
+    one: these travel together and only together, and passed individually they
+    make a signature where two same-typed arguments can be transposed without a
+    type error.
+    """
+
+    outcomes: list[ChunkOutcome]
+    repaid: list[int]
+    spend: _Spend
+    halted: str
+
+
+def _summarize(
+    context: _RunContext,
+    accounting: _Accounting,
+    result: Mapping[str, object] | dict[str, object],
+) -> RunSummary:
+    """Reduce one pass's observations and graphify's own counters into the summary."""
+    outcomes = accounting.outcomes
+    completed = tuple(item for item in outcomes if item.status == "complete")
+    staged_failures = tuple(item for item in outcomes if item.status != "complete")
+    # graphify counts a chunk whose provider call raised; it never reaches the
+    # callback, so it leaves no outcome. Reading that count is what separates
+    # "the provider failed on it" from "it was never attempted" — the previous
+    # version folded both into `skipped`, which reported a paid, failed call as
+    # though the run had simply not got to it.
+    provider_failures = graphify_semantic_slice.result_integer(result, "failed_chunks")
+    if provider_failures < 0:
+        # `result_integer` returns -1 for a MISSING key, and its docstring says
+        # that sentinel exists precisely so absent and zero do not reduce to the
+        # same number. Clamping it to 0 here reduced them to the same number —
+        # the sentinel was created and then discarded one line later. A graphify
+        # release that stopped emitting `failed_chunks` would have reported zero
+        # provider failures and inflated `skipped`, in the summary a human reads
+        # to decide whether the corpus is whole.
+        raise ValueError("graphify result omitted failed_chunks")
+    planned = len(context.ledger.chunks)
+    accounted = len(outcomes) + len(accounting.repaid) + provider_failures
+    return RunSummary(
+        schema_id="graphify-semantic-corpus-run/v0",
+        run_namespace_sha256=context.run_namespace,
+        chunk_total=planned,
+        completed=len(completed),
+        repaid=len(accounting.repaid),
+        failed=len(staged_failures) + provider_failures,
+        # Only what the run genuinely never reached. A negative would mean more
+        # outcomes than planned chunks, which the callback's ledger check already
+        # refuses — clamping keeps a nonsense number out of a summary a human
+        # reads to decide whether the corpus is complete.
+        skipped=max(planned - accounted, 0),
+        node_count=sum(item.node_count for item in completed),
+        edge_count=sum(item.edge_count for item in completed),
+        hyperedge_count=sum(item.hyperedge_count for item in completed),
+        spend_usd=accounting.spend.total_usd,
+        halted=accounting.halted,
+        outcomes=tuple(outcomes),
+    )
+
+
+def _resolve_existing_stage(
+    chunk: graphify_semantic_corpus.PlannedChunk,
+    reasons: tuple[str, ...],
+    context: _RunContext,
+) -> ChunkOutcome | None:
+    """Dispose of a chunk whose stage directory already exists.
+
+    ``None`` means REPAID — the directory verified as this chunk's own evidence,
+    so this pass must not re-publish it. ``stage_chunk`` REFUSES an existing
+    destination (correctly; silently overwriting published evidence is worse), so
+    without this branch a resumed run aborts on the first chunk it had already
+    completed.
+
+    There is deliberately no "resumed" (free) disposition, and that is a
+    measurement rather than a simplification. An AST walk of the pinned 0.9.45
+    finds no cache read anywhere in ``extract_corpus_parallel``'s call chain
+    (``_run_one`` -> ``_extract_with_adaptive_retry`` -> ``extract_files_direct``);
+    ``load_cached`` is reached only from ``graphify/extract.py``, an entry point
+    this driver never uses. The probe discriminates — the same walk does find
+    ``_checkpoint_chunk``, the WRITER, on this path. So every already-staged chunk
+    is paid for again. If a future graphify serves this entry point from cache,
+    re-derive that before adding a free branch back; do not restore it on the
+    strength of the name.
+
+    Any reasons at all mean a directory is sitting where this chunk's evidence
+    belongs and is not this chunk's evidence. There is no repair path from here,
+    so the only honest disposition is a failure naming what is wrong and letting
+    the operator remove it. Counting it as done is the behaviour this replaced.
+
+    The rotation is NOT skipped with the staging. Returning without it leaves this
+    chunk's metadata file and its ``O_EXCL`` boundary marker in place, so the very
+    next chunk dies on ``provider boundary marker already exists`` — the cascade
+    the callback exists to prevent, reintroduced by the fix for a different
+    finding.
+    """
+    clear_stale_evidence(context.metadata_path, context.boundary_dir)
+    if not reasons:
+        return None
+    return ChunkOutcome(
+        ordinal=chunk.ordinal,
+        total=chunk.total,
+        status="failed",
+        node_count=0,
+        edge_count=0,
+        hyperedge_count=0,
+        reasons=tuple(f"chunk-stage-unverifiable: {reason}" for reason in reasons),
+    )
+
+
+def _stage_or_failure(
+    raw: object,
+    chunk: graphify_semantic_corpus.PlannedChunk,
+    context: _RunContext,
+) -> ChunkOutcome:
+    """Stage one completed chunk, or turn the reason it cannot be into an outcome.
+
+    One unusable chunk must not take the other 57 with it. Four reachable paths
+    raise from ``_stage_completed_chunk``: ``normalize_fragment`` on a malformed
+    result, ``_rotate_evidence`` on absent adapter metadata, the metadata decode
+    (a ``msgspec.DecodeError``, which subclasses ``ValueError`` at the pinned
+    msgspec 0.21.1, so naming it here would be redundant), and ``stage_chunk``'s
+    filesystem writes, whose ``mkdir``, ``write_text`` and ``replace`` raise
+    ``OSError``. Any of them propagates out through ``extract_corpus_parallel``
+    and out of ``execute``, past the caller's ``print``. The chunks already staged
+    survived on disk, but the summary naming them never printed, so the operator
+    lost the one artifact that says what landed.
+
+    The evidence is rotated on the way out so the next chunk starts clean;
+    skipping that is how a single recoverable error became ``provider boundary
+    marker already exists`` for every chunk after it.
+    """
+    try:
+        return _stage_completed_chunk(raw, chunk, context)
+    except (TypeError, ValueError, OSError) as exc:
+        clear_stale_evidence(context.metadata_path, context.boundary_dir)
+        return ChunkOutcome(
+            ordinal=chunk.ordinal,
+            total=chunk.total,
+            status="failed",
+            node_count=0,
+            edge_count=0,
+            hyperedge_count=0,
+            reasons=(f"chunk-staging-failed: {exc}",),
+        )
+
+
+def _verified_stages(context: _RunContext) -> dict[int, tuple[str, ...]]:
+    """Map each already-present stage directory to why it is NOT usable, or ``()``.
+
+    VERIFIED, not merely present. This used to be a set comprehension over
+    ``chunk_stage_dir(...).exists()``, and a cold cross-family lane showed exactly
+    what that bought: substituting an unrelated directory for every stage produced
+    "58 accounted, 0 failed, success". Existence is a claim about the filesystem;
+    the driver needs a claim about the EVIDENCE.
+
+    ``verify_staged_chunk`` is not new code written for this fix — it already
+    existed in ``graphify_semantic_corpus``, rehashing every payload against the
+    digests and byte lengths the writer itself recorded, refusing a symlinked or
+    non-regular directory, and refusing an entry set that is not exactly the four
+    published members. The defect was never a missing verifier. It was that
+    nothing on this path CALLED the one that was already there, which is the only
+    reason a validator can be thorough and still gate nothing.
+    """
+    staged: dict[int, tuple[str, ...]] = {}
+    for chunk in context.ledger.chunks:
+        destination = graphify_semantic_corpus.chunk_stage_dir(
+            context.cache_root, context.run_namespace, chunk.ordinal
+        )
+        # `lstat`, via `is_symlink`, so a dangling or redirected stage is a
+        # candidate for verification rather than invisible: `exists()` follows the
+        # link and answers about the TARGET.
+        if not destination.exists() and not destination.is_symlink():
+            continue
+        verification = graphify_semantic_corpus.verify_staged_chunk(
+            context.cache_root,
+            graphify_semantic_corpus.ChunkStageReference(
+                candidate=context.candidate,
+                source_root=context.source_root,
+                cache_namespace=context.config.cache_namespace_sha256,
+                run_namespace=context.run_namespace,
+                chunk=chunk,
+            ),
+        )
+        staged[chunk.ordinal] = () if verification.state == "complete" else verification.reasons
+    return staged
+
+
 def _load_plan(
     candidate: Path,
 ) -> tuple[
@@ -627,41 +905,7 @@ def execute(
         overlay = _adapter_overlay(context, Path(bin_dir))
 
         clear_stale_evidence(context.metadata_path, context.boundary_dir)
-        # VERIFIED, not merely present. This used to be a set comprehension over
-        # `chunk_stage_dir(...).exists()`, and a cold cross-family lane showed
-        # exactly what that bought: substituting an unrelated directory for every
-        # stage produced "58 accounted, 0 failed, success". Existence is a claim
-        # about the filesystem; the driver needs a claim about the EVIDENCE.
-        #
-        # `verify_staged_chunk` is not new code written for this fix — it already
-        # existed in `graphify_semantic_corpus`, rehashing every payload against
-        # the digests and byte lengths the writer itself recorded, refusing a
-        # symlinked or non-regular directory, and refusing an entry set that is
-        # not exactly the four published members. The defect was never a missing
-        # verifier. It was that nothing on this path CALLED the one that was
-        # already there, which is the only reason a validator can be thorough and
-        # still gate nothing.
-        staged: dict[int, tuple[str, ...]] = {}
-        for chunk in ledger.chunks:
-            destination = graphify_semantic_corpus.chunk_stage_dir(
-                cache_root, run_namespace, chunk.ordinal
-            )
-            # `lstat`, via `is_symlink`, so a dangling or redirected stage is a
-            # candidate for verification rather than invisible: `exists()` follows
-            # the link and answers about the TARGET.
-            if not destination.exists() and not destination.is_symlink():
-                continue
-            verification = graphify_semantic_corpus.verify_staged_chunk(
-                cache_root,
-                graphify_semantic_corpus.ChunkStageReference(
-                    candidate=candidate,
-                    source_root=source_root,
-                    cache_namespace=config.cache_namespace_sha256,
-                    run_namespace=run_namespace,
-                    chunk=chunk,
-                ),
-            )
-            staged[chunk.ordinal] = () if verification.state == "complete" else verification.reasons
+        staged = _verified_stages(context)
         # Ordinals seen so far, so a repeated callback cannot be counted twice.
         # The range check below is necessary and was never sufficient: accounting
         # counts EVENTS, and `skipped` clamps its own negative, so two callbacks
@@ -669,7 +913,32 @@ def execute(
         # hole in the corpus reported as `skipped=0`.
         visited: set[int] = set()
 
+        spend = _Spend(config.max_total_cost_usd)
+
         def on_chunk_done(index: int, total: int, raw: object) -> None:
+            """Admit one chunk, charge what it spent, and stop if that exhausts the cap.
+
+            The charge happens BEFORE the disposition and outside every branch,
+            which is the only placement that counts all of them: a chunk that was
+            already staged is paid for again (graphify serves nothing from cache
+            on this entry point), and a chunk that fails to stage was paid for
+            too. Charging inside the staging path would have counted only the
+            branch that succeeds — a spend cap blind to the runs that go wrong.
+
+            The check happens AFTER, so the chunk that crossed the cap is still
+            staged. Its cost is already sunk; discarding its evidence would spend
+            the money and keep nothing for it.
+            """
+            _admit(index, total)
+            spend.charge(observed_spend_usd(context.boundary_dir))
+            _dispose(index, raw)
+            if spend.exceeded:
+                raise _SpendCapError(
+                    f"cumulative provider spend {spend.total_usd:.2f} USD exceeded the plan's "
+                    f"max_total_cost_usd of {spend.limit_usd:.2f} USD after chunk {index + 1}"
+                )
+
+        def _admit(index: int, total: int) -> None:
             # The ledger's ordering IS graphify's, because the planner derived it
             # from the same packing function over the same inputs. Checked rather
             # than assumed: a divergence would file evidence against the WRONG
@@ -699,132 +968,41 @@ def execute(
             if index in visited:
                 raise ValueError(f"provider chunk callback repeated index {index}")
             visited.add(index)
+
+        def _dispose(index: int, raw: object) -> None:
+            """File this chunk's evidence, or the reason it has none."""
             chunk = ledger.chunks[index]
             if chunk.ordinal in staged:
-                # Staged by an earlier run. `stage_chunk` REFUSES an existing
-                # destination — correctly, since silently overwriting published
-                # evidence is worse — so without this a resumed run aborts on the
-                # first chunk it had already completed.
-                #
-                # The rotation is NOT skipped with the staging. Returning early
-                # without it leaves this chunk's metadata file and its O_EXCL
-                # boundary marker in place, so the very next chunk dies on
-                # `provider boundary marker already exists` — the same cascade
-                # this callback exists to prevent, reintroduced by the fix for a
-                # different finding.
-                clear_stale_evidence(context.metadata_path, context.boundary_dir)
-                reasons = staged[chunk.ordinal]
-                if reasons:
-                    # A directory is sitting where this chunk's evidence belongs
-                    # and it is not this chunk's evidence. There is no repair path
-                    # from here — `stage_chunk` refuses the occupied destination —
-                    # so the only honest disposition is a failure that names what
-                    # is wrong and lets the operator remove it. Counting it as
-                    # done is the exact behaviour this fix removes.
-                    outcomes.append(
-                        ChunkOutcome(
-                            ordinal=chunk.ordinal,
-                            total=chunk.total,
-                            status="failed",
-                            node_count=0,
-                            edge_count=0,
-                            hyperedge_count=0,
-                            reasons=tuple(f"chunk-stage-unverifiable: {r}" for r in reasons),
-                        )
-                    )
-                    return
-                # REPAID, with no "resumed" alternative, and that is a measurement
-                # rather than a simplification. The driver calls
-                # `extract_corpus_parallel`, and an AST walk of the pinned 0.9.45
-                # finds no cache read anywhere in its call chain
-                # (`_run_one` -> `_extract_with_adaptive_retry` ->
-                # `extract_files_direct`); `load_cached` is reached only from
-                # `graphify/extract.py`, an entry point this driver never uses.
-                # The probe discriminates — it does find `_checkpoint_chunk`, the
-                # WRITER, on this path.
-                #
-                # So graphify's semantic cache is write-only from here, every
-                # already-staged chunk is paid for again, and the former `resumed`
-                # branch described a state the real system cannot reach. Its test
-                # manufactured that state by omitting adapter metadata, which is
-                # why a free arm ever passed. If a future graphify serves this
-                # entry point from cache, re-derive this comment before adding the
-                # branch back — do not restore it on the strength of the name.
-                repaid.append(chunk.ordinal)
+                outcome = _resolve_existing_stage(chunk, staged[chunk.ordinal], context)
+                if outcome is None:
+                    repaid.append(chunk.ordinal)
+                else:
+                    outcomes.append(outcome)
                 return
-            try:
-                outcomes.append(_stage_completed_chunk(raw, chunk, context))
-            except (TypeError, ValueError, OSError) as exc:
-                # One unusable chunk must not take the other 57 with it. Four
-                # reachable paths raise from `_stage_completed_chunk`:
-                # `normalize_fragment` on a malformed result, `_rotate_evidence`
-                # on absent adapter metadata, the metadata decode (a
-                # `msgspec.DecodeError`, which subclasses `ValueError` at the
-                # pinned msgspec 0.21.1, so naming it here would be redundant),
-                # and `stage_chunk`'s filesystem writes, whose `mkdir`,
-                # `write_text` and `replace` raise `OSError`. Any of them
-                # propagates out through `extract_corpus_parallel` and out of
-                # `execute`, past the caller's `print`. The chunks already staged
-                # survived on disk, but the summary naming them never printed, so
-                # the operator lost the one artifact that says what landed.
-                #
-                # The evidence is rotated on the way out so the next chunk starts
-                # clean; skipping that is how a single recoverable error became
-                # `provider boundary marker already exists` for every chunk after
-                # it.
-                clear_stale_evidence(context.metadata_path, context.boundary_dir)
-                outcomes.append(
-                    ChunkOutcome(
-                        ordinal=chunk.ordinal,
-                        total=chunk.total,
-                        status="failed",
-                        node_count=0,
-                        edge_count=0,
-                        hyperedge_count=0,
-                        reasons=(f"chunk-staging-failed: {exc}",),
-                    )
-                )
+            outcomes.append(_stage_or_failure(raw, chunk, context))
 
-        result = _extract_corpus(
-            admitted_paths(inventory, source_root),
-            context,
-            semantic_cache=semantic_cache,
-            environment=overlay,
-            on_chunk_done=on_chunk_done,
-        )
+        halted = ""
+        try:
+            result = _extract_corpus(
+                admitted_paths(inventory, source_root),
+                context,
+                semantic_cache=semantic_cache,
+                environment=overlay,
+                on_chunk_done=on_chunk_done,
+            )
+        except _SpendCapError as exc:
+            # graphify's own counters are UNOBSERVABLE here: the raise leaves
+            # `extract_corpus_parallel` before it returns its merged dict, so
+            # `failed_chunks` for the chunks it did attempt is lost with it.
+            # Substituting a zero would be a claim; `halted` is the disclosure
+            # that makes every count below a floor rather than an accounting, and
+            # the chunks the run never reached still land in `skipped`, so the
+            # completeness gate fails as it should.
+            halted = str(exc)
+            result = {"failed_chunks": 0}
 
-    completed = tuple(item for item in outcomes if item.status == "complete")
-    staged_failures = tuple(item for item in outcomes if item.status != "complete")
-    # graphify counts a chunk whose provider call raised; it never reaches the
-    # callback, so it leaves no outcome. Reading that count is what separates
-    # "the provider failed on it" from "it was never attempted" — the previous
-    # version folded both into `skipped`, which reported a paid, failed call as
-    # though the run had simply not got to it.
-    provider_failures = graphify_semantic_slice.result_integer(result, "failed_chunks")
-    if provider_failures < 0:
-        # `result_integer` returns -1 for a MISSING key, and its docstring says
-        # that sentinel exists precisely so absent and zero do not reduce to the
-        # same number. Clamping it to 0 here reduced them to the same number —
-        # the sentinel was created and then discarded one line later. A graphify
-        # release that stopped emitting `failed_chunks` would have reported zero
-        # provider failures and inflated `skipped`, in the summary a human reads
-        # to decide whether the corpus is whole.
-        raise ValueError("graphify result omitted failed_chunks")
-    accounted = len(outcomes) + len(repaid) + provider_failures
-    return RunSummary(
-        schema_id="graphify-semantic-corpus-run/v0",
-        run_namespace_sha256=run_namespace,
-        chunk_total=len(ledger.chunks),
-        completed=len(completed),
-        repaid=len(repaid),
-        failed=len(staged_failures) + provider_failures,
-        # Only what the run genuinely never reached. A negative would mean more
-        # outcomes than planned chunks, which the callback's ledger check already
-        # refuses — clamping keeps a nonsense number out of a summary a human
-        # reads to decide whether the corpus is complete.
-        skipped=max(len(ledger.chunks) - accounted, 0),
-        node_count=sum(item.node_count for item in completed),
-        edge_count=sum(item.edge_count for item in completed),
-        hyperedge_count=sum(item.hyperedge_count for item in completed),
-        outcomes=tuple(outcomes),
+    return _summarize(
+        context,
+        _Accounting(outcomes=outcomes, repaid=repaid, spend=spend, halted=halted),
+        result,
     )

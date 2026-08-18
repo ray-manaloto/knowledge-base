@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 import os
 import shutil
 from collections.abc import Callable
@@ -364,8 +365,15 @@ def test_plan_records_the_running_graphify_version_and_the_corpus_profile() -> N
     profile = graphify_semantic_slice.CORPUS_PROFILE
     assert config.graphify_version == config.graphify_runtime.version
     assert config.claude_model == profile.model
-    assert config.claude_max_output_tokens == int(profile.max_output_tokens)
+    # NOT the profile's literal any more, and that inequality IS the assertion.
+    # The profile keeps 8192 as the floor a launcher with no plan behind it gets;
+    # the plan carries half the model's resolved ceiling, which is strictly
+    # larger. An equality here would mean the resolution never reached the plan.
+    assert config.claude_max_output_tokens > int(profile.max_output_tokens)
     assert config.max_cost_usd == profile.max_cost_usd
+    # Per chunk and per run are different authorities. Equal values would mean the
+    # cumulative cap was a restatement rather than a new bound.
+    assert config.max_total_cost_usd > config.max_cost_usd
     # `--effort` is proven by the preflight and therefore lands in the receipt's
     # flag list, which is compared for EQUALITY — so the config must carry it.
     assert "--effort" in config.claude_required_flags
@@ -709,3 +717,269 @@ def test_a_missing_failed_chunks_counter_is_an_error_not_a_clean_run(
 
     _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
     assert _execute(tmp_path).failed == 0
+
+
+#: Monotonic across every `_spend` call in the process, so no two records can
+#: ever share a filename. See the note inside `_spend`.
+_SPEND_SEQ = itertools.count()
+
+
+def _spend(boundary: Path, *amounts: float) -> None:
+    """Leave one spend record per amount, in the shape the adapter writes.
+
+    Written directly rather than through `write_provider_spend`, matching how the
+    marker arms in this module already lay down evidence. The writer opens every
+    directory component with `O_NOFOLLOW`, and the driver's own evidence directory
+    comes from `tempfile.TemporaryDirectory()` — which on macOS sits under `/var`,
+    a symlink to `/private/var`. So the real writer cannot write into the driver's
+    real directory on this platform, and an arm using it here would be measuring
+    that unrelated defect (fixed on `fix-328-extraction-warning-accounting`,
+    unmerged) instead of the summation it names.
+
+    The writer/reader agreement is armed separately, in
+    `test_a_spend_record_round_trips_through_the_directory`, against pytest's
+    `tmp_path` — which is already canonical.
+    """
+    for amount in amounts:
+        record = graphify_semantic_adapter.ProviderSpendRecord(
+            schema_id="graphify-claude-provider-spend/v0",
+            total_cost_usd=amount,
+        )
+        # A PROCESS-WIDE counter, not `enumerate(amounts)`. That is the whole
+        # reason this comment exists: with a per-call index, two calls each
+        # writing one record of the same amount produced the SAME filename, so
+        # the second overwrote the first. The rotation arm then passed with the
+        # rotation deleted — a test that could not fail, caught by `kb-arms`
+        # reporting C4 SURVIVED and not by reading it.
+        (boundary / f"provider-spend-{os.getpid()}-{next(_SPEND_SEQ)}.json").write_bytes(
+            msgspec.json.encode(record)
+        )
+
+
+def test_a_spend_record_round_trips_through_the_directory(tmp_path: Path) -> None:
+    """The adapter's writer and the driver's reader agree, and each call is its own file.
+
+    Two records rather than one, because the whole reason this is a directory of
+    files instead of a field in the adapter metadata is that the metadata path is
+    a single file every call overwrites. If two writes collapsed into one record
+    the sum would be wrong in exactly the case — a bisected chunk — that costs the
+    most.
+    """
+    graphify_semantic_adapter.write_provider_spend(tmp_path, 1.25)
+    graphify_semantic_adapter.write_provider_spend(tmp_path, 0.75)
+
+    assert len(tuple(tmp_path.glob("provider-spend-*.json"))) == 2
+    assert graphify_semantic_corpus_run.observed_spend_usd(tmp_path) == pytest.approx(2.0)
+
+
+def test_an_unreadable_spend_record_is_skipped_rather_than_fatal(tmp_path: Path) -> None:
+    """A malformed record can only make the total LOW, which the cap already handles.
+
+    The control arm is the second assertion: a good record in the SAME directory
+    is still counted, so this measures "the bad one was skipped" rather than "the
+    reader returned zero for some unrelated reason".
+    """
+    (tmp_path / "provider-spend-garbage.json").write_text("not json")
+    assert graphify_semantic_corpus_run.observed_spend_usd(tmp_path) == pytest.approx(0.0)
+
+    _spend(tmp_path, 3.5)
+    assert graphify_semantic_corpus_run.observed_spend_usd(tmp_path) == pytest.approx(3.5)
+
+
+def test_an_absent_boundary_directory_reports_no_spend(tmp_path: Path) -> None:
+    """Absence is the normal pre-first-call state, not an error."""
+    assert graphify_semantic_corpus_run.observed_spend_usd(tmp_path / "missing") == 0.0
+
+
+@_needs_driver
+def test_a_run_halts_once_cumulative_spend_crosses_the_plans_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cap that did not exist: per-chunk authority summing past any total.
+
+    `max_cost_usd` bounds ONE chunk and `--max-budget-usd` bounds one provider
+    invocation, so 58 chunks each individually within authority could spend far
+    past anything a human approved. This arm drives three chunks whose recorded
+    spend crosses the plan's `max_total_cost_usd` on the second, and asserts the
+    third never ran.
+
+    The control arm is the second half: the same three chunks with spend UNDER the
+    cap must run to the end with `halted == ""`. Without it this would pass
+    against a driver that halts on every run.
+
+    The halted run must still return a SUMMARY. An exception escaping `execute`
+    would leave the operator with a traceback and no record of which chunks are
+    staged on disk, which is the artifact that decides what to do next.
+    """
+    cap = _config().max_total_cost_usd
+
+    def driver_over(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        for index in range(3):
+            context.metadata_path.write_bytes(b"{}")
+            _spend(context.boundary_dir, cap * 0.6)
+            on_chunk_done(index, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver_over, result={"failed_chunks": 0})
+    halted = _execute(tmp_path)
+
+    assert halted.halted, "a run that crossed its cumulative cap reported no reason"
+    assert "max_total_cost_usd" in halted.halted
+    assert halted.spend_usd == pytest.approx(cap * 1.2)
+    # Two chunks reached the callback, not three: the third was never dispatched.
+    assert len(halted.outcomes) == 2
+    assert halted.skipped == len(_ledger().chunks) - 2
+
+    def driver_under(
+        context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable
+    ) -> None:
+        for index in range(3):
+            context.metadata_path.write_bytes(b"{}")
+            _spend(context.boundary_dir, cap * 0.1)
+            on_chunk_done(index, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver_under, result={"failed_chunks": 0})
+    completed = _execute(tmp_path / "under")
+
+    assert completed.halted == ""
+    assert len(completed.outcomes) == 3
+    assert completed.spend_usd == pytest.approx(cap * 0.3)
+
+
+@_needs_driver
+def test_spend_is_charged_before_the_disposition_so_no_branch_escapes_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A chunk that FAILS to stage still spent money, and must still be charged.
+
+    The charge sits above the branch rather than inside the staging path, and this
+    is the arm for that placement: the driver here produces a malformed result, so
+    every chunk lands in the failure branch — the one a charge written inside
+    `_stage_completed_chunk` would never reach.
+
+    A cap blind to the runs that go wrong is worse than no cap, because the runs
+    that go wrong are the ones that retry.
+    """
+
+    def driver(context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable) -> None:
+        for index in range(2):
+            _spend(context.boundary_dir, 4.0)
+            on_chunk_done(index, len(context.ledger.chunks), {"nodes": "not-a-list"})
+
+    _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
+    summary = _execute(tmp_path)
+
+    assert summary.failed == 2
+    assert summary.completed == 0
+    assert summary.spend_usd == pytest.approx(8.0)
+
+
+@_needs_driver
+def test_a_bisected_chunks_calls_are_summed_rather_than_overwritten(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One callback, N provider calls — the case summing adapter metadata gets wrong.
+
+    graphify's `_extract_with_adaptive_retry` recurses on halves and merges, then
+    fires ONE callback. The adapter metadata lives at a single fixed path every
+    call overwrites, so a driver reading `metadata.total_cost_usd` sees only the
+    LAST leaf and undercounts precisely the chunks that cost the most.
+
+    The control is the arithmetic: three records of 2.0 must total 6.0, not 2.0.
+    A reader that took the last record — the metadata behaviour — would produce
+    2.0 and pass any assertion that only checked "nonzero".
+    """
+
+    def driver(context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable) -> None:
+        context.metadata_path.write_bytes(b"{}")
+        _spend(context.boundary_dir, 2.0, 2.0, 2.0)
+        on_chunk_done(0, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
+    assert _execute(tmp_path).spend_usd == pytest.approx(6.0)
+
+
+@_needs_driver
+def test_spend_records_are_rotated_so_one_chunk_is_not_charged_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Records are cleared with the markers; a survivor would be charged again.
+
+    Two chunks, one record each, must total 2.0. If the rotation missed the spend
+    records the first chunk's record would still be present at the second chunk's
+    read and the total would be 3.0 — an over-count that fires the cap early,
+    which is the failure mode that looks like the cap working.
+    """
+
+    def driver(context: graphify_semantic_corpus_run._RunContext, on_chunk_done: Callable) -> None:
+        for index in range(2):
+            context.metadata_path.write_bytes(b"{}")
+            _spend(context.boundary_dir, 1.0)
+            on_chunk_done(index, len(context.ledger.chunks), {})
+
+    _stub_extraction(monkeypatch, driver, result={"failed_chunks": 0})
+    assert _execute(tmp_path).spend_usd == pytest.approx(2.0)
+
+
+def test_the_child_takes_the_plans_output_cap_over_the_profile_literal() -> None:
+    """The resolved, plan-pinned cap must reach the provider, by VALUE not by name.
+
+    Three arms, because each is a different way this can silently be wrong:
+
+    * With the variable set, the child gets the plan's value — otherwise the whole
+      resolution is decoration and the run still uses the profile literal.
+    * With it absent, the child gets the profile's literal, which is the LOWER of
+      the two: an absent variable can only under-spend.
+    * With it malformed, resolution RAISES. A typo that quietly reverted to the
+      literal is the exact failure this replaces — an unnoticed low cap truncates
+      a structured extraction mid-object and the run reports a refusal whose cause
+      appears nowhere in the evidence.
+
+    The fourth assertion is the one that protects the committed slice evidence:
+    the child's environment NAMES are identical either way. `environment_names` is
+    the only environment fact any receipt compares, so a new variable here would
+    invalidate evidence for a fact the plan already records.
+    """
+    profile = graphify_semantic_slice.CORPUS_PROFILE
+    name = graphify_semantic_slice.MAX_OUTPUT_TOKENS_ENV_NAME
+
+    pinned = graphify_semantic_slice.claude_child_environment({name: "64000"}, profile=profile)
+    assert pinned["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "64000"
+
+    bare = graphify_semantic_slice.claude_child_environment({}, profile=profile)
+    assert bare["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == profile.max_output_tokens
+    assert int(profile.max_output_tokens) < 64000, "the fallback must be the lower value"
+
+    assert sorted(pinned) == sorted(bare)
+
+    for bad in ("0", "-1", "64k", "sixty"):
+        with pytest.raises(ValueError, match=name):
+            graphify_semantic_slice.claude_child_environment({name: bad}, profile=profile)
+
+
+@_needs_driver
+def test_the_driver_exports_the_plans_cap_rather_than_the_profiles(tmp_path: Path) -> None:
+    """The overlay carries the plan's number, which is what makes the pin reach the call.
+
+    The second assertion is the discrimination: an overlay that simply restated
+    `CORPUS_PROFILE.max_output_tokens` would satisfy the first if the two happened
+    to agree, and they must not — the whole change is that the plan's value is
+    resolved rather than typed.
+    """
+    real_claude = shutil.which("claude")
+    assert real_claude is not None
+    context = msgspec.structs.replace(
+        _run_context(tmp_path),
+        preflight_receipt=msgspec.structs.replace(
+            _run_context(tmp_path).preflight_receipt,
+            executable_sha256=graphify_semantic_slice.sha256_file(Path(real_claude).resolve()),
+        ),
+    )
+    adapter_dir = tmp_path / "bin"
+    adapter_dir.mkdir()
+    overlay = graphify_semantic_corpus_run._adapter_overlay(context, adapter_dir)
+
+    name = graphify_semantic_slice.MAX_OUTPUT_TOKENS_ENV_NAME
+    assert overlay[name] == str(_config().claude_max_output_tokens)
+    assert overlay[name] != graphify_semantic_slice.CORPUS_PROFILE.max_output_tokens

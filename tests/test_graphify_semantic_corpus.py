@@ -33,6 +33,13 @@ from kb_setup import (
     graphify_semantic_slice,
 )
 
+# The output cap for the SYNTHETIC plans below, where the value is irrelevant to
+# what the test asserts. A literal here rather than a resolution because these
+# tests must stay offline and deterministic; the one plan that has to reproduce
+# the committed authority (`_exact_graphify_plan`) calls the real resolver, which
+# is the only place the number has to be the one the CLI would pin.
+_TEST_MAX_OUTPUT_TOKENS = 64_000
+
 _UNSET_AUTHORITY_JSON = (
     b'{"advisories_sha256":"",'
     b'"execution_config_sha256":"",'
@@ -113,6 +120,14 @@ def _exact_graphify_plan(tmp_path: Path) -> Path:
         source,
         candidate,
         source=source_pin,
+        # The REAL resolver, not `_TEST_MAX_OUTPUT_TOKENS`: this plan has to be
+        # byte-identical to the one the CLI writes, or the recorded authority
+        # cannot be reproduced. The consequence is worth knowing before it
+        # surprises someone — if the Models API, the published docs table and the
+        # committed snapshot ever disagree about the ceiling, this plan's digest
+        # depends on which of them answered, and the correct response is a
+        # deliberate re-plan and re-record, not a pin here.
+        max_output_tokens=graphify_semantic_corpus.planned_max_output_tokens(repo_root, os.environ),
     )
     return candidate
 
@@ -139,6 +154,7 @@ def test_plan_artifact_verifier_rehashes_real_source_bytes(unset_authority, tmp_
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
         token_budget=20_000,
     )
 
@@ -179,6 +195,7 @@ def test_plan_warning_is_a_structural_failure(tmp_path: Path) -> None:
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
 
     authority_path = tmp_path / "reviewed-authority.json"
@@ -222,6 +239,7 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
 
     advisories = json.loads((candidate / "advisories.json").read_text(encoding="utf-8"))
@@ -285,6 +303,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
     advisory_path = candidate / "advisories.json"
     advisory = json.loads(advisory_path.read_text(encoding="utf-8"))
@@ -608,6 +627,7 @@ def test_exact_graphify_visual_exclusions_bind_deterministic_evidence(tmp_path: 
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
 
     exclusions = json.loads((candidate / "exclusions.json").read_text(encoding="utf-8"))
@@ -733,6 +753,7 @@ def test_visual_exclusion_evidence_rejects_real_source_drift(
                 commit=_git(source, "rev-parse", "HEAD"),
                 tree=_git(source, "rev-parse", "HEAD^{tree}"),
             ),
+            max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
         )
 
 
@@ -1562,6 +1583,7 @@ def test_file_backed_authority_converges_without_changing_planner_bytes(tmp_path
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
     manifest_sha = hashlib.sha256((candidate / "manifest.json").read_bytes()).hexdigest()
     config_sha = hashlib.sha256((candidate / "execution-config.json").read_bytes()).hexdigest()
@@ -1615,6 +1637,7 @@ def test_semantic_slice_policy_drift_invalidates_existing_plan(
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
     original_module_sha = graphify_semantic_corpus._module_sha
 
@@ -1638,6 +1661,7 @@ def test_ledger_is_reconciled_to_real_source_inventory(tmp_path: Path) -> None:
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
     ledger_path = candidate / "chunk-ledger.json"
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
@@ -2106,6 +2130,7 @@ def _execution_plan(tmp_path: Path, repo_root: Path) -> Path:
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
     )
     return candidate
 
@@ -2337,3 +2362,176 @@ def test_execution_mode_verifier_rejects_fabricated_caller_structs(tmp_path: Pat
     )
     assert result.state == "failed"
     assert result.reasons == ("execution-artifact-path-invalid",)
+
+
+def test_the_planned_output_cap_is_half_a_resolved_ceiling_and_never_a_literal(
+    monkeypatch,
+) -> None:
+    """The cap comes from `model_limits`, halved — and a resolution failure RAISES.
+
+    The literal this replaces was 8192, chosen when nothing here could say what
+    the ceiling was. Two arms, and the second is the one that matters: if the
+    resolver cannot answer, planning must fail rather than fall back, because a
+    silent fallback is how a literal comes back wearing a resolved name.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+
+    monkeypatch.setattr(
+        graphify_semantic_corpus.model_limits,
+        "resolve",
+        lambda *_args, **_kwargs: graphify_semantic_corpus.model_limits.ModelLimits(
+            model="claude-opus-5", max_output_tokens=128_000, source="test"
+        ),
+    )
+    assert graphify_semantic_corpus.planned_max_output_tokens(repo_root, {}) == 64_000
+
+    def refuse(*_args: object, **_kwargs: object) -> Never:
+        raise graphify_semantic_corpus.model_limits.UnresolvableError("no source answered")
+
+    monkeypatch.setattr(graphify_semantic_corpus.model_limits, "resolve", refuse)
+    with pytest.raises(graphify_semantic_corpus.model_limits.UnresolvableError):
+        graphify_semantic_corpus.planned_max_output_tokens(repo_root, {})
+
+
+def test_verification_reads_the_plans_output_cap_instead_of_re_resolving_it(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Verifying must not depend on a network call, or on today's published ceiling.
+
+    `_effective_config` is the planner's builder AND the verifier's expectation.
+    Resolving inside it would put a live lookup on the verify path and let a
+    ceiling that moved upstream report an already-authorized plan as
+    `config-contract-mismatch` — a plan refused for a fact about the world rather
+    than about itself.
+
+    The arm makes the resolver hostile: any call to it fails the test. A green
+    verify under that condition is the evidence.
+    """
+    candidate = _exact_graphify_plan(tmp_path)
+
+    def refuse(*_args: object, **_kwargs: object) -> Never:
+        raise AssertionError("verification re-resolved the output ceiling")
+
+    monkeypatch.setattr(graphify_semantic_corpus.model_limits, "resolve", refuse)
+    result = graphify_semantic_corpus.verify_plan(
+        candidate, source_root=candidate.parent / "exact-graphify-source"
+    )
+
+    assert "config-contract-mismatch" not in result.reasons
+    assert "config-output-cap-implausible" not in result.reasons
+
+
+@pytest.mark.parametrize(
+    ("cap", "flagged"),
+    [
+        pytest.param(0, True, id="zero"),
+        pytest.param(-1, True, id="negative"),
+        pytest.param(10_000_000, True, id="absurd"),
+        pytest.param(64_000, False, id="resolved"),
+        pytest.param(1_000_000, False, id="at-the-bound"),
+    ],
+)
+def test_an_implausible_output_cap_is_named_rather_than_accepted(
+    tmp_path: Path, cap: int, *, flagged: bool
+) -> None:
+    """A bound, not a re-derivation — and it must accept the real resolved value.
+
+    The last two arms are the control. A guard that flagged everything would
+    satisfy the first three and be useless; these assert it passes 64,000 (what
+    the resolver actually returns for Opus 5) and the bound itself.
+
+    `_config_reasons` is called directly rather than through `verify_plan`,
+    because a synthetic single-file plan is `plan-warning-bearing` and whole-plan
+    verification short-circuits on that before it reaches the contract checks. Run
+    through `verify_plan`, every arm here would return the same one-element reason
+    tuple and the test would be measuring the advisory guard while claiming to
+    measure this one.
+    """
+    source = tmp_path / "source"
+    source.mkdir()
+    _git(source, "init", "-q")
+    _git(source, "config", "user.email", "corpus@example.invalid")
+    _git(source, "config", "user.name", "Corpus Contract")
+    (source / "tiny.md").write_text("tiny\n", encoding="utf-8")
+    _git(source, "add", "tiny.md")
+    _git(source, "commit", "-qm", "source")
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(
+            ref="test-ref",
+            commit=_git(source, "rev-parse", "HEAD"),
+            tree=_git(source, "rev-parse", "HEAD^{tree}"),
+        ),
+        # Planned WITH the bad value rather than hand-edited afterwards. Editing
+        # the config in place breaks its member digest, so verification fails
+        # structurally and never reaches the contract check — the arm would then
+        # be measuring the digest guard while claiming to measure this one.
+        max_output_tokens=cap,
+    )
+    decode = msgspec.json.decode
+    reasons = graphify_semantic_corpus._config_reasons(
+        candidate,
+        decode(
+            (candidate / "source-inventory.json").read_bytes(),
+            type=graphify_semantic_corpus.SourceInventory,
+            strict=True,
+        ),
+        decode(
+            (candidate / "exclusions.json").read_bytes(),
+            type=graphify_semantic_corpus.ExclusionCatalog,
+            strict=True,
+        ),
+        decode(
+            (candidate / "chunk-ledger.json").read_bytes(),
+            type=graphify_semantic_corpus.ChunkLedger,
+            strict=True,
+        ),
+        decode(
+            (candidate / "execution-config.json").read_bytes(),
+            type=graphify_semantic_corpus.CorpusExecutionConfig,
+            strict=True,
+        ),
+    )
+
+    assert ("config-output-cap-implausible" in reasons) is flagged
+    # The contract comparison itself must stay green in every arm: the verifier
+    # reads the plan's own cap rather than re-deriving it, so a bad value is a
+    # NAMED reason and never a mismatch reported in the wrong vocabulary.
+    assert "config-contract-mismatch" not in reasons
+
+
+def test_the_cumulative_spend_cap_is_in_the_plan_and_is_not_the_per_chunk_one(
+    tmp_path: Path,
+) -> None:
+    """The plan must carry a WHOLE-RUN authority, distinct from the per-chunk cap.
+
+    Both numbers being present and different is the assertion. A field that simply
+    echoed `max_cost_usd` would look like a cumulative cap and bound nothing new,
+    which is the state this replaced: `max_cost_usd` per chunk and
+    `--max-budget-usd` per provider invocation, with no total anywhere.
+    """
+    source = tmp_path / "source"
+    source.mkdir()
+    _git(source, "init", "-q")
+    _git(source, "config", "user.email", "corpus@example.invalid")
+    _git(source, "config", "user.name", "Corpus Contract")
+    (source / "tiny.md").write_text("tiny\n", encoding="utf-8")
+    _git(source, "add", "tiny.md")
+    _git(source, "commit", "-qm", "source")
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(
+            ref="test-ref",
+            commit=_git(source, "rev-parse", "HEAD"),
+            tree=_git(source, "rev-parse", "HEAD^{tree}"),
+        ),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
+
+    assert config["max_total_cost_usd"] == 100.0
+    assert config["max_total_cost_usd"] != config["max_cost_usd"]

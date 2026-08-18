@@ -854,3 +854,49 @@ def test_staged_verifier_returns_typed_failure_for_rehashed_malformed_fragment(
 
     assert result.state == "failed"
     assert result.reasons == ("fragment-schema-invalid",)
+
+
+def test_the_accepted_claude_identity_describes_evidence_not_the_installed_binary() -> None:
+    """Two constants, two questions — collapsing them invalidates committed evidence.
+
+    `_ACCEPTED_CLAUDE_*` is the authority for the COMMITTED slice receipt: a run
+    that already happened, which no edit here can change. `current_claude()` is
+    what a NEW run may use, and it is what the corpus plan pins.
+
+    This arm exists because the two WERE collapsed, for about twenty minutes.
+    Claude Code self-updated, advancing "the accepted version" looked like
+    ordinary currency work, and it turned the committed slice candidate from
+    `unapproved` to `failed` — evidence refused for a fact about the world rather
+    than about itself. The suite caught it; reading the diff had not.
+
+    The first assertion is the invariant. The second is the control: with the two
+    equal, an implementation that returned `_ACCEPTED_*` from `current_claude()`
+    would satisfy the first forever and the arm would prove nothing — so it
+    asserts the split is REAL right now, and if a future round re-runs the slice
+    at the current version and the two legitimately converge, this is the line to
+    re-derive rather than delete.
+    """
+    current = graphify_semantic_slice.current_claude()
+
+    assert graphify_semantic_slice._ACCEPTED_CLAUDE_VERSION == "2.1.233"
+    assert current.version != graphify_semantic_slice._ACCEPTED_CLAUDE_VERSION
+    assert current.executable_sha256 != graphify_semantic_slice._ACCEPTED_CLAUDE_EXECUTABLE_SHA256
+    # The CLI contract is the thing that must NOT have moved — that identity is
+    # what makes advancing the version a mechanical bump rather than a review.
+    assert current.help_sha256 == graphify_semantic_slice._ACCEPTED_CLAUDE_HELP_SHA256
+
+
+def test_the_corpus_plan_pins_the_current_claude_not_the_accepted_one() -> None:
+    """The planner must declare what will run, not what already ran.
+
+    Without this the corpus preflight refuses on a version nobody reviewed — or,
+    worse, the plan records the version of a receipt from a different run and
+    reads as internally consistent.
+    """
+    from kb_setup import graphify_semantic_corpus
+
+    current = graphify_semantic_slice.current_claude()
+
+    assert current.version == graphify_semantic_corpus._CLAUDE_VERSION
+    assert current.executable_sha256 == graphify_semantic_corpus._CLAUDE_EXECUTABLE_SHA256
+    assert current.help_sha256 == graphify_semantic_corpus._CLAUDE_HELP_SHA256

@@ -43,12 +43,25 @@ from kb_setup import (
     graphify_semantic_adapter,
     graphify_semantic_corpus_authority,
     graphify_semantic_slice,
+    model_limits,
 )
 
 _SCHEMA = "graphify-semantic-corpus-plan/v0"
 _ABORT_SCHEMA = "graphify-semantic-corpus-abort/v0"
 _FILE_CHAR_CAP = 20_000
 _DEFAULT_TOKEN_BUDGET = 20_000
+# Ray's ruling, 2026-08-17. The whole-run authority, in dollars, against a
+# projected corpus cost of roughly 65 — so it is headroom for a run that goes
+# somewhat wrong, and a stop for one that goes badly wrong. It is deliberately
+# not derived from the per-chunk cap times the chunk count: that product (1,450)
+# is the number this constant exists to make unreachable.
+_MAX_TOTAL_COST_USD = 100.0
+# The upper bound the VERIFIER will accept for a plan's resolved output cap. Not
+# the ceiling itself — only the Models API knows that, and asking it on the verify
+# path is the thing this design avoids. It is set well above any published Claude
+# output ceiling (128,000 at the time of writing, and the Batches API reaches
+# 300,000) so it can only catch a plan written against a number nobody resolved.
+_MAX_PLAUSIBLE_OUTPUT_TOKENS = 1_000_000
 _INTENTIONAL_EXCLUSIONS = {
     "docs/demo-path.svg": (
         "regenerable-derived-visual",
@@ -118,12 +131,25 @@ _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
 _PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
-# Kept in step with `graphify_semantic_slice._ACCEPTED_CLAUDE_*`, which carries
-# the reasoning: the `--help` digest is unchanged across 2.1.232 -> 2.1.233, so
-# only the binary moved and the pinned flag contract did not.
-_CLAUDE_VERSION = "2.1.233"
-_CLAUDE_EXECUTABLE_SHA256 = "bc466b6cde63edafc773f471a1fb98787fabb31f52240c8616ce7e1f587b212d"
-_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6da2882d3a5560fea6"
+# READ from the slice, not transcribed. These were three literals here and three
+# more there, bound only by a comment saying "kept in step" — and this module
+# already learned that lesson one field away: `graphify_version` was a literal
+# reading 0.9.43 while the runtime beside it said 0.9.44, so every plan written
+# after that pin bump recorded two different versions for one run. A version that
+# is TRANSCRIBED can disagree with the version that ran; a version that is READ
+# cannot.
+#
+# `current_claude`, NOT the slice's `_ACCEPTED_CLAUDE_*`. Those are the authority
+# for the committed SLICE receipt — evidence about a run that already happened —
+# while a plan declares what a run WILL do. Reading the accepted one advanced it
+# to match the installed binary and turned that committed candidate from
+# `unapproved` to `failed`, which is how the distinction was found rather than
+# reasoned. The `--help`-digest measurement justifying each advance lives with
+# the constants.
+_CURRENT_CLAUDE = graphify_semantic_slice.current_claude()
+_CLAUDE_VERSION = _CURRENT_CLAUDE.version
+_CLAUDE_EXECUTABLE_SHA256 = _CURRENT_CLAUDE.executable_sha256
+_CLAUDE_HELP_SHA256 = _CURRENT_CLAUDE.help_sha256
 _CLAUDE_REQUIRED_FLAGS = (
     "--json-schema",
     "--max-budget-usd",
@@ -327,6 +353,17 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     structured_output_retries: int
     max_turns: int
     max_cost_usd: float
+    # The cap on the WHOLE run, which nothing expressed before. `max_cost_usd` is
+    # per chunk and `--max-budget-usd` is per provider invocation, so 58 chunks
+    # each individually within authority could spend an unbounded total: chunk 1
+    # measured 1.12 USD, 58 chunks project to roughly 65, and the per-chunk
+    # ceiling permits about 1,450.
+    #
+    # No default, deliberately. A plan written before this field existed decodes
+    # into a struct that forbids unknown fields and requires this one, so an old
+    # plan is REFUSED rather than run under a cap nobody authorized — which is
+    # the same failure this field exists to prevent.
+    max_total_cost_usd: float
     graphify_max_retry_depth: int
     graphify_chunk_size: int
     graphify_no_incremental_cache: bool
@@ -578,6 +615,20 @@ def _module_sha(module: ModuleType) -> str:
     return _sha_file(Path(source))
 
 
+class _MemberDigests(msgspec.Struct, frozen=True):
+    """The three plan members the execution config binds itself to.
+
+    Bundled because they always travel together and are all ``str``: as three
+    positional-adjacent keyword arguments, two of them could be transposed
+    without a type error, and the resulting config would bind a plan to the wrong
+    member digests while verifying as internally consistent.
+    """
+
+    inventory_sha256: str
+    exclusions_sha256: str
+    ledger_sha256: str
+
+
 def _config_without_namespace(config: CorpusExecutionConfig) -> dict[str, object]:
     payload = msgspec.to_builtins(config)
     if not isinstance(payload, dict):
@@ -600,9 +651,16 @@ def _effective_config(
     source: SourcePin,
     *,
     token_budget: int,
-    inventory_sha256: str,
-    exclusions_sha256: str,
-    ledger_sha256: str,
+    # Passed IN rather than resolved here, because this function is also the
+    # VERIFIER's expectation: it recomputes the config and compares field by
+    # field. Resolving would put a network call on the verify path and let a
+    # ceiling that moved upstream refuse a plan a human had already authorized.
+    # The verifier passes the plan's own recorded value, which makes this one
+    # field reviewer-owned rather than recomputed — deliberately. What guards it
+    # is `_plan_contract_reasons`' plausibility bound plus the authority digest a
+    # reviewer signs, not a re-derivation.
+    max_output_tokens: int,
+    members: _MemberDigests,
 ) -> CorpusExecutionConfig:
     semantic_fingerprint = _sha(
         graphify_semantic_slice.encode_json(graphify_sdk.semantic_api_fingerprint())
@@ -646,11 +704,12 @@ def _effective_config(
         token_budget=token_budget,
         file_char_cap=_FILE_CHAR_CAP,
         timeout_seconds=120,
-        claude_max_output_tokens=int(_PROFILE.max_output_tokens),
+        claude_max_output_tokens=max_output_tokens,
         claude_max_retries=int(_PROFILE.max_retries),
         structured_output_retries=1,
         max_turns=int(_PROFILE.max_turns),
         max_cost_usd=_PROFILE.max_cost_usd,
+        max_total_cost_usd=_MAX_TOTAL_COST_USD,
         # 0 -> 2 alongside `claude_max_retries`: one blip over 57 chunks is likely
         # rather than hypothetical, and a lost chunk is a hole in the corpus that
         # nothing downstream reports as missing.
@@ -695,14 +754,46 @@ def _effective_config(
         # saying it. A reader who checks the config rather than the comment gets
         # the wrong answer, which is the worse of the two places to leave it.
         cache_policy="checkpoint-write-atomic-per-chunk",
-        source_inventory_sha256=inventory_sha256,
-        exclusions_sha256=exclusions_sha256,
-        chunk_ledger_sha256=ledger_sha256,
+        source_inventory_sha256=members.inventory_sha256,
+        exclusions_sha256=members.exclusions_sha256,
+        chunk_ledger_sha256=members.ledger_sha256,
         cache_namespace_sha256="",
     )
     return msgspec.structs.replace(
         provisional, cache_namespace_sha256=cache_namespace_for(provisional)
     )
+
+
+def planned_max_output_tokens(repo_root: Path, environment: Mapping[str, str]) -> int:
+    """Resolve the model's real output ceiling and return HALF of it, to be pinned.
+
+    The literal this replaces was 8192, chosen when nothing in the repository
+    could say what the ceiling actually was; the model's real ceiling is an order
+    of magnitude higher, and a cap set an order of magnitude low truncates a
+    structured extraction mid-object. ``model_limits`` resolves it — Models API,
+    then the published docs table, then the committed snapshot, and it RAISES
+    rather than falling back to a literal, which is what keeps a resolution
+    failure from silently reinstating the number this removes.
+
+    HALF, per Ray's ruling 2026-08-17: the measured need is about 31,887 tokens,
+    so half the resolved ceiling leaves roughly 2x headroom while still being a
+    bound. A cap equal to the ceiling would not be one.
+
+    PLAN TIME, not import time, and the reason is reproducibility rather than
+    cost. This value is written into ``execution-config.json``, which is digested
+    into ``cache_namespace_sha256`` and into the authority the reviewer signs; a
+    value resolved at import would make those digests depend on a network call at
+    the moment of import. Pinning it means execution compares against a value a
+    human authorized, and re-planning is the deliberate act that re-resolves it.
+
+    Called by the CLI and passed DOWN, rather than called inside
+    ``_effective_config``. That function has a second caller — the VERIFIER, which
+    recomputes the expected config and compares it field by field — so resolving
+    in there would make verification network-dependent, and a ceiling that moved
+    upstream would report an authorized plan as ``config-contract-mismatch``.
+    """
+    limits = model_limits.resolve(_PROFILE.model, repo_root, environment)
+    return limits.max_output_tokens // 2
 
 
 def _relative(source_root: Path, path: Path) -> str:
@@ -1138,6 +1229,10 @@ def plan_source(
     output: Path,
     *,
     source: SourcePin,
+    # Required, and resolved by the CALLER — `planned_max_output_tokens` explains
+    # why. Required rather than defaulted so no path can plan under a literal
+    # again: a default here would be the 8192 this replaced, wearing a new name.
+    max_output_tokens: int,
     token_budget: int = _DEFAULT_TOKEN_BUDGET,
 ) -> PlanManifest:
     """Atomically publish a deterministic, provider-free plan for one Git tree."""
@@ -1165,9 +1260,12 @@ def plan_source(
         config = _effective_config(
             source,
             token_budget=token_budget,
-            inventory_sha256=_sha(inventory_raw),
-            exclusions_sha256=_sha(exclusions_raw),
-            ledger_sha256=_sha(ledger_raw),
+            max_output_tokens=max_output_tokens,
+            members=_MemberDigests(
+                inventory_sha256=_sha(inventory_raw),
+                exclusions_sha256=_sha(exclusions_raw),
+                ledger_sha256=_sha(ledger_raw),
+            ),
         )
         _write(stage / _PLAN_MEMBERS[4], config)
         after = graphify_baseline.source_manifest(
@@ -1452,12 +1550,26 @@ def _config_reasons(
     expected = _effective_config(
         source,
         token_budget=ledger.token_budget,
-        inventory_sha256=_sha_file(candidate / "source-inventory.json"),
-        exclusions_sha256=_sha_file(candidate / "exclusions.json"),
-        ledger_sha256=_sha_file(candidate / "chunk-ledger.json"),
+        # The plan's OWN value, so this one field is not re-derived here. It is
+        # resolved once at plan time from the model's real ceiling, and re-running
+        # that resolution on the verify path would make verification depend on a
+        # network call and let an upstream ceiling change refuse an already
+        # authorized plan. The bound below is what keeps it from being unchecked.
+        max_output_tokens=config.claude_max_output_tokens,
+        members=_MemberDigests(
+            inventory_sha256=_sha_file(candidate / "source-inventory.json"),
+            exclusions_sha256=_sha_file(candidate / "exclusions.json"),
+            ledger_sha256=_sha_file(candidate / "chunk-ledger.json"),
+        ),
     )
     if config != expected:
         reasons.append("config-contract-mismatch")
+    # A bound, not a re-derivation. Zero would send an unusable cap to every call;
+    # a value above any published ceiling means the plan was written against a
+    # number nobody resolved. Between those two the reviewer owns it — the value
+    # is inside the authority digest they sign.
+    if not 0 < config.claude_max_output_tokens <= _MAX_PLAUSIBLE_OUTPUT_TOKENS:
+        reasons.append("config-output-cap-implausible")
     if config.token_budget != ledger.token_budget:
         reasons.append("config-ledger-budget-mismatch")
     if exclusions.source_commit != config.graphify_commit:
@@ -2930,6 +3042,9 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             source_root,
             output,
             source=source_pin,
+            # Resolved HERE, at the one entry point that plans for real, so the
+            # network call happens once per plan and never on the verify path.
+            max_output_tokens=planned_max_output_tokens(repo_root, os.environ),
         )
     print(_encode(manifest).decode().rstrip())
     return 0
