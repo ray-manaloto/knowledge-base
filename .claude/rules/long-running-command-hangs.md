@@ -87,6 +87,31 @@ incident: unbounded wait + pipe-masked exit code.
    `head`/`tail` in one session** (2026-08-08), every one discarding the gate's
    rc — because no task answered "are these two files clean?" until `kb-check`.
 
+3a. **`timeout` DOES NOT EXIST ON macOS, and reaching for it is now DENIED**
+   (`kb_setup.absent_binary`, Ray's ruling 2026-08-18). Neither `timeout` nor
+   `gtimeout` resolves here — control-armed, `command -v` returns 1 for both
+   while `perl` returns `/usr/bin/perl`. That matters far more than a missing
+   convenience: the shell answers `command not found` with **rc 127**, which
+   lands in a transcript looking exactly like the command under test failing.
+   It cost a near-false *"codex unavailable"* — a conclusion about a paid
+   external service drawn from a probe that never ran, which is
+   `probes-need-a-control-arm.md` rule 4 in its most literal form.
+
+   Bound the run instead, in this order: **the Bash tool's own `timeout`
+   parameter** (milliseconds — the native mechanism, and `use-tool-builtins.md`
+   says reach for it first); **a mise task's `timeout` key** for anything
+   recurring; `perl -e 'alarm shift @ARGV; exec @ARGV' <secs> <cmd> …` for a
+   one-off.
+
+   **Why a deny and not this paragraph.** It *was* this paragraph — it reached a
+   handoff's own "things that will bite you" list, written by the session it bit,
+   and was walked into again. Same measurement as every other guard here: the
+   warning-only graph-first rule scored 0 compliance in 19 chances; the deny that
+   replaced it took its violations 62 → 0. The guard is host-conditional
+   (`shutil.which`), so on a machine where `timeout` exists it is silently inert,
+   and `command -v timeout` / `which timeout` are never denied — they are the
+   control arm.
+
 4. **A stalled process is a hang — kill it, don't keep waiting.** A
    process sitting at 0% CPU with no children for minutes is wedged
    (blocked on a lock, stdin, or a dead socket), not working. Kill it

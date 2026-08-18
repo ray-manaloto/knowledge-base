@@ -286,7 +286,7 @@ def check_hook_call(raw: str) -> Result[str | None]:
         # Each is STATELESS and they run before the stateful graph-first check;
         # among themselves the oldest and most specific remedy wins, so a command
         # that trips two reports the one whose advice is narrower.
-        for guard in (_graphify_redirect, _check_first, _stage_explicitly):
+        for guard in (_graphify_redirect, _check_first, _stage_explicitly, _absent_binary):
             reason = guard(tool_input)
             if reason:
                 return Ok(reason)
@@ -344,6 +344,26 @@ def _stage_explicitly(tool_input: dict) -> str | None:
         from kb_setup import stage_explicitly
 
         return stage_explicitly.decide(command)
+    except Exception:
+        return None
+
+
+def _absent_binary(tool_input: dict) -> str | None:
+    """Deny a probe whose command word is not installed here. Never raises.
+
+    LAST of the four stateless Bash guards, which is the weakest claim of the
+    four and belongs behind the three that name a canonical replacement task.
+    A command that both hand-runs a gate AND reaches for a missing binary should
+    report the gate redirect: that one is about what the author meant to do,
+    while this one is only about the host they are on.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import absent_binary
+
+        return absent_binary.decide(command)
     except Exception:
         return None
 

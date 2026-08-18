@@ -105,6 +105,18 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    warning-only version of that directive was complied with **0 times out of
    19** in one session, while the DENY above took its own violations 62 → 0.
    See `research-doc-sources.md` step 0 for the scope.
+2c. **The SAME hook also denies a probe whose command word is not installed
+   here** (`kb_setup.absent_binary`, Ray's ruling 2026-08-18). `timeout` /
+   `gtimeout` / `nproc` / `tac` are GNU coreutils and absent on macOS; a probe
+   using one dies with `command not found` (**rc 127**) and reads in a transcript
+   as the thing under test failing. It nearly produced a false *"codex
+   unavailable"*. Host-conditional via `shutil.which`, so it is inert where the
+   binary exists; `command -v` / `which` / `type` are never denied, being the
+   control arm. It runs LAST of the four stateless Bash guards — a command
+   tripping this AND a gate redirect reports the gate, which is about what the
+   author meant to do. Shares `check_first`'s tokeniser (`segments` /
+   `command_word`, promoted to public for exactly this) rather than carrying a
+   second copy to drift. See `long-running-command-hangs.md` rule 3a.
 3. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.
