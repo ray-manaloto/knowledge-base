@@ -1035,3 +1035,45 @@ def test_the_handoff_gate_runs_before_the_gates(monkeypatch, tmp_path):
     monkeypatch.setattr(pr, "run_gates", lambda _root: ran.append(True) or True)
     assert pr.ship_main(tmp_path) == 1
     assert ran == []
+
+
+def test_repowise_health_is_advisory_but_still_reported(monkeypatch):
+    """A FAILING health gate must not block, and must not vanish either.
+
+    Ray's ruling, 2026-08-17, on PR #336. The argument is different from
+    CodeRabbit's and the difference is the point: CodeRabbit is advisory because
+    it is usually unavailable, Repowise because of what it measures — a delta on
+    a composite score, attributed by AUTHORSHIP rather than by defect
+    ("AI-authored files account for the larger share of this PR's regression").
+    A gate whose failure names no defect cannot be actioned, only appeased.
+
+    Both halves are asserted because relaxing a gate has exactly one dangerous
+    failure mode: relaxing it into SILENCE. The verdict is still in the summary.
+    """
+    rows = [
+        {"name": "Repowise / code health", "bucket": "fail"},
+        {"name": "lint", "bucket": "pass"},
+    ]
+    _stub_run(monkeypatch, lambda _cmd: _Proc(1, json.dumps(rows)))
+    green, summary = pr.checks_state(336)
+
+    assert green is True, "an advisory health gate blocked a merge"
+    assert "Repowise / code health=fail" in summary
+    assert "1 binding check(s) green" in summary
+
+
+def test_a_binding_check_still_blocks_alongside_an_advisory_failure(monkeypatch):
+    """A real failing check must still refuse, alongside an advisory one.
+
+    CONTROL ARM for the test above: without it, that test would pass just as well
+    against a gate that counted NOTHING as binding.
+    """
+    rows = [
+        {"name": "Repowise / code health", "bucket": "fail"},
+        {"name": "lint", "bucket": "fail"},
+    ]
+    _stub_run(monkeypatch, lambda _cmd: _Proc(1, json.dumps(rows)))
+    green, summary = pr.checks_state(336)
+
+    assert green is False
+    assert "lint=fail" in summary
