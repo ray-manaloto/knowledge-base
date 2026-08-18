@@ -276,10 +276,41 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # `exclusions.json`, `source-inventory.json` and `chunk-ledger.json` are BYTE-IDENTICAL
 # at source commit 0738af37, so both digests carrying a reviewed exclusion/advisory
 # decision are untouched and the workload is the same 474 units / 58 chunks.
+#
+# RE-RECORDED 2026-08-17 (e), after this branch was rebased onto `main` at
+# `e8f7f4ea`. **No new judgement.** Both of the entries above were written on
+# branches that could not see each other — the spend rulings landed on `main` via
+# PR #336 while the timeout and `$TMPDIR` work sat here — so each recorded a plan
+# that was true of its own tree and of no tree that would ever run. The rebase is
+# the first time all three of Ray's rulings hold at once, and re-planning is what
+# makes the authority describe that tree rather than either parent.
+#
+# WHAT MOVED, diffed field by field against the pre-rebase plan rather than
+# assumed — FIVE of 43:
+#
+# * `timeout_seconds` 120 -> 900. NOT a new decision: it is the (d) ruling above,
+#   arriving in a plan generated from a tree that also carries the spend caps. The
+#   120 it replaces is the number the (c) block explains as a foreign plan's value
+#   standing in for this branch's, now resolved in the other direction.
+# * `planner_sha256`, `runner_sha256`, `adapter_sha256` — the three files the
+#   merge touched, and `cache_namespace_sha256` derived from them. Ordinary code
+#   identity, the case this file's doctrine describes.
+#
+# THE TWO FIELDS THE MERGE HAD TO CHOOSE BETWEEN, both verified in the regenerated
+# config rather than reasoned about: `claude_max_output_tokens` is **64000**, the
+# value #336 RESOLVES at plan time, not the `_PROFILE` literal this branch read;
+# and `max_total_cost_usd` is **100.0**, present at all only because the rebase
+# brought it. A merge that silently kept this branch's side of either would have
+# produced a plan that looks authorized and spends without a cumulative bound.
+#
+# WHAT DID NOT MOVE: `advisories.json`, `exclusions.json`, `source-inventory.json`
+# and `chunk-ledger.json` are BYTE-IDENTICAL at the same source commit 0738af37,
+# so both digests carrying a reviewed DECISION are unchanged and the workload is
+# the same 474 units / 58 chunks. Nothing here re-opens the scope question.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"a3b6845098cd218a2ca26e61682c1507eb76c536b98c16cd332508b5dbc3a81b",'
+    b'"execution_config_sha256":"ec27adfbd044ad28a6bad330af8a686fe8eea130e4bbbf2a4dd9a2e7d91966cf",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"a91c2ec17b528217ae029c52cd5e7c2d632d86a3fa14cc1cc0b3e39e42baf607",'
+    b'"plan_manifest_sha256":"fc6af9b2c112538599f00e4f2f15176a68763e92618b534b90b254be52caa1d4",'
     b'"schema_version":1}\n'
 )
