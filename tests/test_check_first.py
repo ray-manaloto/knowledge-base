@@ -38,6 +38,19 @@ def _verdict(payload: str) -> str | None:
         pytest.param("uv run ruff check tests/ 2>&1 | tail -3", id="piped-so-the-rc-is-lost"),
         pytest.param("cd python && uv run ruff check .", id="after-an-operator"),
         pytest.param("ruff check python/src/kb_setup/graph_size.py", id="bare-via-the-mise-shim"),
+        pytest.param("git status\nruff check python/", id="on-line-two-of-a-script"),
+        pytest.param("echo start\nty check tests/", id="ty-on-line-two"),
+        pytest.param("uv run ruff check python/ && ls -h", id="another-h-flag-is-not-our-help"),
+        pytest.param(
+            "uv run ruff check python/ && git commit --help",
+            id="another-help-does-not-excuse-the-gate",
+        ),
+        pytest.param("python3 --version && uv run ruff check python/", id="another-version"),
+        pytest.param("uv run -q ruff check python/", id="a-flag-before-the-tool"),
+        pytest.param("uv run --directory python ruff check src/", id="a-flag-that-takes-a-value"),
+        pytest.param("ruff --config ruff.toml check python/", id="subcommand-not-adjacent"),
+        pytest.param("/usr/bin/ruff check .", id="an-absolute-path"),
+        pytest.param("ruff check '", id="unparsable-falls-back-to-the-old-check"),
     ],
 )
 def test_a_hand_chained_gate_is_denied(command: str) -> None:
@@ -65,6 +78,17 @@ def test_a_hand_chained_gate_is_denied(command: str) -> None:
         pytest.param("ruff rule E501", id="asking-what-a-rule-means"),
         pytest.param("git commit -m 'ruff check the thing'", id="the-words-inside-a-message"),
         pytest.param("rg 'ruff check' hk.pkl", id="searching-for-the-string"),
+        pytest.param(
+            'git commit -m "fix: stop hand-running uv run ruff check"',
+            id="a-commit-message-ABOUT-the-guard",
+        ),
+        pytest.param('rg "uv run ruff check" .', id="searching-for-the-uv-spelling"),
+        pytest.param('echo "uv run ruff check"', id="echoing-the-uv-spelling"),
+        pytest.param('git commit -m "fix bug; ruff check clean"', id="a-semicolon-inside-a-quote"),
+        pytest.param('echo "done | ruff format"', id="a-pipe-inside-a-quote"),
+        pytest.param("uv run ruff check --help", id="asking-the-gate-for-help"),
+        pytest.param("uv run python -c 'ruff check'", id="the-words-passed-to-python"),
+        pytest.param("ty --version", id="bare-ty-version"),
         pytest.param("", id="empty"),
         pytest.param("   ", id="blank"),
     ],
@@ -103,9 +127,18 @@ def test_a_graphify_command_still_reports_its_own_redirect() -> None:
     A hand-run `graphify` has its own remedy, and reporting the kb-check redirect
     for it would send the reader to the wrong task. `_check_first` runs after
     `_graphify_redirect` precisely so this stays true.
+
+    The command has to be one BOTH guards match, or the arm cannot fail: a bare
+    `graphify label` is invisible to `check_first`, so the assertion held no
+    matter which guard ran first, and the test measured nothing. Caught by the
+    cold lane on this branch (finding 6).
     """
+    assert check_first.decide("graphify label && uv run ruff check .") is not None, (
+        "PRECONDITION: both guards must match, or this arm cannot detect shadowing"
+    )
     payload = (
-        '{"tool_name": "Bash", "tool_input": {"command": "graphify label"}, '
+        '{"tool_name": "Bash", "tool_input": '
+        '{"command": "graphify label && uv run ruff check ."}, '
         '"session_id": "s1", "cwd": "/tmp"}'
     )
     reason = _verdict(payload)

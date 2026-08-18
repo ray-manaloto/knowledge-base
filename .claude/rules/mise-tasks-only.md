@@ -82,8 +82,18 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    Scope is narrow on purpose. **`pytest` is deliberately absent** — this rule
    explicitly permits a single-test `uv run pytest tests/x.py::test_y`, and a
    guard contradicting the rule it enforces is worse than none. `--version` and
-   `--help` are introspection, not gates. Anything containing `mise run kb-` is
-   allowed outright, because `kb-check` shells out to exactly these tools.
+   `--help` are introspection, not gates — judged per SEGMENT, so another
+   command's `--help` in the same chain cannot excuse the gate beside it.
+   Anything containing `mise run kb-` is allowed outright, because `kb-check`
+   shells out to exactly these tools.
+
+   It **tokenises** (`shlex`) rather than pattern-matching, because a regex sees
+   `ruff check` inside `git commit -m "…ruff check…"` and denies it. Both of the
+   cold review's confirmed false positives on this guard were that shape, and it
+   is the class this rule's own guards have failed on every time. After
+   tokenising, a quoted message is one token and can never sit at a command
+   position; a command `shlex` cannot parse degrades to the older regex rather
+   than opening a hole.
 
    It runs AFTER the graphify redirect (so a hand-run `graphify` keeps reporting
    its own remedy) and BEFORE the graph-first check (a stateless verdict belongs
