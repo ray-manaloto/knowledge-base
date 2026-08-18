@@ -115,3 +115,61 @@ def test_the_sink_is_gitignored() -> None:
     ignored = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
 
     assert any(line.strip() in {".agent/", ".agent"} for line in ignored)
+
+
+def test_a_configured_sink_with_nothing_behind_it_is_announced(tmp_path: Path) -> None:
+    """Capture ON with an empty directory means something, and it is not "clean".
+
+    The sink path in settings.json is RELATIVE, so the writer resolves it against
+    its own working directory while the reaper runs pinned to
+    `${CLAUDE_PROJECT_DIR}`. If those ever diverge the bytes accumulate somewhere
+    this never looks, and the only symptom would be this task reporting a tidy
+    zero forever.
+
+    The control is `test_the_reaper_is_quiet_when_capture_is_off` below: with no
+    sink configured, an empty directory is genuinely nothing to say.
+    """
+    settings = tmp_path / ".claude"
+    settings.mkdir(parents=True, exist_ok=True)
+    (settings / "settings.json").write_text(
+        json.dumps({"env": {"OTEL_LOG_RAW_API_BODIES": "file:.agent/telemetry/"}}),
+        encoding="utf-8",
+    )
+
+    assert telemetry.configured_sink(tmp_path) == "file:.agent/telemetry/"
+    assert telemetry.main(tmp_path) == 0
+
+
+def test_the_reaper_is_quiet_when_capture_is_off(tmp_path: Path) -> None:
+    """No sink configured is a different state from a sink that is empty.
+
+    Both are "zero files", and reporting them the same way is how a split writer
+    and reaper would hide. Three shapes must all read as OFF: no settings file at
+    all, a settings file with no `env`, and a sink that is not a `file:` sink.
+    """
+    assert telemetry.configured_sink(tmp_path) == ""
+
+    settings = tmp_path / ".claude"
+    settings.mkdir(parents=True, exist_ok=True)
+    (settings / "settings.json").write_text(json.dumps({"env": {}}), encoding="utf-8")
+    assert telemetry.configured_sink(tmp_path) == ""
+
+    (settings / "settings.json").write_text(
+        json.dumps({"env": {"OTEL_LOG_RAW_API_BODIES": "1"}}), encoding="utf-8"
+    )
+    assert telemetry.configured_sink(tmp_path) == ""
+
+
+def test_a_malformed_settings_file_is_not_a_crash(tmp_path: Path) -> None:
+    """The reaper reads someone else's config; it must not die on it.
+
+    A SessionStart hook that raises on a hand-edited settings.json would turn a
+    typo into a broken session start, which is a much worse failure than the
+    disk tidiness this task exists for.
+    """
+    settings = tmp_path / ".claude"
+    settings.mkdir(parents=True, exist_ok=True)
+    (settings / "settings.json").write_text("{ not json", encoding="utf-8")
+
+    assert telemetry.configured_sink(tmp_path) == ""
+    assert telemetry.main(tmp_path) == 0

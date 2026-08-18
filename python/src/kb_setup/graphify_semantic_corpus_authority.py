@@ -166,10 +166,16 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 #   unchanged and only the implementation moved. Without this advance the run
 #   would have refused at preflight, correctly, on a version nobody had reviewed.
 #
-# RE-PLANNED FOUR TIMES this round, each one caused by an edit to a digested
+# RE-PLANNED FIVE TIMES this round, each one caused by an edit to a digested
 # module after the previous plan. RE-PLAN LAST is the rule; what this round adds
-# is that a CURRENCY REVIEW is a code change here, so it belongs before the
-# re-plan however unrelated it feels.
+# is that a CURRENCY REVIEW and a REVIEW ROUND are both code changes here, so
+# each belongs before the re-plan however unrelated it feels.
+#
+# The fifth was the cold review itself: closing its P1 moved the completeness
+# decision into `completeness_rc`, and its `model_limits` findings edited that
+# module too. Both are inside this config. So the ordering that actually works is
+# review -> fix -> re-plan -> re-record, and any attempt to re-plan earlier is
+# work that will be redone.
 #
 # The fourth re-plan is worth its own sentence, because it was a real defect
 # rather than sequencing. Advancing "the accepted Claude version" to match the
@@ -199,8 +205,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # both were ruled explicitly.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"1734ea9811158c16864366a9e03925903caa2a50f249906eb979a354b8bb5246",'
+    b'"execution_config_sha256":"beb0e7a7d2c7108512e54a823fd1f81eb1f45dd5a01b76079348b94270f44be2",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"ba6874fa6b0cb0a32923753beb7219588fd20439ad50ec4441cb3cf560f0fb42",'
+    b'"plan_manifest_sha256":"0d086979cd811e2262a6b882611eec05ea3539f655b5710d6ed70b7abeedfc34",'
     b'"schema_version":1}\n'
 )

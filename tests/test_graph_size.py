@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import graph_size
+from kb_setup.result import Rc
 
 
 def _graph(root: Path, size: int) -> Path:
@@ -133,3 +134,38 @@ def test_the_gate_is_on_the_ship_path_rather_than_in_a_report() -> None:
 
     assert "graph-size" in gates.GATE_TASKS
     assert "graph-size" in gates.CONCURRENT_SAFE
+
+
+def test_a_vanished_graph_is_not_run_while_a_never_built_one_is_fine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An absent graph can mean two things, and only one of them is harmless.
+
+    Two absences, two meanings, and collapsing them is what a cold lane flagged:
+
+    * Nothing ever built here — a fresh clone, a CI runner. There is genuinely
+      nothing to gate, and failing would make the repo unshippable until a
+      multi-minute build ran. Exit 0, state NAMED `unbuilt` rather than `OK`.
+    * The build stamp says this machine HAS built and the graph is gone. The gate
+      could not ask its question, which is not a pass — `Rc.NOT_RUN`, the code
+      `skill_lint` already returns when its glob matches nothing.
+
+    The stamp's mere EXISTENCE is the discriminator, so the arm is one file.
+    """
+    monkeypatch.setenv("GRAPHIFY_MAX_GRAPH_BYTES", str(1024 * 1024))
+    out = tmp_path / "graphify-out"
+    out.mkdir(parents=True, exist_ok=True)
+
+    assert graph_size.measure(tmp_path).state == "unbuilt"
+    assert graph_size.main(tmp_path) == int(Rc.OK)
+
+    (out / ".currency-stamp.json").write_text("{}", encoding="utf-8")
+
+    assert graph_size.measure(tmp_path).state == "missing"
+    assert graph_size.main(tmp_path) == int(Rc.NOT_RUN)
+
+    # The control: with the graph present, the stamp changes nothing — otherwise
+    # this would be asserting that a stamped machine can never pass.
+    _graph(tmp_path, 100)
+    assert graph_size.measure(tmp_path).state == "ok"
+    assert graph_size.main(tmp_path) == int(Rc.OK)

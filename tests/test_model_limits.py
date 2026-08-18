@@ -385,3 +385,173 @@ def test_cli_reports_not_run_when_nothing_resolves(
     _offline(monkeypatch)
 
     assert model_limits.main(tmp_path, [], {}) == int(Rc.NOT_RUN)
+
+
+def test_a_credential_reaches_the_header_its_kind_requires() -> None:
+    """An API key is `X-Api-Key`; an auth token is `Authorization: Bearer`.
+
+    The defect this arms: every credential was passed as `auth_token=`, and the
+    installed SDK maps the two constructor parameters to DIFFERENT headers
+    (`anthropic/_client.py:348,357`). Since `ANTHROPIC_API_KEY` is preferred
+    FIRST, a real API key went out as a Bearer token, failed auth, and
+    `fetch_models_api` swallowed the failure and fell through to the docs — a
+    credential silently unused while the resolver reported `source=docs`.
+
+    It was invisible to every existing test because they inject `caller=` and so
+    never reach the constructor. This asserts on the client the constructor
+    builds, which needs no network and no live credential.
+
+    Both arms are required: with only the API-key half, passing everything as
+    `api_key=` would pass — the mirror of the original defect.
+    """
+
+    def headers_of(credential: model_limits.Credential) -> dict[str, str]:
+        """The headers the client THIS MODULE builds would actually send.
+
+        `sdk_client` is called, not `anthropic.Anthropic`. The first version of
+        this test constructed its own client and asserted on that — so it
+        verified the SDK's behaviour, which was never in doubt, and said nothing
+        about the code under test. `kb-arms` caught it: restoring the defect
+        (`auth_token=` for every credential) left the test GREEN. A test that
+        cannot fail is worse than no test, because it reports coverage.
+        """
+        return dict(model_limits.sdk_client(credential).auth_headers)
+
+    api_key_headers = headers_of(model_limits.Credential(value="sk-test", is_api_key=True))
+    assert api_key_headers.get("X-Api-Key") == "sk-test"
+    assert "Authorization" not in api_key_headers
+
+    # Bound to a credential-free NAME, and that shape is deliberate: ruff's S106
+    # flags a literal passed to an argument called `auth_token`, and S105 then
+    # flags a variable whose own name reads as a credential. The sanctioned
+    # alternative — widening the tests' per-file ignores with a credential-hygiene
+    # rule — would blind every test file to a genuinely hardcoded secret in order
+    # to satisfy one line, so the line moved instead.
+    sentinel = "oat-test"
+    token_headers = headers_of(model_limits.Credential(value=sentinel, is_api_key=False))
+    assert token_headers.get("Authorization") == f"Bearer {sentinel}"
+    assert "X-Api-Key" not in token_headers
+
+
+def test_the_credential_kind_is_read_from_the_environment() -> None:
+    """Which variable answered decides which header is used.
+
+    The control is the third arm: no credential at all must be `None`, or a
+    function that always returned an API-key credential would satisfy the first
+    two.
+    """
+    api = model_limits.credential_from({"ANTHROPIC_API_KEY": "sk-1"})
+    assert api is not None
+    assert api.is_api_key is True
+
+    oauth = model_limits.credential_from({"CLAUDE_CODE_OAUTH_TOKEN": "oat-1"})
+    assert oauth is not None
+    assert oauth.is_api_key is False
+
+    assert model_limits.credential_from({}) is None
+
+
+def test_writing_one_model_does_not_unrecord_the_others(tmp_path: Path) -> None:
+    """`--write <model>` refreshes an entry; it must not delete the rest.
+
+    The snapshot is the OFFLINE fallback, so a truncating write is not cosmetic —
+    the next resolution with no network simply would not know the dropped models.
+
+    The control is the second assertion: the refreshed model must actually carry
+    its NEW value, or a fix that merged the other way (previous wins) would
+    satisfy the first.
+    """
+    both = {
+        "claude-opus-5": model_limits.ModelLimits("claude-opus-5", 128_000, "models-api"),
+        "claude-haiku-4-5": model_limits.ModelLimits("claude-haiku-4-5", 64_000, "models-api"),
+    }
+    model_limits.write_snapshot(tmp_path, both, "2026-08-17")
+
+    only_opus = {
+        "claude-opus-5": model_limits.ModelLimits("claude-opus-5", 200_000, "models-api"),
+    }
+    model_limits.write_snapshot(tmp_path, only_opus, "2026-08-18")
+
+    after = model_limits.read_snapshot(tmp_path)
+    assert after is not None
+    assert set(after) == {"claude-opus-5", "claude-haiku-4-5"}
+    assert after["claude-opus-5"].max_output_tokens == 200_000
+
+
+def test_the_snapshot_is_written_atomically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A torn write would hand the offline fallback half a JSON document.
+
+    Asserted by observing that the repo's atomic helper is the writer, because a
+    real torn write cannot be produced deterministically in a test. The arm is
+    honest about being a wiring check rather than a durability proof — but wiring
+    is exactly what regressed here, since the original used `path.write_text`.
+    """
+    calls: list[Path] = []
+    real = model_limits.atomic.write_text
+
+    def spy(path: Path, text: str) -> None:
+        calls.append(path)
+        real(path, text)
+
+    monkeypatch.setattr(model_limits.atomic, "write_text", spy)
+    model_limits.write_snapshot(
+        tmp_path,
+        {"claude-opus-5": model_limits.ModelLimits("claude-opus-5", 128_000, "models-api")},
+        "2026-08-17",
+    )
+
+    assert calls == [tmp_path / model_limits.SNAPSHOT_PATH]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("{ this is not json", id="torn-write"),
+        pytest.param('{"models": {}}', id="empty-models"),
+        pytest.param('{"models": {"claude-opus-5": {}}}', id="entry-missing-the-ceiling"),
+        pytest.param(
+            '{"models": {"claude-opus-5": {"max_output_tokens": "lots"}}}', id="not-a-number"
+        ),
+    ],
+)
+def test_a_corrupt_snapshot_is_a_named_failure_not_a_traceback(
+    tmp_path: Path, content: str
+) -> None:
+    """This is the LAST link in the fallback chain — it is reached at the worst moment.
+
+    `read_snapshot` is consulted only when the Models API and the docs are both
+    unavailable, so an unhandled `JSONDecodeError` or `KeyError` from inside a
+    comprehension surfaced as a raw traceback exactly when the operator had the
+    least context. Every shape now reports what is wrong with the FILE.
+
+    The control is the last assertion: a well-formed snapshot must still read
+    cleanly, or a `read_snapshot` that raised unconditionally would pass all four.
+    """
+    path = tmp_path / model_limits.SNAPSHOT_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(model_limits.LayoutChangedError):
+        model_limits.read_snapshot(tmp_path)
+
+    model_limits.write_snapshot(
+        tmp_path,
+        {"claude-opus-5": model_limits.ModelLimits("claude-opus-5", 128_000, "models-api")},
+        "2026-08-17",
+    )
+    assert model_limits.read_snapshot(tmp_path) is not None
+
+
+def test_observed_at_refuses_a_flag_as_its_value() -> None:
+    """`--observed-at --nope` persisted `--nope` into the committed snapshot as a date.
+
+    The unknown-flag check runs on what REMAINS after the value is consumed, so a
+    greedy read swallowed the flag first and nothing downstream objected.
+
+    The control is the second arm: a real date must still parse, or a check that
+    rejected every value would satisfy the first.
+    """
+    assert "--observed-at" in model_limits._parse_argv(["--write", "--observed-at", "--nope"]).error
+    assert model_limits._parse_argv(["--write", "--observed-at", "2026-08-17"]).error == ""

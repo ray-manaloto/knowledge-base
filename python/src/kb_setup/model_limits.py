@@ -73,8 +73,16 @@ from typing import TYPE_CHECKING
 
 import msgspec
 
+from kb_setup import atomic
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
+
+    # Type-only, so the runtime import stays INSIDE `sdk_client` — this module is
+    # imported by the planner and must not pull the SDK in on every import. A
+    # bare `object` return was the alternative and it defeats the checking: the
+    # caller's `.models` and the test's `.auth_headers` both became unresolved.
+    from anthropic import Anthropic
 
 DOCS_URL = "https://platform.claude.com/docs/en/about-claude/models/overview.md"
 """The credential-free source. Verified 2026-08-17: HTTP 200, 28,879 bytes."""
@@ -226,22 +234,37 @@ def read_snapshot(repo_root: Path) -> dict[str, ModelLimits] | None:
     path = repo_root / SNAPSHOT_PATH
     if not path.is_file():
         return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    models = payload.get("models")
+    # A CORRUPT snapshot is a layout failure, not a traceback. This is the last
+    # link in the fallback chain, so it is reached precisely when the API and the
+    # docs are already unavailable — the worst moment to exit on an unhandled
+    # `JSONDecodeError`. `LayoutChangedError` is a type `main` already renders,
+    # so a torn or hand-edited file now reports what is wrong with the file.
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+        raise LayoutChangedError(f"{SNAPSHOT_PATH} is unreadable: {exc}") from exc
+    models = payload.get("models") if isinstance(payload, dict) else None
     if not isinstance(models, dict) or not models:
         raise LayoutChangedError(f"{SNAPSHOT_PATH} has no usable 'models' mapping")
     # `resolved_id` round-trips into `model`; without that a re-read would
     # report `resolved_id claude-haiku-4-5-20251001 -> claude-haiku-4-5` as a
     # change on every write — a delta that cries wolf gets ignored.
-    return {
-        alias: ModelLimits(
-            model=str(entry.get("resolved_id", alias)),
-            max_output_tokens=int(entry["max_output_tokens"]),
-            source="snapshot",
-            max_input_tokens=entry.get("max_input_tokens"),
-        )
-        for alias, entry in models.items()
-    }
+    try:
+        return {
+            alias: ModelLimits(
+                model=str(entry.get("resolved_id", alias)),
+                max_output_tokens=int(entry["max_output_tokens"]),
+                source="snapshot",
+                max_input_tokens=entry.get("max_input_tokens"),
+            )
+            for alias, entry in models.items()
+        }
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        # An entry missing `max_output_tokens`, or holding a non-numeric one, is
+        # the same class as the decode failure above: the file is not what this
+        # module writes. Reported as a layout change rather than escaping as a
+        # raw `KeyError` from inside a comprehension, which named nothing.
+        raise LayoutChangedError(f"{SNAPSHOT_PATH} has a malformed entry: {exc}") from exc
 
 
 DEFAULT_ALIASES = ("claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5")
@@ -268,21 +291,73 @@ def _requested_aliases(environment: Mapping[str, str]) -> tuple[str, ...]:
     return named or DEFAULT_ALIASES
 
 
-def _sdk_caller(token: str) -> Callable[[str], object]:
+class Credential(msgspec.Struct, frozen=True):
+    """One credential and WHICH KIND it is — the two are not interchangeable."""
+
+    value: str
+    #: True for an `ANTHROPIC_API_KEY`, false for an OAuth/auth token.
+    is_api_key: bool
+
+
+def _sdk_caller(credential: Credential) -> Callable[[str], object]:
     """Bind the official SDK's `models.retrieve` to one credential.
 
     The SDK rather than hand-rolled HTTP because it is the vendor's own typed
     client for this endpoint (`use-tool-builtins.md`): `ModelInfo` already
     carries `max_tokens`, `max_input_tokens` and `capabilities`, so the only
     thing left to write is which models to ask about.
+
+    THE PARAMETER IS CHOSEN BY CREDENTIAL KIND, and that is the fix for a real
+    defect rather than a stylistic split. Every credential used to be passed as
+    `auth_token=`, and the installed SDK maps the two parameters to DIFFERENT
+    headers — `auth_token` to `Authorization: Bearer`, `api_key` to `X-Api-Key`
+    (`anthropic/_client.py:348,357`, read directly). So an `ANTHROPIC_API_KEY`,
+    which this module prefers FIRST, went out as a Bearer token, the call failed
+    auth, and `fetch_models_api` swallowed it and fell through to the docs — a
+    credential silently unused while the resolver reported `source=docs`. That
+    symptom was visible in this session's own run and went unquestioned.
+
+    The failure was invisible to the tests because they inject `caller=`, so no
+    test ever reached this constructor. `test_a_credential_reaches_the_header_its_kind_requires`
+    is the arm; it asserts on the built client's headers rather than on a live call.
+    """
+    return sdk_client(credential).models.retrieve
+
+
+def sdk_client(credential: Credential) -> Anthropic:
+    """Build the SDK client for one credential — separated so it can be OBSERVED.
+
+    `_sdk_caller` returns a bound method, and reaching back through it to the
+    client it came from was the only way a test could see which header would be
+    sent. That reflection typed badly and read worse; the client is the thing
+    under test, so it gets its own function.
+
+    The split is not cosmetic. The first test of this went around the function
+    entirely and asserted on its own `anthropic.Anthropic(...)`, so it verified
+    the SDK — never in doubt — and said nothing about this code. `kb-arms` caught
+    it: restoring the defect left that test green.
     """
     import anthropic
 
-    client = anthropic.Anthropic(
-        auth_token=token,
+    return anthropic.Anthropic(
+        api_key=credential.value if credential.is_api_key else None,
+        auth_token=None if credential.is_api_key else credential.value,
         default_headers={"anthropic-beta": _OAUTH_BETA_HEADER},
     )
-    return client.models.retrieve
+
+
+def credential_from(environment: Mapping[str, str]) -> Credential | None:
+    """Pick the credential to use, and remember which kind it is.
+
+    Order is unchanged — an explicit API key beats an auth token beats the
+    subscription's OAuth token — but the KIND now travels with the value, because
+    dropping it is what sent an API key out under the wrong header.
+    """
+    api_key = environment.get("ANTHROPIC_API_KEY")
+    if api_key:
+        return Credential(value=api_key, is_api_key=True)
+    token = environment.get("ANTHROPIC_AUTH_TOKEN") or environment.get("CLAUDE_CODE_OAUTH_TOKEN")
+    return Credential(value=token, is_api_key=False) if token else None
 
 
 def fetch_models_api(
@@ -304,14 +379,10 @@ def fetch_models_api(
     and an unauthorized one are indistinguishable from the outside, and only the
     404 settles it.
     """
-    token = (
-        environment.get("ANTHROPIC_API_KEY")
-        or environment.get("ANTHROPIC_AUTH_TOKEN")
-        or environment.get("CLAUDE_CODE_OAUTH_TOKEN")
-    )
-    if not token:
+    credential = credential_from(environment)
+    if credential is None:
         return None
-    retrieve = caller if caller is not None else _sdk_caller(token)
+    retrieve = caller if caller is not None else _sdk_caller(credential)
     limits: dict[str, ModelLimits] = {}
     for alias in _requested_aliases(environment):
         try:
@@ -406,15 +477,34 @@ def write_snapshot(repo_root: Path, limits: Mapping[str, ModelLimits], observed_
     one layer up. `observed_at` is a parameter rather than a clock read, so the
     caller owns the timestamp and a test can pin it.
     """
-    previous = read_snapshot(repo_root) or {}
+    # A corrupt previous snapshot must not block WRITING a good one. `previous`
+    # is used for the printed delta and for the merge below — both are
+    # improvements on an empty start, neither is a precondition — so a file this
+    # module cannot read is treated as no file at all. Without this, the one
+    # command that repairs a corrupt snapshot is the one command a corrupt
+    # snapshot prevents. (Found by the control arm of the corrupt-read test,
+    # which could not reach its own control.)
+    try:
+        previous = read_snapshot(repo_root) or {}
+    except LayoutChangedError:
+        previous = {}
     path = repo_root / SNAPSHOT_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
+    # MERGED over the previous snapshot, not replacing it. `main --write <model>`
+    # narrows `limits` to the named aliases, so writing only those silently
+    # DELETED the others from the committed record — and the snapshot is the
+    # offline fallback, so the next resolution without a network simply would not
+    # know those models. Refreshing one model must not un-record three.
+    merged = {**previous, **limits}
     payload = {
         "observed_at": observed_at,
         "source": next(iter(limits.values())).source,
-        "models": {alias: _snapshot_entry(alias, entry) for alias, entry in sorted(limits.items())},
+        "models": {alias: _snapshot_entry(alias, entry) for alias, entry in sorted(merged.items())},
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    # Atomic, via the repo's own helper: a plain `write_text` can leave the file
+    # truncated if the process dies mid-write, and `read_snapshot` — the offline
+    # fallback — would then meet a half-written JSON document.
+    atomic.write_text(path, json.dumps(payload, indent=2) + "\n")
     return _render_delta(previous, limits)
 
 
@@ -475,6 +565,12 @@ def _parse_argv(argv: Sequence[str]) -> _Request:
         if index + 1 >= len(args):
             return _Request(error="--observed-at needs a value")
         observed_at = args[index + 1]
+        # A FLAG is not a value. The unknown-flag check below runs on what
+        # REMAINS, so a greedy read swallowed the next token first and
+        # `--write --observed-at --nope` sailed through — persisting `--nope`
+        # into the committed snapshot as the date it was observed.
+        if observed_at.startswith("-"):
+            return _Request(error=f"--observed-at needs a value, got the flag {observed_at!r}")
         del args[index : index + 2]
     unknown = [arg for arg in args if arg.startswith("-")]
     if unknown:

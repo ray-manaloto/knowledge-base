@@ -18,6 +18,18 @@ WHY NOT `kb-reclaim`. That task is this repo's general disk reaper and it
 explicitly REFUSES to act inside the repository (`reclaim._guard_path`: "refusing
 to act inside the repository"). That refusal is a safety property worth keeping,
 so this directory needs its own reaper rather than a hole punched in that one.
+
+WHAT THIS DOES NOT BOUND, stated because the gap is real and a reader would
+otherwise assume it is covered (cold lane, P1): the growth happens **within** a
+session and the reaper runs at SessionSTART, so **one long session is unbounded
+until its next start**. SessionEnd is not the fix — every SessionEnd hook shares
+ONE budget with the transcript audit, and a killed one is silent — so the
+honest position is a bound chosen with the measured rate in view rather than a
+claim of continuous enforcement. Measured 2026-08-17: ~1.17 MB per request,
+~95.7 MB over one long round. At that rate the 2 GiB ceiling is roughly twenty
+such rounds, so a single session reaching it is implausible rather than
+impossible. If a session ever does, the next start reclaims it — the ceiling is
+a bound on the DIRECTORY, not a guarantee about any one session.
 """
 
 from __future__ import annotations
@@ -129,4 +141,38 @@ def main(repo_root: Path) -> int:
         f"removed {result.removed} ({result.removed_bytes / mib:,.1f} MiB) — "
         f"ceiling {KEEP_BYTES / mib:,.0f} MiB, {KEEP_DAYS}d",
     )
+    # A CONFIGURED sink with nothing behind it is worth saying out loud. The sink
+    # path in `.claude/settings.json` is RELATIVE, so the writer resolves it
+    # against its own working directory while this reaper is invoked with
+    # `-C ${CLAUDE_PROJECT_DIR}`. If those ever differ, the bytes pile up
+    # somewhere this never looks — and the symptom would otherwise be this task
+    # cheerfully reporting a tidy zero forever. (Cold lane, P2.)
+    if configured_sink(repo_root) and result.kept == 0 and result.removed == 0:
+        events.say(
+            "telemetry.prune",
+            "telemetry: capture is CONFIGURED but the sink directory is empty or absent. "
+            "Either nothing has been captured yet, or the writer resolved the relative "
+            f"sink path against a different working directory than {repo_root}.",
+        )
     return 0
+
+
+def configured_sink(repo_root: Path) -> str:
+    """The `file:` sink `.claude/settings.json` declares, or `""` when capture is off.
+
+    Read rather than assumed so the reaper can tell "capture is off, nothing to
+    do" from "capture is on and this directory is empty" — two states that look
+    identical in a count of zero and mean opposite things.
+    """
+    settings = repo_root / ".claude" / "settings.json"
+    try:
+        declared = msgspec.json.decode(settings.read_bytes())
+    except OSError, msgspec.DecodeError:
+        return ""
+    if not isinstance(declared, dict):
+        return ""
+    environment = declared.get("env")
+    if not isinstance(environment, dict):
+        return ""
+    raw = environment.get("OTEL_LOG_RAW_API_BODIES", "")
+    return raw if isinstance(raw, str) and raw.startswith("file:") else ""

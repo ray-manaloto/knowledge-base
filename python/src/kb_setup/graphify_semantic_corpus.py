@@ -21,6 +21,7 @@ from collections.abc import Mapping
 from html.parser import HTMLParser
 from pathlib import Path
 from types import ModuleType
+from typing import Protocol, runtime_checkable
 
 import graphify.llm as graphify_llm
 import msgspec
@@ -2961,6 +2962,72 @@ def _abort(candidate: Path, reasons: tuple[str, ...]) -> int:
     return 2
 
 
+@runtime_checkable
+class RunOutcome(Protocol):
+    """The four fields the completeness decision reads, and nothing else.
+
+    A Protocol rather than an import of `graphify_semantic_corpus_run.RunSummary`,
+    because the driver imports THIS module — a real import would be circular, and
+    the deferred-import trick used elsewhere here would make the signature
+    untypeable. It also states the coupling honestly: this decision depends on
+    four fields, not on the whole summary.
+    """
+
+    # READ-ONLY properties, not bare annotations. `RunSummary` is a FROZEN
+    # msgspec struct, and a plain `x: int` in a Protocol declares a member that
+    # also accepts writes — which a frozen struct does not satisfy. ty catches it;
+    # the fix is to say what is actually needed, which is only reading.
+    @property
+    def completed(self) -> int:
+        """Chunks this pass staged and published."""
+
+    @property
+    def repaid(self) -> int:
+        """Chunks an earlier pass staged, paid for again and not re-published."""
+
+    @property
+    def chunk_total(self) -> int:
+        """Chunks the authorized plan contains."""
+
+    @property
+    def failed(self) -> int:
+        """Chunks reached and lost, whether by the provider or by staging."""
+
+    @property
+    def halted(self) -> str:
+        """Why the run stopped early, or empty when it reached the ledger's end."""
+
+
+def completeness_rc(summary: RunOutcome) -> int:
+    """Is the corpus whole AND was it produced within authority? 0 only if both.
+
+    A FUNCTION, not three lines inline, because nothing could reach those three
+    lines: `_execute_authorized` spends real money to get a summary, so no test
+    ever exercised the decision, and a cold lane found the decision wrong.
+    Separating the judgement from the spending is what makes it armable.
+
+    `halted` is checked FIRST and on its own. A run stopped by the cumulative
+    spend cap can otherwise satisfy every count: when the cap trips right after
+    the LAST chunk stages, `staged == chunk_total` and `failed == 0`, so the
+    count test alone returned 0 — an over-cap run reported as a clean pass. The
+    field was populated all along and nothing read it; its own comment calls it
+    "the only thing that tells a reader the counts are a partial accounting",
+    and the reader that decides the exit code is this gate, not a human. A
+    disclosure no gate consults is a comment. (Cold lane, P1, on the commit that
+    introduced the cap.)
+
+    `completed + repaid`, not `completed`: on a resumed run the chunks staged by
+    an earlier pass are not re-published, so gating on `completed` alone would
+    report a fully-staged corpus as a failure and invite a re-run that could only
+    produce the same answer. `repaid` is the same DISPOSITION — staged, not
+    re-published — and differs only in having cost money this pass.
+    """
+    staged = summary.completed + summary.repaid
+    if summary.halted:
+        return 1
+    return 0 if staged == summary.chunk_total and summary.failed == 0 else 1
+
+
 def _execute_authorized(repo_root: Path, output: Path) -> int:
     """Spend against an already-authorized plan and report what it produced.
 
@@ -3007,8 +3074,7 @@ def _execute_authorized(repo_root: Path, output: Path) -> int:
     # chunk's evidence. Before that check this sum was the whole exit-0 story for
     # a directory nobody had looked inside, which is how a substituted directory
     # reported a complete corpus.
-    staged = summary.completed + summary.repaid
-    return 0 if staged == summary.chunk_total and summary.failed == 0 else 1
+    return completeness_rc(summary)
 
 
 def corpus_main(repo_root: Path, args: list[str]) -> int:

@@ -43,12 +43,17 @@ from pathlib import Path
 import msgspec
 
 from kb_setup import events
+from kb_setup.result import Rc
 
 #: Fraction of the effective ceiling above which the gate WARNS but still passes.
 #: Ours, chosen — see the module docstring.
 WARN_AT = 0.80
 
 _GRAPH = "graph.json"
+#: Written by `kb-build`, recording the graphify version that ACTUALLY RAN. Read
+#: here only for its EXISTENCE, as evidence that this machine has ever built —
+#: which is what separates "nothing to gate" from "the artifact went missing".
+_STAMP = ".currency-stamp.json"
 _MIB = 1024 * 1024
 
 
@@ -99,18 +104,39 @@ def measure(repo_root: Path) -> SizeVerdict:
     A `stat`, never a read: this must stay cheap enough to run on every gate
     invocation against a file measured in hundreds of megabytes.
 
-    An ABSENT graph is `unbuilt`, not `ok`. "We could not check" is not a pass —
-    a fresh clone has no `graphify-out/`, and reporting that as green would make
-    the gate silently useless exactly where it is least observed.
+    An ABSENT graph is never `ok`, and it is two different states rather than
+    one — `missing` when this machine's build stamp says a graph should be here,
+    `unbuilt` when nothing has ever been built. See `main` for why they carry
+    different exit codes; the short version is that only one of them means the
+    gate could not ask its question.
     """
-    graph = repo_root / "graphify-out" / _GRAPH
+    out = repo_root / "graphify-out"
+    graph = out / _GRAPH
     cap = effective_cap_bytes()
     if not graph.is_file():
+        # TWO states, not one, and collapsing them is what a cold lane flagged:
+        # "the gate can pass on an absent graph". It can, and on a machine that
+        # has never built there is genuinely nothing to gate — failing there
+        # would make a fresh clone unshippable and train people to skip this.
+        #
+        # But a machine that HAS built and no longer has the artifact is an
+        # anomaly, and reporting that as a pass is the "gate that never asked the
+        # question" this repo refuses elsewhere. The build stamp is the existing
+        # artifact that tells them apart: `kb-build` writes it, so its presence
+        # beside a missing graph means the graph was deleted or a build was
+        # interrupted. That case is `Rc.NOT_RUN`, on `skill_lint`'s precedent.
+        stamped = (out / _STAMP).is_file()
         return SizeVerdict(
-            state="unbuilt",
+            state="missing" if stamped else "unbuilt",
             size_bytes=0,
             cap_bytes=cap,
-            note=f"no graphify-out/{_GRAPH} — run `mise run kb-build` before trusting this",
+            note=(
+                f"{_STAMP} says this machine has built, but {_GRAPH} is gone — "
+                "the gate could not ask its question. Rebuild with `mise run kb-build`."
+                if stamped
+                else f"no graphify-out/{_GRAPH} here yet — run `mise run kb-build`. "
+                "Nothing has been built on this machine, so there is nothing to gate."
+            ),
         )
     size = graph.stat().st_size
     verdict = SizeVerdict(state="ok", size_bytes=size, cap_bytes=cap, note="")
@@ -156,12 +182,26 @@ def render(verdict: SizeVerdict) -> str:
 def main(repo_root: Path) -> int:
     """CLI boundary: 0 when the graph is within its ceiling, 1 when it is not.
 
-    `unbuilt` returns 0. That is deliberate and it is the one soft edge here: a
-    machine that has never run `kb-build` has no graph to be too large, and
-    failing every gate run on a fresh clone would train people to skip this one.
-    The state is NAMED in the output rather than rendered as `OK`, so a reader
-    can tell "checked and fine" from "nothing to check".
+    Three non-OK states, three different exit codes, because they are three
+    different facts:
+
+    * `over` — checked, and the graph is past the ceiling. **1.**
+    * `missing` — this machine has built (the stamp is there) and the graph is
+      not. The gate could not ask its question, which by
+      `probes-need-a-control-arm.md` is not a pass. **`Rc.NOT_RUN`**, the same
+      code `skill_lint` returns when its glob matches nothing.
+    * `unbuilt` — nothing has ever been built here, so there is nothing to gate.
+      **0**, deliberately: failing every gate run on a fresh clone would make the
+      repo unshippable until a multi-minute build ran, and would train people to
+      skip this gate. The state is NAMED rather than rendered `OK`, so a reader
+      can tell "checked and fine" from "nothing to check".
+
+    The middle state is the one a cold lane asked for, and it is the whole of
+    what that finding was right about: "the gate can pass on an absent graph" is
+    true, and only harmless when the absence means the work never happened.
     """
     verdict = measure(repo_root)
     events.say("graph.size", render(verdict))
-    return 1 if verdict.state == "over" else 0
+    if verdict.state == "over":
+        return int(Rc.FINDINGS)
+    return int(Rc.NOT_RUN) if verdict.state == "missing" else int(Rc.OK)

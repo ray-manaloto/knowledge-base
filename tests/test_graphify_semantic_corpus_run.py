@@ -983,3 +983,64 @@ def test_the_driver_exports_the_plans_cap_rather_than_the_profiles(tmp_path: Pat
     name = graphify_semantic_slice.MAX_OUTPUT_TOKENS_ENV_NAME
     assert overlay[name] == str(_config().claude_max_output_tokens)
     assert overlay[name] != graphify_semantic_slice.CORPUS_PROFILE.max_output_tokens
+
+
+def _summary(**overrides: object) -> graphify_semantic_corpus_run.RunSummary:
+    """A whole, clean 58-chunk run, minus whatever the caller makes wrong."""
+    fields: dict[str, object] = {
+        "schema_id": "graphify-semantic-corpus-run/v0",
+        "run_namespace_sha256": "a" * 64,
+        "chunk_total": 58,
+        "completed": 58,
+        "repaid": 0,
+        "failed": 0,
+        "skipped": 0,
+        "node_count": 0,
+        "edge_count": 0,
+        "hyperedge_count": 0,
+        "spend_usd": 0.0,
+        "halted": "",
+        "outcomes": (),
+    }
+    fields.update(overrides)
+    return msgspec.convert(fields, type=graphify_semantic_corpus_run.RunSummary, strict=True)
+
+
+def test_a_halted_run_can_never_report_success() -> None:
+    """The cap's trip must reach the EXIT CODE, not just the printed summary.
+
+    The defect this arms: when the cumulative cap trips right after the LAST
+    chunk stages, every count is satisfied — `completed + repaid == chunk_total`
+    and `failed == 0` — so the gate returned 0 and an over-cap run was reported
+    as a clean pass. `halted` was populated the whole time and nothing read it.
+
+    The first arm is that exact state: a complete-looking run that halted. The
+    second is the CONTROL, and without it a gate hardcoded to 1 would pass the
+    first — the same counts with no halt must still return 0, or this test would
+    be asserting that nothing ever succeeds.
+    """
+    assert graphify_semantic_corpus.completeness_rc(_summary(halted="cap exceeded")) == 1
+    assert graphify_semantic_corpus.completeness_rc(_summary()) == 0
+
+
+@pytest.mark.parametrize(
+    ("overrides", "rc"),
+    [
+        pytest.param({}, 0, id="whole-and-unhalted"),
+        pytest.param({"completed": 40, "repaid": 18}, 0, id="resumed-counts-as-staged"),
+        pytest.param({"completed": 57, "skipped": 1}, 1, id="a-chunk-never-reached"),
+        pytest.param({"completed": 57, "failed": 1}, 1, id="a-chunk-lost"),
+        pytest.param({"halted": "cap exceeded"}, 1, id="halted-despite-full-counts"),
+    ],
+)
+def test_the_completeness_gate_answers_both_questions(
+    overrides: dict[str, object], rc: int
+) -> None:
+    """Whole corpus AND within authority — 0 only when both hold.
+
+    `resumed-counts-as-staged` is the arm that stops the obvious over-correction:
+    `repaid` chunks were staged by an earlier pass and not re-published, so a gate
+    reading `completed` alone would fail a corpus that is actually complete and
+    invite a re-run that could only produce the same answer.
+    """
+    assert graphify_semantic_corpus.completeness_rc(_summary(**overrides)) == rc
