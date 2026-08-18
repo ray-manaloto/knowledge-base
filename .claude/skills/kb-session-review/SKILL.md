@@ -176,6 +176,29 @@ path cited because it does not exist — so the existing check becomes an **arm 
 derived artifact** rather than a spellcheck on a remembered one. It also proposes
 MEMORY.md index lines; it never writes MEMORY.md.
 
+### The composer RECONCILES the previous handoff — and did not, on run 1
+
+The first real run (2026-08-18) beat the hand-written handoff at everything it was
+given and was blind to everything it was not. It dropped **seven of the nine items**
+under the previous handoff's own *"Owed, unchanged from the previous handoff"*
+heading, the graphify-circle diagnosis and its plan path, and every standing
+environment trap — codex out of credits, `find -newermt` on BSD,
+`docs/session-review/runs/**` being formatter-exempt.
+
+No lane failed. `handoffs` reached the **sweep** lanes and stopped there, and a lane
+returns FINDINGS — so an item that is merely *still owed* was nobody's finding and
+had no route to the composer. A backlog carrying only what a lane re-derived is a
+backlog truncated to one round, which is the exact failure this mode exists to fix.
+
+The composer now reads the handoffs itself and must state, for every item in their
+owed/next/gotcha sections, one of **CARRIED / DONE (with the commit or issue) /
+DROPPED (with the reason)**. Omission is none of those and is not allowed —
+the same reason lane coverage is a required field: an omission and a decision are
+indistinguishable unless the format forbids omission.
+
+**So pass `handoffs` deliberately.** In handoff mode it is not window metadata, it
+is the backlog. A short list means a short memory.
+
 ### Two rules the caller MUST keep
 
 1. **Never make this the only path.** `/clear-prep` fires when the session budget

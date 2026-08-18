@@ -684,6 +684,38 @@ Write it to ${reportDir}/session-review-synthesis.md and end with the
 // BRIEF instead of a review. Same findings, same verdicts, different reader: one
 // who knows nothing and has to act.
 //
+// ── WHY THIS PROMPT READS THE PREVIOUS HANDOFFS AND THE REFUTERS DO NOT ──
+//
+// The first real run of this mode (2026-08-18, wf_701b4d8f-df8) produced a
+// handoff that beat the hand-written one at everything it was given and was
+// structurally blind to everything it was not. Diffed against
+// `.agent/plans/session-2026-08-18-b.md`, it silently dropped SEVEN of the nine
+// items under that file's own heading *"Owed, unchanged from the previous
+// handoff"* — the 18-name roster, two staleness gates, rumdl use-or-remove,
+// gitleaks->betterleaks, mongodb/kingfisher, the hk-builtin review workflow, and
+// `kb-update -- agent-harness-docs` (82 commits behind, and NOT a one-liner). It
+// also dropped the project's actual goal — the graphify-circle diagnosis, the
+// approved plan's path, and the fact that step C4 needs Ray's explicit go — plus
+// the standing environment traps: codex being out of credits (so the cold lane is
+// `agy`), `find -newermt` failing silently on BSD, `docs/session-review/runs/**`
+// being formatter-exempt.
+//
+// NONE of that was a lane failure. `cfg.handoffs` reached the SWEEP lanes through
+// `CONTRACT` and stopped there, and a lane returns FINDINGS — so an item that is
+// merely STILL OWED is nobody's finding and had no route into this prompt at all.
+// A backlog that only carries what some lane happened to re-derive is a backlog
+// truncated to one round, which is precisely the requirements-lost-between-
+// sessions failure this whole mode exists to fix.
+//
+// The cost objection is the one `REFUTE_CONTRACT` answers for the cross-check,
+// and it points the OTHER way here. There it was ~102 KB of mandated reading
+// times fourteen refuters, paid before the claim was even looked at. This is ONE
+// agent, once, and the previous handoff is not context for its job — it IS half
+// of its job. Reconciliation is stated as a three-state requirement (CARRIED /
+// DONE / DROPPED) rather than a suggestion for the same reason lane coverage is:
+// an omission and a decision are indistinguishable unless the format forbids
+// omission.
+//
 // The shape below is not style — it is what `mise run kb-handoff-check` parses.
 // A handoff that fails that check is the artifact this mode exists to replace, so
 // the requirements are stated as requirements rather than suggestions.
@@ -713,11 +745,37 @@ CONTENT, in this order:
 3. What shipped, one line per commit.
 4. Open issues this round filed or touched, by number.
 5. **Gotchas** — the probes that MISLED someone this session, since that is what
-   the next session would otherwise repeat. Take these from the circles lane.
+   the next session would otherwise repeat. Take these from the circles lane AND
+   from the previous handoffs' own gotcha sections. The circles lane finds what
+   went wrong THIS round, which silently drops every standing environment trap
+   nobody happened to walk into again — carry one forward until something
+   retires it.
 6. What is owed and not done.
 
 Do NOT include: a ranked review, tier tables, or anything a reader cannot act on.
 A handoff is a brief, not a report.
+
+7. **RECONCILIATION — the previous handoff's backlog, item by item.** READ every
+file listed under PREVIOUS HANDOFFS below, in full, and find its "owed", "not
+done", "unchanged from the previous handoff", "next task" and gotcha sections.
+For EVERY item in them, this handoff must say one of exactly three things:
+  * CARRIED — still owed, restated with enough detail to act on;
+  * DONE — with the commit, issue or artifact that closed it;
+  * DROPPED — with the reason it is no longer owed.
+Omitting an item is none of those and is not allowed. If you cannot determine an
+item's state, carry it and say the state is unknown.
+
+An ENVIRONMENT gotcha — a tool that is out of credits, a probe that fails on this
+OS, a task that does not cover a file type — is owed by the same rule even when
+no lane rediscovered it this round. Those are the ones that get lost, because no
+lane owns them: a lane finds what happened, and nobody's job is what is still
+true.
+
+PREVIOUS HANDOFFS — read every one IN FULL and reconcile against them per §7.
+This is the ONLY place their content enters this prompt. The lanes were given
+these paths too, but a lane returns FINDINGS: an item that is merely still owed
+is nobody's finding, so it reaches you through this block or not at all.
+${(cfg.handoffs || []).map((h) => '  - ' + h).join('\n')}
 
 Then, SEPARATELY, propose MEMORY.md index lines for anything durable enough to
 outlive this round — one line each, in the existing style. Do not write MEMORY.md
