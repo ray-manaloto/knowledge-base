@@ -9,6 +9,8 @@ purpose.
 
 from __future__ import annotations
 
+import signal
+
 import pytest
 from kb_setup import check_first, hook_guard
 from kb_setup.result import Ok
@@ -115,6 +117,38 @@ def test_legitimate_commands_are_allowed(command: str) -> None:
     run — a guard contradicting the rule it enforces is the worst kind.
     """
     assert check_first.decide(command) is None, f"false positive: {command}"
+
+
+def test_a_separator_after_a_wrapper_neither_hangs_nor_misses() -> None:
+    """`env -- ruff check .` HUNG `_command_word` until the `--` branch existed.
+
+    `_consume_flags` stops AT `--` without consuming it, so the prefix loop got
+    the same list back forever — inside a hook that runs on every Bash call
+    (CodeRabbit on PR #337; confirmed live with a control arm). These inputs
+    stay OUT of the parametrized tables above deliberately: an unbounded test
+    that regresses into a hang wedges the whole suite, which is the one red no
+    runner can read. Alarm-bounded, a regression FAILS in seconds instead.
+    """
+
+    def bail(_signum: int, _frame: object) -> None:
+        raise AssertionError("decide() hung: the `--` separator made no progress")
+
+    previous = signal.signal(signal.SIGALRM, bail)
+    signal.alarm(10)
+    try:
+        assert check_first.decide("env -- ruff check .") is not None, "separator then the gate"
+        assert check_first.decide("env -i -- ruff check .") is not None, (
+            "a wrapper flag, then the separator, then the gate"
+        )
+        assert check_first.decide("FOO=1 -- ruff check .") is not None, (
+            "an assignment prefix hits the same loop"
+        )
+        assert check_first.decide("env -- ls") is None, (
+            "the separator alone must not turn a harmless command into a deny"
+        )
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def test_the_guard_is_wired_into_the_hook() -> None:

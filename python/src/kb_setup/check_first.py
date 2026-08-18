@@ -171,13 +171,27 @@ def _consume_flags(words: list[str], value_flags: frozenset[str] = frozenset()) 
 
 
 def _command_word(tokens: list[str]) -> list[str]:
-    """Strip everything in front of the real command, and return from it on."""
+    """Strip everything in front of the real command, and return from it on.
+
+    Every branch either consumes a token or breaks, and that is a load-bearing
+    property: `_consume_flags` stops AT `--` without consuming it, so before the
+    separator had its own branch, `env -- ruff check .` handed it back unchanged
+    and this loop never progressed again — a hang on EVERY Bash call shaped
+    `<wrapper> -- …`, inside a hook that runs on all of them. (CodeRabbit on
+    PR #337, confirmed live: the hook stalled to its 20 s timeout and the call
+    then ran unguarded.)
+    """
     words = list(tokens)
     saw_a_prefix = False
     while words:
         if _ASSIGNMENT.match(words[0]) or words[0] in _TRANSPARENT_PREFIXES:
             words.pop(0)
             saw_a_prefix = True
+        elif saw_a_prefix and words[0] == "--":
+            # `env -- ruff check .` — the separator ends the wrapper's own
+            # options; what follows is the command. Checked BEFORE the flag
+            # branch below, because `_consume_flags` cannot consume it.
+            words.pop(0)
         elif saw_a_prefix and words[0].startswith("-"):
             # `env -i ruff check .` — the wrapper's own options.
             words = _consume_flags(words)
