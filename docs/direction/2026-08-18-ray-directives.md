@@ -104,6 +104,8 @@ left in a transcript, which is the whole subject of item 1.
 
 ## ADDENDUM — VERBATIM (Ray, same day, after PR #339 landed)
 
+> option 1
+>
 > add this to what needs to be handled in the next session after running /clear
 >
 > these need to be added as critical currency dependencies if they have not been added already and must always be on the latest version:
@@ -180,8 +182,17 @@ the end of a long session.
 
 ### What this addendum adds to the next round's list
 
-- **A named currency roster**, 18 entries, that must be tracked and current —
-  most are not in `currency.toml` today, which tracks 4 of ~14 pins.
+- **A named currency roster**, 18 entries, that must be tracked and current.
+  Re-derived from `currency.toml` 2026-08-18 rather than repeated from a prior
+  note: it defines **12** `[tool.*]` sections (graphify, ffmpeg, mise,
+  claude-code, hk, fnox, doppler, skillopt, uv, ruff, ty, codex), and **9 of the
+  18** in Ray's roster are ALREADY tracked (uv, hk, fnox, doppler, codex,
+  graphify, skillopt, ruff, ty). The **9 missing** are: agnix, antigravity-cli,
+  anthropic, msgspec, datamodel-code-generator, structlog, trafilatura, pytest,
+  pytest-xdist. An earlier draft of this line said "tracks 4 of ~14 pins",
+  inherited from a work-memory note and never re-derived — the cold lane caught
+  it, and it is the inherited-number failure `probes-need-a-control-arm.md`
+  rule 6 names.
 - **Two new top-level staleness gates**: `mise outdated -b -J` and
   `uv tree --outdated --show-sizes --all-groups --format json` must both come
   back clean at the top level.
@@ -195,3 +206,28 @@ the end of a long session.
 - **A workflow that reviews EVERY hk builtin** — no skipping — proposing the ones
   this project lacks, preferring the native/system implementation where several
   overlap, and promoting every adopted builtin to a tracked currency dependency.
+
+---
+
+## Rulings at clear-prep, 2026-08-18 (asked and answered)
+
+- **NEXT SESSION'S FIRST TASK, in Ray's words:** *"improving the session review
+  workflow and running it to aggregate the list of issues we need to handle to
+  stop making mistakes and applying it to the project"*.
+
+  **This takes precedence over the currency gate for the FIRST task**, and the
+  precedence is recorded rather than reconciled, because the directive above says
+  *"not doing any work until all critical currency dependencies are up to date"*.
+  Both are Ray's; the later one is the operative instruction for what to start
+  with. Do not re-litigate the ordering — improve the workflow, run it, file the
+  issues, apply them. Currency follows, and its own ordering is unchanged.
+
+- **THE CORPUS RUN IS RE-SCOPED, NOT SCHEDULED.** Ray chose *"the 5-file chunking
+  may be wrong"* over running it. Chunk 1's drift came from `ARCHITECTURE.md` and
+  `CHANGELOG.md` DESCRIBING 26 other modules, so before spending the projected
+  ~77 USD (measured 1.32 USD/chunk x 58) the chunk boundaries themselves are the
+  question — not whether to accept a refuse-and-retry loop. The earlier ruling
+  *"run it and let the gate refuse + retry"* is therefore SUPERSEDED for the run
+  itself; what survives from it is that the staging gate is trusted to catch
+  drift, which is what makes re-scoping safe to do deliberately rather than
+  urgently.
