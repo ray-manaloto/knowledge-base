@@ -324,10 +324,61 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # This is the third re-plan of this branch and the doctrine holds a third time:
 # a REVIEW ROUND is a code change here, so it belongs before the re-plan however
 # much it feels like a separate activity.
+# RE-RECORDED 2026-08-18 (g), after the first real chunk ran. NO new judgement:
+# one field of 43 moved, `runner_sha256`, plus the derived namespace.
+#
+# WHAT THE RUN FOUND, and neither was reachable by reading:
+#
+# 1. THE CAP RESET ON EVERY RESTART — fixed here. `_Spend` seeded at 0.0 and
+#    summed records living in a `TemporaryDirectory`, so both halves of the
+#    accounting died with the process: a run interrupted at chunk 30 resumed with
+#    a fresh 100 USD, and `ChunkStageReceipt` carries no cost field to contradict
+#    it. A durable `spend-ledger.json` now lives under the run namespace, is
+#    written through on every charge, and refuses a plan already over its cap
+#    BEFORE the first provider call. It works: the re-prove recorded
+#    `{"total_usd":1.3249605,"charges":1}` — the first time this corpus has been
+#    able to say what a chunk cost. At 1.32 USD/chunk, 58 chunks projects to
+#    ~77 USD against the 100 USD cap, which is tighter than the ~65 estimated.
+#
+#    Read next to the driver's own note that `extract_corpus_parallel` never
+#    consults the incremental cache: a resumed run re-buys every chunk, so a
+#    durable cap fires SOONER on a restart. That is the honest cost, previously
+#    invisible in both directions.
+#
+# 2. SCOPE DRIFT — NOT FIXED, and deliberately not papered over. Chunk 1's first
+#    run attributed 61 of 109 nodes to 26 files the chunk never contained;
+#    `fragment-source-scope-mismatch` refused it, correctly. The attempted fix
+#    added a scope clause to `_EXTRACTION_USER_INSTRUCTION` — and that constant is
+#    a MIRROR of text `graphify.llm` hardcodes. graphify builds the prompt itself
+#    and pipes it to our adapter over stdin; `graphify.llm` never references
+#    `kb_setup`. So the change could not reach the prompt, altered only our
+#    RECONSTRUCTION of it, and produced `provider-prompt-bytes-mismatch`: the fix
+#    WAS the defect. Reverted byte-exactly, which is why `prompt_contract_sha256`
+#    and `planner_sha256` are back to the values the (f) block recorded.
+#
+#    The second run is why this is still open rather than closed: same 5 members,
+#    same source commit, same graphify-built prompt — and 0 out-of-scope nodes
+#    instead of 61. The drift is NONDETERMINISTIC, so one clean run is not
+#    evidence of a fix, and one dirty run is not evidence of a permanent defect.
+#    What is established is that the staging gate catches it either way. Closing
+#    it needs a graphify-side prompt hook or a post-hoc decision, and that is a
+#    judgement for Ray, not something to infer from two samples.
+#
+# RE-RECORDED once more the same day, after a cold review of the ledger itself
+# found `charges` resetting on resume while `total_usd` carried — so the record
+# reported `{total_usd: 6.0, charges: 1}` after three charges, contradicting its
+# own total in the one file a finished run can be audited from. `runner_sha256`
+# and the derived namespace moved; nothing else did.
+#
+# WHAT DID NOT MOVE: `advisories.json`, `exclusions.json`, `source-inventory.json`
+# and `chunk-ledger.json` are BYTE-IDENTICAL at source commit 0738af37, so both
+# digests carrying a reviewed DECISION are unchanged and the workload is the same
+# 474 units / 58 chunks. No spend bound was loosened — one was made to survive the
+# thing that was defeating it.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"7d4f3d861656f60b58342b879e2fb6cf6171fbfeffcdaf90a393cde56796de18",'
+    b'"execution_config_sha256":"bc44b4e86c6442099127db277a19e89a3f287b8defa16832f25bef7bd035a461",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"c1fb5e07c5f454a666f877865cc14b0d2796e03e1415e1f3235ee6bcc9ed161e",'
+    b'"plan_manifest_sha256":"10b2b4b0006601ebeb947c1b022e58363870ef29e475ec3d9079ecb9662d0044",'
     b'"schema_version":1}\n'
 )
