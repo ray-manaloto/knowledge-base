@@ -1026,6 +1026,22 @@ description = "Run the gates and record each result durably: mise run kb-gates [
 # the push decision cannot disagree. Logic in kb_setup.gates.
 run = "uv run kb-setup gates"
 
+[tasks.kb-session-select]
+description = "Resolve WHICH session transcripts a run covers: mise run kb-session-select -- (--current | --sessions <id>... | --last N | --since <ISO> [--until <ISO>])"
+# The deterministic half of the session-review seam (#344). The agent fan-out
+# cannot be a task -- it needs a live model -- but SELECTION can, and until now
+# it was done in the head of whichever session typed the workflow's arguments:
+# a transcriptDir string plus a `since` date, unvalidated, re-derived per round.
+# `Date.now()` THROWS inside a Workflow script, so time arithmetic was always
+# going to live outside it; this is that outside, made testable.
+# started_at is BIRTHTIME cross-checked against the transcript's own first
+# timestamped record -- never mtime. Measured 2026-08-18: 20 of 238 transcripts
+# carry a birth-to-mtime gap over 24h, worst 119.6h, because a resumed session
+# is appended to long after it began. Every record says which clock it used.
+# An empty resolution exits 127 (NOT_RUN), never `[]` with rc 0 -- a glob that
+# matches nothing looks exactly like a round with no sessions.
+run = "uv run kb-setup session-select"
+
 [tasks.kb-session-state]
 description = "Print the session's working state as a paste-ready handoff block: mise run kb-session-state [-- --no-pr]"
 # Replaces the by-hand half of /clear-prep step 1, which asks an agent to run four

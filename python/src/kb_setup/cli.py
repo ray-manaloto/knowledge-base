@@ -73,6 +73,8 @@ def _print_usage() -> int:
         "skill-score [--write] [skill...] | skill-refresh | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "session-state [--no-pr] | "
+        "session-select (--current | --sessions <id>... | --last N | "
+        "--since <ISO> [--until <ISO>]) | "
         "remember --question Q [--answer A|--answer-file F] "
         "[--outcome useful|dead_end|corrected] "
         "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
@@ -379,6 +381,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import session_state
 
         return session_state.main(rest, repo_root)
+    if cmd == "session-select":
+        from kb_setup import session_select
+
+        return session_select.main(rest, repo_root)
     if cmd == "remember":
         from kb_setup import remember
 
