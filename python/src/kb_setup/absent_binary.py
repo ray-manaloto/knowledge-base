@@ -55,17 +55,27 @@ repo's guards has been a false positive, never an evasion.
 
 from __future__ import annotations
 
+import itertools
 import posixpath
 import shutil
 
 from kb_setup import check_first
 
-#: Commands that ASK about a binary rather than run it. Checked against the
-#: segment's FIRST RAW TOKEN, before `command_word` strips transparent
-#: prefixes — `command` is itself a transparent prefix there, so
-#: ``command -v timeout`` would otherwise resolve to `timeout` and be denied.
-#: That is the control arm this guard's own docstring tells you to run.
-_INTROSPECTORS = frozenset({"command", "which", "type", "hash", "whence", "whereis"})
+#: Commands that ASK about a binary rather than run it, UNCONDITIONALLY — the
+#: name alone settles it, with no flag to inspect. Checked against the segment's
+#: first raw token and against every token `command_word` strips, because an
+#: introspector can sit behind a transparent prefix (``env which timeout``).
+#: These are the control arm this guard's own docstring tells you to run.
+_INTROSPECTORS = frozenset({"which", "type", "hash", "whence", "whereis"})
+
+#: `command` is NOT in the set above, and that is the whole point of this one.
+#: It is an execution WRAPPER — `command timeout 5 ls` runs `timeout` — and only
+#: `command -v` / `command -V` asks about a name instead of running it. Listing
+#: it unqualified made `command timeout 5 ls` and `env command timeout 5 ls`
+#: both return None, so the absent binary ran and died with rc 127, which is the
+#: exact transcript-poisoning this guard exists to prevent (cold review round 2
+#: of `e42d50e51d12`, P2 — a hole opened by round 1's own fix).
+_INTROSPECTOR_FLAGS = frozenset({"-v", "-V"})
 
 #: The absent-binary traps, each with the remedy that replaces it. A name earns
 #: a row by having been walked into HERE, or by being the same shape as one that
@@ -135,6 +145,15 @@ def decide(command: str) -> str | None:
         # (Cold review of c27bddf60480, P2.)
         prefix = tokens[: len(tokens) - len(words)]
         if any(posixpath.basename(t) in _INTROSPECTORS for t in (tokens[0], *prefix)):
+            continue
+        # `command` only introspects with -v/-V; bare `command X` RUNS X. Look at
+        # the token after each `command` in the prefix rather than at the word
+        # itself, so `command -v timeout` is exempt and `command timeout 5 ls`
+        # is not.
+        if any(
+            posixpath.basename(t) == "command" and nxt in _INTROSPECTOR_FLAGS
+            for t, nxt in itertools.pairwise(tokens)
+        ):
             continue
         name = posixpath.basename(words[0])
         remedy = TRAPS.get(name)

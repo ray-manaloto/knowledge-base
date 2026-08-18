@@ -189,3 +189,27 @@ def test_an_introspector_behind_a_transparent_prefix_is_not_denied() -> None:
         "that actually runs — this is the false negative the narrow fix avoids"
     )
     assert "timeout" in denied
+
+
+def test_bare_command_runs_its_argument_and_is_not_an_introspection_probe() -> None:
+    """Round 2's P2, and a hole opened by round 1's own fix.
+
+    Round 1 exempted a segment whose stripped prefix contained an introspector,
+    with `command` listed unqualified. But `command` is an execution WRAPPER —
+    `command timeout 5 ls` RUNS `timeout` — and only `command -v` / `-V` asks
+    about a name. So the fix that stopped a false positive opened a false
+    NEGATIVE: the absent binary ran and died with rc 127, which is the exact
+    transcript-poisoning this guard exists to prevent.
+
+    Both directions are armed here, because closing one and leaving the other is
+    what produced this finding in the first place.
+    """
+    for runs_it in ("command timeout 5 ls", "env command timeout 5 ls"):
+        denied = absent_binary.decide(runs_it)
+        assert denied is not None, f"{runs_it} EXECUTES timeout; it is not an introspection probe"
+        assert "timeout" in denied
+
+    for asks_about_it in ("command -v timeout", "command -V timeout", "env command -v timeout"):
+        assert absent_binary.decide(asks_about_it) is None, (
+            f"{asks_about_it} is the control arm this guard's own message recommends"
+        )

@@ -146,7 +146,15 @@ _TOO_COMMON = frozenset(
 )
 
 #: A backticked span: `kb-update -- agent-harness-docs`, `hk.pkl`, `--prose`.
-_CODE_SPAN = re.compile(r"`([^`\n]{2,80})`")
+#: No upper bound, deliberately. It was `{2,80}`, and 80 is shorter than the
+#: real commands handoffs quote: a backticked
+#: `mise run kb-artifact-download --provider … --destination …` runs 115
+#: characters, `_CODE_SPAN.findall` returned nothing for it, `_tokens_in` came
+#: back empty, and the whole commitment was skipped — silent loss, the class
+#: this module exists to catch (cold review round 2 of `e42d50e51d12`, P2).
+#: Raising the number would only move the cliff; `[^`\n]` already forbids
+#: crossing a line, which is the only bound a code span actually needs.
+_CODE_SPAN = re.compile(r"`([^`\n]{2,})`")
 
 #: A bare issue or PR reference. Exact by construction and never reworded.
 _ISSUE_REF = re.compile(r"(?<![\w/])#(\d{1,5})\b")
@@ -158,7 +166,17 @@ _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$", re.MULTILINE)
 #: matching closing fence, or to end-of-text for an unterminated fence — an
 #: unterminated fence must swallow the rest rather than leave its body live,
 #: because the failure this masks is a heading matched INSIDE a fence.
-_FENCE = re.compile(r"^(?P<f>```|~~~)[^\n]*\n.*?(?:^(?P=f)[^\n]*$|\Z)", re.MULTILINE | re.DOTALL)
+#:
+#: The leading `[ \t]*` is not decoration. Anchoring hard at column 0 was the
+#: FIRST version of this mask, and the cold lane's round 2 found the hole in it
+#: within one commit: a fence inside a bullet is indented (``  ```bash``), so it
+#: was not masked, and a ``#`` comment at column 0 inside it still ended the
+#: section. Measured on that exact document — `[]` commitments against `[tool-b]`
+#: for the unindented control. The closing fence is matched at any indentation
+#: too, since CommonMark does not require the two to align.
+_FENCE = re.compile(
+    r"^[ \t]*(?P<f>```|~~~)[^\n]*\n.*?(?:^[ \t]*(?P=f)[^\n]*$|\Z)", re.MULTILINE | re.DOTALL
+)
 
 #: Inside a code span, the part worth matching on. A span like
 #: `mise run kb-update -- agent-harness-docs` should match a new handoff that

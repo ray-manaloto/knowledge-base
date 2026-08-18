@@ -419,3 +419,56 @@ def test_the_line_number_is_this_section_s_own_not_an_earlier_match() -> None:
     assert [c.line for c in hr.commitments(distinct)] == [5], (
         "the control arm: a non-repeating document was always numbered correctly"
     )
+
+
+def test_an_indented_code_fence_is_masked_too() -> None:
+    """Round 2's P1, and it was a hole in round 1's own fix.
+
+    The first `_FENCE` anchored hard at column 0. A fence inside a bullet is
+    indented (```` ```bash ```` under `- item:`), so it was never masked, and a
+    `#` comment at column 0 inside it still ended the section — the same silent
+    loss, one markdown dialect over. Measured on that exact document: `[]`
+    commitments, against `[tool-b]` for the unindented control.
+
+    The lesson the fix carries: a mask anchored to one spelling is a bound, and a
+    bound is a probe that can only pass for the shapes it happens to match.
+    """
+    indented = (
+        "## Owed\n- item:\n  ```bash\n# a comment at col 0\n  echo foo\n  ```\n"
+        "- `tool-b` must be fixed\n"
+    )
+    unindented = (
+        "## Owed\n- item:\n```bash\n# a comment at col 0\necho foo\n```\n- `tool-b` must be fixed\n"
+    )
+
+    named = [t for c in hr.commitments(indented) for t in c.tokens]
+    control = [t for c in hr.commitments(unindented) for t in c.tokens]
+
+    assert "tool-b" in named, "an indented fence still truncated the owed section"
+    assert named == control, f"indentation must not change what is extracted: {named} != {control}"
+
+
+def test_a_code_span_longer_than_eighty_characters_is_still_read() -> None:
+    r"""Round 2's P2 — a bound that silently dropped whole commitments.
+
+    `_CODE_SPAN` was `{2,80}`, and real handoff commands are longer than that.
+    A bullet whose only identifier sat inside a 115-character backticked command
+    yielded NO tokens, so `commitments()` skipped the bullet entirely and the
+    gate reported a clean pass over an item it never saw.
+
+    Raising the number would only move the cliff, so the upper bound is gone;
+    `[^`\\n]` already forbids crossing a line, which is the only bound a code
+    span needs.
+    """
+    long_span = (
+        "## Owed\n- run `mise run kb-artifact-download --provider huggingface "
+        "--source org/repo --revision 1234567890abcdef --destination /path/to/my/dir`\n"
+    )
+    short_span = "## Owed\n- run `mise run kb-update -- agent-harness-docs`\n"
+
+    assert [t for c in hr.commitments(long_span) for t in c.tokens], (
+        "a >80-char code span produced no commitment at all"
+    )
+    assert [t for c in hr.commitments(short_span) for t in c.tokens] == ["agent-harness-docs"], (
+        "the control arm: a short span was always read"
+    )

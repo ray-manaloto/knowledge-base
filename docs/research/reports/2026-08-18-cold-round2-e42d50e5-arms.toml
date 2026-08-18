@@ -1,0 +1,59 @@
+# Mutation arms for the round-2 fixes — the ones made against findings in
+# round 1's OWN FIX COMMIT. Two of round 2's five findings were holes opened by
+# round 1, which is the measured norm here, not an anomaly: this repo's memory
+# records "3 of 4 round-2 P1s were IN the fix commit".
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN. It says these four assertions can fail. It
+# says nothing about whether `_mask_fences` now covers every CommonMark fence
+# dialect (tildes at odd indents, fences inside blockquotes, a fence whose info
+# string contains a backtick) — an arm measures the TESTS, never the premise.
+# Round 2 found the indentation dialect precisely because round 1's arms were
+# clean and its premise was still wrong.
+
+suites = ["tests/test_handoff_reconcile.py", "tests/test_absent_binary.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''_PLAIN_MIN = 5'''
+new = '''_PLAIN_MIN = 5  # control'''
+
+# ── R2-F1: the fence mask re-anchored to column 0 ──────────────────────────
+# The realistic break: someone "tidies" the leading `[ \t]*` away. A fence
+# inside a bullet is then unmasked again and a col-0 `#` inside it truncates
+# the section — round 1's defect, one markdown dialect over.
+[[arm]]
+id = "R2F1"
+test = "test_an_indented_code_fence_is_masked_too"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''    r"^[ \t]*(?P<f>```|~~~)[^\n]*\n.*?(?:^[ \t]*(?P=f)[^\n]*$|\Z)", re.MULTILINE | re.DOTALL'''
+new = '''    r"^(?P<f>```|~~~)[^\n]*\n.*?(?:^(?P=f)[^\n]*$|\Z)", re.MULTILINE | re.DOTALL'''
+
+# ── R2-F2: the 80-character code-span cliff restored ───────────────────────
+[[arm]]
+id = "R2F2"
+test = "test_a_code_span_longer_than_eighty_characters_is_still_read"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''_CODE_SPAN = re.compile(r"`([^`\n]{2,})`")'''
+new = '''_CODE_SPAN = re.compile(r"`([^`\n]{2,80})`")'''
+
+# ── R2-F3: `command` back in the unconditional introspector set ────────────
+# The false NEGATIVE round 1's own fix opened: `command timeout 5 ls` EXECUTES
+# timeout, and listing `command` unqualified let it through to rc 127.
+[[arm]]
+id = "R2F3"
+test = "test_bare_command_runs_its_argument_and_is_not_an_introspection_probe"
+file = "python/src/kb_setup/absent_binary.py"
+old = '''_INTROSPECTORS = frozenset({"which", "type", "hash", "whence", "whereis"})'''
+new = '''_INTROSPECTORS = frozenset({"command", "which", "type", "hash", "whence", "whereis"})'''
+
+# ── R2-F4: the flag check deleted outright ─────────────────────────────────
+# The mirror of R2F3: removing the `-v`/`-V` clause re-denies the control arm
+# `command -v timeout`, which the same test asserts in the other direction.
+[[arm]]
+id = "R2F4"
+test = "test_bare_command_runs_its_argument_and_is_not_an_introspection_probe"
+file = "python/src/kb_setup/absent_binary.py"
+old = '''            posixpath.basename(t) == "command" and nxt in _INTROSPECTOR_FLAGS'''
+new = '''            posixpath.basename(t) == "\x00never" and nxt in _INTROSPECTOR_FLAGS'''
