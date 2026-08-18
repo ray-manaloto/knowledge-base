@@ -41,3 +41,19 @@ def test_paired_skills_are_exact_and_route_only_through_mise() -> None:
     assert "destination [plan|apply] [receipt]" in text
     assert "requires `--apply`" not in text
     assert "hf-xet" not in text.lower()
+
+
+def test_session_select_model_exactly_matches_cold_codegen() -> None:
+    """The session-selection contract is generated, not hand-written (Ray's directive).
+
+    Lives beside the fetch-receipt checks because it IS the fetch-receipt
+    pipeline, cloned — including the hardened `uv run --project --locked --group
+    codegen` resolution rather than `generate_source_groups.py`'s bare-PATH form,
+    which is still exposed to a stale pipx shadow.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "schemas.check_session_select_codegen"],
+        cwd=ROOT,
+        check=False,
+    )
+    assert result.returncode == 0

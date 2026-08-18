@@ -122,8 +122,13 @@ _HAND_GATE_FALLBACK = re.compile(
 )
 
 
-def _segments(command: str) -> list[list[str]] | None:
+def segments(command: str) -> list[list[str]] | None:
     """Tokenise the command and split it at shell operators, None if unparsable.
+
+    PUBLIC on `hook_guard.decide`'s precedent, and for the same reason: a second
+    guard (`kb_setup.absent_binary`) needs exactly this tokenising, and a copy of
+    it would drift from the one the review rounds actually hardened. One
+    tokeniser, two guards.
 
     Quote-aware by construction, which is the whole point: `git commit -m "…ruff
     check…"` yields the message as ONE token, so the gate word is never at a
@@ -145,15 +150,15 @@ def _segments(command: str) -> list[list[str]] | None:
     except ValueError:
         return None
 
-    segments: list[list[str]] = [[]]
+    split: list[list[str]] = [[]]
     for token in tokens:
         # punctuation_chars=True emits operators as tokens of their own, made
         # up entirely of shell punctuation.
         if token and all(char in lexer.punctuation_chars for char in token):
-            segments.append([])
+            split.append([])
         else:
-            segments[-1].append(token)
-    return segments
+            split[-1].append(token)
+    return split
 
 
 def _consume_flags(words: list[str], value_flags: frozenset[str] = frozenset()) -> list[str]:
@@ -170,14 +175,38 @@ def _consume_flags(words: list[str], value_flags: frozenset[str] = frozenset()) 
     return words[index:]
 
 
-def _command_word(tokens: list[str]) -> list[str]:
-    """Strip everything in front of the real command, and return from it on."""
+def command_word(tokens: list[str]) -> list[str]:
+    """Strip everything in front of the real command, and return from it on.
+
+    PUBLIC for the same reason as `segments` above — `kb_setup.absent_binary`
+    asks the identical question ("what is this segment actually running?") and
+    must not answer it with a second implementation.
+
+    Every branch either consumes a token or breaks, and that is a load-bearing
+    property: `_consume_flags` stops AT `--` without consuming it, so before the
+    separator had its own branch, `env -- ruff check .` handed it back unchanged
+    and this loop never progressed again — a hang on EVERY Bash call shaped
+    `<wrapper> -- …`, inside a hook that runs on all of them. (CodeRabbit on
+    PR #337, confirmed live: the hook stalled to its 20 s timeout and the call
+    then ran unguarded.)
+    """
     words = list(tokens)
     saw_a_prefix = False
     while words:
         if _ASSIGNMENT.match(words[0]) or words[0] in _TRANSPARENT_PREFIXES:
             words.pop(0)
             saw_a_prefix = True
+        elif saw_a_prefix and words[0] == "--":
+            # `env -- ruff check .` — the separator ends the wrapper's own
+            # options; what follows is the command. Checked BEFORE the flag
+            # branch below, because `_consume_flags` cannot consume it.
+            #
+            # BREAK rather than continue: `--` means everything after it is the
+            # command, so a command that itself starts with `-` must not be
+            # mistaken for another wrapper option. Looping on kept `saw_a_prefix`
+            # true and would have eaten it. (Cold lane NIT, review-2b7bd6ca.)
+            words.pop(0)
+            break
         elif saw_a_prefix and words[0].startswith("-"):
             # `env -i ruff check .` — the wrapper's own options.
             words = _consume_flags(words)
@@ -188,7 +217,7 @@ def _command_word(tokens: list[str]) -> list[str]:
 
 def _segment_is_a_gate(tokens: list[str]) -> bool:
     """True when this ONE segment invokes a tool `kb-check` owns."""
-    words = _command_word(tokens)
+    words = command_word(tokens)
     if not words:
         return False
 
@@ -246,10 +275,10 @@ def decide(command: str) -> str | None:
     # already reaches for the right task is not the behaviour being corrected.
     if re.search(r"\bmise\s+run\s+kb-", command):
         return None
-    segments = _segments(command)
-    if segments is None:
+    segs = segments(command)
+    if segs is None:
         return _REASON if _HAND_GATE_FALLBACK.search(command) else None
-    for tokens in segments:
+    for tokens in segs:
         if not _segment_is_a_gate(tokens):
             continue
         if _INTROSPECTION_TOKENS.intersection(tokens):

@@ -448,9 +448,20 @@ def transcripts_base(env: dict[str, str] | None = None, home: Path | None = None
     return base / "projects"
 
 
-def _encode_cwd(cwd: Path) -> str:
-    """Claude Code's project-dir encoding of an absolute path (``/``, ``.`` -> ``-``)."""
+def encode_cwd(cwd: Path) -> str:
+    """Claude Code's project-dir encoding of an absolute path (``/``, ``.`` -> ``-``).
+
+    PUBLIC because `kb_setup.session_select` needs the same encoding, and this is
+    a Claude Code implementation detail this repo does not own — two copies of a
+    rule you do not own is two chances to be wrong about it when it changes.
+    Same precedent as `check_first.segments`, promoted for `absent_binary`.
+    """
     return re.sub(r"[/.]", "-", str(cwd))
+
+
+#: The pre-promotion name, kept so nothing outside this module has to change in
+#: the same commit that renames it.
+_encode_cwd = encode_cwd
 
 
 def project_transcripts(base: Path, cwd: Path, *, limit: int) -> list[Path]:

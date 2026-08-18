@@ -1,7 +1,7 @@
 ---
 name: kb-session-review
-description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
-argument-hint: "[since-date, e.g. 2026-08-15; defaults to the newest directive's date]"
+description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts, the ignored bot reviews, the pending work stranded on worktrees and branches — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
+argument-hint: "[a kb-session-select selector, e.g. --last 3 | --current | --since 2026-08-15]"
 ---
 
 # kb-session-review
@@ -48,32 +48,86 @@ item is still wanted, and what the window is.
 is its own failure (`clarify-before-acting.md` rule 3). Ask only what a probe
 cannot settle.
 
-### 2. Collect the arguments the workflow refuses to default
+### 2. Resolve the sessions with a task, not by hand
 
-`transcriptDir`, `since` and `handoffs` are REQUIRED and have no defaults.
+`sessions` and `handoffs` are REQUIRED and have no defaults.
 
-- `since` cannot be computed — `Date.now()` throws inside a workflow, so a
-  default would be a hardcoded lie.
-- `handoffs` is passed explicitly rather than globbed, because `.agent/` is
+**`sessions` comes from `mise run kb-session-select`** — never typed:
+
+```bash
+mise run kb-session-select -- --current            # this session (for a handoff)
+mise run kb-session-select -- --last 3             # the last three
+mise run kb-session-select -- --since 2026-08-15   # a datetime range
+mise run kb-session-select -- --sessions <id> <id> # named explicitly
+```
+
+Pass its `sessions` array straight through. It resolves `started_at` from
+**birthtime cross-checked against each transcript's own first timestamp**, and
+says which clock it used — because mtime is not when a session ran. Measured: 20
+of 238 transcripts carry a birth-to-mtime gap over 24h (worst 119.6h), and a run
+of THIS review dropped a session holding **675 of the round's 1,693 tool calls**
+because its UTC records and local mtime straddled midnight.
+
+It **refuses rather than returning nothing**: an empty window exits 127 and says
+how many transcripts it examined; an unknown id exits 2 naming it, never a
+partial list.
+
+- `handoffs` is still passed explicitly rather than globbed, because `.agent/` is
   gitignored and **a glob that matches nothing looks exactly like a round with no
-  handoffs**.
+  handoffs**. In handoff mode it is also the BACKLOG the composer reconciles
+  against, so a short list is a short memory.
 
-`$ARGUMENTS` is the `since` date when the user gave one; with none, propose the
-newest `docs/direction/*.md` date and confirm it in the preflight question rather
+`$ARGUMENTS` is the selector when the user gave one; with none, propose
+`--since <newest docs/direction date>` and confirm it in the preflight rather
 than assuming it.
 
-Arm the window before you use it: `ls -lt` the transcript dir and confirm the
-file just outside `since` really is older. The last run had four independent
-agents agree on 14 files, which is what made the scope trustworthy.
+**Do not hand-arm the window any more.** The old instruction here was to `ls -lt`
+the transcript dir and eyeball whether the file just outside `since` was really
+older — a check performed by the same context that chose the bound. The selector
+does it instead, and reports `started_at` with the clock that produced it, so the
+scope is a resolved artifact you can paste rather than a judgement you made.
 
 ### 3. Run the workflow
 
 ```text
-Workflow({ name: 'session-review', args: { transcriptDir, since, directive, handoffs, answered } })
+Workflow({ name: 'session-review', args: { sessions, handoffs, directive, answered } })
 ```
 
-Six lanes sweep independently, every live finding is adversarially refuted, then
-one ranked synthesis. It returns findings; it changes nothing.
+`output` (`'report'` | `'handoff'`, default `report`) decides the ARTIFACT;
+`lanes` decides the WORK and merely defaults from it. They were one flag until
+2026-08-18, which meant there was no way to ask for a full eight-lane sweep
+ending in a handoff. An unknown value for either now THROWS rather than silently
+falling back — a run that swept four lanes because one was misspelled reports as
+confidently as one that swept five.
+
+Eight lanes sweep independently, the highest-cost findings are adversarially
+refuted, then one ranked synthesis. It returns findings; it changes nothing. The
+two lanes the 2026-08-18 directive added carry their own preflight needs:
+`bot-reviews` discovers the window's PRs itself with `gh`, and `pending-work`
+checks a backup directory only if the preflight named one — so settle that
+path (or its absence) in the interview rather than letting the lane guess.
+
+**What each phase runs on**, because a run that inherits the session model puts
+every agent on the most expensive tier available — which is exactly how one run
+spent 78 agents and died before writing its report:
+
+| Phase / lane | Runs on |
+|---|---|
+| `context`, `unpinned` | `haiku` / `medium` — registry lookups and counting jq |
+| `forgotten`, `bot-reviews`, `pending-work`, `tooling-gap`, `contradicted` | `sonnet` / `high` |
+| `circles` | `opus` / `high` — the round's highest-value lane, and judgment-heavy |
+| Cross-check | `kb-adversarial-verifier` (the roster's own refuter, opus/high) |
+| Synthesise | `kb-synthesist` on **`fable`**, falling back to `opus`/`xhigh` |
+
+The fallback is reported as `synthesis_ran_on` in the return value. **It heals
+model exhaustion only** — a session or weekly limit is shared across models, so
+switching cannot escape it.
+
+**The cross-check is capped** at `MAX_REFUTERS` (14) findings, ranked by
+`cost_rank`, which keeps the whole run under the 25-agent advisory ceiling.
+Anything past the cap is returned as **`not_triaged`** — a fourth state beside
+`confirmed`, `refuted` and `unverified`, and logged per finding. Read it: it
+means the review did not look, not that it looked and found nothing.
 
 ### 4. Read the coverage before the findings
 
@@ -108,7 +162,7 @@ in the shape it does. Write it, in the report, before you close.
 
 ## What this does not claim
 
-Six lanes of an LLM reading a round. `NO FINDINGS` from a lane means that lane
+Eight lanes of an LLM reading a round. `NO FINDINGS` from a lane means that lane
 found nothing — never that the area is sound. The cross-check refutes findings;
 it cannot manufacture the ones nobody looked for. Its value is the *routes* it
 takes, not a proof of completeness.
@@ -119,3 +173,69 @@ takes, not a proof of completeness.
 - `kb-session-reflect` — the per-transcript counter; run it too, with its arguments.
 - `docs/research/reports/2026-08-17-session-review.md` — the first run, verbatim.
 - `.claude/rules/probes-need-a-control-arm.md` — every lane's negative needs one.
+
+## `output: 'handoff'` — this workflow prepares `/clear-prep`'s handoff
+
+Ray, 2026-08-18: *"it should be the session review workflow that is performing the
+handoff preparation for /clear-prep since that is what we are building."*
+
+`clear-prep/SKILL.md` states the problem outright — **"The handoff is written from
+memory."** A session at the end of its context recollecting its own round is where
+wrong, missing and vague come from, and that is directive item 1. Fresh subagents
+reading git, the gates JSON, the issue tracker and the transcripts do not
+recollect; they read.
+
+```text
+mise run kb-session-select -- --current
+Workflow({ name: 'session-review', args: {
+  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the five below
+  handoffOut: '.agent/plans/session-<date>-<letter>.md',
+  sessions, handoffs, answered,
+}})
+```
+
+Lanes in handoff mode: `forgotten` (what was asked and dropped), `pending-work`
+(unlanded branches/worktrees), `circles` (the gotchas the next session would
+repeat), `contradicted` (docs that drifted), `bot-reviews` (findings nobody
+actioned). `unpinned`, `context` and `tooling-gap` are round-level and stand down.
+
+The composer is told the shape `kb-handoff-check` parses — branch in the lead,
+every gate claim carrying its commit with the sha backticked, `(absent)` on any
+path cited because it does not exist — so the existing check becomes an **arm on a
+derived artifact** rather than a spellcheck on a remembered one. It also proposes
+MEMORY.md index lines; it never writes MEMORY.md.
+
+### The composer RECONCILES the previous handoff — and did not, on run 1
+
+The first real run (2026-08-18) beat the hand-written handoff at everything it was
+given and was blind to everything it was not. It dropped **seven of the nine items**
+under the previous handoff's own *"Owed, unchanged from the previous handoff"*
+heading, the graphify-circle diagnosis and its plan path, and every standing
+environment trap — codex out of credits, `find -newermt` on BSD,
+`docs/session-review/runs/**` being formatter-exempt.
+
+No lane failed. `handoffs` reached the **sweep** lanes and stopped there, and a lane
+returns FINDINGS — so an item that is merely *still owed* was nobody's finding and
+had no route to the composer. A backlog carrying only what a lane re-derived is a
+backlog truncated to one round, which is the exact failure this mode exists to fix.
+
+The composer now reads the handoffs itself and must state, for every item in their
+owed/next/gotcha sections, one of **CARRIED / DONE (with the commit or issue) /
+DROPPED (with the reason)**. Omission is none of those and is not allowed —
+the same reason lane coverage is a required field: an omission and a decision are
+indistinguishable unless the format forbids omission.
+
+**So pass `handoffs` deliberately.** In handoff mode it is not window metadata, it
+is the backlog. A short list means a short memory.
+
+### Two rules the caller MUST keep
+
+1. **Never make this the only path.** `/clear-prep` fires when the session budget
+   is most depleted, and a session limit is **not model-scoped** — `judge()`'s
+   fable→opus fallback cannot save it. A workflow handoff that dies leaves
+   NOTHING, which is worse than an imperfect remembered one. Keep the manual
+   handoff as the fallback and treat this as the preferred input.
+2. **Always run `mise run kb-handoff-check` on the result.** That is what turns a
+   nicer draft into a checked one. It has already caught, on a hand-written
+   handoff: a cited path that did not exist, gate claims with no artifact, and
+   gates that had run against a dirty tree.

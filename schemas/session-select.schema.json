@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ray-manaloto/knowledge-base/schemas/session-select.schema.json",
+  "title": "SessionSelection",
+  "description": "The resolved output of `mise run kb-session-select`: which Claude Code session transcripts a run should cover, and how each one's clock was established. Consumed by the kb-session-review skill and passed into the session-review workflow, which re-refuses on shape \u2014 so this is a cross-surface contract rather than a repo-internal record, which is why it is generated rather than hand-written.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "selector",
+    "window",
+    "resolved_by",
+    "sessions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "The selector as invoked, echoed verbatim."
+    },
+    "window": {
+      "$ref": "#/$defs/Window",
+      "description": "Echoed even for a non-time selector, with null bounds."
+    },
+    "resolved_by": {
+      "enum": [
+        "explicit",
+        "graph-first-state",
+        "newest-birthtime",
+        "window"
+      ],
+      "description": "Which route produced this set; --current has two that can disagree."
+    },
+    "caveat": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "The resolution is sound but contested; present means read it."
+    },
+    "sessions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/SessionRecord"
+      },
+      "description": "Never empty; an empty resolution is a refusal, not an empty list."
+    }
+  },
+  "$defs": {
+    "Window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "since",
+        "until"
+      ],
+      "properties": {
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "SessionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "session_id",
+        "started_at",
+        "last_written",
+        "bytes",
+        "time_source"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "started_at": {
+          "type": "string",
+          "description": "When the session STARTED, ISO 8601 UTC. Birthtime, not mtime."
+        },
+        "last_written": {
+          "type": "string",
+          "description": "mtime, ISO 8601 UTC; beside started_at so a resume stays visible."
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time_source": {
+          "enum": [
+            "birthtime",
+            "content",
+            "mtime"
+          ],
+          "description": "Which clock set started_at: birthtime, the file's record, or mtime."
+        }
+      }
+    }
+  }
+}

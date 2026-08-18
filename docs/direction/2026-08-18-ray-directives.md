@@ -99,3 +99,257 @@ left in a transcript, which is the whole subject of item 1.
   chose the widest option explicitly, over "graphify first" and over "graphify plus the
   gate toolchain". So the gate does not lift until every pin above is resolved, and
   `skillopt`'s NOT-CHECKED state is part of that resolution rather than an exception.
+
+---
+
+## ADDENDUM — VERBATIM (Ray, same day, after PR #339 landed)
+
+> option 1
+>
+> add this to what needs to be handled in the next session after running /clear
+>
+> these need to be added as critical currency dependencies if they have not been added already and must always be on the latest version:
+> - uv
+> - hk
+> - github:agent-sh/agnix
+> - fnox
+> - doppler
+> - antigravity-cli
+> - codex
+> - from pyproject.toml:
+>   - anthropic
+>   - graphifyy
+>   - msgspec
+>   - skillopt
+>   - datamodel-code-generator
+>   - ruff
+>   - ty
+>   - structlog
+>   - trafilatura
+>   - pytest
+>   - pytest-xdist
+> - provide/suggest other dependencies that are at the core of what this project is working on that needs expert knowledge
+>
+> review if we use rumdl right now and/or if we should
+> - if not needed, just remove from mise.toml for now and any other references to it
+>
+> - we should replace gitleask with betterleaks
+>   - we can start w adding it as another hk builtin and run it in parallel with gitleaks until we are 100% confident we are losing features
+>
+> add this as another hk builtin checker for the project:
+> - https://github.com/mongodb/kingfisher
+>
+> - create a workflow that revieews every hk builtins (do not skip)
+>   - asses which ones we are missing for this project
+>   - if multiple exist that provide the samw functionality it should pick the native/system one (rust/c++/etc)
+>     - for example we should replace gitleaks with betterleaks
+>   - each hk builtin we use becomes a critical currency depenency
+>
+> the output of these commands should never show anything stale at the top level:
+> - mise outdated -b -J
+> - uv tree --outdated --show-sizes --all-groups --format json
+>
+>
+> can kb-arms be run in parallel?
+
+### The answer to the question, measured
+
+**Not today, and one of the two reasons is fundamental rather than a missing flag.**
+
+`kb_setup.arms` runs a strictly serial `for arm in ordered:` loop
+(`arms.py:466`), and each arm **edits the working tree in place**, runs the
+suite, then restores. Two arms in flight would be mutating the same files at the
+same time, so their verdicts would describe a tree neither of them wrote. That is
+not a concurrency setting; it is the design.
+
+Two directions that WOULD work and are worth pricing next round:
+
+1. **Parallelise INSIDE each arm.** `_PYTEST_FLAGS` is
+   `("-q", "--no-header", "-rf", "-p", "no:cacheprovider")` — no `-n auto`, while
+   `mise run test` uses it. On a 5-arm spec over two large corpus suites this
+   session, each arm took minutes; xdist would cut the wall clock per arm without
+   touching the serial invariant. The caution is real though: this repo has
+   already been bitten by a wall-clock assertion that passed alone and failed
+   under `-n auto`, so a suite with timing-sensitive tests must be measured, not
+   assumed.
+2. **Parallelise ACROSS arms in isolated worktrees.** One git worktree per arm
+   removes the shared-tree problem entirely, at ~200-500 ms and a disk copy each.
+   That is the honest way to get across-arm parallelism, and it is exactly what
+   `Agent`'s `isolation: "worktree"` does for subagents.
+
+Neither is a one-line change, so both are recorded here rather than attempted at
+the end of a long session.
+
+### What this addendum adds to the next round's list
+
+- **A named currency roster**, 18 entries, that must be tracked and current.
+  Re-derived from `currency.toml` 2026-08-18 rather than repeated from a prior
+  note: it defines **12** `[tool.*]` sections (graphify, ffmpeg, mise,
+  claude-code, hk, fnox, doppler, skillopt, uv, ruff, ty, codex), and **9 of the
+  18** in Ray's roster are ALREADY tracked (uv, hk, fnox, doppler, codex,
+  graphify, skillopt, ruff, ty). The **9 missing** are: agnix, antigravity-cli,
+  anthropic, msgspec, datamodel-code-generator, structlog, trafilatura, pytest,
+  pytest-xdist. An earlier draft of this line said "tracks 4 of ~14 pins",
+  inherited from a work-memory note and never re-derived — the cold lane caught
+  it, and it is the inherited-number failure `probes-need-a-control-arm.md`
+  rule 6 names.
+- **Two new top-level staleness gates**: `mise outdated -b -J` and
+  `uv tree --outdated --show-sizes --all-groups --format json` must both come
+  back clean at the top level.
+- **`rumdl`: decide use-or-remove.** It runs today as two hk steps
+  (`rumdl`, `rumdl_format`) over 188 files.
+- **`gitleaks` -> `betterleaks`**, added in PARALLEL first and only swapped once
+  no feature loss is confirmed. Note this repo's gitleaks scope is load-bearing:
+  `.gitleaks.toml` and `hk.pkl`'s `proseExclude` are what keep the
+  review-exempt paths scanner-visible, and two tests pin that.
+- **`mongodb/kingfisher`** as an additional hk builtin.
+- **A workflow that reviews EVERY hk builtin** — no skipping — proposing the ones
+  this project lacks, preferring the native/system implementation where several
+  overlap, and promoting every adopted builtin to a tracked currency dependency.
+
+---
+
+## Rulings at clear-prep, 2026-08-18 (asked and answered)
+
+- **NEXT SESSION'S FIRST TASK, in Ray's words:** *"improving the session review
+  workflow and running it to aggregate the list of issues we need to handle to
+  stop making mistakes and applying it to the project"*.
+
+  **This takes precedence over the currency gate for the FIRST task**, and the
+  precedence is recorded rather than reconciled, because the directive above says
+  *"not doing any work until all critical currency dependencies are up to date"*.
+  Both are Ray's; the later one is the operative instruction for what to start
+  with. Do not re-litigate the ordering — improve the workflow, run it, file the
+  issues, apply them. Currency follows, and its own ordering is unchanged.
+
+- **THE CORPUS RUN IS RE-SCOPED, NOT SCHEDULED.** Ray chose *"the 5-file chunking
+  may be wrong"* over running it. Chunk 1's drift came from `ARCHITECTURE.md` and
+  `CHANGELOG.md` DESCRIBING 26 other modules, so before spending the projected
+  ~77 USD (measured 1.32 USD/chunk x 58) the chunk boundaries themselves are the
+  question — not whether to accept a refuse-and-retry loop. The earlier ruling
+  *"run it and let the gate refuse + retry"* is therefore SUPERSEDED for the run
+  itself; what survives from it is that the staging gate is trusted to catch
+  drift, which is what makes re-scoping safe to do deliberately rather than
+  urgently.
+
+---
+
+## SECOND ADDENDUM — VERBATIM (Ray, same day, as comments on the design artifact)
+
+Four comments left on the published design artifact
+`https://claude.ai/code/artifact/59a537df-bb8e-4970-a96d-5dcd102d5a1e`. Recorded
+here rather than only in the artifact's comment thread because an artifact is not
+something a session loads, and this file is — which is item 1 of the directive
+above, applied to itself.
+
+> and once we do complete the sources/graphify deep extraction/reflections/generated artifacts
+> and have expert level understanding of graphify and a graphify expert agent
+> we need to really enforce that all agents use graphify skills and the graphify query/explain tools as the first place to research and/or navigate the project's code and documentation
+
+> make sure we are not creating hand written models and/or code that can be generated from the latest datamodel-code-generator tool and/or some other code generation tool
+
+> can we enable timestamps in the telemetry to know when exactly messages/commands were being run?
+
+> can we use these sdks instead?
+> - https://github.com/anthropics/anthropic-sdk-python
+> - https://github.com/anthropics/claude-agent-sdk-python
+
+And, in the same exchange, on whether to build the proposed selector:
+
+> option 1
+> but pending review of my artifacts comments
+
+---
+
+## What the second addendum is asking for
+
+- **graphify-first, enforced for AGENTS — not just for this session.** The
+  existing `kb_setup.graph_first` deny is scoped to the Bash and Grep calls of
+  the session that runs it; it says nothing about what a spawned subagent does,
+  and the roster's six agents are instructed to query the graph first only in
+  PROSE, which this repo has measured at 0-of-19 compliance. The directive is
+  explicitly SEQUENCED — it lands *after* the deep extraction, the reflections,
+  the generated artifacts and a graphify expert agent exist. It is not a task for
+  today; it is the acceptance criterion that campaign is aimed at, and it is
+  recorded now so that finishing the campaign does not look like finishing the
+  work.
+- **Codegen before hand-authoring.** Any new data contract — the session-selector
+  JSON among them — goes through this repo's existing codegen path rather than a
+  hand-written model. What that path is, and where hand-written contracts still
+  sit, is being measured rather than assumed.
+- **Telemetry as a clock.** Raised against the finding that file `mtime` mis-dates
+  a resumed session (20 of 238 transcripts, worst 119.6 h). Whether telemetry
+  already answers it, and at what retention cost, is being measured.
+- **The SDKs are a challenge to a PREMISE, and are treated as one.** The claim
+  *"only the model can spawn Claude agents"* (`.claude/workflows/session-review.js:27-31`)
+  is what puts the fan-out in a workflow instead of a `kb_setup` module. If an SDK
+  refutes it, the seam moves and `zero-bash-logic.md`'s reach grows. It is being
+  settled against the installed SDKs and this repo's auth and billing model
+  before anything is built on either answer.
+
+---
+
+## THIRD ADDENDUM — VERBATIM (Ray, at /clear-prep, 2026-08-18)
+
+**Stored verbatim and DELIBERATELY NOT ANALYSED in the session that received it.**
+Ray's own instruction: *"but just store this verbatim so it is analyzed after
+/clear instead of in this session"*. The analysis, the issue filing and the
+prioritisation are the NEXT session's work, fed by a full session-review sweep
+and the issue aggregation/triage this addendum asks for. Anything below that
+reads like a task is a task for that round, not this one.
+
+> below items need to be prioritized and add github issues if they have not been filed yet and prioritized with the eventual aggregation/triage of github issues
+> - but just store this verbatim so it is analyzed after /clear instead of in this session
+>
+> why did this happen? what did we do differntly than before:
+> - One non-fatal note from the push: upstream tracking wasn't set because origin/docs-directive-addendum didn't exist until that moment. The push and PR both succeeded; if you want tracking, git branch -u origin/docs-directive-addendum.
+>
+> we need to track the last session/transcripts/telemetry that the session-review workflow ran on so that we can identify what is pending the session-review workflow to go through to catch up
+> - but provide the ability to rerun a datetime range or specific session just in case we need to drill down to a specific subset again to gather more information
+>
+>
+> review schemas/*.json and ensure there is no duplication
+> - for example there might be some enums that can be merged into one superset
+> - or reusable classes/structs
+> - always strive for code reuse. even for generated code
+>
+> you were instructed to update antigravity-cli to the latest version (1.1.14) for antigravity reviews
+>
+> and note if it is lost, it is ok to be less strict on hk/ruff/ty/linter/static analysis/type checks on generated code once due dilligence has been done and there is no other way
+> - but we need to be on the latest versions of the tools and the linters/static analysis/type checks libraries also
+>
+> and we haven't been enforcing the automated /clear-prep step when we hit over 20% of the running model's context
+> - which for opus 5 is 200K tokens
+>
+>
+> i am seeing commands like this in the session:
+> mise run fmt >/dev/null 2>&1; mise run kb-check -- python/src/kb_setup/handoff_reconcile.py python/src/kb_setup/handoff.py tests/test_handoff_reconcile.py tests/test_handoff.py 2>&1 | tail -14
+>
+> or
+>
+> git status --porcelain | head -3; mise run kb-ship > /tmp/ship.log 2>&1; echo "kb-ship rc=$?"; tail -20 /tmp/ship.log
+>
+> this is not following my requirements of:
+> 1. using a universal logger that includes stdout/stderr so that all output is durable and nothing can be silently dropped and can always be reviewed
+>    - especially for the session-review workflow
+> 2. these should be wrapped as a skill that call modular skills
+>    - the same for mise tasks and python library modules/functions
+>    - should be flexible by providing arguments/parameters to control behaviour
+>    - i shouldnt be the one catching this. the session review workflow should have been flagging this
+>
+> and we need to make sure we address all pr bot reviews
+>
+> and there are plenty more instructions/requirements missing that a true session-review of all the sessions and the aggregation/triage of github issues will unfold that we need to fix and/or implement
+
+---
+
+## Provenance of the third addendum, and nothing more
+
+The only annotation this addendum gets, because Ray scoped the analysis out of
+this session: the commands he quotes are REAL and were run by this session, at
+the times the transcript records. They are not hypothetical examples. The second
+one is the `kb-ship` invocation of 2026-08-18, and the first is one of several
+`mise run fmt >/dev/null 2>&1; …` chains.
+
+That matters for the next round's sweep: the evidence is in this round's own
+transcript, and `mise run kb-session-select -- --current` resolves it.

@@ -1,0 +1,68 @@
+# Mutation arms for the three CODE fixes made against the cold review of
+# `c27bddf60480` (lane `cold:antigravity`, 5 findings, 1 blocking).
+#
+# Each arm reverts one fix to the exact line the reviewer cited, and the test I
+# wrote alongside that fix must go RED. A SURVIVOR here does not mean the fix is
+# fine — it means the test cannot fail, which is the class no mutation sweep
+# over production code can otherwise see, because the arm mutates production and
+# the blindness is in the test (kb-review SKILL.md § "Arm your own fixes").
+#
+# Findings 4 and 5 are PROSE (a rule instructing a hook-denied command; a stale
+# heading). They have no arm and cannot have one; stated rather than omitted, so
+# a clean sweep is not read as covering all five.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: it says these three assertions can fail. It
+# says nothing about whether `_mask_fences` handles every fence dialect, nor
+# whether the prefix-only introspector rule is the right boundary — an arm
+# measures the TESTS, never the premise.
+
+suites = ["tests/test_handoff_reconcile.py", "tests/test_absent_binary.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''_PLAIN_MIN = 5'''
+new = '''_PLAIN_MIN = 5  # control'''
+
+# ── F1: the P1 — headings found in the UNMASKED text ───────────────────────
+# The realistic break: someone "simplifies" the mask away. A `#` comment inside
+# a fence is then an H1, which ends the enclosing `## Owed` and drops every
+# commitment below it.
+[[arm]]
+id = "F1a"
+test = "test_a_hash_comment_in_a_code_fence_does_not_end_the_section"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''    marks = list(_HEADING.finditer(masked))'''
+new = '''    marks = list(_HEADING.finditer(text))'''
+
+# ── F1b: the MIRROR the first fix introduced ───────────────────────────────
+# Slicing bodies from the original was the first attempt: it fixed the
+# truncation and made every line of code inside the fence a candidate
+# commitment, so `# a comment` contributed the token `comment`. Both halves need
+# the mask, so both halves need an arm.
+[[arm]]
+id = "F1b"
+test = "test_a_hash_comment_in_a_code_fence_does_not_end_the_section"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''        out.append((m.group(2), masked[m.end() : end], m.end()))'''
+new = '''        out.append((m.group(2), text[m.end() : end], m.end()))'''
+
+# ── F2: line numbers derived by searching from index 0 ─────────────────────
+[[arm]]
+id = "F2"
+test = "test_the_line_number_is_this_section_s_own_not_an_earlier_match"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''        base = text.count("\n", 0, body_start) + 1 if body else 1'''
+new = '''        base = text.count("\n", 0, text.find(body)) + 1 if body else 1'''
+
+# ── F3: the guard's false positive on its own control arm ──────────────────
+# Reverting to `tokens[0]` re-denies `env command -v timeout` — the probe this
+# guard's own deny message recommends running.
+[[arm]]
+id = "F3"
+test = "test_an_introspector_behind_a_transparent_prefix_is_not_denied"
+file = "python/src/kb_setup/absent_binary.py"
+old = '''        if any(posixpath.basename(t) in _INTROSPECTORS for t in (tokens[0], *prefix)):'''
+new = '''        if posixpath.basename(tokens[0]) in _INTROSPECTORS:'''

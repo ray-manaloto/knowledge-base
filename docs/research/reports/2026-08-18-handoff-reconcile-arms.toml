@@ -1,0 +1,115 @@
+# Mutation arms for the handoff-reconciliation gate (#344's second half).
+#
+# WHY THIS SPEC EXISTS AT ALL. The gate was landed in `bb19a0ec` with tests that
+# looked thorough and could not fail on the thing that mattered: the only
+# end-to-end arm went through `check_handoff` (the CLI) and was
+# `@real_pair`-skipped besides, so DELETING THE WIRING LINE left the fresh-clone
+# suite green. The advisor review found that by reading, not by running — which
+# is exactly the case `probes-need-a-control-arm.md` § "Arm your own fixes"
+# describes: a fix is the least-reviewed code in the diff, and a test written
+# alongside it routinely cannot fail.
+#
+# WHAT A CLEAN SWEEP HERE WOULD AND WOULD NOT MEAN. It says these five
+# assertions can fail. It does NOT say the heuristic is correct: `_PLAIN_MIN`
+# and `_TOO_COMMON` are fitted to one real pair of handoffs and the module says
+# so. An arm measures the TESTS, never the premise.
+#
+# NEVER HAND-WRITE THIS HARNESS — `mise run kb-arms -- <this file>` owns the
+# loop (`kb_setup.arms`, #160), and it refuses a spec with no `control = true`
+# row. This repo has hand-rolled the same loop eleven times; that is the point
+# of the task existing.
+
+suites = ["tests/test_handoff_reconcile.py", "tests/test_handoff.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+# A comment-only edit to the module under test. It must SURVIVE. If it fails,
+# the suite is failing for an unrelated reason and every verdict below is
+# unreadable.
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''_PLAIN_MIN = 5'''
+new = '''_PLAIN_MIN = 5  # control'''
+
+# ── R1: the wiring the commit message wrongly claimed already existed ───────
+# The realistic break, and the one that actually happened: the gate is perfect
+# and nothing calls it from the path `kb-ship` gates through. Deleting the call
+# is the break a refactor would really produce — not renaming the function,
+# which leaves the name as a substring and proves nothing.
+[[arm]]
+id = "R1"
+test = "test_check_for_branch_reconciles_too"
+file = "python/src/kb_setup/handoff.py"
+old = '''    findings.extend(_reconcile_findings(repo_root, newest, text))'''
+new = '''    pass  # R1: kb-ship's path no longer reconciles'''
+
+# ── R2: the same deletion on the CLI path ──────────────────────────────────
+# Two entry points, two wirings, two arms. Covering one and assuming the other
+# is what produced R1 in the first place.
+[[arm]]
+id = "R2"
+test = "test_check_handoff_reports_reconcile_in_a_fresh_clone"
+file = "python/src/kb_setup/handoff.py"
+old = '''    findings.extend(_reconcile_findings(repo_root, target, text))'''
+new = '''    pass  # R2: the CLI path no longer reconciles'''
+
+# ── R3: the weak-token defence ─────────────────────────────────────────────
+# Dropping the structural test lets a plain word of any length back in, so
+# `docs` from `kind = docs` vouches for `agent-harness-docs` beside it — the
+# false CARRIED, the silent direction. Observed live during development, which
+# is why it is an arm and not a hypothetical.
+[[arm]]
+id = "R3"
+test = "test_a_weak_token_cannot_vouch_for_a_strong_one"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''    return [t for t in found if _DISTINCTIVE.search(t) or len(t) >= _PLAIN_MIN]'''
+new = '''    return found  # R3: any token may vouch'''
+
+# ── R4: prose is split per sentence ────────────────────────────────────────
+# Neutering the sentence split folds a dense owed PARAGRAPH into one unit,
+# where a single surviving token clears every commitment in it. This is the
+# error that made the gate go quiet over eight real losses.
+[[arm]]
+id = "R4"
+test = "test_a_prose_paragraph_is_split_per_sentence"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''        out.extend((index, part) for part in _SENTENCE_END.split(text) if part.strip())'''
+new = '''        out.append((index, text))  # R4: prose folded whole'''
+
+# ── R5: the predecessor must be strictly older ─────────────────────────────
+# Reverting to "not the target" makes an older handoff reconcile FORWARD
+# against a newer one, reporting everything the future added as a loss.
+[[arm]]
+id = "R5"
+test = "test_the_previous_handoff_is_strictly_older"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''        if candidate.resolve() != resolved and candidate.stat().st_mtime < cutoff:'''
+new = '''        if candidate.resolve() != resolved:  # R5: not strictly older'''
+
+# ── R6: a sub-heading must not end the owed section ────────────────────────
+# The 43% silent miss. Reverting to "end at ANY next heading" drops every
+# commitment under a `###` inside a `## Owed` — measured across the 14 real
+# handoffs as 6->9, 9->13, 10->20, 8->9, 7->19 and 6->16 commitments.
+[[arm]]
+id = "R6"
+test = "test_a_sub_heading_does_not_end_the_owed_section"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''        level = len(m.group(1))
+        end = len(text)
+        for later in marks[i + 1 :]:
+            if len(later.group(1)) <= level:
+                end = later.start()
+                break'''
+new = '''        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)'''
+
+# ── R7: an issue reference does not match a longer number ──────────────────
+# Reverting to a plain substring lets `#663` clear a commitment about `#66`.
+[[arm]]
+id = "R7"
+test = "test_an_issue_ref_does_not_match_a_longer_number"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''    if token.startswith("#"):
+        return re.search(rf"{re.escape(token)}(?!\d)", haystack) is not None
+    return token in haystack'''
+new = '''    return token in haystack  # R7: no boundary on issue refs'''

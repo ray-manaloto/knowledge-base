@@ -31,6 +31,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | judging a skill by eye, or a raw `plugin-eval score` | `mise run kb-skill-score [-- [--write] <skill>...]` — advisory on findings (a score never fails a gate) but **rc 2 on a malformed request**, e.g. a skill name matching nothing; names WHICH plugin-eval copy scored you, since two scorers are not comparable |
 | eyeballing whether a skill got better, or diffing two transcripts | the committed baseline: `docs/skills/baseline.json` + `README.md`, written by `kb-skill-score -- --write` and shown as a Δ column on every later run |
 | a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD (one exception: a commit whose ENTIRE delta since the receipt is `graphify-out/memory/**` or `docs/goals/README.md`, so the round's own closing tasks can land — `kb_setup.review.EXEMPT_PATHS`, #66) |
+| eyeballing `ls -lt` over the transcript directory to decide which sessions a review covers | `mise run kb-session-select` — `--current` / `--sessions <id>…` / `--last N` / `--since..--until` → a generated JSON contract. `started_at` is **birthtime cross-checked against each transcript's own first record**, because mtime is not when a session ran (20 of 238 transcripts carry a birth-to-mtime gap over 24h, worst 119.6h). It **refuses rather than returning nothing**: an empty window exits 127 saying how many transcripts it examined, an unknown id exits 2 naming it — never a partial list |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
 | `uv run ruff check <file> \| tail -3` (and the ty/pytest forms) — the dev loop | `mise run kb-check -- <paths>` — ruff + format + ty + the paths' own tests, real exit codes, no pipe. `check` is whole-repo and `kb-gates` runs the ship gates; **neither answered "are these two files clean?"**, and that vacuum was filled 35 times in one session by a pipe that discards the gate's rc (2026-08-08), then **12 more times** in the round that built the spend caps — which is why it is now a hook DENY (`kb_setup.check_first`) rather than a preference. Pass the TEST file too: `kb-check` lints only the paths you name, so naming the module alone leaves its test unlinted and hk catches it at commit time |
 | `<gate> 2>&1 \| tail -40` | `mise run kb-check` / `kb-gates` as above. The old advice here was `> /tmp/out.log 2>&1; echo "rc=$?"` — **shell logic, in the repo whose first invariant forbids it**, and unfollowable besides: `${PIPESTATUS[0]}` is a BASH array and this shell is zsh, where it expands to empty for a passing and a failing gate alike (armed both ways, zsh 5.9). If you must pipe, zsh spells it `${pipestatus[1]}` |
@@ -105,6 +106,18 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    warning-only version of that directive was complied with **0 times out of
    19** in one session, while the DENY above took its own violations 62 → 0.
    See `research-doc-sources.md` step 0 for the scope.
+2c. **The SAME hook also denies a probe whose command word is not installed
+   here** (`kb_setup.absent_binary`, Ray's ruling 2026-08-18). `timeout` /
+   `gtimeout` / `nproc` / `tac` are GNU coreutils and absent on macOS; a probe
+   using one dies with `command not found` (**rc 127**) and reads in a transcript
+   as the thing under test failing. It nearly produced a false *"codex
+   unavailable"*. Host-conditional via `shutil.which`, so it is inert where the
+   binary exists; `command -v` / `which` / `type` are never denied, being the
+   control arm. It runs LAST of the four stateless Bash guards — a command
+   tripping this AND a gate redirect reports the gate, which is about what the
+   author meant to do. Shares `check_first`'s tokeniser (`segments` /
+   `command_word`, promoted to public for exactly this) rather than carrying a
+   second copy to drift. See `long-running-command-hangs.md` rule 3a.
 3. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.

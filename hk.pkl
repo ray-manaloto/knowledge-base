@@ -178,8 +178,25 @@ exclude = baseExclude
 // Findings 1 and 3 are the cold lane's, rounds 1 and 2.
 local proseExclude = baseExclude
   + List("graphify-out/memory/**", "docs/research/**", "docs/goals/*-goal.md", "docs/direction/**",
+      "docs/session-review/runs/**",
       "sources/**",
       "**/graphify-out/.*.tmp")
+// `docs/session-review/runs/**` — the promoted output of a session-review run:
+// per-lane reports, refutation reports and the synthesis, kept VERBATIM as the
+// evidence behind the issues they produced. Same argument as `docs/research/**`
+// and `docs/direction/**` above: a formatter or spell-checker "fixing" one of
+// these edits what an agent actually reported, and these files are cited by
+// issue number, so a reader following the citation must find what was written.
+//
+// FORMATTERS AND typos ONLY, per the asymmetry this whole list rests on:
+// gitleaks, `detect_private_key`, `check_merge_conflict` and
+// `check_added_large_files` still read every one of them. That matters more
+// here than for most entries — these files quote transcripts, commands and
+// `gh api` output, so they are a plausible place for a token to land.
+//
+// Scoped to `runs/**` rather than `docs/session-review/**`, deliberately: the
+// generated landing index at that directory's root is OUR file, machine-written
+// and reviewable, so it stays formatted like every other doc.
 // `sources/**` — approved by Ray, 2026-08-17, over the narrower
 // `sources/extractions/**`. FORMATTERS AND typos ONLY, per the asymmetry above:
 // gitleaks, `detect_private_key` and the structural checks still read every one

@@ -24,9 +24,26 @@ rate-limited is not review; it is a delay. The gate had to come back on-machine.
 ## Why a skill and not a mise task
 
 Every other recurring workflow here is a `kb-*` task wrapping a `kb_setup`
-module (`mise-tasks-only.md`). This one cannot be: a task is a shell command,
-and **only the model can spawn Claude agents.** Same reason `kb-extract` is a
-workflow rather than a task.
+module (`mise-tasks-only.md`). This one cannot be — but not for the reason this
+paragraph gave until 2026-08-18, which claimed **"only the model can spawn Claude
+agents."** That is false: `claude-agent-sdk-python` spawns and orchestrates Claude
+subagents from a plain python process, and at its default `setting_sources` it
+resolves this repo's own `.claude/agents/*.md` roster.
+
+The reason that replaced it was **also wrong**. This paragraph then said an SDK
+fan-out must be separately billed — that the ToS forbade reusing this session's
+login and the SDK required `ANTHROPIC_API_KEY`. Ray challenged that too, naming
+`claude setup-token`, and was right: `CLAUDE_CODE_OAUTH_TOKEN` authenticates
+against the **subscription**, the docs name the SDK as a supported consumer of it,
+and the ToS line covered developers reselling claude.ai access *to other users*,
+never the token owner's own automation.
+
+What actually remains is a **trade-off, not a wall**: no shared prompt cache; a
+budget that is *shared and contended* on one account rather than separate (worse
+for a concurrent fan-out, not better); no permission-mode inheritance; and a new
+dependency for something the in-session `Agent` tool already provides. Same
+reason `kb-extract` is a workflow rather than a task — but it is a cost argument
+Ray can overrule, not a constraint.
 
 So the work splits: the *skill* runs the review, and the *task* enforces that it
 happened. `kb-ship` reads the receipt and compares its SHA to `HEAD`. That
