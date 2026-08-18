@@ -26,10 +26,37 @@
 // same disease it was written to diagnose. This file is that fix.
 //
 // WHY A WORKFLOW AND NOT A MISE TASK. `mise-tasks-only.md` wants a task wrapping
-// a python module, and this cannot be one: a task is a shell command and only
-// the model can spawn Claude agents. Same reason `kb-extract` is a workflow.
-// `kb-session-reflect` (the task) counts what a transcript DID; this counts what
-// the round should have done and did not, which needs judgement per lane.
+// a python module. This is not one — but NOT for the reason this comment gave
+// until 2026-08-18, which said "only the model can spawn Claude agents". Ray
+// challenged that line directly, and it is FALSE as stated: `claude-agent-sdk-python`
+// lets a plain python process spawn and orchestrate concurrent Claude subagents
+// with tools, and at its default `setting_sources` it even resolves THIS repo's
+// `.claude/agents/*.md` roster — agent type, model and effort frontmatter
+// included (`sources/agent-harness-docs/docs/claude-code/agent-sdk__python.md:959`).
+// A capability claim was doing the work of a cost claim, which is `md-size-budgets`'
+// carry-the-condition failure and this file's own lesson L8: a confident false
+// comment is what stops the next reader checking.
+//
+// THE REAL REASON, which survives the refutation and is narrower. An SDK fan-out
+// is a SECOND, SEPARATELY AUTHENTICATED CLIENT. Anthropic's own docs forbid it
+// reusing this session's login — "Anthropic does not allow third party developers
+// to offer claude.ai login or rate limits for their products, including agents
+// built on the Claude Agent SDK. Use the API key authentication methods…"
+// (`agent-sdk__overview.md:41-44`), and the SDK hard-requires `ANTHROPIC_API_KEY`
+// (`agent-sdk__quickstart.md:100-106`). So it would run on per-token metered
+// billing ALONGSIDE the subscription this session already pays, with no shared
+// prompt cache, no shared session budget and no shared permission mode. The
+// in-session fan-out gets all four free.
+//
+// It is also not installed and would not be cheap to install: `claude_agent_sdk`
+// is absent from `pyproject.toml` and `uv.lock` (0 hits; control-armed — the same
+// grep for `anthropic` hits `pyproject.toml:31`, so it discriminates), and
+// adopting it means provisioning exactly the class of secret `graphify_env.clean_env()`
+// and `do-not.md` rule 4 exist to keep out of this repo's subprocesses.
+//
+// Same reason `kb-extract` is a workflow. `kb-session-reflect` (the task) counts
+// what a transcript DID; this counts what the round should have done and did not,
+// which needs judgement per lane.
 //
 // WHAT IT IS NOT. It never edits, ships, or files anything. It returns findings.
 // The caller — the `kb-session-review` skill — runs the AskUserQuestion preflight

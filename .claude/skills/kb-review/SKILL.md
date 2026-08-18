@@ -24,9 +24,18 @@ rate-limited is not review; it is a delay. The gate had to come back on-machine.
 ## Why a skill and not a mise task
 
 Every other recurring workflow here is a `kb-*` task wrapping a `kb_setup`
-module (`mise-tasks-only.md`). This one cannot be: a task is a shell command,
-and **only the model can spawn Claude agents.** Same reason `kb-extract` is a
-workflow rather than a task.
+module (`mise-tasks-only.md`). This one cannot be — but not for the reason this
+paragraph gave until 2026-08-18, which claimed **"only the model can spawn Claude
+agents."** That is false: `claude-agent-sdk-python` spawns and orchestrates Claude
+subagents from a plain python process, and at its default `setting_sources` it
+resolves this repo's own `.claude/agents/*.md` roster.
+
+The real reason is narrower and survives the refutation: an SDK fan-out is a
+**second, separately authenticated client**. Anthropic's docs forbid it reusing
+this session's login and require its own `ANTHROPIC_API_KEY`, so it would run on
+per-token metered billing beside the subscription this session already pays, with
+no shared prompt cache, no shared session budget and no shared permission mode.
+Same reason `kb-extract` is a workflow rather than a task.
 
 So the work splits: the *skill* runs the review, and the *task* enforces that it
 happened. `kb-ship` reads the receipt and compares its SHA to `HEAD`. That
