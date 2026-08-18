@@ -51,6 +51,10 @@ def _verdict(payload: str) -> str | None:
         pytest.param("ruff --config ruff.toml check python/", id="subcommand-not-adjacent"),
         pytest.param("/usr/bin/ruff check .", id="an-absolute-path"),
         pytest.param("ruff check '", id="unparsable-falls-back-to-the-old-check"),
+        pytest.param("uv -q run ruff check python/", id="a-uv-flag-before-run"),
+        pytest.param("uv --directory python run ruff check src/", id="a-uv-value-flag-before-run"),
+        pytest.param("env -i ruff check .", id="a-wrappers-own-flag"),
+        pytest.param("time -p ruff check .", id="a-flag-that-takes-a-value-elsewhere"),
     ],
 )
 def test_a_hand_chained_gate_is_denied(command: str) -> None:
@@ -89,6 +93,15 @@ def test_a_hand_chained_gate_is_denied(command: str) -> None:
         pytest.param("uv run ruff check --help", id="asking-the-gate-for-help"),
         pytest.param("uv run python -c 'ruff check'", id="the-words-passed-to-python"),
         pytest.param("ty --version", id="bare-ty-version"),
+        pytest.param(
+            'git commit -m "fix:\nruff check is now passing\nafter the edits"',
+            id="a-MULTILINE-commit-message",
+        ),
+        pytest.param("uv run pytest -k ruff -k check", id="a-pytest-selector-naming-the-tools"),
+        pytest.param("uv run python script.py ruff check", id="args-to-another-uv-run-command"),
+        pytest.param("ruff help check", id="asking-ruff-about-its-check-subcommand"),
+        pytest.param("ty explain check", id="asking-ty-to-explain"),
+        pytest.param("ruff config format", id="asking-ruff-about-config"),
         pytest.param("", id="empty"),
         pytest.param("   ", id="blank"),
     ],

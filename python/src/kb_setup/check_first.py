@@ -31,17 +31,25 @@ SCOPE, kept narrow on purpose:
 * `--version` / `--help` are introspection, not a gate — scoped to the SEGMENT
   they appear in, so another command's `--help` cannot excuse the gate beside it.
 
-HOW IT DECIDES. The command is split into lines, each line tokenised with
-`shlex` (quote-aware), and each line then split at shell operators into
-segments. A segment is a gate when its command word resolves to `ruff`/`ty` and
-one of that tool's gating subcommands appears in its arguments.
+HOW IT DECIDES. The command is tokenised ONCE with `shlex` (quote-aware, with
+newline moved out of `whitespace` and into `punctuation_chars`), split at shell
+operators into segments, and each segment asked whether its COMMAND WORD is a
+gated tool carrying a gating subcommand.
 
 Tokenising rather than pattern-matching is what the cold review bought: a regex
-sees `ruff check` inside `git commit -m "…ruff check…"` and denies it, and both
-of this guard's confirmed false positives were exactly that. After tokenising,
-a quoted message is ONE token and can never sit at a command position. A command
-`shlex` cannot parse (unbalanced quotes) falls back to the older regex, so a
-parse failure degrades to the previous behaviour instead of opening a hole.
+sees `ruff check` inside `git commit -m "…ruff check…"` and denies it, and every
+false positive found across both review rounds was that shape. After tokenising,
+a quoted message is ONE token — including a MULTI-LINE one, which is why the
+command is not split on newlines first. A command `shlex` cannot parse
+(unbalanced quotes) falls back to the older regex, so a parse failure degrades
+to the previous behaviour instead of opening a hole.
+
+WHICH WAY IT MISSES. `_VALUE_FLAGS` lists only the `uv` options likely to sit in
+front of a command word; an unlisted one makes the guard read that option's
+VALUE as the command word and allow the line. That direction is chosen: this
+guard is a redirect, and both review rounds found only false positives, never an
+evasion. `$(…)`, `sh -c`, an alias and `{ ruff check; }` all get through for the
+same reason.
 """
 
 from __future__ import annotations
@@ -59,6 +67,42 @@ _GATES: dict[str, frozenset[str]] = {
 
 #: Wrappers that may precede the real command word without changing what it is.
 _TRANSPARENT_PREFIXES = frozenset({"env", "command", "nohup", "time", "exec"})
+
+#: Subcommands that ASK about a gate rather than running one. `ruff help check`
+#: and `ty explain check` both mention a gating subcommand and neither gates.
+_INTROSPECTION_SUBCOMMANDS = frozenset(
+    {"help", "explain", "config", "rule", "linter", "docs", "version"}
+)
+
+#: `uv` options that take their value as a SEPARATE token, so the token after
+#: them is not the command word. Only the ones plausible in front of a command
+#: are listed; `uv run --help` shows ~40 more.
+#:
+#: An unlisted value-flag makes this guard MISS (its value is read as the
+#: command word, which is not a gated tool), never produce a false positive.
+#: That is the safe direction on purpose — this guard's only measured defects,
+#: in both review rounds, have been false positives.
+_VALUE_FLAGS = frozenset(
+    {
+        "--directory",
+        "--project",
+        "--python",
+        "-p",
+        "--with",
+        "-w",
+        "--with-editable",
+        "--with-requirements",
+        "--group",
+        "--only-group",
+        "--extra",
+        "--package",
+        "--index",
+        "--env-file",
+        "--config-file",
+        "--cache-dir",
+        "--color",
+    }
+)
 
 #: `FOO=bar cmd …` — a leading assignment is not the command word.
 _ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -78,15 +122,23 @@ _HAND_GATE_FALLBACK = re.compile(
 )
 
 
-def _segments(line: str) -> list[list[str]] | None:
-    """Tokenise one line and split it at shell operators, or None if unparsable.
+def _segments(command: str) -> list[list[str]] | None:
+    """Tokenise the command and split it at shell operators, None if unparsable.
 
     Quote-aware by construction, which is the whole point: `git commit -m "…ruff
     check…"` yields the message as ONE token, so the gate word is never at a
     command position. A regex cannot see that difference, and both of this
     guard's confirmed false positives came from it.
+
+    A newline is taken OUT of `whitespace` and put INTO `punctuation_chars`, so
+    it separates commands the way `;` does — while a newline inside a quoted
+    string stays part of its token. Splitting the raw text on newlines first
+    would be simpler and is wrong: it tears a multi-line commit message apart
+    and hands `_segment_is_a_gate` its second line as a command. (Round 2
+    finding 1; the round-1 fix introduced it.)
     """
-    lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+    lexer = shlex.shlex(command, posix=True, punctuation_chars="();<>|&\n")
+    lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
     try:
         tokens = list(lexer)
@@ -104,34 +156,66 @@ def _segments(line: str) -> list[list[str]] | None:
     return segments
 
 
+def _consume_flags(words: list[str], value_flags: frozenset[str] = frozenset()) -> list[str]:
+    """Drop the leading options, so `words[0]` is the next command word.
+
+    `value_flags` is passed rather than read from the module, because it is
+    `uv`'s grammar and not everyone's: `-p` takes a value for `uv` and takes
+    none for `time`, and a shared set silently ate `time -p ruff check`'s
+    command word. Found by this round's own probe table, not by a reviewer.
+    """
+    index = 0
+    while index < len(words) and words[index].startswith("-") and words[index] != "--":
+        index += 2 if words[index] in value_flags else 1
+    return words[index:]
+
+
+def _command_word(tokens: list[str]) -> list[str]:
+    """Strip everything in front of the real command, and return from it on."""
+    words = list(tokens)
+    saw_a_prefix = False
+    while words:
+        if _ASSIGNMENT.match(words[0]) or words[0] in _TRANSPARENT_PREFIXES:
+            words.pop(0)
+            saw_a_prefix = True
+        elif saw_a_prefix and words[0].startswith("-"):
+            # `env -i ruff check .` — the wrapper's own options.
+            words = _consume_flags(words)
+        else:
+            break
+    return words
+
+
 def _segment_is_a_gate(tokens: list[str]) -> bool:
     """True when this ONE segment invokes a tool `kb-check` owns."""
-    words = list(tokens)
-    while words and (_ASSIGNMENT.match(words[0]) or words[0] in _TRANSPARENT_PREFIXES):
-        words.pop(0)
+    words = _command_word(tokens)
     if not words:
         return False
 
     if posixpath.basename(words[0]) == "uv":
-        if words[1:2] != ["run"]:
+        # `uv [OPTIONS] run [OPTIONS] <command> …` — options on BOTH sides of
+        # `run`, which is why flags are consumed twice.
+        words = _consume_flags(words[1:], _VALUE_FLAGS)
+        if words[:1] != ["run"]:
             return False
-        # Skip whatever `uv run` was given before the real command word —
-        # `-q`, `--isolated`, `--directory python`. Anything that is not a
-        # tool we gate is not our business, so scanning forward for the tool
-        # is both simpler and tighter than modelling uv's flag grammar.
-        rest = words[2:]
-        tools = [i for i, word in enumerate(rest) if posixpath.basename(word) in _GATES]
-        if not tools:
+        words = _consume_flags(words[1:], _VALUE_FLAGS)
+        if not words:
             return False
-        words = rest[tools[0] :]
+        # Deliberately NOT a forward scan for the first ruff/ty token. That was
+        # the round-1 fix and it promoted an ARGUMENT into the command position:
+        # `uv run pytest -k ruff -k check` was denied, for a tool this guard
+        # explicitly does not cover. (Round 2 finding 2.)
 
     tool = posixpath.basename(words[0])
     subcommands = _GATES.get(tool)
     if subcommands is None:
         return False
+    arguments = words[1:]
+    if arguments[:1] and arguments[0] in _INTROSPECTION_SUBCOMMANDS:
+        return False
     # The subcommand need not be adjacent: `ruff --config ruff.toml check .`
     # is the same gate run.
-    return any(word in subcommands for word in words[1:])
+    return any(word in subcommands for word in arguments)
 
 
 _REASON = (
@@ -162,19 +246,13 @@ def decide(command: str) -> str | None:
     # already reaches for the right task is not the behaviour being corrected.
     if re.search(r"\bmise\s+run\s+kb-", command):
         return None
-    # Lines first: a newline separates commands as surely as `;` does, and
-    # shlex treats it as plain whitespace. `hook_guard._BARE_PYTHON` already
-    # carries `\n` in its separator class for the same reason.
-    for line in command.splitlines():
-        segments = _segments(line)
-        if segments is None:
-            if _HAND_GATE_FALLBACK.search(line):
-                return _REASON
+    segments = _segments(command)
+    if segments is None:
+        return _REASON if _HAND_GATE_FALLBACK.search(command) else None
+    for tokens in segments:
+        if not _segment_is_a_gate(tokens):
             continue
-        for tokens in segments:
-            if not _segment_is_a_gate(tokens):
-                continue
-            if _INTROSPECTION_TOKENS.intersection(tokens):
-                continue
-            return _REASON
+        if _INTROSPECTION_TOKENS.intersection(tokens):
+            continue
+        return _REASON
     return None
