@@ -33,6 +33,7 @@ class TimeSource(Enum):
 
     birthtime = "birthtime"
     content = "content"
+    mtime = "mtime"
 
 
 class SessionRecord(Struct):
@@ -49,7 +50,7 @@ class SessionRecord(Struct):
     bytes: Annotated[int, Meta(ge=0)]
     time_source: Annotated[
         TimeSource,
-        Meta(description="Which clock set started_at: the filesystem, or the file's own record."),
+        Meta(description="Which clock set started_at: birthtime, the file's record, or mtime."),
     ]
 
 

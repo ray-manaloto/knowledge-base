@@ -154,8 +154,12 @@ def _record(path: Path) -> SessionRecord | None:
     birth = getattr(stat, "st_birthtime", None)
     content = _first_record_timestamp(path)
     if birth is None:
+        # The last resort SAYS mtime. It reported itself as `birthtime` until
+        # 2026-08-18, which told the consumer the one clock it did NOT use —
+        # and time_source exists precisely so a reader can weigh the 119.6h
+        # birth-to-mtime cases this module's own docstring measures.
         started, source = (
-            (content, TimeSource.content) if content else (stat.st_mtime, TimeSource.birthtime)
+            (content, TimeSource.content) if content else (stat.st_mtime, TimeSource.mtime)
         )
     elif content is not None and abs(content - birth) > _CLOCK_SLACK_SECONDS:
         started, source = content, TimeSource.content
@@ -357,7 +361,15 @@ _VALUE_FLAGS = ("--since", "--until", "--last")
 
 
 def _value_for(flag: str, value: str, seen: dict[str, object]) -> Err | None:
-    """Store one value flag, or return the refusal. None means accepted."""
+    """Store one value flag, or return the refusal. None means accepted.
+
+    A REPEATED flag is a refusal, not an overwrite. `--last 3 --last 9` means
+    two different sets, and keeping the later one silently is the "resolves to
+    X" default that `parse` already refuses for two DIFFERENT selectors — the
+    same ambiguity does not become honourable because the flag name repeats.
+    """
+    if seen[flag.removeprefix("--")] is not None:
+        return Err(f"{flag} may be given only once", rc=Rc.BAD_REQUEST)
     if flag == "--last":
         if not value.isdigit() or int(value) < 1:
             return Err(f"--last needs a positive integer, got {value!r}", rc=Rc.BAD_REQUEST)
@@ -367,6 +379,25 @@ def _value_for(flag: str, value: str, seen: dict[str, object]) -> Err | None:
     if bound is None:
         return Err(f"{flag} is not an ISO-8601 date or datetime: {value!r}", rc=Rc.BAD_REQUEST)
     seen[flag.removeprefix("--")] = bound
+    return None
+
+
+def _sessions_for(rest: list[str], seen: dict[str, object]) -> Err | None:
+    """Consume the ids after `--sessions`, or return the refusal.
+
+    A REPEATED `--sessions` is a refusal too: repeating the flag REPLACED the
+    earlier ids until 2026-08-18, so `--sessions a --sessions b` reviewed only
+    b — a silently narrowed scope, refused for the same reason `_value_for`
+    refuses a repeated bound.
+    """
+    if seen["sessions"]:
+        return Err("--sessions may be given only once", rc=Rc.BAD_REQUEST)
+    ids = []
+    while rest and not rest[0].startswith("-"):
+        ids.append(rest.pop(0))
+    if not ids:
+        return Err("--sessions needs at least one id", rc=Rc.BAD_REQUEST)
+    seen["sessions"] = ids
     return None
 
 
@@ -393,12 +424,9 @@ def _tokenise(args: list[str]) -> Result[dict[str, object]]:
         elif flag == "--json":
             continue  # accepted and ignored: JSON is the only output there is
         elif flag == "--sessions":
-            ids = []
-            while rest and not rest[0].startswith("-"):
-                ids.append(rest.pop(0))
-            if not ids:
-                return Err("--sessions needs at least one id", rc=Rc.BAD_REQUEST)
-            seen["sessions"] = ids
+            refusal = _sessions_for(rest, seen)
+            if refusal is not None:
+                return refusal
         elif flag in _VALUE_FLAGS:
             if not rest:
                 return Err(f"{flag} needs a value", rc=Rc.BAD_REQUEST)

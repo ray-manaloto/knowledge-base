@@ -86,10 +86,46 @@ def test_started_at_uses_birthtime_when_the_two_agree(project: Path) -> None:
 
     Without this, a module that ALWAYS preferred content would pass the
     disagreement test — a check that can only produce one answer.
+
+    On a filesystem WITHOUT `st_birthtime` the honest answer is `mtime`, and
+    the expectation says so. This test used to assert `birthtime`
+    unconditionally and passed on such hosts anyway — because the fallback
+    mislabelled its clock, which is exactly the defect the mtime test below
+    now pins.
     """
-    _transcript(_dir(project), "aaaaaaaa-0000-0000-0000-000000000002")
+    path = _transcript(_dir(project), "aaaaaaaa-0000-0000-0000-000000000002")
+    has_birthtime = getattr(path.stat(), "st_birthtime", None) is not None
     (record,) = ss.records(_dir(project))
-    assert record.time_source is TimeSource.birthtime
+    assert record.time_source is (TimeSource.birthtime if has_birthtime else TimeSource.mtime)
+
+
+def test_the_mtime_last_resort_says_mtime_not_birthtime(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No birthtime, no content timestamp — the fallback must NAME its clock.
+
+    It reported itself as `birthtime` until 2026-08-18: the one clock it did
+    not use, on exactly the record whose reader most needs to distrust mtime.
+    `st_birthtime` cannot be unset on a filesystem that has it, so it is hidden
+    by wrapping `stat` — the same one-direction constraint the module docstring
+    already concedes for the cross-check tests.
+    """
+    _transcript(_dir(project), "aaaaaaaa-0000-0000-0000-000000000005")
+    real_stat = Path.stat
+
+    class _NoBirthtime:
+        def __init__(self, inner: os.stat_result) -> None:
+            self._inner = inner
+
+        def __getattr__(self, name: str) -> object:
+            if name == "st_birthtime":
+                raise AttributeError(name)
+            return getattr(self._inner, name)
+
+    monkeypatch.setattr(Path, "stat", lambda self, **kw: _NoBirthtime(real_stat(self, **kw)))
+    (record,) = ss.records(_dir(project))
+    assert record.time_source is TimeSource.mtime
+    assert record.started_at == record.last_written
 
 
 def test_records_sort_by_start_not_by_mtime(project: Path) -> None:
@@ -165,6 +201,24 @@ def test_a_missing_transcript_dir_names_the_path_it_derived(
         (["--last"], "flag with no value"),
         (["--sessions", "../../etc/passwd"], "path traversal is not an id"),
         (["--nope"], "unknown flag"),
+        # A repeated flag OVERWROTE the earlier value until 2026-08-18, so
+        # `--sessions a --sessions b` reviewed only b — a silently narrowed
+        # scope, which is the partial-list defect above in flag form.
+        (
+            [
+                "--sessions",
+                "aaaaaaaa-0000-0000-0000-000000000001",
+                "--sessions",
+                "aaaaaaaa-0000-0000-0000-000000000002",
+            ],
+            "repeated --sessions",
+        ),
+        (["--last", "2", "--last", "9"], "repeated --last"),
+        (["--since", "2026-01-01", "--since", "2026-02-01"], "repeated --since"),
+        (
+            ["--since", "2026-01-01", "--until", "2026-02-01", "--until", "2026-03-01"],
+            "repeated --until",
+        ),
     ],
 )
 def test_a_malformed_request_is_rejected(args: list[str], why: str) -> None:

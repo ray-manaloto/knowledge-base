@@ -108,9 +108,10 @@
         "time_source": {
           "enum": [
             "birthtime",
-            "content"
+            "content",
+            "mtime"
           ],
-          "description": "Which clock set started_at: the filesystem, or the file's own record."
+          "description": "Which clock set started_at: birthtime, the file's record, or mtime."
         }
       }
     }
