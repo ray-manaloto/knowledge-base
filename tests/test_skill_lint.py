@@ -287,3 +287,89 @@ def test_skill_lint_int_wrapper_is_exit_code_of_boundary(tmp_path: Path) -> None
 
     _skill(tmp_path, "bad", _BAD)
     assert skill_lint.skill_lint_main(tmp_path) == exit_code(skill_lint.check_skill_lint(tmp_path))
+
+
+def _mirror(root: Path, name: str, body: str) -> None:
+    """Write the `.agents/` copy of a skill — the non-Claude lanes' tree."""
+    d = root / ".agents" / "skills" / name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "SKILL.md").write_text(body, encoding="utf-8")
+
+
+def test_an_absent_mirror_tree_is_not_drift(tmp_path: Path) -> None:
+    """A repo with no `.agents/skills/` has no mirror to be out of sync.
+
+    This is the control on every arm below: without it, a check that reported
+    drift unconditionally would satisfy all of them. It is also the deliberate
+    hole, closed by `test_this_repo_mirrors_every_skill` rather than here.
+    """
+    _skill(tmp_path, "good", _GOOD)
+    assert skill_lint.mirror_drift(tmp_path) == ()
+
+
+def test_a_diverged_or_missing_mirror_is_named(tmp_path: Path) -> None:
+    """Both shapes of drift, and the identical case that must stay silent.
+
+    The third arm is what makes the first two mean something: with the copies
+    byte-identical the check must report NOTHING, or it is a check that can only
+    fail.
+    """
+    _skill(tmp_path, "good", _GOOD)
+    _mirror(tmp_path, "other", _GOOD)
+    missing = skill_lint.mirror_drift(tmp_path)
+    assert len(missing) == 1
+    assert "no mirror" in missing[0]
+
+    _mirror(tmp_path, "good", _GOOD + "\nan extra line the mirror grew on its own\n")
+    differ = skill_lint.mirror_drift(tmp_path)
+    assert len(differ) == 1
+    assert "differ" in differ[0]
+
+    _mirror(tmp_path, "good", _GOOD)
+    assert skill_lint.mirror_drift(tmp_path) == ()
+
+
+def test_drift_reaches_the_exit_code_through_the_boundary(tmp_path: Path) -> None:
+    """Drift must fail the gate, and must do so WITHOUT a second rc conversion.
+
+    The second assertion is the one worth keeping: an earlier version computed
+    the drift in the renderer and returned its own exit code, which broke the
+    single-conversion property `test_skill_lint_int_wrapper_is_exit_code_of_boundary`
+    exists to protect — a real regression, caught by that test rather than by
+    review.
+    """
+    _skill(tmp_path, "good", _GOOD)
+    _mirror(tmp_path, "good", _GOOD + "\ndrifted\n")
+
+    assert skill_lint.check(tmp_path).failed
+    assert skill_lint.skill_lint_main(tmp_path) == exit_code(skill_lint.check_skill_lint(tmp_path))
+    assert skill_lint.skill_lint_main(tmp_path) != 0
+
+
+def test_the_gate_covers_both_skill_trees(tmp_path: Path) -> None:
+    """A violation in the `.agents/` copy must be found, not only in `.claude/`.
+
+    This is the hole the widening closes: `.agents/skills/` is tracked, is read
+    by the non-Claude lanes, and was matched by no gate at all.
+    """
+    _mirror(tmp_path, "bad", _BAD)
+    report = skill_lint.check(tmp_path)
+
+    assert report.findings, "a violation in the mirror tree went unseen"
+    assert any(f.path.startswith(".agents/") for f in report.findings)
+
+
+def test_this_repo_mirrors_every_skill() -> None:
+    """The adoption half, pinned here because `mirror_drift` only checks faithfulness.
+
+    Deleting `.agents/skills/` would silence that function entirely; this fails
+    instead. `graphify` is excluded on both sides — the two are different
+    documents by design, not copies.
+    """
+    root = Path(__file__).resolve().parents[1]
+    claude = {p.parent.name for p in (root / ".claude/skills").glob("*/SKILL.md")}
+    agents = {p.parent.name for p in (root / ".agents/skills").glob("*/SKILL.md")}
+
+    assert claude, "no .claude skills found — the probe cannot discriminate"
+    assert claude == agents
+    assert skill_lint.mirror_drift(root) == ()

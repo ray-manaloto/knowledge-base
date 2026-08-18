@@ -151,6 +151,14 @@ ignore = [
 ]
 # Intentional catch-all fail-open: a crashed PreToolUse guard must NEVER brick Bash.
 "python/src/kb_setup/hook_guard.py" = ["BLE001"]
+# The graph-size gate calls graphify's OWN `security._max_graph_file_bytes()`.
+# Private, and the lesser risk by a wide margin: the alternative is a second
+# parser for a suffix convention where `GB` means GiB (1024**3), so a
+# reimplementation would agree on the string `"1GB"` and be 7% wrong about the
+# number — reporting headroom this repo does not have, in the gate whose entire
+# job is headroom. `test_the_gate_reads_graphifys_own_cap` fails loudly if the
+# name moves, which is what makes depending on it recoverable rather than silent.
+"python/src/kb_setup/graph_size.py" = ["SLF001"]
 # Same fail-safe rationale, opposite direction: the eval runner catches whatever a
 # repo-supplied probe or control arm raises and RECORDS it as that case's failure.
 # Narrowing this would let one bad case abort the whole run, which is the failure
