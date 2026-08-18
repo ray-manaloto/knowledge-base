@@ -231,3 +231,58 @@ the end of a long session.
   itself; what survives from it is that the staging gate is trusted to catch
   drift, which is what makes re-scoping safe to do deliberately rather than
   urgently.
+
+---
+
+## SECOND ADDENDUM — VERBATIM (Ray, same day, as comments on the design artifact)
+
+Four comments left on the published design artifact
+`https://claude.ai/code/artifact/59a537df-bb8e-4970-a96d-5dcd102d5a1e`. Recorded
+here rather than only in the artifact's comment thread because an artifact is not
+something a session loads, and this file is — which is item 1 of the directive
+above, applied to itself.
+
+> and once we do complete the sources/graphify deep extraction/reflections/generated artifacts
+> and have expert level understanding of graphify and a graphify expert agent
+> we need to really enforce that all agents use graphify skills and the graphify query/explain tools as the first place to research and/or navigate the project's code and documentation
+
+> make sure we are not creating hand written models and/or code that can be generated from the latest datamodel-code-generator tool and/or some other code generation tool
+
+> can we enable timestamps in the telemetry to know when exactly messages/commands were being run?
+
+> can we use these sdks instead?
+> - https://github.com/anthropics/anthropic-sdk-python
+> - https://github.com/anthropics/claude-agent-sdk-python
+
+And, in the same exchange, on whether to build the proposed selector:
+
+> option 1
+> but pending review of my artifacts comments
+
+---
+
+## What the second addendum is asking for
+
+- **graphify-first, enforced for AGENTS — not just for this session.** The
+  existing `kb_setup.graph_first` deny is scoped to the Bash and Grep calls of
+  the session that runs it; it says nothing about what a spawned subagent does,
+  and the roster's six agents are instructed to query the graph first only in
+  PROSE, which this repo has measured at 0-of-19 compliance. The directive is
+  explicitly SEQUENCED — it lands *after* the deep extraction, the reflections,
+  the generated artifacts and a graphify expert agent exist. It is not a task for
+  today; it is the acceptance criterion that campaign is aimed at, and it is
+  recorded now so that finishing the campaign does not look like finishing the
+  work.
+- **Codegen before hand-authoring.** Any new data contract — the session-selector
+  JSON among them — goes through this repo's existing codegen path rather than a
+  hand-written model. What that path is, and where hand-written contracts still
+  sit, is being measured rather than assumed.
+- **Telemetry as a clock.** Raised against the finding that file `mtime` mis-dates
+  a resumed session (20 of 238 transcripts, worst 119.6 h). Whether telemetry
+  already answers it, and at what retention cost, is being measured.
+- **The SDKs are a challenge to a PREMISE, and are treated as one.** The claim
+  *"only the model can spawn Claude agents"* (`.claude/workflows/session-review.js:27-31`)
+  is what puts the fan-out in a workflow instead of a `kb_setup` module. If an SDK
+  refutes it, the seam moves and `zero-bash-logic.md`'s reach grows. It is being
+  settled against the installed SDKs and this repo's auth and billing model
+  before anything is built on either answer.
