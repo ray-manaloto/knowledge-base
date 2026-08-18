@@ -121,10 +121,20 @@ def decide(command: str) -> str | None:
     for tokens in segs:
         if not tokens:
             continue
-        if posixpath.basename(tokens[0]) in _INTROSPECTORS:
-            continue
         words = check_first.command_word(tokens)
         if not words:
+            continue
+        # The introspector may sit BEHIND a transparent prefix. `command` is in
+        # both `_INTROSPECTORS` here and `check_first._TRANSPARENT_PREFIXES`, so
+        # `env command -v timeout` resolves to the command word `timeout` while
+        # `tokens[0]` is `env` — and a check on `tokens[0]` alone denied the
+        # control arm this guard's own message recommends. Testing every token
+        # `command_word` STRIPPED (it returns a suffix, so the prefix is
+        # everything before it) covers the wrapped forms without widening to the
+        # whole token list, which would let `timeout 5 which foo` escape.
+        # (Cold review of c27bddf60480, P2.)
+        prefix = tokens[: len(tokens) - len(words)]
+        if any(posixpath.basename(t) in _INTROSPECTORS for t in (tokens[0], *prefix)):
             continue
         name = posixpath.basename(words[0])
         remedy = TRAPS.get(name)

@@ -174,7 +174,7 @@ takes, not a proof of completeness.
 - `docs/research/reports/2026-08-17-session-review.md` — the first run, verbatim.
 - `.claude/rules/probes-need-a-control-arm.md` — every lane's negative needs one.
 
-## `mode: 'handoff'` — this workflow prepares `/clear-prep`'s handoff
+## `output: 'handoff'` — this workflow prepares `/clear-prep`'s handoff
 
 Ray, 2026-08-18: *"it should be the session review workflow that is performing the
 handoff preparation for /clear-prep since that is what we are building."*

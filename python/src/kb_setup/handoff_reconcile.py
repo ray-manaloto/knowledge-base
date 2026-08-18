@@ -154,6 +154,12 @@ _ISSUE_REF = re.compile(r"(?<![\w/])#(\d{1,5})\b")
 #: A markdown ATX heading, with its level.
 _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$", re.MULTILINE)
 
+#: A fenced code block, ``` or ~~~, with any info string. Non-greedy to the
+#: matching closing fence, or to end-of-text for an unterminated fence — an
+#: unterminated fence must swallow the rest rather than leave its body live,
+#: because the failure this masks is a heading matched INSIDE a fence.
+_FENCE = re.compile(r"^(?P<f>```|~~~)[^\n]*\n.*?(?:^(?P=f)[^\n]*$|\Z)", re.MULTILINE | re.DOTALL)
+
 #: Inside a code span, the part worth matching on. A span like
 #: `mise run kb-update -- agent-harness-docs` should match a new handoff that
 #: says `agent-harness-docs` in any other phrasing, so the span is reduced to
@@ -200,16 +206,49 @@ class Commitment:
     heading: str
 
 
-def _sections(text: str) -> list[tuple[str, str]]:
-    """Every (heading, body) pair in ``text``, body running to the next heading.
+def _mask_fences(text: str) -> str:
+    """``text`` with every fenced code block blanked, offsets preserved.
 
-    Returns the pairs rather than a dict because a handoff may repeat a heading
+    A shell or python block inside an owed section routinely opens a line with
+    ``#``, and :data:`_HEADING` matched it as an H1 — which, being level 1, ended
+    the enclosing ``## Owed`` section right there and dropped every commitment
+    below it. Measured: a body of ``tool-a``, a ```bash fence whose first line is
+    ``# a comment``, then ``tool-b`` yielded ``[tool-a]``; the same body with the
+    comment removed yielded ``[tool-a, tool-b]``. A false CARRIED, silent — the
+    class this module exists to catch, re-made inside the catcher for the second
+    time (cold review of c27bddf60480, P1).
+
+    Newlines are kept so every character index and line number in the masked
+    copy still names the same position in the original.
+    """
+    return _FENCE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+
+
+def _sections(text: str) -> list[tuple[str, str, int]]:
+    """Every (heading, body, body_start) triple, body running to the next heading.
+
+    Returns the triples rather than a dict because a handoff may repeat a heading
     across rounds, and collapsing two sections named "Owed" would drop one of
     them — which is the very failure this module exists to catch, re-made inside
     the catcher.
+
+    ``body_start`` is the body's character offset in ``text``. The caller needs
+    it to number lines: deriving the offset with ``text.find(body)`` searches
+    from index 0 and returns the FIRST occurrence, so a section whose body
+    repeats text from earlier in the document was reported at the earlier line
+    (cold review of c27bddf60480, P2).
+
+    Headings are located in the fence-masked copy, and bodies are sliced from it
+    too. Slicing from the ORIGINAL was the first fix and it traded one defect for
+    a milder mirror: the section no longer ended at the fence, but every line of
+    code inside it became a candidate commitment, so ``# a comment`` contributed
+    the token ``comment``. Both halves need the mask, which is why
+    :func:`_mask_fences` preserves offsets and newlines — every index and line
+    number in the masked copy still names the same position in ``text``.
     """
-    marks = list(_HEADING.finditer(text))
-    out: list[tuple[str, str]] = []
+    masked = _mask_fences(text)
+    marks = list(_HEADING.finditer(masked))
+    out: list[tuple[str, str, int]] = []
     for i, m in enumerate(marks):
         # A section runs to the next heading of the SAME OR HIGHER level, not to
         # the next heading of ANY level. Ending at any heading was a measured
@@ -224,7 +263,7 @@ def _sections(text: str) -> list[tuple[str, str]]:
             if len(later.group(1)) <= level:
                 end = later.start()
                 break
-        out.append((m.group(2), text[m.end() : end]))
+        out.append((m.group(2), masked[m.end() : end], m.end()))
     return out
 
 
@@ -347,10 +386,13 @@ def commitments(text: str) -> list[Commitment]:
     """
     found: list[Commitment] = []
     seen: set[str] = set()
-    for heading, body in _sections(text):
+    for heading, body, body_start in _sections(text):
         if not _is_owed(heading):
             continue
-        base = text.count("\n", 0, text.find(body)) + 1 if body else 1
+        # Count newlines up to THIS body's own offset. `text.find(body)` searched
+        # from 0 and returned the first occurrence, so a section repeating text
+        # from earlier in the document was numbered at the earlier line.
+        base = text.count("\n", 0, body_start) + 1 if body else 1
         for i, line in _units(body):
             fresh = tuple(t for t in _tokens_in(line) if t.lower() not in seen)
             if not fresh:

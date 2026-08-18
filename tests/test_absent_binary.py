@@ -157,3 +157,35 @@ def test_the_gate_redirect_still_wins_over_this_one(absent) -> None:
     value = getattr(hook_guard.check_hook_call(payload), "value", None)
     assert value is not None
     assert "kb-check" in value, "the older, more specific remedy must win"
+
+
+def test_an_introspector_behind_a_transparent_prefix_is_not_denied() -> None:
+    """The cold lane's P2 on `c27bddf60480` — the guard denied its own control arm.
+
+    `command` sits in BOTH this module's `_INTROSPECTORS` and `check_first`'s
+    `_TRANSPARENT_PREFIXES`. So for `env command -v timeout`, `tokens[0]` is
+    `env` (not an introspector), `command_word` strips `env`, `command` and `-v`,
+    and the resolved word is `timeout` — which this guard then denied. The denied
+    command is precisely the probe the guard's own message tells you to run, and
+    a guard that refuses its own remedy is worse than no guard.
+
+    The negative arm matters as much: widening the check to "any token anywhere"
+    would let `timeout 5 which foo` through, because `which` appears in it. Only
+    the tokens `command_word` actually STRIPPED may exempt a segment.
+    """
+    for wrapped in (
+        "env command -v timeout",
+        "time command -v timeout",
+        "nohup command -v timeout",
+    ):
+        assert absent_binary.decide(wrapped) is None, f"{wrapped} is an introspection probe"
+
+    assert absent_binary.decide("command -v timeout") is None, "the unwrapped control arm"
+    assert absent_binary.decide("env which timeout") is None, "`which` behind `env`"
+
+    denied = absent_binary.decide("timeout 5 which foo")
+    assert denied is not None, (
+        "an introspector LATER in the line must not exempt the absent binary "
+        "that actually runs — this is the false negative the narrow fix avoids"
+    )
+    assert "timeout" in denied

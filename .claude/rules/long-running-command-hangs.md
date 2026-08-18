@@ -131,10 +131,20 @@ incident: unbounded wait + pipe-masked exit code.
    **A scary log line adjacent to a hang is not the hang** — confirm a suspect
    by removing it and re-probing.
 
-6. **When lint hangs, run the underlying tool DIRECTLY.** `uv run ruff check`
-   takes seconds and never lies about your own code. Then grep the lint output
+6. **When lint hangs, ask the narrower gate — `mise run kb-check -- <paths>`.**
+   It runs ruff, format, ty and those paths' own tests in seconds, returns a
+   real exit code, and never lies about your own code. Then grep the lint output
    for a `❯ <step>` with no matching `✔ <step>` — that names the wedged step
    without reading the whole debug log.
+
+   This rule said *"run the underlying tool DIRECTLY: `uv run ruff check`"* until
+   2026-08-18, which **the hook denies** — `kb_setup.check_first` redirects
+   exactly that string, so an agent following rule 6 was stopped by a guard rule
+   3 of this same file describes. Probed both ways:
+   `check_first.decide("uv run ruff check")` returns the redirect,
+   `check_first.decide("mise run kb-check -- <path>")` returns `None`. A rule
+   instructing a denied command is unfollowable, and it is worse than a missing
+   rule because it reads as authority. (Cold review of `c27bddf60480`, P2.)
 
 ## Applies to
 

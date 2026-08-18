@@ -358,3 +358,64 @@ def test_a_mixed_case_identifier_matches_a_handoff_that_names_it() -> None:
 
     absent = "# next\n\n## Owed\n\n- unrelated.\n"
     assert hr.dropped(previous, absent, previous_name="p"), "the control arm: it must still fire"
+
+
+def test_a_hash_comment_in_a_code_fence_does_not_end_the_section() -> None:
+    """The cold lane's P1 on `c27bddf60480`, and the false-CARRIED class again.
+
+    `_HEADING` matched any line opening with `#`, including a shell or python
+    comment inside a fenced block. Being level 1, that bogus H1 ended the
+    enclosing `## Owed` section right there, and every commitment BELOW the fence
+    fell out of scope — reported as a clean pass. Handoffs carry fenced shell
+    blocks routinely (this repo's own handoff-d carries three), so the trigger is
+    ordinary content, not a contrived one.
+
+    The control arm is the same document with the comment removed: if that also
+    lost `tool-b`, the fence would not be what did it.
+    """
+
+    def doc(fence_body: str) -> str:
+        return (
+            "## Owed\n\n- `tool-a` must be fixed\n\n"
+            f"```bash\n{fence_body}\n```\n\n"
+            "- `tool-b` must also be fixed\n"
+        )
+
+    with_comment = doc("# a comment\nls")
+    without = doc("ls")
+
+    named = [t for c in hr.commitments(with_comment) for t in c.tokens]
+    control = [t for c in hr.commitments(without) for t in c.tokens]
+
+    assert "tool-b" in named, "a `#` comment inside a fence truncated the owed section"
+    assert named == control, (
+        "the fenced block must be invisible to commitment extraction in BOTH "
+        f"directions — masking it must not ADD tokens either: {named} != {control}"
+    )
+    assert "comment" not in named, (
+        "code inside a fence must not become a commitment; the first fix traded "
+        "the truncation for this mirror"
+    )
+
+
+def test_the_line_number_is_this_section_s_own_not_an_earlier_match() -> None:
+    """The cold lane's P2 on `c27bddf60480`.
+
+    `base` came from `text.find(body)`, which searches from index 0 and returns
+    the FIRST occurrence. A handoff whose owed section repeats a line from an
+    earlier section was therefore numbered at the earlier line, so every
+    `file:line` this gate printed for it pointed a reader at the wrong place.
+
+    Control arm: the same document with a distinct first section already
+    reported the right line, which is why the bug survived — it is invisible
+    unless the text actually repeats.
+    """
+    repeated = "# Background\n- `repeated-tool`\n\n# Next task\n- `repeated-tool`\n"
+    distinct = "# Background\n- `unique-first-tool`\n\n# Next task\n- `repeated-tool`\n"
+
+    assert [c.line for c in hr.commitments(repeated)] == [5], (
+        "the commitment under `# Next task` is on line 5, not on its earlier twin's line"
+    )
+    assert [c.line for c in hr.commitments(distinct)] == [5], (
+        "the control arm: a non-repeating document was always numbered correctly"
+    )
