@@ -95,8 +95,23 @@ def transcript_dir(cwd: Path, env: dict[str, str] | None = None) -> Path:
     return brain.transcripts_base(env) / brain.encode_cwd(cwd)
 
 
+#: Every timestamp this module emits or compares is rendered at MICROSECOND
+#: precision, so all of them are the same width.
+#:
+#: That is what makes a lexicographic comparison equal a chronological one, and
+#: `_window` does compare them as strings. Without it the widths differ —
+#: `_iso` emitted microseconds while `_normalise` emitted none — and
+#: `"2026-08-18T00:00:00.123456Z" >= "2026-08-18T00:00:00Z"` is FALSE, because
+#: `.` sorts below `Z`. A session starting in the first second of the window was
+#: silently excluded. Found by the cold lane; the `--since 2026-08-18` case in
+#: everyday use hides it, since midnight-to-the-microsecond is rare.
+_PRECISION = "microseconds"
+
+
 def _iso(stamp: float) -> str:
-    return datetime.fromtimestamp(stamp, tz=UTC).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.fromtimestamp(stamp, tz=UTC).isoformat(timespec=_PRECISION).replace("+00:00", "Z")
+    )
 
 
 def _first_record_timestamp(path: Path) -> float | None:
@@ -333,7 +348,7 @@ def _normalise(stamp: str) -> str | None:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    return parsed.astimezone(UTC).isoformat(timespec=_PRECISION).replace("+00:00", "Z")
 
 
 #: The flags that take a value. A tuple rather than a branch chain so adding a

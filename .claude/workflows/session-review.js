@@ -593,7 +593,14 @@ for (const l of interrupted) {
   // Only report a field that SAYS something — `isPartial` already treats "none"
   // as silence, and printing "never reached none" beside a real gap reads as a
   // second gap.
-  const says = (v) => stated(v) && !SAYS_NOTHING.has(stated(v).toLowerCase()) && stated(v)
+  // Uses `saysNothing`, the SAME predicate `isPartial` used to decide this lane
+  // was partial in the first place. It used to test the whole string against
+  // `SAYS_NOTHING` while `isPartial` compared only the FIRST CLAUSE, so a lane
+  // answering "None — this lane is scoped and complete." was correctly judged
+  // complete and then logged as `never reached None — this lane is scoped and
+  // complete.` — a fabricated gap in the one line a reader scans for real ones.
+  // Two predicates for one question is one too many. (Cold lane, P2.)
+  const says = (v) => (stated(v) && !saysNothing(v) ? stated(v) : '')
   const why = [
     says(l.coverage?.never_reached) && `never reached ${says(l.coverage.never_reached)}`,
     says(l.coverage?.opened_not_finished) && `opened but unfinished: ${says(l.coverage.opened_not_finished)}`,
@@ -739,7 +746,30 @@ log(
 // `remedy` were dropped for every refuted finding — so the synthesiser could
 // neither rank them by cost nor say which lane raised them, and the run's own
 // state file records the loss (refuted objects carry 2 keys; unverified carry 7).
-const refutedWhole = (r) => ({ ...r.finding, why: r.verdict.why, contradicts: r.verdict.contradicts })
+// The REFUTER's evidence is kept under its own names, not merged into the
+// finding's. Two fields collide and both were lost until the cold lane caught
+// it on this commit:
+//
+//   * `probe` — the command or read that settled the refutation — was never
+//     copied at all. It was ADDED to the refuter schema in 841e88ac precisely
+//     because `additionalProperties: false` had been stripping it, and this
+//     line then dropped it one step later. #343's open question — were 93% of
+//     findings FALSE, or merely hard to re-derive? — is unanswerable without it,
+//     so the field was restored to the schema and lost again on the way out.
+//   * `control_arm` exists on BOTH objects and means different things: on the
+//     finding it is the sweep lane's arm for its own claim, on the verdict it is
+//     the refuter's arm for the refutation. Spreading the finding first let the
+//     lane's version shadow the refuter's silently.
+//
+// Prefixed rather than merged, because a reader must be able to tell whose arm
+// they are looking at.
+const refutedWhole = (r) => ({
+  ...r.finding,
+  why: r.verdict.why,
+  contradicts: r.verdict.contradicts,
+  refuter_probe: r.verdict.probe,
+  refuter_control_arm: r.verdict.control_arm,
+})
 
 // Fable for judgment, Opus if Fable is gone — and never silently.
 //

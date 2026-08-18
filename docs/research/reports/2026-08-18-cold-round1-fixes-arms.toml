@@ -1,0 +1,34 @@
+# Arms for the cold lane's three code findings on 7914e97b.
+#
+# The point is NOT that the fixes work — it is that the tests written ALONGSIDE
+# them can fail. `kb-review` § "Arm your own fixes": a fix is the least-reviewed
+# code in the diff, and a test written beside it routinely cannot fail. One of
+# the defects here was invisible for exactly that reason — the existing test
+# asserted `proseexclude` was DROPPED, and the case-sensitivity bug made it
+# dropped, so the test and the bug agreed and no mutation sweep could see it.
+
+suites = ["tests/test_handoff_reconcile.py", "tests/test_session_select.py"]
+
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''_PLAIN_MIN = 5'''
+new = '''_PLAIN_MIN = 5  # control'''
+
+# Revert the case fix. Every mixed-case identifier stops matching.
+[[arm]]
+id = "F1"
+test = "test_a_mixed_case_identifier_matches_a_handoff_that_names_it"
+file = "python/src/kb_setup/handoff_reconcile.py"
+old = '''    token = token.lower()
+    if token.startswith("#"):'''
+new = '''    if token.startswith("#"):'''
+
+# Revert the fixed-width timestamp. Lexicographic stops equalling chronological.
+[[arm]]
+id = "F2"
+test = "test_a_window_bound_and_a_start_are_comparable_as_strings"
+file = "python/src/kb_setup/session_select.py"
+old = '''    return parsed.astimezone(UTC).isoformat(timespec=_PRECISION).replace("+00:00", "Z")'''
+new = '''    return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")'''

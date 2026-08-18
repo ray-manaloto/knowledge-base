@@ -336,3 +336,25 @@ def test_the_fixed_composer_carries_what_the_broken_one_dropped() -> None:
     assert "agent-harness-docs" not in still_missing, (
         "the regenerated handoff dropped the item the fix exists to carry"
     )
+
+
+def test_a_mixed_case_identifier_matches_a_handoff_that_names_it() -> None:
+    """The cold lane's P1, and a regression my own test could not see.
+
+    `dropped()` lowercases the haystack once; `_names` must lower the token to
+    match. Extracting `_names` from an inline `t.lower() in haystack` dropped
+    that call, so every camelCase or PascalCase identifier — `proseExclude`, a
+    class name, a `--someFlag` — failed against a handoff that named it
+    perfectly and was reported DROPPED forever.
+
+    The reason this needed an outside reviewer: `test_the_known_losses_are_found`
+    asserts `proseexclude` IS in the dropped set, and it kept PASSING — for the
+    wrong reason. A test that agrees with a bug is invisible to a mutation sweep,
+    because the bug and the assertion agree about the answer.
+    """
+    previous = "# h\n\n## Owed\n\n- keep `proseExclude` in `hk.pkl`.\n"
+    carried = "# next\n\n## Owed\n\n- `proseExclude` is still set.\n"
+    assert hr.dropped(previous, carried, previous_name="p") == []
+
+    absent = "# next\n\n## Owed\n\n- unrelated.\n"
+    assert hr.dropped(previous, absent, previous_name="p"), "the control arm: it must still fire"

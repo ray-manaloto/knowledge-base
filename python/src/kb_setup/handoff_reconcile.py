@@ -402,12 +402,22 @@ def _names(haystack: str, token: str) -> bool:
     for names — this gate's credibility depends on not crying wolf, and a token
     appearing inside a longer name HAS been carried.
 
+    ``haystack`` ARRIVES LOWERCASED and the token is lowered HERE. Extracting
+    this function from an inline `t.lower() in haystack` dropped that call, and
+    the cold lane caught it: every camelCase or PascalCase identifier —
+    `proseExclude`, a class name, a `--someFlag` — then failed to match a handoff
+    that named it perfectly, and was reported DROPPED forever. Worse, the
+    regression test asserting `proseexclude` appears in the dropped set kept
+    PASSING, for the wrong reason. A refactor that moves a comparison must move
+    its normalisation with it.
+
     WORD-BOUNDARY for an ISSUE REFERENCE, because the same looseness inverts
     there: `#66` is a substring of `#663`, so a handoff mentioning an unrelated
     issue would clear a commitment about #66 — a false CARRIED, the silent
     direction. A number has no longer legitimate form the way a name does.
     (Advisor review, advisory finding.)
     """
+    token = token.lower()
     if token.startswith("#"):
         return re.search(rf"{re.escape(token)}(?!\d)", haystack) is not None
     return token in haystack

@@ -254,3 +254,29 @@ def test_the_output_round_trips_through_the_generated_contract(project: Path) ->
     back = msgspec.json.decode(encoded, type=type(result.value))
     assert back.schema_version == 1
     assert back.sessions[0].session_id.endswith("0009")
+
+
+def test_a_window_bound_and_a_start_are_comparable_as_strings(project: Path) -> None:
+    """The cold lane's P1: `_window` compares ISO strings, so widths must match.
+
+    `_iso` emitted microseconds and `_normalise` emitted none, and
+    `"...T00:00:00.123456Z" >= "...T00:00:00Z"` is FALSE because `.` sorts below
+    `Z`. A session starting inside the first second of the window was silently
+    excluded — the exact silent-loss shape this module refuses everywhere else.
+
+    Everyday use hides it: `--since 2026-08-18` against a session that began at
+    16:33 compares fine. Only a start in the bound's own second exposes it, which
+    is why no existing test found it.
+    """
+    bound = ss._normalise("2026-08-18")
+    assert bound is not None
+    assert len(bound) == len(ss._iso(1_787_000_000.123456))
+
+    _transcript(
+        _dir(project),
+        "aaaaaaaa-0000-0000-0000-00000000000c",
+        first_timestamp="2026-03-01T00:00:00.5Z",
+    )
+    result = ss.resolve(["--since", "2026-03-01T00:00:00Z"], project)
+    assert isinstance(result, Ok), "a session starting 0.5s into the window was dropped"
+    assert result.value.sessions[0].session_id.endswith("000c")
