@@ -633,7 +633,12 @@ def _partial_extraction_is_reviewed(root: Path, line: str, review: ExtractWarnin
             return False
     except OSError:
         return False
-    return review.extracted_nodes_by_path.get(entry.relative_path) == entry.extracted_nodes
+    # `.get(..., 0)`, not `.get(...)`: `_nodes_by_source_file` is a Counter cast to
+    # a dict, so a file that produced NO nodes is ABSENT rather than zero. Without
+    # the default, a reviewed entry recording `extracted_nodes=0` — a file whose
+    # partial extraction recovered nothing at all, the worst case this inventory
+    # exists to record — compares `None == 0` and can never be approved.
+    return review.extracted_nodes_by_path.get(entry.relative_path, 0) == entry.extracted_nodes
 
 
 def approve_partial_extraction_warning(

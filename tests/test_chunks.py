@@ -911,6 +911,66 @@ def test_assemble_handles_a_null_hyperedges_key(tmp_path) -> None:
     assert got["hyperedges"] == []
 
 
+def test_the_same_chunk_passed_twice_is_refused(tmp_path) -> None:
+    """A file never collides with itself, so the id gate cannot see this at all.
+
+    Measured before the fix: `assemble(root, 'dupe', [p, p])` returned 0 problems
+    and wrote TWO nodes carrying one id. `assembly_overlaps` could not cover for
+    it either — it dedups on `resolve()` BEFORE its two-chunk minimum, so `[p, p]`
+    collapses to one path and it returns `[]`, which is what the docstring
+    claiming otherwise had made nobody check.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    p = tmp_path / "p.json"
+    p.write_text(json.dumps(_chunk([_node("n1")], [])))
+
+    assert chunks.assembly_overlaps([p, p]) == [], (
+        "PRECONDITION: assembly_overlaps is silent here, which is why assemble must not be"
+    )
+    with pytest.raises(ValueError, match="passed more than once"):
+        chunks.assemble(tmp_path, "dupe", [p, p])
+
+
+def test_a_repeat_is_refused_by_its_spelling_not_its_string(tmp_path) -> None:
+    """CONTROL on the identity: two spellings of one file are still one file.
+
+    Comparing the raw arguments would miss this and let the duplicate through,
+    which is the same too-narrow identity the `_labels` fix was about.
+
+    The second spelling uses `..` and NOT `.`, and that is the whole test. A `.`
+    component is removed by `PurePath` at construction, so `tmp_path / "." /
+    "p.json"` is already EQUAL to `tmp_path / "p.json"` and a raw-argument
+    comparison would pass — the first version of this arm used it, the mutation
+    survived, and the mutant was inert rather than the code being covered. `..`
+    cannot be normalised without touching the filesystem, so only `resolve()`
+    collapses it, which is exactly the property under test.
+    """
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    (tmp_path / "sub").mkdir()
+    p = tmp_path / "p.json"
+    p.write_text(json.dumps(_chunk([_node("n1")], [])))
+    detour = tmp_path / "sub" / ".." / "p.json"
+    assert detour != p, "PRECONDITION: the two spellings must differ before resolve()"
+    assert detour.resolve() == p.resolve()
+
+    with pytest.raises(ValueError, match="passed more than once"):
+        chunks.assemble(tmp_path, "dupe", [p, detour])
+
+
+def test_two_different_chunks_are_still_assembled(tmp_path) -> None:
+    """CONTROL ARM: the refusal must not have made ordinary assembly refuse."""
+    (tmp_path / "sources" / "extractions").mkdir(parents=True)
+    p = tmp_path / "p.json"
+    q = tmp_path / "q.json"
+    # Distinct `source_file` values, or `assembly_overlaps` refuses for its own
+    # (correct) reason and this arm would pass without testing the new refusal.
+    p.write_text(json.dumps(_chunk([_node("n1", source_file="one.md")], [])))
+    q.write_text(json.dumps(_chunk([_node("n2", source_file="two.md")], [])))
+
+    out = chunks.assemble(tmp_path, "twochunks", [p, q])
+    assert sorted(n["id"] for n in json.loads(out.read_text())["nodes"]) == ["n1", "n2"]
+
+
 # --- replay_order: capture-date supersession, not the alphabet (#186) ---------
 #
 # build_merge gives a source_file to the LAST chunk that names it, so replay

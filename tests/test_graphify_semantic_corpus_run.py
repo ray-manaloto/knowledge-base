@@ -88,11 +88,17 @@ def test_the_adapter_ceiling_falls_back_short_when_nothing_configures_it() -> No
     # is checking cannot check it.
     for environment in ({}, {"GRAPHIFY_API_TIMEOUT": ""}, {"GRAPHIFY_API_TIMEOUT": "soon"}):
         assert graphify_semantic_adapter.inference_timeout_seconds(environment) == 120
-    for hostile in ("0", "-1", "-900"):
+    # `inf`/`nan`/`1e400` are the two failures this list did NOT cover until the
+    # cold lane on PR #338 constructed them, and they are the interesting ones
+    # precisely because they PASS an ordering test: `float("inf") <= 0` is False
+    # and so is `float("nan") <= 0`, so both reached `subprocess.run`, where a
+    # non-finite deadline disables expiry — the unbounded wait this fallback
+    # exists to prevent, arriving through the guard meant to prevent it.
+    for hostile in ("0", "-1", "-900", "inf", "-inf", "nan", "1e400"):
         assert (
             graphify_semantic_adapter.inference_timeout_seconds({"GRAPHIFY_API_TIMEOUT": hostile})
             == 120
-        )
+        ), hostile
     # And the relationship that makes it a FAIL-CLOSED default rather than just a
     # number: an unconfigured launcher must never inherit the long corpus ceiling.
     assert graphify_semantic_adapter._FALLBACK_INFERENCE_TIMEOUT_SECONDS < 900

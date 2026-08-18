@@ -307,10 +307,27 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # and `chunk-ledger.json` are BYTE-IDENTICAL at the same source commit 0738af37,
 # so both digests carrying a reviewed DECISION are unchanged and the workload is
 # the same 474 units / 58 chunks. Nothing here re-opens the scope question.
+# RE-RECORDED 2026-08-17 (f), after the cold review of PR #338. **No new
+# judgement**, and the narrowest re-plan in this file: exactly TWO of 43 fields,
+# `adapter_sha256` and the `cache_namespace_sha256` derived from it. Every
+# decision field — both spend caps, the output ceiling, the timeout, concurrency
+# — is unchanged, and all four decision-bearing plan files are BYTE-IDENTICAL at
+# source commit 0738af37, so the workload is still 474 units / 58 chunks.
+#
+# WHY THE ADAPTER MOVED: `inference_timeout_seconds` rejected `0` and negatives
+# but passed `inf` and `nan` straight through, because both PASS an ordering test
+# — so a non-finite `GRAPHIFY_API_TIMEOUT` reached `subprocess.run` and disabled
+# the deadline entirely. That is the unbounded wait the fallback exists to
+# prevent, arriving through the guard meant to prevent it, on the one path where
+# an unbounded wait costs money. `math.isfinite` now gates it.
+#
+# This is the third re-plan of this branch and the doctrine holds a third time:
+# a REVIEW ROUND is a code change here, so it belongs before the re-plan however
+# much it feels like a separate activity.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"ec27adfbd044ad28a6bad330af8a686fe8eea130e4bbbf2a4dd9a2e7d91966cf",'
+    b'"execution_config_sha256":"7d4f3d861656f60b58342b879e2fb6cf6171fbfeffcdaf90a393cde56796de18",'
     b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"fc6af9b2c112538599f00e4f2f15176a68763e92618b534b90b254be52caa1d4",'
+    b'"plan_manifest_sha256":"c1fb5e07c5f454a666f877865cc14b0d2796e03e1415e1f3235ee6bcc9ed161e",'
     b'"schema_version":1}\n'
 )

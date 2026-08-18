@@ -760,11 +760,14 @@ def _labels(chunk_paths: Sequence[Path]) -> dict[Path, str]:
     — and `<parent>/<name>` once they are not, which is the smallest suffix that
     distinguishes the runner's per-ordinal chunk directories.
 
-    Deliberately NOT addressed: the same path passed twice still counts as one
-    chunk here (as it does in `assembly_overlaps`, which dedups on `resolve()`),
-    so its nodes concatenate without an id-collision problem. That is unchanged
-    behaviour, not a hole this fix opened, and `assembly_overlaps`' duplicate-claim
-    message is what fires on it.
+    The same path passed twice counts as one chunk here, as it does in
+    `assembly_overlaps`, which dedups on `resolve()`. This paragraph used to add
+    that `assembly_overlaps`' duplicate-claim message "is what fires on it", and
+    that was FALSE: it dedups before its two-chunk minimum, so `[p, p]` collapses
+    to one path and it returns `[]`. Nothing fired, and `assemble` wrote 2 nodes
+    under one id. The cold lane on PR #338 constructed the case; the comment had
+    made it read as covered, which is why nobody had. `assemble` now refuses a
+    repeated path outright — see the `duplicated` check there.
     """
     resolved = [p.resolve() for p in chunk_paths]
     names = Counter(p.name for p in dict.fromkeys(resolved))
@@ -826,6 +829,28 @@ def assemble(repo_root: Path, name: str, chunk_paths: list[Path]) -> Path:
     # measurement. `seen` therefore answers "did a DIFFERENT FILE already claim
     # this id", which is the question this gate was always meant to ask.
     labels = _labels(chunk_paths)
+    # ...which leaves ONE input the id gate cannot speak about: the same path
+    # twice. `seen[nid] != p` is False against itself, so every node concatenates
+    # a second time and nothing is reported. Refused here rather than deduped,
+    # because a caller who named a chunk twice does not know what they asked for,
+    # and assembly is the step whose failure mode is a corpus that merged
+    # cleanly. `assembly_overlaps` cannot cover for it — it dedups on `resolve()`
+    # BEFORE its two-chunk minimum, so `[p, p]` collapses to one path and returns
+    # no problems at all. This module said otherwise until the cold lane on
+    # PR #338 constructed the case and watched 2 nodes with one id get written.
+    duplicated = sorted(
+        {
+            labels[path]
+            for path, count in Counter(p.resolve() for p in chunk_paths).items()
+            if count > 1
+        }
+    )
+    problems.extend(
+        f"{label}: passed more than once; assembly CONCATENATES, so its nodes would "
+        "land twice under one id and the id-collision gate cannot see it (a file "
+        "never collides with itself)"
+        for label in duplicated
+    )
 
     for raw_path in chunk_paths:
         p = raw_path.resolve()

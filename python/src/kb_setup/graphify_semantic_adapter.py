@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import stat
 import subprocess
@@ -822,7 +823,13 @@ def inference_timeout_seconds(environment: Mapping[str, str] | None = None) -> f
         parsed = float(raw)
     except ValueError:
         return _FALLBACK_INFERENCE_TIMEOUT_SECONDS
-    if parsed <= 0:
+    # `math.isfinite` and not just `> 0`, because the two values that break this
+    # are the two that pass an ordering test: `float("inf") <= 0` is False and so
+    # is `float("nan") <= 0`, so both reached `subprocess.run` and DISABLED the
+    # deadline — the unbounded wait this fallback exists to prevent, arriving
+    # through the guard meant to prevent it. Found by the cold lane on PR #338
+    # and independently by probing this function's own edges.
+    if not math.isfinite(parsed) or parsed <= 0:
         return _FALLBACK_INFERENCE_TIMEOUT_SECONDS
     return parsed
 

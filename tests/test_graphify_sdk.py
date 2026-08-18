@@ -560,6 +560,42 @@ def test_reviewed_partial_extraction_approves_when_the_count_still_holds(
     assert approved == ("approved-reviewed-partial-extraction",)
 
 
+def test_a_reviewed_file_that_recovered_nothing_can_still_be_approved(tmp_path: Path) -> None:
+    """The worst case this inventory records is the one it could not express.
+
+    `_nodes_by_source_file` builds its map from a `Counter`, so a file that
+    produced ZERO nodes is ABSENT from it rather than present as `0`. A bare
+    `.get(path)` therefore returned `None`, and `None == 0` is False — so a
+    reviewed entry recording a total loss could never be approved, no matter how
+    correctly it was registered. Latent when found (every committed entry is >= 1),
+    which is why it needs a test rather than a comment. Cold lane, PR #338.
+    """
+    review = _partial_review(tmp_path, extracted_nodes=0)
+    review = graphify_sdk.ExtractWarningReview(
+        source_name=review.source_name,
+        metadata_inventory=review.metadata_inventory,
+        partial_inventory=review.partial_inventory,
+        extracted_nodes_by_path={},
+    )
+
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    )
+
+    assert approved == ("approved-reviewed-partial-extraction",)
+
+
+def test_a_file_that_recovered_nodes_does_not_match_a_zero_entry(tmp_path: Path) -> None:
+    """CONTROL ARM on the default: absent-means-zero must not mean always-matches."""
+    review = _partial_review(tmp_path, extracted_nodes=0)
+
+    approved = graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    )
+
+    assert approved == ()
+
+
 def test_reviewed_partial_extraction_expires_when_the_parser_recovers_more(
     tmp_path: Path,
 ) -> None:
