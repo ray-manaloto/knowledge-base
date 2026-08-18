@@ -45,6 +45,33 @@ So a green local state can rest on bytes nobody else will ever have:
 are reasoning about cannot be reproduced from committed inputs, it does not
 exist for anyone else.
 
+## A blanket `git add` is DENIED (2026-08-18)
+
+`kb_setup.stage_explicitly` refuses `git add -A` / `--all` / `.` / `:/` at the
+PreToolUse hook, and prints the remedy: name the paths, or `git add -u` for
+tracked modifications only.
+
+**The measurement, because a guard without one is a preference.** In a single
+session `git add -A` swept derived corpus evidence under
+`graphify-out/graphify-semantic-corpus-chunks/` into a commit **three times** —
+the first caught, amended out, and written up before the second and third
+happened. Knowing the rule prevented nothing, which is this repo's recurring
+finding about warnings: the warning-only graph-first rule was complied with **0
+times out of 19**, while the DENY that replaced it took its violations **62 → 0**.
+
+**Why that path and not an ignore rule.** `graphify-out/graphify-semantic-corpus-chunks/`
+is deliberately absent from `.gitignore` and the comment there says why: it is
+retained provider evidence for a run that cost real tokens, and whether to track
+it is the open question in #317. Ignoring it settles that question silently;
+committing it settles it just as silently the other way. Untracked-and-visible is
+the intended state, and a blanket add is the one command that destroys it without
+anyone deciding.
+
+**`git add -u` is deliberately allowed.** It stages modifications to
+already-tracked files and cannot introduce an untracked path, which is the entire
+failure mode — a guard that refused the safe alternative its own message
+recommends would be worse than none.
+
 ## Why this rule is eager (never `paths:`-scoped)
 
 Same class as `zero-skip-policy.md`: it fires when validation is about to run,

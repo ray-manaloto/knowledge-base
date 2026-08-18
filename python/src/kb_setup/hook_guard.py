@@ -280,12 +280,16 @@ def check_hook_call(raw: str) -> Result[str | None]:
         return Ok(None)
     tool_input = payload.get("tool_input") or {}
     if tool_name == "Bash":
-        reason = _graphify_redirect(tool_input)
-        if reason:
-            return Ok(reason)
-        reason = _check_first(tool_input)
-        if reason:
-            return Ok(reason)
+        # ORDER IS THE CONTRACT, so the guards are a sequence rather than three
+        # `if reason: return` blocks — a fourth would have been a fourth return,
+        # and the third already pushed this function past the return-count limit.
+        # Each is STATELESS and they run before the stateful graph-first check;
+        # among themselves the oldest and most specific remedy wins, so a command
+        # that trips two reports the one whose advice is narrower.
+        for guard in (_graphify_redirect, _check_first, _stage_explicitly):
+            reason = guard(tool_input)
+            if reason:
+                return Ok(reason)
     try:
         return Ok(_graph_first(payload, tool_name, tool_input))
     except Exception:
@@ -321,6 +325,25 @@ def _graphify_redirect(tool_input: dict) -> str | None:
         return None
     try:
         return decide(command)
+    except Exception:
+        return None
+
+
+def _stage_explicitly(tool_input: dict) -> str | None:
+    """Deny a blanket `git add`; require the paths be named. Never raises.
+
+    Runs LAST of the three Bash guards, and after `_check_first` rather than
+    before it, because a command doing both wants the older, more specific
+    remedy first. Stateless like the two above it, so it stays ahead of the
+    stateful graph-first check.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import stage_explicitly
+
+        return stage_explicitly.decide(command)
     except Exception:
         return None
 
