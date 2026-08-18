@@ -283,6 +283,9 @@ def check_hook_call(raw: str) -> Result[str | None]:
         reason = _graphify_redirect(tool_input)
         if reason:
             return Ok(reason)
+        reason = _check_first(tool_input)
+        if reason:
+            return Ok(reason)
     try:
         return Ok(_graph_first(payload, tool_name, tool_input))
     except Exception:
@@ -318,6 +321,28 @@ def _graphify_redirect(tool_input: dict) -> str | None:
         return None
     try:
         return decide(command)
+    except Exception:
+        return None
+
+
+def _check_first(tool_input: dict) -> str | None:
+    """Deny a hand-chained lint/typecheck; redirect it to `kb-check`. Never raises.
+
+    Runs AFTER the graphify redirect and BEFORE the graph-first check, and the
+    position is chosen rather than incidental. After graphify, because a hand-run
+    `graphify` must keep reporting its own mise-task redirect rather than being
+    shadowed by this newer one. Before graph-first, because this is a
+    STATELESS verdict about the command in hand while graph-first depends on what
+    the session has done — a cheap, order-independent refusal belongs ahead of a
+    stateful one.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import check_first
+
+        return check_first.decide(command)
     except Exception:
         return None
 

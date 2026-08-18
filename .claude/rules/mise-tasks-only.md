@@ -32,7 +32,7 @@ task (wrapping a `kb_setup` module, per `zero-bash-logic.md`) in the same change
 | eyeballing whether a skill got better, or diffing two transcripts | the committed baseline: `docs/skills/baseline.json` + `README.md`, written by `kb-skill-score -- --write` and shown as a Δ column on every later run |
 | a hand-rolled pre-PR review, or waiting on CodeRabbit | the `kb-review` skill, then `mise run kb-review-receipt` — **both** `kb-ship` and `kb-land` refuse an unreviewed HEAD (one exception: a commit whose ENTIRE delta since the receipt is `graphify-out/memory/**` or `docs/goals/README.md`, so the round's own closing tasks can land — `kb_setup.review.EXEMPT_PATHS`, #66) |
 | `mise run <task> &` (hand-detaching a local task) | the harness background run — a `&`-detached local task gets REAPED when the turn goes idle |
-| `uv run ruff check <file> \| tail -3` (and the ty/pytest forms) — the dev loop | `mise run kb-check -- <paths>` — ruff + format + ty + the paths' own tests, real exit codes, no pipe. `check` is whole-repo and `kb-gates` runs the ship gates; **neither answered "are these two files clean?"**, and that vacuum was filled 35 times in one session by a pipe that discards the gate's rc (2026-08-08) |
+| `uv run ruff check <file> \| tail -3` (and the ty/pytest forms) — the dev loop | `mise run kb-check -- <paths>` — ruff + format + ty + the paths' own tests, real exit codes, no pipe. `check` is whole-repo and `kb-gates` runs the ship gates; **neither answered "are these two files clean?"**, and that vacuum was filled 35 times in one session by a pipe that discards the gate's rc (2026-08-08), then **12 more times** in the round that built the spend caps — which is why it is now a hook DENY (`kb_setup.check_first`) rather than a preference. Pass the TEST file too: `kb-check` lints only the paths you name, so naming the module alone leaves its test unlinted and hk catches it at commit time |
 | `<gate> 2>&1 \| tail -40` | `mise run kb-check` / `kb-gates` as above. The old advice here was `> /tmp/out.log 2>&1; echo "rc=$?"` — **shell logic, in the repo whose first invariant forbids it**, and unfollowable besides: `${PIPESTATUS[0]}` is a BASH array and this shell is zsh, where it expands to empty for a passing and a failing gate alike (armed both ways, zsh 5.9). If you must pipe, zsh spells it `${pipestatus[1]}` |
 | `git status` + `git branch` + `git log` + `gh pr list`, reformatted by hand into a handoff | `mise run kb-session-state` — one task, already handoff-shaped (#144). `-- --no-pr` skips the network call. A failed `gh` lookup prints `COULD NOT ASK`, never `none`; the four raw commands stay fine for ordinary diagnostics. **To COPY the block, use `uv run kb-setup session-state`** — mise redaction mangles the branch, every SHA and every PR number, which is the one case in this table where the task is not the right transport |
 | running the gates one at a time and retyping the exit codes into a handoff | `mise run kb-gates` — runs them and writes `.agent/kb/gates/gates-<sha>.json`, so the claim has a surviving artifact. The `/tmp` form above is still correct for a ONE-OFF gate; what it cannot do is outlive the session (#146) |
@@ -71,6 +71,33 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    installer-generated `.claude/skills/graphify/**` is excluded on
    `md_budget`'s precedent. A glob matching nothing exits **`Rc.NOT_RUN` (127)**, not 0 — a gate
    that never asked the question is not a pass.
+2a. **The SAME hook also denies a HAND-CHAINED GATE** (`kb_setup.check_first`,
+   Ray's ruling 2026-08-17). `uv run ruff check …`, `ruff format …` and
+   `ty check …` are redirected to `mise run kb-check -- <paths>`. It is the third
+   measurement of this rule's thesis: `kb-check` was built because 35 piped gate
+   invocations in one session discarded their exit codes, and the round that
+   built the spend caps then hand-chained the gates **12 more times** while the
+   task sat there unused.
+
+   Scope is narrow on purpose. **`pytest` is deliberately absent** — this rule
+   explicitly permits a single-test `uv run pytest tests/x.py::test_y`, and a
+   guard contradicting the rule it enforces is worse than none. `--version` and
+   `--help` are introspection, not gates — judged per SEGMENT, so another
+   command's `--help` in the same chain cannot excuse the gate beside it.
+   Anything containing `mise run kb-` is allowed outright, because `kb-check`
+   shells out to exactly these tools.
+
+   It **tokenises** (`shlex`) rather than pattern-matching, because a regex sees
+   `ruff check` inside `git commit -m "…ruff check…"` and denies it. Both of the
+   cold review's confirmed false positives on this guard were that shape, and it
+   is the class this rule's own guards have failed on every time. After
+   tokenising, a quoted message is one token and can never sit at a command
+   position; a command `shlex` cannot parse degrades to the older regex rather
+   than opening a hole.
+
+   It runs AFTER the graphify redirect (so a hand-run `graphify` keeps reporting
+   its own remedy) and BEFORE the graph-first check (a stateless verdict belongs
+   ahead of a stateful one).
 2b. **The SAME hook also denies a broad source search before any graph query**
    (`kb_setup.graph_first`, #253) — a second directive, one entry point, so
    `.claude/settings.json` matches `Bash|Grep` for this hook rather than `Bash`.
