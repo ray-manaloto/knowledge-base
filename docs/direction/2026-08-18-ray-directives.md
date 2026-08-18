@@ -286,3 +286,70 @@ And, in the same exchange, on whether to build the proposed selector:
   refutes it, the seam moves and `zero-bash-logic.md`'s reach grows. It is being
   settled against the installed SDKs and this repo's auth and billing model
   before anything is built on either answer.
+
+---
+
+## THIRD ADDENDUM — VERBATIM (Ray, at /clear-prep, 2026-08-18)
+
+**Stored verbatim and DELIBERATELY NOT ANALYSED in the session that received it.**
+Ray's own instruction: *"but just store this verbatim so it is analyzed after
+/clear instead of in this session"*. The analysis, the issue filing and the
+prioritisation are the NEXT session's work, fed by a full session-review sweep
+and the issue aggregation/triage this addendum asks for. Anything below that
+reads like a task is a task for that round, not this one.
+
+> below items need to be prioritized and add github issues if they have not been filed yet and prioritized with the eventual aggregation/triage of github issues
+> - but just store this verbatim so it is analyzed after /clear instead of in this session
+>
+> why did this happen? what did we do differntly than before:
+> - One non-fatal note from the push: upstream tracking wasn't set because origin/docs-directive-addendum didn't exist until that moment. The push and PR both succeeded; if you want tracking, git branch -u origin/docs-directive-addendum.
+>
+> we need to track the last session/transcripts/telemetry that the session-review workflow ran on so that we can identify what is pending the session-review workflow to go through to catch up
+> - but provide the ability to rerun a datetime range or specific session just in case we need to drill down to a specific subset again to gather more information
+>
+>
+> review schemas/*.json and ensure there is no duplication
+> - for example there might be some enums that can be merged into one superset
+> - or reusable classes/structs
+> - always strive for code reuse. even for generated code
+>
+> you were instructed to update antigravity-cli to the latest version (1.1.14) for antigravity reviews
+>
+> and note if it is lost, it is ok to be less strict on hk/ruff/ty/linter/static analysis/type checks on generated code once due dilligence has been done and there is no other way
+> - but we need to be on the latest versions of the tools and the linters/static analysis/type checks libraries also
+>
+> and we haven't been enforcing the automated /clear-prep step when we hit over 20% of the running model's context
+> - which for opus 5 is 200K tokens
+>
+>
+> i am seeing commands like this in the session:
+> mise run fmt >/dev/null 2>&1; mise run kb-check -- python/src/kb_setup/handoff_reconcile.py python/src/kb_setup/handoff.py tests/test_handoff_reconcile.py tests/test_handoff.py 2>&1 | tail -14
+>
+> or
+>
+> git status --porcelain | head -3; mise run kb-ship > /tmp/ship.log 2>&1; echo "kb-ship rc=$?"; tail -20 /tmp/ship.log
+>
+> this is not following my requirements of:
+> 1. using a universal logger that includes stdout/stderr so that all output is durable and nothing can be silently dropped and can always be reviewed
+>    - especially for the session-review workflow
+> 2. these should be wrapped as a skill that call modular skills
+>    - the same for mise tasks and python library modules/functions
+>    - should be flexible by providing arguments/parameters to control behaviour
+>    - i shouldnt be the one catching this. the session review workflow should have been flagging this
+>
+> and we need to make sure we address all pr bot reviews
+>
+> and there are plenty more instructions/requirements missing that a true session-review of all the sessions and the aggregation/triage of github issues will unfold that we need to fix and/or implement
+
+---
+
+## Provenance of the third addendum, and nothing more
+
+The only annotation this addendum gets, because Ray scoped the analysis out of
+this session: the commands he quotes are REAL and were run by this session, at
+the times the transcript records. They are not hypothetical examples. The second
+one is the `kb-ship` invocation of 2026-08-18, and the first is one of several
+`mise run fmt >/dev/null 2>&1; …` chains.
+
+That matters for the next round's sweep: the evidence is in this round's own
+transcript, and `mise run kb-session-select -- --current` resolves it.
