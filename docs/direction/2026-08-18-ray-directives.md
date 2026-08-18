@@ -99,3 +99,99 @@ left in a transcript, which is the whole subject of item 1.
   chose the widest option explicitly, over "graphify first" and over "graphify plus the
   gate toolchain". So the gate does not lift until every pin above is resolved, and
   `skillopt`'s NOT-CHECKED state is part of that resolution rather than an exception.
+
+---
+
+## ADDENDUM — VERBATIM (Ray, same day, after PR #339 landed)
+
+> add this to what needs to be handled in the next session after running /clear
+>
+> these need to be added as critical currency dependencies if they have not been added already and must always be on the latest version:
+> - uv
+> - hk
+> - github:agent-sh/agnix
+> - fnox
+> - doppler
+> - antigravity-cli
+> - codex
+> - from pyproject.toml:
+>   - anthropic
+>   - graphifyy
+>   - msgspec
+>   - skillopt
+>   - datamodel-code-generator
+>   - ruff
+>   - ty
+>   - structlog
+>   - trafilatura
+>   - pytest
+>   - pytest-xdist
+> - provide/suggest other dependencies that are at the core of what this project is working on that needs expert knowledge
+>
+> review if we use rumdl right now and/or if we should
+> - if not needed, just remove from mise.toml for now and any other references to it
+>
+> - we should replace gitleask with betterleaks
+>   - we can start w adding it as another hk builtin and run it in parallel with gitleaks until we are 100% confident we are losing features
+>
+> add this as another hk builtin checker for the project:
+> - https://github.com/mongodb/kingfisher
+>
+> - create a workflow that revieews every hk builtins (do not skip)
+>   - asses which ones we are missing for this project
+>   - if multiple exist that provide the samw functionality it should pick the native/system one (rust/c++/etc)
+>     - for example we should replace gitleaks with betterleaks
+>   - each hk builtin we use becomes a critical currency depenency
+>
+> the output of these commands should never show anything stale at the top level:
+> - mise outdated -b -J
+> - uv tree --outdated --show-sizes --all-groups --format json
+>
+>
+> can kb-arms be run in parallel?
+
+### The answer to the question, measured
+
+**Not today, and one of the two reasons is fundamental rather than a missing flag.**
+
+`kb_setup.arms` runs a strictly serial `for arm in ordered:` loop
+(`arms.py:466`), and each arm **edits the working tree in place**, runs the
+suite, then restores. Two arms in flight would be mutating the same files at the
+same time, so their verdicts would describe a tree neither of them wrote. That is
+not a concurrency setting; it is the design.
+
+Two directions that WOULD work and are worth pricing next round:
+
+1. **Parallelise INSIDE each arm.** `_PYTEST_FLAGS` is
+   `("-q", "--no-header", "-rf", "-p", "no:cacheprovider")` — no `-n auto`, while
+   `mise run test` uses it. On a 5-arm spec over two large corpus suites this
+   session, each arm took minutes; xdist would cut the wall clock per arm without
+   touching the serial invariant. The caution is real though: this repo has
+   already been bitten by a wall-clock assertion that passed alone and failed
+   under `-n auto`, so a suite with timing-sensitive tests must be measured, not
+   assumed.
+2. **Parallelise ACROSS arms in isolated worktrees.** One git worktree per arm
+   removes the shared-tree problem entirely, at ~200-500 ms and a disk copy each.
+   That is the honest way to get across-arm parallelism, and it is exactly what
+   `Agent`'s `isolation: "worktree"` does for subagents.
+
+Neither is a one-line change, so both are recorded here rather than attempted at
+the end of a long session.
+
+### What this addendum adds to the next round's list
+
+- **A named currency roster**, 18 entries, that must be tracked and current —
+  most are not in `currency.toml` today, which tracks 4 of ~14 pins.
+- **Two new top-level staleness gates**: `mise outdated -b -J` and
+  `uv tree --outdated --show-sizes --all-groups --format json` must both come
+  back clean at the top level.
+- **`rumdl`: decide use-or-remove.** It runs today as two hk steps
+  (`rumdl`, `rumdl_format`) over 188 files.
+- **`gitleaks` -> `betterleaks`**, added in PARALLEL first and only swapped once
+  no feature loss is confirmed. Note this repo's gitleaks scope is load-bearing:
+  `.gitleaks.toml` and `hk.pkl`'s `proseExclude` are what keep the
+  review-exempt paths scanner-visible, and two tests pin that.
+- **`mongodb/kingfisher`** as an additional hk builtin.
+- **A workflow that reviews EVERY hk builtin** — no skipping — proposing the ones
+  this project lacks, preferring the native/system implementation where several
+  overlap, and promoting every adopted builtin to a tracked currency dependency.
