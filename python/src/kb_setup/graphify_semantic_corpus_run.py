@@ -66,6 +66,7 @@ from pathlib import Path
 import msgspec
 
 from kb_setup import (
+    atomic,
     graphify_semantic_adapter,
     graphify_semantic_corpus,
     graphify_semantic_slice,
@@ -137,26 +138,120 @@ class _SpendCapError(Exception):
     """
 
 
+#: Where the cumulative spend total lives BETWEEN runs, beside the staged chunks
+#: rather than in the run's temporary evidence directory.
+SPEND_LEDGER = "spend-ledger.json"
+
+
+class SpendLedger(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """The durable running total for one plan's namespace."""
+
+    total_usd: float
+    charges: int
+    schema_version: int = 1
+
+
+def read_spend_ledger(namespace_dir: Path) -> float:
+    """The spend already charged against this plan, across every previous run.
+
+    An unreadable or malformed ledger returns 0.0 rather than raising, on
+    ``observed_spend_usd``'s precedent — but the two defaults point OPPOSITE
+    ways and that is deliberate. There, an unreadable record can only make the
+    total too low, which delays the cap. Here it does the same, so this is the
+    one place a corrupt file is dangerous: say so rather than hide it. The
+    alternative — refusing to run at all on a stray byte — would make a
+    resumable run unresumable, which is the failure this ledger exists to fix.
+    """
+    path = namespace_dir / SPEND_LEDGER
+    try:
+        return msgspec.json.decode(path.read_bytes(), type=SpendLedger, strict=True).total_usd
+    except OSError, msgspec.DecodeError, msgspec.ValidationError:
+        return 0.0
+
+
 class _Spend:
-    """Running provider spend for one pass, against the plan's cumulative cap.
+    """Running provider spend for one plan, against its cumulative cap.
 
     Mutable and un-frozen on purpose — it is the one thing in this module that
     accumulates. It exists because nothing summed anything: the plan capped
     ``max_cost_usd`` PER CHUNK and ``--max-budget-usd`` per provider invocation,
     so 58 chunks each individually within authority could spend far past any
     total anyone had approved.
+
+    FOR ONE PLAN, NOT ONE PROCESS, and that distinction is the whole reason this
+    class writes to disk. The first version seeded at 0.0 and summed records
+    living in a ``TemporaryDirectory``, so both halves of the accounting died
+    with the process: a run interrupted at chunk 30 — a crash, a timeout, a
+    closed laptop, a SIGKILL — resumed with a fresh cap and could spend the whole
+    limit again. Measured on the first real chunk: three restarts is three times
+    the approved total, and nothing on disk would have said so, because
+    ``ChunkStageReceipt`` carries no cost field either. The 58-chunk run takes
+    ~10.6 h at concurrency 1, which makes a restart the expected case rather than
+    the unlucky one.
     """
 
-    def __init__(self, limit_usd: float) -> None:
+    def __init__(self, limit_usd: float, ledger_dir: Path | None = None) -> None:
         self.limit_usd = limit_usd
-        self.total_usd = 0.0
+        self.ledger_dir = ledger_dir
+        self.carried_usd = read_spend_ledger(ledger_dir) if ledger_dir is not None else 0.0
+        self.total_usd = self.carried_usd
+        self.charges = 0
 
     def charge(self, amount: float) -> None:
         self.total_usd += amount
+        self.charges += 1
+        self._persist()
+
+    def _persist(self) -> None:
+        """Write the running total through before the next call can be made.
+
+        Written on EVERY charge rather than at the end, for the same reason the
+        ledger exists at all: a total that is only durable once the run finishes
+        is not durable on the runs that do not.
+        """
+        if self.ledger_dir is None:
+            return
+        self.ledger_dir.mkdir(parents=True, exist_ok=True)
+        atomic.write_text(
+            self.ledger_dir / SPEND_LEDGER,
+            msgspec.json.encode(
+                SpendLedger(total_usd=self.total_usd, charges=self.charges)
+            ).decode()
+            + "\n",
+        )
 
     @property
     def exceeded(self) -> bool:
         return self.total_usd > self.limit_usd
+
+
+def seeded_spend(limit_usd: float, ledger_dir: Path) -> _Spend:
+    """Build the cap seeded from this plan's durable ledger, and refuse a spent one.
+
+    A standalone function rather than three lines inside `execute`, for the reason
+    this repo has recorded twice: `execute` is invoked by no test — it needs a real
+    plan, a real clone and a real provider — so anything living inside it is
+    unarmed by construction. An armed decision with an unarmed consumer is the
+    shape that ships. Here the decision IS the consumer, so it is put somewhere a
+    fixture can reach.
+
+    The already-exceeded refusal is not decoration. It is the case a resumable cap
+    creates: a run that hit the cap at chunk 40 and was restarted must refuse
+    BEFORE the first provider call, not discover it after paying for chunk 41.
+    """
+    ledger_dir_str = str(ledger_dir)
+    spend = _Spend(limit_usd, ledger_dir)
+    if spend.carried_usd:
+        print(
+            f"[corpus] resuming against {spend.carried_usd:.2f} USD already charged to this "
+            f"plan (cap {spend.limit_usd:.2f}); ledger {ledger_dir_str}/{SPEND_LEDGER}"
+        )
+    if spend.exceeded:
+        raise _SpendCapError(
+            f"cumulative provider spend {spend.total_usd:.2f} USD already exceeds the plan's "
+            f"max_total_cost_usd of {spend.limit_usd:.2f} USD — no chunk was run"
+        )
+    return spend
 
 
 def observed_spend_usd(boundary_dir: Path) -> float:
@@ -984,7 +1079,7 @@ def execute(
         # hole in the corpus reported as `skipped=0`.
         visited: set[int] = set()
 
-        spend = _Spend(config.max_total_cost_usd)
+        spend = seeded_spend(config.max_total_cost_usd, context.cache_root / context.run_namespace)
 
         def on_chunk_done(index: int, total: int, raw: object) -> None:
             """Admit one chunk, charge what it spent, and stop if that exhausts the cap.

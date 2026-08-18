@@ -1237,3 +1237,80 @@ def test_the_completeness_gate_answers_both_questions(
     invite a re-run that could only produce the same answer.
     """
     assert graphify_semantic_corpus.completeness_rc(_summary(**overrides)) == rc
+
+
+# --- the cumulative spend cap must outlive the PROCESS (2026-08-17) -----------
+#
+# Found on the first real chunk. `_Spend` seeded at 0.0 and summed records living
+# in a `TemporaryDirectory`, so both halves of the accounting died with the
+# process: a run interrupted at chunk 30 resumed with a fresh cap. Three restarts
+# is three times the approved total, and nothing on disk would have said so —
+# `ChunkStageReceipt` carries no cost field either (grepped: no cost/spend/usd).
+
+
+def test_spend_survives_a_restart(tmp_path: Path) -> None:
+    """The whole point: a second process must inherit the first one's total."""
+    first = graphify_semantic_corpus_run.seeded_spend(100.0, tmp_path)
+    assert first.carried_usd == 0.0
+    first.charge(7.5)
+    first.charge(2.5)
+
+    second = graphify_semantic_corpus_run.seeded_spend(100.0, tmp_path)
+
+    assert second.carried_usd == 10.0
+    assert second.total_usd == 10.0
+
+
+def test_spend_is_persisted_on_every_charge_not_at_the_end(tmp_path: Path) -> None:
+    """A total that is only durable once the run finishes is not durable.
+
+    The runs that need this are exactly the ones that do not finish.
+    """
+    spend = graphify_semantic_corpus_run.seeded_spend(100.0, tmp_path)
+    spend.charge(3.0)
+
+    assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path) == 3.0
+
+    spend.charge(4.0)
+
+    assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path) == 7.0
+
+
+def test_an_already_spent_plan_refuses_before_the_first_call(tmp_path: Path) -> None:
+    """The case a resumable cap creates, and the reason it is not just a seed.
+
+    A run that hit the cap at chunk 40 and was restarted must refuse before any
+    provider call, not discover it after paying for chunk 41.
+    """
+    spent = graphify_semantic_corpus_run.seeded_spend(10.0, tmp_path)
+    spent.charge(11.0)
+
+    with pytest.raises(Exception, match="already exceeds"):
+        graphify_semantic_corpus_run.seeded_spend(10.0, tmp_path)
+
+
+def test_a_different_plan_starts_its_own_total(tmp_path: Path) -> None:
+    """CONTROL ARM: the ledger is scoped to the run namespace, not the machine.
+
+    A re-planned corpus gets a different namespace and a fresh cap, which is
+    correct — a new plan is a new authorization. Without this the fix would turn
+    the cap into a permanent one-time budget for the repository.
+    """
+    graphify_semantic_corpus_run.seeded_spend(100.0, tmp_path / "plan-a").charge(60.0)
+
+    other = graphify_semantic_corpus_run.seeded_spend(100.0, tmp_path / "plan-b")
+
+    assert other.carried_usd == 0.0
+
+
+def test_an_unreadable_ledger_reads_as_zero_rather_than_raising(tmp_path: Path) -> None:
+    """Documented direction, stated because it is the dangerous one.
+
+    A corrupt ledger under-reports and so DELAYS the cap. The alternative —
+    refusing to run on a stray byte — makes a resumable run unresumable, which is
+    the failure this ledger exists to fix.
+    """
+    (tmp_path / graphify_semantic_corpus_run.SPEND_LEDGER).write_text("{ not json")
+
+    assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path) == 0.0
+    assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path / "absent") == 0.0
