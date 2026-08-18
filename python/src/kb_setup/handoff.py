@@ -749,6 +749,20 @@ def check_for_branch(repo_root: Path, branch: str | None) -> BranchHandoff:
         )
 
     findings = check(repo_root, text)
+    # RECONCILE HERE TOO, and this line is the one bb19a0ec's commit message
+    # claimed already existed. It did not: reconcile was wired only into
+    # `check_handoff` (the CLI), while `kb-ship` gates through THIS function, so
+    # the message's "that blocks kb-ship, which is the intended behaviour" was
+    # false when written. Found by the advisor review, not by a test — no test
+    # could have found it, because the only end-to-end arm went through the CLI
+    # path that already worked.
+    #
+    # Wiring rather than retracting, because the blast radius is already bounded
+    # by the SKIP above: this runs only for the newest handoff AND only when it
+    # records the branch being shipped. A handoff describing another branch — the
+    # ordinary case, since /clear-prep writes it after the round — never reaches
+    # here at all.
+    findings.extend(_reconcile_findings(repo_root, newest, text))
     broken = any(f.verdict is Verdict.FAIL for f in findings)
     return BranchHandoff(
         Coverage.BROKEN if broken else Coverage.OK,

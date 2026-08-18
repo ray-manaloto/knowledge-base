@@ -67,8 +67,13 @@ def test_the_gate_fails_the_generated_handoff_and_says_why() -> None:
 
     `handoff.check` passed this document at 20 OK / 0 broken while it was missing
     seven owed items — a validator nothing calls is not a gate, and neither is one
-    wired to the wrong entry point. This drives `check_handoff`, the function
-    `mise run kb-handoff-check` and `kb-ship` actually run.
+    wired to the wrong entry point.
+
+    This drives `check_handoff`, which is the CLI path ONLY. The claim this
+    docstring first made — "the function kb-handoff-check and kb-ship actually
+    run" — was half wrong: `kb-ship` gates through `check_for_branch`, a
+    different function that did not reconcile at all. Both are now wired and
+    `test_check_for_branch_reconciles_too` covers the other one.
     """
     result = handoff.check_handoff([str(GENERATED)], REPO)
     assert isinstance(result, handoff.Ok)
@@ -172,6 +177,96 @@ def test_no_earlier_handoff_is_unverifiable_not_a_pass(tmp_path: Path) -> None:
     done = hr.reconcile(tmp_path, only, only.read_text(encoding="utf-8"))
     assert done.previous is None
     assert done.checked == 0
+
+
+def test_a_sub_heading_does_not_end_the_owed_section() -> None:
+    """The 43% silent miss: a `###` under `## Owed` used to exit scope.
+
+    Measured across the 14 real handoffs on disk, before/after this fix, by
+    counting commitments: 6->9, 9->13, 10->20, 8->9, 7->19, 6->16. The worst was
+    checking SEVEN of nineteen commitments and reporting a clean pass — the
+    false-CARRIED class this module's own docstring calls strictly worse.
+    """
+    previous = (
+        "# h\n\n## Owed and not done\n\n"
+        "- `first-thing` is owed.\n\n"
+        "### A sub-heading, which used to end the section\n\n"
+        "- `second-thing` is also owed.\n\n"
+        "## What shipped\n\n- `third-thing` landed.\n"
+    )
+    named = {
+        t.lower()
+        for d in hr.dropped(previous, "# next\n", previous_name="p")
+        for t in d.commitment.tokens
+    }
+    assert "first-thing" in named
+    assert "second-thing" in named, "the sub-heading ended the owed section"
+    assert "third-thing" not in named, "a non-owed section leaked into scope"
+
+
+def test_an_issue_ref_does_not_match_a_longer_number() -> None:
+    """`#66` must not be cleared by `#663` — the silent direction again.
+
+    A NAME may legitimately appear inside a longer name, so name matching stays a
+    substring test. A number may not, so issue refs get a boundary. Both halves
+    are asserted, because fixing one direction and breaking the other is how this
+    module's token rule went wrong twice already.
+    """
+    assert not hr._names("we closed #663 today", "#66")
+    assert hr._names("we closed #66 today", "#66")
+    assert hr._names("mise run kb-update -- agent-harness-docs", "agent-harness-docs")
+
+
+def test_check_handoff_reports_reconcile_in_a_fresh_clone(tmp_path: Path) -> None:
+    """End-to-end through the CLI path, WITHOUT the gitignored real pair.
+
+    The only e2e arm was `@real_pair`-skipped, so deleting the wiring line left
+    the fresh-clone suite green — a validator nothing calls, in a module written
+    about exactly that. (Advisor review, JOB 1 finding 3.)
+    """
+    plans = tmp_path / ".agent" / "plans"
+    plans.mkdir(parents=True)
+    import os
+
+    old, new = plans / "session-2026-01-01-a.md", plans / "session-2026-01-02-b.md"
+    old.write_text("# h\n\n## Owed and not done\n\n- `kb-update -- agent-harness-docs`\n", "utf-8")
+    new.write_text("# h\n\n- **branch**: `x`\n\n## Owed\n\n- nothing carried.\n", "utf-8")
+    for i, p in enumerate((old, new)):
+        os.utime(p, (1_700_000_000 + i * 60, 1_700_000_000 + i * 60))
+
+    result = handoff.check_handoff([str(new)], tmp_path)
+    assert isinstance(result, handoff.Ok)
+    fails = [f for f in result.value.findings if f.check == "reconcile"]
+    assert any(f.verdict is handoff.Verdict.FAIL for f in fails), (
+        "the CLI path ran no reconciliation"
+    )
+
+
+def test_check_for_branch_reconciles_too(tmp_path: Path) -> None:
+    """The path `kb-ship` ACTUALLY runs — which bb19a0ec wrongly claimed it did.
+
+    `pr.py` gates through `check_for_branch`, not `check_handoff`. Reconcile was
+    wired only into the latter, so the commit message's "that blocks kb-ship"
+    was false when written and no test could have caught it: the only e2e arm
+    went through the path that already worked.
+    """
+    plans = tmp_path / ".agent" / "plans"
+    plans.mkdir(parents=True)
+    import os
+
+    old, new = plans / "session-2026-01-01-a.md", plans / "session-2026-01-02-b.md"
+    old.write_text("# h\n\n## Owed and not done\n\n- `kb-update -- agent-harness-docs`\n", "utf-8")
+    new.write_text("# h\n\n- **branch**: `feat/x`\n\n## Owed\n\n- nothing carried.\n", "utf-8")
+    for i, p in enumerate((old, new)):
+        os.utime(p, (1_700_000_000 + i * 60, 1_700_000_000 + i * 60))
+
+    got = handoff.check_for_branch(tmp_path, "feat/x")
+    assert got.coverage is handoff.Coverage.BROKEN, "kb-ship's path did not reconcile"
+    assert any(f.check == "reconcile" for f in got.findings)
+
+    # The SKIP still bounds it: a handoff naming another branch never reaches here.
+    skipped = handoff.check_for_branch(tmp_path, "feat/other")
+    assert skipped.coverage is not handoff.Coverage.BROKEN
 
 
 def test_the_previous_handoff_is_strictly_older(tmp_path: Path) -> None:

@@ -211,7 +211,19 @@ def _sections(text: str) -> list[tuple[str, str]]:
     marks = list(_HEADING.finditer(text))
     out: list[tuple[str, str]] = []
     for i, m in enumerate(marks):
-        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        # A section runs to the next heading of the SAME OR HIGHER level, not to
+        # the next heading of ANY level. Ending at any heading was a measured
+        # 43% silent false negative: 6 of the 14 real handoffs on disk put a
+        # `###` under their `##` owed or next-task heading, and every commitment
+        # below that sub-heading fell out of scope unchecked — reported as a
+        # clean pass, which is the false-CARRIED class this module's own
+        # docstring calls "strictly worse". (Advisor review, JOB 1 finding 2.)
+        level = len(m.group(1))
+        end = len(text)
+        for later in marks[i + 1 :]:
+            if len(later.group(1)) <= level:
+                end = later.start()
+                break
         out.append((m.group(2), text[m.end() : end]))
     return out
 
@@ -377,8 +389,28 @@ def dropped(previous_text: str, new_text: str, *, previous_name: str) -> list[Dr
     return [
         Dropped(commitment=c, previous=previous_name)
         for c in commitments(previous_text)
-        if not any(t.lower() in haystack for t in c.tokens)
+        if not any(_names(haystack, t) for t in c.tokens)
     ]
+
+
+def _names(haystack: str, token: str) -> bool:
+    """Does ``haystack`` mention ``token``?
+
+    Substring for a NAME: a handoff writing `kb-update -- agent-harness-docs`
+    must satisfy a commitment recorded as `agent-harness-docs`, and a
+    word-boundary test would refuse it. The looser test is the right direction
+    for names — this gate's credibility depends on not crying wolf, and a token
+    appearing inside a longer name HAS been carried.
+
+    WORD-BOUNDARY for an ISSUE REFERENCE, because the same looseness inverts
+    there: `#66` is a substring of `#663`, so a handoff mentioning an unrelated
+    issue would clear a commitment about #66 — a false CARRIED, the silent
+    direction. A number has no longer legitimate form the way a name does.
+    (Advisor review, advisory finding.)
+    """
+    if token.startswith("#"):
+        return re.search(rf"{re.escape(token)}(?!\d)", haystack) is not None
+    return token in haystack
 
 
 def previous_handoff(repo_root: Path, target: Path) -> Path | None:
