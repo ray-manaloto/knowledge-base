@@ -421,8 +421,8 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # it, which is the gate working; the ordering rule is how not to need it.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"88ed68a5e0c483019b64ac6e903440251766d6982a94f9148d446ce25ba4218c",'
-    b'"execution_config_sha256":"d8b1211447b7d7f14da41e9b4543729eb2b8e172ddb9e18971f4e72317530def",'
+    b'"execution_config_sha256":"8e43be121dc5944ac63a919fb9428d05af726d45691534e88ba7eed6d1432ea0",'
     b'"exclusions_sha256":"fac4b2c398c7c852419ed9436c742afcec4aab2481091e8f63d1e5d6454e2cc7",'
-    b'"plan_manifest_sha256":"d0869047be2ca2c63a2260be967a1c4a4287954d1b626cc001c858da718d031b",'
+    b'"plan_manifest_sha256":"d2b1ac94e5d9ec2e89e35307271194e48423f8ee177dee382f55d25c9696e4d5",'
     b'"schema_version":1}\n'
 )

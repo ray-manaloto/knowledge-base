@@ -265,3 +265,51 @@ def test_this_repos_bindings_all_resolve_to_a_real_anchor():
         assert path.exists(), f"{binding.label}: bound file does not exist"
         found = re.search(binding.pattern, path.read_text(encoding="utf-8"))
         assert found is not None, f"{binding.label}: pattern reaches no anchor"
+
+
+def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
+    """The suite must SEE a ref-binding drift, not just that patterns match.
+
+    `test_this_repos_bindings_all_resolve_to_a_real_anchor` above asserts each
+    pattern reaches an anchor, which is its own claim and a real one. But nothing
+    asserted the anchors AGREE — so the suite went 18/18 green while
+    `kb-currency-check` reported the graphify bindings in DRIFT, and the
+    disagreement was visible only to whoever happened to run the check by hand
+    (cold review round 2 of the 0.9.46 bump).
+
+    So this asserts the live verdict, with the ONE deliberate exception named
+    rather than tolerated in general:
+
+    `graphify_semantic_slice.SOURCE_REF`/`SOURCE_COMMIT` are the authority for a
+    COMMITTED SLICE RECEIPT. That module's own comment forbids advancing them
+    "as part of a pin bump on its own, which would assert an identity the
+    evidence contradicts" — they may move only when the slice re-runs and
+    produces a new receipt. Every OTHER binding must track the manifest, and any
+    new laggard fails here instead of waiting for someone to run the check.
+    """
+    from pathlib import Path
+
+    from kb_setup.currency import sync
+
+    repo_root = Path(__file__).resolve().parents[1]
+    spec = next(s for s in config.load(repo_root) if s.name == "graphify")
+    finding = sync._check_ref_bindings(repo_root, spec)
+
+    if finding.status == sync.OK:
+        return  # the slice has been re-run and everything agrees; nothing to permit
+
+    allowed = "python/src/kb_setup/graphify_semantic_slice.py"
+    # Strip the trailing "(ref)"/"(commit)" qualifier AND the detail's leading
+    # prose: the FIRST segment reads "the repo disagrees … — <path>", so a naive
+    # split names the sentence instead of the file and the failure message reads
+    # like a parser bug rather than a finding.
+    lagging = {
+        part.split(" (", 1)[0].rsplit("— ", 1)[-1].strip()
+        for part in finding.detail.split(";")
+        if " reads " in part
+    }
+    unexpected = {p for p in lagging if not p.endswith(allowed)}
+    assert not unexpected, (
+        "only the slice's frozen receipt bindings may lag the manifest; these "
+        f"also lag and must be advanced with the pin: {sorted(unexpected)}"
+    )

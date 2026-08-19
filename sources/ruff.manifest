@@ -4,12 +4,12 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: pyproject.toml `[dependency-groups] dev` EXACT pin `ruff==0.16.1`,
+#   version source: pyproject.toml `[dependency-groups] dev` EXACT pin `ruff==0.16.3`,
 #                   confirmed against `uv run ruff --version`. It was a floor
 #                   (`ruff>=0.11`) when this manifest was written; the group moved to
 #                   exact pins, so the old wording named a constraint that no longer
 #                   exists and would send the next bumper to the wrong line.
-#   pinned here:    0.16.1
+#   pinned here:    0.16.3
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every

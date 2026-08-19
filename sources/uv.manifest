@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] uv`
-#   pinned here:    0.12.2
+#   pinned here:    0.12.5
 # Cross-checkable without trusting this file: `uv --version` prints the tag's own
 # short commit (`46ead6098`), so binary and pin verify against each other — the
 # same property ty has and ruff does not.

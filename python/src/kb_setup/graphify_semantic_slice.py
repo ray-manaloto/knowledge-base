@@ -338,14 +338,32 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # The wheel/sdist digests DID move, because the distribution is a new build; they
 # are read from `uv.lock`, which is the same source `graphify_baseline` derives
 # them from rather than a second opinion about the same artifact.
+# ADVANCED to 0.9.46, and the distinction from `_ACCEPTED_GRAPHIFY_RUNTIME`
+# above is the whole point: that one is FROZEN EVIDENCE about a receipt that
+# already happened and may not move until the slice re-runs; this one is the
+# runtime a non-authority run may additionally use, i.e. what is INSTALLED. So
+# the pin bump moves this and must not move that.
+#
+# Leaving it behind was a LIVE break, not a cosmetic lag — the comment at the
+# pairing site below says so in advance: "a literal left beside a newer runtime
+# makes the pair unmatchable and the non-authority path rejects every run under
+# the installed version." Found by the cold lane's round 2; the ref-binding
+# check reported DRIFT and its own test could not (see
+# tests/test_currency_ref_bindings.py).
+#
+# All three digests MEASURED against the installed 0.9.46 via
+# `graphify_baseline.runtime_identity`, not carried:
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.45 -> 0.9.46 — the public SDK
+# surface is identical — while the wheel and sdist digests moved because the
+# distribution is a new build.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.45",
-    cli_version="0.9.45",
-    sdk_version="0.9.45",
+    version="0.9.46",
+    cli_version="0.9.46",
+    sdk_version="0.9.46",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
-    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
+    wheel_sha256="35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
+    sdist_sha256="9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
 )
 # The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
 # authority for it — `_receipt_reasons` compares the retained receipt against
@@ -1269,7 +1287,7 @@ def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> li
             # the non-authority path rejects every run under the installed
             # version.
             (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),
-            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.45"),
+            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.46"),
         )
     )
     accepted_graphify_runtimes = tuple(pair[0] for pair in accepted_graphify_pairs)
