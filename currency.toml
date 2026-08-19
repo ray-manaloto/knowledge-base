@@ -1659,8 +1659,29 @@ retires (1), and nothing retires (2) short of a version-sorted listing."""
 # MEASUREMENT, not an absence: all three generators were re-run at 0.74.0 and
 # `git diff --stat python/src/kb_setup/generated/` came back EMPTY. That probe
 # discriminates — the same command failed loudly minutes earlier at the version
-# guard. None of the three passes `--additional-imports`, `--extra-template-data`
-# or a custom template dir, which is why the output is stable.
+# guard.
+#
+# ⚠️ THE STRUCTURAL CLAIM THAT USED TO SIT HERE WAS FALSE, and it was written
+# while CORRECTING a different false claim four lines up. It read "none of the
+# three passes `--additional-imports`, `--extra-template-data` or a custom
+# template dir". All three DO pass `--custom-template-dir`
+# (`schemas/generate_*.py`, one call site each), and the cold lane caught it in
+# round 2 — a correction can be wrong twice, and the replacement sentence gets
+# LESS scrutiny than the one it replaces.
+#
+# What is TRUE, and it is stronger: `schemas/templates/` supplies
+# `msgspec.jinja2` and `Enum.jinja2`, and the output type is `msgspec.Struct` —
+# so that directory provides the ROOT template, not just includes. 0.73.0 states
+# that "trusted custom root templates (`--custom-template-dir` providing the root
+# template) keep the previous unrestricted raw behavior", and its
+# include-only-directory change explicitly does NOT reach a directory that
+# supplies the root. So this repo is on the path 0.73.0 left alone, by
+# construction rather than by luck.
+#
+# The two claims that ARE structural and ARE checked: none of the three passes
+# `--additional-imports` or `--extra-template-data`, which is what the other two
+# breaking changes key on. Verified by grep across `schemas/*.py`, zero hits
+# against a control of three hits for `--custom-template-dir` in the same files.
 #
 # Each generator pins its own `GENERATOR_VERSION` and refuses to run under a
 # different one, so a bump MUST move four places at once: this row, the

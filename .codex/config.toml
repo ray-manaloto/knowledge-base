@@ -4,6 +4,12 @@ inherit = "core"
 [shell_environment_policy.set]
 CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD = "1"
 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
+CLAUDE_CODE_ENABLE_TELEMETRY = "1"
+OTEL_LOG_USER_PROMPTS = "1"
+OTEL_LOG_ASSISTANT_RESPONSES = "1"
+OTEL_LOG_TOOL_DETAILS = "1"
+OTEL_LOG_TOOL_CONTENT = "1"
+OTEL_LOG_RAW_API_BODIES = "file:.agent/telemetry/"
 
 [mcp_servers.graphify]
 url = "https://api.graphify.com/mcp"

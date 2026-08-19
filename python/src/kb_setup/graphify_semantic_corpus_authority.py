@@ -419,10 +419,62 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # `graphify_semantic_slice.py`, and `execution_config_sha256` /
 # `plan_manifest_sha256` both drifted before the commit was made. The gate caught
 # it, which is the gate working; the ordering rule is how not to need it.
+# RE-RECORDED 2026-08-19 (h), for the graphify v0.9.46 -> v0.9.47 currency bump.
+# **NO NEW JUDGEMENT.** Every decision field is unchanged and that was VERIFIED
+# field by field against the previous plan rather than asserted:
+#
+#     max_total_cost_usd        100.0  ->  100.0
+#     max_cost_usd               25.0  ->   25.0
+#     claude_max_output_tokens  64000  ->  64000
+#     timeout_seconds             900  ->    900
+#     concurrency                   1  ->      1
+#     max_turns                     3  ->      3
+#
+# FOURTEEN of 44 fields moved, and every one is IDENTITY:
+#
+# * `graphify_ref` / `graphify_commit` / `graphify_tree` / `graphify_version` /
+#   `graphify_runtime` — the pin, and its wheel and sdist digests, which move
+#   because the distribution is a new build. `sdk_fingerprint_sha256` is
+#   UNCHANGED (b10406f9…), the same value 0.9.45 and 0.9.46 both recorded, so
+#   the public SDK surface is identical at all three.
+# * `graphify_llm_sha256` — 0.9.47 fixes an `AttributeError: 'ThinkingBlock'`
+#   crash when an extended-thinking response leads with a thinking block
+#   (#2697). That is the CLAUDE backend, i.e. the only backend this repo
+#   permits, so it is a reason to adopt rather than a risk.
+# * `claude_version` / `claude_executable_sha256` 2.1.235 -> 2.1.236 — `claude`
+#   self-updated in place. The `--help` digest did NOT move, so every flag this
+#   path depends on is spelled identically.
+# * `planner_sha256`, `semantic_slice_sha256`, and the four digests derived from
+#   the plan's own members — ordinary code identity, the case this file's
+#   doctrine describes.
+#
+# BOTH DECISION-BEARING FILES MOVED THIS TIME, which is a first for this file and
+# is why each was diffed rather than re-digested:
+#
+# * `exclusions.json` — ONLY `source_commit` and `source_tree` changed. Every
+#   exclusion ENTRY is byte-identical, so no scope question is re-opened.
+# * `advisories.json` — `detector_git_object` (the detect.py blob, whose diff is
+#   read at `_ACCEPTED_GRAPHIFY_DETECT_OBJECT` in `graphify_semantic_corpus.py`
+#   and touches no detection logic) plus the OBSERVED census: 798 -> 803 files
+#   and 1,406,076 -> 1,415,411 words. Both thresholds — 500 files, 500,000 words
+#   — are unchanged. An observation moving is not a decision moving.
+#
+# WORKLOAD: 474 -> 475 admitted units, still 58 chunks, `detected_source_count`
+# unchanged at 374. Worth stating because it is not predictable from the release
+# diff: upstream added FIVE files, all `tests/*.py`, and the admitted unit count
+# moved by ONE.
+#
+# ORDERING, the rule this file has had to restate seven times: this block was
+# written AFTER the cold review's two rounds and after every fix from both, so
+# `planner_sha256` and `semantic_slice_sha256` were final when the four digests
+# below were computed. That is the point of recording it last — round 2 changed
+# `graphify_semantic_corpus.py` and `graphify_semantic_slice.py`, and recording
+# before it would have staled these values exactly as the note above describes
+# happening at 31c63d4d.
 AUTHORITY_JSON = (
-    b'{"advisories_sha256":"88ed68a5e0c483019b64ac6e903440251766d6982a94f9148d446ce25ba4218c",'
-    b'"execution_config_sha256":"3af65561ec248ed320c457276d4cb6dc20f613575fb92d63ded23351fc3f3a34",'
-    b'"exclusions_sha256":"fac4b2c398c7c852419ed9436c742afcec4aab2481091e8f63d1e5d6454e2cc7",'
-    b'"plan_manifest_sha256":"bc04484600e208f4302e9805fbb1c130a44f4b1e2f0ad3c328bfca2e60240be0",'
+    b'{"advisories_sha256":"2d3dcc7b6783205ee40a61dd1a4bd0161cb42efe9d937d26759102c1559d13ac",'
+    b'"execution_config_sha256":"0594d4347f76e517de6dae24bb90f128b0ba5332b243bd979058aeeb8225e244",'
+    b'"exclusions_sha256":"6a97e1cda84b3187ff06595950549abb0f20db2c0741f2620b25def5144ed3a5",'
+    b'"plan_manifest_sha256":"d4e95c0c2a33f95ee417fe0bfb4d42c97d16a51dd6583e4a6562d3c519420956",'
     b'"schema_version":1}\n'
 )

@@ -788,7 +788,7 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     # forces. Do not "fix" it by deriving it.
     assert inventory["detected_source_count"] == 374
     assert inventory["discovered_unit_count"] == 479
-    assert inventory["admitted_unit_count"] == 474
+    assert inventory["admitted_unit_count"] == 475
     assert (
         inventory["source_manifest_sha256"]
         == graphify_semantic_corpus._ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256
