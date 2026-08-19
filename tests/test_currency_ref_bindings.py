@@ -13,6 +13,9 @@ declared check into a silent no-op, which is the exact shape
 `probes-need-a-control-arm.md` exists to catch, so it is DRIFT here.
 """
 
+import re
+from pathlib import Path
+
 import pytest
 from kb_setup.currency import config, sync
 
@@ -267,6 +270,50 @@ def test_this_repos_bindings_all_resolve_to_a_real_anchor():
         assert found is not None, f"{binding.label}: pattern reaches no anchor"
 
 
+def _unhealthy_bindings(repo_root, spec) -> set[tuple[str, str, str]]:
+    """Every declared binding that is NOT currently agreeing, keyed structurally.
+
+    Evaluated from `spec.ref_bindings` directly rather than by parsing
+    `Finding.detail`. Parsing the message was wrong twice, both found by the cold
+    lane on one commit:
+
+    * keying on the path alone collapsed two bindings in one file into a single
+      set member, and keying on "<path> (<field>)" still collapsed a THIRD
+      binding with the same field in the same file;
+    * filtering segments on `" reads "` dropped the OTHER drift kinds entirely —
+      a broken anchor and a missing file produce different sentences, so those
+      passed while an allowed laggard was present to keep the set non-empty.
+
+    A human-readable string is not a machine contract. The key here is
+    `(path, field, pattern)`, which is what actually distinguishes two bindings,
+    and every unhealthy KIND counts — mismatch, dead anchor, missing file,
+    unreadable file, and an unreadable manifest field.
+    """
+    from kb_setup.currency.sync import _manifest_field, manifest_ref
+
+    expected = {
+        "ref": manifest_ref(repo_root, spec),
+        "commit": _manifest_field(repo_root, spec, "commit"),
+    }
+    unhealthy = set()
+    for b in spec.ref_bindings:
+        key = (b.path, b.field, b.pattern)
+        want = expected.get(b.field, "")
+        path = repo_root / b.path
+        if not want or not path.exists():
+            unhealthy.add(key)
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError, UnicodeDecodeError:
+            unhealthy.add(key)
+            continue
+        found = re.search(b.pattern, text)
+        if found is None or found.group(1) != want:
+            unhealthy.add(key)
+    return unhealthy
+
+
 def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
     """The suite must SEE a ref-binding drift, not just that patterns match.
 
@@ -274,52 +321,27 @@ def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
     pattern reaches an anchor, which is its own claim and a real one. But nothing
     asserted the anchors AGREE — so the suite went 18/18 green while
     `kb-currency-check` reported the graphify bindings in DRIFT, and the
-    disagreement was visible only to whoever happened to run the check by hand
-    (cold review round 2 of the 0.9.46 bump).
+    disagreement was visible only to whoever happened to run the check by hand.
 
-    So this asserts the live verdict, with the ONE deliberate exception named
-    rather than tolerated in general:
-
+    The ONE permitted exception is named rather than tolerated in general:
     `graphify_semantic_slice.SOURCE_REF`/`SOURCE_COMMIT` are the authority for a
-    COMMITTED SLICE RECEIPT. That module's own comment forbids advancing them
-    "as part of a pin bump on its own, which would assert an identity the
-    evidence contradicts" — they may move only when the slice re-runs and
-    produces a new receipt. Every OTHER binding must track the manifest, and any
-    new laggard fails here instead of waiting for someone to run the check.
+    COMMITTED SLICE RECEIPT, and that module forbids advancing them "as part of a
+    pin bump on its own, which would assert an identity the evidence
+    contradicts". Every OTHER binding must track the manifest, and a new laggard
+    fails here instead of waiting for someone to run the check.
     """
-    from pathlib import Path
-
-    from kb_setup.currency import sync
-
     repo_root = Path(__file__).resolve().parents[1]
     spec = next(s for s in config.load(repo_root) if s.name == "graphify")
-    finding = sync._check_ref_bindings(repo_root, spec)
-
-    if finding.status == sync.OK:
-        return  # the slice has been re-run and everything agrees; nothing to permit
 
     slice_path = "python/src/kb_setup/graphify_semantic_slice.py"
-    # Keyed on "<path> (<field>)", NOT on the path alone. graphify's PR bot on
-    # #375 caught the collapse: two bindings in the SAME file reduce to one set
-    # member, so a THIRD binding in that file which must NOT lag would vanish
-    # into the allowed entry and pass. Only the frozen receipt's `ref` and
-    # `commit` may lag, and naming them individually is what says so.
-    #
-    # The leading prose is still stripped — the FIRST segment reads
-    # "the repo disagrees … — <path> (<field>)", so a naive split names the
-    # sentence instead of the file and the failure reads like a parser bug.
-    allowed = {f"{slice_path} (ref)", f"{slice_path} (commit)"}
-    lagging = {
-        part.rsplit("— ", 1)[-1].split(":", 1)[0].strip()
-        for part in finding.detail.split(";")
-        if " reads " in part
-    }
-    # Exact-set equality, not suffix filtering: a suffix match would admit an
-    # unrelated path that merely ENDS with an allowed one (archive/<allowed>),
-    # and a parse that finds no " reads " segments at all would yield an empty
-    # set that a mere "no unexpected paths" check waves through.
-    assert lagging == allowed, (
-        "only the slice's frozen receipt bindings may lag the manifest; the "
-        f"finding names {sorted(lagging)} but exactly {sorted(allowed)} may lag "
-        "— anything else must be advanced with the pin"
+    allowed = {(b.path, b.field, b.pattern) for b in spec.ref_bindings if b.path == slice_path}
+    assert allowed, f"expected declared bindings in {slice_path}; the exemption names no rows"
+
+    unhealthy = _unhealthy_bindings(repo_root, spec)
+
+    unexpected = unhealthy - allowed
+    assert not unexpected, (
+        "only the slice's frozen receipt bindings may lag the manifest; these are "
+        f"also unhealthy and must be advanced with the pin: "
+        f"{sorted((p, f) for p, f, _ in unexpected)}"
     )

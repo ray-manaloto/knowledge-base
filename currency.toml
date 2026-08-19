@@ -1565,14 +1565,20 @@ manifest = "sources/codex.manifest"
 mise_key = "antigravity-cli"
 binary = "agy"
 github = "google-antigravity/antigravity-cli"
-# Tolerant of a name prefix, on `[tool.codex]`'s precedent
+# Tolerant of ANY leading name and an optional `v`, rather than an enumerated
+# list of prefixes. The enumerated form was the first fix and the cold lane
+# immediately produced three spellings it missed — `antigravity-cli 1.1.15`,
+# `antigravity cli 1.1.15`, `agy v1.1.15`. Guessing which names a CLI might print
+# is the same losing game as guessing its version; `\D*?` cannot lose it, and the
+# `\d+\.\d+\.\d+` group is still what has to match, so `garbage` and a bare
+# `1.1` are both still rejected. On `[tool.codex]`'s precedent
 # (`'^(?:codex-cli )?(\d+\.\d+\.\d+)'`). Measured here: `mise exec -- agy
 # --version` prints a BARE `1.1.15`, so the anchored form matched today — but
 # graphify's PR bot flagged the bare anchor on #375 and it is right about the
 # risk: a CLI that starts printing its own name in a later release turns this
 # row from a check into a silent SKIP, and this row exists because the tool was
 # untracked and reported green by never being asked. Costs nothing to tolerate.
-version_pattern = '^(?:agy |[Aa]ntigravity(?: CLI)? )?(\d+\.\d+\.\d+)'
+version_pattern = '^\D*?v?(\d+\.\d+\.\d+)'
 # ⚠️ ASK THE BINARY, NEVER THE INSTALL DIRECTORY. `agy` SELF-UPDATES IN PLACE:
 # the binary inside the `1.1.5` install dir once reported 1.1.10, so the
 # directory name is mise's label and `mise which` can never answer "which
