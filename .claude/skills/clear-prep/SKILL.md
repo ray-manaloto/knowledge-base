@@ -361,13 +361,18 @@ knows how to jump to handoff so there is less copy/paste needed."*
 failure this step exists to prevent. A handoff nobody is told to read is a
 handoff nobody reads.
 
-The older form still works and is the fallback when `.agent/` is absent (a fresh
-clone) or when the next session should read a SPECIFIC handoff rather than the
-newest:
+The older form still works when the next session should read a SPECIFIC handoff
+rather than the newest:
 
 ```text
 Read and follow .agent/plans/session-<date>.md
 ```
+
+(`/kb-resume <path>` does the same and keeps the repo checks.) It is no use on
+a fresh clone: `.agent/` is gitignored, so a missing `.agent/` directory has no
+handoff to point at. `/kb-resume` handles that case itself, falling back to the
+newest tracked `docs/direction/*.md` plus `git log`, so `/kb-resume` stays the
+right prompt to print either way.
 
 ## Keeping this skill honest over time
 

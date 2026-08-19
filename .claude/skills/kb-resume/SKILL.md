@@ -25,13 +25,25 @@ disagreement rather than smoothing it over.
 
 ### 1. Find the handoff and the directive
 
+Apply `$ARGUMENTS` first, before selecting anything:
+
+- **A path** (anything containing `/` or ending in `.md`): read THAT handoff
+  instead of the newest one. The newest directive is still read alongside it,
+  and every check below still runs. If the path does not exist, say so and
+  stop; do not silently substitute the newest.
+- **A nudge** (*"just the traps"*, *"only what's owed"*): selection is
+  unchanged (still the newest of each), but note which report section it names;
+  the report shape below applies it.
+- **Empty**: the normal case, everything below as written.
+
 ```bash
 ls -t .agent/plans/session-*.md | head -3
 ls -t docs/direction/*.md | head -2
 ```
 
-Read the **newest** of each, in full. Not a skim: the owed section and the
-gotchas are the parts that cost a session when missed.
+Read the **newest** of each (or the handoff `$ARGUMENTS` named), in full. Not a
+skim: the owed section and the gotchas are the parts that cost a session when
+missed.
 
 **`.agent/` is gitignored.** On a fresh clone there is no handoff at all, and
 that is a different state from "no work pending" — say so plainly and fall back
@@ -107,6 +119,10 @@ TRAPS: <the ones that would bite today>
 
 Expand a section only when it earns it. The failure mode here is a wall of text
 that restates a handoff the user could have opened themselves.
+
+When `$ARGUMENTS` gave a nudge, print the header line plus only the section it
+asked for. The DISAGREEMENT line is exempt from the nudge: it appears whenever
+there is one, because a nudge narrows the report, not the reconciliation.
 
 ## What this does not do
 

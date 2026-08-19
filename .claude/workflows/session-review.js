@@ -217,12 +217,17 @@ if (OUTPUT === 'handoff' && !(typeof cfg.handoffOut === 'string' && cfg.handoffO
   )
 }
 
-// The five a handoff is actually made of: what was asked and dropped, what is
-// unlanded, what got redone, what drifted, and what a bot flagged that nobody
-// actioned. `unpinned`, `context` and `tooling-gap` are round-level questions
+// The six a handoff is actually made of: what was asked and dropped, what is
+// unlanded, what got redone, what drifted, what a bot flagged that nobody
+// actioned, and what was done by hand that a task already owns. `tooling-gap`
+// joined on 2026-08-19: the heredoc, shell-chain and repeated-mistake checks
+// live in its brief, and the clear-prep handoff path is how this workflow
+// actually gets invoked, so leaving the lane out of handoff mode meant those
+// detectors never ran at all (the round's own finding: detectors that nothing
+// invokes run zero times). `unpinned` and `context` stay round-level questions
 // and are not worth a session-end agent each. A DEFAULT now — pass `lanes` to
 // override in either direction.
-const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews'])
+const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews', 'tooling-gap'])
 
 // `sessions` REPLACES `transcriptDir` + `since`, and comes from
 // `mise run kb-session-select` rather than from whoever is typing the call.
