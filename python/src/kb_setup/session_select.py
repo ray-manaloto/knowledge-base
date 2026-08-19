@@ -129,6 +129,12 @@ def _first_record_timestamp(path: Path) -> float | None:
                     return None
                 try:
                     stamp = json.loads(line).get("timestamp")
+                # PEP 758: unparenthesized multi-exception `except` is valid on
+                # Python 3.14, and this repo's ruff config (target-version py314)
+                # ACTIVELY STRIPS the parentheses — `except (A, B):` is rewritten to
+                # `except A, B:` by `mise run fmt`. Three reviewers have now flagged
+                # this form as a SyntaxError; it is not one here, the module imports
+                # and the suite is green. Do not "fix" it: the formatter will undo it.
                 except json.JSONDecodeError, AttributeError:
                     continue
                 if isinstance(stamp, str):
