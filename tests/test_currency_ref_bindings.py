@@ -298,22 +298,28 @@ def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
     if finding.status == sync.OK:
         return  # the slice has been re-run and everything agrees; nothing to permit
 
-    allowed = "python/src/kb_setup/graphify_semantic_slice.py"
-    # Strip the trailing "(ref)"/"(commit)" qualifier AND the detail's leading
-    # prose: the FIRST segment reads "the repo disagrees … — <path>", so a naive
-    # split names the sentence instead of the file and the failure message reads
-    # like a parser bug rather than a finding.
+    slice_path = "python/src/kb_setup/graphify_semantic_slice.py"
+    # Keyed on "<path> (<field>)", NOT on the path alone. graphify's PR bot on
+    # #375 caught the collapse: two bindings in the SAME file reduce to one set
+    # member, so a THIRD binding in that file which must NOT lag would vanish
+    # into the allowed entry and pass. Only the frozen receipt's `ref` and
+    # `commit` may lag, and naming them individually is what says so.
+    #
+    # The leading prose is still stripped — the FIRST segment reads
+    # "the repo disagrees … — <path> (<field>)", so a naive split names the
+    # sentence instead of the file and the failure reads like a parser bug.
+    allowed = {f"{slice_path} (ref)", f"{slice_path} (commit)"}
     lagging = {
-        part.split(" (", 1)[0].rsplit("— ", 1)[-1].strip()
+        part.rsplit("— ", 1)[-1].split(":", 1)[0].strip()
         for part in finding.detail.split(";")
         if " reads " in part
     }
     # Exact-set equality, not suffix filtering: a suffix match would admit an
-    # unrelated path that merely ENDS with the allowed one (archive/<allowed>),
+    # unrelated path that merely ENDS with an allowed one (archive/<allowed>),
     # and a parse that finds no " reads " segments at all would yield an empty
     # set that a mere "no unexpected paths" check waves through.
-    assert lagging == {allowed}, (
+    assert lagging == allowed, (
         "only the slice's frozen receipt bindings may lag the manifest; the "
-        f"finding names {sorted(lagging)} but exactly [{allowed!r}] may lag — "
-        "anything else must be advanced with the pin"
+        f"finding names {sorted(lagging)} but exactly {sorted(allowed)} may lag "
+        "— anything else must be advanced with the pin"
     )
