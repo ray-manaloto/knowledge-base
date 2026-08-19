@@ -19,6 +19,7 @@ from pathlib import Path
 
 import msgspec
 
+from kb_setup import graphify_baseline
 from kb_setup.graphify_baseline import RuntimeIdentity
 
 _CLAUDE_MODEL = "claude-haiku-4-5-20251001"
@@ -337,14 +338,32 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # The wheel/sdist digests DID move, because the distribution is a new build; they
 # are read from `uv.lock`, which is the same source `graphify_baseline` derives
 # them from rather than a second opinion about the same artifact.
+# ADVANCED to 0.9.46, and the distinction from `_ACCEPTED_GRAPHIFY_RUNTIME`
+# above is the whole point: that one is FROZEN EVIDENCE about a receipt that
+# already happened and may not move until the slice re-runs; this one is the
+# runtime a non-authority run may additionally use, i.e. what is INSTALLED. So
+# the pin bump moves this and must not move that.
+#
+# Leaving it behind was a LIVE break, not a cosmetic lag — the comment at the
+# pairing site below says so in advance: "a literal left beside a newer runtime
+# makes the pair unmatchable and the non-authority path rejects every run under
+# the installed version." Found by the cold lane's round 2; the ref-binding
+# check reported DRIFT and its own test could not (see
+# tests/test_currency_ref_bindings.py).
+#
+# All three digests MEASURED against the installed 0.9.46 via
+# `graphify_baseline.runtime_identity`, not carried:
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.45 -> 0.9.46 — the public SDK
+# surface is identical — while the wheel and sdist digests moved because the
+# distribution is a new build.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.45",
-    cli_version="0.9.45",
-    sdk_version="0.9.45",
+    version="0.9.46",
+    cli_version="0.9.46",
+    sdk_version="0.9.46",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
-    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
+    wheel_sha256="35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
+    sdist_sha256="9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
 )
 # The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
 # authority for it — `_receipt_reasons` compares the retained receipt against
@@ -382,9 +401,20 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # The 2.1.226 -> 2.1.234 release review lives in `currency.toml`'s
 # `[tool.claude-code]` block. Nothing in those eight releases touches the flags,
 # the argv shape or the envelope this path depends on.
-_CURRENT_CLAUDE_VERSION = "2.1.234"
+#
+# 2.1.234 -> 2.1.235 advanced 2026-08-19 alongside `currency.toml`'s `expected`,
+# because `claude` self-updates in place and the binary on PATH had already moved
+# — so leaving this at 2.1.234 asserted an identity the host contradicts. Both
+# values are MEASURED here, not carried: `claude --version` reports 2.1.235 and
+# `shasum -a 256 $(command -v claude)` reports the digest below.
+#
+# It is the ELEVENTH version-restatement site in this package and the cold lane
+# found it, not the ref-binding check — that check compares against
+# `sources/graphify.manifest`, so a claude-code binding is outside its scope
+# entirely. Worth stating plainly: the currency machinery does not see this line.
+_CURRENT_CLAUDE_VERSION = "2.1.235"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "08d8700313697cbe730a25420c908a299ce52d56f0eb2cf4fac94cab5109bc57"
+    "83b8f806f6f2eea316cfe246628e6c23374711d868f1fd0409db551b877b7748"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (
@@ -767,9 +797,19 @@ def preflight(
     # function default rather than a module constant — which is why no
     # `ref_binding` row reaches it and why it lagged silently. It feeds
     # `assert_semantic_sdk`, so a stale value asks "is the semantic API the one
-    # 0.9.44 shipped?" while 0.9.45 is installed: a version gate checking the
-    # wrong version, which passes for exactly as long as nothing moves.
-    graphify_version: str = "0.9.45",
+    # 0.9.44 shipped?" while a newer release is installed: a version gate
+    # checking the wrong version, which passes for exactly as long as nothing
+    # moves.
+    #
+    # It is no longer a literal. At the 0.9.46 bump it lagged AGAIN, exactly as
+    # the paragraph above predicted, and the prediction is the reason it is now
+    # READ: this default is about the runtime that will RUN, so it belongs to
+    # `graphify_baseline.ACCEPTED_GRAPHIFY_VERSION` — the constant the installed
+    # binary is separately asserted to match. It is deliberately NOT bound to
+    # `_ACCEPTED_GRAPHIFY_RUNTIME.version` below, which is frozen evidence about a
+    # receipt that already happened and may only move when that receipt is
+    # re-produced.
+    graphify_version: str = graphify_baseline.ACCEPTED_GRAPHIFY_VERSION,
     require_max_turns: bool = False,
     profile: ClaudeProfile = SLICE_PROFILE,
 ) -> ClaudePreflight:
@@ -1235,19 +1275,25 @@ def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> li
         ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),)
         if enforce_authority
         else (
-            # Both pairs now read 0.9.45: the AUTHORITY pair advanced because
-            # the committed slice evidence was re-produced at 0.9.45 (never on a
-            # pin bump alone, which would assert an identity the receipt on disk
-            # contradicts), and the CURRENT pair moves with the pin. The two
-            # entries are therefore currently EQUAL, which is expected rather
-            # than a duplication mistake; they diverge again the moment the pin
-            # moves ahead of the committed receipt. Each version string has to
+            # The two pairs DIVERGE here: the AUTHORITY pair stays at 0.9.45
+            # because that is where the committed slice evidence was produced
+            # (it never advances on a pin bump alone, which would assert an
+            # identity the receipt on disk contradicts), while the CURRENT pair
+            # moved with the pin to 0.9.46. They converge again only when the
+            # slice re-runs and commits a new receipt under the installed
+            # version.
+            #
+            # Worth keeping: the comment this replaces PREDICTED this exact
+            # state ("they diverge again the moment the pin moves ahead of the
+            # committed receipt") and then opened "Both pairs now read 0.9.45"
+            # once it arrived. A comment that forecasts its own obsolescence
+            # still needs something to move it. Each version string has to
             # move WITH its runtime (the two are checked as a pair), so a
             # literal left beside a newer runtime makes the pair unmatchable and
             # the non-authority path rejects every run under the installed
             # version.
             (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),
-            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.45"),
+            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.46"),
         )
     )
     accepted_graphify_runtimes = tuple(pair[0] for pair in accepted_graphify_pairs)

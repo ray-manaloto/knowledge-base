@@ -595,7 +595,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.3"
+expected = "2026.8.8"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -844,7 +844,7 @@ setting, and task/lockfile/python fixes."""
 # `_ACCEPTED_CLAUDE_VERSION` advance a mechanical bump instead of a new review —
 # every flag the semantic path requires is spelled the same and only the
 # implementation changed.
-expected = "2.1.234"
+expected = "2.1.235"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
@@ -1451,7 +1451,7 @@ manifest = "sources/uv.manifest"
 # takes `expected` (the version we have REVIEWED) rather than pretending mise
 # owns it. Bump `expected` and the pyproject pin in the same change, or this row
 # asserts a review that did not happen.
-expected = "0.16.2"
+expected = "0.16.3"
 binary = "ruff"
 github = "astral-sh/ruff"
 pypi = "ruff"
@@ -1463,7 +1463,7 @@ manifest = "sources/ruff.manifest"
 # `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
 # it needs a row rather than trust — a 0.0.x bump can carry a breaking change
 # with no marker to trip gate 3.
-expected = "0.0.69"
+expected = "0.0.72"
 binary = "ty"
 github = "astral-sh/ty"
 pypi = "ty"
@@ -1550,3 +1550,29 @@ version_pattern = '^(?:codex-cli )?(\d+\.\d+\.\d+)'
 # regression is a mutation arm that DIES.
 tag_prefix = "rust-v"
 manifest = "sources/codex.manifest"
+
+[tool.antigravity-cli]
+# Google's Antigravity CLI (Gemini 3.x). Ray, 2026-08-19: a CRITICAL currency
+# dependency, and it earns that outright — with `codex` out of credits it IS the
+# cold-review lane, so a stale antigravity is a stale review gate.
+#
+# It was absent from this file entirely until now, which is the whole point of
+# the row: the engine reported green for it forever by never asking. It was also
+# where an inherited-false number came from — a handoff recorded "agy 1.1.14 vs
+# currency.toml pin 1.1.13" when the pin was `mise.toml`'s 1.1.11 and this file
+# did not mention antigravity at all. Both halves wrong, and the figure reached
+# Ray's own directive text before anyone re-derived it.
+mise_key = "antigravity-cli"
+binary = "agy"
+github = "google-antigravity/antigravity-cli"
+version_pattern = '^(\d+\.\d+\.\d+)'
+# ⚠️ ASK THE BINARY, NEVER THE INSTALL DIRECTORY. `agy` SELF-UPDATES IN PLACE:
+# the binary inside the `1.1.5` install dir once reported 1.1.10, so the
+# directory name is mise's label and `mise which` can never answer "which
+# version is this". `binary` above is what makes this row honest; a
+# path-derived check here would be decoration.
+#
+# `manifest` is deliberately absent for now: there is no
+# `sources/antigravity-cli.manifest`, and declaring one before the source is
+# pinned would report DRIFT against a file that does not exist — the same false-
+# DRIFT shape `[tool.codex]` above documents at length. Add both together.

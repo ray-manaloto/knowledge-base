@@ -117,9 +117,9 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_REF = "v0.9.45"
-_ACCEPTED_GRAPHIFY_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
-_ACCEPTED_GRAPHIFY_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.46"
+_ACCEPTED_GRAPHIFY_COMMIT = "558df6d57d61cb6ef79c740ec7473c6d953d79a7"
+_ACCEPTED_GRAPHIFY_TREE = "5477ba01c420117fcda22804b8046ad9d571c156"
 # The digest of the baseline's GENERATED `source-manifest.json` member, not of
 # `sources/graphify.manifest`. Worth stating: the two are both "the source
 # manifest" in English, the committed file is the obvious reading, and it is the
@@ -127,28 +127,46 @@ _ACCEPTED_GRAPHIFY_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
 # its candidate, which is what makes it a measurement rather than a guess that
 # happens to be 64 hex characters.
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911"
+    "2ee48f39cdf09037029eedf7f7d97d24a7311a7feaf56c6c76f2056cb4f2e9ae"
 )
 # `graphify/detect.py`'s git blob at the pinned commit. Control-armed before it
 # was trusted: the same derivation at v0.9.43 reproduces the c51ea916 this line
 # used to hold, so the method is right and the new value is not a guess.
 #
-# UNCHANGED at v0.9.45, and that is a measurement with two independent routes
-# agreeing: the blob API at the 0.9.45 commit returns this same f76a4259…, and
-# `graphify/detect.py` does not appear in `compare/v0.9.44...v0.9.45` at all. The
-# tree digest above moved in the same derivation, which is what proves the probe
-# can return a different value rather than echoing its input.
-_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "f76a4259f6a7360872663fbe711c4738ecda4680"
+# MOVED at v0.9.46: f76a4259… -> 4cb12310…, the first change to this blob since
+# v0.9.43. Re-calibrated deliberately, with the diff read, because line 871 gates
+# the large-corpus COST advisory on this value — so bumping it blind would
+# silence a spend warning by assertion. What the 61-line diff actually does:
+#
+#   1. adds `.lisp`/`.cl`/`.lsp`/`.asd` to CODE_EXTENSIONS for a new Common Lisp
+#      extractor;
+#   2. replaces `errors="ignore"` when reading .gitignore/.graphifyignore with a
+#      UTF-8 -> UTF-16-by-BOM -> host-encoding chain that WARNS. The old form
+#      turned an incorrectly encoded byte into no byte, so `Orçamento/` became the pattern
+#      `Oramento/`, matched nothing, and the directory was scanned despite an
+#      explicit exclusion. Strictly a fix in our favour.
+#
+# It touches NO cost/advisory logic — grepped for cost/advisor/word/token/large
+# across the diff, zero hits. And both changes are inert or trivial here,
+# control-armed: exactly ONE lisp-family file exists in the pinned source
+# (`tests/fixtures/sample.lisp`, the new extractor's own fixture) against a
+# control of 316 `.py` files, and NO ignore file in the source is non-ASCII.
+#
+# The empty advisory that surfaced this was never a broken advisory: line 871
+# WITHHOLDS it when the detector object disagrees, which is this module revoking
+# its own authority rather than vouching for a calibration it no longer has.
+# That fail-closed is why this constant may be moved only with the note above.
+_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "4cb123104cb29a14fa53caaf09b5e1da75157f26"
 _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.45",
-    cli_version="0.9.45",
-    sdk_version="0.9.45",
+    version="0.9.46",
+    cli_version="0.9.46",
+    sdk_version="0.9.46",
     executable=".venv/bin/graphify",
     # Unchanged, and MEASURED rather than carried forward — see
     # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
-    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
+    wheel_sha256="35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
+    sdist_sha256="9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
 )
 _PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000

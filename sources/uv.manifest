@@ -5,10 +5,17 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] uv`
-#   pinned here:    0.12.2
+#   pinned here:    0.12.5
 # Cross-checkable without trusting this file: `uv --version` prints the tag's own
-# short commit (`46ead6098`), so binary and pin verify against each other — the
+# short commit (`210d1f678`), so binary and pin verify against each other — the
 # same property ty has and ruff does not.
+#
+# ⚠️ ASK `mise exec -- uv`, NOT bare `uv`. Measured 2026-08-19 right here: bare
+# `uv --version` reported 0.12.3 (507230998) while `mise exec -- uv --version`
+# reported 0.12.5 (210d1f678) — `command -v uv` resolves into the OLD install
+# dir, which stays on PATH after a bump. The pin was correct and installed the
+# whole time; only the shell was stale. A cross-check run through the wrong uv
+# reports a drift that does not exist, which is worse than not checking.
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -23,7 +30,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/uv
-ref = 0.12.3
-commit = 507230998c9541d67814b57463ac00e454ff6991
+ref = 0.12.5
+commit = 210d1f6785e95a8c8c0d53e284408c9be1134700
 kind = code
 added = 2026-08-02

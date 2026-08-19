@@ -8,7 +8,7 @@ from pathlib import Path
 
 import networkx as nx
 import pytest
-from kb_setup import graphify_sdk
+from kb_setup import graphify_baseline, graphify_sdk
 from kb_setup.currency import config as currency_config
 from kb_setup.graphify_health import (
     ExpectedMetadataOnly,
@@ -20,8 +20,16 @@ from kb_setup.graphify_health import (
 )
 
 
-def test_graphify_0945_public_sdk_contract_is_current() -> None:
-    assert graphify_sdk.contract_errors("0.9.45") == ()
+def test_the_pinned_graphify_public_sdk_contract_is_current() -> None:
+    """No version in the NAME. The old name said 0945 and outlived it.
+
+    A version baked into a test's identifier is a stale literal that no
+    grep for a constant will find and no bump will remind you about — the
+    0.9.45 -> 0.9.46 advance had to rename this test and its sibling in
+    test_graphify_semantic_slice.py. The version under test belongs in the
+    assertion, read from the pin.
+    """
+    assert graphify_sdk.contract_errors(graphify_baseline._ACCEPTED_GRAPHIFY_VERSION) == ()
 
 
 def test_graphify_0943_watch_conclusions_are_structured_notes() -> None:

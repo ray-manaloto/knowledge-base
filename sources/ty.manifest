@@ -4,15 +4,15 @@
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: pyproject.toml `[dependency-groups] dev` EXACT pin `ty==0.0.69`,
+#   version source: pyproject.toml `[dependency-groups] dev` EXACT pin `ty==0.0.72`,
 #                   confirmed against `uv run ty --version`, which prints the tag's
-#                   own short commit (`1dca8443e`) — so binary and pin are checkable
+#                   own short commit (`62ebbecc7`) — so binary and pin are checkable
 #                   against each other here in a way ruff's output does not allow.
 #                   It was a floor (`ty>=0.0.1a1`) when this manifest was written;
 #                   pyproject's own comment calls that floor the worst of the group,
 #                   since a pre-1.0 tool admitted every breaking release by
 #                   construction. The floor is gone — do not go looking for it.
-#   pinned here:    0.0.69
+#   pinned here:    0.0.72
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -27,7 +27,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/ty
-ref = 0.0.69
-commit = 1dca8443ea27abc78829fad0c6417cb7a0fc6a80
+ref = 0.0.72
+commit = 62ebbecc704512d56ec2bce29e836168f4c46288
 kind = code
 added = 2026-08-02

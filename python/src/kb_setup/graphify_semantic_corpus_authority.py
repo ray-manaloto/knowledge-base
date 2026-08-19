@@ -375,10 +375,54 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # digests carrying a reviewed DECISION are unchanged and the workload is the same
 # 474 units / 58 chunks. No spend bound was loosened — one was made to survive the
 # thing that was defeating it.
+# RE-RECORDED 2026-08-19 against the plan regenerated at graphify 0.9.46 (source
+# commit 558df6d5). Ray's ruling for this advance was explicit: MEASURE the
+# admitted inventory first, and re-record only if it is unchanged — otherwise the
+# cost moved and it is a fresh review, not a re-record.
+#
+# It is unchanged, and that is the whole justification. Measured by building the
+# real plan through `plan_source` with the real `planned_max_output_tokens`
+# resolver, exactly as `_exact_graphify_plan` does:
+#
+#     unique admitted paths  370   (0.9.45: 370)
+#     units                  474   (0.9.45: 474)
+#     chunks                  58   (0.9.45:  58)
+#
+# So nothing additional will be sent to a provider and the projected spend is
+# unmoved. The specific risk this measurement was aimed at: 0.9.46 adds
+# `graphify/extractors/commonlisp.py` — production source, which could plausibly
+# have entered the admitted set and changed the cost. It did NOT; zero
+# lisp-related paths are admitted, and neither is the extractor itself. The other
+# five files 0.9.46 adds are a `.lisp` fixture and four test modules.
+#
+# What DID move, and why each is identity or census rather than judgement:
+#
+#   * `exclusions.json` — still the SAME FOUR entries; only `source_commit` and
+#     `source_tree` differ. No reviewed judgement changed.
+#   * `advisories.json` — same code, same thresholds, same `provisional` status;
+#     the census moved 792 files / ~1,394,475 words -> 798 / ~1,406,076, which is
+#     the six added files in the whole-tree count, none of them admitted.
+#   * `execution-config.json` and `manifest.json` — pin identity.
+#
+# This is the same shape as the 0.9.45 re-record, and it is recorded here rather
+# than merely believed because the previous note had to be corrected once: the
+# digests were once described as never changing, and then they changed.
+#
+# RECORD THIS BLOCK LAST — after every other edit in the change is final.
+# `execution-config.json` hashes `planner_sha256` (this package's corpus module)
+# and `semantic_slice_sha256` among others, so ANY later edit to those files,
+# including a one-word comment fix, moves two of the four digests below and
+# stales the authorization. That is not hypothetical twice over: the note above
+# records it happening at 31c63d4d for a comment in the runner, and it happened
+# AGAIN while writing this very entry — the four values were computed, then a
+# typo fix landed in `graphify_semantic_corpus.py` and a public-alias change in
+# `graphify_semantic_slice.py`, and `execution_config_sha256` /
+# `plan_manifest_sha256` both drifted before the commit was made. The gate caught
+# it, which is the gate working; the ordering rule is how not to need it.
 AUTHORITY_JSON = (
-    b'{"advisories_sha256":"ce1da16ed2d71accb10526e45b897599f32453188d19e0a5a2240c95763e2d36",'
-    b'"execution_config_sha256":"bc44b4e86c6442099127db277a19e89a3f287b8defa16832f25bef7bd035a461",'
-    b'"exclusions_sha256":"9aeb4c1b37c1c72188cb9340a2f3e9e6899e5f8c149d9b0b174c7b76fc9df83c",'
-    b'"plan_manifest_sha256":"10b2b4b0006601ebeb947c1b022e58363870ef29e475ec3d9079ecb9662d0044",'
+    b'{"advisories_sha256":"88ed68a5e0c483019b64ac6e903440251766d6982a94f9148d446ce25ba4218c",'
+    b'"execution_config_sha256":"3af65561ec248ed320c457276d4cb6dc20f613575fb92d63ded23351fc3f3a34",'
+    b'"exclusions_sha256":"fac4b2c398c7c852419ed9436c742afcec4aab2481091e8f63d1e5d6454e2cc7",'
+    b'"plan_manifest_sha256":"bc04484600e208f4302e9805fbb1c130a44f4b1e2f0ad3c328bfca2e60240be0",'
     b'"schema_version":1}\n'
 )
