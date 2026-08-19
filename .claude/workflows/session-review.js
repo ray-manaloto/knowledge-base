@@ -305,6 +305,18 @@ A lane that is interrupted returns a confident report about the part it reached
 and reads exactly like one that finished. That happened twice in the round that
 wrote this file. If you are running out of room, write the coverage line FIRST.
 
+A REPEATED MISTAKE IS A FINDING FOR ANY LANE THAT SEES IT, and the useful half
+is not the count — it is what would MECHANICALLY prevent the next one. A deny, a
+gate, a task. Never "someone should remember". This repo has measured the
+difference: a warning-only rule scored 0 compliance in 19 chances, and the deny
+that replaced it took its violations 62 to 0.
+
+Do not leave this to whichever lane happens to be scheduled. The heredoc and
+hand-run-chain rules were put in ONE lane's brief to answer exactly this
+complaint, and handoff mode stood that lane down, so the amendment never ran in
+the round meant to test it — it only looked like it had, because another lane
+found the same shapes independently.
+
 A DEFERRAL RECORDED INSIDE THE REVIEWED WINDOW IS SCOPE FOR YOU, NOT AN
 EXEMPTION. If the round said "this is the next session's job", "after /clear",
 "deferred", "carried" or "not yet" — YOU ARE THE NEXT SESSION. Report it as an
