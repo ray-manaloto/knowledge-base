@@ -351,3 +351,18 @@ def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
         f"also unhealthy and must be advanced with the pin: "
         f"{sorted((p, f) for p, f, _ in unexpected)}"
     )
+    # BOTH directions. The subset check above only asks "is anything unexpected
+    # lagging"; on its own it also passes when the exemption covers NOTHING,
+    # because an empty `unhealthy` trivially has no unexpected members. That
+    # silently keeps a dead exemption alive, and a dead exemption is a hole
+    # waiting for the next drift in that file to fall through.
+    #
+    # The previous form asserted exact equality and had this property for free;
+    # the rewrite to structural keying dropped it. Restored explicitly, and
+    # graphify's PR bot on #385 is what caught the loss.
+    assert unhealthy, (
+        f"every binding now agrees, including {slice_path}'s — the slice receipt "
+        "has been re-produced, so this exemption is DEAD. Delete it and let the "
+        "plain 'all bindings agree' assertion stand, or the next drift in that "
+        "file passes unnoticed."
+    )
