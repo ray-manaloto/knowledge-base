@@ -1281,7 +1281,13 @@ def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> li
             # identity the receipt on disk contradicts), while the CURRENT pair
             # moved with the pin to 0.9.46. They converge again only when the
             # slice re-runs and commits a new receipt under the installed
-            # version. Each version string has to
+            # version.
+            #
+            # Worth keeping: the comment this replaces PREDICTED this exact
+            # state ("they diverge again the moment the pin moves ahead of the
+            # committed receipt") and then opened "Both pairs now read 0.9.45"
+            # once it arrived. A comment that forecasts its own obsolescence
+            # still needs something to move it. Each version string has to
             # move WITH its runtime (the two are checked as a pair), so a
             # literal left beside a newer runtime makes the pair unmatchable and
             # the non-authority path rejects every run under the installed

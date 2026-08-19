@@ -9,6 +9,13 @@
 # Cross-checkable without trusting this file: `uv --version` prints the tag's own
 # short commit (`210d1f678`), so binary and pin verify against each other — the
 # same property ty has and ruff does not.
+#
+# ⚠️ ASK `mise exec -- uv`, NOT bare `uv`. Measured 2026-08-19 right here: bare
+# `uv --version` reported 0.12.3 (507230998) while `mise exec -- uv --version`
+# reported 0.12.5 (210d1f678) — `command -v uv` resolves into the OLD install
+# dir, which stays on PATH after a bump. The pin was correct and installed the
+# whole time; only the shell was stale. A cross-check run through the wrong uv
+# reports a drift that does not exist, which is worse than not checking.
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
