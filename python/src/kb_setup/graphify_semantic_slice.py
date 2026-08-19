@@ -424,9 +424,29 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # found it, not the ref-binding check — that check compares against
 # `sources/graphify.manifest`, so a claude-code binding is outside its scope
 # entirely. Worth stating plainly: the currency machinery does not see this line.
-_CURRENT_CLAUDE_VERSION = "2.1.235"
+#
+# 2.1.235 -> 2.1.236 advanced 2026-08-19, for the same reason and by the same
+# measurement: `claude` self-updated in place again, so the sweep that moved
+# `currency.toml`'s `expected` and `sources/claude-code.manifest` had to move
+# this too or it would assert an identity the host contradicts. Measured, not
+# carried: `claude --version` reports 2.1.236 and the digest below is
+# `sha256(Path(which("claude")).read_bytes())`.
+#
+# THE `--help` DIGEST DID NOT MOVE — re-hashed against the INSTALLED 2.1.236
+# through this module's own `claude_child_environment`, it is still
+# 71ad650f…, the value 2.1.232 through 2.1.235 all recorded. So every flag this
+# path depends on is spelled identically and only the implementation moved,
+# which is the fourth consecutive advance with that shape.
+#
+# AND THE CURRENCY MACHINERY STILL DOES NOT SEE THIS LINE. The paragraph above
+# recorded that once; this bump proves it was not a one-off. The claude-code
+# sweep moved four files and left this constant behind, `kb-currency-check`
+# reported nothing, and the COLD LANE found it a SECOND time (P0, review of
+# fe57f996). Two independent misses by the same blind spot is not an anecdote —
+# it is the evidence for #393, which is why that issue cites it.
+_CURRENT_CLAUDE_VERSION = "2.1.236"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "83b8f806f6f2eea316cfe246628e6c23374711d868f1fd0409db551b877b7748"
+    "6bc4ba992d2786cbf0237c4453ca53c1fdf0c3b3d83ffa0025c0d8190ed27848"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (

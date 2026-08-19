@@ -23,13 +23,19 @@
 #                   `datamodel-codegen --version`.
 #   pinned here:    0.74.0
 #
-# ⚠️ DECLARED BUT NOT YET INVOKED. `docs/directives-2026-08-08.md` records
-# `git log -S datamodel --all` -> 0 hits: this is ADOPTION, not restoration.
-# That is exactly why 0.73.0's breaking changes (validated `--additional-imports`,
-# reserved `--extra-template-data` keys now erroring, built-in templates
-# serializing values as non-executing literals) cost this repo nothing. Ingesting
-# the source before first use is what lets the graph answer "what does it emit?"
-# while that is still a cheap question.
+# ⚠️ IT IS INVOKED — three generators depend on it, and this file nearly shipped
+# claiming the opposite. The claim was "DECLARED BUT NOT YET INVOKED", sourced to
+# `docs/directives-2026-08-08.md`'s `git log -S datamodel --all` -> 0 hits: an
+# INHERITED NUMBER, true on 2026-08-08 and false eleven days later. Ingesting the
+# source matters MORE for that, not less — the graph is being asked "what does
+# this emit?" about code we already ship.
+#
+#   schemas/generate_fetch_receipt.py  -> python/src/kb_setup/generated/fetch_receipt.py
+#   schemas/generate_source_groups.py  -> python/src/kb_setup/generated/source_groups.py
+#   schemas/generate_session_select.py -> python/src/kb_setup/generated/session_select.py
+#
+# 0.73.0's breaking changes cost this repo nothing, but by MEASUREMENT rather
+# than by absence: all three regenerate byte-identically at 0.74.0.
 #
 # ⚠️ TAGS CARRY NO `v` PREFIX — the tag is `0.74.0`, not `v0.74.0`, so a
 # `v<x>`-only resolver finds nothing and an apply aborts rather than mispinning.

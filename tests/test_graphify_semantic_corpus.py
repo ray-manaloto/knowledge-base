@@ -249,11 +249,11 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
             "detector_git_object": graphify_semantic_corpus._ACCEPTED_GRAPHIFY_DETECT_OBJECT,
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 798 files · ~1,406,076 words. Semantic extraction will be "
+                "Large corpus: 803 files · ~1,415,411 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 798,
-            "observed_words": 1_406_076,
+            "observed_files": 803,
+            "observed_words": 1_415_411,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }
@@ -777,8 +777,17 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     assert inventory["source_ref"] == graphify_semantic_corpus._ACCEPTED_GRAPHIFY_REF
     assert inventory["source_commit"] == graphify_semantic_corpus._ACCEPTED_GRAPHIFY_COMMIT
     assert inventory["source_tree"] == graphify_semantic_corpus._ACCEPTED_GRAPHIFY_TREE
+    # These three stay LITERAL on purpose — they are the reviewed workload, and
+    # deriving them from the plan would make this assert the plan against itself.
+    # The cost is that a graphify bump moves them: 478 -> 479 at v0.9.47, after
+    # 472 -> 478 at v0.9.46. Worth reading together with the counts one bump
+    # apart: upstream added FIVE files (all `tests/*.py`) and the discovered unit
+    # count moved by ONE, while `detected_source_count` did not move at all. So a
+    # unit is not a file and this is not a count anyone can predict from the
+    # release diff — it has to be measured, which is what turning this red
+    # forces. Do not "fix" it by deriving it.
     assert inventory["detected_source_count"] == 374
-    assert inventory["discovered_unit_count"] == 478
+    assert inventory["discovered_unit_count"] == 479
     assert inventory["admitted_unit_count"] == 474
     assert (
         inventory["source_manifest_sha256"]

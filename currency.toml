@@ -1641,14 +1641,30 @@ retires (1), and nothing retires (2) short of a version-sorted listing."""
 # graphify source it syncs with". Directive R6 (2026-08-08) makes it the ONE
 # owner of generated models.
 #
-# ⚠️ DECLARED BUT NOT YET USED — `docs/directives-2026-08-08.md` records
-# `git log -S datamodel --all` -> 0 hits. So this row tracks an ADOPTION, and
-# that is deliberate rather than premature: the whole reason the 0.73.0
-# breaking changes (validated `--additional-imports`, reserved
-# `--extra-template-data` keys now erroring, built-in templates serializing
-# values as non-executing literals) cost this repo nothing is that nothing
-# invokes it yet. Tracking it BEFORE adoption is what stops the first real use
-# from landing on a version whose notes nobody read.
+# ⚠️ IT IS USED. THREE GENERATORS DEPEND ON IT, and this row nearly shipped
+# saying the opposite. The claim here was "DECLARED BUT NOT YET USED", sourced
+# to `docs/directives-2026-08-08.md`'s `git log -S datamodel --all` -> 0 hits —
+# an INHERITED NUMBER, true on 2026-08-08 and false by 2026-08-19. It was used
+# to argue that 0.73.0's breaking changes cost nothing *because nothing invokes
+# it*, which is a right answer resting on a wrong premise: the most disarming
+# shape a comment can take. The cold lane rated it P1.
+#
+#   schemas/generate_fetch_receipt.py  -> python/src/kb_setup/generated/fetch_receipt.py
+#   schemas/generate_source_groups.py  -> python/src/kb_setup/generated/source_groups.py
+#   schemas/generate_session_select.py -> python/src/kb_setup/generated/session_select.py
+#
+# The REAL reason 0.73.0's breaking changes (validated `--additional-imports`,
+# reserved `--extra-template-data` keys now erroring, built-in templates
+# serializing values as non-executing literals) cost this repo nothing is a
+# MEASUREMENT, not an absence: all three generators were re-run at 0.74.0 and
+# `git diff --stat python/src/kb_setup/generated/` came back EMPTY. That probe
+# discriminates — the same command failed loudly minutes earlier at the version
+# guard. None of the three passes `--additional-imports`, `--extra-template-data`
+# or a custom template dir, which is why the output is stable.
+#
+# Each generator pins its own `GENERATOR_VERSION` and refuses to run under a
+# different one, so a bump MUST move four places at once: this row, the
+# pyproject pin, all three generator constants. #393 is about that class.
 #
 # NOT a `[tools]` pin: it is a `codegen` dependency-group entry in the root
 # pyproject.toml, reached as `uv run datamodel-codegen`. Same shape as
