@@ -196,3 +196,78 @@ collapsed to a single member.
 began with hand-edited `mise.toml`/`pyproject.toml` pins followed by
 `mise install`. The tools ship commands for this — `mise use <tool>@<version>`,
 `uv add --dev <pkg>==<version>` — which maintain the lockfile themselves.
+
+---
+
+## FIFTH ADDENDUM — VERBATIM (Ray, at the second /clear-prep, 2026-08-19)
+
+**Ray's own instruction on this block, honoured literally:** *"DO not do anything
+for statement below besides copying verbatim"* and *"NOTE: DO NOT action on this
+addendum in this session besides copying it verbatim to analyze on the next
+session"*. Nothing below was analysed, probed, filed or implemented in the
+session that received it. No issues were opened from it. The analysis is the
+NEXT session's first work.
+
+> i dont think we ran /clear-prep properly and i dont think it ran the session-review workflow on this session
+> - and it does not provide the prompt to run after /clear
+>   - and we need to automate this better so that i can just run a slash command and/or skill on the next session that just knows how to jump to handoff so there is less copy/paste needed
+>
+> add to addendum (DO not do anything for statement below besides copying verbatim):
+> - hk has a new release we need to resync:
+>   - https://github.com/jdx/hk/releases/tag/v1.56.0
+>   - perform same release-notes/features/changes review
+>     - add/update the skill for this so it is parameterized by dependency so it is re-usable
+>       - suggest other parameters needed
+>     - and its mise task(s) -> python libary module(s)/function(s) protocol
+>     - we should utilize HK_OUTPUT_FILE
+>     - review new builtins we should add/update/replace into this project
+>       - such as: https://github.com/suzuki-shunsuke/pinact
+>         - so we can proactively update versions in place instead of waiting for renovate
+>         - if added make a currency/critical dependency
+>
+> - why does mise.lock have references to linux?
+>   - this is running on a mac?
+>     - is this for CI/CD runs?
+>     - mise should provide a way to add attributes or settings to specify what operating system a specific tool or task should run on
+>
+> - the session-review workflow needs to be finding repeated mistakes and how to prevent them from happening again and how to automated manual steps
+>   - if it is not finding them, then we need to identify what is preventing it from catching them
+>   - and it shoul be finding ways to wrap manual commands being done into wrapper skills/mise tasks/python library modules/functions
+>
+> - we should add verify specifc version of python dependency in pyproject.toml if possible
+>   - update:
+>     - from: requires-python = ">=3.14"
+>     - to: requires-python = ">=3.14.7"
+>     - will this allow us to remove python from mise.toml using mise's dependency feature so we can have the configuration in multiple places?
+>
+> - explore creating the eventual cli we are building
+>   - AST tree-sitter
+>   - lsp
+>   - graphql
+>   - other features we can add to make it easy for another ai/llm agent/human/ide to navigate our code
+>
+> - add gha workflows for full ci/cd of the project
+>   - run tests
+>   - renovate updates
+>   - dependabot updates
+>   - semantic version increments and package deploys of the project
+>   - provide other suggestions
+>   - improving upon what /Users/rmanaloto/dev/github/ray-manaloto/dotfiles using modern best practices and all modern services/tools/libraries/sdks vs hand-writing our own code
+>
+> - we need to create an api/cli for this project for steps that involve updating multiple files so we dont ever risk drift
+>   - for example updating a version of a dependency should be wrapped in an api call so all the machinery needed to be done is automated, won't drift and the internals can be changed without affecting too much upstream
+>   - suggest what else can be wrapped
+>   - or if we can consolidate to fewer config files or files to add/update/remove
+>     - for example i want to make every first-level dependency in mise.toml and pyproject.toml critical currency dependencies
+>       - we should be able to just use those config files and/or their cli tools to avoid having currency.toml and other files or reduce what they have to maintain
+>
+> - update workflow to a workflow engine using a state machine library
+>   - review: 
+>     - dbos with sqlite or postgres
+>     - https://github.com/microsoft/pg_durable 
+>   - use research tools to find alternative solutions/products/frameworks/libraries/sdks/apis/services/etc
+>     - must be free or provide a free tier that fits our workloads
+>
+> - getting expert level understanding of graphify and completing the deep extraction and refletion and generated artifacts needs to be completed soon so we can start deep learing the dependencies to find these answers and navigate the dependencies faster/more efficiently
+>
+> NOTE: DO NOT action on this addendum in this session besides copying it verbatim to analyze on the next session
