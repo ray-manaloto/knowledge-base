@@ -25,7 +25,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/openai/codex
-ref = rust-v0.147.0
-commit = 3ed6f04f6bf8b7c46299d1cb1ff99c74ce21a51d
+ref = rust-v0.148.0
+commit = ab52d1794d47d47ecaeb0ec37fc00fa31593ecf3
 kind = code
 added = 2026-08-02

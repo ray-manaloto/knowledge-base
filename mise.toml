@@ -128,8 +128,8 @@ gh = "2.97.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-codex = "0.147.0"
-antigravity-cli = "1.1.11"
+codex = "0.148.0"
+antigravity-cli = "1.1.15"
 
 [deps.uv]
 auto = true

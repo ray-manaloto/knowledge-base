@@ -1,4 +1,8 @@
 {
+  "antigravity-cli": {
+    "latest": "1.1.15",
+    "observed_at": "2026-08-19T14:14:59.197929+00:00"
+  },
   "claude-code": {
     "latest": "v2.1.235",
     "observed_at": "2026-08-18T22:14:44.605335+00:00"

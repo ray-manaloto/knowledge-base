@@ -260,9 +260,22 @@ def test_real_ffmpeg_selection_uses_declared_version_flag(monkeypatch) -> None:
     assert seen == [["mise", "exec", "--", "ffmpeg", "-version"]]
 
 
-def test_live_eligibility_census_is_only_ffmpeg() -> None:
+def test_live_eligibility_census_is_exactly_the_two_mise_only_pins() -> None:
+    """The census is asserted EXACTLY, so an accidental widening still fails.
+
+    It was `("ffmpeg",)` until 2026-08-19 and grew when `[tool.antigravity-cli]`
+    was added to `currency.toml` — a mise-only pin with a binary and a version
+    pattern, which is precisely what this deliberately narrow command CAN
+    truthfully synchronize. So the growth is #314's direction (`kb-tool-sync`
+    covering more than one of twelve tools), not a regression, and the test was
+    renamed rather than relaxed: freezing the count at one would have made the
+    next legitimate addition look like a defect.
+
+    What keeps this honest is that it stays an exact tuple. A tool that becomes
+    eligible without anyone intending it still turns this red.
+    """
     repo_root = Path(__file__).parents[1]
-    assert tool_sync.eligible_tools(repo_root) == ("ffmpeg",)
+    assert tool_sync.eligible_tools(repo_root) == ("antigravity-cli", "ffmpeg")
 
 
 def test_unexpected_exception_is_redacted_after_rollback(tmp_path, monkeypatch, capsys) -> None:
