@@ -595,7 +595,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.3"
+expected = "2026.8.8"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -844,7 +844,7 @@ setting, and task/lockfile/python fixes."""
 # `_ACCEPTED_CLAUDE_VERSION` advance a mechanical bump instead of a new review —
 # every flag the semantic path requires is spelled the same and only the
 # implementation changed.
-expected = "2.1.234"
+expected = "2.1.235"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
@@ -1451,7 +1451,7 @@ manifest = "sources/uv.manifest"
 # takes `expected` (the version we have REVIEWED) rather than pretending mise
 # owns it. Bump `expected` and the pyproject pin in the same change, or this row
 # asserts a review that did not happen.
-expected = "0.16.2"
+expected = "0.16.3"
 binary = "ruff"
 github = "astral-sh/ruff"
 pypi = "ruff"
@@ -1463,7 +1463,7 @@ manifest = "sources/ruff.manifest"
 # `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
 # it needs a row rather than trust — a 0.0.x bump can carry a breaking change
 # with no marker to trip gate 3.
-expected = "0.0.69"
+expected = "0.0.72"
 binary = "ty"
 github = "astral-sh/ty"
 pypi = "ty"

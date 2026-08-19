@@ -19,6 +19,7 @@ from pathlib import Path
 
 import msgspec
 
+from kb_setup import graphify_baseline
 from kb_setup.graphify_baseline import RuntimeIdentity
 
 _CLAUDE_MODEL = "claude-haiku-4-5-20251001"
@@ -767,9 +768,19 @@ def preflight(
     # function default rather than a module constant — which is why no
     # `ref_binding` row reaches it and why it lagged silently. It feeds
     # `assert_semantic_sdk`, so a stale value asks "is the semantic API the one
-    # 0.9.44 shipped?" while 0.9.45 is installed: a version gate checking the
-    # wrong version, which passes for exactly as long as nothing moves.
-    graphify_version: str = "0.9.45",
+    # 0.9.44 shipped?" while a newer release is installed: a version gate
+    # checking the wrong version, which passes for exactly as long as nothing
+    # moves.
+    #
+    # It is no longer a literal. At the 0.9.46 bump it lagged AGAIN, exactly as
+    # the paragraph above predicted, and the prediction is the reason it is now
+    # READ: this default is about the runtime that will RUN, so it belongs to
+    # `graphify_baseline.ACCEPTED_GRAPHIFY_VERSION` — the constant the installed
+    # binary is separately asserted to match. It is deliberately NOT bound to
+    # `_ACCEPTED_GRAPHIFY_RUNTIME.version` below, which is frozen evidence about a
+    # receipt that already happened and may only move when that receipt is
+    # re-produced.
+    graphify_version: str = graphify_baseline.ACCEPTED_GRAPHIFY_VERSION,
     require_max_turns: bool = False,
     profile: ClaudeProfile = SLICE_PROFILE,
 ) -> ClaudePreflight:

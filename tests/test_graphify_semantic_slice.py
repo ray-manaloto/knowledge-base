@@ -15,13 +15,14 @@ from pathlib import Path
 
 import msgspec
 import pytest
-from kb_setup import cli, graphify_sdk, graphify_semantic_slice
+from kb_setup import cli, graphify_baseline, graphify_sdk, graphify_semantic_slice
 
 _MODEL = "claude-haiku-4-5-20251001"
 
 
-def test_graphify_0945_semantic_sdk_contract_is_current() -> None:
-    assert graphify_sdk.semantic_contract_errors("0.9.45") == ()
+def test_the_pinned_graphify_semantic_sdk_contract_is_current() -> None:
+    """No version in the NAME — see the sibling in test_graphify_sdk.py."""
+    assert graphify_sdk.semantic_contract_errors(graphify_baseline._ACCEPTED_GRAPHIFY_VERSION) == ()
 
 
 def test_default_preflight_checks_the_current_graphify_runtime(
@@ -41,7 +42,7 @@ def test_default_preflight_checks_the_current_graphify_runtime(
     with pytest.raises(RuntimeError, match="version tripwire"):
         graphify_semantic_slice.preflight(tmp_path, environment={"PATH": "/usr/bin"})
 
-    assert checked == ["0.9.45"]
+    assert checked == [graphify_baseline._ACCEPTED_GRAPHIFY_VERSION]
 
 
 def test_enforcing_authority_never_widens_the_accepted_runtime_set(

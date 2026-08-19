@@ -14,8 +14,15 @@ import msgspec
 import pytest
 from kb_setup import graph, graphify_baseline, graphify_env
 
-_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
-_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+# Derived from the production authority, not duplicated as literals. These
+# fixtures build a candidate the verifier should ACCEPT, so their subject is the
+# verifier's logic, never the constant's value — and a copy of the constant goes
+# stale at every graphify bump. The 0.9.45 -> 0.9.46 advance broke seven tests
+# here for exactly that reason, none of which was a real defect. Where a test's
+# point genuinely IS the literal (the installed-runtime binding below), it keeps
+# one.
+_COMMIT = graphify_baseline._ACCEPTED_AUTHORITY.source_commit
+_TREE = graphify_baseline._ACCEPTED_AUTHORITY.source_tree
 _REVIEWED_SHA = "f" * 64
 _LPK_PATH = "tests/fixtures/sample.lpk"
 _LPK_SHA = "d35ab7cfc6b30910020239b7389a4e732b5545269fd4b1cd43d7459aa2c40e1f"
@@ -120,7 +127,7 @@ def _write_public_candidate(root: Path) -> Path:
             "status": "complete",
             "source_commit": _COMMIT,
             "source_tree": _TREE,
-            "runtime_version": "0.9.45",
+            "runtime_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
             "detected_count": 1,
             "extracted_count": 1,
             "node_count": 1,
@@ -143,15 +150,15 @@ def _write_public_candidate(root: Path) -> Path:
         },
         "runtime.json": {
             "schema_version": 1,
-            "version": "0.9.45",
-            "cli_version": "0.9.45",
-            "sdk_version": "0.9.45",
+            "version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
+            "cli_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
+            "sdk_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
             "executable": ".venv/bin/graphify",
             "sdk_fingerprint_sha256": (
                 "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157"
             ),
-            "wheel_sha256": ("134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663"),
-            "sdist_sha256": ("ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7"),
+            "wheel_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES["wheel_sha256"],
+            "sdist_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES["sdist_sha256"],
         },
         "controls.json": {
             "schema_version": 1,
@@ -171,7 +178,7 @@ def _write_public_candidate(root: Path) -> Path:
         "dispositions.json": {
             "schema_version": 1,
             "source": "graphify",
-            "source_ref": "v0.9.45",
+            "source_ref": graphify_baseline._ACCEPTED_GRAPHIFY_REF,
             "source_commit": _COMMIT,
             "source_tree": _TREE,
             "entries": [
@@ -203,7 +210,7 @@ def _write_public_candidate(root: Path) -> Path:
     manifest = {
         "schema_id": "graphify-deterministic-baseline/v0",
         "source": "graphify",
-        "source_ref": "v0.9.45",
+        "source_ref": graphify_baseline._ACCEPTED_GRAPHIFY_REF,
         "source_commit": _COMMIT,
         "source_tree": _TREE,
         "catalog_sha256": hashlib.sha256(payloads["dispositions.json"]).hexdigest(),
@@ -218,7 +225,7 @@ def _write_public_candidate(root: Path) -> Path:
     )
     source_manifest_sha256 = hashlib.sha256(payloads["source-manifest.json"]).hexdigest()
     _FIXTURE_AUTHORITIES[root] = graphify_baseline.BaselineAuthority(
-        source_ref="v0.9.45",
+        source_ref=graphify_baseline._ACCEPTED_GRAPHIFY_REF,
         source_commit=_COMMIT,
         source_tree=_TREE,
         catalog_sha256=hashlib.sha256(payloads["dispositions.json"]).hexdigest(),
@@ -240,7 +247,7 @@ def _refresh_fixture_authority(candidate: Path) -> None:
     source_member = next(item for item in members if item["name"] == "source-manifest.json")
     build = json.loads((candidate / "build-receipt.json").read_bytes())
     _FIXTURE_AUTHORITIES[candidate] = graphify_baseline.BaselineAuthority(
-        source_ref="v0.9.45",
+        source_ref=graphify_baseline._ACCEPTED_GRAPHIFY_REF,
         source_commit=_COMMIT,
         source_tree=_TREE,
         catalog_sha256=str(manifest["catalog_sha256"]),
@@ -967,8 +974,8 @@ def test_committed_graphify_disposition_catalog_is_typed_and_exact() -> None:
     catalog = graphify_baseline.load_disposition_catalog(repo)
 
     assert catalog.source == "graphify"
-    assert catalog.source_commit == "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
-    assert catalog.source_tree == "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+    assert catalog.source_commit == graphify_baseline._ACCEPTED_AUTHORITY.source_commit
+    assert catalog.source_tree == graphify_baseline._ACCEPTED_AUTHORITY.source_tree
     # 21 -> 20: `docs/superpowers` lost its `ignored-tree` disposition at 0.9.45.
     # graphify #2759 stopped dropping a git-tracked file that also matches a
     # `.gitignore` pattern, matching git's own behaviour, so those two markdown
@@ -1033,15 +1040,20 @@ def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:
 
     identity = graphify_baseline.runtime_identity(repo)
 
-    assert identity.version == "0.9.45"
+    # Against the ACCEPTED constants rather than pasted literals. This is not
+    # vacuous and it is not the stale-copy pattern the module header describes:
+    # `identity` is read from the INSTALLED graphify, so each line asserts that
+    # what is installed is what the baseline accepts — which is exactly the
+    # `runtime-version-drift` / `runtime-identity-drift` condition, checked from
+    # the test side. A pasted literal asserted the same thing and additionally
+    # went stale at every bump, which is how it became one of the seven.
+    assert identity.version == graphify_baseline._ACCEPTED_GRAPHIFY_VERSION
     assert identity.cli_version == identity.sdk_version == identity.version
-    assert identity.executable == ".venv/bin/graphify"
-    assert identity.wheel_sha256 == (
-        "134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663"
-    )
-    assert identity.sdist_sha256 == (
-        "ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7"
-    )
+    assert identity.executable == graphify_baseline._ACCEPTED_GRAPHIFY_EXECUTABLE
+    for key in ("wheel_sha256", "sdist_sha256", "sdk_fingerprint_sha256"):
+        assert getattr(identity, key) == graphify_baseline._ACCEPTED_RUNTIME_HASHES[key], (
+            f"the installed graphify's {key} is not the one the baseline accepts"
+        )
     assert len(identity.sdk_fingerprint_sha256) == 64
 
 

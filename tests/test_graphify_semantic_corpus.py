@@ -235,7 +235,7 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.45",
+            ref=graphify_semantic_corpus._ACCEPTED_GRAPHIFY_REF,
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -246,14 +246,14 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
     assert advisories["entries"] == [
         {
             "code": "graphify-large-corpus-token-cost",
-            "detector_git_object": "f76a4259f6a7360872663fbe711c4738ecda4680",
+            "detector_git_object": graphify_semantic_corpus._ACCEPTED_GRAPHIFY_DETECT_OBJECT,
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 792 files · ~1,394,475 words. Semantic extraction will be "
+                "Large corpus: 798 files · ~1,406,076 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 792,
-            "observed_words": 1_394_475,
+            "observed_files": 798,
+            "observed_words": 1_406_076,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }
@@ -299,7 +299,7 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
         source,
         candidate,
         source=graphify_semantic_corpus.SourcePin(
-            ref="v0.9.45",
+            ref=graphify_semantic_corpus._ACCEPTED_GRAPHIFY_REF,
             commit=_git(source, "rev-parse", "HEAD"),
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
@@ -307,16 +307,19 @@ def test_coherently_rehashed_advisory_cannot_bypass_source_recomputation(
     )
     advisory_path = candidate / "advisories.json"
     advisory = json.loads(advisory_path.read_text(encoding="utf-8"))
-    advisory["entries"][0]["observed_files"] += 1
-    advisory["entries"][0]["message"] = advisory["entries"][0]["message"].replace(
-        # 792 -> 793, tracking `observed_files += 1` above. These two must stay in
-        # step: the mutation is only a mutation while the written value DIFFERS
-        # from the recomputed one, so leaving "791 files" here after the corpus
-        # grew would rewrite nothing and the test would assert a mismatch it
-        # never actually created.
-        "792 files",
-        "793 files",
+    # Both sides DERIVED from the observed count, never written twice. The
+    # comment this replaces predicted its own failure exactly — "leaving '791
+    # files' here after the corpus grew would rewrite nothing and the test would
+    # assert a mismatch it never actually created" — and then the v0.9.46 bump
+    # grew the corpus 792 -> 798 and did precisely that. A literal that must
+    # track a measurement is a mutation waiting to become a no-op.
+    observed_files = advisory["entries"][0]["observed_files"]
+    advisory["entries"][0]["observed_files"] = observed_files + 1
+    before, after = f"{observed_files} files", f"{observed_files + 1} files"
+    assert before in advisory["entries"][0]["message"], (
+        f"the message must state the observed count for the mutation to bite: {before!r}"
     )
+    advisory["entries"][0]["message"] = advisory["entries"][0]["message"].replace(before, after)
     advisory_path.write_bytes(_canonical(advisory))
     _rehash_plan(candidate)
 
@@ -767,15 +770,19 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     ledger = json.loads((candidate / "chunk-ledger.json").read_text(encoding="utf-8"))
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
-    assert inventory["source_ref"] == "v0.9.45"
-    assert inventory["source_commit"] == "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
-    assert inventory["source_tree"] == "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+    # Against the module constants, not pasted literals: the claim is that the
+    # inventory records the SOURCE THE MODULE ACCEPTS, which is what a reader
+    # needs. A copy of each value asserted the same thing and went stale at
+    # every graphify bump, which is how these became four of the eleven.
+    assert inventory["source_ref"] == graphify_semantic_corpus._ACCEPTED_GRAPHIFY_REF
+    assert inventory["source_commit"] == graphify_semantic_corpus._ACCEPTED_GRAPHIFY_COMMIT
+    assert inventory["source_tree"] == graphify_semantic_corpus._ACCEPTED_GRAPHIFY_TREE
     assert inventory["detected_source_count"] == 374
     assert inventory["discovered_unit_count"] == 478
     assert inventory["admitted_unit_count"] == 474
     assert (
         inventory["source_manifest_sha256"]
-        == "980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911"
+        == graphify_semantic_corpus._ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256
     )
     assert len(ledger["chunks"]) == 58
     assert config["max_turns"] == 3

@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 import tempfile
 import tomllib
 from copy import deepcopy
@@ -223,8 +224,17 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.45"
-_ACCEPTED_GRAPHIFY_REF = "v0.9.45"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.46"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.46"
+
+#: The public spelling of the version above, for the ONE cross-module consumer:
+#: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
+#: hardcoded literal and lagged silently at two bumps in a row — its own comment
+#: called it "the only one that is a function default rather than a module
+#: constant… which is why no `ref_binding` row reaches it". Binding it here makes
+#: it un-laggable, and a public alias is the honest way to do that rather than
+#: reaching across the module boundary for a private name.
+ACCEPTED_GRAPHIFY_VERSION = _ACCEPTED_GRAPHIFY_VERSION
 _ACCEPTED_GRAPHIFY_EXECUTABLE = ".venv/bin/graphify"
 _ACCEPTED_GRAPHIFY_URL = "https://github.com/Graphify-Labs/graphify"
 # Deliberately NOT renamed at the 0.9.44 bump. The version in this string names
@@ -244,23 +254,30 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
-    "sdist_sha256": "ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
+    "wheel_sha256": "35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
+    "sdist_sha256": "9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="0738af373af9cf5c95f862cc5f3327fd96b4ea23",
-    source_tree="e0e089a404dd0b9f6d01273b869c80197c0cc03c",
-    catalog_sha256="2510886162c52c58c7d977c24cca962473cb4cf77867077d5c42d105f4df5af5",
-    source_manifest_sha256="980fab12cee6348416b2962121f42a3c66a97277ac9e89855abb9d6fe4856911",
-    # 417 -> 418 detected, 409 -> 410 extracted across v0.9.44 -> v0.9.45. Both
-    # RE-DERIVED by a real build against the installed 0.9.45, never carried
+    source_commit="558df6d57d61cb6ef79c740ec7473c6d953d79a7",
+    source_tree="5477ba01c420117fcda22804b8046ad9d571c156",
+    catalog_sha256="99f56744e68d12eff9056578893d7e9fec1d19c5674026652a467e5fc82727e3",
+    source_manifest_sha256="2ee48f39cdf09037029eedf7f7d97d24a7311a7feaf56c6c76f2056cb4f2e9ae",
+    # 418 -> 424 detected, 410 -> 416 extracted across v0.9.45 -> v0.9.46. Both
+    # RE-DERIVED by a real build against the installed 0.9.46, never carried
     # forward: the same run reproduced `source_tree` independently of the GitHub
     # API derivation above, which is what makes these counts a measurement.
-    # +1/+1 is ordinary upstream growth — the release adds one test module net of
-    # the files it touches, and no warning was emitted.
-    detected_count=418,
-    extracted_count=410,
+    # +6/+6 is ordinary upstream growth — every newly detected file was also
+    # extracted, so the gap between the two counts is UNCHANGED at 8, and no
+    # warning was emitted.
+    #
+    # How these were obtained is worth recording, because it is what made the
+    # 0.9.46 advance possible at all: `_authority_reasons` now prints OBSERVED vs
+    # ACCEPTED for every drifted key (#373). Before that it named the key only
+    # and deleted its output, so the build could not tell you what to move the
+    # constants to while refusing to run until you had.
+    detected_count=424,
+    extracted_count=416,
 )
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.
@@ -1075,11 +1092,44 @@ def _authority_reasons(
     )
     reasons = [reason for observed, expected, reason in comparisons if observed != expected]
     build = payloads.get("build-receipt.json")
-    if not isinstance(build, dict) or (
-        build.get("detected_count"),
-        build.get("extracted_count"),
-    ) != (authority.detected_count, authority.extracted_count):
+    observed_counts = (
+        (build.get("detected_count"), build.get("extracted_count"))
+        if isinstance(build, dict)
+        else None
+    )
+    accepted_counts = (authority.detected_count, authority.extracted_count)
+    if observed_counts != accepted_counts:
         reasons.append("authority-build-count-mismatch")
+
+    # Report OBSERVED vs ACCEPTED to stderr — never into `reasons`, which is a
+    # machine-readable code other code and tests match on exactly. Overloading a
+    # code with a human message was the first shape of this fix and it broke two
+    # `"<code>" in receipt.reasons` assertions; the code is the contract, the
+    # diagnostic is a different channel.
+    #
+    # Why the diagnostic exists at all: naming the drifted key without its values
+    # is what made a graphify bump a multi-hour derivation chain. The build
+    # refuses until these constants move and was the only thing that could
+    # honestly say what to move them TO — then it deleted its output. Five
+    # re-plans did not close that loop; printing the pair turns the next bump
+    # into reading one line. (#373)
+    details = [
+        f"  {reason}: observed {observed!r}, accepted {expected!r}"
+        for observed, expected, reason in comparisons
+        if observed != expected
+    ]
+    if observed_counts != accepted_counts:
+        details.append(
+            f"  authority-build-count-mismatch: observed {observed_counts!r}, "
+            f"accepted {accepted_counts!r}"
+        )
+    if details:
+        print(
+            "[graphify-baseline] authority drift — move these in _ACCEPTED_AUTHORITY:",
+            *details,
+            sep="\n",
+            file=sys.stderr,
+        )
     return reasons
 
 

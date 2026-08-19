@@ -24,7 +24,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/astral-sh/ruff
-ref = 0.16.2
-commit = 5b48a040974781ba90b47c8df628f8fd9b6c95dd
+ref = 0.16.3
+commit = b0e47022cfce4f3594aa26d15ea792681430b6f6
 kind = code
 added = 2026-08-02

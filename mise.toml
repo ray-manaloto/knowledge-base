@@ -26,13 +26,13 @@
 # comment and the value drift apart (they did, and the cold lane caught it).
 # Keep soft > hard or soft is inert: hard errors across exactly the range soft
 # would warn in, so an equal pair makes the warning unobservable.
-min_version = { hard = "2026.7.14", soft = "2026.8.3" }
+min_version = { hard = "2026.7.14", soft = "2026.8.8" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
-uv = "0.12.3"
-hk = "1.54.1"
+uv = "0.12.5"
+hk = "1.55.0"
 pkl = "0.32.1"
 typos = "1.49.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -65,12 +65,12 @@ gitleaks = "8.30.1"
 # while the global install stays on `latest` — a deliberate, accepted skew.
 # This repo pins what fnox it EXPECTS; it does not touch `~/.config/fnox`, so
 # `do-not.md` #11 is not engaged. Bump alongside the global one.
-fnox = "1.32.0"
+fnox = "1.33.1"
 # Doppler is the runtime secret-delivery boundary used by the devcontainer and
 # CI/CD workflows. Keep this exact pin aligned with `[tool.doppler]` and
 # `sources/doppler.manifest`; credentials/config remain user-owned and are not
 # stored in this repository.
-doppler = "3.76.1"
+doppler = "3.76.5"
 # gh: the GitHub CLI `kb-ship` and `kb-land` are BUILT ON — `pr.py` alone holds
 # 19 `"gh"` literals, and it backs PR creation (`pr.py:372`) and the merge
 # (`pr.py:233`). Until 2026-08-17 it was pinned NOWHERE in this repo and resolved
