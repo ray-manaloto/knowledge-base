@@ -217,12 +217,17 @@ if (OUTPUT === 'handoff' && !(typeof cfg.handoffOut === 'string' && cfg.handoffO
   )
 }
 
-// The five a handoff is actually made of: what was asked and dropped, what is
-// unlanded, what got redone, what drifted, and what a bot flagged that nobody
-// actioned. `unpinned`, `context` and `tooling-gap` are round-level questions
+// The six a handoff is actually made of: what was asked and dropped, what is
+// unlanded, what got redone, what drifted, what a bot flagged that nobody
+// actioned, and what was done by hand that a task already owns. `tooling-gap`
+// joined on 2026-08-19: the heredoc, shell-chain and repeated-mistake checks
+// live in its brief, and the clear-prep handoff path is how this workflow
+// actually gets invoked, so leaving the lane out of handoff mode meant those
+// detectors never ran at all (the round's own finding: detectors that nothing
+// invokes run zero times). `unpinned` and `context` stay round-level questions
 // and are not worth a session-end agent each. A DEFAULT now — pass `lanes` to
 // override in either direction.
-const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews'])
+const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews', 'tooling-gap'])
 
 // `sessions` REPLACES `transcriptDir` + `since`, and comes from
 // `mise run kb-session-select` rather than from whoever is typing the call.
@@ -299,6 +304,30 @@ End your report with a COVERAGE line naming, explicitly:
 A lane that is interrupted returns a confident report about the part it reached
 and reads exactly like one that finished. That happened twice in the round that
 wrote this file. If you are running out of room, write the coverage line FIRST.
+
+A REPEATED MISTAKE IS A FINDING FOR ANY LANE THAT SEES IT, and the useful half
+is not the count — it is what would MECHANICALLY prevent the next one. A deny, a
+gate, a task. Never "someone should remember". This repo has measured the
+difference: a warning-only rule scored 0 compliance in 19 chances, and the deny
+that replaced it took its violations 62 to 0.
+
+Do not leave this to whichever lane happens to be scheduled. The heredoc and
+hand-run-chain rules were put in ONE lane's brief to answer exactly this
+complaint, and handoff mode stood that lane down, so the amendment never ran in
+the round meant to test it — it only looked like it had, because another lane
+found the same shapes independently.
+
+A DEFERRAL RECORDED INSIDE THE REVIEWED WINDOW IS SCOPE FOR YOU, NOT AN
+EXEMPTION. If the round said "this is the next session's job", "after /clear",
+"deferred", "carried" or "not yet" — YOU ARE THE NEXT SESSION. Report it as an
+item with its status. Never as out of scope, and never in a section headed
+"explicitly not owed". The 2026-08-18 sweep declined to analyse the largest item
+on its own agenda on exactly this misreading, and discarded three of its own
+lane findings with it.
+
+ONE EXCEPTION, and only when the brief says so explicitly: content the USER has
+scoped out of THIS review in the directive itself. That is the user deferring
+forward, not the round deferring sideways.
 
 Write your findings to ${reportDir}/<your-lane>.md AS YOU GO, not at the end.
 An agent that dies holding everything in memory leaves nothing.
@@ -409,7 +438,26 @@ delegation rate as a share of tool calls.`,
 that no task owns yet. For each candidate automation say which layer is EARNED —
 skill, mise task, or python module — and what evidence supports it. Be sceptical:
 propose nothing that a single existing task already does with the right arguments,
-and say plainly which existing tools should be FIXED before anything is added.`,
+and say plainly which existing tools should be FIXED before anything is added.
+
+A HEREDOC THAT IMPORTS \`kb_setup\` IS A WRAPPER CANDIDATE BY DEFINITION. Grep the
+transcript for Bash commands containing \`<<\` together with \`from kb_setup\` or
+\`import kb_setup\`. That shape is the library driven DIRECTLY, bypassing the task
+layer \`zero-bash-logic.md\` and \`mise-tasks-only.md\` exist to enforce — so the
+shape IS the finding and needs no judgement about whether it "deserves" a task.
+Report every one, with the module it imports and how many times it recurred. Once
+is enough to report: the alternative always exists.
+
+ALSO REPORT MULTI-STEP CHAINS RUN BY HAND — a \`;\`- or \`&&\`-joined sequence of
+three or more commands that recurs, especially any ending in a redirect-and-tail
+or a pipe into head/tail. Ray has quoted these back at the project twice and
+said "i shouldnt be the one catching this. the session review workflow should
+have been flagging this." A lane that reports none of these on a round that ran
+them has not looked.
+
+AND REPEATED MISTAKES ARE IN SCOPE HERE, not only in the circles lane: for each,
+say what would MECHANICALLY prevent it — a deny, a gate, a task — not what
+someone should remember.`,
   },
   {
     key: 'bot-reviews',

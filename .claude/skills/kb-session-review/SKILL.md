@@ -188,7 +188,7 @@ recollect; they read.
 ```text
 mise run kb-session-select -- --current
 Workflow({ name: 'session-review', args: {
-  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the five below
+  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the six below
   handoffOut: '.agent/plans/session-<date>-<letter>.md',
   sessions, handoffs, answered,
 }})
@@ -197,7 +197,10 @@ Workflow({ name: 'session-review', args: {
 Lanes in handoff mode: `forgotten` (what was asked and dropped), `pending-work`
 (unlanded branches/worktrees), `circles` (the gotchas the next session would
 repeat), `contradicted` (docs that drifted), `bot-reviews` (findings nobody
-actioned). `unpinned`, `context` and `tooling-gap` are round-level and stand down.
+actioned), `tooling-gap` (hand-run work a task already owns, including the
+heredoc, shell-chain and repeated-mistake checks; excluded until 2026-08-19,
+which is why those detectors ran zero times on the path that actually invokes
+this workflow). `unpinned` and `context` are round-level and stand down.
 
 The composer is told the shape `kb-handoff-check` parses — branch in the lead,
 every gate claim carrying its commit with the sha backticked, `(absent)` on any

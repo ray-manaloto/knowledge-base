@@ -344,12 +344,35 @@ summaries or gate commands is the duplication this skill exists to prevent —
 and a prompt that disagrees with the handoff sends the next session to the
 wrong one.
 
+**The pointer is now a skill, so there is nothing to paste:**
+
+```text
+/kb-resume
+```
+
+`kb-resume` finds the newest handoff itself, reads the newest directive with it,
+and — the part a pasted path cannot do — CHECKS both against the repo, reporting
+any place they disagree. Ray, 2026-08-19: *"we need to automate this better so
+that i can just run a slash command and/or skill on the next session that just
+knows how to jump to handoff so there is less copy/paste needed."*
+
+**Print this line even when the round ended untidily.** It was skipped on
+2026-08-19 and the next session had no idea where to start, which is the whole
+failure this step exists to prevent. A handoff nobody is told to read is a
+handoff nobody reads.
+
+The older form still works when the next session should read a SPECIFIC handoff
+rather than the newest:
+
 ```text
 Read and follow .agent/plans/session-<date>.md
 ```
 
-Then one line for the human: *"Run `/clear`, paste that, and the session resumes
-from the handoff."*
+(`/kb-resume <path>` does the same and keeps the repo checks.) It is no use on
+a fresh clone: `.agent/` is gitignored, so a missing `.agent/` directory has no
+handoff to point at. `/kb-resume` handles that case itself, falling back to the
+newest tracked `docs/direction/*.md` plus `git log`, so `/kb-resume` stays the
+right prompt to print either way.
 
 ## Keeping this skill honest over time
 
@@ -386,7 +409,7 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Auto-memory written + `MEMORY.md` pointer added.
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate.
-- [ ] One-line resume prompt printed.
+- [ ] Resume prompt printed — `/kb-resume` (skipped on 2026-08-19; the next session had no idea where to start).
 
 ## See also
 
