@@ -308,8 +308,12 @@ def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
         for part in finding.detail.split(";")
         if " reads " in part
     }
-    unexpected = {p for p in lagging if not p.endswith(allowed)}
-    assert not unexpected, (
-        "only the slice's frozen receipt bindings may lag the manifest; these "
-        f"also lag and must be advanced with the pin: {sorted(unexpected)}"
+    # Exact-set equality, not suffix filtering: a suffix match would admit an
+    # unrelated path that merely ENDS with the allowed one (archive/<allowed>),
+    # and a parse that finds no " reads " segments at all would yield an empty
+    # set that a mere "no unexpected paths" check waves through.
+    assert lagging == {allowed}, (
+        "only the slice's frozen receipt bindings may lag the manifest; the "
+        f"finding names {sorted(lagging)} but exactly [{allowed!r}] may lag — "
+        "anything else must be advanced with the pin"
     )

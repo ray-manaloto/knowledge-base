@@ -1275,13 +1275,13 @@ def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> li
         ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),)
         if enforce_authority
         else (
-            # Both pairs now read 0.9.45: the AUTHORITY pair advanced because
-            # the committed slice evidence was re-produced at 0.9.45 (never on a
-            # pin bump alone, which would assert an identity the receipt on disk
-            # contradicts), and the CURRENT pair moves with the pin. The two
-            # entries are therefore currently EQUAL, which is expected rather
-            # than a duplication mistake; they diverge again the moment the pin
-            # moves ahead of the committed receipt. Each version string has to
+            # The two pairs DIVERGE here: the AUTHORITY pair stays at 0.9.45
+            # because that is where the committed slice evidence was produced
+            # (it never advances on a pin bump alone, which would assert an
+            # identity the receipt on disk contradicts), while the CURRENT pair
+            # moved with the pin to 0.9.46. They converge again only when the
+            # slice re-runs and commits a new receipt under the installed
+            # version. Each version string has to
             # move WITH its runtime (the two are checked as a pair), so a
             # literal left beside a newer runtime makes the pair unmatchable and
             # the non-authority path rejects every run under the installed

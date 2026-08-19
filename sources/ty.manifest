@@ -6,7 +6,7 @@
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: pyproject.toml `[dependency-groups] dev` EXACT pin `ty==0.0.72`,
 #                   confirmed against `uv run ty --version`, which prints the tag's
-#                   own short commit (`1dca8443e`) — so binary and pin are checkable
+#                   own short commit (`62ebbecc7`) — so binary and pin are checkable
 #                   against each other here in a way ruff's output does not allow.
 #                   It was a floor (`ty>=0.0.1a1`) when this manifest was written;
 #                   pyproject's own comment calls that floor the worst of the group,

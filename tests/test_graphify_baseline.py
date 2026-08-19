@@ -154,9 +154,9 @@ def _write_public_candidate(root: Path) -> Path:
             "cli_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
             "sdk_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
             "executable": ".venv/bin/graphify",
-            "sdk_fingerprint_sha256": (
-                "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157"
-            ),
+            "sdk_fingerprint_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES[
+                "sdk_fingerprint_sha256"
+            ],
             "wheel_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES["wheel_sha256"],
             "sdist_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES["sdist_sha256"],
         },

@@ -7,7 +7,7 @@
 #   version source: mise.toml `[tools] uv`
 #   pinned here:    0.12.5
 # Cross-checkable without trusting this file: `uv --version` prints the tag's own
-# short commit (`46ead6098`), so binary and pin verify against each other — the
+# short commit (`210d1f678`), so binary and pin verify against each other — the
 # same property ty has and ruff does not.
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`

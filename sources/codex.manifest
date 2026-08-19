@@ -5,12 +5,13 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] codex`
-#   pinned here:    0.147.0
+#   pinned here:    0.148.0
 # Note the tag prefix: releases are `rust-v<version>`, so `ref` is NOT the bare
 # version the two lines above name. Also: this manifest read 0.146.0 while
 # mise.toml ran 0.146.1, i.e. it was ALREADY drifting before the 0.147.0 bump —
-# the invariant above is stated in 13 manifests and enforced by nothing, which
-# is filed separately rather than fixed silently here.
+# back then the invariant above was stated in 13 manifests and enforced by
+# nothing. The manifest check in `kb-currency-check` now enforces it, with the
+# `rust-v` prefix handled via the spec's `tag_prefix` (#245).
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
