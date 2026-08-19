@@ -407,10 +407,22 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # This is the same shape as the 0.9.45 re-record, and it is recorded here rather
 # than merely believed because the previous note had to be corrected once: the
 # digests were once described as never changing, and then they changed.
+#
+# RECORD THIS BLOCK LAST — after every other edit in the change is final.
+# `execution-config.json` hashes `planner_sha256` (this package's corpus module)
+# and `semantic_slice_sha256` among others, so ANY later edit to those files,
+# including a one-word comment fix, moves two of the four digests below and
+# stales the authorization. That is not hypothetical twice over: the note above
+# records it happening at 31c63d4d for a comment in the runner, and it happened
+# AGAIN while writing this very entry — the four values were computed, then a
+# typo fix landed in `graphify_semantic_corpus.py` and a public-alias change in
+# `graphify_semantic_slice.py`, and `execution_config_sha256` /
+# `plan_manifest_sha256` both drifted before the commit was made. The gate caught
+# it, which is the gate working; the ordering rule is how not to need it.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"88ed68a5e0c483019b64ac6e903440251766d6982a94f9148d446ce25ba4218c",'
-    b'"execution_config_sha256":"e2de8422cce0afd0a90b0f2573083fa5823bd30572dc5e7e8064ed6102b0a4d7",'
+    b'"execution_config_sha256":"d8b1211447b7d7f14da41e9b4543729eb2b8e172ddb9e18971f4e72317530def",'
     b'"exclusions_sha256":"fac4b2c398c7c852419ed9436c742afcec4aab2481091e8f63d1e5d6454e2cc7",'
-    b'"plan_manifest_sha256":"c8000cc0d93b2a05298c2501042e3039d7a15d27122de22ee40dda02d0dd5176",'
+    b'"plan_manifest_sha256":"d0869047be2ca2c63a2260be967a1c4a4287954d1b626cc001c858da718d031b",'
     b'"schema_version":1}\n'
 )

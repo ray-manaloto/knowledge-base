@@ -383,9 +383,20 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # The 2.1.226 -> 2.1.234 release review lives in `currency.toml`'s
 # `[tool.claude-code]` block. Nothing in those eight releases touches the flags,
 # the argv shape or the envelope this path depends on.
-_CURRENT_CLAUDE_VERSION = "2.1.234"
+#
+# 2.1.234 -> 2.1.235 advanced 2026-08-19 alongside `currency.toml`'s `expected`,
+# because `claude` self-updates in place and the binary on PATH had already moved
+# — so leaving this at 2.1.234 asserted an identity the host contradicts. Both
+# values are MEASURED here, not carried: `claude --version` reports 2.1.235 and
+# `shasum -a 256 $(command -v claude)` reports the digest below.
+#
+# It is the ELEVENTH version-restatement site in this package and the cold lane
+# found it, not the ref-binding check — that check compares against
+# `sources/graphify.manifest`, so a claude-code binding is outside its scope
+# entirely. Worth stating plainly: the currency machinery does not see this line.
+_CURRENT_CLAUDE_VERSION = "2.1.235"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "08d8700313697cbe730a25420c908a299ce52d56f0eb2cf4fac94cab5109bc57"
+    "83b8f806f6f2eea316cfe246628e6c23374711d868f1fd0409db551b877b7748"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (
