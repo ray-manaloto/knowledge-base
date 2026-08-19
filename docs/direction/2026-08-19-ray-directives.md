@@ -153,8 +153,9 @@ answer turned out to be a defect on `main`, fixed in the same session.
 
 **Three `graphify-labs` reviews existed on PR #375** and none of their bodies was
 read: `4973529378` (14:55Z), `4973713252` (15:13Z), `4974111558` (15:54Z). The PR
-merged at **15:49Z**, so the first two were available for **54 minutes** before
-the merge.
+merged at **15:49Z**. Review `4973529378` was available for **54 minutes**;
+review `4973713252` for **36 minutes**. Review `4974111558` was posted
+**5 minutes after** the merge.
 
 **Why the probe could not see them.** The bot sweep used
 `gh api repos/.../pulls/375/comments` — the INLINE-comment endpoint. graphify-labs
