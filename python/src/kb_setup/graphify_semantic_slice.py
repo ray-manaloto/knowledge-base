@@ -351,19 +351,31 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # check reported DRIFT and its own test could not (see
 # tests/test_currency_ref_bindings.py).
 #
-# All three digests MEASURED against the installed 0.9.46 via
-# `graphify_baseline.runtime_identity`, not carried:
-# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.45 -> 0.9.46 — the public SDK
-# surface is identical — while the wheel and sdist digests moved because the
-# distribution is a new build.
+# ADVANCED AGAIN to 0.9.47. All three digests MEASURED against the installed
+# 0.9.47 via `graphify_baseline.runtime_identity`, not carried:
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.45 -> 0.9.46 -> 0.9.47 — the
+# public SDK surface is identical at all three — while the wheel and sdist
+# digests moved because each distribution is a new build.
+#
+# ⚠️ DO NOT COPY FORWARD THE 0.9.45 ARGUMENT HERE. That entry justified its
+# fingerprint by noting `graphify/llm.py` "does not appear in the compare at
+# all". At 0.9.47 IT DOES: `compare/v0.9.46...v0.9.47` lists 30 files and
+# `graphify/llm.py` is one of them — the release fixes an `AttributeError:
+# 'ThinkingBlock'` crash when an extended-thinking response leads with a
+# thinking block (#2697). That is the CLAUDE backend, i.e. the only backend
+# this repo permits, so it is a reason to adopt rather than a risk. What
+# settles `assert_semantic_sdk`'s "review the release before inference" gate is
+# the fingerprint being byte-identical: the changed code is inside the
+# response-reading path, not on the signature of `llm.extract_corpus_parallel`.
+# The absence-of-llm.py test would have PASSED at 0.9.45 and been FALSE here.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.46",
-    cli_version="0.9.46",
-    sdk_version="0.9.46",
+    version="0.9.47",
+    cli_version="0.9.47",
+    sdk_version="0.9.47",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
-    sdist_sha256="9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
+    wheel_sha256="2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
+    sdist_sha256="26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
 )
 # The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
 # authority for it — `_receipt_reasons` compares the retained receipt against
@@ -412,9 +424,29 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # found it, not the ref-binding check — that check compares against
 # `sources/graphify.manifest`, so a claude-code binding is outside its scope
 # entirely. Worth stating plainly: the currency machinery does not see this line.
-_CURRENT_CLAUDE_VERSION = "2.1.235"
+#
+# 2.1.235 -> 2.1.236 advanced 2026-08-19, for the same reason and by the same
+# measurement: `claude` self-updated in place again, so the sweep that moved
+# `currency.toml`'s `expected` and `sources/claude-code.manifest` had to move
+# this too or it would assert an identity the host contradicts. Measured, not
+# carried: `claude --version` reports 2.1.236 and the digest below is
+# `sha256(Path(which("claude")).read_bytes())`.
+#
+# THE `--help` DIGEST DID NOT MOVE — re-hashed against the INSTALLED 2.1.236
+# through this module's own `claude_child_environment`, it is still
+# 71ad650f…, the value 2.1.232 through 2.1.235 all recorded. So every flag this
+# path depends on is spelled identically and only the implementation moved,
+# which is the fourth consecutive advance with that shape.
+#
+# AND THE CURRENCY MACHINERY STILL DOES NOT SEE THIS LINE. The paragraph above
+# recorded that once; this bump proves it was not a one-off. The claude-code
+# sweep moved four files and left this constant behind, `kb-currency-check`
+# reported nothing, and the COLD LANE found it a SECOND time (P0, review of
+# fe57f996). Two independent misses by the same blind spot is not an anecdote —
+# it is the evidence for #393, which is why that issue cites it.
+_CURRENT_CLAUDE_VERSION = "2.1.236"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "83b8f806f6f2eea316cfe246628e6c23374711d868f1fd0409db551b877b7748"
+    "6bc4ba992d2786cbf0237c4453ca53c1fdf0c3b3d83ffa0025c0d8190ed27848"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (

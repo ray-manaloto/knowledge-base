@@ -1,6 +1,63 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
-# R6: the named source of truth for generated models. R10 PASS, last commit 2026-08-06. Note the dotfiles session found it silently drops unevaluatedProperties false for msgspec output - refuting or confirming that is R11 work and needs this source in the graph.
+# Re-clone at build time; the working tree under sources/datamodel-code-generator/
+# is gitignored.
+#
+# R6: the named source of truth for generated models. R10 PASS, last commit
+# 2026-08-06. Note the dotfiles session found it silently drops
+# `unevaluatedProperties: false` for msgspec output — refuting or confirming that
+# is R11 work and needs this source in the graph.
+#
+# Ray, 2026-08-19: a CRITICAL/currency dependency this repo must SYNC with.
+# `[tool.datamodel-code-generator]` in `currency.toml` now checks this pin.
+#
+# ⚠️ THIS PIN WAS `ref = main` UNTIL 2026-08-19 — a BRANCH HEAD, which every
+# other manifest here explicitly forbids ("Pin the RELEASE TAG, never a branch
+# head — a branch drifts ahead of the release"). A branch pin makes the corpus
+# describe unreleased code and makes the clone non-reproducible: the same
+# manifest resolves to different bytes on different days. Fixed to the release
+# tag matching the version we declare.
+#
+# ⚠️ INVARIANT: this pin MUST track the version we actually declare.
+#   version source: pyproject.toml `[dependency-groups] codegen` EXACT pin
+#                   `datamodel-code-generator==0.74.0`, confirmed against
+#                   `datamodel-codegen --version`.
+#   pinned here:    0.74.0
+#
+# ⚠️ IT IS INVOKED — three generators depend on it, and this file nearly shipped
+# claiming the opposite. The claim was "DECLARED BUT NOT YET INVOKED", sourced to
+# `docs/directives-2026-08-08.md`'s `git log -S datamodel --all` -> 0 hits: an
+# INHERITED NUMBER, true on 2026-08-08 and false eleven days later. Ingesting the
+# source matters MORE for that, not less — the graph is being asked "what does
+# this emit?" about code we already ship.
+#
+#   schemas/generate_fetch_receipt.py  -> python/src/kb_setup/generated/fetch_receipt.py
+#   schemas/generate_source_groups.py  -> python/src/kb_setup/generated/source_groups.py
+#   schemas/generate_session_select.py -> python/src/kb_setup/generated/session_select.py
+#
+# 0.73.0's breaking changes cost this repo nothing, but by MEASUREMENT rather
+# than by absence: all three regenerate byte-identically at 0.74.0.
+#
+# ⚠️ TAGS CARRY NO `v` PREFIX — the tag is `0.74.0`, not `v0.74.0`, so a
+# `v<x>`-only resolver finds nothing and an apply aborts rather than mispinning.
+# Same class as `[tool.codex]`'s `rust-v<version>`, opposite direction. Both
+# routes agree on the commit here (lightweight tag), unlike agnix.
+#
+# ⚠️ AND ITS VERSION LITERAL IS LOAD-BEARING IN A TEST (#396).
+# `tests/test_skillopt_contract.py` `.replace()`s the exact string
+# `codegen = ["datamodel-code-generator==<version>"]` inside a copy of the REAL
+# pyproject.toml. Bumping the pin without updating that literal makes the
+# replace a silent no-op and the assertion fails. It also depends on the array
+# being on ONE LINE: `uv add` writes it multi-line and taplo collapses it back,
+# so run `mise run fmt` before `pytest`.
+#
+# To bump: `uv add --group codegen 'datamodel-code-generator==<version>'`,
+# update both test literals, `mise run fmt`, then set ref/commit here:
+#   mise ls-remote datamodel-code-generator      # Ray's directive, #395
+#   gh api repos/koxudaxi/datamodel-code-generator/commits/<version> --jq .sha
+# then `mise run kb-build`.
+#
+# kind = code: AST extraction only, no LLM, no cost.
 url = https://github.com/koxudaxi/datamodel-code-generator
-ref = main
-commit = 56dff6a10802ce1a9a65b857fcd85ea0aa581af0
+ref = 0.74.0
+commit = 5d313d72b001e4b830b581c5d2be6c2da6e00000
 kind = code

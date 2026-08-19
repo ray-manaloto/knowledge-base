@@ -844,7 +844,7 @@ setting, and task/lockfile/python fixes."""
 # `_ACCEPTED_CLAUDE_VERSION` advance a mechanical bump instead of a new review —
 # every flag the semantic path requires is spelled the same and only the
 # implementation changed.
-expected = "2.1.235"
+expected = "2.1.236"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
@@ -1463,7 +1463,7 @@ manifest = "sources/ruff.manifest"
 # `expected` for the same reason. Pre-1.0 and moving fast, which is exactly why
 # it needs a row rather than trust — a 0.0.x bump can carry a breaking change
 # with no marker to trip gate 3.
-expected = "0.0.72"
+expected = "0.0.73"
 binary = "ty"
 github = "astral-sh/ty"
 pypi = "ty"
@@ -1591,3 +1591,141 @@ version_pattern = '^v?(\d+\.\d+\.\d+)$'
 # `sources/antigravity-cli.manifest`, and declaring one before the source is
 # pinned would report DRIFT against a file that does not exist — the same false-
 # DRIFT shape `[tool.codex]` above documents at length. Add both together.
+
+[tool.agnix]
+# The agent-documentation validator. Ray, 2026-08-19: "make a critical/currency
+# dependency / make github repo a graphify source it syncs with".
+#
+# It earns CRITICAL for a reason no other row here has: agnix runs
+# **warnings-as-errors** (`mise run lint-docs` is `agnix . --strict`, and the hk
+# `agnix` step is the same check), so a rule ADDED upstream becomes a lint
+# FAILURE here the moment the pin moves. Every other tracked tool can drift
+# quietly; this one converts upstream's editorial decisions into our red gate.
+# v0.49.0 is the worked example — it added CC-SET-024, warning on a
+# project-level `sandbox.ripgrep` override that Claude Code silently ignores.
+# We do not set that key, so `--strict` stayed green, but that was verified by
+# RUNNING it rather than by reading the note.
+mise_key = "github:agent-sh/agnix"
+binary = "agnix"
+github = "agent-sh/agnix"
+# `mise exec -- agnix --version` prints `agnix 0.49.0` — the house form with the
+# tool's own name anchored, as at `[tool.ruff]` / `[tool.ty]`.
+version_pattern = '^agnix (\d+\.\d+\.\d+)'
+manifest = "sources/agnix.manifest"
+
+[[tool.agnix.watch]]
+kind = "local"
+id = "agnix-tags-are-annotated-and-unsorted"
+note = """TWO probe traps live on this repo's tag list, both hit on the 0.49.0
+bump and both recorded in `sources/agnix.manifest`.
+
+1. **The tags are ANNOTATED.** `git ls-remote --tags --refs .../agnix v0.49.0`
+   returns `dc388699…`, which is the TAG OBJECT, not the commit. The commit is
+   `b0401135…` (`gh api repos/agent-sh/agnix/commits/v0.49.0 --jq .sha`). Two
+   routes, two different 40-hex strings, and only one of them is a commit — a
+   manifest pinned to the tag object still clones, so nothing would have
+   reported it. Contrast graphify and datamodel-code-generator, whose
+   lightweight tags make both routes agree.
+
+2. **The tag list is not sorted by version.** `git ls-remote --tags` ends at
+   `v0.9.3`, which reads like the latest and is THREE MINORS behind v0.49.0.
+   Ask `gh api repos/agent-sh/agnix/releases/latest --jq .tag_name` instead.
+   This is a display-order bound wearing the clothes of an answer — exactly
+   `probes-need-a-control-arm.md` rule 3.
+
+Re-probe both on each bump: an upstream that switches to lightweight tags
+retires (1), and nothing retires (2) short of a version-sorted listing."""
+
+[tool.datamodel-code-generator]
+# Ray, 2026-08-19: "make a critical/currency dependency / make github repo a
+# graphify source it syncs with". Directive R6 (2026-08-08) makes it the ONE
+# owner of generated models.
+#
+# ⚠️ IT IS USED. THREE GENERATORS DEPEND ON IT, and this row nearly shipped
+# saying the opposite. The claim here was "DECLARED BUT NOT YET USED", sourced
+# to `docs/directives-2026-08-08.md`'s `git log -S datamodel --all` -> 0 hits —
+# an INHERITED NUMBER, true on 2026-08-08 and false by 2026-08-19. It was used
+# to argue that 0.73.0's breaking changes cost nothing *because nothing invokes
+# it*, which is a right answer resting on a wrong premise: the most disarming
+# shape a comment can take. The cold lane rated it P1.
+#
+#   schemas/generate_fetch_receipt.py  -> python/src/kb_setup/generated/fetch_receipt.py
+#   schemas/generate_source_groups.py  -> python/src/kb_setup/generated/source_groups.py
+#   schemas/generate_session_select.py -> python/src/kb_setup/generated/session_select.py
+#
+# The REAL reason 0.73.0's breaking changes (validated `--additional-imports`,
+# reserved `--extra-template-data` keys now erroring, built-in templates
+# serializing values as non-executing literals) cost this repo nothing is a
+# MEASUREMENT, not an absence: all three generators were re-run at 0.74.0 and
+# `git diff --stat python/src/kb_setup/generated/` came back EMPTY. That probe
+# discriminates — the same command failed loudly minutes earlier at the version
+# guard.
+#
+# ⚠️ THE STRUCTURAL CLAIM THAT USED TO SIT HERE WAS FALSE, and it was written
+# while CORRECTING a different false claim four lines up. It read "none of the
+# three passes `--additional-imports`, `--extra-template-data` or a custom
+# template dir". All three DO pass `--custom-template-dir`
+# (`schemas/generate_*.py`, one call site each), and the cold lane caught it in
+# round 2 — a correction can be wrong twice, and the replacement sentence gets
+# LESS scrutiny than the one it replaces.
+#
+# What is TRUE, and it is stronger: `schemas/templates/` supplies
+# `msgspec.jinja2` and `Enum.jinja2`, and the output type is `msgspec.Struct` —
+# so that directory provides the ROOT template, not just includes. 0.73.0 states
+# that "trusted custom root templates (`--custom-template-dir` providing the root
+# template) keep the previous unrestricted raw behavior", and its
+# include-only-directory change explicitly does NOT reach a directory that
+# supplies the root. So this repo is on the path 0.73.0 left alone, by
+# construction rather than by luck.
+#
+# The two claims that ARE structural and ARE checked: none of the three passes
+# `--additional-imports` or `--extra-template-data`, which is what the other two
+# breaking changes key on. Verified by grep across `schemas/*.py`, zero hits
+# against a control of three hits for `--custom-template-dir` in the same files.
+#
+# Each generator pins its own `GENERATOR_VERSION` and refuses to run under a
+# different one, so a bump MUST move four places at once: this row, the
+# pyproject pin, all three generator constants. #393 is about that class.
+#
+# NOT a `[tools]` pin: it is a `codegen` dependency-group entry in the root
+# pyproject.toml, reached as `uv run datamodel-codegen`. Same shape as
+# `[tool.ruff]` / `[tool.ty]`, so it takes `expected` rather than pretending
+# mise owns it. Bump `expected` and the pyproject pin in the same change, or
+# this row asserts a review that did not happen.
+expected = "0.74.0"
+binary = "datamodel-codegen"
+github = "koxudaxi/datamodel-code-generator"
+pypi = "datamodel-code-generator"
+version_pattern = '^datamodel-codegen (\d+\.\d+\.\d+)'
+manifest = "sources/datamodel-code-generator.manifest"
+
+[[tool.datamodel-code-generator.watch]]
+kind = "local"
+id = "codegen-version-literal-is-load-bearing-in-a-test"
+note = """`tests/test_skillopt_contract.py` copies the REAL `pyproject.toml`
+into a tmp dir and `.replace()`s the exact string
+`codegen = ["datamodel-code-generator==<version>"]`. The bump to 0.74.0 made
+that replace a silent no-op and the assertion failed — loudly, which is the
+only good part.
+
+The repair is more fragile than it looks, and that is the finding: the literal
+also depends on the ARRAY BEING ON ONE LINE. `uv add --group codegen` writes
+it multi-line; `mise run fmt` (taplo) collapses it back. So the test passes
+today because two independent tools happen to agree on formatting, not because
+anything asserts it. A taplo config change would break it with no bump at all.
+
+The durable fix is for that test to construct its own fixture rather than
+string-replace a copy of a real config file — a test must own its own
+environment. Until then: bump the pin, update BOTH literals, and run
+`mise run fmt` before `pytest`.
+
+Re-probe on each bump by running `pytest tests/test_skillopt_contract.py`
+BEFORE assuming the pin change is complete."""
+
+[[tool.datamodel-code-generator.watch]]
+kind = "local"
+id = "codegen-tags-carry-no-v-prefix"
+note = """Tags here are bare (`0.74.0`), not `v0.74.0`. A resolver that tries
+only `v<x>` finds nothing and an apply aborts rather than mispinning — the same
+class as `[tool.codex]`'s `rust-v<version>`, in the opposite direction. Stated
+so that abort reads as a known shape rather than a bug."""
