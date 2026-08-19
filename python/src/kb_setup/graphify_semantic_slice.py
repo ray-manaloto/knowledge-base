@@ -351,19 +351,31 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # check reported DRIFT and its own test could not (see
 # tests/test_currency_ref_bindings.py).
 #
-# All three digests MEASURED against the installed 0.9.46 via
-# `graphify_baseline.runtime_identity`, not carried:
-# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.45 -> 0.9.46 — the public SDK
-# surface is identical — while the wheel and sdist digests moved because the
-# distribution is a new build.
+# ADVANCED AGAIN to 0.9.47. All three digests MEASURED against the installed
+# 0.9.47 via `graphify_baseline.runtime_identity`, not carried:
+# `sdk_fingerprint_sha256` is UNCHANGED across 0.9.45 -> 0.9.46 -> 0.9.47 — the
+# public SDK surface is identical at all three — while the wheel and sdist
+# digests moved because each distribution is a new build.
+#
+# ⚠️ DO NOT COPY FORWARD THE 0.9.45 ARGUMENT HERE. That entry justified its
+# fingerprint by noting `graphify/llm.py` "does not appear in the compare at
+# all". At 0.9.47 IT DOES: `compare/v0.9.46...v0.9.47` lists 30 files and
+# `graphify/llm.py` is one of them — the release fixes an `AttributeError:
+# 'ThinkingBlock'` crash when an extended-thinking response leads with a
+# thinking block (#2697). That is the CLAUDE backend, i.e. the only backend
+# this repo permits, so it is a reason to adopt rather than a risk. What
+# settles `assert_semantic_sdk`'s "review the release before inference" gate is
+# the fingerprint being byte-identical: the changed code is inside the
+# response-reading path, not on the signature of `llm.extract_corpus_parallel`.
+# The absence-of-llm.py test would have PASSED at 0.9.45 and been FALSE here.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.46",
-    cli_version="0.9.46",
-    sdk_version="0.9.46",
+    version="0.9.47",
+    cli_version="0.9.47",
+    sdk_version="0.9.47",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
-    sdist_sha256="9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
+    wheel_sha256="2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
+    sdist_sha256="26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
 )
 # The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
 # authority for it — `_receipt_reasons` compares the retained receipt against

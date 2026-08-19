@@ -117,9 +117,9 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_REF = "v0.9.46"
-_ACCEPTED_GRAPHIFY_COMMIT = "558df6d57d61cb6ef79c740ec7473c6d953d79a7"
-_ACCEPTED_GRAPHIFY_TREE = "5477ba01c420117fcda22804b8046ad9d571c156"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.47"
+_ACCEPTED_GRAPHIFY_COMMIT = "b14b52e94ec3d9840413d81777f4c134eac0a40d"
+_ACCEPTED_GRAPHIFY_TREE = "cef4315aa8b20beb314c3a00f09b3db4d6b01eca"
 # The digest of the baseline's GENERATED `source-manifest.json` member, not of
 # `sources/graphify.manifest`. Worth stating: the two are both "the source
 # manifest" in English, the committed file is the obvious reading, and it is the
@@ -127,7 +127,7 @@ _ACCEPTED_GRAPHIFY_TREE = "5477ba01c420117fcda22804b8046ad9d571c156"
 # its candidate, which is what makes it a measurement rather than a guess that
 # happens to be 64 hex characters.
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "2ee48f39cdf09037029eedf7f7d97d24a7311a7feaf56c6c76f2056cb4f2e9ae"
+    "fce48f42fe9e661eb9fdfb60c22944acd17c24a2f86549f0a04967add2e462a4"
 )
 # `graphify/detect.py`'s git blob at the pinned commit. Control-armed before it
 # was trusted: the same derivation at v0.9.43 reproduces the c51ea916 this line
@@ -156,17 +156,42 @@ _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
 # WITHHOLDS it when the detector object disagrees, which is this module revoking
 # its own authority rather than vouching for a calibration it no longer has.
 # That fail-closed is why this constant may be moved only with the note above.
-_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "4cb123104cb29a14fa53caaf09b5e1da75157f26"
+#
+# MOVED AGAIN at v0.9.47: 4cb12310… -> d16b5800…. Same discipline, diff read
+# before the value moved. Control-armed first: re-deriving the blob at the
+# v0.9.46 commit reproduces the 4cb12310… this line used to hold exactly, so the
+# derivation discriminates and the new value is a measurement.
+#
+# The v0.9.47 diff is three hunks, and NONE of them is detection:
+#
+#   1. `converted_dir` moves from `root/graphify-out/converted` to
+#      `cache_root/graphify-out/converted` when a cache root is set (#2787) —
+#      where converted Office/Workspace SIDECARS are WRITTEN, so a read-only or
+#      pinned checkout stays clean. Inert here by construction: with no
+#      `cache_root` the expression is `out_base = root`, i.e. byte-identical
+#      behaviour to before.
+#   2. `seen` is preserved when mtime AND the target hashes are unchanged and no
+#      clear was requested, instead of being restamped every run (#2838).
+#   3. `manifest.json` is not rewritten when the serialized payload is identical
+#      (#2838) — this is what stops `graphify-out/` showing as dirty and
+#      producing a trailing graph commit on a no-op run.
+#
+# So the file WALK, the extension sets, the ignore handling and the
+# detected/extracted composition are all untouched — which is the only thing the
+# large-corpus COST advisory keys on. Hunks 2 and 3 are strictly in our favour
+# for the currency machinery: a fingerprint that stops moving on a no-op run is
+# the behaviour `kb_setup.currency.views` needs.
+_ACCEPTED_GRAPHIFY_DETECT_OBJECT = "d16b5800ce19ba36aa5276a204e77ecccc1dbe5c"
 _ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.46",
-    cli_version="0.9.46",
-    sdk_version="0.9.46",
+    version="0.9.47",
+    cli_version="0.9.47",
+    sdk_version="0.9.47",
     executable=".venv/bin/graphify",
     # Unchanged, and MEASURED rather than carried forward — see
     # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
-    sdist_sha256="9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
+    wheel_sha256="2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
+    sdist_sha256="26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
 )
 _PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000

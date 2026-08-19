@@ -6,7 +6,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-GENERATOR_VERSION = "0.72.4"
+GENERATOR_VERSION = "0.74.0"
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "schemas" / "fetch-receipt.schema.json"
 OUTPUT = ROOT / "python" / "src" / "kb_setup" / "generated" / "fetch_receipt.py"

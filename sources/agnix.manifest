@@ -3,24 +3,49 @@
 #
 # TOOLCHAIN SOURCE — a tool this repo actually RUNS (#81, ingested 2026-08-02).
 #
+# Ray, 2026-08-19: agnix is a CRITICAL/currency dependency and this repo must
+# SYNC with it. It already existed as a source and had gone SIX MINORS stale
+# (v0.40.0, pinned 2026-08-02, against an installed 0.46.0) with nothing
+# reporting it, because there was no `[tool.agnix]` row in `currency.toml` to
+# ask. That row now exists; this pin is what it checks against.
+#
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
-#   version source: mise.toml `[tools] "github:agent-sh/agnix"`
-#   pinned here:    0.40.0
+#   version source: mise.toml `[tools]` pin `"github:agent-sh/agnix" = "0.49.0"`,
+#                   confirmed against `mise exec -- agnix --version`.
+#   pinned here:    0.49.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
-# "how does graphify work?" answer came from the wrong source.
+# "how does graphify work?" answer came from the wrong source. agnix adds a
+# sharper edge: it runs WARNINGS-AS-ERRORS here (`mise run lint-docs` is
+# `agnix . --strict`), so a rule added upstream becomes a lint FAILURE the
+# moment the pin moves — v0.49.0's new CC-SET-024 is the worked example.
 #
 # Pin the RELEASE TAG, never a branch head — a branch drifts ahead of the release.
-# To bump: change the version in its source above, then
-#   git ls-remote --tags --refs https://github.com/agent-sh/agnix | grep <version>
-# and set ref/commit here to match, then `mise run kb-build`.
+#
+# ⚠️ TWO PROBE TRAPS LIVE ON THIS REPO'S TAGS. Both were hit on the 0.49.0 bump;
+# see `[[tool.agnix.watch]]` in currency.toml and #235/#395.
+#
+#   1. THE TAGS ARE ANNOTATED. `git ls-remote --tags --refs` returns the TAG
+#      OBJECT (`dc388699…` for v0.49.0), NOT the commit (`b0401135…`). A
+#      manifest pinned to the tag object still clones, so nothing downstream
+#      reports it. Control arm: graphify and datamodel-code-generator use
+#      lightweight tags and both routes agree there, so the probe discriminates.
+#
+#   2. THE TAG LIST IS NOT VERSION-SORTED. `git ls-remote --tags` ends at
+#      `v0.9.3` — three minors BEHIND v0.49.0 — and reads exactly like "latest".
+#
+# To bump: `mise use "github:agent-sh/agnix@<version>"`, then resolve the tag
+# with mise (Ray's directive, #395) and cross-check the COMMIT:
+#   mise ls-remote "github:agent-sh/agnix"
+#   gh api repos/agent-sh/agnix/commits/v<version> --jq .sha
+# set ref/commit here to match, then `mise run kb-build`.
 #
 # kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/agent-sh/agnix
-ref = v0.40.0
-commit = 4acd2ef33b1a6bf569ef44c324a071de3c1b039e
+ref = v0.49.0
+commit = b0401135afa76997dd11895056a299a07d747fd0
 kind = code
 added = 2026-08-02

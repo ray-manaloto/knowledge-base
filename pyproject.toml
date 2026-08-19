@@ -28,8 +28,8 @@ dependencies = [
   # arrived via graphifyy) because a dependency we import must be one we name.
   # A subscription-minted CLAUDE_CODE_OAUTH_TOKEN authorizes that endpoint —
   # verified 2026-08-17, 200 for a real model against 404 for a bogus one.
-  "anthropic>=0.122.0",
-  "graphifyy[all]==0.9.46",
+  "anthropic>=0.124.0",
+  "graphifyy[all]==0.9.47",
   "msgspec==0.21.1",
   "skillopt @ git+https://github.com/microsoft/SkillOpt@93bdf3d770b99128daf35278218e5a666fe392f3",
   "structlog>=26.1",
@@ -79,13 +79,13 @@ fetch = ["trafilatura>=2.0"]
 # parallelises well; a suite dominated by one slow test would not have been.
 dev = [
   "ruff==0.16.3",
-  "ty==0.0.72",
+  "ty==0.0.73",
   "pytest==9.1.1",
   "pytest-xdist==3.8.0",
   "trafilatura==2.2.0",
 ]
 
-codegen = ["datamodel-code-generator==0.72.4"]
+codegen = ["datamodel-code-generator==0.74.0"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source": "graphify",
-  "source_ref": "v0.9.46",
-  "source_commit": "558df6d57d61cb6ef79c740ec7473c6d953d79a7",
-  "source_tree": "5477ba01c420117fcda22804b8046ad9d571c156",
+  "source_ref": "v0.9.47",
+  "source_commit": "b14b52e94ec3d9840413d81777f4c134eac0a40d",
+  "source_tree": "cef4315aa8b20beb314c3a00f09b3db4d6b01eca",
   "entries": [
     {
       "path": ".dockerignore",
@@ -88,8 +88,8 @@
     {
       "path": "uv.lock",
       "kind": "unsupported-file",
-      "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.45",
-      "sha256": "f769bfb3ed0ca31b42b8c09767c2e8d1d6e85d3a75d49b16a3b39bc54ef7913e",
+      "reason": "uv lockfile is unsupported by Graphify detection 0.9.42 through 0.9.47",
+      "sha256": "9056871a4e1537a0998b0d928a696553618fae60ac1fbab0662cc7b005b3757f",
       "size": 1014582,
       "file_type": "regular"
     },

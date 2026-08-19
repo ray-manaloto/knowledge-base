@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -243,20 +244,36 @@ def test_stale_or_arbitrary_lock_rejects_and_rolls_back(tmp_path, monkeypatch) -
 
 
 def test_real_ffmpeg_selection_uses_declared_version_flag(monkeypatch) -> None:
+    """The subject is the FLAG and the argv, never which ffmpeg is pinned.
+
+    `pinned` was asserted against the literal `"8.1.2"` until 2026-08-19, and the
+    stubbed stdout carried the same literal a second time. Bumping the real pin
+    to 9.0.1 turned this red for a reason that has nothing to do with what the
+    test is named after — `_selection` reads `mise.toml`, so the literal was this
+    test asserting a config value it does not own, exactly the coupling #396
+    records in `test_skillopt_contract`.
+
+    Now the pin is READ and then fed to the stub, so the test owns its own
+    environment and a pin bump can never break it. The assertions that carry the
+    meaning are unchanged and still exact: the declared version flag, the round
+    trip through `_observed`, and the full argv.
+    """
     repo_root = Path(__file__).parents[1]
     spec, pinned = tool_sync._selection(repo_root, ["ffmpeg"])
     assert spec.version_args == ("-version",)
-    assert pinned == "8.1.2"
+    # Not a tautology against `_selection`: this asserts the pin was READABLE and
+    # is version-shaped. An unreadable pin yields "" and still fails here.
+    assert re.fullmatch(r"\d+\.\d+\.\d+", pinned), pinned
     seen: list[list[str]] = []
 
     def run(argv: list[str], _root: Path) -> subprocess.CompletedProcess[str]:
         seen.append(argv)
         return subprocess.CompletedProcess(
-            argv, 0, stdout="ffmpeg version 8.1.2 Copyright\n", stderr=""
+            argv, 0, stdout=f"ffmpeg version {pinned} Copyright\n", stderr=""
         )
 
     monkeypatch.setattr(tool_sync, "_run", run)
-    assert tool_sync._observed(repo_root, spec) == "8.1.2"
+    assert tool_sync._observed(repo_root, spec) == pinned
     assert seen == [["mise", "exec", "--", "ffmpeg", "-version"]]
 
 

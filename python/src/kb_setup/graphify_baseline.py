@@ -224,8 +224,8 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.46"
-_ACCEPTED_GRAPHIFY_REF = "v0.9.46"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.47"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.47"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -254,30 +254,39 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "35d854d66884c623a8e25ca059b54744ade91ae17ffc0f79fd39e108a1666b5d",
-    "sdist_sha256": "9af794a52d550fd87e0e3c3f68cbf81409109cf11c175aa0088bb28d10124fda",
+    "wheel_sha256": "2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
+    "sdist_sha256": "26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="558df6d57d61cb6ef79c740ec7473c6d953d79a7",
-    source_tree="5477ba01c420117fcda22804b8046ad9d571c156",
-    catalog_sha256="99f56744e68d12eff9056578893d7e9fec1d19c5674026652a467e5fc82727e3",
-    source_manifest_sha256="2ee48f39cdf09037029eedf7f7d97d24a7311a7feaf56c6c76f2056cb4f2e9ae",
-    # 418 -> 424 detected, 410 -> 416 extracted across v0.9.45 -> v0.9.46. Both
-    # RE-DERIVED by a real build against the installed 0.9.46, never carried
+    source_commit="b14b52e94ec3d9840413d81777f4c134eac0a40d",
+    source_tree="cef4315aa8b20beb314c3a00f09b3db4d6b01eca",
+    catalog_sha256="5f32d9f356f8fe05dc0e41a0975fa3895c627bd103cc49f3bbd25bef2fc50df1",
+    source_manifest_sha256="fce48f42fe9e661eb9fdfb60c22944acd17c24a2f86549f0a04967add2e462a4",
+    # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
+    # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
+    # RE-DERIVED by a real build against the installed 0.9.47, never carried
     # forward: the same run reproduced `source_tree` independently of the GitHub
     # API derivation above, which is what makes these counts a measurement.
-    # +6/+6 is ordinary upstream growth — every newly detected file was also
+    # +5/+5 is ordinary upstream growth — every newly detected file was also
     # extracted, so the gap between the two counts is UNCHANGED at 8, and no
     # warning was emitted.
+    #
+    # The +5 is ACCOUNTED FOR rather than assumed: `compare/v0.9.46...v0.9.47`
+    # lists exactly five ADDED files and all five are `tests/*.py` — ordinary
+    # supported source, which is why none of them needed a disposition entry.
+    # Nothing was removed. That is also why this bump touched ONE catalog entry
+    # (`uv.lock`, whose bytes moved) out of the catalog's 20, against a first
+    # reading of "30 files changed, the catalog needs re-curating" that was
+    # inferred from the build's first error rather than measured.
     #
     # How these were obtained is worth recording, because it is what made the
     # 0.9.46 advance possible at all: `_authority_reasons` now prints OBSERVED vs
     # ACCEPTED for every drifted key (#373). Before that it named the key only
     # and deleted its output, so the build could not tell you what to move the
     # constants to while refusing to run until you had.
-    detected_count=424,
-    extracted_count=416,
+    detected_count=429,
+    extracted_count=421,
 )
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.
