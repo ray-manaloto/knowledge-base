@@ -1375,3 +1375,32 @@ def test_the_unresolvable_skip_does_not_claim_the_clone_is_absent(tmp_path) -> N
     detail = sync._check_manifest(tmp_path, spec, "1.54.1").detail
     assert "clone is absent" not in detail
     assert "could not resolve that ref" in detail
+
+
+def test_a_corrupt_stamp_is_not_reported_as_never_run(tmp_path, monkeypatch) -> None:
+    """A corrupt stamp is a build we cannot ask about, not one that never ran.
+
+    Saying "never run" for both is #397's collapse one level up: a corrupt stamp
+    is a build we cannot ask about, not a build that never happened.
+    """
+    root = _repo(tmp_path)
+    spec = _spec(root)
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    # CONTROL ARM: genuinely absent -> the never-run wording, as before.
+    absent = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert absent.status == sync.DRIFT
+    assert "never run" in absent.detail
+
+    stamp = root / "graphify-out" / ".currency-stamp.json"
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text("{ not json", encoding="utf-8")
+
+    corrupt = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert corrupt.status == sync.DRIFT
+    assert "could not be read" in corrupt.detail
+    assert corrupt.detail != absent.detail
+    # Not a bare `"never run" not in detail`: the message itself says
+    # "this is NOT 'never run'", so that assertion fails on the remedy's own
+    # wording rather than on the behaviour. A remedy has to clear its own text.
+    assert "NOT 'never run'" in corrupt.detail

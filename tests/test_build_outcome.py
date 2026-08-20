@@ -288,3 +288,46 @@ def test_supersession_needs_about_a_second_because_built_at_truncates(tmp_path) 
 
     assert build_outcome.describe(tmp_path, stamp_built_at=same_second) is not None
     assert build_outcome.describe(tmp_path, stamp_built_at=next_second) is None
+
+
+def test_undecodable_bytes_do_not_escape_the_reader(tmp_path) -> None:
+    """A decode error must not escape the reader; `UnicodeError` is no `OSError`.
+
+    `except OSError` around `read_text` therefore let a decode error propagate
+    out of `read()` and abort the whole currency check rather than answer it —
+    reproduced with invalid UTF-8 before the fix. Same class as the diagnostic
+    that could replace the build exception, through a door the first fix missed.
+    """
+    path = build_outcome.record_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\xff\xfe\x00not utf-8 \xc3\x28")
+
+    failure = build_outcome.read(tmp_path)
+    assert failure is not None, "must fail CLOSED, not raise and not report absent"
+    assert build_outcome.describe(tmp_path) is not None
+
+    # CONTROL ARM: valid UTF-8 in the same slot still parses normally, so this
+    # is discriminating on decodability and not on the reader being inert.
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+    good = build_outcome.read(tmp_path)
+    assert good is not None
+    assert good.stage == "build"
+
+
+def test_a_non_ascii_summary_is_recorded_not_raised(tmp_path) -> None:
+    """A build exception can carry a non-ASCII path or message; it round-trips.
+
+    What this does NOT prove, stated because the arm settled it: that the
+    explicit `encoding="utf-8"` on the WRITE is load-bearing. `json.dumps`
+    defaults to `ensure_ascii=True`, so this module's payload is always pure
+    ASCII however exotic the summary — `"refusé"` serialises as `"refus\u00e9"`
+    — and a mutation writing as `ascii` SURVIVED because it genuinely cannot
+    fail. The read half IS reachable (a record corrupted by something else) and
+    is armed separately. The encoding argument stays regardless: it costs
+    nothing and takes the locale out of a decision it has no business making.
+    """
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refusé — Ünicode ✗ 日本語")
+    failure = build_outcome.read(tmp_path)
+    assert failure is not None
+    assert "refusé" in failure.summary
+    assert "日本語" in failure.summary

@@ -1556,6 +1556,23 @@ def _check_artifact_identity(
     return None
 
 
+def _no_stamp_detail(repo_root: Path, spec: ToolSpec) -> str:
+    """Why there is no usable stamp — and the two reasons are not one reason.
+
+    `read_stamp` returns `{}` for BOTH an absent stamp and a present-but-corrupt
+    one, so reporting "never run" for both is the same collapse #397 is about,
+    one level up: a corrupt stamp is a build we cannot ask about, not a build
+    that never happened. (CodeRabbit, minor.)
+    """
+    recorded = stamp_path(repo_root, spec)
+    if recorded is not None and recorded.exists():
+        return (
+            f"{spec.stamp} exists but could not be read — this is NOT 'never run'; "
+            "rebuild to replace it"
+        )
+    return "no build has run here yet — rebuild pending (never run)"
+
+
 def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not spec.stamp:
         return Finding("build-stamp", SKIP, "this tool declares no build stamp")
@@ -1576,9 +1593,12 @@ def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
         return Finding("build-stamp", status, outcome.text)
 
     if not stamp:
-        return Finding(
-            "build-stamp", DRIFT, "no build has run here yet — rebuild pending (never run)"
-        )
+        # `read_stamp` returns {} for TWO states — absent, and present but
+        # unreadable — and saying "never run" for both is the same collapse
+        # #397 is about, one level up: a corrupt stamp is a build we cannot ask
+        # about, not a build that never happened. Ask the filesystem which it is.
+        # (CodeRabbit, minor.)
+        return Finding("build-stamp", DRIFT, _no_stamp_detail(repo_root, spec))
 
     mismatch = _check_artifact_identity(repo_root, spec, stamp)
     if mismatch is not None:

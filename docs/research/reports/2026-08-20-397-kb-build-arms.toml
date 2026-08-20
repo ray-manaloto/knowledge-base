@@ -294,3 +294,50 @@ test = "test_supersession_needs_about_a_second_because_built_at_truncates"
 file = "python/src/kb_setup/build_outcome.py"
 old = """    return stamped > failed"""
 new = """    return stamped >= failed.replace(microsecond=0)"""
+
+# ═══ ROUND 4 — arms for the CodeRabbit findings on PR #410 ═════════════════
+#
+# Both are the SAME CLASS as round 2's P2 — an exception that is not an
+# `OSError` escaping an `except OSError` — reached through a door the earlier
+# fix did not close. A finding is a sample of a class, not the class.
+
+# ── E1: a decode error must not escape the reader ──────────────────────────
+[[arm]]
+id = "E1"
+test = "test_undecodable_bytes_do_not_escape_the_reader"
+file = "python/src/kb_setup/build_outcome.py"
+# NOTE the shape: `ruff format` rewrites `except (A, B):` into PEP 758's
+# UNPARENTHESISED form on 3.14, so the anchor is not what was typed.
+old = """    except OSError, UnicodeError:"""
+new = """    except OSError:"""
+
+# ── E2/E3 REMOVED — the write-side half of the finding is unreachable ──────
+#
+# CodeRabbit's major finding named BOTH directions: an `UnicodeEncodeError` on
+# write and an `UnicodeDecodeError` on read. Armed both. E2 (read as ascii) and
+# E3 (write as ascii) SURVIVED, and hand-running the mutation confirmed it —
+# so the survivors were investigated rather than explained away.
+#
+# The mechanism: `json.dumps` defaults to `ensure_ascii=True`, so the payload
+# this module writes is ALWAYS pure ASCII no matter what the summary contains
+# (`"refusé 日本語"` serialises to `"refus\u00e9 \u65e5..."`). The write can
+# therefore never raise `UnicodeEncodeError` from our own data, and a file we
+# wrote can never fail an ascii read. The finding's write half over-claims.
+#
+# The READ half is real and stays armed as E1, because a record can be corrupted
+# by something other than this module — verified with raw undecodable bytes,
+# which reached `read()` and propagated `UnicodeDecodeError` before the fix.
+#
+# The explicit `encoding="utf-8"` on both calls is kept regardless: it costs
+# nothing and removes the locale from a decision it has no business making.
+# What is NOT claimed is that an arm proves it necessary.
+
+# ── E4: a corrupt stamp is not "never run" ─────────────────────────────────
+[[arm]]
+id = "E4"
+test = "test_a_corrupt_stamp_is_not_reported_as_never_run"
+file = "python/src/kb_setup/currency/sync.py"
+old = """    recorded = stamp_path(repo_root, spec)
+    if recorded is not None and recorded.exists():"""
+new = """    recorded = stamp_path(repo_root, spec)
+    if False:"""

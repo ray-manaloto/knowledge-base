@@ -21,6 +21,11 @@ Two directions are deliberately asymmetric:
 
 * Writing is **best-effort**. Recording a failure must never replace the
   failure being recorded, so `record_failure` swallows its own IO errors.
+* Every read and write names `encoding="utf-8"` explicitly. Left to the
+  locale, a non-ASCII exception message could raise `UnicodeEncodeError` while
+  recording, and undecodable bytes could raise `UnicodeDecodeError` while
+  reading — and neither is an `OSError`, so both escaped the handlers below.
+
 * Reading **fails closed**. A record that exists but cannot be READ OR parsed
   still means a build ran and failed; degrading it to "never run" would restore
   exactly the confusion this module removes. Only `FileNotFoundError` means
@@ -95,8 +100,8 @@ def record_failure(repo_root: Path, stage: str, summary: str) -> None:
     }
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    except OSError as exc:
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
         # Swallowed so the build's own failure still propagates — but NOT
         # silently. Without this line the durable record fails to write, every
         # later check says "never run", and nothing anywhere says why: the exact
@@ -143,13 +148,21 @@ def read(repo_root: Path) -> BuildFailure | None:
     """
     path = record_path(repo_root)
     try:
-        raw = path.read_text()
+        raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         # The ONLY OSError that means "no build has failed here".
         return None
-    except OSError:
+    except OSError, UnicodeError:
         # Present but unreadable — a permission change, a directory in its
-        # place. Fails CLOSED, per this module's contract.
+        # place, bytes that are not UTF-8. Fails CLOSED, per this contract.
+        #
+        # `UnicodeError` is listed explicitly because it is NOT an `OSError` —
+        # it is a `ValueError` — so `except OSError` alone let a decode error
+        # propagate out of `read()` and abort the whole currency check rather
+        # than answer it. Reproduced: undecodable bytes in the record raised
+        # `UnicodeDecodeError` straight through. Same class as the diagnostic
+        # that could replace the build exception, through a door the first fix
+        # did not close. (CodeRabbit, major.)
         return BuildFailure()
     try:
         decoded = json.loads(raw)
