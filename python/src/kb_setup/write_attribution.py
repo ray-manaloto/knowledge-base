@@ -108,19 +108,27 @@ def _parse_ts(raw: object) -> datetime | None:
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
-def _describe(record: dict[str, object]) -> tuple[str, str] | None:
-    """Reduce one transcript record to (kind, detail), or None if it says nothing.
+def _describe(record: dict[str, object]) -> list[tuple[str, str]]:
+    """Reduce one transcript record to its (kind, detail) rows; [] if it says nothing.
 
     Hooks are pulled out FIRST and by name. They are the highest-value rows here:
     a hook is a command the harness runs on its own schedule, which is exactly the
     shape of a writer nobody remembers invoking.
+
+    **EVERY `tool_use` block, not just the first.** One assistant record carries
+    all the tool calls issued in parallel, and this codebase issues parallel Bash
+    calls constantly — so returning after the first dropped the rest and reported
+    a quieter window than actually occurred. In a module whose whole output is
+    "what was running here", under-reporting is the one failure that matters.
+    (graphify-labs, PR #406.)
     """
     attachment = record.get("attachment")
     if isinstance(attachment, dict):
         hook = attachment.get("hookName")
         if isinstance(hook, str) and hook:
-            return "hook", hook
+            return [("hook", hook)]
 
+    rows: list[tuple[str, str]] = []
     message = record.get("message")
     if isinstance(message, dict):
         content = message.get("content")
@@ -137,12 +145,14 @@ def _describe(record: dict[str, object]) -> tuple[str, str] | None:
                     # dumping a payload nobody can scan.
                     raw = params.get("command") or params.get("file_path") or ""
                     detail = " ".join(str(raw).split())[:120]
-                return "tool", f"{name}: {detail}" if detail else name
+                rows.append(("tool", f"{name}: {detail}" if detail else name))
+    if rows:
+        return rows
 
     kind = record.get("type")
     if isinstance(kind, str) and kind in {"system", "user"}:
-        return kind, ""
-    return None
+        return [(kind, "")]
+    return []
 
 
 def events_in(path: Path, mtime: datetime, window: float) -> Iterator[Event]:
@@ -167,11 +177,8 @@ def events_in(path: Path, mtime: datetime, window: float) -> Iterator[Event]:
         delta = (at - mtime).total_seconds()
         if abs(delta) > window:
             continue
-        described = _describe(record)
-        if described is None:
-            continue
-        kind, detail = described
-        yield Event(at=at, delta=delta, kind=kind, detail=detail, session=session)
+        for kind, detail in _describe(record):
+            yield Event(at=at, delta=delta, kind=kind, detail=detail, session=session)
 
 
 def _relevant(
@@ -304,12 +311,24 @@ def write_attribution_main(root: Path, args: Sequence[str] = ()) -> int:
     transcripts_dir: Path | None = None
 
     pending = list(args)
+    # A malformed numeric flag must be a REFUSAL, not a traceback, and not a
+    # silent fallback to the default. `--window abc` used to raise ValueError
+    # straight out of `main` — a stack trace from a module whose entire subject is
+    # reporting rather than raising. Swallowing it would be worse: the run would
+    # then search a different window than the one the caller asked for and report
+    # the result as if it answered their question. (graphify-labs, PR #406.)
     while pending:
         item = pending.pop(0)
-        if item == "--window" and pending:
-            window = float(pending.pop(0))
-        elif item == "--limit" and pending:
-            limit = int(pending.pop(0))
+        if item in {"--window", "--limit"} and pending:
+            raw = pending.pop(0)
+            try:
+                if item == "--window":
+                    window = float(raw)
+                else:
+                    limit = int(raw)
+            except ValueError:
+                print(f"write-attribution: {item} needs a number, got {raw!r}")
+                return int(Rc.NOT_RUN)
         elif item == "--transcripts" and pending:
             transcripts_dir = Path(pending.pop(0))
         else:

@@ -106,7 +106,13 @@ def _kill_group(proc: subprocess.Popen[str]) -> None:
         # timeout firing and this call).
         os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
     except OSError:
-        proc.kill()
+        # Also suppressed: the fallback races the same exit the OSError above
+        # usually means. If hk died between `getpgid` failing and this line,
+        # `kill()` can raise in turn — and a gate that raised while cleaning up
+        # after a timeout would report a crash instead of the timeout, turning a
+        # bounded failure into an unbounded-looking one. (graphify-labs, PR #406.)
+        with contextlib.suppress(OSError):
+            proc.kill()
     with contextlib.suppress(subprocess.TimeoutExpired):
         proc.wait(timeout=_KILL_GRACE)
 

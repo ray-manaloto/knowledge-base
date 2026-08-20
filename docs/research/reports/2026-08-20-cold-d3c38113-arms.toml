@@ -130,3 +130,35 @@ old = '''        finally:
             _close_pipes(proc)'''
 new = '''        finally:
             pass'''
+
+# ══ PR #406 SECOND bot pass (graphify-labs on e37fe07d) ════════════════════
+# 5 findings; 1 REFUTED (a claimed undefined name at tests/test_hk_test.py:312 —
+# that line is `assert proc.stderr.closed` and the suite was green). The bot
+# labelled all five "agreed by 2 of 2 members but NOT verified", and that caveat
+# is what the refuted one proves is worth reading.
+
+# ── F8: every parallel tool_use in one record, not just the first ──────────
+# The realistic break is the original code: `return` inside the loop. It reads
+# as correct for the common single-call record and silently drops the rest — and
+# this codebase issues parallel Bash calls constantly, so the tool reported a
+# quieter window than actually occurred, in a module whose only job is reporting
+# what ran.
+[[arm]]
+id = "F8"
+test = "test_every_parallel_tool_call_in_one_record_is_reported"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''                rows.append(("tool", f"{name}: {detail}" if detail else name))'''
+new = '''                return [("tool", f"{name}: {detail}" if detail else name)]'''
+
+# ── F9: a malformed numeric flag is refused, never raised ─────────────────
+# `--window abc` raised ValueError out of main. Mutating to the bare `float()`
+# is the pre-fix code exactly.
+[[arm]]
+id = "F9"
+test = "test_a_malformed_numeric_flag_is_refused_not_a_traceback"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            except ValueError:
+                print(f"write-attribution: {item} needs a number, got {raw!r}")
+                return int(Rc.NOT_RUN)'''
+new = '''            except ValueError:
+                pass'''

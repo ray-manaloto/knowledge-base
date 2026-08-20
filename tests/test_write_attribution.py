@@ -13,9 +13,16 @@ import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kb_setup import write_attribution as wa
 from kb_setup.result import Err, Ok, Rc
+
+if TYPE_CHECKING:
+    # Annotation-only: nothing here uses pytest at runtime (no fixtures are
+    # defined in this file), and `from __future__ import annotations` above makes
+    # the deferred reference resolve.
+    import pytest
 
 _MTIME = datetime(2026, 8, 20, 6, 3, 34, tzinfo=UTC)
 
@@ -210,7 +217,7 @@ def test_an_offsetless_timestamp_does_not_crash_the_scan(tmp_path: Path) -> None
     assert result.value.events[0].delta == 0.0
 
 
-def test_an_offsetless_timestamp_is_read_as_utc_not_local(tmp_path: Path) -> None:
+def test_an_offsetless_timestamp_is_read_as_utc_not_local() -> None:
     """The control arm on the ASSUMPTION, not just on the absence of a crash.
 
     Defaulting to the local zone would also stop the crash while silently
@@ -219,3 +226,91 @@ def test_an_offsetless_timestamp_is_read_as_utc_not_local(tmp_path: Path) -> Non
     """
     assert wa._parse_ts("2026-08-20T06:03:34") == datetime(2026, 8, 20, 6, 3, 34, tzinfo=UTC)
     assert wa._parse_ts("2026-08-20T06:03:34Z") == wa._parse_ts("2026-08-20T06:03:34")
+
+
+# ── PR #406 second bot pass (graphify-labs) ────────────────────────────────
+
+
+def test_every_parallel_tool_call_in_one_record_is_reported(tmp_path: Path) -> None:
+    """One assistant record holds ALL the tool calls issued in parallel.
+
+    `_describe` used to `return` on the first `tool_use` block, so a record with
+    three parallel Bash calls contributed one row and the window read quieter
+    than it was. For a module whose entire output is "what was running here",
+    under-reporting is the failure that matters most. (graphify-labs, PR #406.)
+    """
+    target = _target(tmp_path)
+    record: dict[str, object] = {
+        "timestamp": _at(1),
+        "message": {
+            "content": [
+                {"type": "text", "text": "ignored"},
+                {"type": "tool_use", "name": "Bash", "input": {"command": "first"}},
+                {"type": "tool_use", "name": "Bash", "input": {"command": "second"}},
+                {"type": "tool_use", "name": "Read", "input": {"file_path": "/third"}},
+            ]
+        },
+    }
+    transcript = _transcript(tmp_path, "sess", [record])
+
+    result = wa.attribute(target, [transcript], window=60)
+
+    assert isinstance(result, Ok)
+    details = [event.detail for event in result.value.events]
+    assert len(details) == 3
+    assert any("first" in d for d in details)
+    assert any("second" in d for d in details)
+    assert any("/third" in d for d in details)
+
+
+def test_a_malformed_numeric_flag_is_refused_not_a_traceback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A malformed numeric flag is refused, not raised.
+
+    `--window abc` used to raise ValueError straight out of `main` — a stack
+    trace from a module whose whole subject is reporting instead of raising.
+
+    Asserting NOT_RUN rather than 0 is the point: silently keeping the default
+    window would search a different window than the caller asked for and report
+    the result as if it had answered their question.
+    """
+    target = _target(tmp_path)
+    _transcript(tmp_path, "sess", [_tool(1, "Bash", "in window")])
+
+    rc = wa.write_attribution_main(
+        tmp_path, [str(target), "--window", "abc", "--transcripts", str(tmp_path)]
+    )
+
+    printed = capsys.readouterr().out
+    # Asserted on the MESSAGE, not on the rc alone. The first version checked
+    # only `rc == NOT_RUN` and SURVIVED its own mutation arm: swallowing the
+    # ValueError also reaches NOT_RUN, by a different route entirely. A test that
+    # passes for the wrong reason is invisible to every sweep over production
+    # code, which is the class this whole arms spec exists to catch.
+    assert "needs a number" in printed
+    assert "'abc'" in printed
+    assert rc == int(Rc.NOT_RUN)
+
+
+def test_a_wellformed_numeric_flag_is_parsed_not_rejected(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The control arm — the guard above must not reject valid input.
+
+    Asserted on the OUTPUT, not on a bare `rc != NOT_RUN`. The first draft of
+    this test was `assert rc != int(Rc.NOT_RUN) or True`, which passes for every
+    possible input — a test incapable of failing, written while fixing a finding
+    about exactly that class of defect.
+    """
+    target = _target(tmp_path)
+    _transcript(tmp_path, "sess", [_tool(1, "Bash", "in window")])
+
+    rc = wa.write_attribution_main(
+        tmp_path, [str(target), "--window", "5", "--transcripts", str(tmp_path)]
+    )
+
+    printed = capsys.readouterr().out
+    assert "needs a number" not in printed
+    assert "window  +/-5s" in printed
+    assert rc == int(Rc.OK)
