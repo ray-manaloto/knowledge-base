@@ -449,3 +449,62 @@ def test_the_empty_window_message_does_not_exclude_a_tool_call(tmp_path: Path) -
     assert "leave a process that writes later" in rendered
     # The exact over-claim, asserted absent rather than merely hoping.
     assert "was not a tool call or a hook" not in rendered
+
+
+def test_a_negative_window_is_refused_not_reported_as_no_events(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A negative window made EVERY event fall outside it.
+
+    So the run printed `NO EVENTS`, at rc 0, with the window rendered `+/--5s` —
+    a FALSE NEGATIVE from the one module built to refuse false negatives. A
+    silently wrong answer is worse here than a crash. (graphify-labs, PR #406.)
+    """
+    target = _target(tmp_path)
+    _transcript(tmp_path, "sess", [_tool(1, "Bash", "in window")])
+
+    rc = wa.write_attribution_main(
+        tmp_path, [str(target), "--transcripts", str(tmp_path), "--window", "-5"]
+    )
+
+    printed = capsys.readouterr().out
+    assert "must be greater than 0" in printed
+    assert "NO EVENTS" not in printed
+    assert rc == int(Rc.NOT_RUN)
+
+
+def test_a_nonpositive_limit_is_refused(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """`--limit -1` showed ZERO rows while printing '1 more not shown'.
+
+    Named separately from the window case because they are different failures
+    that happen to share a guard: one hides every event, the other hides every
+    row. A guard written for only one would leave the other live.
+    """
+    target = _target(tmp_path)
+    _transcript(tmp_path, "sess", [_tool(1, "Bash", "in window")])
+
+    rc = wa.write_attribution_main(
+        tmp_path, [str(target), "--transcripts", str(tmp_path), "--limit", "0"]
+    )
+
+    printed = capsys.readouterr().out
+    assert "must be greater than 0" in printed
+    assert rc == int(Rc.NOT_RUN)
+
+
+def test_a_positive_window_and_limit_still_pass(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The control arm — the guard must not reject the ordinary case."""
+    target = _target(tmp_path)
+    _transcript(tmp_path, "sess", [_tool(1, "Bash", "in window")])
+
+    rc = wa.write_attribution_main(
+        tmp_path,
+        [str(target), "--transcripts", str(tmp_path), "--window", "5", "--limit", "3"],
+    )
+
+    printed = capsys.readouterr().out
+    assert "must be greater than 0" not in printed
+    assert "in window" in printed
+    assert rc == int(Rc.OK)

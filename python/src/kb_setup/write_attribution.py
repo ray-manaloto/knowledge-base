@@ -335,49 +335,91 @@ def _transcript_dir(root: Path) -> Path:
     return Path.home() / ".claude" / "projects" / slug
 
 
-def write_attribution_main(root: Path, args: Sequence[str] = ()) -> int:
-    """CLI: `uv run kb-setup write-attribution <path> [--window N] [--limit N]`."""
+@dataclass(frozen=True)
+class _Options:
+    """A parsed command line."""
+
+    positional: tuple[str, ...]
+    window: float
+    limit: int
+    transcripts_dir: Path | None
+
+
+#: Flags that consume the next argument. Listed once so the missing-value check
+#: cannot fall out of step with the parsing — the first version handled
+#: `--window`/`--limit` as a set and `--transcripts` on its own branch, and a
+#: guard written for the pair missed the third.
+_VALUED_FLAGS = ("--window", "--limit", "--transcripts")
+
+
+def _parse_args(args: Sequence[str]) -> Result[_Options]:
+    """Parse argv, REFUSING anything malformed rather than raising or defaulting.
+
+    Every refusal here is a defect this module actually shipped, so they are
+    listed rather than implied (all graphify-labs, PR #406):
+
+    - a value that is not a number raised `ValueError` out of `main` — a stack
+      trace from a module whose entire subject is reporting instead of raising;
+    - a flag at the END of argv had nothing to pop, fell through to `positional`
+      and became the TARGET PATH, silently ignoring the caller's flag;
+    - a NON-POSITIVE value was accepted, and that is the cardinal sin rather than
+      input hygiene: `--window -5` made every `abs(delta) > window` true, so the
+      run printed NO EVENTS at rc 0 — a FALSE NEGATIVE from the one tool built to
+      refuse false negatives — and `--limit -1` hid every row while printing
+      "1 more not shown".
+
+    Defaulting silently would be worse than any of them: the run would search a
+    different window than the caller asked for and report the answer as theirs.
+    """
     positional: list[str] = []
     window = DEFAULT_WINDOW
     limit = DEFAULT_LIMIT
     transcripts_dir: Path | None = None
 
     pending = list(args)
-    # A malformed numeric flag must be a REFUSAL, not a traceback, and not a
-    # silent fallback to the default. `--window abc` used to raise ValueError
-    # straight out of `main` — a stack trace from a module whose entire subject is
-    # reporting rather than raising. Swallowing it would be worse: the run would
-    # then search a different window than the one the caller asked for and report
-    # the result as if it answered their question. (graphify-labs, PR #406.)
-    #: Flags that consume the next argument. Listed rather than inlined so the
-    #: missing-value check below cannot fall out of step with the parsing.
-    valued = {"--window", "--limit", "--transcripts"}
     while pending:
         item = pending.pop(0)
-        if item in valued:
-            # A flag at the END of argv had no `pending` to pop, so it fell
-            # through to `positional` and became the TARGET PATH — silently
-            # ignoring the caller's flag and searching the default window. The
-            # first version of this parser guarded the value-is-not-a-number case
-            # and not the value-is-missing one, which is the same defect wearing
-            # the other half of the pair. (graphify-labs, PR #406, third pass.)
-            if not pending:
-                print(f"write-attribution: {item} needs a value")
-                return int(Rc.NOT_RUN)
-            raw = pending.pop(0)
-            if item == "--transcripts":
-                transcripts_dir = Path(raw)
-                continue
-            try:
-                if item == "--window":
-                    window = float(raw)
-                else:
-                    limit = int(raw)
-            except ValueError:
-                print(f"write-attribution: {item} needs a number, got {raw!r}")
-                return int(Rc.NOT_RUN)
-        else:
+        if item not in _VALUED_FLAGS:
             positional.append(item)
+            continue
+        if not pending:
+            return Err(f"{item} needs a value", Rc.NOT_RUN)
+        raw = pending.pop(0)
+        if item == "--transcripts":
+            transcripts_dir = Path(raw)
+            continue
+        try:
+            value = float(raw) if item == "--window" else int(raw)
+        except ValueError:
+            return Err(f"{item} needs a number, got {raw!r}", Rc.NOT_RUN)
+        if value <= 0:
+            return Err(f"{item} must be greater than 0, got {raw!r}", Rc.NOT_RUN)
+        if item == "--window":
+            window = value
+        else:
+            limit = int(value)
+
+    return Ok(
+        _Options(
+            positional=tuple(positional),
+            window=window,
+            limit=limit,
+            transcripts_dir=transcripts_dir,
+        )
+    )
+
+
+def write_attribution_main(root: Path, args: Sequence[str] = ()) -> int:
+    """CLI: `uv run kb-setup write-attribution <path> [--window N] [--limit N]`."""
+    parsed = _parse_args(args)
+    if not isinstance(parsed, Ok):
+        print(f"write-attribution: {parsed.message}")
+        return exit_code(parsed)
+    options = parsed.value
+    positional = list(options.positional)
+    window = options.window
+    limit = options.limit
+    transcripts_dir = options.transcripts_dir
 
     if not positional:
         print("usage: kb-setup write-attribution <path> [--window N] [--limit N]")

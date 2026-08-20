@@ -157,11 +157,8 @@ new = '''                return [("tool", f"{name}: {detail}" if detail else nam
 id = "F9"
 test = "test_a_malformed_numeric_flag_is_refused_not_a_traceback"
 file = "python/src/kb_setup/write_attribution.py"
-old = '''            except ValueError:
-                print(f"write-attribution: {item} needs a number, got {raw!r}")
-                return int(Rc.NOT_RUN)'''
-new = '''            except ValueError:
-                pass'''
+old = '''        return Err(f"{item} needs a number, got {raw!r}", Rc.NOT_RUN)'''
+new = '''        window = DEFAULT_WINDOW'''
 
 # ══ PR #406 THIRD bot pass (graphify-labs on f4fa88ed) ═════════════════════
 # 4 findings; 2 REFUTED. Both refutations were "high" severity and BOTH anchored
@@ -182,11 +179,11 @@ new = '''            except ValueError:
 id = "F10"
 test = "test_a_flag_at_the_end_of_argv_is_refused_not_swallowed"
 file = "python/src/kb_setup/write_attribution.py"
-old = '''            if not pending:
-                print(f"write-attribution: {item} needs a value")
-                return int(Rc.NOT_RUN)'''
-new = '''            if not pending:
-                pass'''
+old = '''        if not pending:
+            return Err(f"{item} needs a value", Rc.NOT_RUN)'''
+new = '''        if not pending:
+            positional.append(item)
+            continue'''
 
 # ── F11: the SAME guard must cover `--transcripts` ─────────────────────────
 # The first parser handled `--window`/`--limit` as a set and `--transcripts` on
@@ -196,8 +193,8 @@ new = '''            if not pending:
 id = "F11"
 test = "test_the_transcripts_flag_is_covered_by_the_same_guard"
 file = "python/src/kb_setup/write_attribution.py"
-old = '''    valued = {"--window", "--limit", "--transcripts"}'''
-new = '''    valued = {"--window", "--limit"}'''
+old = '''_VALUED_FLAGS = ("--window", "--limit", "--transcripts")'''
+new = '''_VALUED_FLAGS = ("--window", "--limit")'''
 
 # ══ PR #406 FOURTH bot pass (graphify-labs on 851949be) ════════════════════
 # 5 findings: 2 real, 1 not-a-defect ("no-arg kb-gates now runs an additional
@@ -276,3 +273,34 @@ file = "python/src/kb_setup/hk_test.py"
 old = '''            _kill_group(proc)
             raise'''
 new = '''            raise'''
+
+# ══ PR #406 SEVENTH pass (graphify-labs on 38351b82) ═══════════════════════
+# 3 findings: 1 real and NEW, 2 repeats of already-refuted ones (the
+# `ruff_format` concurrency claim — `exclusive = true`, hk.pkl:385 — and the
+# "additional gate" non-defect, now raised for the THIRD time).
+#
+# The phantom syntax error did NOT recur this pass.
+
+# ── F16: a non-positive window is refused, never answered ─────────────────
+# The module's cardinal sin, not input hygiene. `--window -5` made every
+# `abs(delta) > window` true, so the run printed NO EVENTS at rc 0 with the
+# window rendered `+/--5s` — a FALSE NEGATIVE from the one tool built to refuse
+# false negatives. `--limit -1` hid every row while printing "1 more not shown".
+[[arm]]
+id = "F16"
+test = "test_a_negative_window_is_refused_not_reported_as_no_events"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''        if value <= 0:
+            return Err(f"{item} must be greater than 0, got {raw!r}", Rc.NOT_RUN)'''
+new = '''        if False:
+            return Err(f"{item} must be greater than 0, got {raw!r}", Rc.NOT_RUN)'''
+
+# ── F17: the SAME guard must cover --limit ────────────────────────────────
+# Different failures sharing one guard: the window hides every EVENT, the limit
+# hides every ROW. Armed separately so a guard narrowed to one cannot pass.
+[[arm]]
+id = "F17"
+test = "test_a_nonpositive_limit_is_refused"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            value = float(raw) if item == "--window" else int(raw)'''
+new = '''            value = float(raw) if item == "--window" else abs(int(raw)) + 1'''
