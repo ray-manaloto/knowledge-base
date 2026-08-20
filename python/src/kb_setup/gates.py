@@ -128,7 +128,15 @@ SHA_ABBREV = 12
 #: is the only one that can fail for a reason no code change causes: the corpus
 #: grew. That is exactly why it belongs on the ship path rather than in a report,
 #: which is where the same number sat while the graph reached ~72% of its cap.
-GATE_TASKS = ("lint", "test", "brain-audit", "eval", "graph-size")
+#: `hk-test` joined 2026-08-19. It runs hk's step-defined tests — 46 of them,
+#: every one shipped by a builtin and every one a bad-file/good-file PAIR, so it
+#: is the only gate here that exercises the FAIL direction of the linters rather
+#: than just their pass direction. `lint` going green says the tree is clean; it
+#: cannot say the linters can still detect anything, and a step whose detector
+#: died reports rc=0 forever. Wrapped rather than run bare because `hk test`
+#: exits 0 when it runs NOTHING (measured on 1.56.0), so `kb_setup.hk_test`
+#: asserts a floor on the count before it reads hk's rc.
+GATE_TASKS = ("lint", "test", "brain-audit", "eval", "graph-size", "hk-test")
 
 #: Gates that may run CONCURRENTLY with each other. Everything not named here
 #: runs EXCLUSIVE — alone, with nothing else in flight — and that default is the
@@ -176,6 +184,16 @@ GATE_TASKS = ("lint", "test", "brain-audit", "eval", "graph-size")
 #: `eval` lacked. It deliberately does not READ `graph.json`; a gate that had to
 #: stream ~771 MB to report its size would be the slowest thing here instead of
 #: the fastest.
+#: `hk-test` is deliberately NOT here, and it is the worked example of this set's
+#: fail-closed default rather than an oversight. Question 1 is already answered in
+#: its favour — measured with `find -newer` across a full run, it writes NOTHING
+#: into the tree. Question 2 is not: it invokes the same linter binaries `lint`
+#: does, through the same hk, and whether the two contend over hk's own state or
+#: cache directory has not been characterised. `eval` was in this set on exactly
+#: that kind of unexamined assumption and had to come out after starving under
+#: `test`'s 12 xdist workers — intermittently, passing every time it ran alone.
+#: So `hk-test` runs exclusive: correct and slow, which is the right way round,
+#: and it costs under a second. Admit it only after characterising the contention.
 CONCURRENT_SAFE = frozenset({"lint", "test", "brain-audit", "graph-size"})
 
 

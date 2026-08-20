@@ -1,0 +1,306 @@
+# Mutation arms for the CODE fixes made against the cold review of
+# `d3c381139f2b37d9c06fb07516bc8e741bb18c1d` (lane `cold:codex`, batches 1-3,
+# 8 findings, 0 blocking).
+#
+# Each arm reverts one fix to the shape the reviewer cited, and the test written
+# alongside that fix must go RED. A SURVIVOR does not mean the fix is fine — it
+# means the test cannot fail, which is the class no sweep over production code
+# can otherwise see, because the arm mutates production while the blindness is
+# in the test (kb-review SKILL.md § "Arm your own fixes").
+#
+# SCOPE, stated so a clean sweep is not over-read. Three of the eight findings
+# are NOT code and have no arm here:
+#   - the `currency.toml` comment whose stated rationale was false (prose)
+#   - the `HK_TIMING_JSON` static-path collision (config)
+#   - the memory-file "11 tests" vs CLAUDE.md "46" ambiguity (prose)
+# A green run below covers the four python fixes plus the timeout-ordering guard.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: it says these four assertions can fail. It
+# says nothing about whether killing the process group is the RIGHT remedy for a
+# wedged linter, nor whether `_MIN_TESTS = 40` is the right floor — an arm
+# measures the TESTS, never the premise.
+
+# Every file holding a test named by an arm below. F6 SURVIVED on its first run
+# purely because `test_write_attribution.py` was missing here — the mutation
+# applied, the named test never ran, and the report read "no test fails under
+# this mutation". A hand-run of the same mutation failed BOTH its tests. That is
+# the arm-measuring-something-its-id-does-not-name failure, and the fix is to
+# keep this list in step with the arms rather than to trust a survivor.
+suites = [
+  "tests/test_hk_test.py",
+  "tests/test_gates.py",
+  "tests/test_write_attribution.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/hk_test.py"
+old = '''_KILL_GRACE = 5'''
+new = '''_KILL_GRACE = 5  # control'''
+
+# ── F1: the timeout must kill the process GROUP, not just hk ───────────────
+# The realistic break is not deleting the call — it is "simplifying" it back to
+# the `Popen.kill()` that looks equivalent and signals the direct child only,
+# leaving the wedged linter alive holding the pipes.
+[[arm]]
+id = "F1"
+test = "test_timeout_kills_the_whole_process_group"
+file = "python/src/kb_setup/hk_test.py"
+old = '''        os.killpg(proc.pid, signal.SIGKILL)'''
+new = '''        proc.kill()'''
+
+# ── F2: `start_new_session` is what MAKES the group addressable ────────────
+# Dropping it is the quieter half of the same defect: `killpg` still runs, still
+# looks correct in a diff, and now signals the group the test runner is in.
+[[arm]]
+id = "F2"
+test = "test_it_spawns_in_its_own_session_or_the_group_kill_cannot_work"
+file = "python/src/kb_setup/hk_test.py"
+old = '''            start_new_session=True,'''
+new = '''            start_new_session=False,'''
+
+# ── F3: a hang must still print what hk managed to say ─────────────────────
+# The break that actually happened: the branch returned the Err without printing
+# the partial output, so the one failure with nothing else to go on produced no
+# diagnostic. Reverting the print is exactly the pre-fix code.
+[[arm]]
+id = "F3"
+test = "test_timeout_prints_the_partial_output_it_captured"
+file = "python/src/kb_setup/hk_test.py"
+old = '''            if partial:
+                print(partial)'''
+new = '''            if partial and False:
+                print(partial)'''
+
+# ── F4: undecodable linter output is NOT_RUN, not a crash ──────────────────
+# `gates.py:282` already handles this for `git status`. The realistic break is a
+# reviewer "tidying" the tuple back to the two obvious exceptions, since
+# UnicodeDecodeError is neither an OSError nor a SubprocessError and reads as a
+# mistake to anyone who has not hit it.
+[[arm]]
+id = "F4"
+test = "test_undecodable_output_is_not_run_not_a_crash"
+file = "python/src/kb_setup/hk_test.py"
+old = '''    except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:'''
+new = '''    except (OSError, subprocess.SubprocessError) as exc:'''
+
+# ── F5: the inner gate bound must stay strictly under the outer one ────────
+# The realistic break is the one that already happened: someone raises a slow
+# gate's bound to the round number that matches `_GATE_TIMEOUT`. It looks like a
+# matching pair and is actually a race. Mutating the CONFIG, not the checker,
+# because the checker is what must notice.
+[[arm]]
+id = "F5"
+test = "test_every_gate_task_bound_is_strictly_under_the_outer_gate_timeout"
+file = "mise.toml"
+old = '''# `tests/test_gates.py` asserts the ordering for every GATE_TASK.
+timeout = "25m"'''
+new = '''# `tests/test_gates.py` asserts the ordering for every GATE_TASK.
+timeout = "30m"'''
+
+# ══ PR #406 bot findings (graphify-labs + CodeRabbit, both confirmed) ═══════
+
+# ── F6: an offsetless transcript timestamp must not crash the scan ─────────
+# BOTH bots found this independently and a control arm confirmed it:
+# `naive - aware` raises TypeError, so ONE offsetless line anywhere aborted the
+# whole run. The realistic break is the exact edit that caused it — ruff flagged
+# the `.replace("Z", "+00:00")` as redundant (it is, on 3.11+), and removing it
+# looked like a pure cleanup while deleting the only thing that guaranteed a
+# tzinfo. So the mutation is "return what fromisoformat gave you".
+[[arm]]
+id = "F6"
+test = "test_an_offsetless_timestamp_does_not_crash_the_scan"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)'''
+new = '''    return parsed'''
+
+# ── F7: no unbounded wait on any path out of `run` ─────────────────────────
+# `Popen.__exit__` calls `wait()` with NO timeout. Using `with` reads as the
+# tidier, more idiomatic form — which is exactly why it is the realistic
+# regression — and it reintroduces the hang the timeout exists to bound, one
+# frame later. The fake `_Proc` deliberately has no `__enter__`/`__exit__`, so a
+# revert to `with` fails rather than silently passing.
+[[arm]]
+id = "F7"
+test = "test_the_pipes_are_closed_even_on_the_happy_path"
+file = "python/src/kb_setup/hk_test.py"
+old = '''        finally:
+            _close_pipes(proc)'''
+new = '''        finally:
+            pass'''
+
+# ══ PR #406 SECOND bot pass (graphify-labs on e37fe07d) ════════════════════
+# 5 findings; 1 REFUTED (a claimed undefined name at tests/test_hk_test.py:312 —
+# that line is `assert proc.stderr.closed` and the suite was green). The bot
+# labelled all five "agreed by 2 of 2 members but NOT verified", and that caveat
+# is what the refuted one proves is worth reading.
+
+# ── F8: every parallel tool_use in one record, not just the first ──────────
+# The realistic break is the original code: `return` inside the loop. It reads
+# as correct for the common single-call record and silently drops the rest — and
+# this codebase issues parallel Bash calls constantly, so the tool reported a
+# quieter window than actually occurred, in a module whose only job is reporting
+# what ran.
+[[arm]]
+id = "F8"
+test = "test_every_parallel_tool_call_in_one_record_is_reported"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''                rows.append(("tool", f"{name}: {detail}" if detail else name))'''
+new = '''                return [("tool", f"{name}: {detail}" if detail else name)]'''
+
+# ── F9: a malformed numeric flag is refused, never raised ─────────────────
+# `--window abc` raised ValueError out of main. Mutating to the bare `float()`
+# is the pre-fix code exactly.
+[[arm]]
+id = "F9"
+test = "test_a_malformed_numeric_flag_is_refused_not_a_traceback"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''        return Err(f"{item} needs a number, got {raw!r}", Rc.NOT_RUN)'''
+new = '''        window = DEFAULT_WINDOW'''
+
+# ══ PR #406 THIRD bot pass (graphify-labs on f4fa88ed) ═════════════════════
+# 4 findings; 2 REFUTED. Both refutations were "high" severity and BOTH anchored
+# at `:312` — of two different files. A repeated line number across unrelated
+# files is itself evidence the anchor is fabricated, and both files parse, hold
+# no stray name and no unterminated docstring, with the suite green.
+#
+# The two real ones are ONE defect: a valued flag with nothing after it.
+
+# ── F10: a valued flag at the END of argv is refused, not swallowed ────────
+# `[target, "--window"]` left `pending` empty, so `--window` fell through to
+# `positional` and became the TARGET PATH — the caller's flag silently ignored
+# and the DEFAULT window searched, then reported as if it had answered. This is
+# the same failure the not-a-number guard (F9) exists to prevent; that guard
+# covered only half the pair, which is why the mutation here restores the `and
+# pending` form rather than deleting the check.
+[[arm]]
+id = "F10"
+test = "test_a_flag_at_the_end_of_argv_is_refused_not_swallowed"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''        if not pending:
+            return Err(f"{item} needs a value", Rc.NOT_RUN)'''
+new = '''        if not pending:
+            positional.append(item)
+            continue'''
+
+# ── F11: the SAME guard must cover `--transcripts` ─────────────────────────
+# The first parser handled `--window`/`--limit` as a set and `--transcripts` on
+# its own `elif`, so a guard written for the pair would have missed the third.
+# A finding is a SAMPLE of a class; this arm is the class.
+[[arm]]
+id = "F11"
+test = "test_the_transcripts_flag_is_covered_by_the_same_guard"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''_VALUED_FLAGS = ("--window", "--limit", "--transcripts")'''
+new = '''_VALUED_FLAGS = ("--window", "--limit")'''
+
+# ══ PR #406 FOURTH bot pass (graphify-labs on 851949be) ════════════════════
+# 5 findings: 2 real, 1 not-a-defect ("no-arg kb-gates now runs an additional
+# gate" — that IS the feature), and the `:312` phantom AGAIN, twice, now three
+# passes running. Across four passes: 17 findings, 5 refuted, 11 real, 1 no-op.
+
+# ── F12: the pgid is the PID, never a lookup ──────────────────────────────
+# `os.getpgid(proc.pid)` fails exactly when the leader has already exited — the
+# case where the group still holds the WEDGED GRANDCHILDREN this function exists
+# to kill. The lookup failing dropped us to `proc.kill()`, reaping a dead leader
+# and leaving the linters running. Under `start_new_session` the pgid EQUALS the
+# pid, so the lookup was never needed. The fixture stubs `getpgid` to RAISE, so
+# this mutation cannot pass by accident.
+[[arm]]
+id = "F12"
+test = "test_timeout_kills_the_whole_process_group"
+file = "python/src/kb_setup/hk_test.py"
+old = '''        os.killpg(proc.pid, signal.SIGKILL)'''
+new = '''        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)'''
+
+# ── F13: an UNREADABLE transcript is not an empty one ─────────────────────
+# `events_in` caught OSError and returned, so a file nobody could read
+# contributed no events and counted as SCANNED — reporting a permissions problem
+# as "nothing ran in this window". That is the DRIFT/SKIP/OK collapse this whole
+# module exists to refuse, inside the module itself.
+[[arm]]
+id = "F13"
+test = "test_an_unreadable_transcript_is_counted_not_swallowed"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            unreadable += 1'''
+new = '''            pass'''
+
+# ══ PR #406 FIFTH pass (CodeRabbit back from rate limit, on 44a85a5f) ══════
+# 2 findings, both real, both about things I had already "fixed" elsewhere.
+
+# ── F14: the NO EVENTS text must not repeat the over-claim ────────────────
+# Three places carried "the writer was not a tool call": the skill step, the
+# work-memory, and this rendering. The first two were corrected in one round and
+# the RENDERING — the only one a reader actually sees — was not. The realistic
+# break is therefore the original sentence, restored verbatim.
+[[arm]]
+id = "F14"
+test = "test_the_empty_window_message_does_not_exclude_a_tool_call"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            "nothing here — a finding, not a failure to look. It does NOT show "
+            "the writer was never a tool call: an earlier call can leave a "
+            "process that writes later. Narrow or widen --window and re-ask."'''
+new = '''            "nothing here — which is a finding (the writer was not a tool call or "
+            "a hook of a recorded session), not a failure to look."'''
+
+# ══ PR #406 SIXTH pass (graphify-labs on 1245dddd) ═════════════════════════
+# 4 findings: 1 real, 1 not-a-defect (the "additional gate" IS the feature, and
+# this is the SECOND pass to raise it), and 2 REFUTED:
+#   - an "unclosed docstring" at tests/test_hk_test.py:326 — the file is 327
+#     lines, parses via ast.parse, and the suite is green. Fourth pass running
+#     with a fabricated syntax-error claim in that file.
+#   - "moving the format barrier last lets other gates read while ruff --fix
+#     writes" — `ruff_format` carries `exclusive = true` (hk.pkl:385), a
+#     WHOLE-PIPELINE barrier, so nothing runs alongside it. The finding assumes
+#     a non-exclusive step.
+
+# ── F15: an interrupt must kill the group before it propagates ────────────
+# A REGRESSION `start_new_session` introduced two commits earlier, not a
+# pre-existing gap: a terminal signals its FOREGROUND process group, and the new
+# session is exactly what removes hk from it. So Ctrl-C, which used to kill hk
+# with the gate, now reaches only us — and unwinding without this leaves hk and
+# every linter it spawned running orphaned.
+#
+# The mutation drops the handler entirely, which is the pre-fix code. The paired
+# test asserts the KeyboardInterrupt STILL propagates: a gate that swallowed
+# Ctrl-C would be worse than one that leaks a process.
+[[arm]]
+id = "F15"
+test = "test_an_interrupt_kills_the_group_before_it_propagates"
+file = "python/src/kb_setup/hk_test.py"
+old = '''            _kill_group(proc)
+            raise'''
+new = '''            raise'''
+
+# ══ PR #406 SEVENTH pass (graphify-labs on 38351b82) ═══════════════════════
+# 3 findings: 1 real and NEW, 2 repeats of already-refuted ones (the
+# `ruff_format` concurrency claim — `exclusive = true`, hk.pkl:385 — and the
+# "additional gate" non-defect, now raised for the THIRD time).
+#
+# The phantom syntax error did NOT recur this pass.
+
+# ── F16: a non-positive window is refused, never answered ─────────────────
+# The module's cardinal sin, not input hygiene. `--window -5` made every
+# `abs(delta) > window` true, so the run printed NO EVENTS at rc 0 with the
+# window rendered `+/--5s` — a FALSE NEGATIVE from the one tool built to refuse
+# false negatives. `--limit -1` hid every row while printing "1 more not shown".
+[[arm]]
+id = "F16"
+test = "test_a_negative_window_is_refused_not_reported_as_no_events"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''        if value <= 0:
+            return Err(f"{item} must be greater than 0, got {raw!r}", Rc.NOT_RUN)'''
+new = '''        if False:
+            return Err(f"{item} must be greater than 0, got {raw!r}", Rc.NOT_RUN)'''
+
+# ── F17: the SAME guard must cover --limit ────────────────────────────────
+# Different failures sharing one guard: the window hides every EVENT, the limit
+# hides every ROW. Armed separately so a guard narrowed to one cannot pass.
+[[arm]]
+id = "F17"
+test = "test_a_nonpositive_limit_is_refused"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            value = float(raw) if item == "--window" else int(raw)'''
+new = '''            value = float(raw) if item == "--window" else abs(int(raw)) + 1'''

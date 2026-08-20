@@ -1646,3 +1646,76 @@ def test_gates_int_wrapper_is_exit_code_of_boundary(tmp_path: Path, monkeypatch)
     rc_boundary = exit_code(gates.check_gates(list(_TASKS), root))
 
     assert rc_main == rc_boundary == int(Rc.FINDINGS)
+
+
+# ── the inner/outer timeout ordering (cold lane, batch 2) ──────────────────
+
+
+def _mise_task_timeouts() -> dict[str, str]:
+    """Every `[tasks.<name>]` timeout declared in the real `mise.toml`.
+
+    Read from the repo's own file rather than a fixture: the defect this guards
+    is a DRIFT between two files, so a fixture copy of one of them would assert
+    that the fixture agrees with itself.
+    """
+    import tomllib
+
+    raw = tomllib.loads(Path("mise.toml").read_text(encoding="utf-8"))
+    tasks = raw.get("tasks", {})
+    return {
+        name: body["timeout"]
+        for name, body in tasks.items()
+        if isinstance(body, dict) and "timeout" in body
+    }
+
+
+def _seconds(spec: str) -> int:
+    unit = spec[-1]
+    value = int(spec[:-1])
+    return value * {"s": 1, "m": 60, "h": 3600}[unit]
+
+
+def test_every_gate_task_bound_is_strictly_under_the_outer_gate_timeout() -> None:
+    """An equal bound is a RACE, not a belt-and-braces pair.
+
+    `gates.py` wraps each `mise run <task>` in `_GATE_TIMEOUT`. When the task
+    declares the same number, which one fires is decided by scheduling — and the
+    outer one names no task and kills no process tree, so the worse message wins
+    half the time. `test` and `eval` were both exactly 1800s. (Cold lane, batch 2.)
+
+    Asserted over ALL gate tasks rather than the two that were wrong, because the
+    next one added would otherwise reintroduce it silently.
+    """
+    declared = _mise_task_timeouts()
+    offenders = {
+        task: declared[task]
+        for task in gates.GATE_TASKS
+        if task in declared and _seconds(declared[task]) >= gates._GATE_TIMEOUT
+    }
+    assert not offenders, (
+        f"these gate tasks declare a bound >= the outer {gates._GATE_TIMEOUT}s "
+        f"and therefore race it: {offenders}"
+    )
+
+
+def test_the_ordering_check_can_actually_fail() -> None:
+    """The control arm for the test above — it must reject a bound that races.
+
+    Without this, a `_seconds` that always returned 0, or a `GATE_TASKS` that
+    stopped intersecting `mise.toml`, would make the assertion vacuous and green
+    forever.
+    """
+    assert _seconds("30m") >= gates._GATE_TIMEOUT
+    assert _seconds("25m") < gates._GATE_TIMEOUT
+
+
+def test_the_gate_tasks_are_actually_found_in_mise_toml() -> None:
+    """A bound-limited probe: the check above skips any task it cannot see.
+
+    If `GATE_TASKS` and `mise.toml` stopped intersecting, `offenders` is empty
+    and the test passes having examined nothing — the "gate that never asked the
+    question" shape. This pins that the intersection is non-trivial.
+    """
+    declared = _mise_task_timeouts()
+    covered = [task for task in gates.GATE_TASKS if task in declared]
+    assert len(covered) >= 3, f"only {covered} of {list(gates.GATE_TASKS)} declare a timeout"

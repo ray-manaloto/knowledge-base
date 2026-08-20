@@ -16,23 +16,34 @@
 # none). A self-update moves UP, so this can never fire on one; catching that
 # direction is `currency.toml`'s `[tool.mise]`, not this.
 #
-# hard=2026.7.14 is where the env-file secret-expansion fix (#11269) and both
-# task-freshness correctness fixes (#11288, #11296) landed — below that there are
-# known-bad behaviours, even though this repo is not currently exposed to either
-# (no `env._.file`, no task `sources`/`outputs`). soft tracks the version this
-# repo has actually been verified against — 2026.8.0 as of the 2026-08-03
-# currency review — so anything from 7.14 up runs with a nudge rather than a stop.
-# Bump soft in the SAME change that bumps `currency.toml`'s `expected`, or the
-# comment and the value drift apart (they did, and the cold lane caught it).
-# Keep soft > hard or soft is inert: hard errors across exactly the range soft
-# would warn in, so an equal pair makes the warning unobservable.
-min_version = { hard = "2026.7.14", soft = "2026.8.8" }
+# ⚠️ RAY RULED 2026-08-19, and the ruling OVERRODE the doctrine this comment used
+# to argue. Read this before reasoning from the shape of the values.
+#
+# Until 2026-08-19 the two keys meant different things: `hard` was a CORRECTNESS
+# FLOOR frozen at 2026.7.14 (where the env-file secret-expansion fix #11269 and
+# both task-freshness fixes #11288/#11296 landed), and `soft` tracked the version
+# this repo had actually been verified against. That split is retired. Ray was
+# shown it with its consequence and chose to move `hard` anyway: **both keys now
+# track the reviewed version, and both move on every currency bump.**
+#
+# So `soft` is INTENTIONALLY INERT. An equal pair makes the warning band empty —
+# `hard` errors across exactly the range `soft` would have warned in — and that is
+# the accepted cost, not an oversight. The key is retained rather than deleted
+# because Ray asked for it to be "kept as a slot in case the two-tier split
+# returns"; do not delete it, and do not raise it above `hard` to "fix" the
+# inertness, which would reinstate the doctrine the ruling replaced.
+#
+# The one rule that survives unchanged: bump these in the SAME change as
+# `currency.toml`'s `expected` and `sources/mise.manifest`. All three now name
+# one version, so any disagreement between them is drift by definition. (They
+# drifted once under the old two-tier rule and the cold lane caught it.)
+min_version = { hard = "2026.8.9", soft = "2026.8.9" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
 python = "3.14.7"
 uv = "0.12.5"
-hk = "1.55.0"
+hk = "1.56.0"
 pkl = "0.32.1"
 typos = "1.49.0"
 # ffmpeg: system binary graphify's `video` extra (faster-whisper) needs to
@@ -223,6 +234,62 @@ GRAPHIFY_MAX_GRAPH_BYTES = "1GB"
 [tasks.lint]
 description = "Run hk check --all (read-only, ≡ CI) — hygiene, typos, pkl"
 run = "hk run check --all"
+# STRUCTURED OUTPUT, without changing what a human sees. Both of these write to a
+# FILE and leave stdout exactly as it was, which is why they are here rather than
+# `--format json` — that one replaces stdout, and `mise run lint` is read live.
+#
+# `HK_TIMING_JSON` is hk's own timing report: a run total plus per-step wall time
+# **with overlapping intervals merged**, which is the correct measure for a
+# parallel pipeline and is NOT the same quantity as `--format json`'s per-step
+# `duration_ms` (that one is each command's own execution, and summing it across
+# a parallel run produces a meaningless number — measured 2026-08-19, the two
+# disagree by up to 2x per step). Documented only in hk's `docs/logging.md`
+# § Performance Timing Reports — not in `--help`, not in the release notes.
+#
+# `HK_OUTPUT_FILE` (new in 1.56.0, #1204) puts the full output of FAILED commands
+# at a known path instead of leaving it in scrollback. Default is
+# `~/.local/state/hk/output.log`; pointing it into `.agent/kb/gates/` keeps it
+# beside the gate record it explains, so "lint rc=1" has readable evidence next
+# to it rather than a claim someone has to reproduce.
+#
+# Both land in `.agent/kb/gates/` — gitignored, machine-local, and the directory
+# `kb-gates` already owns (`agent-artifact-conventions.md`), so this adds no
+# ad-hoc path.
+#
+# ⚠️ THE CONDITION, because the paragraph above over-claimed it. These are FIXED
+# paths, not per-run ones, so "beside the gate record it explains" holds only for
+# the MOST RECENT lint. Two lint runs overlapping — a hand-run `mise run lint`
+# while `kb-gates` is in flight, which happened on 2026-08-19 — leave one run's
+# timing beside another run's `gates-<sha>.json`, and nothing in the file says
+# which run wrote it. Read them as "the last lint on this machine", never as
+# evidence for a particular sha. They are deliberately NOT keyed per-run: nothing
+# reads them programmatically (`gates.py` never opens either), they exist for a
+# human following a failure, and a pid-suffixed path no one can guess is worse at
+# that job than a stale one. (Cold lane, batch 2.)
+env.HK_TIMING_JSON = "{{config_root}}/.agent/kb/gates/lint-timing.json"
+env.HK_OUTPUT_FILE = "{{config_root}}/.agent/kb/gates/lint-output.log"
+# ⚠️ THE BOUND hk CANNOT GIVE ITSELF. `long-running-command-hangs.md` rule 1 has
+# named this mechanism since it was written — "hk has no --timeout flag, no
+# timeout step key, and no HK_* timeout env var, so a hard bound has to come from
+# outside it... a mise task carries a `timeout` key" — and it was declared on
+# ZERO of this repo's 75 tasks until 2026-08-19. The rule documented a mechanism
+# nothing used, which is the state the rule itself was written from: a
+# `hk run pre-commit --all` sat at 0% CPU for ~7 HOURS with nothing to abort it.
+#
+# Verified on the installed 2026.8.9 rather than read off a schema, three arms:
+# a 10s run under a 2s bound -> rc=1 at 2s with "ERROR timed out after 2s"; a 1s
+# run under a 10s bound -> rc=0 at 1s; a 3s run with no bound -> rc=0 at 3s. So
+# the key fires, and does not fire early. (`mise -C <dir> run <task>` — the `-C`
+# must precede `run`, or task DISCOVERY ignores it and every arm dies "no task
+# found", which is what the first attempt at this measurement did.)
+#
+# 20m against an observed ~1-2 minutes. Deliberately loose: this is a WEDGE
+# detector, not a performance budget, and a bound tight enough to fire on a slow
+# machine would be a flake that teaches people to re-run rather than to look.
+# It sits under `kb_setup.gates._GATE_TIMEOUT` (1800s), so on the gate path mise
+# aborts first and reports which task wedged — better than a bare subprocess
+# timeout in python that only knows something took too long.
+timeout = "20m"
 
 [tasks.fmt]
 description = "Auto-fix formatting/lint issues"
@@ -256,6 +323,12 @@ description = "Run the Python test suite (pytest-xdist, one worker per core)"
 # xdist sibling workers may finish an in-flight test first, so more than one
 # failure can be reported. That is more information, not less.
 run = "uv run pytest tests/ -x -q -n auto"
+# Bound: the full suite under 12 xdist workers; a wedged worker is the failure mode, not a slow one. See [tasks.lint] for the measurement behind this key.
+# 25m and NOT 30m: `kb_setup.gates._GATE_TIMEOUT` is 1800s, so an equal bound is a
+# RACE — whichever fires first decides the message, and the outer one names no
+# task and kills no tree. Strictly under, so the inner bound always wins.
+# `tests/test_gates.py` asserts the ordering for every GATE_TASK.
+timeout = "25m"
 
 [tasks.eval]
 description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor, `-- --slow` retrieval"
@@ -345,6 +418,9 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 # output, not the rc. While it is green, `mise run` figures are trustworthy;
 # when it is red, re-read every number from `uv run`.
 run = "uv run kb-setup eval"
+# Bound: tier1/tier2 cases carry their own 60s internal bounds; this only catches the harness itself wedging. See [tasks.lint] for the measurement behind this key.
+# 25m, not 30m — see [tasks.test] for why an equal bound races `_GATE_TIMEOUT`.
+timeout = "25m"
 
 [tasks.kb-skill-lint]
 description = "Check every SKILL.md instructs mise tasks, not raw commands (#128)"
@@ -407,6 +483,26 @@ description = "What did THIS round do by hand that a task already owns? (advisor
 # Advisory by construction: always exits 0 and gates nothing. An un-automated
 # step is a statement about future cost, not a failure.
 run = "uv run kb-setup session-reflect {{arg(name='args', var=true, default='')}}"
+
+[tasks.kb-attribute-write]
+description = "What ran when a tracked file was written behind our back? (advisory)"
+# Built because guessing does not converge. `.codex/config.toml` was rewritten on
+# 2026-08-18 (#399) and again on 2026-08-20, and across the two incidents ELEVEN
+# candidate writers were refuted by reproduction — every one of them a tool or a
+# CLI someone thought of. Not one was it.
+#
+# This asks the only question with a bounded answer: what was running in the
+# seconds around the file's mtime? Its first real run paid for itself — it showed
+# the 2026-08-20 write landed in a window with ZERO recorded tool activity, which
+# is why probing tools kept refuting.
+#
+# NOT declared with `{{arg(...)}}`: those are the deprecated Tera helpers of #403.
+# mise appends `--` args to the last command when no template function is used,
+# which is what `kb-arms` already relies on.
+#
+# Advisory, and in no gate. It produces CANDIDATES; a row near the mtime is a
+# lead to reproduce, never an attribution.
+run = "uv run kb-setup write-attribution"
 
 [tasks.kb-distill]
 description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
@@ -496,6 +592,8 @@ description = "Reproduce graph.json from committed inputs (manifests + doc extra
 # `min_version.hard` floor were cache-correctness bugs. The objection is
 # correctness, so a speedup measurement cannot answer it.
 run = "uv run kb-setup build"
+# Bound: re-clones EVERY sources/*.manifest at its pinned SHA, so it is network-bound; a transient stall here is the case persistence-gate-retry.md is about, and this bound turns an indefinite hang into a retryable failure. See [tasks.lint] for the measurement behind this key.
+timeout = "180m"
 
 [tasks.kb-detect-census]
 description = "Emit a read-only complete-source Graphify detection receipt"
@@ -792,12 +890,16 @@ description = "Transcribe a local audio file with graphify's bundled whisper (lo
 # For a graphify-downloaded yt_*.m4a. Local faster-whisper — no LLM backend. The
 # transcript is then host-agent (Claude Code) extracted like any prose source.
 run = "uv run kb-setup transcribe"
+# Bound: local faster-whisper over a full recording — tens of minutes is NORMAL here, so this bound is deliberately far out. See [tasks.lint] for the measurement behind this key.
+timeout = "120m"
 
 [tasks.kb-artifacts]
 description = 'Regenerate all derived outputs (wiki/graphml/cypher/html/tree/obsidian/svg): mise run kb-artifacts [-- fmt...]'
 # Data-driven registry in kb_setup.artifacts (no copy-paste); ensures output deps
 # (scipy for svg) first. All read graph.json; none are committed (regenerable).
 run = "uv run kb-setup artifacts"
+# Bound: regenerates every derived view over a ~736 MiB graph. See [tasks.lint] for the measurement behind this key.
+timeout = "60m"
 
 [tasks.kb-ensure-deps]
 description = "Inject output-only runtime deps missing from graphify's env (e.g. scipy for svg on py3.14)"
@@ -852,6 +954,8 @@ run = "uv run kb-setup brain reflect"
 [tasks.brain-audit]
 description = "Fail if any recorded routing outcome is not a closed record (ship-gate precondition)"
 run = "uv run kb-setup brain audit"
+# Bound: reads recorded outcomes; anything near this is a wedge. See [tasks.lint] for the measurement behind this key.
+timeout = "10m"
 
 [tasks.brain-transcript-audit]
 description = "ADVISORY: flag sessions that delegated + verified but recorded no routing outcome"
@@ -1010,6 +1114,21 @@ description = "Verify a handoff's claims — paths (incl. mistyped extensions an
 # fresh clone has no records at all — failing there would break the checker in
 # exactly the situation it exists for.
 run = "uv run kb-setup handoff-check"
+
+[tasks.hk-test]
+description = "Gate: run hk's step-defined tests (both directions per builtin) and refuse a run that tested nothing"
+# NOT `run = "hk test"`. hk exits 0 when its filter matches nothing (measured:
+# `hk test --name definitely-no-such-test` -> rc=0, no output), so a bare seam
+# would report green having asked no question the moment the config stopped
+# declaring testable steps. `kb_setup.hk_test` asserts a floor on the number of
+# tests that ACTUALLY RAN before it looks at hk's exit code, which is the only
+# ordering that can tell "all passed" from "there were none".
+#
+# What it buys: 46 tests, all shipped by the builtins, every one a bad-file/
+# good-file PAIR. That is the FAIL direction of each linter, proven in under a
+# second — the hand-work `ci-local-parity.md` rule 6 asks for on every new step.
+run = "uv run kb-setup hk-test"
+timeout = "10m"
 
 [tasks.kb-gates]
 description = "Run the gates and record each result durably: mise run kb-gates [-- <task>... --stop]"
