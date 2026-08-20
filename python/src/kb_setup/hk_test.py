@@ -32,6 +32,9 @@ not a gate. What it catches is the collapse, not the drift.
 
 from __future__ import annotations
 
+import contextlib
+import os
+import signal
 import subprocess
 from pathlib import Path
 
@@ -47,6 +50,11 @@ _ARGV = ("mise", "exec", "--", "hk", "test")
 #: Wall-clock bound. The full suite runs in well under a second; this exists only
 #: so a wedged linter cannot hang the gate indefinitely.
 _TIMEOUT = 300
+
+#: How long to wait for the process group to actually die after SIGKILL. Short on
+#: purpose: SIGKILL is not catchable, so anything still here after this is a
+#: zombie whose parent is us, and blocking the gate on it helps nobody.
+_KILL_GRACE = 5
 
 #: The floor. 40 against 46 observed on hk 1.56.0 — enough headroom that a builtin
 #: dropping one or two tests upstream does not fail the gate, tight enough that the
@@ -80,23 +88,80 @@ def _report(passed: int, failed: int) -> None:
     print(f"hk-test: {passed} passed, {failed} failed (floor {_MIN_TESTS})")
 
 
+def _kill_group(proc: subprocess.Popen[str]) -> None:
+    """Kill hk AND everything it spawned, then reap it.
+
+    `Popen.kill()` signals the direct child only. hk's whole job is spawning
+    linters, so the process that is actually wedged is usually a grandchild —
+    killing hk alone leaves it running and holding the pipes. `start_new_session`
+    at spawn time is what makes the group addressable here.
+
+    Both calls are best-effort: the group is already gone if hk exited between the
+    timeout firing and this call, and a gate must not raise on the way to
+    reporting NOT_RUN.
+    """
+    try:
+        # `ProcessLookupError` needs no separate arm — it is an OSError subclass,
+        # which is also the case that gets here most often (hk exited between the
+        # timeout firing and this call).
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except OSError:
+        proc.kill()
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        proc.wait(timeout=_KILL_GRACE)
+
+
+def _decode(stream: str | bytes | None) -> str:
+    """Whatever a stream turned out to be, as text that cannot raise.
+
+    `TimeoutExpired.stdout` is typed loosely and is `bytes` even when the call
+    asked for text, because the decode happens after `communicate` returns and a
+    timeout never gets there. Callers want the partial output either way.
+    """
+    if stream is None:
+        return ""
+    if isinstance(stream, bytes):
+        return stream.decode("utf-8", errors="replace")
+    return stream
+
+
 def run(repo_root: Path) -> Result[int]:
     """Run the step tests; Ok(passed) only if they ran AND all of them passed."""
     try:
-        proc = subprocess.run(
+        # `start_new_session` puts hk in its own process GROUP, which is what
+        # makes the timeout below able to kill the linters hk spawned rather than
+        # only hk itself. Without it a wedged linter survives the timeout holding
+        # the pipes open, and the gate returns while the hang continues.
+        with subprocess.Popen(
             _ARGV,
             cwd=repo_root,
-            check=False,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
-        return Err(f"hk test did not finish within {_TIMEOUT}s", Rc.NOT_RUN)
-    except (OSError, subprocess.SubprocessError) as exc:
+            start_new_session=True,
+        ) as proc:
+            try:
+                stdout, stderr = proc.communicate(timeout=_TIMEOUT)
+            except subprocess.TimeoutExpired as exc:
+                _kill_group(proc)
+                # Print what hk managed to say before it wedged. Every other
+                # failure branch here prints its captured output; discarding it
+                # exactly when the run hung would withhold the diagnostic at the
+                # one moment there is nothing else to go on.
+                partial = (_decode(exc.stdout) + _decode(exc.stderr)).rstrip()
+                if partial:
+                    print(partial)
+                return Err(f"hk test did not finish within {_TIMEOUT}s", Rc.NOT_RUN)
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:
+        # UnicodeDecodeError is neither of the other two — `text=True` decodes
+        # inside `communicate`, so a byte sequence a linter emits verbatim that is
+        # not UTF-8 would raise straight past a handler whose whole job is to
+        # return NOT_RUN instead of raising. `gates.py:282` already handles this
+        # for `git status`; a sibling gate diverging from it is how one surface
+        # ends up able to crash where the other reports. (Cold lane, batch 1.)
         return Err(f"hk test could not run: {exc}", Rc.NOT_RUN)
 
-    output = proc.stdout + proc.stderr
+    output = stdout + stderr
     passed, failed = _counts(output)
     total = passed + failed
 

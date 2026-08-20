@@ -11,6 +11,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Self
 
 import pytest
 from kb_setup import hk_test
@@ -24,26 +25,84 @@ def _tap(passed: int, failed: int = 0) -> str:
 
 
 class _Proc:
-    def __init__(self, stdout: str, returncode: int = 0, stderr: str = "") -> None:
+    """A stand-in for `Popen`, used as the context manager the gate opens.
+
+    `communicate` is where a hang surfaces, so a `TimeoutExpired` handed here is
+    raised from THERE rather than from construction — which is the difference
+    between exercising the timeout branch and exercising the could-not-start one.
+    """
+
+    def __init__(
+        self,
+        stdout: str,
+        returncode: int = 0,
+        stderr: str = "",
+        raises: BaseException | None = None,
+    ) -> None:
         self.stdout = stdout
         self.stderr = stderr
         self.returncode = returncode
+        self._raises = raises
+        #: Deliberately invalid. Nothing in these tests may reach a real process
+        #: group — `os.killpg` is monkeypatched, and this is the second layer.
+        self.pid = -1
+        self.killed = False
+        #: The bounds the gate actually passed. Recorded rather than ignored so a
+        #: test can assert the timeout was applied at all — a fake that silently
+        #: accepted and dropped it would let an unbounded call pass every test.
+        self.communicate_timeout: float | None = None
+        self.wait_timeout: float | None = None
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+        self.communicate_timeout = timeout
+        if self._raises is not None:
+            raise self._raises
+        return self.stdout, self.stderr
+
+    def kill(self) -> None:
+        self.killed = True
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.wait_timeout = timeout
+        return self.returncode
+
+
+class _Spawn:
+    """What the fixture records: the argv AND the kwargs of each spawn."""
+
+    def __init__(self) -> None:
+        self.argv: list[tuple[str, ...]] = []
+        self.kwargs: list[dict[str, object]] = []
 
 
 @pytest.fixture
 def fake_run(monkeypatch: pytest.MonkeyPatch):
-    """Replace the ONE subprocess call so the gate's own logic is what is tested."""
+    """Replace the ONE subprocess call so the gate's own logic is what is tested.
 
-    def _install(proc: object) -> list[tuple[str, ...]]:
-        seen: list[tuple[str, ...]] = []
+    `os.killpg` is replaced too, and not as an afterthought: the gate now kills a
+    process GROUP on timeout, and a test that let that call through would be one
+    bad pid away from killing the test runner.
+    """
 
-        def _fake(argv: Sequence[str], **_kwargs: object) -> object:
-            seen.append(tuple(argv))
+    def _install(proc: object) -> _Spawn:
+        seen = _Spawn()
+
+        def _fake(argv: Sequence[str], **kwargs: object) -> object:
+            seen.argv.append(tuple(argv))
+            seen.kwargs.append(kwargs)
             if isinstance(proc, BaseException):
                 raise proc
             return proc
 
-        monkeypatch.setattr(subprocess, "run", _fake)
+        monkeypatch.setattr(subprocess, "Popen", _fake)
+        monkeypatch.setattr(hk_test.os, "killpg", lambda *_a: None)
+        monkeypatch.setattr(hk_test.os, "getpgid", lambda _pid: 4242)
         return seen
 
     return _install
@@ -110,11 +169,79 @@ def test_it_invokes_through_mise_exec_not_a_bare_hk(tmp_path: Path, fake_run) ->
     """The stale-PATH skew is live on this machine; a bare `hk` runs the OLD one."""
     seen = fake_run(_Proc(_tap(46)))
     hk_test.run(tmp_path)
-    assert seen == [("mise", "exec", "--", "hk", "test")]
+    assert seen.argv == [("mise", "exec", "--", "hk", "test")]
 
 
 def test_timeout_is_not_run_not_findings(tmp_path: Path, fake_run) -> None:
-    fake_run(subprocess.TimeoutExpired(cmd="hk", timeout=1))
+    fake_run(_Proc("", raises=subprocess.TimeoutExpired(cmd="hk", timeout=1)))
+    result = hk_test.run(tmp_path)
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+
+
+def test_timeout_prints_the_partial_output_it_captured(
+    tmp_path: Path, fake_run, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A hang is the one failure with nothing else to go on — do not discard it.
+
+    Every other failure branch prints what hk said. The timeout branch used to
+    drop `TimeoutExpired.stdout`/`.stderr` on the floor, so the run that most
+    needed a diagnostic was the only one that produced none. (Cold lane, batch 1.)
+    """
+    exc = subprocess.TimeoutExpired(cmd="hk", timeout=1)
+    exc.stdout = b"ok - step :: case 0 (5ms)\n"
+    exc.stderr = b"hk: still waiting on gitleaks\n"
+    fake_run(_Proc("", raises=exc))
+
+    result = hk_test.run(tmp_path)
+
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    printed = capsys.readouterr().out
+    assert "ok - step :: case 0" in printed
+    assert "still waiting on gitleaks" in printed
+
+
+def test_timeout_kills_the_whole_process_group(
+    tmp_path: Path, fake_run, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hk spawns the linters, so the wedged process is usually a GRANDCHILD.
+
+    Killing hk alone leaves it running and holding the pipes, which is the defect
+    this asserts against: the signal must go to the group.
+    """
+    fake_run(_Proc("", raises=subprocess.TimeoutExpired(cmd="hk", timeout=1)))
+    # AFTER `fake_run`, which installs its own no-op `killpg`. Patching first
+    # would be silently overwritten and this test would assert nothing — the
+    # fixture-ordering shape of a test that cannot fail.
+    killed: list[int] = []
+    monkeypatch.setattr(hk_test.os, "killpg", lambda pgid, _sig: killed.append(pgid))
+
+    hk_test.run(tmp_path)
+
+    assert killed == [4242]
+
+
+def test_it_spawns_in_its_own_session_or_the_group_kill_cannot_work(
+    tmp_path: Path, fake_run
+) -> None:
+    """`start_new_session` is what MAKES the group above addressable.
+
+    Without it hk shares our group and `killpg` would signal the test runner, so
+    this pins the spawn flag rather than trusting the kill test alone.
+    """
+    seen = fake_run(_Proc(_tap(46)))
+    hk_test.run(tmp_path)
+    assert seen.kwargs[0]["start_new_session"] is True
+
+
+def test_undecodable_output_is_not_run_not_a_crash(tmp_path: Path, fake_run) -> None:
+    """`text=True` decodes inside `communicate`, so a bad byte raises from there.
+
+    `gates.py` already handles this for `git status`; a sibling gate that does not
+    is one non-UTF-8 linter message away from crashing where the other reports.
+    """
+    fake_run(UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"))
     result = hk_test.run(tmp_path)
     assert isinstance(result, Err)
     assert result.rc is Rc.NOT_RUN

@@ -1236,10 +1236,21 @@ manifest = "sources/hk.manifest"
 # a watch item is prose, so it warned nobody. This is the machine-enforced half.
 #
 # Anchored on the URI prefix and capturing the leading `v` so the value compares
-# directly against the manifest's `ref = v1.56.0`. The `hk@1.56.0` fragment later
-# in the same URI is deliberately NOT bound separately: it is the same literal in
-# the same string, so a second binding would report one defect twice rather than
-# checking a second place.
+# directly against the manifest's `ref = v1.56.0`.
+#
+# The `hk@1.56.0` fragment later in the same URI is NOT bound separately, and the
+# reason stated here until 2026-08-20 was FALSE: it said the two are "the same
+# literal in the same string", which they are not — one carries the `v` prefix
+# and one does not, so a partial hand-edit genuinely can desync them and this
+# binding would not see it. (Cold lane, batch 2.)
+#
+# It stays unbound for a different and weaker reason, recorded honestly rather
+# than dressed up: a desync here is not silent. Pkl resolves the package by the
+# whole URI, so `download/v1.57.0/hk@1.56.0` fails to load the config outright
+# and `mise run lint` exits non-zero on the next run. The failure mode this
+# mechanism exists to catch is the QUIET one — a version that drifts while
+# everything still works — and that is not this. Binding it would also need a
+# `field` holding the bare version, which `currency.toml` does not carry.
 [[tool.hk.ref_binding]]
 path = "hk.pkl"
 pattern = 'amends "package://github\.com/jdx/hk/releases/download/(v[0-9]+\.[0-9]+\.[0-9]+)/'

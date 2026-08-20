@@ -36,8 +36,13 @@ outcome: "useful"
 - **`ruff_format` declared last.** `exclusive` is a whole-pipeline barrier; at
   position 15 of 20 it split the run into three phases and stranded five
   unrelated steps behind a 40 ms task.
-- **`hk-test` is a gate**: `[tasks.hk-test]` -> `kb_setup.hk_test` -> 11 tests,
-  added to `GATE_TASKS`, deliberately NOT in `CONCURRENT_SAFE`.
+- **`hk-test` is a gate**: `[tasks.hk-test]` -> `kb_setup.hk_test`, added to
+  `GATE_TASKS`, deliberately NOT in `CONCURRENT_SAFE`. Two counts travel with
+  this and are easy to swap: the gate RUNS hk's **46** step-defined tests (what
+  `CLAUDE.md` quotes and what the floor of 40 sits under), while the wrapper
+  module carries pytest unit tests OF ITS OWN — 11 at `d3c381139f2b`, 15 after
+  the cold-review fixes. Neither number is the other; the second one moves
+  whenever the module gains a test, so read it from the suite, not from here.
 - **`lint` now emits structured output**: `HK_TIMING_JSON` + `HK_OUTPUT_FILE`
   into `.agent/kb/gates/`, armed both directions, human stdout unchanged.
 

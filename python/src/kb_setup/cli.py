@@ -68,6 +68,7 @@ def _print_usage() -> int:
         "arms <spec.toml> [--dry-run] | "
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
         "graph-counts [--by-source] [name...] | "
+        "write-attribution <path> [--window N] [--limit N] | "
         "model-limits [--write] [--observed-at DATE] [model...] | "
         "md-budget | skill-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
@@ -337,7 +338,9 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
 #: `reclaim` is advisory in the same sense — it gates nothing — but it is the one
 #: member that CAN delete, and only behind an explicit `--apply`. Grouped here
 #: because its default path (report, rc 0, no mutation) is identical to the others'.
-_ADVISORY = frozenset({"distill", "session-reflect", "arms", "reclaim", "graph-counts"})
+_ADVISORY = frozenset(
+    {"distill", "session-reflect", "arms", "reclaim", "graph-counts", "write-attribution"}
+)
 
 
 def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
@@ -350,6 +353,10 @@ def _dispatch_advisory(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import session_reflect
 
         return session_reflect.reflect_main(repo_root, rest)
+    if cmd == "write-attribution":
+        from kb_setup import write_attribution
+
+        return write_attribution.write_attribution_main(repo_root, rest)
     if cmd == "reclaim":
         from kb_setup import reclaim
 

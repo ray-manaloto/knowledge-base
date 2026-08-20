@@ -141,6 +141,40 @@ limit and once on a content-policy refusal.
 and aim a follow-up at exactly what was missed. It does not buy an extra round;
 it costs coverage.
 
+### 4a. Attribute every UNEXPLAINED write to a tracked file
+
+Before the findings, look at what the round left dirty:
+
+```bash
+git status --short
+mise run kb-attribute-write -- <path> --window 45
+```
+
+For each tracked file modified by nothing anyone remembers doing, run the
+attribution. It reports what the transcripts recorded in the seconds around that
+file's mtime — tool calls by command, hooks by name — nearest first.
+
+**This step exists because the alternative was measured and it does not work.**
+`.codex/config.toml` was rewritten by an unknown writer on 2026-08-18 (#399) and
+again on 2026-08-20. Both rounds responded by naming a plausible culprit and
+probing it; across the two, **eleven** candidates were refuted by reproduction and
+none was the writer. Guessing cannot converge on a search space of every process
+that ran, and the refutations themselves are expensive — each one is a full
+reproduce-and-restore cycle.
+
+Read the result as **leads, not attribution** (`reader-findings-are-leads-not-findings`).
+Two outcomes are both useful and must not be collapsed:
+
+- **rows near the mtime** — the top row is where to aim the next reproduction.
+- **NO EVENTS in a window that WAS searched** — the writer was not a tool call or
+  a hook of a recorded session. That is a finding: it rules out the entire class
+  everyone keeps probing. Its first real run returned exactly this, which is why
+  six tool-shaped candidates had all been refuted.
+
+The task refuses rather than returning an empty list when nothing was examined —
+no transcripts, or every one prefiltered away — because "nothing ran" and "nothing
+was looked at" are the same empty list and opposite conclusions.
+
 ### 5. Apply — and this is the half that gets skipped
 
 A review nobody acts on is a document. Turn the confirmed findings into:

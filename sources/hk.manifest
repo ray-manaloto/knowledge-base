@@ -16,8 +16,15 @@
 # set ref/commit here to match, then `mise run kb-build`:
 #   gh api repos/jdx/hk/commits/<tag> --jq .sha
 #
-# ⚠️ NOT `git ls-remote --tags` (#395), which is what this line said until
-# 2026-08-19. hk happens to ship LIGHTWEIGHT tags, so that call returned the
+# ⚠️ NOT `git ls-remote --tags <url> <tag>` (#395), which is what this line said
+# until 2026-08-19. Naming the tag EXACTLY is what makes it wrong: the commit an
+# annotated tag points at is on the peeled `<tag>^{}` line, and an exact pattern
+# does not match that line, so only the tag object comes back. Control-armed
+# against jdx/mise v2026.8.8 on 2026-08-20 — exact pattern returns one line
+# (`ca93e5fe…`, the tag object) with or WITHOUT `--refs`, while the glob
+# `'v2026.8.8*'` returns both and `--refs` then suppresses the useful one. So
+# neither adding `--refs` nor dropping it rescues the exact form.
+# hk happens to ship LIGHTWEIGHT tags, so that call returned the
 # commit here and this file was never wrong — but the identical instruction in
 # `sources/mise.manifest` put a TAG OBJECT in its `commit` field for 17 days,
 # because mise ships annotated ones. The instruction was the defect; that it did

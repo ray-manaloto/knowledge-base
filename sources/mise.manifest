@@ -16,9 +16,15 @@
 # set ref/commit here to match, then `mise run kb-build`:
 #   gh api repos/jdx/mise/commits/<tag> --jq .sha
 #
-# ⚠️ NOT `git ls-remote --tags` (#395), which is what this line said until
-# 2026-08-19 and what put a wrong value below it. mise ships ANNOTATED tags, so
-# that call returns the TAG OBJECT rather than the commit: `commit` here read
+# ⚠️ NOT `git ls-remote --tags <url> <tag>` (#395), which is what this line said
+# until 2026-08-19 and what put a wrong value below it. mise ships ANNOTATED tags,
+# so that call returns the TAG OBJECT rather than the commit. Naming the tag
+# EXACTLY is the half that makes it silent: the commit sits on the peeled
+# `<tag>^{}` line, which an exact pattern does not match. Control-armed
+# 2026-08-20 — `--tags <url> v2026.8.8` returns ONE line, `ca93e5fe…`, with or
+# WITHOUT `--refs`; the glob `'v2026.8.8*'` returns both lines and `--refs` then
+# suppresses the useful one. Neither flag rescues the exact form.
+# `commit` here read
 # `ca93e5fe…` from 2026-08-02 to 2026-08-19, which is the v2026.8.8 tag object
 # pointing at commit `c454c6f4…`. It never surfaced because `git checkout` peels
 # a tag object, so the clone was right while the recorded provenance was not.

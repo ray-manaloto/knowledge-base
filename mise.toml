@@ -255,6 +255,17 @@ run = "hk run check --all"
 # Both land in `.agent/kb/gates/` — gitignored, machine-local, and the directory
 # `kb-gates` already owns (`agent-artifact-conventions.md`), so this adds no
 # ad-hoc path.
+#
+# ⚠️ THE CONDITION, because the paragraph above over-claimed it. These are FIXED
+# paths, not per-run ones, so "beside the gate record it explains" holds only for
+# the MOST RECENT lint. Two lint runs overlapping — a hand-run `mise run lint`
+# while `kb-gates` is in flight, which happened on 2026-08-19 — leave one run's
+# timing beside another run's `gates-<sha>.json`, and nothing in the file says
+# which run wrote it. Read them as "the last lint on this machine", never as
+# evidence for a particular sha. They are deliberately NOT keyed per-run: nothing
+# reads them programmatically (`gates.py` never opens either), they exist for a
+# human following a failure, and a pid-suffixed path no one can guess is worse at
+# that job than a stale one. (Cold lane, batch 2.)
 env.HK_TIMING_JSON = "{{config_root}}/.agent/kb/gates/lint-timing.json"
 env.HK_OUTPUT_FILE = "{{config_root}}/.agent/kb/gates/lint-output.log"
 # ⚠️ THE BOUND hk CANNOT GIVE ITSELF. `long-running-command-hangs.md` rule 1 has
@@ -313,7 +324,11 @@ description = "Run the Python test suite (pytest-xdist, one worker per core)"
 # failure can be reported. That is more information, not less.
 run = "uv run pytest tests/ -x -q -n auto"
 # Bound: the full suite under 12 xdist workers; a wedged worker is the failure mode, not a slow one. See [tasks.lint] for the measurement behind this key.
-timeout = "30m"
+# 25m and NOT 30m: `kb_setup.gates._GATE_TIMEOUT` is 1800s, so an equal bound is a
+# RACE — whichever fires first decides the message, and the outer one names no
+# task and kills no tree. Strictly under, so the inner bound always wins.
+# `tests/test_gates.py` asserts the ordering for every GATE_TASK.
+timeout = "25m"
 
 [tasks.eval]
 description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor, `-- --slow` retrieval"
@@ -404,7 +419,8 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 # when it is red, re-read every number from `uv run`.
 run = "uv run kb-setup eval"
 # Bound: tier1/tier2 cases carry their own 60s internal bounds; this only catches the harness itself wedging. See [tasks.lint] for the measurement behind this key.
-timeout = "30m"
+# 25m, not 30m — see [tasks.test] for why an equal bound races `_GATE_TIMEOUT`.
+timeout = "25m"
 
 [tasks.kb-skill-lint]
 description = "Check every SKILL.md instructs mise tasks, not raw commands (#128)"
@@ -467,6 +483,26 @@ description = "What did THIS round do by hand that a task already owns? (advisor
 # Advisory by construction: always exits 0 and gates nothing. An un-automated
 # step is a statement about future cost, not a failure.
 run = "uv run kb-setup session-reflect {{arg(name='args', var=true, default='')}}"
+
+[tasks.kb-attribute-write]
+description = "What ran when a tracked file was written behind our back? (advisory)"
+# Built because guessing does not converge. `.codex/config.toml` was rewritten on
+# 2026-08-18 (#399) and again on 2026-08-20, and across the two incidents ELEVEN
+# candidate writers were refuted by reproduction — every one of them a tool or a
+# CLI someone thought of. Not one was it.
+#
+# This asks the only question with a bounded answer: what was running in the
+# seconds around the file's mtime? Its first real run paid for itself — it showed
+# the 2026-08-20 write landed in a window with ZERO recorded tool activity, which
+# is why probing tools kept refuting.
+#
+# NOT declared with `{{arg(...)}}`: those are the deprecated Tera helpers of #403.
+# mise appends `--` args to the last command when no template function is used,
+# which is what `kb-arms` already relies on.
+#
+# Advisory, and in no gate. It produces CANDIDATES; a row near the mtime is a
+# lead to reproduce, never an attribution.
+run = "uv run kb-setup write-attribution"
 
 [tasks.kb-distill]
 description = "Propose skill/task/module candidates from this session's throwaway scripts (#219)"
