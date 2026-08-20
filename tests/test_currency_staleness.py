@@ -422,6 +422,48 @@ def test_report_keeps_never_built_out_of_the_changed_block(tmp_path, capsys):
     assert "corpus inputs changed" not in out
 
 
+def test_report_separates_a_failed_build_from_a_fresh_clone(tmp_path, capsys):
+    """#397: "no graph has been built here yet" is a LIE when one ran and failed."""
+    from kb_setup import build_outcome
+
+    root = _repo(tmp_path)
+
+    # CONTROL ARM: no failure record -> the fresh-clone sentence, as before.
+    staleness.report([staleness.check_inputs(root, _spec(root))])
+    assert "no graph has been built here yet" in capsys.readouterr().out
+
+    build_outcome.record_failure(root, "build", "SystemExit: detect preflight failed")
+    status = staleness.check_inputs(root, _spec(root))
+    assert status.state == staleness.BUILD_FAILED
+    staleness.report([status])
+    out = capsys.readouterr().out
+    assert "RAN AND FAILED" in out
+    assert "no graph has been built here yet" not in out
+    assert "corpus inputs changed" not in out
+
+
+def test_a_cleared_failure_record_restores_the_fresh_clone_reading(tmp_path):
+    """A build that later SUCCEEDS must stop reporting the old failure."""
+    from kb_setup import build_outcome
+
+    root = _repo(tmp_path)
+    build_outcome.record_failure(root, "build", "SystemExit: boom")
+    assert staleness.check_inputs(root, _spec(root)).state == staleness.BUILD_FAILED
+    build_outcome.clear(root)
+    assert staleness.check_inputs(root, _spec(root)).state == staleness.NEVER_BUILT
+
+
+def test_an_unreadable_failure_record_still_reads_as_a_failed_build(tmp_path):
+    """Fails CLOSED: a corrupt record must not degrade to "never run"."""
+    from kb_setup import build_outcome
+
+    root = _repo(tmp_path)
+    path = build_outcome.record_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not json", encoding="utf-8")
+    assert staleness.check_inputs(root, _spec(root)).state == staleness.BUILD_FAILED
+
+
 def test_report_never_renders_not_verifiable_as_a_pass(tmp_path, capsys):
     root = _repo(tmp_path)
     _stamp(root)

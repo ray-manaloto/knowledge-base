@@ -98,6 +98,13 @@ graphify-out/.vocab.txt
 # that actually produced the file (the stamp mechanism shipped without its own
 # ignore rule, so nothing had revealed the gap).
 graphify-out/.currency-stamp.json
+# The last-failure record beside it (#397), machine-local for the same reasons
+# and then some: it describes THIS host's last `kb-build` attempt, so a fresh
+# clone inheriting one would report a defect it has not got. Listed explicitly
+# because `graphify-out/` is an allowlist here, not a wildcard — the stamp above
+# shipped without its own rule for exactly this reason, and nothing revealed the
+# gap until the file first appeared.
+graphify-out/.build-failure.json
 # Count continuity ledger (#191) + the handoff file `_merge_docs.py` writes its
 # post-merge counts to. Both DERIVED and both machine-local: the ledger is only
 # meaningful next to the graph.json fingerprint it records, and graph.json is

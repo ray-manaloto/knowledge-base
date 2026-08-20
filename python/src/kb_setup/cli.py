@@ -531,24 +531,41 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
 
 def _build_checked(repo_root: Path) -> int:
-    """Build and require typed evidence for the complete graph output set."""
-    from kb_setup import graph, graphify_health
+    """Build and require typed evidence for the complete graph output set.
 
-    graph.build(repo_root)
-    expected = ("graphify-out/graph.json", "graphify-out/graph-prose.json")
-    produced = tuple(path for path in expected if (repo_root / path).is_file())
-    graphify_health.require_complete(
-        graphify_health.assess(
-            graphify_health.GraphifyOperation.BUILD,
-            graphify_health.GraphifyEvidence(
-                observed=True,
-                mode="deep",
-                deep_required=True,
-                expected_artifacts=expected,
-                produced_artifacts=produced,
-            ),
+    Every exit from here is RECORDED (#397). A build that fails writes no stamp,
+    and "no stamp" read identically to a fresh clone's — so the defect presented
+    as a scheduling to-do and several handoffs in a row carried it as one. The
+    record is what lets `kb-currency-check` tell the two apart; see
+    `kb_setup.build_outcome`.
+    """
+    from kb_setup import build_outcome, graph, graphify_health
+
+    try:
+        graph.build(repo_root)
+        expected = ("graphify-out/graph.json", "graphify-out/graph-prose.json")
+        produced = tuple(path for path in expected if (repo_root / path).is_file())
+        graphify_health.require_complete(
+            graphify_health.assess(
+                graphify_health.GraphifyOperation.BUILD,
+                graphify_health.GraphifyEvidence(
+                    observed=True,
+                    mode="deep",
+                    deep_required=True,
+                    expected_artifacts=expected,
+                    produced_artifacts=produced,
+                ),
+            )
         )
-    )
+    except BaseException as exc:
+        # BaseException, not Exception: `graph.build` refuses with `SystemExit`,
+        # which is the single most likely failure to reach here and is NOT an
+        # `Exception`. A KeyboardInterrupt is recorded too — an interrupted
+        # build also leaves no stamp, and calling that "never run" is the same
+        # lie in a smaller hat.
+        build_outcome.record_failure(repo_root, "build", f"{type(exc).__name__}: {exc}")
+        raise
+    build_outcome.clear(repo_root)
     return 0
 
 

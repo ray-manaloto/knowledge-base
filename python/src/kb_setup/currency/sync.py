@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import build_outcome
 from kb_setup.currency import _proc
 
 if TYPE_CHECKING:
@@ -1560,7 +1561,15 @@ def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
         return Finding("build-stamp", SKIP, "this tool declares no build stamp")
     stamp = read_stamp(repo_root, spec)
     if not stamp:
-        return Finding("build-stamp", DRIFT, "artifacts have never been stamped — rebuild pending")
+        # NEVER RUN and RAN-AND-FAILED both leave no stamp, and this line said
+        # "rebuild pending" for both — so a defect read as a scheduling item and
+        # was carried as one across several rounds (#397). Ask first.
+        failed = build_outcome.describe(repo_root)
+        if failed:
+            return Finding("build-stamp", DRIFT, failed)
+        return Finding(
+            "build-stamp", DRIFT, "no build has run here yet — rebuild pending (never run)"
+        )
 
     mismatch = _check_artifact_identity(repo_root, spec, stamp)
     if mismatch is not None:

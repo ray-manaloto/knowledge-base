@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import build_outcome
 from kb_setup.currency import sync
 
 if TYPE_CHECKING:
@@ -45,6 +46,12 @@ SKIP = "skip"
 #: stamp nor graph, and calling that "your whole corpus went stale" would make
 #: the very first session in a new clone report a defect that does not exist.
 NEVER_BUILT = "never-built"
+#: A build RAN HERE AND FAILED, so there is no stamp for the same reason a fresh
+#: clone has none — and that coincidence is exactly the defect #397 records: the
+#: two were rendered with one sentence, and the failing build was carried as a
+#: to-do for several rounds. Kept apart from NEVER_BUILT for the reason DRIFT and
+#: NOT-CHECKED are kept apart everywhere else in this engine.
+BUILD_FAILED = "build-failed"
 #: A build exists but the question could not be asked — an unreadable stamp, or
 #: one written before inputs were fingerprinted. Never rendered as a pass.
 NOT_VERIFIABLE = "not-verifiable"
@@ -111,9 +118,9 @@ def check_inputs(repo_root: Path, spec: ToolSpec) -> InputStatus:
     # directly rather than through `sync.stamp_path`, whose Optional return would
     # need narrowing that says nothing a reader does not already know.
     stamp_file = repo_root / spec.stamp
-    missing = _no_build_reason(repo_root, spec, stamp_file)
-    if missing is not None:
-        return InputStatus(spec.name, NEVER_BUILT, missing)
+    absent = _absent_build_status(repo_root, spec, stamp_file)
+    if absent is not None:
+        return absent
 
     recorded, why_not = _recorded_inputs(spec, stamp_file)
     if recorded is None:
@@ -153,6 +160,23 @@ def _recorded_inputs(spec: ToolSpec, stamp_file: Path) -> tuple[dict[str, str] |
     if recorded is None:
         return None, "the stamp predates input fingerprinting — rebuild to record them"
     return recorded, ""
+
+
+def _absent_build_status(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> InputStatus | None:
+    """The status for "there is no build to compare against", or None if there is.
+
+    Both no-build causes land here, and telling them apart is the whole point of
+    #397: a fresh clone (NEVER_BUILT) and a build that ran and failed
+    (BUILD_FAILED) leave the same absence, and one sentence over both is how the
+    defect was carried as a to-do for several rounds.
+    """
+    missing = _no_build_reason(repo_root, spec, stamp_file)
+    if missing is None:
+        return None
+    failed = build_outcome.describe(repo_root)
+    if failed:
+        return InputStatus(spec.name, BUILD_FAILED, failed)
+    return InputStatus(spec.name, NEVER_BUILT, missing)
 
 
 def _no_build_reason(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> str | None:
@@ -207,7 +231,9 @@ def report(statuses: Iterable[InputStatus]) -> None:
         for line in status.changes:
             print(f"{_HEADER}   {line}")
     for status in blind:
-        if status.state == NEVER_BUILT:
+        if status.state == BUILD_FAILED:
+            print(f"{_HEADER} {status.detail}")
+        elif status.state == NEVER_BUILT:
             # Deliberately not the word "stale", and deliberately not in the
             # changed block: nothing has gone out of date, there is simply no
             # graph here yet. This is what a fresh clone sees.

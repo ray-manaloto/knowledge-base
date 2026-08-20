@@ -774,7 +774,39 @@ def test_build_clears_the_stamp_before_touching_the_artifact(tmp_path, monkeypat
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
     assert finding.status == sync.DRIFT
-    assert "never been stamped" in finding.detail
+    # No failure was RECORDED here, so this is the fresh-clone half of the #397
+    # split. The other half has its own test below.
+    assert "never run" in finding.detail
+
+
+def test_a_build_that_ran_and_failed_is_not_reported_as_never_run(tmp_path, monkeypatch) -> None:
+    """#397: the two no-stamp causes must not share one sentence.
+
+    A failing `kb-build` writes no stamp, which is indistinguishable from a fresh
+    clone by the stamp alone — so the defect presented as a scheduling to-do and
+    several handoffs in a row carried it as one.
+    """
+    from kb_setup import build_outcome, graph
+
+    root = _repo(tmp_path)
+    sync.write_stamp(root, _spec(root), version="0.9.25")
+    graph._clear_stamp(root)
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    # CONTROL ARM: same state, no failure record -> the never-run wording.
+    before = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert before.status == sync.DRIFT
+    assert "never run" in before.detail
+    assert "RAN AND FAILED" not in before.detail
+
+    build_outcome.record_failure(root, "build", "SystemExit: detect preflight failed")
+
+    after = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert after.status == sync.DRIFT
+    assert "RAN AND FAILED" in after.detail
+    assert "DEFECT" in after.detail
+    assert "detect preflight failed" in after.detail
+    assert "never run" not in after.detail
 
 
 def test_the_stamped_tool_is_chosen_by_name_not_by_sort_order(tmp_path) -> None:

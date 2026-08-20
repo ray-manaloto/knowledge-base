@@ -1,0 +1,133 @@
+# Mutation arms for #397 — `mise run kb-build` FAILS.
+#
+# Two independent fixes, so two groups of arms:
+#   1. the three `anthropic-sdk-python` files that blocked detect (D*)
+#   2. the "rebuild pending" wording that let the resulting DEFECT present as a
+#      scheduling to-do for several rounds (W*)
+#
+# Each arm reverts one fix to the shape that produced the bug, and the test
+# written alongside it must go RED. A SURVIVOR is a claim about the HARNESS, not
+# about the fix: it means the test cannot fail, which is the class no sweep over
+# production code can see on its own.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - criterion 2 (`kb-build` completes and stamps) — an end-to-end run, not a
+#     unit assertion; its evidence is the run itself plus the census receipt.
+#   - the CHOICE of class for each file. An arm proves `Brewfile` is absorbed by
+#     the counted class; it cannot say counted-vs-silent was the right call.
+#     That judgment is the reviewed-class doctrine's, and it is prose.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that the new failure record is the right
+# mechanism, only that the assertions about it can fail.
+
+suites = [
+  "tests/test_build_outcome.py",
+  "tests/test_currency_sync.py",
+  "tests/test_currency_staleness.py",
+  "tests/test_detection_classes.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/build_outcome.py"
+old = '''_SCHEMA_VERSION = 1'''
+new = '''_SCHEMA_VERSION = 1  # control'''
+
+# ── D1: `.keep` must be absorbed as repo bookkeeping ───────────────────────
+# The realistic break is not a rename — it is the entry never being added, which
+# is the state this branch found. Deleting the member reproduces it exactly.
+[[arm]]
+id = "D1"
+test = "test_a_keep_placeholder_is_repo_bookkeeping"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = '''        ".keep",
+        ".mailmap",'''
+new = '''        ".mailmap",'''
+
+# ── D2: `Brewfile` must be COUNTED, not silently absorbed ──────────────────
+# Two directions matter and one arm cannot cover both, so this arm removes it
+# entirely (back to `unresolved`, the #397 failure) and D3 moves it to the
+# silent class (a green build burying loss — the #231 shape).
+[[arm]]
+id = "D2"
+test = "test_a_brewfile_is_counted_as_unsupported_language"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = '''        "Brewfile",
+        "PKGBUILD",'''
+new = '''        "PKGBUILD",'''
+
+# ── D3: moving it to the SILENT class must be caught ───────────────────────
+# The build would go green and the tally would drop a unit of loss. This is the
+# mutation that looks most like a reasonable edit, which is why it is armed.
+# `_is_non_source` is tested BEFORE `_is_unsupported_language`, so one added
+# member is enough to move the file across — no second edit, no inert mutant.
+[[arm]]
+id = "D3"
+test = "test_a_brewfile_is_counted_as_unsupported_language"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = '''        ".bazelversion",'''
+new = '''        "Brewfile",
+        ".bazelversion",'''
+
+# ── W1: the two no-stamp causes must not share one sentence ────────────────
+# This IS the #397 defect, restored verbatim: one detail string for both.
+[[arm]]
+id = "W1"
+test = "test_a_build_that_ran_and_failed_is_not_reported_as_never_run"
+file = "python/src/kb_setup/currency/sync.py"
+old = '''        failed = build_outcome.describe(repo_root)
+        if failed:
+            return Finding("build-stamp", DRIFT, failed)'''
+new = '''        failed = None
+        if failed:
+            return Finding("build-stamp", DRIFT, failed)'''
+
+# ── W2: the same collapse, in the OTHER reader ─────────────────────────────
+# Fixing one layer and leaving the next is this repo's most-measured fix
+# failure, so each reader is armed independently.
+[[arm]]
+id = "W2"
+test = "test_report_separates_a_failed_build_from_a_fresh_clone"
+file = "python/src/kb_setup/currency/staleness.py"
+old = '''    failed = build_outcome.describe(repo_root)
+    if failed:
+        return InputStatus(spec.name, BUILD_FAILED, failed)'''
+new = '''    failed = None
+    if failed:
+        return InputStatus(spec.name, BUILD_FAILED, failed)'''
+
+# ── W3: reading must FAIL CLOSED on a corrupt record ───────────────────────
+# `return None` here is the plausible edit — it reads as defensive — and it
+# silently restores "never run" for a repo whose build is broken.
+[[arm]]
+id = "W3"
+test = "test_reading_fails_closed_on_a_record_it_cannot_parse"
+file = "python/src/kb_setup/build_outcome.py"
+old = '''    except ValueError:
+        return BuildFailure()'''
+new = '''    except ValueError:
+        return None'''
+
+# ── W4: `SystemExit` is not an `Exception` ─────────────────────────────────
+# The single most likely regression: someone "tightens" the bare BaseException
+# to Exception, and the detect-preflight refusal #397 was filed from stops
+# being recorded at all.
+[[arm]]
+id = "W4"
+test = "test_a_systemexit_is_recorded_even_though_it_is_not_an_exception"
+file = "python/src/kb_setup/cli.py"
+old = '''    except BaseException as exc:'''
+new = '''    except Exception as exc:'''
+
+# ── W5: a SUCCEEDING build must clear a stale record ───────────────────────
+# The failure direction is armed above; this is the other one, and it is worse:
+# a stale record reports a DEFECT that has already been fixed.
+[[arm]]
+id = "W5"
+test = "test_a_failing_build_records_and_a_succeeding_one_clears"
+file = "python/src/kb_setup/cli.py"
+old = '''    build_outcome.clear(repo_root)
+    return 0'''
+new = '''    return 0'''
