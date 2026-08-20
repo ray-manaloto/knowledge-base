@@ -325,3 +325,41 @@ def test_the_pipes_are_closed_on_the_timeout_path_too(tmp_path: Path, fake_run) 
 
     assert proc.stdout.closed
     assert proc.stderr.closed
+
+
+def test_an_interrupt_kills_the_group_before_it_propagates(
+    tmp_path: Path, fake_run, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ctrl-C must not leave hk and its linters running orphaned.
+
+    This is a regression `start_new_session` INTRODUCED, not a pre-existing gap:
+    a terminal delivers SIGINT to its foreground process group only, and the new
+    session is exactly what takes hk out of that group. Before it, Ctrl-C killed
+    hk along with the gate; after it, the interrupt reaches only us.
+
+    The KeyboardInterrupt must still propagate — a gate that swallowed Ctrl-C
+    would be worse than one that leaks a process. (graphify-labs, PR #406.)
+    """
+    fake_run(_Proc("", raises=KeyboardInterrupt()))
+    killed: list[int] = []
+    monkeypatch.setattr(hk_test.os, "killpg", lambda pgid, _sig: killed.append(pgid))
+
+    with pytest.raises(KeyboardInterrupt):
+        hk_test.run(tmp_path)
+
+    assert killed == [4242]
+
+
+def test_an_interrupt_still_closes_the_pipes(
+    tmp_path: Path, fake_run, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `finally` must survive the re-raise, or the interrupt path leaks FDs."""
+    proc = _Proc("", raises=KeyboardInterrupt())
+    fake_run(proc)
+    monkeypatch.setattr(hk_test.os, "killpg", lambda *_a: None)
+
+    with pytest.raises(KeyboardInterrupt):
+        hk_test.run(tmp_path)
+
+    assert proc.stdout.closed
+    assert proc.stderr.closed

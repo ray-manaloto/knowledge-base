@@ -185,6 +185,17 @@ def run(repo_root: Path) -> Result[int]:
             if partial:
                 print(partial)
             return Err(f"hk test did not finish within {_TIMEOUT}s", Rc.NOT_RUN)
+        except BaseException:
+            # Ctrl-C, and this is a REGRESSION `start_new_session` introduced two
+            # commits ago rather than a pre-existing gap. A terminal delivers
+            # SIGINT to its FOREGROUND process group only, and the new session is
+            # precisely what takes hk out of that group — so the interrupt that
+            # used to kill hk along with the gate now reaches only us, and
+            # unwinding without this would leave hk and every linter it spawned
+            # running orphaned. The bare `except` re-raises immediately; it
+            # suppresses nothing. (graphify-labs, PR #406.)
+            _kill_group(proc)
+            raise
         finally:
             _close_pipes(proc)
     except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:

@@ -247,3 +247,32 @@ old = '''            "nothing here — a finding, not a failure to look. It does
             "process that writes later. Narrow or widen --window and re-ask."'''
 new = '''            "nothing here — which is a finding (the writer was not a tool call or "
             "a hook of a recorded session), not a failure to look."'''
+
+# ══ PR #406 SIXTH pass (graphify-labs on 1245dddd) ═════════════════════════
+# 4 findings: 1 real, 1 not-a-defect (the "additional gate" IS the feature, and
+# this is the SECOND pass to raise it), and 2 REFUTED:
+#   - an "unclosed docstring" at tests/test_hk_test.py:326 — the file is 327
+#     lines, parses via ast.parse, and the suite is green. Fourth pass running
+#     with a fabricated syntax-error claim in that file.
+#   - "moving the format barrier last lets other gates read while ruff --fix
+#     writes" — `ruff_format` carries `exclusive = true` (hk.pkl:385), a
+#     WHOLE-PIPELINE barrier, so nothing runs alongside it. The finding assumes
+#     a non-exclusive step.
+
+# ── F15: an interrupt must kill the group before it propagates ────────────
+# A REGRESSION `start_new_session` introduced two commits earlier, not a
+# pre-existing gap: a terminal signals its FOREGROUND process group, and the new
+# session is exactly what removes hk from it. So Ctrl-C, which used to kill hk
+# with the gate, now reaches only us — and unwinding without this leaves hk and
+# every linter it spawned running orphaned.
+#
+# The mutation drops the handler entirely, which is the pre-fix code. The paired
+# test asserts the KeyboardInterrupt STILL propagates: a gate that swallowed
+# Ctrl-C would be worse than one that leaks a process.
+[[arm]]
+id = "F15"
+test = "test_an_interrupt_kills_the_group_before_it_propagates"
+file = "python/src/kb_setup/hk_test.py"
+old = '''            _kill_group(proc)
+            raise'''
+new = '''            raise'''
