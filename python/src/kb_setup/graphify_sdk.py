@@ -563,9 +563,32 @@ _ZERO_NODE_WARNING = re.compile(
     r"please report the file\(s\) \(#1666\)\.\Z"
 )
 
+#: Graphify 0.9.47 REWORDED this warning, and the approval expired closed — which
+#: is the right direction to fail, but it blocked `kb-build` outright (#397).
+#: Read from the installed `graphify/extract.py` rather than inferred from one
+#: observed line, because two of the three changes are invisible in a single
+#: sample:
+#:
+#:   1. the trailing ` (#2551)` is GONE. Deliberate, and their comment says why:
+#:      #2551 is closed and Kotlin-specific, so the reference sent readers of
+#:      every other language to a resolved problem (their #2788).
+#:   2. the parenthetical now carries the RECOVERED-SYMBOL COUNT — `no symbols
+#:      extracted` or `N symbol(s) extracted`. This is the number
+#:      `ExpectedPartialExtraction` was invented to supply because the tool did
+#:      not state one; now it does, and `_partial_extraction_is_reviewed` checks
+#:      the entry against BOTH the message and the sub-graph.
+#:   3. `first error at line N` degrades to a bare `syntax error` when the line
+#:      is unknown. Matched as an alternation rather than left to fail closed on
+#:      a shape the emitter can genuinely produce.
+#:
+#: Only the CURRENT wording is matched. Accepting the old form too would carry a
+#: condition nothing here can verify — the pin is 0.9.47, and a host running an
+#: older graphify is drift `kb-currency-check` should report, not something this
+#: regex should quietly absorb.
 _PARTIAL_EXTRACTION_WARNING = re.compile(
     r"\A {2}warning: (?P<count>\d+) file\(s\) had syntax errors and may be partially "
-    r"extracted: (?P<path>[^()]+?) \(first error at line (?P<line>\d+)\) \(#2551\)\.?\Z"
+    r"extracted: (?P<path>[^()]+?) \((?:first error at line (?P<line>\d+)|syntax error), "
+    r"(?:no symbols|(?P<kept>\d+) symbol\(s\)) extracted\)\Z"
 )
 
 
@@ -616,6 +639,25 @@ class ExtractWarningReview:
     extracted_nodes_by_path: Mapping[str, int] = field(default_factory=dict)
 
 
+def _warning_text_matches_entry(match: re.Match[str], entry: ExpectedPartialExtraction) -> bool:
+    """Does what graphify PRINTED agree with what the reviewer registered?
+
+    Separate from the graph check in the caller on purpose: these are two
+    independent routes to the same numbers — the tool's own message and the
+    sub-graph it wrote — and when they disagree, one of them is wrong and
+    neither is a safe basis for absorbing corpus loss.
+    """
+    # `line` is None when graphify could not locate the error and printed a bare
+    # `syntax error`. A reviewed entry states a line, so that is a genuine change
+    # in what the tool observed and must not be approved on the entry's word.
+    if match.group("line") is None or int(match.group("line")) != entry.first_error_line:
+        return False
+    # The recovered-symbol count 0.9.47 added. It excludes the file's OWN node,
+    # so `no symbols extracted` (kept 0) corresponds to `extracted_nodes = 1`.
+    kept = 0 if match.group("kept") is None else int(match.group("kept"))
+    return kept == max(entry.extracted_nodes - 1, 0)
+
+
 def _partial_extraction_is_reviewed(root: Path, line: str, review: ExtractWarningReview) -> bool:
     """True iff this #2551 warning matches a reviewed entry AND the measured loss."""
     inventory = review.partial_inventory
@@ -626,7 +668,7 @@ def _partial_extraction_is_reviewed(root: Path, line: str, review: ExtractWarnin
         return False
     named = match.group("path").strip()
     entry = next((item for item in inventory if item.relative_path == named), None)
-    if entry is None or int(match.group("line")) != entry.first_error_line:
+    if entry is None or not _warning_text_matches_entry(match, entry):
         return False
     try:
         if _sha256_file(root / entry.relative_path) != entry.content_sha256:
@@ -646,11 +688,15 @@ def approve_partial_extraction_warning(
 ) -> tuple[str, ...]:
     """Approve one reviewed #2551 warning, with the loss re-counted from the graph.
 
-    Graphify's wording is "may be partially extracted" and carries NO count, so
-    approving it on the strength of the text alone would approve an unmeasured
-    quantity of corpus loss — the #231 shape. The reviewed entry states how many
-    nodes the file contributes, and that number is checked against the sub-graph
-    graphify just wrote, so the approval expires the moment the parser's
+    Graphify's wording is "may be partially extracted". Until 0.9.47 it carried
+    NO count at all, which is why this inventory exists: approving the text alone
+    would approve an unmeasured quantity of corpus loss — the #231 shape. 0.9.47
+    now prints the recovered-symbol count, so the entry is checked against BOTH
+    that number (`_warning_text_matches_entry`) and the sub-graph below — two
+    independent routes to one figure, and a disagreement between them is itself a
+    finding.
+
+    The approval expires the moment the parser's
     behaviour changes in EITHER direction: a regression to zero nodes and a fix
     that recovers the symbols both stop matching, and both are worth a look.
 
@@ -726,6 +772,11 @@ _NON_SOURCE_NAMES = frozenset(
         ".gitattributes",
         ".gitkeep",
         ".gitmodules",
+        # `.keep` is `.gitkeep` under the other common spelling. Both of
+        # anthropic-sdk-python's carry a sentence of Stainless prose rather than
+        # being empty, which is why a size check would not have caught them: the
+        # class is about what the file IS FOR, not how many bytes it holds.
+        ".keep",
         ".mailmap",
         ".python-version",
         ".python-version-default",
@@ -817,6 +868,13 @@ _NON_SOURCE_SUFFIXES = frozenset(
 #: proceed, but reported with a per-language tally on every run.
 _UNSUPPORTED_LANGUAGE_NAMES = frozenset(
     {
+        # A Brewfile is Ruby that `brew bundle` EXECUTES, in the same
+        # `<Tool>file` family as the Dockerfile/Justfile/Makefile stems below —
+        # a program, so it is counted as loss rather than absorbed silently.
+        # A NAME and not a STEM: the census found the one bare spelling here,
+        # and `Brewfile.lock.json` (the only variant Homebrew emits) is already
+        # `.json`. Widen to a stem when a variant actually turns up.
+        "Brewfile",
         "PKGBUILD",
         "PklProject",
         "make.bat",

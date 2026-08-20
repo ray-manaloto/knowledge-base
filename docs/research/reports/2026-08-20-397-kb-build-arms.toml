@@ -1,0 +1,343 @@
+# Mutation arms for #397 — `mise run kb-build` FAILS.
+#
+# Two independent fixes, so two groups of arms:
+#   1. the three `anthropic-sdk-python` files that blocked detect (D*)
+#   2. the "rebuild pending" wording that let the resulting DEFECT present as a
+#      scheduling to-do for several rounds (W*)
+#
+# Each arm reverts one fix to the shape that produced the bug, and the test
+# written alongside it must go RED. A SURVIVOR is a claim about the HARNESS, not
+# about the fix: it means the test cannot fail, which is the class no sweep over
+# production code can see on its own.
+#
+# SCOPE, stated so a clean sweep is not over-read. What is NOT armed here:
+#   - criterion 2 (`kb-build` completes and stamps) — an end-to-end run, not a
+#     unit assertion; its evidence is the run itself plus the census receipt.
+#   - the CHOICE of class for each file. An arm proves `Brewfile` is absorbed by
+#     the counted class; it cannot say counted-vs-silent was the right call.
+#     That judgment is the reviewed-class doctrine's, and it is prose.
+#
+# WHAT A CLEAN SWEEP WOULD NOT MEAN: that the new failure record is the right
+# mechanism, only that the assertions about it can fail.
+
+suites = [
+  "tests/test_build_outcome.py",
+  "tests/test_currency_sync.py",
+  "tests/test_currency_staleness.py",
+  "tests/test_detection_classes.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/build_outcome.py"
+old = '''_SCHEMA_VERSION = 1'''
+new = '''_SCHEMA_VERSION = 1  # control'''
+
+# ── D1: `.keep` must be absorbed as repo bookkeeping ───────────────────────
+# The realistic break is not a rename — it is the entry never being added, which
+# is the state this branch found. Deleting the member reproduces it exactly.
+[[arm]]
+id = "D1"
+test = "test_a_keep_placeholder_is_repo_bookkeeping"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = '''        ".keep",
+        ".mailmap",'''
+new = '''        ".mailmap",'''
+
+# ── D2: `Brewfile` must be COUNTED, not silently absorbed ──────────────────
+# Two directions matter and one arm cannot cover both, so this arm removes it
+# entirely (back to `unresolved`, the #397 failure) and D3 moves it to the
+# silent class (a green build burying loss — the #231 shape).
+[[arm]]
+id = "D2"
+test = "test_a_brewfile_is_counted_as_unsupported_language"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = '''        "Brewfile",
+        "PKGBUILD",'''
+new = '''        "PKGBUILD",'''
+
+# ── D3: moving it to the SILENT class must be caught ───────────────────────
+# The build would go green and the tally would drop a unit of loss. This is the
+# mutation that looks most like a reasonable edit, which is why it is armed.
+# `_is_non_source` is tested BEFORE `_is_unsupported_language`, so one added
+# member is enough to move the file across — no second edit, no inert mutant.
+[[arm]]
+id = "D3"
+test = "test_a_brewfile_is_counted_as_unsupported_language"
+file = "python/src/kb_setup/graphify_sdk.py"
+old = '''        ".bazelversion",'''
+new = '''        "Brewfile",
+        ".bazelversion",'''
+
+# ── W1: the two no-stamp causes must not share one sentence ────────────────
+# This IS the #397 defect, restored verbatim: one detail string for both.
+[[arm]]
+id = "W1"
+test = "test_a_build_that_ran_and_failed_is_not_reported_as_never_run"
+file = "python/src/kb_setup/currency/sync.py"
+old = """    if outcome is not None:
+        # An INTERRUPT is not drift"""
+new = """    if outcome is not None and False:
+        # An INTERRUPT is not drift"""
+
+# ── W2: the same collapse, in the OTHER reader ─────────────────────────────
+# Fixing one layer and leaving the next is this repo's most-measured fix
+# failure, so each reader is armed independently.
+[[arm]]
+id = "W2"
+test = "test_report_separates_a_failed_build_from_a_fresh_clone"
+file = "python/src/kb_setup/currency/staleness.py"
+old = """    if outcome is not None:
+        # BUILD_FAILED asserts a defect"""
+new = """    if outcome is not None and False:
+        # BUILD_FAILED asserts a defect"""
+
+# ── W3: reading must FAIL CLOSED on a corrupt record ───────────────────────
+# `return None` here is the plausible edit — it reads as defensive — and it
+# silently restores "never run" for a repo whose build is broken.
+[[arm]]
+id = "W3"
+test = "test_reading_fails_closed_on_a_record_it_cannot_parse"
+file = "python/src/kb_setup/build_outcome.py"
+old = '''    except ValueError:
+        return BuildFailure()'''
+new = '''    except ValueError:
+        return None'''
+
+# ── W4: `SystemExit` is not an `Exception` ─────────────────────────────────
+# The single most likely regression: someone "tightens" the bare BaseException
+# to Exception, and the detect-preflight refusal #397 was filed from stops
+# being recorded at all.
+[[arm]]
+id = "W4"
+test = "test_a_systemexit_is_recorded_even_though_it_is_not_an_exception"
+file = "python/src/kb_setup/cli.py"
+old = '''    except BaseException as exc:'''
+new = '''    except Exception as exc:'''
+
+# ── W5: a SUCCEEDING build must clear a stale record ───────────────────────
+# The failure direction is armed above; this is the other one, and it is worse:
+# a stale record reports a DEFECT that has already been fixed.
+[[arm]]
+id = "W5"
+test = "test_a_failing_build_records_and_a_succeeding_one_clears"
+file = "python/src/kb_setup/cli.py"
+old = '''    build_outcome.clear(repo_root)
+    return 0'''
+new = '''    return 0'''
+
+# ═══ ROUND 2 — arms for the cold lane's five findings ══════════════════════
+#
+# Armed with MORE suspicion than the round-1 arms, not less: three of the five
+# findings were defects in code written earlier in the same session, and the P1
+# was #397's own defect reintroduced inside the fix for it.
+
+# ── R1 (P1): the failure record must be consulted BEFORE the stamp ─────────
+# The realistic break is not deleting the check — it is putting it back inside
+# the no-stamp branch, which is where it was written first and where it reads
+# perfectly sensibly. A machine with a prior good stamp then reports OK for a
+# build that is broken.
+[[arm]]
+id = "R1"
+test = "test_a_valid_stamp_does_not_mask_a_failed_rebuild"
+file = "python/src/kb_setup/currency/sync.py"
+# RE-DERIVED after round 2 restructured this block. The break is the same one:
+# consult the record only when the stamp is ABSENT.
+old = """    outcome = build_outcome.describe(repo_root, stamp_built_at=str(stamp.get("built_at", "")))
+    if outcome is not None:"""
+new = """    outcome = build_outcome.describe(repo_root, stamp_built_at=str(stamp.get("built_at", "")))
+    if outcome is not None and not stamp:"""
+
+# ── R2 (P1): the same ordering, in the OTHER reader ────────────────────────
+[[arm]]
+id = "R2"
+test = "test_a_valid_stamp_does_not_mask_a_failed_rebuild"
+file = "python/src/kb_setup/currency/staleness.py"
+# RE-DERIVED after round 2. Same break: only ask when there is no build.
+old = """    outcome = build_outcome.describe(repo_root, stamp_built_at=_stamp_built_at(stamp_file))
+    if outcome is not None:"""
+new = """    outcome = build_outcome.describe(repo_root, stamp_built_at=_stamp_built_at(stamp_file))
+    if outcome is not None and stamp_file.exists() is False:"""
+
+# ── R3 (P2): reading must fail CLOSED on an unreadable record ──────────────
+# Collapsing the two excepts back into one bare `except OSError: return None` is
+# the exact shape that shipped, and it reads as defensive.
+[[arm]]
+id = "R3"
+test = "test_an_unreadable_record_fails_closed_on_more_than_bad_json"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    except FileNotFoundError:"""
+new = """    except OSError:
+        return None
+    except FileNotFoundError:"""
+
+# ── R4 (P2): a failed write must say so ────────────────────────────────────
+[[arm]]
+id = "R4"
+test = "test_a_failed_write_says_so_on_stderr"
+file = "python/src/kb_setup/build_outcome.py"
+# RE-DERIVED. The first version deleted only the middle of the `print(` call,
+# which left unbalanced parens: the module stopped importing, the whole suite
+# went red, and `kb-arms` correctly refused it as PROBE BROKEN — the suite did
+# not name this arm's test. A mutation that breaks the file measures nothing.
+# The realistic break is deleting the whole statement, which is what "swallow it
+# silently" actually looks like as an edit.
+old = """        _warn(f"could not record the build failure at {path}: {exc}")
+        return"""
+new = """        return"""
+
+# ── R5 (P2): an interrupt must be RECORDED as one ──────────────────────────
+[[arm]]
+id = "R5"
+test = "test_an_interrupt_is_not_reported_as_a_defect"
+file = "python/src/kb_setup/cli.py"
+old = """        stage = build_outcome.INTERRUPTED if isinstance(exc, KeyboardInterrupt) else "build\""""
+new = """        stage = "build\""""
+
+# ── R6 (P2): and REPORTED as one ───────────────────────────────────────────
+# R5 arms the recording side, R6 the reporting side. One arm cannot cover both,
+# and a fix at one layer leaving the next is this repo's most-measured failure.
+[[arm]]
+id = "R6"
+test = "test_an_interrupt_is_not_reported_as_a_defect"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    if failure.stage == INTERRUPTED:"""
+new = """    if False:"""
+
+# ═══ ROUND 3 — arms for the round-2 fixes ══════════════════════════════════
+#
+# Round 2's P1 was the MIRROR of round 1's P1: making the record outrank the
+# stamp meant a `clear()` that failed left a SUCCESSFUL build reporting a defect
+# forever. Two consecutive rounds where the fix was the defect, in the same
+# module, in opposite directions — so these are armed in both directions too.
+
+# ── S1: a newer stamp must SUPERSEDE a stale record ────────────────────────
+# The realistic break is dropping the supersession entirely and trusting
+# `clear()`, which is exactly what shipped in round 1.
+[[arm]]
+id = "S1"
+test = "test_a_successful_build_supersedes_a_record_it_could_not_delete"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    if _superseded_by(failure, stamp_built_at):
+        return None"""
+new = """    if False:
+        return None"""
+
+# ── S2: ...but an OLDER stamp must NOT ─────────────────────────────────────
+# The opposite failure, and the worse one: superseding on the mere EXISTENCE of
+# a stamp restores round 1's P1 verbatim — OK for a broken build.
+[[arm]]
+id = "S2"
+test = "test_a_successful_build_supersedes_a_record_it_could_not_delete"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    return stamped > failed"""
+new = """    return True"""
+
+# ── S3: an untrusted timestamp must fall on the REPORTING side ─────────────
+[[arm]]
+id = "S3"
+test = "test_supersession_refuses_to_act_on_a_timestamp_it_cannot_trust"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    except ValueError:
+        return False"""
+new = """    except ValueError:
+        return True"""
+
+# ── S4: a NAIVE stamp datetime must not abort the whole check ──────────────
+# `naive > aware` raises TypeError, which would propagate out of a currency
+# check rather than answer it.
+[[arm]]
+id = "S4"
+test = "test_supersession_refuses_to_act_on_a_timestamp_it_cannot_trust"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    if stamped.tzinfo is None or failed.tzinfo is None:
+        return False"""
+new = """    if False:
+        return False"""
+
+# ── S5: a failed clear must say so ─────────────────────────────────────────
+[[arm]]
+id = "S5"
+test = "test_a_failed_clear_says_so"
+file = "python/src/kb_setup/build_outcome.py"
+old = """        _warn(f"could not clear the stale build-failure record: {exc}")
+        return"""
+new = """        return"""
+
+# ── S6: the diagnostic must not become the exception ───────────────────────
+[[arm]]
+id = "S6"
+test = "test_a_broken_stderr_never_replaces_the_build_exception"
+file = "python/src/kb_setup/build_outcome.py"
+old = """        print(f"[kb-build] WARNING: {message}", file=sys.stderr)
+    except OSError:
+        return"""
+new = """        print(f"[kb-build] WARNING: {message}", file=sys.stderr)
+    except ValueError:
+        return"""
+
+# ── S7: the truncation CONDITION is pinned, not folklore ───────────────────
+# RE-DERIVED. The first version mutated `>` to `>=` and SURVIVED — and it was an
+# INERT MUTANT, not a coverage gap: `built_at` truncates DOWN to whole seconds
+# while `failed_at` keeps microseconds, so the two are never exactly equal and
+# the operators cannot differ. Checked before re-deriving, per the rule that a
+# survivor is a claim about the harness until the assertion has been examined.
+#
+# The observable break is NORMALISING BOTH SIDES, which is what someone tidying
+# this comparison would actually write: it makes a same-second stamp supersede a
+# failure, which is the direction that reports OK for a broken build.
+[[arm]]
+id = "S7"
+test = "test_supersession_needs_about_a_second_because_built_at_truncates"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    return stamped > failed"""
+new = """    return stamped >= failed.replace(microsecond=0)"""
+
+# ═══ ROUND 4 — arms for the CodeRabbit findings on PR #410 ═════════════════
+#
+# Both are the SAME CLASS as round 2's P2 — an exception that is not an
+# `OSError` escaping an `except OSError` — reached through a door the earlier
+# fix did not close. A finding is a sample of a class, not the class.
+
+# ── E1: a decode error must not escape the reader ──────────────────────────
+[[arm]]
+id = "E1"
+test = "test_undecodable_bytes_do_not_escape_the_reader"
+file = "python/src/kb_setup/build_outcome.py"
+# NOTE the shape: `ruff format` rewrites `except (A, B):` into PEP 758's
+# UNPARENTHESISED form on 3.14, so the anchor is not what was typed.
+old = """    except OSError, UnicodeError:"""
+new = """    except OSError:"""
+
+# ── E2/E3 REMOVED — the write-side half of the finding is unreachable ──────
+#
+# CodeRabbit's major finding named BOTH directions: an `UnicodeEncodeError` on
+# write and an `UnicodeDecodeError` on read. Armed both. E2 (read as ascii) and
+# E3 (write as ascii) SURVIVED, and hand-running the mutation confirmed it —
+# so the survivors were investigated rather than explained away.
+#
+# The mechanism: `json.dumps` defaults to `ensure_ascii=True`, so the payload
+# this module writes is ALWAYS pure ASCII no matter what the summary contains
+# (`"refusé 日本語"` serialises to `"refus\u00e9 \u65e5..."`). The write can
+# therefore never raise `UnicodeEncodeError` from our own data, and a file we
+# wrote can never fail an ascii read. The finding's write half over-claims.
+#
+# The READ half is real and stays armed as E1, because a record can be corrupted
+# by something other than this module — verified with raw undecodable bytes,
+# which reached `read()` and propagated `UnicodeDecodeError` before the fix.
+#
+# The explicit `encoding="utf-8"` on both calls is kept regardless: it costs
+# nothing and removes the locale from a decision it has no business making.
+# What is NOT claimed is that an arm proves it necessary.
+
+# ── E4: a corrupt stamp is not "never run" ─────────────────────────────────
+[[arm]]
+id = "E4"
+test = "test_a_corrupt_stamp_is_not_reported_as_never_run"
+file = "python/src/kb_setup/currency/sync.py"
+old = """    recorded = stamp_path(repo_root, spec)
+    if recorded is not None and recorded.exists():"""
+new = """    recorded = stamp_path(repo_root, spec)
+    if False:"""

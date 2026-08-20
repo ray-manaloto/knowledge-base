@@ -774,7 +774,72 @@ def test_build_clears_the_stamp_before_touching_the_artifact(tmp_path, monkeypat
     monkeypatch.setattr(sync.shutil, "which", lambda _: None)
     finding = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
     assert finding.status == sync.DRIFT
-    assert "never been stamped" in finding.detail
+    # No failure was RECORDED here, so this is the fresh-clone half of the #397
+    # split. The other half has its own test below.
+    assert "never run" in finding.detail
+
+
+def test_a_build_that_ran_and_failed_is_not_reported_as_never_run(tmp_path, monkeypatch) -> None:
+    """#397: the two no-stamp causes must not share one sentence.
+
+    A failing `kb-build` writes no stamp, which is indistinguishable from a fresh
+    clone by the stamp alone — so the defect presented as a scheduling to-do and
+    several handoffs in a row carried it as one.
+    """
+    from kb_setup import build_outcome, graph
+
+    root = _repo(tmp_path)
+    sync.write_stamp(root, _spec(root), version="0.9.25")
+    graph._clear_stamp(root)
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    # CONTROL ARM: same state, no failure record -> the never-run wording.
+    before = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert before.status == sync.DRIFT
+    assert "never run" in before.detail
+    assert "RAN AND FAILED" not in before.detail
+
+    build_outcome.record_failure(root, "build", "SystemExit: detect preflight failed")
+
+    after = _finding(sync.check_sync(root, _spec(root)), "build-stamp")
+    assert after.status == sync.DRIFT
+    assert "RAN AND FAILED" in after.detail
+    assert "DEFECT" in after.detail
+    assert "detect preflight failed" in after.detail
+    assert "never run" not in after.detail
+
+
+def test_a_valid_stamp_does_not_mask_a_failed_rebuild(tmp_path, monkeypatch) -> None:
+    """#397's own defect, reintroduced inside its fix. Found by the cold lane (P1).
+
+    The first version consulted the failure record only when the stamp was
+    ABSENT. But `graph.build` runs the detect preflight BEFORE `_clear_stamp`,
+    so a preflight refusal — the exact failure #397 was filed from — aborts with
+    the previous stamp still on disk. Any machine that had ever built
+    successfully therefore reported `OK` for a build that was broken.
+
+    Reproduced with a control arm before the fix: with a valid stamp and a
+    recorded failure, `_check_stamp` returned OK and never called `describe()`.
+    """
+    from kb_setup import build_outcome as build_outcome_module
+
+    root = _repo(tmp_path)
+    spec = _spec(root)
+    sync.write_stamp(root, spec, version="0.9.25")
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    # CONTROL ARM: a valid stamp with NO recorded failure is genuinely OK, so
+    # this test discriminates on the record rather than on the stamp path
+    # having been broken outright.
+    before = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert before.status == sync.OK
+
+    build_outcome_module.record_failure(root, "build", "SystemExit: detect preflight failed")
+
+    after = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert after.status == sync.DRIFT
+    assert "RAN AND FAILED" in after.detail
+    assert "detect preflight failed" in after.detail
 
 
 def test_the_stamped_tool_is_chosen_by_name_not_by_sort_order(tmp_path) -> None:
@@ -1310,3 +1375,32 @@ def test_the_unresolvable_skip_does_not_claim_the_clone_is_absent(tmp_path) -> N
     detail = sync._check_manifest(tmp_path, spec, "1.54.1").detail
     assert "clone is absent" not in detail
     assert "could not resolve that ref" in detail
+
+
+def test_a_corrupt_stamp_is_not_reported_as_never_run(tmp_path, monkeypatch) -> None:
+    """A corrupt stamp is a build we cannot ask about, not one that never ran.
+
+    Saying "never run" for both is #397's collapse one level up: a corrupt stamp
+    is a build we cannot ask about, not a build that never happened.
+    """
+    root = _repo(tmp_path)
+    spec = _spec(root)
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    # CONTROL ARM: genuinely absent -> the never-run wording, as before.
+    absent = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert absent.status == sync.DRIFT
+    assert "never run" in absent.detail
+
+    stamp = root / "graphify-out" / ".currency-stamp.json"
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text("{ not json", encoding="utf-8")
+
+    corrupt = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert corrupt.status == sync.DRIFT
+    assert "could not be read" in corrupt.detail
+    assert corrupt.detail != absent.detail
+    # Not a bare `"never run" not in detail`: the message itself says
+    # "this is NOT 'never run'", so that assertion fails on the remedy's own
+    # wording rather than on the behaviour. A remedy has to clear its own text.
+    assert "NOT 'never run'" in corrupt.detail

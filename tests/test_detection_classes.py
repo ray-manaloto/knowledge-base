@@ -385,3 +385,40 @@ def test_boost_style_licence_with_underscore_digits_still_absorbs(tmp_path: Path
     non_source, _unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, (relative,))
     assert non_source == (relative,)
     assert unresolved == ()
+
+
+def test_a_keep_placeholder_is_repo_bookkeeping(tmp_path) -> None:
+    """#397: `.keep` blocked `kb-build` outright until it joined `.gitkeep`.
+
+    The bodies here are the real ones from `anthropic-sdk-python` — a sentence of
+    Stainless prose, not zero bytes. Stated because the obvious wrong fix is an
+    emptiness check, which these two files would have walked straight past.
+    """
+    prose = "File generated from our OpenAPI spec by Stainless.\n\nThis directory can be used.\n"
+    paths = (
+        _write(tmp_path, "examples/.keep", prose),
+        _write(tmp_path, "src/anthropic/lib/.keep", prose),
+    )
+    non_source, unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, paths)
+    assert not unresolved
+    assert not unsupported
+    assert set(non_source) == set(paths)
+
+    # CONTROL ARM: a name one character away is NOT in the class, so this test
+    # is discriminating on membership rather than on anything about the bytes.
+    other = (_write(tmp_path, "keep", prose),)
+    assert graphify_sdk.classify_unclassified(tmp_path, other)[2] == other
+
+
+def test_a_brewfile_is_counted_as_unsupported_language(tmp_path) -> None:
+    """#397: absorbed so the build proceeds, but TALLIED as loss, never silent.
+
+    Both halves are asserted. `Brewfile` missing entirely is the state that broke
+    the build; `Brewfile` in the silent class is a green build burying a unit of
+    real loss, which is the #231 shape and the more expensive of the two.
+    """
+    paths = (_write(tmp_path, "Brewfile", 'brew "uv"\n'),)
+    non_source, unsupported, unresolved = graphify_sdk.classify_unclassified(tmp_path, paths)
+    assert not unresolved, "a Brewfile must not block the build"
+    assert not non_source, "a Brewfile must be COUNTED, never silently absorbed"
+    assert unsupported == paths

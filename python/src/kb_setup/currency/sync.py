@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import build_outcome
 from kb_setup.currency import _proc
 
 if TYPE_CHECKING:
@@ -1555,12 +1556,49 @@ def _check_artifact_identity(
     return None
 
 
+def _no_stamp_detail(repo_root: Path, spec: ToolSpec) -> str:
+    """Why there is no usable stamp — and the two reasons are not one reason.
+
+    `read_stamp` returns `{}` for BOTH an absent stamp and a present-but-corrupt
+    one, so reporting "never run" for both is the same collapse #397 is about,
+    one level up: a corrupt stamp is a build we cannot ask about, not a build
+    that never happened. (CodeRabbit, minor.)
+    """
+    recorded = stamp_path(repo_root, spec)
+    if recorded is not None and recorded.exists():
+        return (
+            f"{spec.stamp} exists but could not be read — this is NOT 'never run'; "
+            "rebuild to replace it"
+        )
+    return "no build has run here yet — rebuild pending (never run)"
+
+
 def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not spec.stamp:
         return Finding("build-stamp", SKIP, "this tool declares no build stamp")
+    # BEFORE the stamp is read, not inside the no-stamp branch. A failing detect
+    # preflight aborts ahead of `graph._clear_stamp`, so a machine that has ever
+    # built successfully keeps its OLD stamp through a failed rebuild — and this
+    # function then returned OK for a build that is broken. Asking here means a
+    # recorded failure is reported whatever the stamp says, which is the whole
+    # point: the record is cleared only by a build that SUCCEEDS.
+    # (Cold lane, P1 — the #397 defect reintroduced inside its own fix.)
     stamp = read_stamp(repo_root, spec)
+    outcome = build_outcome.describe(repo_root, stamp_built_at=str(stamp.get("built_at", "")))
+    if outcome is not None:
+        # An INTERRUPT is not drift — nothing was verified and nothing is known
+        # to be wrong. Reporting it as DRIFT made the check contradict its own
+        # sentence, which said "not a defect". BLIND is never rendered as green.
+        status = BLIND if outcome.kind == build_outcome.INTERRUPTED else DRIFT
+        return Finding("build-stamp", status, outcome.text)
+
     if not stamp:
-        return Finding("build-stamp", DRIFT, "artifacts have never been stamped — rebuild pending")
+        # `read_stamp` returns {} for TWO states — absent, and present but
+        # unreadable — and saying "never run" for both is the same collapse
+        # #397 is about, one level up: a corrupt stamp is a build we cannot ask
+        # about, not a build that never happened. Ask the filesystem which it is.
+        # (CodeRabbit, minor.)
+        return Finding("build-stamp", DRIFT, _no_stamp_detail(repo_root, spec))
 
     mismatch = _check_artifact_identity(repo_root, spec, stamp)
     if mismatch is not None:

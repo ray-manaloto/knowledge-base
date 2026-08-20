@@ -527,9 +527,14 @@ def test_truncated_zero_node_warning_mutations_do_not_approve(
 
 
 _ASTRO_PATH = "website/src/pages/index.astro"
+# graphify 0.9.47's wording, taken from its own `extract.py` and not from one
+# observed line. The previous fixture pinned the 0.9.45 form — trailing
+# ` (#2551)`, no symbol count — so this suite went on passing while the real
+# `kb-build` failed closed against a message it could no longer match (#397).
+# A fixture is a claim about what the tool emits, and it ages with the tool.
 _PARTIAL_WARNING = (
     f"  warning: 1 file(s) had syntax errors and may be partially extracted: "
-    f"{_ASTRO_PATH} (first error at line 1) (#2551)\n"
+    f"{_ASTRO_PATH} (first error at line 1, no symbols extracted)\n"
 )
 
 
@@ -827,3 +832,57 @@ def test_claudeignore_requires_exact_source_root_hash_utf8_size_and_grammar(
 
     assert accepted.optional_unclassified_paths == (".claudeignore",)
     assert rejected.optional_unclassified_paths == ()
+
+
+def test_the_warnings_symbol_count_must_agree_with_the_reviewed_entry(tmp_path: Path) -> None:
+    """Graphify 0.9.47 states the count; it is checked, not just parsed (#397).
+
+    The message excludes the file's own node, so `extracted_nodes=1` (file node
+    only) must be printed as `no symbols extracted`. A message claiming symbols
+    were recovered against an entry that records none is a parser whose behaviour
+    changed, and approving it would absorb an unmeasured quantity of loss.
+    """
+    review = _partial_review(tmp_path)
+
+    # CONTROL ARM: the agreeing message IS approved, so this test discriminates
+    # on the count rather than on the rewritten regex rejecting everything.
+    assert graphify_sdk.approve_partial_extraction_warning(
+        tmp_path, _PARTIAL_WARNING.rstrip(), review
+    ) == ("approved-reviewed-partial-extraction",)
+
+    disagreeing = (
+        f"  warning: 1 file(s) had syntax errors and may be partially extracted: "
+        f"{_ASTRO_PATH} (first error at line 1, 7 symbol(s) extracted)"
+    )
+    assert graphify_sdk.approve_partial_extraction_warning(tmp_path, disagreeing, review) == ()
+
+
+def test_a_warning_with_no_error_line_is_never_approved(tmp_path: Path) -> None:
+    """`(syntax error, …)` is graphify's shape when it cannot locate the error.
+
+    It is matched rather than left to fail on an unknown format — but matching is
+    not approving: a reviewed entry names a line, so a message that has none is
+    reporting something the reviewer did not measure.
+    """
+    review = _partial_review(tmp_path)
+    unlocated = (
+        f"  warning: 1 file(s) had syntax errors and may be partially extracted: "
+        f"{_ASTRO_PATH} (syntax error, no symbols extracted)"
+    )
+    assert graphify_sdk._PARTIAL_EXTRACTION_WARNING.match(unlocated) is not None
+    assert graphify_sdk.approve_partial_extraction_warning(tmp_path, unlocated, review) == ()
+
+
+def test_the_retired_2551_wording_is_no_longer_accepted(tmp_path: Path) -> None:
+    """The 0.9.45 form must not be silently absorbed alongside the current one.
+
+    Accepting both would carry a condition nothing here can verify. The pin is
+    0.9.47; a host emitting the old text is drift `kb-currency-check` should
+    report, not something this matcher should paper over.
+    """
+    review = _partial_review(tmp_path)
+    retired = (
+        f"  warning: 1 file(s) had syntax errors and may be partially extracted: "
+        f"{_ASTRO_PATH} (first error at line 1) (#2551)"
+    )
+    assert graphify_sdk.approve_partial_extraction_warning(tmp_path, retired, review) == ()

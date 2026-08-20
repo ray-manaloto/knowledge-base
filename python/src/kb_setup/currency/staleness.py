@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import build_outcome
 from kb_setup.currency import sync
 
 if TYPE_CHECKING:
@@ -45,6 +46,12 @@ SKIP = "skip"
 #: stamp nor graph, and calling that "your whole corpus went stale" would make
 #: the very first session in a new clone report a defect that does not exist.
 NEVER_BUILT = "never-built"
+#: A build RAN HERE AND FAILED, so there is no stamp for the same reason a fresh
+#: clone has none — and that coincidence is exactly the defect #397 records: the
+#: two were rendered with one sentence, and the failing build was carried as a
+#: to-do for several rounds. Kept apart from NEVER_BUILT for the reason DRIFT and
+#: NOT-CHECKED are kept apart everywhere else in this engine.
+BUILD_FAILED = "build-failed"
 #: A build exists but the question could not be asked — an unreadable stamp, or
 #: one written before inputs were fingerprinted. Never rendered as a pass.
 NOT_VERIFIABLE = "not-verifiable"
@@ -111,9 +118,9 @@ def check_inputs(repo_root: Path, spec: ToolSpec) -> InputStatus:
     # directly rather than through `sync.stamp_path`, whose Optional return would
     # need narrowing that says nothing a reader does not already know.
     stamp_file = repo_root / spec.stamp
-    missing = _no_build_reason(repo_root, spec, stamp_file)
-    if missing is not None:
-        return InputStatus(spec.name, NEVER_BUILT, missing)
+    verdict = _no_comparison_possible(repo_root, spec, stamp_file)
+    if verdict is not None:
+        return verdict
 
     recorded, why_not = _recorded_inputs(spec, stamp_file)
     if recorded is None:
@@ -153,6 +160,49 @@ def _recorded_inputs(spec: ToolSpec, stamp_file: Path) -> tuple[dict[str, str] |
     if recorded is None:
         return None, "the stamp predates input fingerprinting — rebuild to record them"
     return recorded, ""
+
+
+def _no_comparison_possible(
+    repo_root: Path, spec: ToolSpec, stamp_file: Path
+) -> InputStatus | None:
+    """Why there is nothing to compare against, or None when there is.
+
+    The ORDER here is the whole of the P1 fix, and it is the opposite of the
+    obvious one. A failing detect preflight aborts ahead of `graph._clear_stamp`,
+    so a machine that has ever built successfully keeps its OLD stamp through a
+    failed rebuild. Asking about the failure record only when the stamp is
+    MISSING therefore never sees that case at all, and reports OK for a build
+    that is broken — #397 itself, reintroduced inside its own fix.
+
+    The record is authoritative because it is cleared only by a build that
+    SUCCEEDS: present means the last build attempt failed, whatever else is on
+    disk. Deliberately NOT cleared by `sync.write_stamp`, since `kb-merge` and
+    `kb-label` also stamp and neither of them is a build — clearing there would
+    let an unrelated merge hide a broken `kb-build`. (Cold lane, P1.)
+    """
+    outcome = build_outcome.describe(repo_root, stamp_built_at=_stamp_built_at(stamp_file))
+    if outcome is not None:
+        # BUILD_FAILED asserts a defect; an INTERRUPT is not one. It is
+        # "nothing was verified", which is what NOT_VERIFIABLE already means
+        # here and is never rendered as a pass.
+        state = NOT_VERIFIABLE if outcome.kind == build_outcome.INTERRUPTED else BUILD_FAILED
+        return InputStatus(spec.name, state, outcome.text)
+    missing = _no_build_reason(repo_root, spec, stamp_file)
+    if missing is not None:
+        return InputStatus(spec.name, NEVER_BUILT, missing)
+    return None
+
+
+def _stamp_built_at(stamp_file: Path) -> str:
+    """The successful build's own timestamp, or "" when there is no readable stamp."""
+    try:
+        stamp = json.loads(stamp_file.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        # No readable stamp means nothing can supersede a recorded failure, and
+        # "" is exactly how `describe` spells that. Never guess a timestamp here:
+        # a fabricated one would silence a live failure.
+        return ""
+    return str(stamp.get("built_at", "")) if isinstance(stamp, dict) else ""
 
 
 def _no_build_reason(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> str | None:
@@ -207,7 +257,9 @@ def report(statuses: Iterable[InputStatus]) -> None:
         for line in status.changes:
             print(f"{_HEADER}   {line}")
     for status in blind:
-        if status.state == NEVER_BUILT:
+        if status.state == BUILD_FAILED:
+            print(f"{_HEADER} {status.detail}")
+        elif status.state == NEVER_BUILT:
             # Deliberately not the word "stale", and deliberately not in the
             # changed block: nothing has gone out of date, there is simply no
             # graph here yet. This is what a fresh clone sees.
