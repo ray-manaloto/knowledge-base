@@ -471,3 +471,24 @@ def test_report_never_renders_not_verifiable_as_a_pass(tmp_path, capsys):
     staleness.report([staleness.check_inputs(root, _spec(root))])
     out = capsys.readouterr().out
     assert "NOT CHECKED against its inputs (this is not a pass)" in out
+
+
+def test_a_valid_stamp_does_not_mask_a_failed_rebuild(tmp_path) -> None:
+    """The same P1 as in `sync`, in the OTHER reader.
+
+    Armed separately on purpose: fixing one layer and leaving the next is this
+    repo's most-measured fix failure, and both readers had the identical
+    stamp-first ordering. (Cold lane, P1.)
+    """
+    from kb_setup import build_outcome
+
+    root = _repo(tmp_path)
+    _stamp(root)
+
+    # CONTROL ARM: a valid stamp with no recorded failure is not BUILD_FAILED.
+    assert staleness.check_inputs(root, _spec(root)).state != staleness.BUILD_FAILED
+
+    build_outcome.record_failure(root, "build", "SystemExit: detect preflight failed")
+    status = staleness.check_inputs(root, _spec(root))
+    assert status.state == staleness.BUILD_FAILED
+    assert "RAN AND FAILED" in (status.detail or "")

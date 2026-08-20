@@ -809,6 +809,39 @@ def test_a_build_that_ran_and_failed_is_not_reported_as_never_run(tmp_path, monk
     assert "never run" not in after.detail
 
 
+def test_a_valid_stamp_does_not_mask_a_failed_rebuild(tmp_path, monkeypatch) -> None:
+    """#397's own defect, reintroduced inside its fix. Found by the cold lane (P1).
+
+    The first version consulted the failure record only when the stamp was
+    ABSENT. But `graph.build` runs the detect preflight BEFORE `_clear_stamp`,
+    so a preflight refusal — the exact failure #397 was filed from — aborts with
+    the previous stamp still on disk. Any machine that had ever built
+    successfully therefore reported `OK` for a build that was broken.
+
+    Reproduced with a control arm before the fix: with a valid stamp and a
+    recorded failure, `_check_stamp` returned OK and never called `describe()`.
+    """
+    from kb_setup import build_outcome as build_outcome_module
+
+    root = _repo(tmp_path)
+    spec = _spec(root)
+    sync.write_stamp(root, spec, version="0.9.25")
+    monkeypatch.setattr(sync.shutil, "which", lambda _: None)
+
+    # CONTROL ARM: a valid stamp with NO recorded failure is genuinely OK, so
+    # this test discriminates on the record rather than on the stamp path
+    # having been broken outright.
+    before = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert before.status == sync.OK
+
+    build_outcome_module.record_failure(root, "build", "SystemExit: detect preflight failed")
+
+    after = _finding(sync.check_sync(root, spec), "build-stamp")
+    assert after.status == sync.DRIFT
+    assert "RAN AND FAILED" in after.detail
+    assert "detect preflight failed" in after.detail
+
+
 def test_the_stamped_tool_is_chosen_by_name_not_by_sort_order(tmp_path) -> None:
     """currency.toml is explicitly multi-tool; "first spec with a stamp" picks the wrong one."""
     from kb_setup import graph

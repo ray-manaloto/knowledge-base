@@ -118,9 +118,9 @@ def check_inputs(repo_root: Path, spec: ToolSpec) -> InputStatus:
     # directly rather than through `sync.stamp_path`, whose Optional return would
     # need narrowing that says nothing a reader does not already know.
     stamp_file = repo_root / spec.stamp
-    absent = _absent_build_status(repo_root, spec, stamp_file)
-    if absent is not None:
-        return absent
+    verdict = _no_comparison_possible(repo_root, spec, stamp_file)
+    if verdict is not None:
+        return verdict
 
     recorded, why_not = _recorded_inputs(spec, stamp_file)
     if recorded is None:
@@ -162,21 +162,31 @@ def _recorded_inputs(spec: ToolSpec, stamp_file: Path) -> tuple[dict[str, str] |
     return recorded, ""
 
 
-def _absent_build_status(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> InputStatus | None:
-    """The status for "there is no build to compare against", or None if there is.
+def _no_comparison_possible(
+    repo_root: Path, spec: ToolSpec, stamp_file: Path
+) -> InputStatus | None:
+    """Why there is nothing to compare against, or None when there is.
 
-    Both no-build causes land here, and telling them apart is the whole point of
-    #397: a fresh clone (NEVER_BUILT) and a build that ran and failed
-    (BUILD_FAILED) leave the same absence, and one sentence over both is how the
-    defect was carried as a to-do for several rounds.
+    The ORDER here is the whole of the P1 fix, and it is the opposite of the
+    obvious one. A failing detect preflight aborts ahead of `graph._clear_stamp`,
+    so a machine that has ever built successfully keeps its OLD stamp through a
+    failed rebuild. Asking about the failure record only when the stamp is
+    MISSING therefore never sees that case at all, and reports OK for a build
+    that is broken — #397 itself, reintroduced inside its own fix.
+
+    The record is authoritative because it is cleared only by a build that
+    SUCCEEDS: present means the last build attempt failed, whatever else is on
+    disk. Deliberately NOT cleared by `sync.write_stamp`, since `kb-merge` and
+    `kb-label` also stamp and neither of them is a build — clearing there would
+    let an unrelated merge hide a broken `kb-build`. (Cold lane, P1.)
     """
-    missing = _no_build_reason(repo_root, spec, stamp_file)
-    if missing is None:
-        return None
     failed = build_outcome.describe(repo_root)
     if failed:
         return InputStatus(spec.name, BUILD_FAILED, failed)
-    return InputStatus(spec.name, NEVER_BUILT, missing)
+    missing = _no_build_reason(repo_root, spec, stamp_file)
+    if missing is not None:
+        return InputStatus(spec.name, NEVER_BUILT, missing)
+    return None
 
 
 def _no_build_reason(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> str | None:

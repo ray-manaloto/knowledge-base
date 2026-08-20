@@ -562,8 +562,10 @@ def _build_checked(repo_root: Path) -> int:
         # which is the single most likely failure to reach here and is NOT an
         # `Exception`. A KeyboardInterrupt is recorded too — an interrupted
         # build also leaves no stamp, and calling that "never run" is the same
-        # lie in a smaller hat.
-        build_outcome.record_failure(repo_root, "build", f"{type(exc).__name__}: {exc}")
+        # lie in a smaller hat — but under its OWN stage, because nothing about
+        # Ctrl-C says the build is broken or that a re-run will fail again.
+        stage = build_outcome.INTERRUPTED if isinstance(exc, KeyboardInterrupt) else "build"
+        build_outcome.record_failure(repo_root, stage, f"{type(exc).__name__}: {exc}")
         raise
     build_outcome.clear(repo_root)
     return 0

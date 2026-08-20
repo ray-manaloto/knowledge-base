@@ -21,14 +21,27 @@ Two directions are deliberately asymmetric:
 
 * Writing is **best-effort**. Recording a failure must never replace the
   failure being recorded, so `record_failure` swallows its own IO errors.
-* Reading **fails closed**. A record that exists but cannot be parsed still
-  means a build ran and failed; degrading it to "never run" would restore
-  exactly the confusion this module removes.
+* Reading **fails closed**. A record that exists but cannot be READ OR parsed
+  still means a build ran and failed; degrading it to "never run" would restore
+  exactly the confusion this module removes. Only `FileNotFoundError` means
+  absent — every other `OSError` (a `PermissionError`, a mode change, a
+  directory in its place) is a record we could not read, not a record that
+  is not there. The first version caught every `OSError` and returned None,
+  which failed OPEN against its own stated contract. (Cold lane, P2.)
+
+* A record present means the LAST BUILD ATTEMPT FAILED, whatever else is on
+  disk. That is why both consumers ask here BEFORE they look at the stamp: a
+  failing detect preflight aborts before `graph._clear_stamp` runs, so a
+  machine that has ever built successfully keeps its old stamp through a
+  failed rebuild — and a stamp-first reader then reports OK for a build that
+  is broken. That is #397 itself, wearing a new coat, inside the fix for it.
+  (Cold lane, P1, reproduced with a control arm.)
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -38,6 +51,12 @@ import msgspec
 RECORD_NAME = ".build-failure.json"
 
 _SCHEMA_VERSION = 1
+
+#: The build did not fail — a person stopped it. Recorded, because an
+#: interrupted build leaves no stamp either and calling that "never run" is the
+#: same lie in a smaller hat; reported differently, because nothing about Ctrl-C
+#: says the build is broken or that re-running it will fail again. (Cold lane, P2.)
+INTERRUPTED = "interrupted"
 
 #: A failure summary is a rendered exception and can be a 900-character detect
 #: dump per source. Bounded so a pathological run cannot leave an unreadable
@@ -74,7 +93,16 @@ def record_failure(repo_root: Path, stage: str, summary: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    except OSError:
+    except OSError as exc:
+        # Swallowed so the build's own failure still propagates — but NOT
+        # silently. Without this line the durable record fails to write, every
+        # later check says "never run", and nothing anywhere says why: the exact
+        # ambiguity this module exists to remove, restored by its own error
+        # path. stderr, so a piped stdout cannot lose it. (Cold lane, P2.)
+        print(
+            f"[kb-build] WARNING: could not record the build failure at {path}: {exc}",
+            file=sys.stderr,
+        )
         return
 
 
@@ -96,8 +124,13 @@ def read(repo_root: Path) -> BuildFailure | None:
     path = record_path(repo_root)
     try:
         raw = path.read_text()
-    except OSError:
+    except FileNotFoundError:
+        # The ONLY OSError that means "no build has failed here".
         return None
+    except OSError:
+        # Present but unreadable — a permission change, a directory in its
+        # place. Fails CLOSED, per this module's contract.
+        return BuildFailure()
     try:
         decoded = json.loads(raw)
     except ValueError:
@@ -121,8 +154,16 @@ def describe(repo_root: Path) -> str | None:
     if failure is None:
         return None
     when = failure.failed_at or "an unrecorded time"
-    stage = f" at {failure.stage}" if failure.stage else ""
     detail = f": {failure.summary.splitlines()[0]}" if failure.summary else ""
+    if failure.stage == INTERRUPTED:
+        # Neither "DEFECT" nor "will fail again" follows from Ctrl-C, and
+        # asserting them would make this module lie in the one direction it was
+        # built to stop lying in. Still not "never run": no stamp exists.
+        return (
+            f"a build was INTERRUPTED ({when}) and left no stamp — not a defect; "
+            f"re-run `mise run kb-build`{detail}"
+        )
+    stage = f" at {failure.stage}" if failure.stage else ""
     return (
         f"a build RAN AND FAILED{stage} ({when}) — this is a DEFECT, not a pending "
         f"rebuild; re-running `mise run kb-build` will fail again{detail}"

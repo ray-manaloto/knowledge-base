@@ -77,12 +77,12 @@ new = '''        "Brewfile",
 id = "W1"
 test = "test_a_build_that_ran_and_failed_is_not_reported_as_never_run"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''        failed = build_outcome.describe(repo_root)
-        if failed:
-            return Finding("build-stamp", DRIFT, failed)'''
-new = '''        failed = None
-        if failed:
-            return Finding("build-stamp", DRIFT, failed)'''
+old = '''    failed = build_outcome.describe(repo_root)
+    if failed:
+        return Finding("build-stamp", DRIFT, failed)'''
+new = '''    failed = None
+    if failed:
+        return Finding("build-stamp", DRIFT, failed)'''
 
 # ── W2: the same collapse, in the OTHER reader ─────────────────────────────
 # Fixing one layer and leaving the next is this repo's most-measured fix
@@ -131,3 +131,92 @@ file = "python/src/kb_setup/cli.py"
 old = '''    build_outcome.clear(repo_root)
     return 0'''
 new = '''    return 0'''
+
+# ═══ ROUND 2 — arms for the cold lane's five findings ══════════════════════
+#
+# Armed with MORE suspicion than the round-1 arms, not less: three of the five
+# findings were defects in code written earlier in the same session, and the P1
+# was #397's own defect reintroduced inside the fix for it.
+
+# ── R1 (P1): the failure record must be consulted BEFORE the stamp ─────────
+# The realistic break is not deleting the check — it is putting it back inside
+# the no-stamp branch, which is where it was written first and where it reads
+# perfectly sensibly. A machine with a prior good stamp then reports OK for a
+# build that is broken.
+[[arm]]
+id = "R1"
+test = "test_a_valid_stamp_does_not_mask_a_failed_rebuild"
+file = "python/src/kb_setup/currency/sync.py"
+old = """    failed = build_outcome.describe(repo_root)
+    if failed:
+        return Finding("build-stamp", DRIFT, failed)
+
+    stamp = read_stamp(repo_root, spec)
+    if not stamp:"""
+new = """    stamp = read_stamp(repo_root, spec)
+    if not stamp:
+        failed = build_outcome.describe(repo_root)
+        if failed:
+            return Finding("build-stamp", DRIFT, failed)"""
+
+# ── R2 (P1): the same ordering, in the OTHER reader ────────────────────────
+[[arm]]
+id = "R2"
+test = "test_a_valid_stamp_does_not_mask_a_failed_rebuild"
+file = "python/src/kb_setup/currency/staleness.py"
+old = """    failed = build_outcome.describe(repo_root)
+    if failed:
+        return InputStatus(spec.name, BUILD_FAILED, failed)
+    missing = _no_build_reason(repo_root, spec, stamp_file)"""
+new = """    missing = _no_build_reason(repo_root, spec, stamp_file)
+    failed = build_outcome.describe(repo_root) if missing else None
+    if failed:
+        return InputStatus(spec.name, BUILD_FAILED, failed)"""
+
+# ── R3 (P2): reading must fail CLOSED on an unreadable record ──────────────
+# Collapsing the two excepts back into one bare `except OSError: return None` is
+# the exact shape that shipped, and it reads as defensive.
+[[arm]]
+id = "R3"
+test = "test_an_unreadable_record_fails_closed_on_more_than_bad_json"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    except FileNotFoundError:"""
+new = """    except OSError:
+        return None
+    except FileNotFoundError:"""
+
+# ── R4 (P2): a failed write must say so ────────────────────────────────────
+[[arm]]
+id = "R4"
+test = "test_a_failed_write_says_so_on_stderr"
+file = "python/src/kb_setup/build_outcome.py"
+# RE-DERIVED. The first version deleted only the middle of the `print(` call,
+# which left unbalanced parens: the module stopped importing, the whole suite
+# went red, and `kb-arms` correctly refused it as PROBE BROKEN — the suite did
+# not name this arm's test. A mutation that breaks the file measures nothing.
+# The realistic break is deleting the whole statement, which is what "swallow it
+# silently" actually looks like as an edit.
+old = """        print(
+            f"[kb-build] WARNING: could not record the build failure at {path}: {exc}",
+            file=sys.stderr,
+        )
+        return"""
+new = """        return"""
+
+# ── R5 (P2): an interrupt must be RECORDED as one ──────────────────────────
+[[arm]]
+id = "R5"
+test = "test_an_interrupt_is_not_reported_as_a_defect"
+file = "python/src/kb_setup/cli.py"
+old = """        stage = build_outcome.INTERRUPTED if isinstance(exc, KeyboardInterrupt) else "build\""""
+new = """        stage = "build\""""
+
+# ── R6 (P2): and REPORTED as one ───────────────────────────────────────────
+# R5 arms the recording side, R6 the reporting side. One arm cannot cover both,
+# and a fix at one layer leaving the next is this repo's most-measured failure.
+[[arm]]
+id = "R6"
+test = "test_an_interrupt_is_not_reported_as_a_defect"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    if failure.stage == INTERRUPTED:"""
+new = """    if False:"""

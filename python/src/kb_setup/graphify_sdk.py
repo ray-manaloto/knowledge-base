@@ -688,11 +688,15 @@ def approve_partial_extraction_warning(
 ) -> tuple[str, ...]:
     """Approve one reviewed #2551 warning, with the loss re-counted from the graph.
 
-    Graphify's wording is "may be partially extracted" and carries NO count, so
-    approving it on the strength of the text alone would approve an unmeasured
-    quantity of corpus loss — the #231 shape. The reviewed entry states how many
-    nodes the file contributes, and that number is checked against the sub-graph
-    graphify just wrote, so the approval expires the moment the parser's
+    Graphify's wording is "may be partially extracted". Until 0.9.47 it carried
+    NO count at all, which is why this inventory exists: approving the text alone
+    would approve an unmeasured quantity of corpus loss — the #231 shape. 0.9.47
+    now prints the recovered-symbol count, so the entry is checked against BOTH
+    that number (`_warning_text_matches_entry`) and the sub-graph below — two
+    independent routes to one figure, and a disagreement between them is itself a
+    finding.
+
+    The approval expires the moment the parser's
     behaviour changes in EITHER direction: a regression to zero nodes and a fix
     that recovers the symbols both stop matching, and both are worth a look.
 

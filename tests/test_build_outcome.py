@@ -106,3 +106,91 @@ def test_a_pathological_summary_is_bounded(tmp_path) -> None:
     failure = build_outcome.read(tmp_path)
     assert failure is not None
     assert len(failure.summary) == build_outcome._MAX_SUMMARY
+
+
+def test_an_unreadable_record_fails_closed_on_more_than_bad_json(tmp_path, monkeypatch) -> None:
+    """A PermissionError is a record we could not READ, not one that is absent.
+
+    The first version caught every `OSError` and returned None, so a record whose
+    permissions changed fell back to "never run" — failing OPEN against this
+    module's own stated contract, in the one direction it exists to prevent.
+    (Cold lane, P2.)
+    """
+    path = build_outcome.record_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}", encoding="utf-8")
+
+    real = Path.read_text
+
+    def _denied(self: Path, *args: str | None, **kwargs: str | None) -> str:
+        if self == path:
+            raise PermissionError("denied")
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", _denied)
+    assert build_outcome.read(tmp_path) is not None
+    assert build_outcome.describe(tmp_path)
+
+
+def test_a_missing_record_is_still_absent_not_unreadable(tmp_path) -> None:
+    """FileNotFoundError must remain the ONE OSError that means "absent".
+
+    Control arm for the test above: without it, a `read` that returned a
+    BuildFailure for everything would pass that test and still be broken.
+    """
+    assert build_outcome.read(tmp_path) is None
+    assert build_outcome.describe(tmp_path) is None
+
+
+def test_a_failed_write_says_so_on_stderr(tmp_path, monkeypatch, capsys) -> None:
+    """Swallowed, but never silent.
+
+    Without a diagnostic the record fails to write, every later check reports
+    "never run", and nothing anywhere says why — the exact ambiguity this module
+    removes, restored by its own error path. (Cold lane, P2.)
+    """
+
+    def _no_write(*_args: object, **_kwargs: object) -> Never:
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr(build_outcome.Path, "write_text", _no_write)
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+
+    assert build_outcome.read(tmp_path) is None
+    err = capsys.readouterr().err
+    assert "could not record the build failure" in err
+    assert "read-only filesystem" in err
+
+
+def test_an_interrupt_is_not_reported_as_a_defect(tmp_path, monkeypatch) -> None:
+    """Ctrl-C leaves no stamp, but it is not a defect and a re-run may well work.
+
+    Both halves matter: calling an interrupt "never run" is a lie, and calling it
+    a DEFECT that "will fail again" is a different lie. (Cold lane, P2.)
+    """
+    from kb_setup import graph
+
+    def _interrupt(_root: Path) -> Never:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(graph, "build", _interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        cli._build_checked(tmp_path)
+
+    recorded = build_outcome.read(tmp_path)
+    assert recorded is not None
+    assert recorded.stage == build_outcome.INTERRUPTED
+
+    described = build_outcome.describe(tmp_path)
+    assert described is not None
+    assert "INTERRUPTED" in described
+    assert "DEFECT" not in described
+    assert "will fail again" not in described
+
+    # CONTROL ARM: a real build failure in the same repo still says DEFECT, so
+    # this test discriminates on the stage rather than on the wording softening
+    # for everything.
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+    other = build_outcome.describe(tmp_path)
+    assert other is not None
+    assert "DEFECT" in other

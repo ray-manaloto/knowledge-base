@@ -1559,14 +1559,19 @@ def _check_artifact_identity(
 def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     if not spec.stamp:
         return Finding("build-stamp", SKIP, "this tool declares no build stamp")
+    # BEFORE the stamp is read, not inside the no-stamp branch. A failing detect
+    # preflight aborts ahead of `graph._clear_stamp`, so a machine that has ever
+    # built successfully keeps its OLD stamp through a failed rebuild — and this
+    # function then returned OK for a build that is broken. Asking here means a
+    # recorded failure is reported whatever the stamp says, which is the whole
+    # point: the record is cleared only by a build that SUCCEEDS.
+    # (Cold lane, P1 — the #397 defect reintroduced inside its own fix.)
+    failed = build_outcome.describe(repo_root)
+    if failed:
+        return Finding("build-stamp", DRIFT, failed)
+
     stamp = read_stamp(repo_root, spec)
     if not stamp:
-        # NEVER RUN and RAN-AND-FAILED both leave no stamp, and this line said
-        # "rebuild pending" for both — so a defect read as a scheduling item and
-        # was carried as one across several rounds (#397). Ask first.
-        failed = build_outcome.describe(repo_root)
-        if failed:
-            return Finding("build-stamp", DRIFT, failed)
         return Finding(
             "build-stamp", DRIFT, "no build has run here yet — rebuild pending (never run)"
         )
