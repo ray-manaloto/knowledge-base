@@ -314,3 +314,44 @@ def test_a_wellformed_numeric_flag_is_parsed_not_rejected(
     assert "needs a number" not in printed
     assert "window  +/-5s" in printed
     assert rc == int(Rc.OK)
+
+
+def test_a_flag_at_the_end_of_argv_is_refused_not_swallowed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A valued flag with nothing after it became the TARGET PATH.
+
+    `[target, "--window"]` left `pending` empty, so `--window` fell through to
+    `positional` — the caller's flag silently ignored and the DEFAULT window
+    searched, then reported as if it had answered their question. That is the
+    exact failure the not-a-number guard was written to prevent, and the first
+    version of that guard covered only half the pair.
+    """
+    target = _target(tmp_path)
+    _transcript(tmp_path, "sess", [_tool(1, "Bash", "in window")])
+
+    rc = wa.write_attribution_main(
+        tmp_path, [str(target), "--transcripts", str(tmp_path), "--window"]
+    )
+
+    printed = capsys.readouterr().out
+    assert "--window needs a value" in printed
+    assert rc == int(Rc.NOT_RUN)
+
+
+def test_the_transcripts_flag_is_covered_by_the_same_guard(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The sibling half: `--transcripts` consumes a value too.
+
+    Named separately because the first fix handled `--window`/`--limit` as a set
+    and left `--transcripts` on its own `elif` — so a guard added for the pair
+    would have missed the third one. A finding is a SAMPLE of a class.
+    """
+    target = _target(tmp_path)
+
+    rc = wa.write_attribution_main(tmp_path, [str(target), "--transcripts"])
+
+    printed = capsys.readouterr().out
+    assert "--transcripts needs a value" in printed
+    assert rc == int(Rc.NOT_RUN)

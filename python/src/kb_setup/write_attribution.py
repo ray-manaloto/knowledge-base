@@ -317,10 +317,25 @@ def write_attribution_main(root: Path, args: Sequence[str] = ()) -> int:
     # reporting rather than raising. Swallowing it would be worse: the run would
     # then search a different window than the one the caller asked for and report
     # the result as if it answered their question. (graphify-labs, PR #406.)
+    #: Flags that consume the next argument. Listed rather than inlined so the
+    #: missing-value check below cannot fall out of step with the parsing.
+    valued = {"--window", "--limit", "--transcripts"}
     while pending:
         item = pending.pop(0)
-        if item in {"--window", "--limit"} and pending:
+        if item in valued:
+            # A flag at the END of argv had no `pending` to pop, so it fell
+            # through to `positional` and became the TARGET PATH — silently
+            # ignoring the caller's flag and searching the default window. The
+            # first version of this parser guarded the value-is-not-a-number case
+            # and not the value-is-missing one, which is the same defect wearing
+            # the other half of the pair. (graphify-labs, PR #406, third pass.)
+            if not pending:
+                print(f"write-attribution: {item} needs a value")
+                return int(Rc.NOT_RUN)
             raw = pending.pop(0)
+            if item == "--transcripts":
+                transcripts_dir = Path(raw)
+                continue
             try:
                 if item == "--window":
                     window = float(raw)
@@ -329,8 +344,6 @@ def write_attribution_main(root: Path, args: Sequence[str] = ()) -> int:
             except ValueError:
                 print(f"write-attribution: {item} needs a number, got {raw!r}")
                 return int(Rc.NOT_RUN)
-        elif item == "--transcripts" and pending:
-            transcripts_dir = Path(pending.pop(0))
         else:
             positional.append(item)
 

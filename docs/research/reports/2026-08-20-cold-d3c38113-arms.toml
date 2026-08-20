@@ -162,3 +162,39 @@ old = '''            except ValueError:
                 return int(Rc.NOT_RUN)'''
 new = '''            except ValueError:
                 pass'''
+
+# ══ PR #406 THIRD bot pass (graphify-labs on f4fa88ed) ═════════════════════
+# 4 findings; 2 REFUTED. Both refutations were "high" severity and BOTH anchored
+# at `:312` — of two different files. A repeated line number across unrelated
+# files is itself evidence the anchor is fabricated, and both files parse, hold
+# no stray name and no unterminated docstring, with the suite green.
+#
+# The two real ones are ONE defect: a valued flag with nothing after it.
+
+# ── F10: a valued flag at the END of argv is refused, not swallowed ────────
+# `[target, "--window"]` left `pending` empty, so `--window` fell through to
+# `positional` and became the TARGET PATH — the caller's flag silently ignored
+# and the DEFAULT window searched, then reported as if it had answered. This is
+# the same failure the not-a-number guard (F9) exists to prevent; that guard
+# covered only half the pair, which is why the mutation here restores the `and
+# pending` form rather than deleting the check.
+[[arm]]
+id = "F10"
+test = "test_a_flag_at_the_end_of_argv_is_refused_not_swallowed"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            if not pending:
+                print(f"write-attribution: {item} needs a value")
+                return int(Rc.NOT_RUN)'''
+new = '''            if not pending:
+                pass'''
+
+# ── F11: the SAME guard must cover `--transcripts` ─────────────────────────
+# The first parser handled `--window`/`--limit` as a set and `--transcripts` on
+# its own `elif`, so a guard written for the pair would have missed the third.
+# A finding is a SAMPLE of a class; this arm is the class.
+[[arm]]
+id = "F11"
+test = "test_the_transcripts_flag_is_covered_by_the_same_guard"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''    valued = {"--window", "--limit", "--transcripts"}'''
+new = '''    valued = {"--window", "--limit"}'''
