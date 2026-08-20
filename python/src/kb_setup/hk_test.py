@@ -104,7 +104,15 @@ def _kill_group(proc: subprocess.Popen[str]) -> None:
         # `ProcessLookupError` needs no separate arm — it is an OSError subclass,
         # which is also the case that gets here most often (hk exited between the
         # timeout firing and this call).
-        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        #
+        # The pgid is `proc.pid` BY CONSTRUCTION, not by lookup: `start_new_session`
+        # makes hk its own group leader, so the group id equals its pid for the
+        # lifetime of the group. Asking `getpgid` instead would fail exactly when
+        # the leader has already exited — and that is the case where the group
+        # still holds the WEDGED GRANDCHILDREN this function exists to kill, so
+        # the lookup failing would drop us to a `proc.kill()` that reaps a dead
+        # leader and leaves the linters running. (graphify-labs, PR #406.)
+        os.killpg(proc.pid, signal.SIGKILL)
     except OSError:
         # Also suppressed: the fallback races the same exit the OSError above
         # usually means. If hk died between `getpgid` failing and this line,

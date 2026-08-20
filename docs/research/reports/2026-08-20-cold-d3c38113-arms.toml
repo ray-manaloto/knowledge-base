@@ -48,7 +48,7 @@ new = '''_KILL_GRACE = 5  # control'''
 id = "F1"
 test = "test_timeout_kills_the_whole_process_group"
 file = "python/src/kb_setup/hk_test.py"
-old = '''        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)'''
+old = '''        os.killpg(proc.pid, signal.SIGKILL)'''
 new = '''        proc.kill()'''
 
 # ── F2: `start_new_session` is what MAKES the group addressable ────────────
@@ -198,3 +198,34 @@ test = "test_the_transcripts_flag_is_covered_by_the_same_guard"
 file = "python/src/kb_setup/write_attribution.py"
 old = '''    valued = {"--window", "--limit", "--transcripts"}'''
 new = '''    valued = {"--window", "--limit"}'''
+
+# ══ PR #406 FOURTH bot pass (graphify-labs on 851949be) ════════════════════
+# 5 findings: 2 real, 1 not-a-defect ("no-arg kb-gates now runs an additional
+# gate" — that IS the feature), and the `:312` phantom AGAIN, twice, now three
+# passes running. Across four passes: 17 findings, 5 refuted, 11 real, 1 no-op.
+
+# ── F12: the pgid is the PID, never a lookup ──────────────────────────────
+# `os.getpgid(proc.pid)` fails exactly when the leader has already exited — the
+# case where the group still holds the WEDGED GRANDCHILDREN this function exists
+# to kill. The lookup failing dropped us to `proc.kill()`, reaping a dead leader
+# and leaving the linters running. Under `start_new_session` the pgid EQUALS the
+# pid, so the lookup was never needed. The fixture stubs `getpgid` to RAISE, so
+# this mutation cannot pass by accident.
+[[arm]]
+id = "F12"
+test = "test_timeout_kills_the_whole_process_group"
+file = "python/src/kb_setup/hk_test.py"
+old = '''        os.killpg(proc.pid, signal.SIGKILL)'''
+new = '''        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)'''
+
+# ── F13: an UNREADABLE transcript is not an empty one ─────────────────────
+# `events_in` caught OSError and returned, so a file nobody could read
+# contributed no events and counted as SCANNED — reporting a permissions problem
+# as "nothing ran in this window". That is the DRIFT/SKIP/OK collapse this whole
+# module exists to refuse, inside the module itself.
+[[arm]]
+id = "F13"
+test = "test_an_unreadable_transcript_is_counted_not_swallowed"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            unreadable += 1'''
+new = '''            pass'''

@@ -59,9 +59,11 @@ class _Proc:
         self.stderr = _Pipe()
         self.returncode = returncode
         self._raises = raises
-        #: Deliberately invalid. Nothing in these tests may reach a real process
-        #: group — `os.killpg` is monkeypatched, and this is the second layer.
-        self.pid = -1
+        #: The group id `_kill_group` must signal. Under `start_new_session` the
+        #: pgid EQUALS the pid, which is the property the kill test pins.
+        #: Nothing here may reach a real process group — `os.killpg` is
+        #: monkeypatched, which is the layer that makes this safe.
+        self.pid = 4242
         self.killed = False
         #: The bounds the gate actually passed. Recorded rather than ignored so a
         #: test can assert the timeout was applied at all — a fake that silently
@@ -116,7 +118,15 @@ def fake_run(monkeypatch: pytest.MonkeyPatch):
 
         monkeypatch.setattr(subprocess, "Popen", _fake)
         monkeypatch.setattr(hk_test.os, "killpg", lambda *_a: None)
-        monkeypatch.setattr(hk_test.os, "getpgid", lambda _pid: 4242)
+
+        # `getpgid` is stubbed to RAISE, not to answer. The production code no
+        # longer calls it — the pgid is the pid by construction — and a stub that
+        # returned a plausible number would let a regression back to the lookup
+        # keep passing every test here.
+        def _no_getpgid(_pid: int) -> int:
+            raise AssertionError("_kill_group must not look the pgid up; it IS the pid")
+
+        monkeypatch.setattr(hk_test.os, "getpgid", _no_getpgid)
         return seen
 
     return _install
@@ -223,6 +233,11 @@ def test_timeout_kills_the_whole_process_group(
 
     Killing hk alone leaves it running and holding the pipes, which is the defect
     this asserts against: the signal must go to the group.
+
+    The group id asserted is the PID, not a `getpgid` lookup. Under
+    `start_new_session` they are equal by construction, and the lookup would fail
+    exactly when the leader has already exited — the case where the group still
+    holds the wedged grandchildren. (graphify-labs, PR #406.)
     """
     fake_run(_Proc("", raises=subprocess.TimeoutExpired(cmd="hk", timeout=1)))
     # AFTER `fake_run`, which installs its own no-op `killpg`. Patching first

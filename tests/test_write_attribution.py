@@ -355,3 +355,45 @@ def test_the_transcripts_flag_is_covered_by_the_same_guard(
     printed = capsys.readouterr().out
     assert "--transcripts needs a value" in printed
     assert rc == int(Rc.NOT_RUN)
+
+
+def test_an_unreadable_transcript_is_counted_not_swallowed(tmp_path: Path) -> None:
+    """Unreadable and examined-and-empty are byte-identical in the result.
+
+    `events_in` used to catch OSError and return, so a transcript nobody could
+    read contributed no events and was counted as SCANNED — reporting a
+    permissions problem as "nothing ran in this window". That is the exact
+    collapse this module refuses everywhere else. (graphify-labs, PR #406.)
+    """
+    target = _target(tmp_path)
+    good = _transcript(tmp_path, "good", [_tool(1, "Bash", "visible")])
+    bad = _transcript(tmp_path, "bad", [_tool(2, "Bash", "hidden")])
+    bad.chmod(0o000)
+
+    try:
+        result = wa.attribute(target, [good, bad], window=60)
+
+        assert isinstance(result, Ok)
+        assert result.value.transcripts_unreadable == 1
+        assert result.value.transcripts_examined == 1
+        rendered = wa.render(result.value)
+        assert "could not be READ" in rendered
+        assert "not evidence" in rendered
+    finally:
+        bad.chmod(0o644)
+
+
+def test_all_transcripts_unreadable_is_refused_not_an_empty_window(tmp_path: Path) -> None:
+    """The control arm on the other side: nothing readable means nothing searched."""
+    target = _target(tmp_path)
+    bad = _transcript(tmp_path, "bad", [_tool(1, "Bash", "hidden")])
+    bad.chmod(0o000)
+
+    try:
+        result = wa.attribute(target, [bad], window=60)
+
+        assert isinstance(result, Err)
+        assert result.rc is Rc.NOT_RUN
+        assert "never actually searched" in result.message
+    finally:
+        bad.chmod(0o644)

@@ -83,6 +83,10 @@ class Attribution:
     events: tuple[Event, ...]
     transcripts_examined: int
     transcripts_skipped: int
+    #: Candidates that could not be READ at all. Kept apart from `examined`
+    #: because contributing no events and being unreadable are byte-identical in
+    #: the result and opposite in meaning.
+    transcripts_unreadable: int = 0
 
 
 def _parse_ts(raw: object) -> datetime | None:
@@ -156,12 +160,16 @@ def _describe(record: dict[str, object]) -> list[tuple[str, str]]:
 
 
 def events_in(path: Path, mtime: datetime, window: float) -> Iterator[Event]:
-    """Every event in one transcript whose timestamp falls inside the window."""
+    """Every event in one transcript whose timestamp falls inside the window.
+
+    Raises `OSError` if the file cannot be read. That is deliberate and it is the
+    module's whole thesis applied to itself: swallowing the error here made an
+    UNREADABLE transcript indistinguishable from an examined-and-empty one, so a
+    permissions problem would have been reported as "nothing ran in this window".
+    The caller counts these separately. (graphify-labs, PR #406.)
+    """
     session = path.stem
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return
+    text = path.read_text(encoding="utf-8", errors="replace")
     for line in text.splitlines():
         if not line.strip():
             continue
@@ -236,9 +244,24 @@ def attribute(
         )
 
     found: list[Event] = []
+    unreadable = 0
     for path in keep:
-        found.extend(events_in(path, mtime, window))
+        try:
+            found.extend(events_in(path, mtime, window))
+        except OSError:
+            # Counted, never swallowed. An unreadable transcript contributes no
+            # events, which is byte-identical to an examined-and-empty one — so
+            # silently continuing would report a permissions problem as "nothing
+            # ran here", the exact collapse this module exists to refuse.
+            unreadable += 1
     found.sort(key=lambda event: abs(event.delta))
+
+    if unreadable and unreadable == len(keep):
+        return Err(
+            f"all {unreadable} candidate transcript(s) could not be READ, so the "
+            "window was never actually searched. This is NOT 'nothing ran'.",
+            Rc.NOT_RUN,
+        )
 
     return Ok(
         Attribution(
@@ -246,8 +269,9 @@ def attribute(
             mtime=mtime,
             window=window,
             events=tuple(found),
-            transcripts_examined=len(keep),
+            transcripts_examined=len(keep) - unreadable,
             transcripts_skipped=skipped,
+            transcripts_unreadable=unreadable,
         )
     )
 
@@ -269,6 +293,13 @@ def render(result: Attribution, *, limit: int = DEFAULT_LIMIT) -> str:
         ),
         "",
     ]
+    if result.transcripts_unreadable:
+        head.insert(
+            -1,
+            f"  ⚠ {result.transcripts_unreadable} candidate transcript(s) could "
+            "not be READ — those windows were not searched, and their silence "
+            "here is not evidence.",
+        )
     if not result.events:
         head.append(
             "  NO EVENTS in the window. The transcripts were read and contained "
