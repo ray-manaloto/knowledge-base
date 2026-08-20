@@ -39,6 +39,7 @@ from graphify.reflect import build_learning_overlay, reflect
 from kb_setup.graphify_health import (
     APPROVED_METADATA_ZERO_NODE_WARNING,
     APPROVED_PARTIAL_EXTRACTION_WARNING,
+    APPROVED_SAME_FILE_ID_COLLISION_NOTE,
     ExpectedMetadataOnly,
     ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
@@ -169,7 +170,8 @@ _SEMANTIC_SYMBOLS = (
         "(files: 'list[Path]', backend: 'str' = 'kimi', api_key: 'str | None' = None, "
         "model: 'str | None' = None, root: 'Path' = PosixPath('.'), chunk_size: 'int' = 20, "
         "on_chunk_done: 'Callable | None' = None, token_budget: 'int | None' = 60000, "
-        "max_concurrency: 'int' = 4, max_retry_depth: 'int' = 3, deep_mode: 'bool' = False, "
+        "max_concurrency: 'int' = 4, max_retry_depth: 'int | None' = None, "
+        "deep_mode: 'bool' = False, "
         "cache_root: \"'Path | None'\" = None) -> 'dict'",
     ),
 )
@@ -712,6 +714,36 @@ def approve_partial_extraction_warning(
     return (APPROVED_PARTIAL_EXTRACTION_WARNING,)
 
 
+#: The SAME-FILE id-collision note, and only that one. Anchored at the start of
+#: the line and on the lower-case `note:` token, because graphify spells the
+#: different-FILE case `[graphify] WARNING:` on the very next branch of the same
+#: function — a pattern loose enough to catch both would approve the one case
+#: that is real corpus loss.
+_SAME_FILE_ID_COLLISION_NOTE = re.compile(
+    r"^\[graphify\] note: node '[^']+' was extracted twice from "
+    r"'(?P<file>[^']+)' under different labels — keeping '[^']*', dropping '[^']*'\.?$"
+)
+
+
+def approve_same_file_id_collision_note(line: str) -> tuple[str, ...]:
+    """Approve graphify's same-file id-collision NOTE; never its different-file WARNING.
+
+    graphify's own `dedup.py:_report_id_collision` reports "in proportion to what
+    dropping the loser actually costs": for two labels of one entity in one file
+    it prints `note:` and keeps the entity and its edges; for one id minted by two
+    different files it prints `WARNING:` and says the dropped node is lost.
+
+    This approves the first and deliberately cannot match the second, so the
+    severity distinction graphify already draws survives into our gate instead of
+    being flattened by a looser pattern. No inventory is required because there is
+    no quantity to review — the note reports a redundant LABEL, not a lost node,
+    which is what separates it from `approve_partial_extraction_warning` above.
+    """
+    return (
+        (APPROVED_SAME_FILE_ID_COLLISION_NOTE,) if _SAME_FILE_ID_COLLISION_NOTE.match(line) else ()
+    )
+
+
 def account_for_extract_stderr(
     root: Path, stderr: str, review: ExtractWarningReview
 ) -> tuple[tuple[str, ...], str]:
@@ -728,9 +760,13 @@ def account_for_extract_stderr(
         line = raw.rstrip()
         if not line.strip():
             continue
-        approved = approve_metadata_zero_node_warning(
-            root, review.source_name, line, review.metadata_inventory
-        ) or approve_partial_extraction_warning(root, line, review)
+        approved = (
+            approve_metadata_zero_node_warning(
+                root, review.source_name, line, review.metadata_inventory
+            )
+            or approve_partial_extraction_warning(root, line, review)
+            or approve_same_file_id_collision_note(line)
+        )
         if approved:
             classifications.extend(approved)
         else:

@@ -247,6 +247,54 @@ _EXPECTED_METADATA_ONLY = (
 # refs". This file has no imports at all, so the rescue recovers nothing.
 # Upstream #2551 is watched in `currency.toml` so its close surfaces as movement.
 _EXPECTED_PARTIAL_EXTRACTION = (
+    # OpenSymphony's deliberately-broken python fixture — 53 bytes, one function
+    # with a missing colon, and the file is NAMED `malformed.py`. Being
+    # unparsable is its entire purpose as a test input, so the warning is
+    # expected forever rather than pending a fix.
+    #
+    # MEASURED, not inferred, and the measurement is the reason this entry is
+    # cheap: graphify says "1 symbol(s) extracted", and the sub-graph carries
+    # TWO nodes for the path — the file stub `malformed.py` AND `broken()`. The
+    # file defines exactly one symbol, so **nothing is lost** and
+    # `lost_symbols` is 0. That is the opposite of the Attacca `.astro` entry
+    # below, where 1 node is the stub alone and 25 named symbols are gone; do not
+    # read the two entries as the same situation because they share a warning.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="OpenSymphony",
+        relative_path="crates/opensymphony-code-intel/fixtures/python/malformed.py",
+        content_sha256="5812469eaff4436903f09258c1dc76da0ff4a8057c3a3fa083dc29bb3d158e6f",
+        first_error_line=2,
+        extracted_nodes=2,
+        lost_symbols=0,
+        reason=(
+            "a 53-byte fixture named malformed.py whose only function omits a colon; "
+            "tree-sitter error recovery still yields the file stub and broken(), so "
+            "the partial extraction loses nothing"
+        ),
+    ),
+    # cclint's control-character security test. Line 28 embeds a literal NUL and
+    # 0x1f — verified by reading the bytes, not the rendered text, which displays
+    # them as spaces — because the test's subject IS rejecting control characters.
+    # tree-sitter cannot parse past them, so the loss is permanent and expected.
+    #
+    # MEASURED from the sub-graph: exactly 1 node survives (the file stub), and
+    # the file names 21 `describe`/`it` blocks, all lost. Same shape as the
+    # `.astro` entry below and the OPPOSITE of the `malformed.py` entry above,
+    # where recovery was complete — which is why each entry carries its own
+    # numbers rather than sharing a class.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="cclint",
+        relative_path="tests/unit/infrastructure/security/PathValidator.test.ts",
+        content_sha256="8bacc406e7f3b40412570618c0ad219820ec2838d8a7f2d9d7c4f719cabb2c44",
+        first_error_line=28,
+        extracted_nodes=1,
+        lost_symbols=21,
+        reason=(
+            "the file embeds literal NUL and 0x1f bytes as the fixture for a "
+            "control-character rejection test; tree-sitter cannot parse past them "
+            "and recovers no symbols"
+        ),
+    ),
     graphify_health.ExpectedPartialExtraction(
         source_name="Attacca",
         relative_path="website/src/pages/index.astro",
@@ -2353,6 +2401,27 @@ def _cluster_study_graph(repo_root: Path, study_out: Path) -> None:
         shutil.copy(staged, study_out)
 
 
+def _drop_skipped_builds(manifests: list[mf.Manifest]) -> list[mf.Manifest]:
+    """Partition off `build = skip` sources, announcing each with its reason.
+
+    Called BEFORE the clone, the detect preflight and the AST pass — those are the
+    three things that cost, and the two that fail. Never silently: the hazard of
+    this field is that it can turn a red build green by removing the source that
+    was reporting a real problem, so every exclusion states why on its own line.
+
+    A skipped manifest is NOT dropped from the input fingerprints `build` takes
+    first: the pin stays committed and fingerprinted, so the source remains
+    reproducible-by-reference. It is excluded from this build, not from the record.
+    """
+    kept = [m for m in manifests if m.build != "skip"]
+    if not kept:
+        raise SystemExit("every sources/*.manifest is build = skip — nothing to build")
+    for m in manifests:
+        if m.build == "skip":
+            print(f"  [excluded] {m.name}: build = skip — {m.skip_reason}")
+    return kept
+
+
 def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
@@ -2409,6 +2478,8 @@ def build(repo_root: Path) -> None:
             f"{len(collisions)} cross-chunk source_file collision(s) — refusing to build:\n  "
             + "\n  ".join(collisions)
         )
+
+    manifests = _drop_skipped_builds(manifests)
 
     print(f"[kb-build] {len(manifests)} source(s)")
     for m in manifests:

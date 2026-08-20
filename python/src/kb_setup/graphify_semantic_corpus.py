@@ -117,9 +117,9 @@ _MAX_ARGS = 2
 _EXECUTION_MODE_COUNT = 4
 _SHA256_LENGTH = 64
 _GIT_OBJECT_LENGTH = 40
-_ACCEPTED_GRAPHIFY_REF = "v0.9.47"
-_ACCEPTED_GRAPHIFY_COMMIT = "b14b52e94ec3d9840413d81777f4c134eac0a40d"
-_ACCEPTED_GRAPHIFY_TREE = "cef4315aa8b20beb314c3a00f09b3db4d6b01eca"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.48"
+_ACCEPTED_GRAPHIFY_COMMIT = "b2cd36267456c166788c95be6e68574064a92a42"
+_ACCEPTED_GRAPHIFY_TREE = "be8636735370ed82708bb53eba33170e85acc369"
 # The digest of the baseline's GENERATED `source-manifest.json` member, not of
 # `sources/graphify.manifest`. Worth stating: the two are both "the source
 # manifest" in English, the committed file is the obvious reading, and it is the
@@ -127,7 +127,7 @@ _ACCEPTED_GRAPHIFY_TREE = "cef4315aa8b20beb314c3a00f09b3db4d6b01eca"
 # its candidate, which is what makes it a measurement rather than a guess that
 # happens to be 64 hex characters.
 _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
-    "fce48f42fe9e661eb9fdfb60c22944acd17c24a2f86549f0a04967add2e462a4"
+    "3df2a5d858c2c2c69b60c6efa58c1b08242b0dbd15fe31127bc3516a26c27c7f"
 )
 # `graphify/detect.py`'s git blob at the pinned commit. Control-armed before it
 # was trusted: the same derivation at v0.9.43 reproduces the c51ea916 this line

@@ -12,6 +12,17 @@ import msgspec
 
 APPROVED_METADATA_ZERO_NODE_WARNING = "approved-reviewed-metadata-zero-node"
 APPROVED_PARTIAL_EXTRACTION_WARNING = "approved-reviewed-partial-extraction"
+#: A SAME-FILE id collision: one entity the extractor labelled twice, one label
+#: discarded. Approved because graphify itself draws this distinction and says
+#: what it costs — `dedup.py:_report_id_collision` emits a lower-case `note:`
+#: here and states that "the structural entity and its edges survive", reserving
+#: `WARNING:` for the different-FILE case where "they are distinct entities and
+#: one is genuinely lost".
+#:
+#: The severity split is the whole reason this is a separate token rather than a
+#: widening of an existing one. Approving the `note:` must not approve the
+#: `WARNING:`: that one IS the #231 silent-loss shape and has to keep blocking.
+APPROVED_SAME_FILE_ID_COLLISION_NOTE = "approved-same-file-id-collision-note"
 
 
 class GraphifyOperation(StrEnum):
