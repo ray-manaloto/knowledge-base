@@ -70,13 +70,25 @@ installed graphify), on top of five in #399. Eleven refutations, zero writers
 found. Each one is a full reproduce-and-restore cycle.
 
 The instrument that did narrow it, on its first run: what did the transcripts
-record around the file's mtime? Answer — NOTHING. Last event 21.5s before, next
-120s+ after. The write landed in an idle gap 75s after `/reload-plugins --force`.
+record around the file's mtime? At **+/-20s, NO EVENTS**. At **+/-45s**, the
+nearest was **21.5s before** the write and the next was **120s+ after**. So the
+write landed in a quiet stretch, 75s after `/reload-plugins --force`.
 
-That rules out the whole class being probed. It was never a tool call, which is
-exactly why every tool-shaped candidate refuted cleanly. `NO EVENTS in a window
-that WAS searched` is a finding; it is not the same as no window searched, and
-`kb_setup.write_attribution` refuses rather than collapsing the two.
+**State the window with the result.** Two runs of the same probe on the same
+incident said "nothing" and "something 21.5s out", and only the window separates
+them — a result quoted without it says almost nothing. My own write-up quoted the
++/-20s figure and the +/-45s detail in the same paragraph as if they were one
+run, and CodeRabbit caught it on the PR.
+
+And the conclusion I drew from it was too strong. "It was never a tool call" does
+NOT follow: a call that returned earlier can leave behind a process that writes
+later, which the module's own docstring says and the prose then ignored. What the
+result supports is narrower and still useful — nothing the transcript records ran
+in that window, so the next reproduction should not start from the tool calls.
+
+`NO EVENTS in a window that WAS searched` is a finding; it is not the same as no
+window searched, and `kb_setup.write_attribution` refuses rather than collapsing
+the two.
 
 
 ## Outcome

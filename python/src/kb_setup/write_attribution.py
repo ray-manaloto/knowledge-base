@@ -86,12 +86,26 @@ class Attribution:
 
 
 def _parse_ts(raw: object) -> datetime | None:
+    """Parse a transcript timestamp, ALWAYS tz-aware, or None if unusable.
+
+    The `tzinfo` line is the whole point. `fromisoformat` returns a NAIVE
+    datetime for a string carrying no offset, and subtracting a naive from the
+    tz-aware mtime raises `TypeError` — so one offsetless line anywhere in any
+    scanned transcript crashed the entire run. Every fixture here carried an
+    offset, so no test could see it; both PR bots on #406 found it independently
+    and a control arm confirmed it.
+
+    UTC is the right assumption rather than a shrug: Claude Code writes these
+    timestamps in UTC (the records this module reads end in `Z`), so an
+    offsetless one is a truncation of UTC, not a local time.
+    """
     if not isinstance(raw, str) or not raw:
         return None
     try:
-        return datetime.fromisoformat(raw)
+        parsed = datetime.fromisoformat(raw)
     except ValueError:
         return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
 def _describe(record: dict[str, object]) -> tuple[str, str] | None:

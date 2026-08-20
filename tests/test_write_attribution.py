@@ -180,3 +180,42 @@ def test_malformed_lines_do_not_stop_the_scan(tmp_path: Path) -> None:
 
     assert isinstance(result, Ok)
     assert "survived" in result.value.events[0].detail
+
+
+# ── the naive-timestamp crash (PR #406 bots, control-armed) ────────────────
+
+
+def test_an_offsetless_timestamp_does_not_crash_the_scan(tmp_path: Path) -> None:
+    """One offsetless line must not kill the whole run.
+
+    `fromisoformat` returns a NAIVE datetime for a string with no offset, and
+    `naive - aware` raises TypeError — so a single such line anywhere in any
+    scanned transcript aborted the entire scan with an unhandled exception.
+
+    Every fixture above carries an offset, which is exactly why no test here
+    could see it. Both PR bots on #406 found it independently; a control arm
+    confirmed `TypeError: can't subtract offset-naive and offset-aware`.
+    """
+    target = _target(tmp_path)
+    offsetless: dict[str, object] = {
+        "timestamp": "2026-08-20T06:03:34",
+        "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "x"}}]},
+    }
+    transcript = _transcript(tmp_path, "sess", [offsetless])
+
+    result = wa.attribute(target, [transcript], window=60)
+
+    assert isinstance(result, Ok)
+    assert len(result.value.events) == 1
+    assert result.value.events[0].delta == 0.0
+
+
+def test_an_offsetless_timestamp_is_read_as_utc_not_local(tmp_path: Path) -> None:
+    """The control arm on the ASSUMPTION, not just on the absence of a crash.
+
+    Defaulting to the local zone would also stop the crash while silently
+    shifting every offsetless event by the host's UTC offset — a bug that
+    survives the test above and shows up as rows in the wrong place.
+    """
+    assert wa._parse_ts("2026-08-20T06:03:34") == datetime(2026, 8, 20, 6, 3, 34, tzinfo=UTC)
+    assert wa._parse_ts("2026-08-20T06:03:34Z") == wa._parse_ts("2026-08-20T06:03:34")

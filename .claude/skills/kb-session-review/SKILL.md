@@ -166,10 +166,12 @@ Read the result as **leads, not attribution** (`reader-findings-are-leads-not-fi
 Two outcomes are both useful and must not be collapsed:
 
 - **rows near the mtime** — the top row is where to aim the next reproduction.
-- **NO EVENTS in a window that WAS searched** — the writer was not a tool call or
-  a hook of a recorded session. That is a finding: it rules out the entire class
-  everyone keeps probing. Its first real run returned exactly this, which is why
-  six tool-shaped candidates had all been refuted.
+- **NO EVENTS in a window that WAS searched** — nothing the transcript records
+  ran there. That narrows the search; it does **not** prove the writer was never
+  a tool call, because a call that returned earlier can leave a process that
+  writes later. State the window with the result, always: the same incident read
+  `NO EVENTS` at ±20s and showed an event 21.5s out at ±45s, so a result quoted
+  without its window says almost nothing.
 
 The task refuses rather than returning an empty list when nothing was examined —
 no transcripts, or every one prefiltered away — because "nothing ran" and "nothing

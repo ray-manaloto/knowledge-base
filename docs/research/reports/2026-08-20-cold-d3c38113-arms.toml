@@ -20,7 +20,17 @@
 # wedged linter, nor whether `_MIN_TESTS = 40` is the right floor — an arm
 # measures the TESTS, never the premise.
 
-suites = ["tests/test_hk_test.py", "tests/test_gates.py"]
+# Every file holding a test named by an arm below. F6 SURVIVED on its first run
+# purely because `test_write_attribution.py` was missing here — the mutation
+# applied, the named test never ran, and the report read "no test fails under
+# this mutation". A hand-run of the same mutation failed BOTH its tests. That is
+# the arm-measuring-something-its-id-does-not-name failure, and the fix is to
+# keep this list in step with the arms rather than to trust a survivor.
+suites = [
+  "tests/test_hk_test.py",
+  "tests/test_gates.py",
+  "tests/test_write_attribution.py",
+]
 
 # ── the control ────────────────────────────────────────────────────────────
 [[arm]]
@@ -59,10 +69,10 @@ new = '''            start_new_session=False,'''
 id = "F3"
 test = "test_timeout_prints_the_partial_output_it_captured"
 file = "python/src/kb_setup/hk_test.py"
-old = '''                if partial:
-                    print(partial)'''
-new = '''                if partial and False:
-                    print(partial)'''
+old = '''            if partial:
+                print(partial)'''
+new = '''            if partial and False:
+                print(partial)'''
 
 # ── F4: undecodable linter output is NOT_RUN, not a crash ──────────────────
 # `gates.py:282` already handles this for `git status`. The realistic break is a
@@ -89,3 +99,34 @@ old = '''# `tests/test_gates.py` asserts the ordering for every GATE_TASK.
 timeout = "25m"'''
 new = '''# `tests/test_gates.py` asserts the ordering for every GATE_TASK.
 timeout = "30m"'''
+
+# ══ PR #406 bot findings (graphify-labs + CodeRabbit, both confirmed) ═══════
+
+# ── F6: an offsetless transcript timestamp must not crash the scan ─────────
+# BOTH bots found this independently and a control arm confirmed it:
+# `naive - aware` raises TypeError, so ONE offsetless line anywhere aborted the
+# whole run. The realistic break is the exact edit that caused it — ruff flagged
+# the `.replace("Z", "+00:00")` as redundant (it is, on 3.11+), and removing it
+# looked like a pure cleanup while deleting the only thing that guaranteed a
+# tzinfo. So the mutation is "return what fromisoformat gave you".
+[[arm]]
+id = "F6"
+test = "test_an_offsetless_timestamp_does_not_crash_the_scan"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)'''
+new = '''    return parsed'''
+
+# ── F7: no unbounded wait on any path out of `run` ─────────────────────────
+# `Popen.__exit__` calls `wait()` with NO timeout. Using `with` reads as the
+# tidier, more idiomatic form — which is exactly why it is the realistic
+# regression — and it reintroduces the hang the timeout exists to bound, one
+# frame later. The fake `_Proc` deliberately has no `__enter__`/`__exit__`, so a
+# revert to `with` fails rather than silently passing.
+[[arm]]
+id = "F7"
+test = "test_the_pipes_are_closed_even_on_the_happy_path"
+file = "python/src/kb_setup/hk_test.py"
+old = '''        finally:
+            _close_pipes(proc)'''
+new = '''        finally:
+            pass'''

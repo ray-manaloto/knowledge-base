@@ -111,6 +111,19 @@ def _kill_group(proc: subprocess.Popen[str]) -> None:
         proc.wait(timeout=_KILL_GRACE)
 
 
+def _close_pipes(proc: subprocess.Popen[str]) -> None:
+    """Release the pipe FDs the context manager would otherwise have closed.
+
+    Dropping the `with` (see `run`) means nothing closes these for us, and a
+    leaked FD per gate run is a slow leak rather than a loud one. Best-effort:
+    a close that raises must not become the reason the gate reports nothing.
+    """
+    for stream in (proc.stdout, proc.stderr):
+        if stream is not None:
+            with contextlib.suppress(OSError):
+                stream.close()
+
+
 def _decode(stream: str | bytes | None) -> str:
     """Whatever a stream turned out to be, as text that cannot raise.
 
@@ -132,26 +145,34 @@ def run(repo_root: Path) -> Result[int]:
         # makes the timeout below able to kill the linters hk spawned rather than
         # only hk itself. Without it a wedged linter survives the timeout holding
         # the pipes open, and the gate returns while the hang continues.
-        with subprocess.Popen(
+        # Deliberately NOT used as a context manager. `Popen.__exit__` closes the
+        # pipes and then calls `wait()` with NO timeout, so a process that
+        # outlived `_kill_group`'s grace period would hand the gate an unbounded
+        # wait on the way OUT of the `with` — reintroducing the hang this path
+        # exists to bound, one frame later and somewhere nobody would look for it.
+        # Every wait here is bounded instead. (graphify-labs, PR #406.)
+        proc = subprocess.Popen(
             _ARGV,
             cwd=repo_root,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             start_new_session=True,
-        ) as proc:
-            try:
-                stdout, stderr = proc.communicate(timeout=_TIMEOUT)
-            except subprocess.TimeoutExpired as exc:
-                _kill_group(proc)
-                # Print what hk managed to say before it wedged. Every other
-                # failure branch here prints its captured output; discarding it
-                # exactly when the run hung would withhold the diagnostic at the
-                # one moment there is nothing else to go on.
-                partial = (_decode(exc.stdout) + _decode(exc.stderr)).rstrip()
-                if partial:
-                    print(partial)
-                return Err(f"hk test did not finish within {_TIMEOUT}s", Rc.NOT_RUN)
+        )
+        try:
+            stdout, stderr = proc.communicate(timeout=_TIMEOUT)
+        except subprocess.TimeoutExpired as exc:
+            _kill_group(proc)
+            # Print what hk managed to say before it wedged. Every other
+            # failure branch here prints its captured output; discarding it
+            # exactly when the run hung would withhold the diagnostic at the
+            # one moment there is nothing else to go on.
+            partial = (_decode(exc.stdout) + _decode(exc.stderr)).rstrip()
+            if partial:
+                print(partial)
+            return Err(f"hk test did not finish within {_TIMEOUT}s", Rc.NOT_RUN)
+        finally:
+            _close_pipes(proc)
     except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:
         # UnicodeDecodeError is neither of the other two — `text=True` decodes
         # inside `communicate`, so a byte sequence a linter emits verbatim that is

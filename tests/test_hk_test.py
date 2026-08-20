@@ -11,7 +11,6 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Self
 
 import pytest
 from kb_setup import hk_test
@@ -24,8 +23,18 @@ def _tap(passed: int, failed: int = 0) -> str:
     return "\n".join(lines) + "\n"
 
 
+class _Pipe:
+    """A closeable stand-in for one of `Popen`'s pipe streams."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
 class _Proc:
-    """A stand-in for `Popen`, used as the context manager the gate opens.
+    """A stand-in for `Popen`.
 
     `communicate` is where a hang surfaces, so a `TimeoutExpired` handed here is
     raised from THERE rather than from construction — which is the difference
@@ -39,8 +48,15 @@ class _Proc:
         stderr: str = "",
         raises: BaseException | None = None,
     ) -> None:
-        self.stdout = stdout
-        self.stderr = stderr
+        self.out_text = stdout
+        self.err_text = stderr
+        #: Real closeable stand-ins, because `run` no longer uses `Popen` as a
+        #: context manager and closes these itself. A fake whose `stdout` was a
+        #: plain string passed while the `with` did the closing, and broke the
+        #: moment the code took that job over — so these track `closed` and the
+        #: test below asserts it.
+        self.stdout = _Pipe()
+        self.stderr = _Pipe()
         self.returncode = returncode
         self._raises = raises
         #: Deliberately invalid. Nothing in these tests may reach a real process
@@ -53,17 +69,15 @@ class _Proc:
         self.communicate_timeout: float | None = None
         self.wait_timeout: float | None = None
 
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, *_exc: object) -> None:
-        return None
+    # No `__enter__`/`__exit__`: `run` deliberately does NOT use `Popen` as a
+    # context manager, because `__exit__` calls `wait()` unbounded. Leaving them
+    # here would let a regression back to `with` keep passing these tests.
 
     def communicate(self, timeout: float | None = None) -> tuple[str, str]:
         self.communicate_timeout = timeout
         if self._raises is not None:
             raise self._raises
-        return self.stdout, self.stderr
+        return self.out_text, self.err_text
 
     def kill(self) -> None:
         self.killed = True
@@ -267,3 +281,32 @@ def test_not_ok_is_not_miscounted_as_ok() -> None:
     single most damaging parse bug this module could have.
     """
     assert hk_test._counts("not ok - step :: bad (1ms)\n") == (0, 1)
+
+
+def test_the_pipes_are_closed_even_on_the_happy_path(tmp_path: Path, fake_run) -> None:
+    """`run` dropped the `with`, so closing the FDs became ITS job.
+
+    `Popen.__exit__` used to do this. It was removed because it also calls
+    `wait()` with no timeout, which would reintroduce an unbounded wait on the
+    way out of a path built to bound one (graphify-labs, PR #406). Taking over
+    the close without taking over the cleanup would leak two FDs per gate run —
+    a slow leak, which is the kind nothing notices.
+    """
+    proc = _Proc(_tap(46))
+    fake_run(proc)
+
+    hk_test.run(tmp_path)
+
+    assert proc.stdout.closed
+    assert proc.stderr.closed
+
+
+def test_the_pipes_are_closed_on_the_timeout_path_too(tmp_path: Path, fake_run) -> None:
+    """The control arm: the leak would otherwise survive on the branch that hangs."""
+    proc = _Proc("", raises=subprocess.TimeoutExpired(cmd="hk", timeout=1))
+    fake_run(proc)
+
+    hk_test.run(tmp_path)
+
+    assert proc.stdout.closed
+    assert proc.stderr.closed
