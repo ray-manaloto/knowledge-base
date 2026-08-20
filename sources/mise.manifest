@@ -5,22 +5,32 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: the mise binary itself (`mise --version`)
-#   pinned here:    2026.8.8
+#   pinned here:    2026.8.9
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
 # "how does graphify work?" answer came from the wrong source.
 #
 # Pin the RELEASE TAG, never a branch head — a branch drifts ahead of the release.
-# To bump: change the version in its source above, then
-#   git ls-remote --tags --refs https://github.com/jdx/mise | grep <version>
-# and set ref/commit here to match, then `mise run kb-build`.
+# To bump: change the version in its source above, resolve the tag to its COMMIT,
+# set ref/commit here to match, then `mise run kb-build`:
+#   gh api repos/jdx/mise/commits/<tag> --jq .sha
+#
+# ⚠️ NOT `git ls-remote --tags` (#395), which is what this line said until
+# 2026-08-19 and what put a wrong value below it. mise ships ANNOTATED tags, so
+# that call returns the TAG OBJECT rather than the commit: `commit` here read
+# `ca93e5fe…` from 2026-08-02 to 2026-08-19, which is the v2026.8.8 tag object
+# pointing at commit `c454c6f4…`. It never surfaced because `git checkout` peels
+# a tag object, so the clone was right while the recorded provenance was not.
+# Control arm on the replacement call: it reproduces `sources/hk.manifest`'s pin
+# byte-for-byte (hk ships LIGHTWEIGHT tags, so the two agree there) and disagreed
+# here — a second route to one fact, which is how the drift was found at all.
 #
 # kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/mise
-ref = v2026.8.8
-commit = ca93e5fe6ff19da2a536bc36172ad9f72801acec
+ref = v2026.8.9
+commit = d9a27434a4e462f99a662231c6cd74aa34a75946
 kind = code
 added = 2026-08-02

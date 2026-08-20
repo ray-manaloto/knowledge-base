@@ -5,22 +5,29 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] hk`
-#   pinned here:    1.55.0
+#   pinned here:    1.56.0
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
 # "how does graphify work?" answer came from the wrong source.
 #
 # Pin the RELEASE TAG, never a branch head — a branch drifts ahead of the release.
-# To bump: change the version in its source above, then
-#   git ls-remote --tags --refs https://github.com/jdx/hk | grep <version>
-# and set ref/commit here to match, then `mise run kb-build`.
+# To bump: change the version in its source above, resolve the tag to its COMMIT,
+# set ref/commit here to match, then `mise run kb-build`:
+#   gh api repos/jdx/hk/commits/<tag> --jq .sha
+#
+# ⚠️ NOT `git ls-remote --tags` (#395), which is what this line said until
+# 2026-08-19. hk happens to ship LIGHTWEIGHT tags, so that call returned the
+# commit here and this file was never wrong — but the identical instruction in
+# `sources/mise.manifest` put a TAG OBJECT in its `commit` field for 17 days,
+# because mise ships annotated ones. The instruction was the defect; that it did
+# not fire here is luck, not safety, and hk could switch tag styles tomorrow.
 #
 # kind = code: AST extraction only, no LLM, no cost. NOTE this extracts the
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/jdx/hk
-ref = v1.55.0
-commit = 291444625d5717d48e7ee5f009406988b026984f
+ref = v1.56.0
+commit = bad550709d9ce2e6f43a8d25880e1c7d6397f13f
 kind = code
 added = 2026-08-02

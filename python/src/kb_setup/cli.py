@@ -324,6 +324,10 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
         from kb_setup import skill_lint
 
         return skill_lint.skill_lint_main(repo_root)
+    if cmd == "hk-test":
+        from kb_setup import hk_test
+
+        return hk_test.hk_test_main(repo_root)
     return None
 
 

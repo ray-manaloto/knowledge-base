@@ -595,7 +595,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.8"
+expected = "2026.8.9"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -638,7 +638,32 @@ RE-PROBED 2026-08-08 at the 2026.8.2 -> 2026.8.3 self-update: `soft` moved to
 2026.8.3 in the SAME change as `expected`, which is this item's whole rule.
 `hard` stays 2026.7.14 — nothing in 2026.8.3 touches the env-file
 secret-expansion or task-freshness fixes that set the floor. soft > hard still
-holds, so the warning band remains observable."""
+holds, so the warning band remains observable.
+
+⚠️ SUPERSEDED IN PART 2026-08-19 — RAY RULED, and the ruling retires the
+two-tier doctrine every paragraph above rests on. `hard` MOVED 2026.7.14 ->
+2026.8.9 at the 2026.8.8 -> 2026.8.9 self-update. Ray was shown the doctrine
+(hard = correctness floor, soft = verified-against) together with the
+consequence (an equal pair makes the warning band empty) and chose to move
+`hard` anyway. It is his call and it is final; do NOT relitigate it from the
+comment in `mise.toml`, which has been rewritten to match rather than left to
+argue against its own values.
+
+What that changes: `soft` is now INTENTIONALLY INERT at 2026.8.9, retained as a
+slot in case the two-tier split returns, per Ray. The "soft must stay ABOVE
+hard" rule above no longer applies and must not be used to "fix" the equality.
+
+What SURVIVES unchanged, and is now stronger: all three of `expected` (here),
+`min_version` (both keys) and `sources/mise.manifest` name ONE version and move
+in ONE change. Any disagreement among them is drift by definition — there is no
+longer a legitimate reason for them to differ.
+
+The 2026.8.9 notes were read for this bump. Its three breaking changes are all
+INERT here, control-armed (a `graphify` grep of `mise.toml` returns 84, so the
+probes discriminate): `conf.d` fragment filenames — this repo has NO `conf.d`
+directory at all; `vlang` version strings — not pinned; legacy `RTX_*` variables
+— 0 uses across `mise.toml`, `hk.pkl` and `python/src/`, and they are a
+plugin-author surface this repo does not write to."""
 
 [[tool.mise.watch]]
 kind = "local"
@@ -1195,6 +1220,42 @@ github = "jdx/hk"
 # reason is a fact about the repo that can silently stop being true.
 manifest = "sources/hk.manifest"
 
+# ⚠️ ADDED 2026-08-19 AFTER THIS EXACT DRIFT WENT LIVE AND UNNOTICED. `hk.pkl`'s
+# two package URIs are a THIRD copy of the hk version, and until now this table
+# declared no bindings — so `sync.py` reported `ref-binding | skip | this tool
+# declares no revision bindings`, a SKIP whose stated reason was a true fact
+# about the repo, which is the same hole the `manifest` key above records twice.
+#
+# What it cost: the 1.55.0 bump moved `mise.toml` and `sources/hk.manifest` and
+# left `hk.pkl` on **v1.54.1**. Every other check was correctly green — pin vs
+# upstream agreed, manifest vs pin agreed — because none of them can see a URI.
+# `hk validate` could not catch it either: 1.54.1 schemas evaluate fine under a
+# 1.55.0 binary, so the mismatch is silent until a schema field actually moves.
+# That is precisely the "new BINARY against the old SCHEMAS" failure the
+# `hk-version-is-written-three-times` watch item below exists to warn about — and
+# a watch item is prose, so it warned nobody. This is the machine-enforced half.
+#
+# Anchored on the URI prefix and capturing the leading `v` so the value compares
+# directly against the manifest's `ref = v1.56.0`. The `hk@1.56.0` fragment later
+# in the same URI is deliberately NOT bound separately: it is the same literal in
+# the same string, so a second binding would report one defect twice rather than
+# checking a second place.
+[[tool.hk.ref_binding]]
+path = "hk.pkl"
+pattern = 'amends "package://github\.com/jdx/hk/releases/download/(v[0-9]+\.[0-9]+\.[0-9]+)/'
+field = "ref"
+note = "hk.pkl's `amends` — the Config.pkl schema the config is written against"
+
+[[tool.hk.ref_binding]]
+path = "hk.pkl"
+pattern = 'import "package://github\.com/jdx/hk/releases/download/(v[0-9]+\.[0-9]+\.[0-9]+)/'
+field = "ref"
+note = """hk.pkl's `import` — the Builtins.pkl schema. Bound SEPARATELY from the
+`amends` above rather than with one pattern matching both, because they are two
+independent edits: a bump that updates one and misses the other is exactly the
+mistake a human makes here, and a single binding that matched either would pass
+on the half-done edit."""
+
 [[tool.hk.watch]]
 kind = "local"
 ref = "depends-ban-is-now-a-choice-not-a-workaround"
@@ -1230,7 +1291,23 @@ now steer authors toward `stage` for hk-owned staging and `exclusive` for
 legacy commands that write the index directly. That is GUIDANCE, not a
 dependency-graph change — upstream's own advice now names `exclusive` first,
 which is what this repo already does. The ban stays a CHOICE, still
-deliberately not retired."""
+deliberately not retired.
+
+RE-PROBED 2026-08-19 for v1.55.0 -> v1.56.0: unchanged in substance, and this
+release does not touch the dependency graph at all. 1.56.0 is a Pkl package
+cache + offline mode (`HK_PKL_CACHE_DIR`, `HK_PKL_OFFLINE`), pinact v3/v4
+builtins, `HK_OUTPUT_FILE`, the `allow_binary` step option, and five fixes
+(argv boundaries, linked worktrees, annotated tags, expr v2 conditions). Nothing
+in it mentions `depends`, dependents, or deadlock. The ban stays a CHOICE, still
+deliberately not retired.
+
+Its ONE breaking change is also inert here, and worth recording because it is
+the kind that looks alarming: builtins migrated to structured argv (#1194) now
+require LIST-form prefixes (`prefix = List("mise", "x", "--")`) instead of
+shell-string ones. `hk.pkl` sets ZERO builtin prefixes — `prefix` occurs 5 times
+and every one is prose in a comment, two of them (`hk.pkl:243-244`) already
+documenting this very migration and why a `(Builtins.ruff){prefix=…}` panics
+here. So this repo had already adapted to the change before it shipped."""
 
 [[tool.hk.watch]]
 kind = "local"
@@ -1262,7 +1339,29 @@ different hat: after `mise install`, a bare `hk` still ran **1.54.0** while
 `mise which hk` reported 1.54.1. `MISE_ENV_CACHE=1` and the stale install dirs
 sit at PATH positions 4/5/8, ahead of the shims. So "did the bump take?" cannot
 be answered with `hk version`; use `mise exec -- hk version` or the absolute
-path. The engine's own `resolution` check reports this independently."""
+path. The engine's own `resolution` check reports this independently.
+
+⚠️ RE-PROBED 2026-08-19 at the 1.55.0 -> 1.56.0 bump, and THIS TIME THE ITEM
+FIRED — it was live, not hypothetical. `hk.pkl`'s two URLs read **v1.54.1**
+while `mise.toml` pinned **1.55.0**: the 1.55.0 bump moved the pin alone, which
+is exactly the "new BINARY against the old SCHEMAS" failure this item exists to
+prevent, and it had been sitting in the tree unnoticed since.
+
+Nothing caught it, and the reason is structural rather than an oversight: the
+engine's own checks compare the `mise.toml` pin against upstream and against
+`sources/hk.manifest`, and BOTH agreed — the manifest tracked 1.55.0 correctly.
+The pkl URLs are a third copy no check reads. `hk validate` did not catch it
+either; the 1.54.1 schemas evaluate fine under a 1.55.0 binary, so the drift is
+silent right up until a schema field moves. This is the count-based method's
+blind spot in its own item: asserting "2 occurrences moved" verifies the EDIT,
+never that the value matches the pin.
+
+Method held once it was found, same as the previous three rounds: counted first
+(2 occurrences of `1.54.1`, control 0 for `1.56.0`), replaced, re-counted (0 and
+2), then `mise exec -- hk validate` rc=0 with the new binary against the new
+schemas. The stale-PATH skew above ALSO reproduced verbatim this round — bare
+`hk version` printed 1.55.0 while `mise exec -- hk version` printed 1.56.0 —
+which is why the validate was run through `mise exec`."""
 
 # ---------------------------------------------------------------------------
 # fnox — the credential tool the shell's secrets come from (#86)

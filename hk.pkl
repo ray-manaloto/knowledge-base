@@ -1,9 +1,9 @@
-amends "package://github.com/jdx/hk/releases/download/v1.54.1/hk@1.54.1#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Config.pkl"
 
 // Builtin linters MUST be assigned from Builtins (`= Builtins.name`), never a
 // bare `["name"] {}` block — a bare block is a fresh empty Step that hk silently
 // skips. See ray-manaloto/dotfiles feedback_hk_builtins_need_assignment.
-import "package://github.com/jdx/hk/releases/download/v1.54.1/hk@1.54.1#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Builtins.pkl"
 
 // Refuse this config on an older hk binary rather than silently misreading it.
 min_hk_version = "1.49.0"
@@ -245,6 +245,10 @@ local proseExclude = baseExclude
 // Order per Astral docs: `ruff check --fix` BEFORE `ruff format`; `exclusive` (a
 // barrier), NOT `depends` (a failed dep deadlocks hk — dotfiles #268). taplo/rumdl and
 // the hygiene builtins are on PATH via mise (HK_MISE=1), so they need no prefix.
+// `ruff_format` is declared at the BOTTOM of `lintSteps`, far from `ruff` — that
+// separation is measured and deliberate; see the comment on the step itself before
+// moving it back up. The `depends` note above still stands as the reason it is a
+// barrier at all; the note below is the reason for WHERE the barrier sits.
 local pyGlob = List("python/src/**/*.py", "tests/**/*.py")
 
 local lintSteps: Mapping<String, Step> = new {
@@ -269,12 +273,6 @@ local lintSteps: Mapping<String, Step> = new {
     glob = pyGlob
     check = "uv run ruff check {{files}}"
     fix = "uv run ruff check --fix {{files}}"
-  }
-  ["ruff_format"] = new Step {
-    glob = pyGlob
-    check = "uv run ruff format --check {{files}}"
-    fix = "uv run ruff format {{files}}"
-    exclusive = true
   }
   ["ty"] = new Step {
     glob = pyGlob
@@ -345,6 +343,46 @@ local lintSteps: Mapping<String, Step> = new {
   //     mode #214 records.
   ["skill_lint"] = new Step {
     check = "uv run kb-setup skill-lint"
+  }
+  // ⚠️ POSITION IS LOAD-BEARING — this step is LAST on purpose, not by accident,
+  //     and moving it back beside `ruff` costs ~190 ms on every run. Do not
+  //     "tidy" the two ruff steps back together.
+  //
+  //     `exclusive` is a WHOLE-PIPELINE barrier, not a per-step one: hk drains
+  //     everything declared before it, runs this step alone, then starts
+  //     everything declared after it. At its old position (15 of 20) that split
+  //     the run into THREE phases and stranded five unrelated steps — ty,
+  //     no_lint_skip, agnix, md_size_budget, skill_lint — behind a 40 ms task
+  //     that was itself waiting on a 1,546 ms one. Declared last, the barrier
+  //     drains a pipeline with nothing left behind it, and the run is two phases.
+  //
+  //     MEASURED 2026-08-19 from hk's own `--format json` on one host. Old
+  //     position: mean 1999 ms (n=8, range 1908-2090, median 1994). This
+  //     position: mean 1832 ms (n=10, range 1750-1993, median 1817). Barrier
+  //     DELETED outright: mean 1799 ms (n=3) — inside the ~150 ms noise floor
+  //     of the move, which is the evidence that the POSITION carried the cost
+  //     and the barrier itself is nearly free. Hence the barrier stays.
+  //
+  //     Effect is ~167 ms of mean (~8%), and the DISTRIBUTIONS OVERLAP at the
+  //     tails: a confirmation batch on the committed config produced a 1993 ms
+  //     run, inside the old range. An earlier draft of this comment claimed
+  //     "every after-run beat every before-run, no overlap across 13 runs" —
+  //     true of those 13 runs and it did not replicate, so it is corrected here
+  //     rather than left standing. **One run cannot demonstrate this change.**
+  //     Compare medians over n>=5 per arm, or you are reading the noise floor.
+  //
+  //     Ordering is preserved: `ruff check --fix` still precedes `ruff format`
+  //     per Astral's docs, because declaration order still determines it. And
+  //     this is deliberately NOT `depends = ["ruff"]`, which would express the
+  //     dependency exactly and buys ~10 ms more — inside the noise. The ban on
+  //     `depends` is a standing decision (Ray, 2026-07-31), kept after upstream
+  //     fixed the deadlock in v1.53.0 because the doctrine spans both repos and
+  //     dotfiles machine-enforces it. A 10 ms gain is not a reason to split them.
+  ["ruff_format"] = new Step {
+    glob = pyGlob
+    check = "uv run ruff format --check {{files}}"
+    fix = "uv run ruff format {{files}}"
+    exclusive = true
   }
 }
 
