@@ -229,3 +229,21 @@ test = "test_an_unreadable_transcript_is_counted_not_swallowed"
 file = "python/src/kb_setup/write_attribution.py"
 old = '''            unreadable += 1'''
 new = '''            pass'''
+
+# ══ PR #406 FIFTH pass (CodeRabbit back from rate limit, on 44a85a5f) ══════
+# 2 findings, both real, both about things I had already "fixed" elsewhere.
+
+# ── F14: the NO EVENTS text must not repeat the over-claim ────────────────
+# Three places carried "the writer was not a tool call": the skill step, the
+# work-memory, and this rendering. The first two were corrected in one round and
+# the RENDERING — the only one a reader actually sees — was not. The realistic
+# break is therefore the original sentence, restored verbatim.
+[[arm]]
+id = "F14"
+test = "test_the_empty_window_message_does_not_exclude_a_tool_call"
+file = "python/src/kb_setup/write_attribution.py"
+old = '''            "nothing here — a finding, not a failure to look. It does NOT show "
+            "the writer was never a tool call: an earlier call can leave a "
+            "process that writes later. Narrow or widen --window and re-ask."'''
+new = '''            "nothing here — which is a finding (the writer was not a tool call or "
+            "a hook of a recorded session), not a failure to look."'''

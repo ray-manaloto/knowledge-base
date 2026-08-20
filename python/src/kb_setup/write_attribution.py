@@ -303,8 +303,9 @@ def render(result: Attribution, *, limit: int = DEFAULT_LIMIT) -> str:
     if not result.events:
         head.append(
             "  NO EVENTS in the window. The transcripts were read and contained "
-            "nothing here — which is a finding (the writer was not a tool call or "
-            "a hook of a recorded session), not a failure to look."
+            "nothing here — a finding, not a failure to look. It does NOT show "
+            "the writer was never a tool call: an earlier call can leave a "
+            "process that writes later. Narrow or widen --window and re-ask."
         )
         return "\n".join(head)
 

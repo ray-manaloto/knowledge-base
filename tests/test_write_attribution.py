@@ -13,16 +13,10 @@ import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from kb_setup import write_attribution as wa
 from kb_setup.result import Err, Ok, Rc
-
-if TYPE_CHECKING:
-    # Annotation-only: nothing here uses pytest at runtime (no fixtures are
-    # defined in this file), and `from __future__ import annotations` above makes
-    # the deferred reference resolve.
-    import pytest
 
 _MTIME = datetime(2026, 8, 20, 6, 3, 34, tzinfo=UTC)
 
@@ -56,6 +50,25 @@ def _tool(offset: float, name: str, command: str) -> dict[str, object]:
 
 def _hook(offset: float, name: str) -> dict[str, object]:
     return {"timestamp": _at(offset), "attachment": {"hookName": name}}
+
+
+def _deny_reads(monkeypatch: pytest.MonkeyPatch, blocked: Path) -> None:
+    """Make exactly ONE path raise PermissionError on read; leave the rest alone.
+
+    Deterministic where `chmod(0o000)` is not: chmod does not deny reads to root
+    and is a no-op on some filesystems, so a permission fixture built on it can
+    silently PERMIT and leave the tests that depend on it asserting nothing.
+    `test_the_deny_reads_helper_actually_denies` is the control arm on this.
+    (CodeRabbit, PR #406.)
+    """
+    real = Path.read_text
+
+    def _guarded(self: Path, encoding: str | None = None, errors: str | None = None) -> str:
+        if self == blocked:
+            raise PermissionError(13, "Permission denied", str(self))
+        return real(self, encoding=encoding, errors=errors)
+
+    monkeypatch.setattr(Path, "read_text", _guarded)
 
 
 def test_events_inside_the_window_are_found_and_sorted_by_nearness(tmp_path: Path) -> None:
@@ -357,7 +370,9 @@ def test_the_transcripts_flag_is_covered_by_the_same_guard(
     assert rc == int(Rc.NOT_RUN)
 
 
-def test_an_unreadable_transcript_is_counted_not_swallowed(tmp_path: Path) -> None:
+def test_an_unreadable_transcript_is_counted_not_swallowed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Unreadable and examined-and-empty are byte-identical in the result.
 
     `events_in` used to catch OSError and return, so a transcript nobody could
@@ -368,32 +383,69 @@ def test_an_unreadable_transcript_is_counted_not_swallowed(tmp_path: Path) -> No
     target = _target(tmp_path)
     good = _transcript(tmp_path, "good", [_tool(1, "Bash", "visible")])
     bad = _transcript(tmp_path, "bad", [_tool(2, "Bash", "hidden")])
-    bad.chmod(0o000)
+    _deny_reads(monkeypatch, bad)
 
-    try:
-        result = wa.attribute(target, [good, bad], window=60)
+    result = wa.attribute(target, [good, bad], window=60)
 
-        assert isinstance(result, Ok)
-        assert result.value.transcripts_unreadable == 1
-        assert result.value.transcripts_examined == 1
-        rendered = wa.render(result.value)
-        assert "could not be READ" in rendered
-        assert "not evidence" in rendered
-    finally:
-        bad.chmod(0o644)
+    assert isinstance(result, Ok)
+    assert result.value.transcripts_unreadable == 1
+    assert result.value.transcripts_examined == 1
+    rendered = wa.render(result.value)
+    assert "could not be READ" in rendered
+    assert "not evidence" in rendered
 
 
-def test_all_transcripts_unreadable_is_refused_not_an_empty_window(tmp_path: Path) -> None:
+def test_all_transcripts_unreadable_is_refused_not_an_empty_window(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The control arm on the other side: nothing readable means nothing searched."""
     target = _target(tmp_path)
     bad = _transcript(tmp_path, "bad", [_tool(1, "Bash", "hidden")])
-    bad.chmod(0o000)
+    _deny_reads(monkeypatch, bad)
 
-    try:
-        result = wa.attribute(target, [bad], window=60)
+    result = wa.attribute(target, [bad], window=60)
 
-        assert isinstance(result, Err)
-        assert result.rc is Rc.NOT_RUN
-        assert "never actually searched" in result.message
-    finally:
-        bad.chmod(0o644)
+    assert isinstance(result, Err)
+    assert result.rc is Rc.NOT_RUN
+    assert "never actually searched" in result.message
+
+
+def test_the_deny_reads_helper_actually_denies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The control arm ON THE HELPER — otherwise the two tests above are theatre.
+
+    The first version used `chmod(0o000)`, which does not deny reads to root and
+    is a no-op on some filesystems. A permission fixture that silently permits
+    would make both tests pass while the code swallowed nothing. Assert the
+    simulation works before trusting what it simulates.
+    """
+    blocked = _transcript(tmp_path, "blocked", [_tool(1, "Bash", "x")])
+    allowed = _transcript(tmp_path, "allowed", [_tool(1, "Bash", "y")])
+    _deny_reads(monkeypatch, blocked)
+
+    with pytest.raises(PermissionError):
+        blocked.read_text(encoding="utf-8")
+    assert allowed.read_text(encoding="utf-8")  # the other file is untouched
+
+
+def test_the_empty_window_message_does_not_exclude_a_tool_call(tmp_path: Path) -> None:
+    """The NO EVENTS text must not repeat the over-claim it warns about.
+
+    Three separate places carried "the writer was not a tool call": the skill
+    step, the work-memory, and this rendering. Two were corrected and the
+    rendering — the one a reader actually sees — was not, which is the
+    fix-at-one-layer-leaves-the-next shape. (CodeRabbit, PR #406.)
+    """
+    target = _target(tmp_path)
+    transcript = _transcript(tmp_path, "sess", [_tool(-999, "Bash", "elsewhere")])
+
+    result = wa.attribute(target, [transcript], window=60)
+
+    assert isinstance(result, Ok)
+    rendered = wa.render(result.value)
+    assert "NO EVENTS" in rendered
+    assert "does NOT show" in rendered
+    assert "leave a process that writes later" in rendered
+    # The exact over-claim, asserted absent rather than merely hoping.
+    assert "was not a tool call or a hook" not in rendered
