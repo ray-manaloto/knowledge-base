@@ -183,9 +183,10 @@ def test_an_interrupt_is_not_reported_as_a_defect(tmp_path, monkeypatch) -> None
 
     described = build_outcome.describe(tmp_path)
     assert described is not None
-    assert "INTERRUPTED" in described
-    assert "DEFECT" not in described
-    assert "will fail again" not in described
+    assert described.kind == build_outcome.INTERRUPTED
+    assert "INTERRUPTED" in described.text
+    assert "DEFECT" not in described.text
+    assert "will fail again" not in described.text
 
     # CONTROL ARM: a real build failure in the same repo still says DEFECT, so
     # this test discriminates on the stage rather than on the wording softening
@@ -193,4 +194,97 @@ def test_an_interrupt_is_not_reported_as_a_defect(tmp_path, monkeypatch) -> None
     build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
     other = build_outcome.describe(tmp_path)
     assert other is not None
-    assert "DEFECT" in other
+    assert other.kind == build_outcome.FAILED
+    assert "DEFECT" in other.text
+
+
+def test_a_successful_build_supersedes_a_record_it_could_not_delete(tmp_path) -> None:
+    """The MIRROR of this module's first defect, found by the cold lane (round 2, P1).
+
+    `clear()` is best-effort, and once the record outranked the stamp, a
+    `clear()` that failed left a SUCCESSFUL build reporting a DEFECT forever with
+    no path back. Comparing against the stamp's own `built_at` self-heals, which
+    is why the supersession lives in `describe` rather than in `clear`.
+    """
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+    failure = build_outcome.read(tmp_path)
+    assert failure is not None
+
+    # CONTROL ARM: an OLDER stamp must NOT supersede — otherwise this test would
+    # pass for a `describe` that ignored the record whenever any stamp existed,
+    # which is the original P1 in a new coat.
+    assert build_outcome.describe(tmp_path, stamp_built_at="2001-01-01T00:00:00+00:00")
+    assert build_outcome.describe(tmp_path, stamp_built_at="") is not None
+
+    later = "2099-01-01T00:00:00+00:00"
+    assert build_outcome.describe(tmp_path, stamp_built_at=later) is None
+
+
+def test_supersession_refuses_to_act_on_a_timestamp_it_cannot_trust(tmp_path) -> None:
+    """Ambiguity keeps REPORTING the failure — the two errors are not symmetric.
+
+    Wrongly ignoring a live failure reports OK for a broken build, which is #397
+    itself. Wrongly keeping a stale record reports a defect that one successful
+    build clears. So every unreadable form must fall on the reporting side —
+    including a NAIVE datetime, which would otherwise raise on comparison and
+    abort the whole check rather than answer it.
+    """
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+    for untrusted in ("", "not-a-timestamp", "2099-01-01T00:00:00", "2099-01-01"):
+        assert build_outcome.describe(tmp_path, stamp_built_at=untrusted) is not None, untrusted
+
+
+def test_a_failed_clear_says_so(tmp_path, monkeypatch, capsys) -> None:
+    """A surviving record now outranks the stamp, so failing to remove one matters."""
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+
+    def _cannot(*_args: object, **_kwargs: object) -> Never:
+        raise PermissionError("cannot remove")
+
+    monkeypatch.setattr(build_outcome.Path, "unlink", _cannot)
+    build_outcome.clear(tmp_path)
+    assert "could not clear the stale build-failure record" in capsys.readouterr().err
+
+
+def test_a_broken_stderr_never_replaces_the_build_exception(tmp_path, monkeypatch) -> None:
+    """`print` can raise — a BrokenPipeError IS an OSError.
+
+    `record_failure` runs inside an `except` while a build exception is already
+    propagating, so a raise here would REPLACE that exception with an unrelated
+    IO one and hide why the build actually failed. (Cold lane round 2, P2.)
+    """
+
+    def _no_write(*_args: object, **_kwargs: object) -> Never:
+        raise OSError("read-only filesystem")
+
+    def _broken_print(*_args: object, **_kwargs: object) -> Never:
+        raise BrokenPipeError("stderr is gone")
+
+    monkeypatch.setattr(build_outcome.Path, "write_text", _no_write)
+    monkeypatch.setattr("builtins.print", _broken_print)
+
+    # Must not raise. Before the fix this propagated BrokenPipeError.
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+
+
+def test_supersession_needs_about_a_second_because_built_at_truncates(tmp_path) -> None:
+    """The stated CONDITION, pinned so nobody rediscovers it as a bug.
+
+    A stamp's `built_at` is written with `timespec="seconds"`, so it truncates
+    DOWN by up to a second while `failed_at` keeps microseconds. Under a strict
+    `>` that means a stamp from the SAME second does not supersede. Harmless for
+    a build that takes minutes — and it is exactly what a compressed probe shows,
+    which is the probe's artifact and not this function's defect.
+    """
+    build_outcome.record_failure(tmp_path, "build", "SystemExit: refused")
+    failure = build_outcome.read(tmp_path)
+    assert failure is not None
+
+    from datetime import datetime, timedelta
+
+    failed = datetime.fromisoformat(failure.failed_at)
+    same_second = failed.replace(microsecond=0).isoformat(timespec="seconds")
+    next_second = (failed + timedelta(seconds=1)).isoformat(timespec="seconds")
+
+    assert build_outcome.describe(tmp_path, stamp_built_at=same_second) is not None
+    assert build_outcome.describe(tmp_path, stamp_built_at=next_second) is None

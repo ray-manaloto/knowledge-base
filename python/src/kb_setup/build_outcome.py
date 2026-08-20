@@ -58,6 +58,9 @@ _SCHEMA_VERSION = 1
 #: says the build is broken or that re-running it will fail again. (Cold lane, P2.)
 INTERRUPTED = "interrupted"
 
+#: An ordinary build failure — a defect, and it will recur.
+FAILED = "failed"
+
 #: A failure summary is a rendered exception and can be a 900-character detect
 #: dump per source. Bounded so a pathological run cannot leave an unreadable
 #: record; the full text was already printed by the run that failed.
@@ -99,18 +102,35 @@ def record_failure(repo_root: Path, stage: str, summary: str) -> None:
         # later check says "never run", and nothing anywhere says why: the exact
         # ambiguity this module exists to remove, restored by its own error
         # path. stderr, so a piped stdout cannot lose it. (Cold lane, P2.)
-        print(
-            f"[kb-build] WARNING: could not record the build failure at {path}: {exc}",
-            file=sys.stderr,
-        )
+        _warn(f"could not record the build failure at {path}: {exc}")
+        return
+
+
+def _warn(message: str) -> None:
+    """Diagnostics must never become the failure they are describing.
+
+    `print` to stderr can itself raise — a BrokenPipeError is an OSError — and
+    this is called from inside an `except` while a build exception is already
+    propagating. A raise here would REPLACE that exception with an unrelated IO
+    one, hiding the real reason the build failed. (Cold lane round 2, P2.)
+    """
+    try:
+        print(f"[kb-build] WARNING: {message}", file=sys.stderr)
+    except OSError:
         return
 
 
 def clear(repo_root: Path) -> None:
-    """Best-effort removal, called only after a build actually succeeded."""
+    """Remove the record after a build SUCCEEDS. Best-effort, but never silent.
+
+    A surviving record now outranks the stamp, so a failure to remove one is a
+    real consequence and not a shrug — it is why `describe` also accepts the
+    stamp's `built_at` and supersedes the record independently of this.
+    """
     try:
         record_path(repo_root).unlink(missing_ok=True)
-    except OSError:
+    except OSError as exc:
+        _warn(f"could not clear the stale build-failure record: {exc}")
         return
 
 
@@ -144,27 +164,82 @@ def read(repo_root: Path) -> BuildFailure | None:
     )
 
 
-def describe(repo_root: Path) -> str | None:
-    """The reader-facing clause for "there is no stamp", or None if none failed.
+class Outcome(msgspec.Struct, frozen=True):
+    """What a recorded build outcome MEANS, kept apart from how it reads.
 
-    Callers append this to their own header so each keeps its own voice; what
-    they must not do is render the no-stamp state without asking here first.
+    `kind` exists because the two are not the same verdict and a caller must not
+    have to pattern-match on prose to tell them apart: a FAILURE is a defect and
+    belongs in a drift bucket, an INTERRUPT is "nothing was verified" and belongs
+    in a could-not-check one. The first version returned only the text, so both
+    landed in DRIFT/BUILD_FAILED while the text said "not a defect" — the check
+    contradicting itself in the same line. (Cold lane round 2, P2.)
+    """
+
+    kind: str
+    text: str
+
+
+def describe(repo_root: Path, *, stamp_built_at: str = "") -> Outcome | None:
+    """The reader-facing verdict for a recorded outcome, or None if there is none.
+
+    `stamp_built_at` is the successful build's own `built_at` from the stamp,
+    when there is one. A record older than it has been SUPERSEDED: a build
+    succeeded after that failure, so the failure is history.
+
+    That parameter is the fix for the mirror of this module's first defect.
+    `clear()` is best-effort, and once the record was made authoritative over the
+    stamp, a `clear()` that failed left a successful build reporting a DEFECT
+    forever, with no path back — reproduced by making `Path.unlink` raise.
+    Comparing against the stamp SELF-HEALS: the next successful build supersedes
+    the record whether or not the file could be removed.
+
+    The comparison is deliberately STRICT (`>`), so an unparsable or
+    same-second timestamp keeps REPORTING the failure. Note the CONDITION that
+    follows: the stamp's `built_at` is written with `timespec="seconds"` and so
+    truncates DOWN by up to a second, which means supersession needs about a
+    second of real separation. Harmless for a build that takes minutes — and it
+    is what a compressed same-second probe shows as "not superseded", which is
+    the probe's artifact, not this function's defect. The two errors are not
+    symmetric: wrongly ignoring a live failure reports OK for a broken build,
+    which is #397 itself, while wrongly keeping a stale one reports a defect that
+    a single successful build clears.
     """
     failure = read(repo_root)
     if failure is None:
+        return None
+    if _superseded_by(failure, stamp_built_at):
         return None
     when = failure.failed_at or "an unrecorded time"
     detail = f": {failure.summary.splitlines()[0]}" if failure.summary else ""
     if failure.stage == INTERRUPTED:
         # Neither "DEFECT" nor "will fail again" follows from Ctrl-C, and
         # asserting them would make this module lie in the one direction it was
-        # built to stop lying in. Still not "never run": no stamp exists.
-        return (
-            f"a build was INTERRUPTED ({when}) and left no stamp — not a defect; "
-            f"re-run `mise run kb-build`{detail}"
+        # built to stop lying in. Still not "never run": no stamp was written.
+        return Outcome(
+            INTERRUPTED,
+            f"a build was INTERRUPTED ({when}) and left no stamp — not a defect, "
+            f"but nothing here was verified; re-run `mise run kb-build`{detail}",
         )
     stage = f" at {failure.stage}" if failure.stage else ""
-    return (
+    return Outcome(
+        FAILED,
         f"a build RAN AND FAILED{stage} ({when}) — this is a DEFECT, not a pending "
-        f"rebuild; re-running `mise run kb-build` will fail again{detail}"
+        f"rebuild; re-running `mise run kb-build` will fail again{detail}",
     )
+
+
+def _superseded_by(failure: BuildFailure, stamp_built_at: str) -> bool:
+    """True iff a successful build was stamped strictly AFTER this failure."""
+    if not stamp_built_at or not failure.failed_at:
+        return False
+    try:
+        stamped = datetime.fromisoformat(stamp_built_at)
+        failed = datetime.fromisoformat(failure.failed_at)
+    except ValueError:
+        return False
+    # Both are written by this repo and both are tz-aware, but a hand-edited or
+    # older stamp need not be — and `naive - aware` RAISES, which would abort the
+    # whole check rather than answer it. Treat a naive value as unanswerable.
+    if stamped.tzinfo is None or failed.tzinfo is None:
+        return False
+    return stamped > failed

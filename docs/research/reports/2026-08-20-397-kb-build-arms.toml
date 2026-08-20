@@ -77,12 +77,10 @@ new = '''        "Brewfile",
 id = "W1"
 test = "test_a_build_that_ran_and_failed_is_not_reported_as_never_run"
 file = "python/src/kb_setup/currency/sync.py"
-old = '''    failed = build_outcome.describe(repo_root)
-    if failed:
-        return Finding("build-stamp", DRIFT, failed)'''
-new = '''    failed = None
-    if failed:
-        return Finding("build-stamp", DRIFT, failed)'''
+old = """    if outcome is not None:
+        # An INTERRUPT is not drift"""
+new = """    if outcome is not None and False:
+        # An INTERRUPT is not drift"""
 
 # ── W2: the same collapse, in the OTHER reader ─────────────────────────────
 # Fixing one layer and leaving the next is this repo's most-measured fix
@@ -91,12 +89,10 @@ new = '''    failed = None
 id = "W2"
 test = "test_report_separates_a_failed_build_from_a_fresh_clone"
 file = "python/src/kb_setup/currency/staleness.py"
-old = '''    failed = build_outcome.describe(repo_root)
-    if failed:
-        return InputStatus(spec.name, BUILD_FAILED, failed)'''
-new = '''    failed = None
-    if failed:
-        return InputStatus(spec.name, BUILD_FAILED, failed)'''
+old = """    if outcome is not None:
+        # BUILD_FAILED asserts a defect"""
+new = """    if outcome is not None and False:
+        # BUILD_FAILED asserts a defect"""
 
 # ── W3: reading must FAIL CLOSED on a corrupt record ───────────────────────
 # `return None` here is the plausible edit — it reads as defensive — and it
@@ -147,31 +143,23 @@ new = '''    return 0'''
 id = "R1"
 test = "test_a_valid_stamp_does_not_mask_a_failed_rebuild"
 file = "python/src/kb_setup/currency/sync.py"
-old = """    failed = build_outcome.describe(repo_root)
-    if failed:
-        return Finding("build-stamp", DRIFT, failed)
-
-    stamp = read_stamp(repo_root, spec)
-    if not stamp:"""
-new = """    stamp = read_stamp(repo_root, spec)
-    if not stamp:
-        failed = build_outcome.describe(repo_root)
-        if failed:
-            return Finding("build-stamp", DRIFT, failed)"""
+# RE-DERIVED after round 2 restructured this block. The break is the same one:
+# consult the record only when the stamp is ABSENT.
+old = """    outcome = build_outcome.describe(repo_root, stamp_built_at=str(stamp.get("built_at", "")))
+    if outcome is not None:"""
+new = """    outcome = build_outcome.describe(repo_root, stamp_built_at=str(stamp.get("built_at", "")))
+    if outcome is not None and not stamp:"""
 
 # ── R2 (P1): the same ordering, in the OTHER reader ────────────────────────
 [[arm]]
 id = "R2"
 test = "test_a_valid_stamp_does_not_mask_a_failed_rebuild"
 file = "python/src/kb_setup/currency/staleness.py"
-old = """    failed = build_outcome.describe(repo_root)
-    if failed:
-        return InputStatus(spec.name, BUILD_FAILED, failed)
-    missing = _no_build_reason(repo_root, spec, stamp_file)"""
-new = """    missing = _no_build_reason(repo_root, spec, stamp_file)
-    failed = build_outcome.describe(repo_root) if missing else None
-    if failed:
-        return InputStatus(spec.name, BUILD_FAILED, failed)"""
+# RE-DERIVED after round 2. Same break: only ask when there is no build.
+old = """    outcome = build_outcome.describe(repo_root, stamp_built_at=_stamp_built_at(stamp_file))
+    if outcome is not None:"""
+new = """    outcome = build_outcome.describe(repo_root, stamp_built_at=_stamp_built_at(stamp_file))
+    if outcome is not None and stamp_file.exists() is False:"""
 
 # ── R3 (P2): reading must fail CLOSED on an unreadable record ──────────────
 # Collapsing the two excepts back into one bare `except OSError: return None` is
@@ -196,10 +184,7 @@ file = "python/src/kb_setup/build_outcome.py"
 # not name this arm's test. A mutation that breaks the file measures nothing.
 # The realistic break is deleting the whole statement, which is what "swallow it
 # silently" actually looks like as an edit.
-old = """        print(
-            f"[kb-build] WARNING: could not record the build failure at {path}: {exc}",
-            file=sys.stderr,
-        )
+old = """        _warn(f"could not record the build failure at {path}: {exc}")
         return"""
 new = """        return"""
 
@@ -220,3 +205,92 @@ test = "test_an_interrupt_is_not_reported_as_a_defect"
 file = "python/src/kb_setup/build_outcome.py"
 old = """    if failure.stage == INTERRUPTED:"""
 new = """    if False:"""
+
+# ═══ ROUND 3 — arms for the round-2 fixes ══════════════════════════════════
+#
+# Round 2's P1 was the MIRROR of round 1's P1: making the record outrank the
+# stamp meant a `clear()` that failed left a SUCCESSFUL build reporting a defect
+# forever. Two consecutive rounds where the fix was the defect, in the same
+# module, in opposite directions — so these are armed in both directions too.
+
+# ── S1: a newer stamp must SUPERSEDE a stale record ────────────────────────
+# The realistic break is dropping the supersession entirely and trusting
+# `clear()`, which is exactly what shipped in round 1.
+[[arm]]
+id = "S1"
+test = "test_a_successful_build_supersedes_a_record_it_could_not_delete"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    if _superseded_by(failure, stamp_built_at):
+        return None"""
+new = """    if False:
+        return None"""
+
+# ── S2: ...but an OLDER stamp must NOT ─────────────────────────────────────
+# The opposite failure, and the worse one: superseding on the mere EXISTENCE of
+# a stamp restores round 1's P1 verbatim — OK for a broken build.
+[[arm]]
+id = "S2"
+test = "test_a_successful_build_supersedes_a_record_it_could_not_delete"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    return stamped > failed"""
+new = """    return True"""
+
+# ── S3: an untrusted timestamp must fall on the REPORTING side ─────────────
+[[arm]]
+id = "S3"
+test = "test_supersession_refuses_to_act_on_a_timestamp_it_cannot_trust"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    except ValueError:
+        return False"""
+new = """    except ValueError:
+        return True"""
+
+# ── S4: a NAIVE stamp datetime must not abort the whole check ──────────────
+# `naive > aware` raises TypeError, which would propagate out of a currency
+# check rather than answer it.
+[[arm]]
+id = "S4"
+test = "test_supersession_refuses_to_act_on_a_timestamp_it_cannot_trust"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    if stamped.tzinfo is None or failed.tzinfo is None:
+        return False"""
+new = """    if False:
+        return False"""
+
+# ── S5: a failed clear must say so ─────────────────────────────────────────
+[[arm]]
+id = "S5"
+test = "test_a_failed_clear_says_so"
+file = "python/src/kb_setup/build_outcome.py"
+old = """        _warn(f"could not clear the stale build-failure record: {exc}")
+        return"""
+new = """        return"""
+
+# ── S6: the diagnostic must not become the exception ───────────────────────
+[[arm]]
+id = "S6"
+test = "test_a_broken_stderr_never_replaces_the_build_exception"
+file = "python/src/kb_setup/build_outcome.py"
+old = """        print(f"[kb-build] WARNING: {message}", file=sys.stderr)
+    except OSError:
+        return"""
+new = """        print(f"[kb-build] WARNING: {message}", file=sys.stderr)
+    except ValueError:
+        return"""
+
+# ── S7: the truncation CONDITION is pinned, not folklore ───────────────────
+# RE-DERIVED. The first version mutated `>` to `>=` and SURVIVED — and it was an
+# INERT MUTANT, not a coverage gap: `built_at` truncates DOWN to whole seconds
+# while `failed_at` keeps microseconds, so the two are never exactly equal and
+# the operators cannot differ. Checked before re-deriving, per the rule that a
+# survivor is a claim about the harness until the assertion has been examined.
+#
+# The observable break is NORMALISING BOTH SIDES, which is what someone tidying
+# this comparison would actually write: it makes a same-second stamp supersede a
+# failure, which is the direction that reports OK for a broken build.
+[[arm]]
+id = "S7"
+test = "test_supersession_needs_about_a_second_because_built_at_truncates"
+file = "python/src/kb_setup/build_outcome.py"
+old = """    return stamped > failed"""
+new = """    return stamped >= failed.replace(microsecond=0)"""

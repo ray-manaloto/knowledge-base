@@ -180,13 +180,29 @@ def _no_comparison_possible(
     `kb-label` also stamp and neither of them is a build — clearing there would
     let an unrelated merge hide a broken `kb-build`. (Cold lane, P1.)
     """
-    failed = build_outcome.describe(repo_root)
-    if failed:
-        return InputStatus(spec.name, BUILD_FAILED, failed)
+    outcome = build_outcome.describe(repo_root, stamp_built_at=_stamp_built_at(stamp_file))
+    if outcome is not None:
+        # BUILD_FAILED asserts a defect; an INTERRUPT is not one. It is
+        # "nothing was verified", which is what NOT_VERIFIABLE already means
+        # here and is never rendered as a pass.
+        state = NOT_VERIFIABLE if outcome.kind == build_outcome.INTERRUPTED else BUILD_FAILED
+        return InputStatus(spec.name, state, outcome.text)
     missing = _no_build_reason(repo_root, spec, stamp_file)
     if missing is not None:
         return InputStatus(spec.name, NEVER_BUILT, missing)
     return None
+
+
+def _stamp_built_at(stamp_file: Path) -> str:
+    """The successful build's own timestamp, or "" when there is no readable stamp."""
+    try:
+        stamp = json.loads(stamp_file.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        # No readable stamp means nothing can supersede a recorded failure, and
+        # "" is exactly how `describe` spells that. Never guess a timestamp here:
+        # a fabricated one would silence a live failure.
+        return ""
+    return str(stamp.get("built_at", "")) if isinstance(stamp, dict) else ""
 
 
 def _no_build_reason(repo_root: Path, spec: ToolSpec, stamp_file: Path) -> str | None:

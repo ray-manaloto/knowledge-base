@@ -1566,11 +1566,15 @@ def _check_stamp(repo_root: Path, spec: ToolSpec, pinned: str) -> Finding:
     # recorded failure is reported whatever the stamp says, which is the whole
     # point: the record is cleared only by a build that SUCCEEDS.
     # (Cold lane, P1 — the #397 defect reintroduced inside its own fix.)
-    failed = build_outcome.describe(repo_root)
-    if failed:
-        return Finding("build-stamp", DRIFT, failed)
-
     stamp = read_stamp(repo_root, spec)
+    outcome = build_outcome.describe(repo_root, stamp_built_at=str(stamp.get("built_at", "")))
+    if outcome is not None:
+        # An INTERRUPT is not drift — nothing was verified and nothing is known
+        # to be wrong. Reporting it as DRIFT made the check contradict its own
+        # sentence, which said "not a defect". BLIND is never rendered as green.
+        status = BLIND if outcome.kind == build_outcome.INTERRUPTED else DRIFT
+        return Finding("build-stamp", status, outcome.text)
+
     if not stamp:
         return Finding(
             "build-stamp", DRIFT, "no build has run here yet — rebuild pending (never run)"
