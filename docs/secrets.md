@@ -97,71 +97,76 @@ doppler secrets set 'KEY_NAME' --project dotfiles --config dev_personal --silent
 # 5. Confirm with a NAMES-ONLY listing (never `doppler secrets get`).
 doppler secrets --project dotfiles --config dev_personal --only-names | grep KEY_NAME
 
-# 6. Declare it in fnox. The declaration holds the NAME, never the value.
-fnox edit
+# 6. Declare it in fnox. The declaration holds the NAME, never the value:
 #    KEY_NAME = { provider = "doppler_dotfiles_dev_personal", value = "KEY_NAME", env = true }
 #    `value` is the PROVIDER'S KEY, not the secret.
+#    ⚠️ The guide shows `fnox edit` here. PREFER THE GENERATOR — see the next
+#    section: `mde-py secrets bootstrap-config` derives this declaration from
+#    Doppler, and the config says not to edit it by hand.
 
 # 7. Optional offline age cache. `--global` is NOT optional (see the trap).
 fnox sync --global -p age KEY_NAME
 
-# 8. REQUIRED — add "KEY_NAME" to doctor.toml's [fnox] env_true list in the SAME
-#    reviewed diff. This is the only thing that gets committed to dotfiles.
+# 8. The reviewed PROCESS requires this: add "KEY_NAME" to doctor.toml's [fnox]
+#    env_true list in the SAME diff. The only thing committed to dotfiles.
+#    NOT required for the credential to work — see the table below.
 # 9. Run a narrow consumer health check; report only the non-secret result.
 ```
 
 **Never** `doppler secrets set KEY 'value'` (argv + history) or
 `echo 'value' | doppler secrets set KEY` (plaintext through the tool call).
 
-Three traps worth not rediscovering:
+### The sync is AUTOMATIC — do not hand-declare
 
-- **`fnox sync` without `--global`** targets a `fnox.toml` in the *current
-  directory*, not the user-root config the declaration lives in. The dry-run
-  says `to provider age (global):` only with `-g`.
-- **Skipping step 8** makes `mise run doctor`'s `fnox-baseline` report drift in
-  the next session, and someone "fixes" it by deleting the new secret.
-- **Doppler config `dev`** is a per-clone opt-out set by a **top-level**
-  `[env] DOPPLER_CONFIG = "dev"` in `mise.local.toml` — never a `[tasks.up]`
-  block, which replaces the whole task. A credential written to `dev` reaches
-  nothing by default, and **fails silently**.
+**Doppler is the source; the fnox declarations are DERIVED from it.** The
+generator is `mde-py secrets bootstrap-config`
+(`macos-development-environment/src/mde/secrets/manage.py:372`), whose own
+docstring reads *"Reconcile `~/.config/fnox/config.toml` declarations against
+Doppler."* Its `_reconcile_declarations` (`:349`) declares every Doppler key that
+fnox does not yet declare, and prunes declarations Doppler no longer has —
+skipping hand-declared keys such as `DOPPLER_TOKEN`.
 
-The wrapper `mde-secret-add KEY_NAME` does steps 3–7 in one command (a live zsh
-function, not a binary) but **still does not touch `doctor.toml`** — step 8 is
-manual either way. As of 2026-08-21 the wrapper is **broken on this host**: the
-mde venv's `python` is a dangling symlink to a mise python 3.14.4 that is no
-longer installed, and the wrapper's `[[ ! -x "$_bin" ]]` guard does not catch a
-dead *interpreter*, so it surfaces as a raw `bad interpreter`. Fix with
-`cd "$MDE_PROJECT_DIR" && uv sync`, or use the manual path, which depends only
-on `doppler` and `fnox`.
-
-## Diagnosing "the credential is missing"
-
-The failure this repo has already hit twice: **a name written to Doppler but
-never declared in fnox reaches no shell, and fails silently.** That is step 6 of
-the nine skipped, and nothing announces it — `doppler secrets set` succeeded, so
-it looks done.
-
-Two names-only listings settle it in seconds:
+So a credential that is **already in Doppler but missing from every shell** does
+not need a hand-written declaration. It needs the generator to run:
 
 ```sh
-fnox list                                             # what is DECLARED
-doppler secrets --project dotfiles --config dev_personal --only-names   # what is STORED
+cd "$MDE_PROJECT_DIR" && uv sync     # only if mde-py is broken — see below
+mde-py secrets bootstrap-config      # picks up EVERY undeclared Doppler key at once
 ```
 
-A name in the second and not the first is the silent case. A name in the first
-and not the second is normal for exactly one entry — `DOPPLER_TOKEN`, which is
-keychain-backed by design.
+`mde-secret-add KEY` is the same path for a credential that does not exist yet:
+`add_secret` (`manage.py:151`) writes to Doppler, then calls `bootstrap_config()`
+and a full age resync.
 
-**Measured 2026-08-21: five names were in Doppler and not in fnox** —
-`FIRECRAWL_API_KEY`, `GITHUB_PAT_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`,
-`REPOWISE_KNOWLEDGE_BASE_API_KEY` and `REPO_RECOVERY_AGE_IDENTITY_20260813`
-(51 declared vs 58 Doppler names, of which 55 are real; intersection 50). The
-remedy for each is steps 6-8, not a re-write of the value.
+⚠️ **Do not reach for `fnox set --global` or `fnox edit`.** They work, and they
+are the wrong tool: the config's own header says *"Managed by `mde-py secrets
+bootstrap-config`. Do not edit by hand."* A hand declaration is a second writer
+to a generated file, and it drifts from the mechanism that owns it. This section
+originally documented exactly that mistake (Ray, 2026-08-21: *"i dont want to
+invent a new way"*).
 
-**Do not conclude "the key does not exist" from a fnox probe alone.** `fnox get`
-returning nothing is consistent with *never declared* as well as *never created*,
-and those have different fixes. It is also a forbidden verb — the honest probe is
-`fnox list` against the Doppler names-only listing above.
+**Which repo does what, since this is the part that confuses:**
+
+| repo | role |
+|---|---|
+| **Doppler** | the value of record |
+| **macos-development-environment** | **generates** the fnox config — `bootstrap-config`, and the `mde-secret-*` zsh wrappers around it |
+| **dotfiles** | **watches.** It runs no sync at all — every `bootstrap-config` mention in its `mise.toml` and `dotfiles_setup/` is commentary. `doctor.py:586` is "the bootstrap-config tripwire", and `doctor.toml` is the baseline it compares against |
+| **this repo** | consumes the resulting environment variables, and edits none of it (`do-not.md` #11) |
+
+That is why `doctor.toml` is not a prerequisite. It is the **alarm on** the sync,
+not part of it: `_opt_in_findings` (`doctor.py:625`) appends findings to a report
+when the shell-visible set and the reviewed list disagree, in either direction.
+An unlisted secret works fine; you get a drift finding every session. Add the name
+anyway, for the reason the guide gives — the standing risk is that a later session
+"fixes" the reported drift by **deleting the secret**.
+
+⚠️ **The generator is broken on this host (2026-08-21).**
+`$MDE_PROJECT_DIR/.venv/bin/mde-py secrets --help` exits **127, bad interpreter**:
+the venv's `python` is a dangling symlink to a mise python `3.14.4` that is no
+longer installed. The zsh wrapper's `[[ ! -x "$_bin" ]]` guard cannot see a dead
+*interpreter*, so it surfaces as a raw shell error rather than the wrapper's
+friendly message. `cd "$MDE_PROJECT_DIR" && uv sync` restores it.
 
 ## The mise redaction trap — and a correction to our own note
 
