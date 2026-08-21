@@ -52,9 +52,14 @@ frontmatter; treat an unlinked ref as AMBIGUOUS and resolve it upstream.
 - **fnox** declares and resolves; it holds names and provider keys, never
   values. One `default` profile, one config file
   (`~/.config/fnox/config.toml`), three providers: `keychain` (1 secret — the
-  bootstrap `DOPPLER_TOKEN`), `doppler_dotfiles_dev_personal` (50), and `age`
-  (49 offline-cache `sync` blocks — `AGE_PRIVATE_KEY` cannot cache itself, so
-  49 ≠ 50 is correct and must not be "fixed").
+  bootstrap `DOPPLER_TOKEN`), `doppler_dotfiles_dev_personal`, and `age`
+  (offline-cache `sync` blocks). **Measured 2026-08-21: 52 declared, 51 with a
+  sync block, 52 with inline `env = true`.** `AGE_PRIVATE_KEY` is the one without
+  a sync block — it decrypts the age cache, so it cannot live in it, and
+  `sync == declared - 1` is correct and must not be "fixed". Every count here
+  moves whenever a credential is added; re-derive with `tomllib` rather than
+  quoting this line. The vendored dotfiles docs say **50/49**, correctly, for
+  their pinned commit.
 - **The environment** is delivery, never a source of truth. Secrets arrive via
   `fnox activate zsh`'s chpwd/precmd hooks, installed by
   `macos-development-environment/home/dot_zshrc.d/50-mde-secrets.zsh:27-29`.
@@ -92,6 +97,9 @@ Presence is probed **without** revealing anything:
 zsh -c '[[ -v KEY_NAME ]] || exit 20; print "credential is present"'
 ```
 
+⚠️ That form only sees what the CALLING shell already has. For a credential just
+declared, fire the activation hook or open a new terminal — see "Diagnosing" below.
+
 ⚠️ **`${FOO:+SET}${FOO:-ABSENT}` PRINTS THE VALUE when the variable is set.** It
 opens with the recommended construct so it reads as compliant, and on an *unset*
 variable it looks perfect — so an unset-only control arm certifies nothing. A
@@ -120,16 +128,18 @@ doppler secrets --project dotfiles --config dev_personal --only-names | grep KEY
 # 6. Declare it in fnox. The declaration holds the NAME, never the value:
 #    KEY_NAME = { provider = "doppler_dotfiles_dev_personal", value = "KEY_NAME", env = true }
 #    `value` is the PROVIDER'S KEY, not the secret.
-#    ⚠️ The guide shows `fnox edit` here. PREFER THE GENERATOR — see the next
-#    section: `mde-py secrets bootstrap-config` derives this declaration from
-#    Doppler, and the config says not to edit it by hand.
+#    ⚠️ The guide shows `fnox edit`. Prefer `fnox set KEY KEY --provider …`,
+#    which is what the reconciler itself runs — see "Fixing a stranded name".
 
-# 7. Optional offline age cache. `--global` is NOT optional (see the trap).
+# 7. Age sync. `--global` is NOT optional, and neither is this step if you want
+#    the declaration to MATCH the others — see below.
 fnox sync --global -p age KEY_NAME
 
 # 8. The reviewed PROCESS requires this: add "KEY_NAME" to doctor.toml's [fnox]
 #    env_true list in the SAME diff. The only thing committed to dotfiles.
-#    NOT required for the credential to work — see the table below.
+#    Not required for the credential to WORK; required so `mise run doctor`
+#    does not report it as unsanctioned drift, which a later session may
+#    "fix" by deleting it.
 # 9. Run a narrow consumer health check; report only the non-secret result.
 ```
 
@@ -161,6 +171,76 @@ Doppler that reaches no shell**, where reconciling is the whole fix.
 — the file's header says *"Managed by `mde-py secrets bootstrap-config`. Do not
 edit by hand."* An earlier version of this section recommended exactly that, and
 was wrong (Ray, 2026-08-21: *"i dont want to invent a new way"*).
+
+## Diagnosing "the credential is missing"
+
+**A name written to Doppler but never declared in fnox reaches no shell, and
+fails silently** — `doppler secrets set` succeeded, so it looks done. Two
+names-only listings settle it:
+
+```sh
+fnox list                                                              # DECLARED
+doppler secrets --project dotfiles --config dev_personal --only-names  # STORED
+```
+
+A name in the second and not the first is that case. A name in the first and not
+the second is normal for exactly one entry — `DOPPLER_TOKEN`, keychain-backed by
+design.
+
+**Measured 2026-08-21: five names were stranded that way.**
+`REPOWISE_KNOWLEDGE_BASE_API_KEY` was fixed the same day; **four remain** —
+`FIRECRAWL_API_KEY`, `GITHUB_PAT_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`,
+`REPO_RECOVERY_AGE_IDENTITY_20260813`.
+
+### ⚠️ `zsh -ic '<cmd>'` is a BROKEN probe for this
+
+It reported ABSENT three times on a credential that was already correctly
+declared, synced and resolving. `fnox activate` delivers through a **`precmd`
+hook**, and `zsh -c` runs a command without ever showing a prompt, so the hook
+never fires — the probe measures env *inheritance from the calling shell*, not
+activation.
+
+The tell was an inverted control: `fnox hook-env -s zsh` emitted **2** export
+lines, the new key among them, and the known-good control **not at all** — because
+`hook-env` is a **delta emitter** and the control was already inherited. A probe
+whose control looks broken is usually the probe.
+
+The honest forms:
+
+```sh
+# fire the hook, as a prompt would
+zsh -ic 'eval "$(fnox hook-env -s zsh)"; [[ -v KEY_NAME ]] && print present || print ABSENT'
+
+# or just open a new terminal
+```
+
+`fnox exec -- …` resolving while the shell does not is the guide's documented
+"REAL FAULT" signature — but only once the probe itself is sound.
+
+### Fixing a stranded name — the two commands
+
+```sh
+fnox set KEY_NAME KEY_NAME --provider doppler_dotfiles_dev_personal \
+  --config "$HOME/.config/fnox/config.toml"
+fnox sync --global -p age --force KEY_NAME
+```
+
+This is what mde's `add_secret` runs internally (`_fnox_declare`, `manage.py:275`,
+is literally a `fnox set` call), so it is the sanctioned mechanism, not a
+workaround. The key name goes in as the **positional value** — that is what lands
+`value = "<KEY>"` in the declaration.
+
+`fnox set` alone leaves `['provider', 'value']`; **the sync is what adds `env` and
+`sync`**, giving the four-field shape every other declaration has. So step 7 is
+not merely a speed cache, which is what an earlier version of this file called it.
+
+⚠️ **Safe only because the provider is Doppler**, which advertises `RemoteRead`
+only — `fnox set` writes a declaration and never a remote write. **Never this
+shape for a `keychain`-backed secret**: that provider supports storage, so the
+positional value would be written into the keychain for real.
+
+Scope the sync to the one key. mde's bulk form re-encrypts all 51 ciphertexts on
+every call.
 
 ## The takeover — decided 2026-08-04, not built
 
