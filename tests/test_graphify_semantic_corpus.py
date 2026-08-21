@@ -86,6 +86,34 @@ def _source(root: Path) -> tuple[str, str]:
     return _git(root, "rev-parse", "HEAD"), _git(root, "rev-parse", "HEAD^{tree}")
 
 
+def _duplicated_source(root: Path) -> tuple[str, str]:
+    """Sibling of `_source` for content-hash dedupe (#414).
+
+    Three byte-identical copies of the same multi-slice `guide.md` content, at
+    `copies/a/guide.md`, `copies/b/guide.md` and `guide.md` — proving the drop
+    happens at whole-PATH granularity, not per-unit — plus one small, distinct
+    file that must be admitted untouched. `copies/a/guide.md` sorts first in
+    `sorted(kinds)`, so it is the canonical path a correct implementation picks
+    — NOT `guide.md`, which a "shallowest path" rule would wrongly prefer
+    (design §1's rejected alternative).
+    """
+    root.mkdir()
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "corpus@example.invalid")
+    _git(root, "config", "user.name", "Corpus Contract")
+    words = "semantic " * 50_100
+    text = f"# Guide\n\n{words}\n"
+    (root / "guide.md").write_text(text, encoding="utf-8")
+    (root / "copies" / "a").mkdir(parents=True)
+    (root / "copies" / "b").mkdir(parents=True)
+    (root / "copies" / "a" / "guide.md").write_text(text, encoding="utf-8")
+    (root / "copies" / "b" / "guide.md").write_text(text, encoding="utf-8")
+    (root / "distinct.md").write_text("# Distinct\n\nnot a copy of guide.\n", encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "source")
+    return _git(root, "rev-parse", "HEAD"), _git(root, "rev-parse", "HEAD^{tree}")
+
+
 def _canonical(payload: object) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode() + b"\n"
 
@@ -800,12 +828,35 @@ def test_exact_graphify_plan_is_structurally_complete_after_authority_revocation
     # forces. Do not "fix" it by deriving it.
     assert inventory["detected_source_count"] == 374
     assert inventory["discovered_unit_count"] == 479
-    assert inventory["admitted_unit_count"] == 475
+    # Content-hash dedupe (#414) moved this one alone: 475 admitted units before
+    # dedupe existed, 170 after — the SAME 374 detected / 479 discovered corpus,
+    # re-plumbed through the new admission rule. Re-derived from this same
+    # re-plan, not pasted; a graphify bump can move it together with the counts
+    # above and with the dedupe figures below.
+    assert inventory["admitted_unit_count"] == 170
     assert (
         inventory["source_manifest_sha256"]
         == graphify_semantic_corpus._ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256
     )
-    assert len(ledger["chunks"]) == 58
+    assert len(ledger["chunks"]) == 26
+    assert len(inventory["duplicate_groups"]) == 28
+    assert inventory["duplicate_dropped_path_count"] == 257
+    assert inventory["duplicate_dropped_unit_count"] == 305
+    assert inventory["duplicate_dropped_estimated_tokens"] == 571_462
+    assert inventory["admitted_estimated_tokens"] == 466_590
+    # Path-independence: within one suffix class (every canonical here is
+    # `.md`), a dropped group's unit count is exactly its path count times the
+    # canonical's own slice count — the cross-check the verifier deliberately
+    # does NOT assert (pv-lane3 A1; `_source_reasons` already guards the raw
+    # totals by recomputation).
+    units_by_path: dict[str, list[dict[str, object]]] = {}
+    for unit in inventory["units"]:
+        units_by_path.setdefault(unit["path"], []).append(unit)
+    for group in inventory["duplicate_groups"]:
+        canonical_slice_total = cast(
+            "int", units_by_path[group["canonical_path"]][0]["slice_total"]
+        )
+        assert group["dropped_unit_count"] == len(group["dropped_paths"]) * canonical_slice_total
     assert config["max_turns"] == 3
     assert (
         config["semantic_slice_sha256"]
@@ -1705,6 +1756,215 @@ def test_ledger_is_reconciled_to_real_source_inventory(tmp_path: Path) -> None:
     result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
     assert result.state == "failed"
     assert "ledger-member-inventory-mismatch" in result.reasons
+
+
+def _inventory_tamper_recipe(candidate: Path) -> None:
+    """Re-sign an already-tampered `source-inventory.json` (#414).
+
+    The ledger-tamper pattern above (`test_ledger_is_reconciled_to_real_source_
+    inventory`) fixes `config["chunk_ledger_sha256"]`; an INVENTORY tamper must
+    fix the DIFFERENT member digest `_config_reasons` recomputes from — else
+    `_manifest_reasons` returns early with only `member-digest-mismatch:
+    source-inventory.json` and the inventory-level reasons this suite targets
+    never get evaluated (pv-lane3 MISSING #3).
+    """
+    inventory_path = candidate / "source-inventory.json"
+    config_path = candidate / "execution-config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["source_inventory_sha256"] = hashlib.sha256(inventory_path.read_bytes()).hexdigest()
+    config["cache_namespace_sha256"] = graphify_semantic_corpus.cache_namespace_for(config)
+    config_path.write_bytes(_canonical(config))
+    _rehash_plan(candidate)
+
+
+def test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical(
+    unset_authority, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    commit, tree = _duplicated_source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    inventory = msgspec.json.decode(
+        (candidate / "source-inventory.json").read_bytes(),
+        type=graphify_semantic_corpus.SourceInventory,
+        strict=True,
+    )
+
+    canonical_units = [unit for unit in inventory.units if unit.path == "copies/a/guide.md"]
+    assert canonical_units, "the lexicographically-first path must be admitted"
+    canonical_slice_total = canonical_units[0].slice_total
+    canonical_tokens = sum(unit.estimated_tokens for unit in canonical_units)
+
+    # copies/a/guide.md sorts before copies/b/guide.md and guide.md — NOT the
+    # "shallowest path" a root-first rule would wrongly crown (design §1).
+    assert len(inventory.duplicate_groups) == 1
+    group = inventory.duplicate_groups[0]
+    assert group.canonical_path == "copies/a/guide.md"
+    assert group.dropped_paths == ("copies/b/guide.md", "guide.md")
+    assert group.dropped_unit_count == 2 * canonical_slice_total
+    assert group.dropped_estimated_tokens == 2 * canonical_tokens
+    assert group.reason == graphify_semantic_corpus._DUPLICATE_REASON
+
+    # +1 distinct.md, which is never sliced and never touches this group.
+    assert inventory.admitted_unit_count == canonical_slice_total + 1
+    assert inventory.discovered_unit_count == 3 * canonical_slice_total + 1
+    assert inventory.duplicate_dropped_path_count == 2
+    assert inventory.duplicate_dropped_unit_count == 2 * canonical_slice_total
+    assert inventory.duplicate_dropped_estimated_tokens == 2 * canonical_tokens
+    assert inventory.admitted_estimated_tokens == sum(
+        unit.estimated_tokens for unit in inventory.units
+    )
+    # Neither dropped path may appear among the admitted units at all.
+    admitted_paths = {unit.path for unit in inventory.units}
+    assert admitted_paths.isdisjoint(group.dropped_paths)
+
+    ledger = msgspec.json.decode(
+        (candidate / "chunk-ledger.json").read_bytes(),
+        type=graphify_semantic_corpus.ChunkLedger,
+        strict=True,
+    )
+    member_paths = {member.path for chunk in ledger.chunks for member in chunk.members}
+    assert member_paths <= admitted_paths
+
+    # Control: the new invariants hold on a plan nobody has tampered with.
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    assert result.reasons == ("plan-authority-unset",)
+
+
+def test_a_dropped_duplicate_re_admitted_by_hand_is_refused(
+    unset_authority, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    commit, tree = _duplicated_source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    inventory_path = candidate / "source-inventory.json"
+    payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    canonical_units = [unit for unit in payload["units"] if unit["path"] == "copies/a/guide.md"]
+    assert canonical_units, "fixture must admit the canonical path"
+
+    # Re-admit the dropped `guide.md` by hand: clone the canonical's own units
+    # under the dropped path with fresh ordinals, exactly as a hand-edited plan
+    # would smuggle a duplicate back in.
+    next_ordinal = max(unit["ordinal"] for unit in payload["units"]) + 1
+    reintroduced = []
+    for unit in canonical_units:
+        clone = dict(unit)
+        clone["path"] = "guide.md"
+        clone["ordinal"] = next_ordinal
+        next_ordinal += 1
+        reintroduced.append(clone)
+    payload["units"] = [*payload["units"], *reintroduced]
+    payload["admitted_unit_count"] = len(payload["units"])
+    payload["admitted_estimated_tokens"] += sum(unit["estimated_tokens"] for unit in reintroduced)
+    inventory_path.write_bytes(_canonical(payload))
+    _inventory_tamper_recipe(candidate)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    assert result.state == "failed"
+    # `verify_plan` accumulates advisory/cross/source reasons with no early
+    # return (pv-lane3 I6), so every inventory tamper co-occurs with the
+    # recomputation mismatch — assert membership, not equality.
+    assert "inventory-duplicate-path-admitted" in result.reasons
+    assert "inventory-parent-content-duplicate" in result.reasons
+    assert "source-inventory-recomputation-mismatch" in result.reasons
+
+
+def test_a_group_whose_canonical_is_not_admitted_is_refused(
+    unset_authority, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    commit, tree = _duplicated_source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    inventory_path = candidate / "source-inventory.json"
+    payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    payload["duplicate_groups"][0]["canonical_path"] = "missing.md"
+    inventory_path.write_bytes(_canonical(payload))
+    _inventory_tamper_recipe(candidate)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    assert result.state == "failed"
+    assert "inventory-duplicate-canonical-not-admitted" in result.reasons
+    assert "source-inventory-recomputation-mismatch" in result.reasons
+
+
+def test_duplicate_totals_that_disagree_with_the_groups_are_refused(
+    unset_authority, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    commit, tree = _duplicated_source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    inventory_path = candidate / "source-inventory.json"
+    payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    payload["duplicate_dropped_estimated_tokens"] += 1
+    inventory_path.write_bytes(_canonical(payload))
+    _inventory_tamper_recipe(candidate)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    assert result.state == "failed"
+    assert "inventory-duplicate-totals-mismatch" in result.reasons
+    assert "source-inventory-recomputation-mismatch" in result.reasons
+
+
+def test_dedupe_summary_states_the_measurement() -> None:
+    inventory = graphify_semantic_corpus.SourceInventory(
+        source_ref="test-ref",
+        source_commit="c" * 40,
+        source_tree="t" * 40,
+        source_manifest_sha256="m" * 64,
+        detected_source_count=4,
+        discovered_unit_count=5,
+        admitted_unit_count=3,
+        units=(),
+        warnings=(),
+        duplicate_groups=(
+            graphify_semantic_corpus.DuplicateGroup(
+                parent_sha256="a" * 64,
+                source_git_object="b" * 40,
+                parent_size=100,
+                kind="document",
+                canonical_path="copies/a/guide.md",
+                dropped_paths=("copies/b/guide.md", "guide.md"),
+                dropped_unit_count=2,
+                dropped_estimated_tokens=200,
+                reason=graphify_semantic_corpus._DUPLICATE_REASON,
+            ),
+        ),
+        duplicate_dropped_path_count=2,
+        duplicate_dropped_unit_count=2,
+        duplicate_dropped_estimated_tokens=200,
+        admitted_estimated_tokens=300,
+    )
+
+    summary = graphify_semantic_corpus._dedupe_summary(inventory)
+
+    assert summary == (
+        "duplicate-content: 1 groups · 2 paths / 2 units dropped · "
+        "200 of 500 estimated tokens (40.0%) not re-extracted · "
+        "admitted 3 units / 300 tokens"
+    )
 
 
 def test_run_is_a_typed_refusal_before_execution_authority(tmp_path: Path, capsys) -> None:

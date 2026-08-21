@@ -39,6 +39,7 @@ from graphify.llm import (
 
 from kb_setup import (
     atomic,
+    events,
     graphify_baseline,
     graphify_sdk,
     graphify_semantic_adapter,
@@ -323,6 +324,37 @@ class SourceUnit(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     estimated_tokens: int
 
 
+# The record's own stated reason a duplicate group is absent from admission —
+# so a reader of `source-inventory.json` never has to know the planner to see
+# WHY a path is missing. Verifier-checked in `_inventory_reasons`.
+_DUPLICATE_REASON = "duplicate-content-of-canonical-path"
+
+
+class DuplicateGroup(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """One set of byte-identical paths (#414) collapsed to a single admission.
+
+    `canonical_path` is the lexicographically-first path detected for
+    `parent_sha256` (tied to the same `sorted(kinds)` order `_inventory`
+    already iterates in); every other path carrying the identical bytes is
+    named in `dropped_paths`. `kind`/`source_git_object`/`parent_size` are the
+    CANONICAL's values — safe because `_inventory` asserts every path sharing
+    a `parent_sha256` agrees with the canonical on git object, kind, and slice
+    count (the last being the real content-behavior discriminator: two
+    byte-identical files with different suffixes can slice differently — see
+    `_estimate_file_tokens`/`expand_oversized_files`).
+    """
+
+    parent_sha256: str
+    source_git_object: str
+    parent_size: int
+    kind: str
+    canonical_path: str
+    dropped_paths: tuple[str, ...]
+    dropped_unit_count: int
+    dropped_estimated_tokens: int
+    reason: str
+
+
 class SourceInventory(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Complete detected semantic inventory before reviewed dispositions."""
 
@@ -335,7 +367,12 @@ class SourceInventory(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     admitted_unit_count: int
     units: tuple[SourceUnit, ...]
     warnings: tuple[str, ...]
-    schema_version: int = 1
+    duplicate_groups: tuple[DuplicateGroup, ...]
+    duplicate_dropped_path_count: int
+    duplicate_dropped_unit_count: int
+    duplicate_dropped_estimated_tokens: int
+    admitted_estimated_tokens: int
+    schema_version: int = 2
 
 
 class CorpusAdvisory(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -1233,6 +1270,20 @@ def _inventory(
     admitted: list[Path | FileSlice] = []
     units: list[SourceUnit] = []
     members = {member.path: member for member in manifest.members}
+    # Content-hash dedupe (#414): the first path seen for a `parent_sha256`,
+    # in this same `sorted(kinds)` order, is canonical; every later path
+    # carrying the identical bytes is dropped whole rather than sliced and
+    # admitted a second time. `canonical_slice_total` exists because two
+    # byte-identical files can still slice differently if their suffixes put
+    # them in different `is_splittable_text` classes (graphify's
+    # `expand_oversized_files`) — that divergence is the real content-behavior
+    # discriminator, so it is asserted directly off the computed slice count
+    # rather than re-deriving graphify's own suffix rule.
+    canonical_by_parent: dict[str, str] = {}
+    canonical_slice_total: dict[str, int] = {}
+    dropped_paths: dict[str, set[str]] = {}
+    dropped_unit_counts: dict[str, int] = {}
+    dropped_tokens: dict[str, int] = {}
     for unit in expanded:
         parent = unit_path(unit)
         relative = _relative(source_root, parent)
@@ -1250,6 +1301,22 @@ def _inventory(
                         members=members,
                     )
                 )
+            continue
+        canonical = canonical_by_parent.setdefault(member.sha256, relative)
+        if member.git_object != members[canonical].git_object:
+            raise ValueError(f"duplicate-group-git-object-mismatch:{relative}")
+        if kinds[relative] != kinds[canonical]:
+            raise ValueError(f"duplicate-group-kind-mismatch:{relative}")
+        slice_total = unit.total if isinstance(unit, FileSlice) else 1
+        expected_slice_total = canonical_slice_total.setdefault(member.sha256, slice_total)
+        if slice_total != expected_slice_total:
+            raise ValueError(f"duplicate-group-suffix-class-mismatch:{relative}")
+        if relative != canonical:
+            dropped_paths.setdefault(member.sha256, set()).add(relative)
+            dropped_unit_counts[member.sha256] = dropped_unit_counts.get(member.sha256, 0) + 1
+            dropped_tokens[member.sha256] = dropped_tokens.get(
+                member.sha256, 0
+            ) + _estimate_file_tokens(unit)
             continue
         admitted.append(unit)
         raw = _unit_bytes(unit)
@@ -1273,6 +1340,25 @@ def _inventory(
                 estimated_tokens=_estimate_file_tokens(unit),
             )
         )
+    duplicate_groups = tuple(
+        sorted(
+            (
+                DuplicateGroup(
+                    parent_sha256=parent_sha256,
+                    source_git_object=members[canonical_by_parent[parent_sha256]].git_object,
+                    parent_size=members[canonical_by_parent[parent_sha256]].size,
+                    kind=kinds[canonical_by_parent[parent_sha256]],
+                    canonical_path=canonical_by_parent[parent_sha256],
+                    dropped_paths=tuple(sorted(group_dropped_paths)),
+                    dropped_unit_count=dropped_unit_counts[parent_sha256],
+                    dropped_estimated_tokens=dropped_tokens[parent_sha256],
+                    reason=_DUPLICATE_REASON,
+                )
+                for parent_sha256, group_dropped_paths in dropped_paths.items()
+            ),
+            key=lambda group: group.canonical_path,
+        )
+    )
     return (
         SourceInventory(
             source_ref=source_ref,
@@ -1284,6 +1370,17 @@ def _inventory(
             admitted_unit_count=len(units),
             units=tuple(units),
             warnings=warnings,
+            duplicate_groups=duplicate_groups,
+            duplicate_dropped_path_count=sum(
+                len(group.dropped_paths) for group in duplicate_groups
+            ),
+            duplicate_dropped_unit_count=sum(
+                group.dropped_unit_count for group in duplicate_groups
+            ),
+            duplicate_dropped_estimated_tokens=sum(
+                group.dropped_estimated_tokens for group in duplicate_groups
+            ),
+            admitted_estimated_tokens=sum(unit.estimated_tokens for unit in units),
         ),
         AdvisoryCatalog(
             source_commit=source_commit,
@@ -1542,6 +1639,89 @@ def _inventory_reasons(inventory: SourceInventory) -> list[str]:
             or totals != {len(group)}
         ):
             reasons.append(f"inventory-slice-sequence-invalid:{path}")
+    reasons.extend(_duplicate_group_reasons(inventory))
+    return reasons
+
+
+def _duplicate_group_is_well_formed(
+    group: DuplicateGroup, canonical_units: list[SourceUnit]
+) -> bool:
+    """Structural validity of one `DuplicateGroup` record (#414).
+
+    Split out of `_duplicate_group_reasons` purely to keep both functions'
+    branch count low — this is one boolean property, not a separate reason.
+    """
+    return (
+        group.reason == _DUPLICATE_REASON
+        and _valid_sha(group.parent_sha256)
+        and len(group.source_git_object) == _GIT_OBJECT_LENGTH
+        and all(char in "0123456789abcdef" for char in group.source_git_object)
+        and group.parent_size > 0
+        and group.kind in {"document", "paper", "image"}
+        and bool(group.canonical_path)
+        and not group.canonical_path.startswith("/")
+        and ".." not in Path(group.canonical_path).parts
+        and bool(group.dropped_paths)
+        and group.dropped_paths == tuple(sorted(set(group.dropped_paths)))
+        and group.canonical_path not in group.dropped_paths
+        and all(
+            bool(path) and not path.startswith("/") and ".." not in Path(path).parts
+            for path in group.dropped_paths
+        )
+        and group.dropped_unit_count > 0
+        and group.dropped_estimated_tokens > 0
+        and all(unit.parent_sha256 == group.parent_sha256 for unit in canonical_units)
+    )
+
+
+def _duplicate_group_reasons(inventory: SourceInventory) -> list[str]:
+    """Content-hash dedupe (#414) verifier checks.
+
+    First an independent property of `units` alone — two admitted units at
+    different paths must never share a `parent_sha256` — then the
+    `duplicate_groups` records themselves.
+    """
+    reasons: list[str] = []
+    units = inventory.units
+    admitted_paths = {unit.path for unit in units}
+    parent_paths: dict[str, set[str]] = {}
+    for unit in units:
+        parent_paths.setdefault(unit.parent_sha256, set()).add(unit.path)
+    if any(len(paths) > 1 for paths in parent_paths.values()):
+        reasons.append("inventory-parent-content-duplicate")
+    for group in inventory.duplicate_groups:
+        canonical_units = [unit for unit in units if unit.path == group.canonical_path]
+        if not _duplicate_group_is_well_formed(group, canonical_units):
+            reasons.append(f"inventory-duplicate-group-invalid:{group.canonical_path}")
+        if not canonical_units:
+            reasons.append("inventory-duplicate-canonical-not-admitted")
+        if admitted_paths.intersection(group.dropped_paths):
+            reasons.append("inventory-duplicate-path-admitted")
+    canonical_paths = tuple(group.canonical_path for group in inventory.duplicate_groups)
+    parent_shas = tuple(group.parent_sha256 for group in inventory.duplicate_groups)
+    group_paths: list[str] = []
+    for group in inventory.duplicate_groups:
+        group_paths.append(group.canonical_path)
+        group_paths.extend(group.dropped_paths)
+    if (
+        canonical_paths != tuple(sorted(canonical_paths))
+        or len(parent_shas) != len(set(parent_shas))
+        or len(group_paths) != len(set(group_paths))
+    ):
+        reasons.append("inventory-duplicate-group-order-invalid")
+    expected_dropped_paths = sum(len(group.dropped_paths) for group in inventory.duplicate_groups)
+    expected_dropped_units = sum(group.dropped_unit_count for group in inventory.duplicate_groups)
+    expected_dropped_tokens = sum(
+        group.dropped_estimated_tokens for group in inventory.duplicate_groups
+    )
+    expected_admitted_tokens = sum(unit.estimated_tokens for unit in units)
+    if (
+        inventory.duplicate_dropped_path_count != expected_dropped_paths
+        or inventory.duplicate_dropped_unit_count != expected_dropped_units
+        or inventory.duplicate_dropped_estimated_tokens != expected_dropped_tokens
+        or inventory.admitted_estimated_tokens != expected_admitted_tokens
+    ):
+        reasons.append("inventory-duplicate-totals-mismatch")
     return reasons
 
 
@@ -1613,9 +1793,17 @@ def _exclusion_reasons(inventory: SourceInventory, exclusions: ExclusionCatalog)
     admitted_paths = {unit.path for unit in inventory.units}
     if admitted_paths.intersection(paths):
         reasons.append("exclusion-admission-overlap")
-    if inventory.detected_source_count != len(admitted_paths) + len(paths):
+    # Content-hash dedupe (#414) removes whole paths before admission, so a
+    # dropped duplicate path is neither an admitted path nor an intentional
+    # exclusion — both invariants below must account for it, or the real
+    # corpus's own plan fails these on arrival every time it dedupes anything.
+    if inventory.detected_source_count != (
+        len(admitted_paths) + len(paths) + inventory.duplicate_dropped_path_count
+    ):
         reasons.append("detected-source-count-mismatch")
-    if inventory.discovered_unit_count != inventory.admitted_unit_count + len(paths):
+    if inventory.discovered_unit_count != (
+        inventory.admitted_unit_count + len(paths) + inventory.duplicate_dropped_unit_count
+    ):
         reasons.append("discovered-unit-count-mismatch")
     return reasons
 
@@ -3259,6 +3447,28 @@ def _execute_authorized(repo_root: Path, output: Path) -> int:
     return completeness_rc(summary)
 
 
+def _dedupe_summary(inventory: SourceInventory) -> str:
+    """Human line for the plan's content-hash dedupe (#414) — never stored.
+
+    Every number here is read straight off the inventory's own fields; the
+    percentage is the only DERIVED value (dropped / (admitted + dropped)),
+    computed here at print time so no float ever enters a digested plan
+    member.
+    """
+    dropped_tokens = inventory.duplicate_dropped_estimated_tokens
+    total_tokens = inventory.admitted_estimated_tokens + dropped_tokens
+    ratio = (dropped_tokens / total_tokens) if total_tokens else 0.0
+    return (
+        f"duplicate-content: {len(inventory.duplicate_groups)} groups · "
+        f"{inventory.duplicate_dropped_path_count} paths / "
+        f"{inventory.duplicate_dropped_unit_count} units dropped · "
+        f"{dropped_tokens:,} of {total_tokens:,} estimated tokens "
+        f"({ratio:.1%}) not re-extracted · "
+        f"admitted {inventory.admitted_unit_count} units / "
+        f"{inventory.admitted_estimated_tokens:,} tokens"
+    )
+
+
 def corpus_main(repo_root: Path, args: list[str]) -> int:
     """CLI boundary for provider-free planning and read-only verification."""
     if not args or args[0] not in {"plan", "run", "verify"} or len(args) > _MAX_ARGS:
@@ -3295,5 +3505,19 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             max_output_tokens=planned_max_output_tokens(repo_root, os.environ),
             repo_root=repo_root,
         )
+    # Outside the `with`: the temp source root is gone by now, so the summary
+    # depends only on the written plan, never on the source tree — it reads
+    # back the SAME `source-inventory.json` `plan_source` just wrote.
+    inventory, _advisories, _exclusions, _ledger, _config = _typed_members(output)
+    events.say(
+        "corpus_plan.dedupe",
+        _dedupe_summary(inventory),
+        groups=len(inventory.duplicate_groups),
+        dropped_paths=inventory.duplicate_dropped_path_count,
+        dropped_units=inventory.duplicate_dropped_unit_count,
+        dropped_tokens=inventory.duplicate_dropped_estimated_tokens,
+        total_tokens=inventory.admitted_estimated_tokens
+        + inventory.duplicate_dropped_estimated_tokens,
+    )
     print(_encode(manifest).decode().rstrip())
     return 0
