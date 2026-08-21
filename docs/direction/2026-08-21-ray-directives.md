@@ -122,3 +122,47 @@ at 0.9.48 (G2); #426 = derive the runtime and refuse at verify AND execute; the
 cap follows the ONE-FULL-RESTART rule (first ≈$140 at 58 chunks, re-derived to
 $63 at the measured 26 post-dedupe chunks); #414 dedupe IN the bundle; NO new
 lint suppression — refactor instead.
+
+## Second addendum, same day (session `kb-20260821.03`, at `/clear-prep` step 0) — VERBATIM
+
+Asked "what should I record before /clear?" (AskUserQuestion). Ray:
+
+> 1. the /clear-prep skill should be refactored to call the session-review workflow
+>    - so every step it does should become a step/lane in the session-review workflow
+>    - steps that i think are still missing:
+>      - finding the cause of what is writing to .codex/config.toml and adding claude telemetry lines
+>      - finding manaul commands being run that are not wrapped in modular skill(s) -> mise task(s) -> python library module(s)/function(s)
+>      - finding cases where a skill isn't being triggered and manual commands are being done and/or not following a predefined skill's steps
+>        - all skills should be creeated via /skill-creator and use /mattpocock-skills:writing-for-agents
+>      - identify issues/repeated mistakes that need to be escalated as critical and need to be fixed immediately either in the current session if there is enough headroom in the current context or most likely as the immediate next tasks in the next session after running /clear
+>      - identify code that should have been generated using datamodel-code-generator or some other code generation tool
+>        - especially cases where an enum should have been used instead of a string literal
+>    - it should also be able to be triggered by an agent so that it runs when context hits over 20%
+>      - so toggle this flag: 'disable-model-invocation: true' in .claude/skills/clear-prep/SKILL.md
+>    - there are a lot more requests that i've made that are still either being lost and/or have not been run through the aggregation/triage step of the session-review workflow
+>    - use graphify as ai agent memory with regards to the results the session-review workflow
+>      - should we do a deep extraction and reflection and generate artifacts from its final output or on its intermediate steps
+>    - but self-reflection/self-correction/self-healing/self-optimizing the /clear-prep skill needs to be automated
+> 2. all the workflows in this project should have graphify ingested/deep extracted/reflected/generated artifacts
+>    - workflows:
+>      - .claude/workflows/kb-extract.js
+>      - .claude/workflows/kb-tool-review.js
+>      - .claude/workflows/session-review.js
+>    - should be using this for analysis:
+>      - AST tree sitter from graphify
+>      - LSP
+>   - generate visual document(s) explaining the workflow
+>     - show components and their relationships/dependencies
+>     - show architecture/workflow/sequence diagrams
+>       - use appropriate diagramming tool(s) like mermaid/tldr/excalidraw/etc
+>     - must update/say in synce when the code changes
+>       - research and find tools that can automate this step
+>         - provide cited resources on what the tools are with pros/cons and which one should be chosen
+>   - same synced visual documents should be done for this project's python code also
+
+**Decisions recorded at the same step (AskUserQuestion):** after round 3 lands, the
+session STOPS and asks go/no-go before the first provider call; the /clear-prep
+DENY guard + #428/#429/#430 ship as a SMALL PR BEFORE round 3. The
+`disable-model-invocation` flag on clear-prep was flipped in this session per the
+directive above (the banner in the skill updated); the rest is filed as two epics
+(see the handoff) for the session-review aggregation/triage step.
