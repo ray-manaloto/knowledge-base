@@ -380,6 +380,21 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 #      rediscovering: `mise env --json-extended` reports `source=None` for all
 #      three while naming the file for ordinary `[env]` vars, so do not expect it
 #      to attribute a plugin-provided directive.
+#
+#      ⚠️ CORRECTION, 2026-08-21: item 1's ATTRIBUTION is stale. `_.fnox-env` is
+#      COMMENTED OUT in `~/.config/mise/config.toml` (now line 90), and the
+#      plugin, while still registered under `[plugins]`, is deliberately
+#      disabled — enabling it spawned runaway `fnox config-files` subprocesses
+#      (10+ concurrent at 100% CPU, login shells hanging;
+#      macos-development-environment#75). Secrets reach the shell through
+#      `fnox activate zsh`'s chpwd/precmd hooks instead, so by the time mise runs
+#      they are ORDINARY INHERITED ENV VARS, not a mise env directive. The arm
+#      described above was sound when it ran; the config changed under it. The
+#      redaction EFFECT below is unaffected and still bites — only the cause
+#      named here is wrong. Item 3 is stale too: `env = "exec"` was reversed to
+#      `env = true` (dotfiles' own rule file dates that 2026-08-02), so all ~50
+#      credentials are in the shell again. Full chain and the agent contract:
+#      `docs/secrets.md`.
 #   2. Before 2026-07-27, fnox defaulted to `env = true` and exposed all 49
 #      declared secrets, several with short values (one-character telemetry
 #      flags). The literal string `1` was therefore IN the redaction set.

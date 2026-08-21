@@ -86,7 +86,8 @@
     "claude-md-management@claude-plugins-official": true,
     "mise@brentmitchell25": true,
     "plugin-eval@claude-code-workflows": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "mcp2cli@claude-community": true
   },
   "extraKnownMarketplaces": {
     "fable-orchestrator": {

@@ -61,3 +61,19 @@ later project-local adapter slice, so `/skillopt-sleep` is intentionally unavail
 - **Lanes**: `codex` (GPT-5.6 Sol) for correctness-critical work; `antigravity` (Gemini 3.x) for
   broad/mechanical or a second-opinion; cross-family review keeps the reviewer a different family
   than the implementer; terminal fallback is always a Claude Opus subagent (never silent).
+
+# Secrets
+
+Credentials are **owned by the sibling `ray-manaloto/dotfiles` repo**, not here.
+**See `docs/secrets.md`** — the chain (Keychain → `DOPPLER_TOKEN` → Doppler →
+fnox → env), the nine-step add procedure, and the agent contract.
+
+Two lines of it bind every session here, which is why they are repeated rather
+than only linked. **`fnox get`, `fnox export`, `fnox list --values`,
+`doppler secrets get`, and `security … -w` are FORBIDDEN** — probe presence with
+`[[ -v KEY_NAME ]]`, never `${FOO:+SET}${FOO:-ABSENT}`, which *prints the value*
+when set and looks perfect on an unset control arm. And **any figure `mise run`
+prints may be mangled** by redaction (a no-word-boundary literal replace), so
+re-read SHAs, branches and PR numbers from `uv run kb-setup …` or plain `git`.
+
+This repo has no hook guard for the first line — dotfiles does. That gap is #441.
