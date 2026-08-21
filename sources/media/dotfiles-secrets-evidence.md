@@ -10,6 +10,17 @@ captured_at: 2026-08-21
 provenance: primary
 fetch_note: >-
   The measurement annex: probe tables, the config-wipe timeline, and the pre-reversal exec-era sections verbatim. Vendored at the same commit as the guide and the rule.
+issue_refs: >-
+  ⚠️ Bare `#N` references in this file belong to ANOTHER repository's tracker —
+  `ray-manaloto/dotfiles` or `ray-manaloto/macos-development-environment` — and
+  must never be read as an issue in `ray-manaloto/knowledge-base`. The collision
+  is live: this corpus's own #418, #432 and #441 exist and are unrelated (KB #441
+  is the secret-command hook guard; dotfiles #441 is an agent profile). Which
+  tracker a given ref belongs to is NOT derivable here: only a minority are
+  markdown-linked to a URL, and the unlinked default is inconsistent — this
+  file's `macos-development-environment#82` is qualified inline while `#83`,
+  also an mde issue, is bare. Treat an unlinked `#N` as AMBIGUOUS and resolve it
+  against the source repo before acting on it.
 ---
 
 # Evidence — `secrets-out-of-the-shell-env`

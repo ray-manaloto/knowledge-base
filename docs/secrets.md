@@ -18,6 +18,14 @@ Vendored into the corpus at dotfiles commit `6c9c5273df89` so `kb-query` can
 answer from them (`sources/media/dotfiles-secrets-*.md`). Read the live copies
 when it matters — the vendored ones are a snapshot:
 
+⚠️ **A bare `#N` in any of them is another repo's issue** — `dotfiles` or
+`macos-development-environment` — never one of ours, and this corpus's
+own #418, #432 and #441 all exist and are unrelated. It is not derivable which:
+only a minority are markdown-linked, and the unlinked default is inconsistent
+(`macos-development-environment#82` is qualified inline while `#83`, also an
+mde issue, is bare). Each vendored file carries this caveat in its `issue_refs`
+frontmatter; treat an unlinked ref as AMBIGUOUS and resolve it upstream.
+
 | in dotfiles | lines | what it is |
 |---|---:|---|
 | `docs/secrets-doppler-fnox-keychain.md` | 593 | the canonical guide: four-layer model, agent contract, add/rotate recipes, diagnosis ladder, incident log |
