@@ -457,13 +457,14 @@ raw_args = true
 [tasks.kb-reclaim]
 description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --apply to reclaim"
 # REPORT-ONLY by default and there is no config key that changes that: reclaiming
-# needs `-- --apply` on every run. A deleter whose destructive mode can be armed
-# from a config file is a destructive action at a distance, which is precisely
-# what `reclaim.toml` must not become.
-# The guard is the explicit per-run `--apply` in argv (`reclaim.main`), NOT mise's
-# `--` separator: probed 2026-08-21 on a scratch task, the old `{{arg(...)}}`
-# template forwarded `--apply` WITHOUT `--` exactly as `raw_args = true` does, so
-# the two spellings were always the same deliberate act (cold review of 90be7169).
+# needs an explicit `--apply` on every run (`mise run kb-reclaim -- --apply`). A
+# deleter whose destructive mode can be armed from a config file is a destructive
+# action at a distance, which is precisely what `reclaim.toml` must not become.
+# The guard is that per-run flag in argv (`reclaim.main`), NOT mise's `--`
+# separator: probed 2026-08-21 on a scratch task — and reproduced independently by
+# the round-2 cold lane — the old `{{arg(...)}}` template forwarded `--apply`
+# WITHOUT `--` exactly as `raw_args = true` does, so the two spellings were always
+# the same deliberate act (cold review of 90be7169 / 4343a38a).
 #
 # Policy lives in `reclaim.toml` — every category can be disabled, re-scoped or
 # re-thresholded there, and `--only`/`--skip` narrow a single run. Docker cleanup
