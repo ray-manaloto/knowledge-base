@@ -1063,8 +1063,13 @@ def execute(
     # Scrubbed before ANYTHING else — before the plan even loads — so a forbidden
     # routing name ambient in this process can never reach the preflight below or
     # any `claude` child this run spawns (#334). See
-    # `graphify_semantic_slice.scrub_route_overrides`.
-    graphify_semantic_slice.scrub_route_overrides()
+    # `graphify_semantic_slice.scrub_route_overrides`. Reported through
+    # `report_routing_scrub`, the same as the slice's own call sites (cold
+    # review P1-1): the removed names are emitted, never their values, so a
+    # scrubbed run is distinguishable from a clean one after the fact.
+    graphify_semantic_slice.report_routing_scrub(
+        "execute", graphify_semantic_slice.scrub_route_overrides()
+    )
     inventory, ledger, config = _load_plan(candidate)
     run_namespace = _run_namespace(candidate, config.cache_namespace_sha256)
     preflight_receipt = graphify_semantic_slice.preflight(

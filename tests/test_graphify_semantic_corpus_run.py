@@ -721,22 +721,34 @@ def _execute(tmp_path: Path) -> graphify_semantic_corpus_run.RunSummary:
 
 
 def test_execute_scrubs_routing_overrides_before_preflight(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """`execute()` must scrub forbidden routing names before it ever preflights.
 
-    Planted in the REAL process env via `monkeypatch.setenv` (auto-restored at
-    teardown, never mutated by hand) so this is about what `execute()` actually
-    did to `os.environ`, not about a mapping the test controls. The check lives
-    INSIDE the stubbed `preflight`, so a scrub call placed anywhere AFTER it —
-    including one hiding behind `_load_plan` or `_run_namespace` — would be
-    caught here, not only one placed before it (#334).
+    Planted in the REAL `os.environ` first (so `monkeypatch` tracks and
+    restores it normally), THEN isolated behind a `dict` copy (cold review
+    P2-3) before the call — `execute()`'s scrub targets `os.environ` with no
+    argument, and the un-isolated form permanently deleted whatever else was
+    ambient (`AWS_DEFAULT_REGION`, `AWS_SECRET_ACCESS_KEY` on this host) for
+    the rest of the pytest session. `real_environ` is the reference saved
+    before the swap; the final assertion reads the planted value back off it,
+    proving the scrub only ever touched the copy. The check lives INSIDE the
+    stubbed `preflight`, so a scrub call placed anywhere AFTER it — including
+    one hiding behind `_load_plan` or `_run_namespace` — would be caught here,
+    not only one placed before it (#334).
+
+    Also proves cold review P1-1: the removed name must be EMITTED, via
+    `capsys.readouterr().err` (never `caplog` — `events._ensure_sink` sets
+    `logger.propagate = False`, so records never reach the root logger
+    `caplog` attaches to).
 
     No `@_needs_driver`: this never reaches `_extract_corpus` or needs the
     provider binaries — it stops at the stubbed preflight, before any evidence
     directory or `_RunContext` is built.
     """
+    real_environ = os.environ
     monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setattr(os, "environ", dict(os.environ))
     assert graphify_semantic_slice.route_override_names(os.environ) != ()
 
     def stop_at_preflight(
@@ -749,6 +761,11 @@ def test_execute_scrubs_routing_overrides_before_preflight(
 
     with pytest.raises(RuntimeError, match="preflight tripwire"):
         _execute(tmp_path)
+
+    assert real_environ["AWS_REGION"] == "us-east-1"
+    captured = capsys.readouterr()
+    assert "AWS_REGION" in captured.err
+    assert captured.out == ""
 
 
 @_needs_driver

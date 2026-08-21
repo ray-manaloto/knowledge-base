@@ -19,7 +19,7 @@ from pathlib import Path
 
 import msgspec
 
-from kb_setup import graphify_baseline
+from kb_setup import events, graphify_baseline
 from kb_setup.graphify_baseline import RuntimeIdentity
 
 _CLAUDE_MODEL = "claude-haiku-4-5-20251001"
@@ -145,6 +145,36 @@ _ROUTE_OVERRIDE_NAMES = frozenset(
         "AZURE_OPENAI_ENDPOINT",
         "AZURE_API_KEY",
         "ANTHROPIC_CUSTOM_HEADERS",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+    }
+)
+
+# EXCLUDED from `scrub_route_overrides` (cold review P2-4) — `preflight`'s
+# refusal still fires on all four, unchanged, because they stay IN
+# `_ROUTE_OVERRIDE_NAMES` above; only the scrub leaves them alone. Egress
+# configuration is not a routing credential, and scrubbing it from THIS
+# process is not the same decision as scrubbing it from the `claude` CHILD.
+# `claude_child_environment` (below) builds a closed allowlist that never
+# copies a proxy name regardless of what this process's own `os.environ`
+# carries, so the child was always proxy-free downstream of `preflight` — that
+# is the true scope of "the child environment already did this", and it does
+# not extend to the parent. The parent-scope consumers a scrub WOULD touch are
+# `git` (`_admit_source` -> `graph.materialize_source_snapshot`) and the
+# in-process graphify SDK, whose httpx client defaults to `trust_env=True`. On
+# a host actually behind a proxy, deleting these four turns `preflight`'s loud
+# refusal into a silent direct connection or an opaque clone failure — worse
+# than the refusal it would have replaced. Verified before excluding: no proxy
+# name appears anywhere in graphify's installed source (`grep -rq
+# 'HTTP_PROXY\|HTTPS_PROXY\|ALL_PROXY\|NO_PROXY'
+# .venv/lib/python3.14/site-packages/graphify/` -> absent; control
+# `GEMINI_API_KEY` -> present), so excluding them from the scrub cannot open a
+# non-Claude routing path — the invariant `do-not.md` #4 exists to protect is
+# unaffected.
+_ROUTE_OVERRIDE_PROXY_NAMES = frozenset(
+    {
         "HTTP_PROXY",
         "HTTPS_PROXY",
         "ALL_PROXY",
@@ -326,19 +356,25 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
     sdist_sha256="14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e",
 )
 # The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above now
-# reads 0.9.45 because the COMMITTED receipt was re-produced at 0.9.45 in the
-# same change: it is the authority for that receipt, which is evidence about a
-# run that happened, and it moved because the evidence moved, never because the
-# pin did.
+# reads 0.9.48, re-attested 2026-08-21 in `a67cbac4` (cold review P2-1 — this
+# paragraph said "reads 0.9.45" long after that stopped being true). It read
+# 0.9.45 when this paragraph was first written, at the 0.9.44 -> 0.9.45 bump
+# described below: it is the authority for whichever receipt is committed, and
+# it moves only because the evidence moves, never because the pin does.
 #
 # `sdk_fingerprint_sha256` is UNCHANGED across 0.9.44 -> 0.9.45, and that is a
 # measurement rather than a copy-forward, re-derived against the INSTALLED 0.9.45:
-# `public_api_fingerprint()` hashes to b10406f9… and `semantic_api_fingerprint()`
-# to 43122fca…, both byte-identical to the 0.9.44 records. The one signature the
-# semantic path depends on — `llm.extract_corpus_parallel` — did not change, which
-# is what `assert_semantic_sdk`'s "review the release before inference" gate is
-# actually asking about. Cross-checked against the release diff: `graphify/llm.py`
-# does not appear in `compare/v0.9.43...v0.9.45` at all, against a 30-file control.
+# `public_api_fingerprint()` hashed to b10406f9… and `semantic_api_fingerprint()`
+# to 43122fca… AT THAT BUMP, both byte-identical to the 0.9.44 records — see the
+# ⚠️ block below for where and why `semantic_api_fingerprint()` later moved to
+# 6047cf0e… at 0.9.48 (cold review P2-1 again: citing 43122fca… with nothing
+# beside it reads as current, and by 0.9.48 it no longer is);
+# `public_api_fingerprint()` is still b10406f9… today. The one signature the
+# semantic path depends on — `llm.extract_corpus_parallel` — did not change AT
+# THIS BUMP, which is what `assert_semantic_sdk`'s "review the release before
+# inference" gate is actually asking about. Cross-checked against the release
+# diff: `graphify/llm.py` does not appear in `compare/v0.9.43...v0.9.45` at all,
+# against a 30-file control.
 #
 # The wheel/sdist digests DID move, because the distribution is a new build; they
 # are read from `uv.lock`, which is the same source `graphify_baseline` derives
@@ -384,8 +420,11 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # non-authority path rejects every run under the installed version" — and it was
 # written because it had already happened once at 0.9.46. It then happened again
 # one bump later, in the file that says so. A warning is not a mechanism; that is
-# why this advance ships `test_non_authority_graphify_pairs_*` instead of a
-# third restatement of the same paragraph.
+# why this advance ships
+# `test_non_authority_path_accepts_the_current_graphify_runtime`
+# (tests/test_graphify_semantic_slice.py) instead of a third restatement of the
+# same paragraph. (Cold review nit 4: this comment used to cite
+# `test_non_authority_graphify_pairs_*`, a name that test never had.)
 #
 # NOTHING CAUGHT IT: the suite was rc=0 the whole time, because no test exercised
 # the non-authority path. CodeRabbit did, on PR #422, after a cold cross-family
@@ -794,22 +833,36 @@ def route_override_names(environment: Mapping[str, str]) -> tuple[str, ...]:
 def scrub_route_overrides(
     environment: MutableMapping[str, str] | None = None,
 ) -> tuple[str, ...]:
-    """Delete every forbidden routing name so the refusal never has to fire (#334).
+    """Delete every forbidden ROUTING name so the refusal never has to fire (#334).
 
-    `preflight`'s routing check is untouched and still raises on any name this
-    misses — that refusal is the backstop, not the mechanism. This is the
-    mechanism: every CLI entry that reaches `preflight` calls this FIRST, so the
-    ambient `AWS_*`/`ANTHROPIC_*` names an ordinary login shell carries cannot
-    reach it in the first place, rather than relying on an operator to remember
-    `env -u` at every launch.
+    `preflight`'s routing check is untouched and still raises on any of the
+    full 37-name `_ROUTE_OVERRIDE_NAMES` set this misses — that refusal is the
+    backstop, not the mechanism. This is the mechanism: every CLI entry that
+    reaches `preflight` calls this FIRST, so the ambient `AWS_*`/`ANTHROPIC_*`
+    names an ordinary login shell carries cannot reach it in the first place,
+    rather than relying on an operator to remember `env -u` at every launch.
+    Every call site passes the return value to `report_routing_scrub` (never
+    the values themselves) so a run that had to remove something and a run
+    that never had anything to remove are no longer byte-indistinguishable
+    after the fact — this function stays silent itself; it only deletes and
+    returns what it deleted, to its own caller.
 
-    Deletes, never reads — reuses `route_override_names` for the name set and
-    only ever calls `del`, so this cannot leak a value it never inspected. The
-    37-name set includes the four proxy variables (`HTTP_PROXY`/`HTTPS_PROXY`/
-    `ALL_PROXY`/`NO_PROXY`); scrubbing those too is a decision, not an
-    oversight — on a proxied host it turns a loud refusal into a run with the
-    proxy stripped, which is what the child environment allowlist
-    (`claude_child_environment`) already did downstream of preflight.
+    Deletes, never reads — reuses `route_override_names` for the candidate set
+    and only ever calls `del`, so this cannot leak a value it never inspected.
+
+    EXCLUDES the four proxy variables (`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/
+    `NO_PROXY`) from the 37-name set, scrubbing only the remaining 33
+    (cold review P2-4; see `_ROUTE_OVERRIDE_PROXY_NAMES`'s own comment for the
+    full reasoning). `preflight` keeps refusing all 37, proxies included —
+    only the SCRUB leaves them alone. A prior version of this docstring
+    justified scrubbing the proxies too by pointing at
+    `claude_child_environment`'s allowlist: true of the `claude` CHILD, which
+    never copies a proxy name regardless of what this function does, but
+    irrelevant to what this function actually mutates — `os.environ` for THIS
+    process, which is also what `git` (`_admit_source`) and the in-process
+    graphify SDK's httpx client (`trust_env=True`) read. Scrubbing the
+    parent's proxy configuration changed THEIR egress, not the child's, which
+    is why it no longer happens.
 
     Defaults to the REAL process environment, deliberately: a `claude` child
     inherits `os.environ`, not a filtered mapping handed only to `preflight`, so
@@ -818,10 +871,35 @@ def scrub_route_overrides(
     left to remove and returns `()`.
     """
     target = os.environ if environment is None else environment
-    removed = route_override_names(target)
+    removed = tuple(
+        name for name in route_override_names(target) if name not in _ROUTE_OVERRIDE_PROXY_NAMES
+    )
     for name in removed:
         del target[name]
     return removed
+
+
+def report_routing_scrub(site: str, removed: tuple[str, ...]) -> None:
+    """Emit a WARNING naming the routing names `site`'s scrub removed (never their values).
+
+    Every `scrub_route_overrides()` call site (`build_candidate`, `semantic_main`
+    here, and `graphify_semantic_corpus_run.execute`) passes its return value
+    straight here. Before this existed, all three discarded it as a bare
+    statement, so a host that had a forbidden name scrubbed produced a receipt
+    byte-indistinguishable from a host that never had one — the refusal
+    `preflight` still carries could not fire from any production caller,
+    because the scrub always ran first (cold review P1-1). A no-op call
+    (`removed == ()`) emits nothing, matching a clean host's silence — this is
+    the one place that decision lives, so every call site's own complexity
+    stays a single line.
+    """
+    if not removed:
+        return
+    events.warn(
+        "semantic.routing_scrub",
+        f"{site}: scrubbed forbidden routing environment names: " + ", ".join(removed),
+        names=removed,
+    )
 
 
 def classify_auth(raw: bytes) -> AuthIdentity:
@@ -1919,8 +1997,11 @@ def build_candidate(repo_root: Path, output: Path) -> CandidateManifest:
 
     # Scrubbed here too, even though `semantic_main` already scrubs before
     # dispatching to this function: `build_candidate` is public and may be
-    # called directly, bypassing that entry point (#334).
-    scrub_route_overrides()
+    # called directly, bypassing that entry point (#334). `report_routing_scrub`
+    # is what makes a run that had to remove something distinguishable, after
+    # the fact, from one that never had anything to remove — the two used to
+    # be byte-indistinguishable (cold review P1-1).
+    report_routing_scrub("build_candidate", scrub_route_overrides())
     if output.exists():
         raise ValueError(f"semantic output already exists: {output}")
     # `require_max_turns` follows the boundary marker: the adapter adds
@@ -2054,8 +2135,11 @@ def semantic_main(repo_root: Path, args: list[str]) -> int:
     # Scrub before ANY dispatch, including a usage error: `preflight` (called
     # directly below) and `build_candidate` (which preflights internally) must
     # never see a forbidden routing name that this process could have removed
-    # itself (#334) — see `scrub_route_overrides`.
-    scrub_route_overrides()
+    # itself (#334) — see `scrub_route_overrides`. Reported through
+    # `report_routing_scrub` (cold review P1-1); when this one already found
+    # and removed everything, `build_candidate`'s own scrub below is
+    # idempotent and reports nothing further.
+    report_routing_scrub("semantic_main", scrub_route_overrides())
     if not args or args[0] not in {"preflight", "run", "verify"} or len(args) > _MAX_SEMANTIC_ARGS:
         print("kb-setup graphify-semantic-slice preflight|run|verify [PATH]")
         return 2

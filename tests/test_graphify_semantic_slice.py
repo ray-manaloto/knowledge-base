@@ -79,6 +79,18 @@ def test_enforcing_authority_never_widens_the_accepted_runtime_set(
     )
 
     assert graphify_semantic_slice._runtime_reasons(committed, enforce_authority=True) == []
+    # VACUITY NOTE (cold review P2-2): `committed` is the retained receipt's own
+    # runtime, which is `_ACCEPTED_GRAPHIFY_RUNTIME` by construction — so this
+    # line cannot tell an `(_ACCEPTED,)` non-authority tuple from an
+    # `(_ACCEPTED, _CURRENT)` one whenever the two constants happen to agree,
+    # which is EXPECTED right after a re-attest (they are field-identical at
+    # this commit; see both constants' own comments). Kept anyway because it is
+    # still a real assertion about `committed` — the arm that actually
+    # discriminates the two-entry tuple is
+    # `test_non_authority_path_accepts_the_current_graphify_runtime` above,
+    # which forces `_ACCEPTED_GRAPHIFY_RUNTIME` apart from `_CURRENT_GRAPHIFY_RUNTIME`
+    # with a monkeypatched synthetic value specifically so agreement in reality
+    # cannot hide a regression here.
     assert graphify_semantic_slice._runtime_reasons(committed, enforce_authority=False) == []
     # Rejected in BOTH modes — the control arm. Without it, "enforcing rejects it"
     # would be satisfied by a check that rejects everything.
@@ -253,25 +265,194 @@ def test_scrub_route_overrides_removes_only_forbidden_names_and_returns_them() -
     assert env == {"HOME": "/safe/home", "PATH": "/safe/bin"}
 
 
-def test_preflight_passes_after_scrub_with_ambient_routing_names(
+def test_scrub_route_overrides_clears_the_real_process_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The end-to-end arm for #334: scrub, then the real process env is clean.
+    """`scrub_route_overrides()` with no argument targets the REAL `os.environ`.
 
     Distinct from the dict-based arm above: this plants the forbidden names in
-    the REAL `os.environ` via `monkeypatch.setenv` (auto-restored at teardown)
-    and scrubs with NO argument, proving the default target is the live process
-    environment `preflight` checks and every spawned `claude` child inherits —
-    not a copy that would leave the real one untouched.
+    the REAL `os.environ` and scrubs with NO argument, proving the default
+    target is the live process environment `preflight` checks and every
+    spawned `claude` child inherits — not a copy that would leave the real one
+    untouched.
+
+    RENAMED from `test_preflight_passes_after_scrub_with_ambient_routing_names`
+    (cold review nit 1): the old name and docstring called this "the end-to-end
+    arm for #334", but it never calls `preflight` — it asserts directly on
+    `route_override_names`. The real end-to-end wiring arms are
+    `test_semantic_main_scrubs_routing_overrides_before_dispatch` and
+    `test_build_candidate_scrubs_routing_overrides_before_dispatch` below, plus
+    `test_execute_scrubs_routing_overrides_before_preflight` in
+    `test_graphify_semantic_corpus_run.py`.
+
+    ISOLATED (cold review P2-3): the old form planted two names via
+    `monkeypatch.setenv` on the REAL `os.environ` and then scrubbed it with no
+    argument — which deletes every forbidden name PRESENT, not just the two
+    planted, silently and permanently removing whatever else this host carries
+    ambiently (`AWS_DEFAULT_REGION`, `AWS_SECRET_ACCESS_KEY` here) for the rest
+    of the pytest session. Planting now happens on the REAL `os.environ` first
+    (so `monkeypatch` tracks and restores it normally), and ONLY THEN is
+    `os.environ` swapped for an isolated `dict` copy — so the scrub that
+    follows mutates the copy, never the real mapping. `real_environ` is the
+    reference saved before the swap; the final assertions read the exact
+    planted values back off it, proving the scrub never reached it.
     """
+    real_environ = os.environ
     monkeypatch.setenv("AWS_REGION", "us-east-1")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "planted")
+    monkeypatch.setattr(os, "environ", dict(os.environ))
     assert graphify_semantic_slice.route_override_names(os.environ) != ()
 
     removed = graphify_semantic_slice.scrub_route_overrides()
 
     assert {"AWS_REGION", "AWS_ACCESS_KEY_ID"} <= set(removed)
     assert graphify_semantic_slice.route_override_names(os.environ) == ()
+    assert real_environ["AWS_REGION"] == "us-east-1"
+    assert real_environ["AWS_ACCESS_KEY_ID"] == "planted"
+
+
+def test_scrub_route_overrides_excludes_proxy_configuration() -> None:
+    """Proxy variables are FORBIDDEN (`preflight` still refuses them) but not SCRUBBED.
+
+    Cold review P2-4: scrubbing `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`
+    from this process changes the egress of `git` and the in-process graphify
+    SDK, not just the `claude` child — see `_ROUTE_OVERRIDE_PROXY_NAMES`'s own
+    comment for the full reasoning. `route_override_names` (what `preflight`'s
+    refusal reads) must still see all four; only `scrub_route_overrides` must
+    leave them alone.
+    """
+    env = {
+        "HOME": "/safe/home",
+        "AWS_REGION": "must-be-removed",
+        "HTTP_PROXY": "http://proxy.example:8080",
+        "HTTPS_PROXY": "https://proxy.example:8443",
+        "ALL_PROXY": "socks5://proxy.example:1080",
+        "NO_PROXY": "localhost",
+    }
+
+    removed = graphify_semantic_slice.scrub_route_overrides(env)
+
+    assert removed == ("AWS_REGION",)
+    assert env == {
+        "HOME": "/safe/home",
+        "HTTP_PROXY": "http://proxy.example:8080",
+        "HTTPS_PROXY": "https://proxy.example:8443",
+        "ALL_PROXY": "socks5://proxy.example:1080",
+        "NO_PROXY": "localhost",
+    }
+    assert set(graphify_semantic_slice.route_override_names(env)) == {
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+    }
+
+
+def test_semantic_main_scrubs_routing_overrides_before_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`semantic_main` must scrub forbidden routing names before ANY dispatch.
+
+    Cold review P1-2: this call site — the highest-traffic of the three, since
+    it covers `preflight`/`run`/`verify` from the CLI — had NO wiring test at
+    all; deleting its scrub call survived the entire suite. Ported from
+    `test_execute_scrubs_routing_overrides_before_preflight`
+    (`test_graphify_semantic_corpus_run.py`): planted on the REAL `os.environ`,
+    then isolated behind a `dict` copy (cold review P2-3) before the call, so
+    the scrub — which targets `os.environ` with no argument — cannot delete an
+    ambient name this test never tracked. The check lives INSIDE the stubbed
+    `preflight`, so a scrub call placed anywhere after it would be caught too.
+
+    Also proves P1-1: the removed name must be EMITTED. Asserted on
+    `capsys.readouterr().err`, never `caplog` (`events._ensure_sink` sets
+    `logger.propagate = False`, so records never reach the root logger `caplog`
+    attaches to) — WARNING lands on stderr, so stdout must stay silent up to
+    the point the stub raises.
+    """
+    real_environ = os.environ
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setattr(os, "environ", dict(os.environ))
+    assert graphify_semantic_slice.route_override_names(os.environ) != ()
+
+    def stop_at_preflight(
+        *_args: object, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
+        assert graphify_semantic_slice.route_override_names(os.environ) == ()
+        raise RuntimeError("preflight tripwire")
+
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", stop_at_preflight)
+
+    with pytest.raises(RuntimeError, match="preflight tripwire"):
+        graphify_semantic_slice.semantic_main(tmp_path, ["preflight"])
+
+    assert real_environ["AWS_REGION"] == "us-east-1"
+    captured = capsys.readouterr()
+    assert "AWS_REGION" in captured.err
+    assert captured.out == ""
+
+
+def test_build_candidate_scrubs_routing_overrides_before_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`build_candidate` must scrub forbidden routing names before ITS preflight.
+
+    Cold review P1-2: `build_candidate` is public and may be called directly,
+    bypassing `semantic_main` — the comment beside its own scrub call says so —
+    so it needs its own wiring arm, and had none. Same isolation as the
+    `semantic_main` arm above (cold review P2-3), and the same emission proof
+    (P1-1).
+    """
+    real_environ = os.environ
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setattr(os, "environ", dict(os.environ))
+    assert graphify_semantic_slice.route_override_names(os.environ) != ()
+
+    def stop_at_preflight(
+        *_args: object, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
+        assert graphify_semantic_slice.route_override_names(os.environ) == ()
+        raise RuntimeError("preflight tripwire")
+
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", stop_at_preflight)
+
+    with pytest.raises(RuntimeError, match="preflight tripwire"):
+        graphify_semantic_slice.build_candidate(tmp_path, tmp_path / "out")
+
+    assert real_environ["AWS_REGION"] == "us-east-1"
+    captured = capsys.readouterr()
+    assert "AWS_REGION" in captured.err
+    assert captured.out == ""
+
+
+def test_semantic_main_emits_nothing_when_nothing_needs_scrubbing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A clean host — nothing to scrub — must emit nothing, not an empty warning.
+
+    Isolated behind a deliberately-clean dict (no forbidden names at all)
+    rather than the real `os.environ`, so this is independent of whatever this
+    host happens to carry ambiently — the same isolation reasoning as the
+    other tests in this group (cold review P2-3), applied here to guarantee
+    the CLEAN case rather than merely avoid leaking the DIRTY one. The
+    `if removed:` guard at every one of the three call sites is identical in
+    shape; this demonstrates it once rather than at each site.
+    """
+    monkeypatch.setattr(os, "environ", {"PATH": os.environ.get("PATH", "")})
+    assert graphify_semantic_slice.route_override_names(os.environ) == ()
+
+    def stop_at_preflight(
+        *_args: object, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
+        raise RuntimeError("preflight tripwire")
+
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", stop_at_preflight)
+
+    with pytest.raises(RuntimeError, match="preflight tripwire"):
+        graphify_semantic_slice.semantic_main(tmp_path, ["preflight"])
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
 
 
 def test_auth_classification_retains_only_public_routing_fields() -> None:
@@ -944,9 +1125,14 @@ def test_current_claude_reads_the_current_constants_not_the_accepted_ones(
     assert current.executable_sha256 != graphify_semantic_slice._ACCEPTED_CLAUDE_EXECUTABLE_SHA256
     # The CLI contract is the thing that must NOT have moved — that identity is
     # what makes advancing the version a mechanical bump rather than a review.
-    # Unpatched here, so this reads the REAL current help digest, which still
-    # equals the accepted one (`_CURRENT_CLAUDE_HELP_SHA256` is bound from
-    # `_ACCEPTED_CLAUDE_HELP_SHA256` at import time, not a live alias).
+    # Unpatched here, so this checks what `current_claude()` actually reads off
+    # the module's constants at call time, not a live measurement of the
+    # installed binary: `_CURRENT_CLAUDE_HELP_SHA256` is bound from
+    # `_ACCEPTED_CLAUDE_HELP_SHA256` at import time, not a live alias. (Cold
+    # review nit 2: this comment used to say "this reads the REAL current help
+    # digest", which reads as if something here measured the installed
+    # `claude --help` output — nothing in this module does that at import
+    # time; both sides are literals.)
     assert current.help_sha256 == graphify_semantic_slice._ACCEPTED_CLAUDE_HELP_SHA256
 
 
@@ -1000,7 +1186,9 @@ def _preflight_for(
 _PAIR_REASONS = frozenset({"receipt-runtime-mismatch", "receipt-graphify-version-mismatch"})
 
 
-def test_non_authority_path_accepts_the_current_graphify_runtime() -> None:
+def test_non_authority_path_accepts_the_current_graphify_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The CURRENT runtime must be matchable on the non-authority path.
 
     This is the test that was missing, and its absence is why a failure this
@@ -1013,15 +1201,37 @@ def test_non_authority_path_accepts_the_current_graphify_runtime() -> None:
     comment at the pairing site had predicted exactly that, having been written
     after the same slip at 0.9.46.
 
-    Asserted on the CONSTANT rather than on the installed binary on purpose: the
-    installed version moves under the session, and a test that reads it would go
-    red on a self-update instead of on the defect it is here to catch.
+    RE-DERIVED (cold review P2-2): the 0.9.48 re-attest converged
+    `_ACCEPTED_GRAPHIFY_RUNTIME` and `_CURRENT_GRAPHIFY_RUNTIME` to the SAME
+    identity, which is expected right after a re-attest, not a bug — but it
+    also made this test incapable of failing: with the two constants equal,
+    dropping `_CURRENT_GRAPHIFY_RUNTIME` from the non-authority tuple leaves
+    `_ACCEPTED_GRAPHIFY_RUNTIME` alone still matching, and the assertion below
+    would have kept passing. This forces them apart with a monkeypatched
+    SYNTHETIC `_ACCEPTED_GRAPHIFY_RUNTIME` (differing from CURRENT in one
+    digest, never in version — the sibling authority test below follows the
+    same precedent) so the two paths can be told apart again inside the test
+    regardless of whether they happen to agree in
+    reality: the non-authority path must still accept CURRENT because it is in
+    the tuple in its own right, while the authority path — which only ever
+    consults `_ACCEPTED_GRAPHIFY_RUNTIME` — must refuse it against the now-
+    different synthetic accepted. Asserting both in one test is what proves
+    they are two different mechanisms, not one guard that happens to agree.
     """
     current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
+    synthetic_accepted = msgspec.structs.replace(current, sdk_fingerprint_sha256="1" * 64)
+    assert synthetic_accepted != current, "fixture must actually differ from CURRENT"
+    monkeypatch.setattr(graphify_semantic_slice, "_ACCEPTED_GRAPHIFY_RUNTIME", synthetic_accepted)
+
     reasons = graphify_semantic_slice._runtime_reasons(
         _preflight_for(current, current.version), enforce_authority=False
     )
     assert _PAIR_REASONS.isdisjoint(reasons), reasons
+
+    authority_reasons = graphify_semantic_slice._runtime_reasons(
+        _preflight_for(current, current.version), enforce_authority=True
+    )
+    assert "receipt-runtime-mismatch" in authority_reasons
 
 
 def test_authority_path_still_refuses_a_runtime_that_is_not_accepted() -> None:

@@ -22,6 +22,13 @@ from pathlib import Path
 # KEPT — that is the Claude path, and the claude API backend (unlike the broken
 # claude-cli one, #2076) parses fine. See CLAUDE.md, the kb-label task, and
 # `.claude/skills/kb-curator`.
+# Scoped to graphify subprocesses ONLY. `graphify_semantic_slice.scrub_route_overrides`
+# removes `ANTHROPIC_API_KEY`/`ANTHROPIC_BASE_URL` from THIS PROCESS's own
+# `os.environ` before the real-Claude semantic slice/corpus entry points run
+# (subscription-only auth is the invariant, `do-not.md` #4) — a different
+# scope and a different reason than the KEPT decision above, but it means a
+# `clean_env()` copy taken inside one of those processes will not carry either
+# name either, having nothing left in `os.environ` to copy.
 _STRIP_BACKEND_ENV = (
     # gemini / google
     "GEMINI_API_KEY",
