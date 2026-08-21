@@ -9,6 +9,7 @@ the repository task's retained real-run receipt.
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 from copy import deepcopy
 from pathlib import Path
@@ -223,6 +224,54 @@ def test_route_controls_reject_each_documented_override(name: str) -> None:
         graphify_semantic_slice.route_override_names({"HOME": "/safe/home", "PATH": "/safe/bin"})
         == ()
     )
+
+
+def test_scrub_route_overrides_removes_only_forbidden_names_and_returns_them() -> None:
+    """Deletes the forbidden set and nothing else, and returns only their NAMES."""
+    env = {
+        "HOME": "/safe/home",
+        "PATH": "/safe/bin",
+        "AWS_ACCESS_KEY_ID": "must-not-be-read",
+        "AWS_DEFAULT_REGION": "must-not-be-read",
+        "AWS_REGION": "must-not-be-read",
+        "AWS_SECRET_ACCESS_KEY": "must-not-be-read",
+        "ANTHROPIC_API_KEY": "must-not-be-read",
+    }
+
+    removed = graphify_semantic_slice.scrub_route_overrides(env)
+
+    assert removed == (
+        "ANTHROPIC_API_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_DEFAULT_REGION",
+        "AWS_REGION",
+        "AWS_SECRET_ACCESS_KEY",
+    )
+    assert env == {"HOME": "/safe/home", "PATH": "/safe/bin"}
+    # Idempotent — a second call finds nothing left to remove.
+    assert graphify_semantic_slice.scrub_route_overrides(env) == ()
+    assert env == {"HOME": "/safe/home", "PATH": "/safe/bin"}
+
+
+def test_preflight_passes_after_scrub_with_ambient_routing_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The end-to-end arm for #334: scrub, then the real process env is clean.
+
+    Distinct from the dict-based arm above: this plants the forbidden names in
+    the REAL `os.environ` via `monkeypatch.setenv` (auto-restored at teardown)
+    and scrubs with NO argument, proving the default target is the live process
+    environment `preflight` checks and every spawned `claude` child inherits —
+    not a copy that would leave the real one untouched.
+    """
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "planted")
+    assert graphify_semantic_slice.route_override_names(os.environ) != ()
+
+    removed = graphify_semantic_slice.scrub_route_overrides()
+
+    assert {"AWS_REGION", "AWS_ACCESS_KEY_ID"} <= set(removed)
+    assert graphify_semantic_slice.route_override_names(os.environ) == ()
 
 
 def test_auth_classification_retains_only_public_routing_fields() -> None:
@@ -857,33 +906,47 @@ def test_staged_verifier_returns_typed_failure_for_rehashed_malformed_fragment(
     assert result.reasons == ("fragment-schema-invalid",)
 
 
-def test_the_accepted_claude_identity_describes_evidence_not_the_installed_binary() -> None:
+def test_current_claude_reads_the_current_constants_not_the_accepted_ones(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Two constants, two questions — collapsing them invalidates committed evidence.
 
     `_ACCEPTED_CLAUDE_*` is the authority for the COMMITTED slice receipt: a run
     that already happened, which no edit here can change. `current_claude()` is
     what a NEW run may use, and it is what the corpus plan pins.
 
-    This arm exists because the two WERE collapsed, for about twenty minutes.
-    Claude Code self-updated, advancing "the accepted version" looked like
-    ordinary currency work, and it turned the committed slice candidate from
-    `unapproved` to `failed` — evidence refused for a fact about the world rather
-    than about itself. The suite caught it; reading the diff had not.
+    This arm exists because the two WERE collapsed once already, for about
+    twenty minutes: Claude Code self-updated, advancing "the accepted version"
+    looked like ordinary currency work, and it turned the committed slice
+    candidate from `unapproved` to `failed` — evidence refused for a fact about
+    the world rather than about itself. The suite caught it; reading the diff
+    had not.
 
-    The first assertion is the invariant. The second is the control: with the two
-    equal, an implementation that returned `_ACCEPTED_*` from `current_claude()`
-    would satisfy the first forever and the arm would prove nothing — so it
-    asserts the split is REAL right now, and if a future round re-runs the slice
-    at the current version and the two legitimately converge, this is the line to
-    re-derive rather than delete.
+    Re-derived after the graphify 0.9.48 re-attest: the slice was re-run at
+    2.1.238 in this same change, so ACCEPTED and CURRENT now hold the SAME value
+    — a coincidence of evidence, not a merge of the two questions. Asserting
+    `current.version != _ACCEPTED_CLAUDE_VERSION` would therefore be asserting a
+    fact about today's repo state rather than about `current_claude()`, exactly
+    the failure mode `test_authority_path_still_refuses_the_current_graphify_runtime`
+    hit at the same bump. Proven instead by monkeypatching CURRENT away from
+    ACCEPTED and confirming `current_claude()` follows it: an implementation that
+    quietly returned `_ACCEPTED_*` would pass every other test in this file today
+    and only fail once the two next diverge.
     """
+    monkeypatch.setattr(graphify_semantic_slice, "_CURRENT_CLAUDE_VERSION", "9.9.9-not-accepted")
+    monkeypatch.setattr(graphify_semantic_slice, "_CURRENT_CLAUDE_EXECUTABLE_SHA256", "f" * 64)
+
     current = graphify_semantic_slice.current_claude()
 
-    assert graphify_semantic_slice._ACCEPTED_CLAUDE_VERSION == "2.1.233"
+    assert current.version == "9.9.9-not-accepted"
+    assert current.executable_sha256 == "f" * 64
     assert current.version != graphify_semantic_slice._ACCEPTED_CLAUDE_VERSION
     assert current.executable_sha256 != graphify_semantic_slice._ACCEPTED_CLAUDE_EXECUTABLE_SHA256
     # The CLI contract is the thing that must NOT have moved — that identity is
     # what makes advancing the version a mechanical bump rather than a review.
+    # Unpatched here, so this reads the REAL current help digest, which still
+    # equals the accepted one (`_CURRENT_CLAUDE_HELP_SHA256` is bound from
+    # `_ACCEPTED_CLAUDE_HELP_SHA256` at import time, not a live alias).
     assert current.help_sha256 == graphify_semantic_slice._ACCEPTED_CLAUDE_HELP_SHA256
 
 
@@ -961,23 +1024,28 @@ def test_non_authority_path_accepts_the_current_graphify_runtime() -> None:
     assert _PAIR_REASONS.isdisjoint(reasons), reasons
 
 
-def test_authority_path_still_refuses_the_current_graphify_runtime() -> None:
-    """The FAIL direction, and the reason the two entries are separate.
+def test_authority_path_still_refuses_a_runtime_that_is_not_accepted() -> None:
+    """The FAIL direction, re-derived after the 0.9.48 re-attest converged the pair.
 
-    The authority path accepts only the runtime the committed slice receipt was
-    produced under, so the current runtime must be refused there. Without this
-    arm the test above could be satisfied by an `accepted` tuple that admits
-    everything, which is the defect it would then be hiding rather than catching.
+    This used to refuse CURRENT specifically, on the premise that CURRENT and
+    ACCEPTED were different versions — true right up until the 0.9.48 re-attest
+    committed the slice receipt AT the installed runtime, converging the two by
+    construction. That premise being gone is not a defect (the vacuity guard the
+    prior form carried would have said so loudly), so this is re-derived rather
+    than deleted, exactly as `test_the_current_graphify_runtime_tracks_the_pinned_manifest_ref`'s
+    docstring anticipates for its own constant.
+
+    The authority path must still refuse anything OTHER than the exact accepted
+    identity. Proven with a SYNTHETIC identity differing from accepted in one
+    digest only — never in the version string — so the arm shows the check
+    compares the whole identity rather than merely a version number.
     """
-    current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
     accepted = graphify_semantic_slice._ACCEPTED_GRAPHIFY_RUNTIME
-    assert current.version != accepted.version, (
-        "this arm is vacuous while the two constants agree — they converge only "
-        "when the slice re-runs and commits a receipt under the installed version, "
-        "and at that point this test needs re-deriving rather than deleting"
-    )
+    synthetic = msgspec.structs.replace(accepted, sdk_fingerprint_sha256="0" * 64)
+    assert synthetic != accepted, "fixture must actually differ from the accepted identity"
+
     reasons = graphify_semantic_slice._runtime_reasons(
-        _preflight_for(current, current.version), enforce_authority=True
+        _preflight_for(synthetic, synthetic.version), enforce_authority=True
     )
     assert "receipt-runtime-mismatch" in reasons
 

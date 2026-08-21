@@ -1036,6 +1036,11 @@ def execute(
     than raising on a failed chunk, because a run that dies on chunk 40 of 58
     should still leave the first 39 staged and say so.
     """
+    # Scrubbed before ANYTHING else — before the plan even loads — so a forbidden
+    # routing name ambient in this process can never reach the preflight below or
+    # any `claude` child this run spawns (#334). See
+    # `graphify_semantic_slice.scrub_route_overrides`.
+    graphify_semantic_slice.scrub_route_overrides()
     inventory, ledger, config = _load_plan(candidate)
     run_namespace = _run_namespace(candidate, config.cache_namespace_sha256)
     preflight_receipt = graphify_semantic_slice.preflight(

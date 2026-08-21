@@ -716,6 +716,37 @@ def _execute(tmp_path: Path) -> graphify_semantic_corpus_run.RunSummary:
     )
 
 
+def test_execute_scrubs_routing_overrides_before_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`execute()` must scrub forbidden routing names before it ever preflights.
+
+    Planted in the REAL process env via `monkeypatch.setenv` (auto-restored at
+    teardown, never mutated by hand) so this is about what `execute()` actually
+    did to `os.environ`, not about a mapping the test controls. The check lives
+    INSIDE the stubbed `preflight`, so a scrub call placed anywhere AFTER it —
+    including one hiding behind `_load_plan` or `_run_namespace` — would be
+    caught here, not only one placed before it (#334).
+
+    No `@_needs_driver`: this never reaches `_extract_corpus` or needs the
+    provider binaries — it stops at the stubbed preflight, before any evidence
+    directory or `_RunContext` is built.
+    """
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    assert graphify_semantic_slice.route_override_names(os.environ) != ()
+
+    def stop_at_preflight(
+        *_args: object, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
+        assert graphify_semantic_slice.route_override_names(os.environ) == ()
+        raise RuntimeError("preflight tripwire")
+
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", stop_at_preflight)
+
+    with pytest.raises(RuntimeError, match="preflight tripwire"):
+        _execute(tmp_path)
+
+
 @_needs_driver
 def test_a_chunk_that_fails_to_stage_does_not_abort_the_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

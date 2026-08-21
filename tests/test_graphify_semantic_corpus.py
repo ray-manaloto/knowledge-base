@@ -2346,6 +2346,16 @@ def test_execution_mode_verifier_refuses_inherited_slice_as_corpus_evidence(
 
 
 def test_semantic_graph_is_rebuilt_from_retained_real_fragment_bytes(tmp_path: Path) -> None:
+    """The counts are re-derived per retained fragment, not carried forward.
+
+    `(18, 17, 2)` is what `_graph_counts` measures for the graphify 0.9.48
+    re-attest's fragment (`graphify-out/graphify-semantic-slice/semantic-fragment.json`,
+    2026-08-21) — read from THIS run's own failure output, not assumed equal to
+    the raw semantic node/edge/hyperedge counts in `receipt.json`, which count a
+    different thing (`_graph_counts` rebuilds and dedupes against the base
+    graph). It moved from `(13, 8, 1)` at the 0.9.45 attempt for the same reason
+    this file's literal always moves when the retained fragment does.
+    """
     repo_root = Path(__file__).parent.parent
     candidate = _execution_plan(tmp_path, repo_root)
     binding = graphify_semantic_corpus._plan_binding(candidate)
@@ -2355,7 +2365,7 @@ def test_semantic_graph_is_rebuilt_from_retained_real_fragment_bytes(tmp_path: P
 
     assert reasons == []
     assert rebuilt is not None
-    assert graphify_semantic_corpus._graph_counts(rebuilt) == (13, 8, 1)
+    assert graphify_semantic_corpus._graph_counts(rebuilt) == (18, 17, 2)
     assert (
         graphify_semantic_corpus._semantic_graph_integrity_reasons(
             rebuilt, {"docs/how-it-works.md"}
