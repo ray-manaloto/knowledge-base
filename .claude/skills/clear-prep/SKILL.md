@@ -1,6 +1,6 @@
 ---
 name: clear-prep
-description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Invoke explicitly as /clear-prep [next-task]."
+description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Use it PROACTIVELY, without being asked, as soon as the session's context passes ~20% of the model's window, when a round is ending (PR open or landed, gates green), or whenever the user says clear, handoff, wrap up, or asks what the next session should do — and explicitly as /clear-prep [next-task]. It prepares the handoff and then ASKS the user to /clear; it never clears."
 disable-model-invocation: false
 argument-hint: "[one-line description of the next task, optional]"
 ---
@@ -27,10 +27,13 @@ in this skill that cannot be reordered without losing work.
 > question, never a silent run: an agent that invokes this skill does so to PREPARE the
 > handoff and then asks the user to `/clear` (AskUserQuestion), and the intended
 > mechanical trigger is a DENY-style guard on context usage (session-review R1, #431/#433
-> neighbours), not a warning. It also means the
-> `triggering_accuracy` dimension in `mise run kb-skill-score` is permanently
-> low for this skill and should be ignored here: it measures a trigger this
-> skill is designed not to have.
+> neighbours) — not built yet, so until it lands the trigger is the description above
+> plus the agent's own context reading. The description is what model invocation
+> matches on, so it now names the triggers (context past ~20%, a round ending, the user
+> asking for a handoff); the `triggering_accuracy` dimension in `mise run
+> kb-skill-score` therefore measures a real trigger for this skill from 2026-08-21 on —
+> re-baseline it (`-- --write`) rather than reading the old "inert" note. Step 7 is
+> where the "asks the user" half is made concrete.
 
 ## 0. Resolve next-task ambiguity FIRST (Ray, 2026-07-08)
 
@@ -366,6 +369,15 @@ knows how to jump to handoff so there is less copy/paste needed."*
 failure this step exists to prevent. A handoff nobody is told to read is a
 handoff nobody reads.
 
+**Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
+never by clearing yourself.** This is the "asks the user" half of the banner,
+and it is the last act of the skill whether a human typed `/clear-prep` or an
+agent invoked it on its own at ~20% context: one question, options *"/clear now
+(then `/kb-resume`)"* and *"not yet — keep going in this session"*, with the
+handoff path and the resume line in the question text so the answer is
+one click. Only the user runs `/clear`; an agent that invoked this skill has
+prepared for it and stops here.
+
 The older form still works when the next session should read a SPECIFIC handoff
 rather than the newest:
 
@@ -393,7 +405,9 @@ This repo can measure its own skills, so use that rather than taste:
 - Read the number with its condition attached. `triggering_accuracy` is a regex
   over the description, so it rewards the literal words "proactively" and
   "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague
-  description is not. For this skill the dimension is inert (see the banner).
+  description is not. For this skill the dimension was inert while it was
+  human-only; since 2026-08-21 it measures a real trigger (see the banner), so
+  re-baseline after the description change and read the Δ.
 - SkillOpt's mutable marketplace plugin is disabled while its immutable
   provenance/API contract is established. `/skillopt-sleep` is intentionally
   unavailable until a later project-local adapter preserves explicit adoption.
@@ -415,6 +429,7 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate.
 - [ ] Resume prompt printed — `/kb-resume` (skipped on 2026-08-19; the next session had no idea where to start).
+- [ ] The user ASKED to `/clear` via `AskUserQuestion` (step 7) — the skill prepares; it never clears.
 
 ## See also
 
