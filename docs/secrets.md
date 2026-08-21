@@ -1,5 +1,15 @@
 # Secrets — where they live, and what an agent in THIS repo may do with them
 
+> ⚠️ **Everything below describes an arrangement that was decided to be
+> REPLACED, and the replacement has not been built.** On 2026-08-04 dotfiles
+> resolved to take credential management over from
+> `macos-development-environment` — and decision **D5 goes further: drop fnox
+> entirely**, for Doppler + macOS Keychain. Both artefacts carry the same banner:
+> *"This is a planning artifact. No code ships from it."* Verified 2026-08-21 by
+> three control-armed probes: **nothing is built.** So the fnox runbook here is
+> what RUNS, not what was intended to last. See "The takeover" below before
+> treating any of it as the end state.
+
 This repo consumes credentials; it does not own them. The mechanism, the
 authority and the enforcement all live in the sibling
 [`ray-manaloto/dotfiles`](https://github.com/ray-manaloto/dotfiles), and this
@@ -49,11 +59,21 @@ frontmatter; treat an unlinked ref as AMBIGUOUS and resolve it upstream.
   `fnox activate zsh`'s chpwd/precmd hooks, installed by
   `macos-development-environment/home/dot_zshrc.d/50-mde-secrets.zsh:27-29`.
 
-`~/.config/fnox/config.toml` is **generated** — its header says *"Managed by
-`mde-py secrets bootstrap-config`. Do not edit by hand."* — by a third repo,
-`macos-development-environment`, installed editable. Which code runs therefore
-depends on that clone's branch. Nothing in dotfiles produces it; what dotfiles
-owns is the drift detector (`doctor.toml` `[fnox]`).
+`~/.config/fnox/config.toml` is owned by `mde-py secrets bootstrap-config` — its
+header says *"Managed by … Do not edit by hand."* — from a third repo,
+`macos-development-environment`, installed editable, so which code runs depends on
+that clone's branch.
+
+**It RECONCILES; it does not regenerate.** Since mde #83 (`716b17d`, 2026-08-03)
+it adds and drops declarations by invoking `fnox`, writing the file directly only
+when it does not exist. The "regenerates from a template" behaviour — which lost
+the `env` mode and every opt-in by construction — is pre-fix, and survives only on
+one stale local branch. Saying "generated" invites the wrong mental model of the
+blast radius.
+
+What dotfiles owns is the drift detector (`doctor.toml` `[fnox]`) — and not
+passively: its `env_true` list is a reviewed baseline **a human hand-edits on
+every add**.
 
 ## The agent contract — this is the part that binds a session here
 
@@ -116,57 +136,62 @@ fnox sync --global -p age KEY_NAME
 **Never** `doppler secrets set KEY 'value'` (argv + history) or
 `echo 'value' | doppler secrets set KEY` (plaintext through the tool call).
 
-### The sync is AUTOMATIC — do not hand-declare
+### Which command actually adds one, today
 
-**Doppler is the source; the fnox declarations are DERIVED from it.** The
-generator is `mde-py secrets bootstrap-config`
-(`macos-development-environment/src/mde/secrets/manage.py:372`), whose own
-docstring reads *"Reconcile `~/.config/fnox/config.toml` declarations against
-Doppler."* Its `_reconcile_declarations` (`:349`) declares every Doppler key that
-fnox does not yet declare, and prunes declarations Doppler no longer has —
-skipping hand-declared keys such as `DOPPLER_TOKEN`.
+**`mde-secret-add KEY_NAME`** — a shell function (not a binary) from
+`~/.zshrc.d/50-mde-secrets.zsh`, sourced from **mde**, which calls
+`$MDE_PROJECT_DIR/.venv/bin/mde-py secrets add KEY` and `eval`s the emitted
+`export` line so the value lands in the *current* shell. It covers **steps 3–7**.
 
-So a credential that is **already in Doppler but missing from every shell** does
-not need a hand-written declaration. It needs the generator to run:
+`which mde-py` returning rc=1 proves nothing — it is never on `$PATH`; only the
+function reaches it (control: `which doppler` resolves).
 
-```sh
-cd "$MDE_PROJECT_DIR" && uv sync     # only if mde-py is broken — see below
-mde-py secrets bootstrap-config      # picks up EVERY undeclared Doppler key at once
-```
+**Step 8 is still yours by hand**, and there is live proof: the dotfiles working
+tree currently carries an uncommitted `doctor.toml` edit adding
+`+ "CLAUDE_CODE_OAUTH_TOKEN",`. The takeover spec's user story 2 — *"I want the
+add verb to update the reviewed baseline in the same run"* — is exactly what does
+not exist yet.
 
-`mde-secret-add KEY` is the same path for a credential that does not exist yet:
-`add_secret` (`manage.py:151`) writes to Doppler, then calls `bootstrap_config()`
-and a full age resync.
+**`bootstrap-config` is the reconciler, not the add path.** `add_secret`
+(`manage.py:151`) calls it as its own step 6, to give the new key a fnox entry.
+Reach for it directly only in the case this round hit: a credential **already in
+Doppler that reaches no shell**, where reconciling is the whole fix.
 
-⚠️ **Do not reach for `fnox set --global` or `fnox edit`.** They work, and they
-are the wrong tool: the config's own header says *"Managed by `mde-py secrets
-bootstrap-config`. Do not edit by hand."* A hand declaration is a second writer
-to a generated file, and it drifts from the mechanism that owns it. This section
-originally documented exactly that mistake (Ray, 2026-08-21: *"i dont want to
-invent a new way"*).
+⚠️ **Do not hand-write a declaration** (`fnox set --global`, or editing the config)
+— the file's header says *"Managed by `mde-py secrets bootstrap-config`. Do not
+edit by hand."* An earlier version of this section recommended exactly that, and
+was wrong (Ray, 2026-08-21: *"i dont want to invent a new way"*).
 
-**Which repo does what, since this is the part that confuses:**
+## The takeover — decided 2026-08-04, not built
 
-| repo | role |
-|---|---|
-| **Doppler** | the value of record |
-| **macos-development-environment** | **generates** the fnox config — `bootstrap-config`, and the `mde-secret-*` zsh wrappers around it |
-| **dotfiles** | **watches.** It runs no sync at all — every `bootstrap-config` mention in its `mise.toml` and `dotfiles_setup/` is commentary. `doctor.py:586` is "the bootstrap-config tripwire", and `doctor.toml` is the baseline it compares against |
-| **this repo** | consumes the resulting environment variables, and edits none of it (`do-not.md` #11) |
+`docs/research/kb/decisions/secrets-cli-grilling-2026-08-04b.md` (vendored here as
+`sources/media/dotfiles-secrets-decision.md`) records six decisions. The north
+star, in Ray's words:
 
-That is why `doctor.toml` is not a prerequisite. It is the **alarm on** the sync,
-not part of it: `_opt_in_findings` (`doctor.py:625`) appends findings to a report
-when the shell-visible set and the reviewed list disagree, in either direction.
-An unlisted secret works fine; you get a drift finding every session. Add the name
-anyway, for the reason the guide gives — the standing risk is that a later session
-"fixes" the reported drift by **deleting the secret**.
+> *"Dev projects on the mac having a universal way to crud api keys secrets."*
 
-⚠️ **The generator is broken on this host (2026-08-21).**
-`$MDE_PROJECT_DIR/.venv/bin/mde-py secrets --help` exits **127, bad interpreter**:
-the venv's `python` is a dangling symlink to a mise python `3.14.4` that is no
-longer installed. The zsh wrapper's `[[ ! -x "$_bin" ]]` guard cannot see a dead
-*interpreter*, so it surfaces as a raw shell error rather than the wrapper's
-friendly message. `cd "$MDE_PROJECT_DIR" && uv sync` restores it.
+| | decision | status |
+|---|---|---|
+| D1 | scoping = additive declaration + reconcile; buys **zero confinement**, accepted | settled |
+| D2 | declarations use fnox's native hierarchy | **voided by D5** |
+| D3 | storage is the status quo — Keychain holds only `DOPPLER_TOKEN`, Doppler owns CRUD | settled |
+| D4 | the highest-value verbs are **rotate / classify / retire**, not create | settled |
+| **D5** | **DROP FNOX. The stack becomes Doppler + macOS Keychain.** Reverses the earlier "fnox stays" ruling, on measurement | **settled** |
+| D6 | language deferred, near-zero variance | open |
+
+**Built: nothing.** Three independent control-armed probes on 2026-08-21 — no
+`secrets*.py` among 76 `dotfiles_setup` modules (control: `doctor.py` present),
+nothing in the argparse registry, nothing in live `--help`.
+
+The migration ledger (dotfiles **#431**, both halves unstarted) still has mde
+owning the chezmoi source root, the shell fragment that populates every terminal,
+and all credential CRUD — while mde is itself **deprecated** as of 2026-08-04.
+Full ledger: `sources/media/dotfiles-secrets-takeover-spec.md`.
+
+**Why this section exists at all.** Without it the corpus is one-sided: the three
+runbook documents describe the fnox arrangement in detail and say nothing about
+its being superseded, so a future session would read it as the intended design.
+That is a corpus-integrity problem, not a documentation nicety.
 
 ## The mise redaction trap — and a correction to our own note
 
