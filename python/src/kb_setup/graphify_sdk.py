@@ -39,9 +39,12 @@ from graphify.reflect import build_learning_overlay, reflect
 from kb_setup.graphify_health import (
     APPROVED_METADATA_ZERO_NODE_WARNING,
     APPROVED_PARTIAL_EXTRACTION_WARNING,
+    APPROVED_SAME_FILE_ID_COLLISION_NOTE,
+    APPROVED_UNSUPPORTED_LANGUAGE_WARNING,
     ExpectedMetadataOnly,
     ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
+    ExpectedUnsupportedLanguage,
     GraphifyEvidence,
     GraphifyOperation,
     GraphifyReceipt,
@@ -169,7 +172,8 @@ _SEMANTIC_SYMBOLS = (
         "(files: 'list[Path]', backend: 'str' = 'kimi', api_key: 'str | None' = None, "
         "model: 'str | None' = None, root: 'Path' = PosixPath('.'), chunk_size: 'int' = 20, "
         "on_chunk_done: 'Callable | None' = None, token_budget: 'int | None' = 60000, "
-        "max_concurrency: 'int' = 4, max_retry_depth: 'int' = 3, deep_mode: 'bool' = False, "
+        "max_concurrency: 'int' = 4, max_retry_depth: 'int | None' = None, "
+        "deep_mode: 'bool' = False, "
         "cache_root: \"'Path | None'\" = None) -> 'dict'",
     ),
 )
@@ -634,6 +638,7 @@ class ExtractWarningReview:
     source_name: str
     metadata_inventory: tuple[ExpectedMetadataOnly, ...] = ()
     partial_inventory: tuple[ExpectedPartialExtraction, ...] = ()
+    unsupported_language_inventory: tuple[ExpectedUnsupportedLanguage, ...] = ()
     #: Per-file node totals from the sub-graph graphify just wrote. A reviewed
     #: partial extraction is checked against THIS, never against its own claim.
     extracted_nodes_by_path: Mapping[str, int] = field(default_factory=dict)
@@ -712,6 +717,128 @@ def approve_partial_extraction_warning(
     return (APPROVED_PARTIAL_EXTRACTION_WARNING,)
 
 
+#: The #1689 no-AST-extractor warning. Anchored end-to-end against the exact
+#: f-string in the installed `graphify/extract.py` (0.9.48, line 5673), because
+#: this warning is the one that reports a file counted as code, parsed by
+#: nothing, and absent from the graph with exit code 0.
+_UNSUPPORTED_LANGUAGE_WARNING = re.compile(
+    r"\A {2}warning: (?P<total>\d+) file\(s\) are classified as code but graphify has no "
+    r"AST extractor for their language, so they contributed nothing to the graph: "
+    r"(?P<groups>.+?)\. Please open an issue to request support for these \(#1689\)\.\Z"
+)
+
+#: One `ext (n)` pair inside that warning's comma-joined group list.
+_UNSUPPORTED_LANGUAGE_GROUP = re.compile(r"\A(?P<ext>\.[A-Za-z0-9_+-]+) \((?P<count>\d+)\)\Z")
+
+
+def _parse_unsupported_language_groups(groups: str) -> dict[str, int] | None:
+    """Split the warning's `.r (2), .ets (1)` tail into {ext: count}, or None.
+
+    Returns None rather than a partial dict on anything unexpected: an
+    unparsable group must leave the whole warning in the residual, since a
+    silently dropped group is a language whose loss nobody reviewed.
+    """
+    parsed: dict[str, int] = {}
+    for chunk in groups.split(", "):
+        match = _UNSUPPORTED_LANGUAGE_GROUP.match(chunk)
+        if match is None:
+            return None
+        ext = match.group("ext")
+        if ext in parsed:
+            return None
+        parsed[ext] = int(match.group("count"))
+    return parsed or None
+
+
+def _unsupported_entry_still_holds(
+    root: Path, item: ExpectedUnsupportedLanguage, review: ExtractWarningReview
+) -> bool:
+    """True iff one reviewed entry still describes the tree AND the sub-graph."""
+    try:
+        if _sha256_file(root / item.relative_path) != item.content_sha256:
+            return False
+    except OSError:
+        return False
+    # The warning's own claim is "contributed nothing to the graph". Checked
+    # against the sub-graph rather than believed, so an upstream extractor
+    # landing for this language expires the approval instead of inheriting it.
+    # `.get(..., 0)` because `_nodes_by_source_file` omits absent files.
+    return review.extracted_nodes_by_path.get(item.relative_path, 0) == 0
+
+
+def _unsupported_language_is_reviewed(root: Path, line: str, review: ExtractWarningReview) -> bool:
+    """True iff this #1689 warning is fully covered by reviewed, re-measured entries."""
+    inventory = review.unsupported_language_inventory
+    if not inventory or any(item.source_name != review.source_name for item in inventory):
+        return False
+    match = _UNSUPPORTED_LANGUAGE_WARNING.match(line)
+    if match is None:
+        return False
+    groups = _parse_unsupported_language_groups(match.group("groups"))
+    if groups is None or sum(groups.values()) != int(match.group("total")):
+        return False
+    # Every file graphify counted must be one this repo reviewed, per language.
+    # Compared as dicts so an EXTRA reviewed entry fails too: an inventory that
+    # over-covers is an inventory nobody re-measured against the current tree.
+    reviewed = Counter(item.language for item in inventory)
+    if dict(reviewed) != groups:
+        return False
+    return all(_unsupported_entry_still_holds(root, item, review) for item in inventory)
+
+
+def approve_unsupported_language_warning(
+    root: Path, line: str, review: ExtractWarningReview
+) -> tuple[str, ...]:
+    """Approve one reviewed #1689 warning, with the zero-node claim re-verified.
+
+    Graphify emits this when a file's extension is in `CODE_EXTENSIONS` but
+    `_get_extractor` returns `None` — the file is *counted* as code, takes the
+    AST path, finds no dispatch, and contributes nothing. Because it is typed as
+    code it is never queued for semantic extraction either, so it falls between
+    both extractors and the run still exits 0. That is the whole reason this
+    approval is measured rather than textual.
+
+    The warning names extensions and COUNTS, never paths, so the text alone can
+    never identify what was lost. Approval therefore requires the reviewed
+    inventory to account for every counted file exactly — same languages, same
+    per-language totals — and each reviewed path to still hash as reviewed and
+    still contribute zero nodes.
+    """
+    if not _unsupported_language_is_reviewed(root, line, review):
+        return ()
+    return (APPROVED_UNSUPPORTED_LANGUAGE_WARNING,)
+
+
+#: The SAME-FILE id-collision note, and only that one. Anchored at the start of
+#: the line and on the lower-case `note:` token, because graphify spells the
+#: different-FILE case `[graphify] WARNING:` on the very next branch of the same
+#: function — a pattern loose enough to catch both would approve the one case
+#: that is real corpus loss.
+_SAME_FILE_ID_COLLISION_NOTE = re.compile(
+    r"^\[graphify\] note: node '[^']+' was extracted twice from "
+    r"'(?P<file>[^']+)' under different labels — keeping '[^']*', dropping '[^']*'\.?$"
+)
+
+
+def approve_same_file_id_collision_note(line: str) -> tuple[str, ...]:
+    """Approve graphify's same-file id-collision NOTE; never its different-file WARNING.
+
+    graphify's own `dedup.py:_report_id_collision` reports "in proportion to what
+    dropping the loser actually costs": for two labels of one entity in one file
+    it prints `note:` and keeps the entity and its edges; for one id minted by two
+    different files it prints `WARNING:` and says the dropped node is lost.
+
+    This approves the first and deliberately cannot match the second, so the
+    severity distinction graphify already draws survives into our gate instead of
+    being flattened by a looser pattern. No inventory is required because there is
+    no quantity to review — the note reports a redundant LABEL, not a lost node,
+    which is what separates it from `approve_partial_extraction_warning` above.
+    """
+    return (
+        (APPROVED_SAME_FILE_ID_COLLISION_NOTE,) if _SAME_FILE_ID_COLLISION_NOTE.match(line) else ()
+    )
+
+
 def account_for_extract_stderr(
     root: Path, stderr: str, review: ExtractWarningReview
 ) -> tuple[tuple[str, ...], str]:
@@ -728,9 +855,14 @@ def account_for_extract_stderr(
         line = raw.rstrip()
         if not line.strip():
             continue
-        approved = approve_metadata_zero_node_warning(
-            root, review.source_name, line, review.metadata_inventory
-        ) or approve_partial_extraction_warning(root, line, review)
+        approved = (
+            approve_metadata_zero_node_warning(
+                root, review.source_name, line, review.metadata_inventory
+            )
+            or approve_partial_extraction_warning(root, line, review)
+            or approve_unsupported_language_warning(root, line, review)
+            or approve_same_file_id_collision_note(line)
+        )
         if approved:
             classifications.extend(approved)
         else:

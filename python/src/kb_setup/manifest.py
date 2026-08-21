@@ -34,6 +34,23 @@ class Manifest:
     #: corpus". Both are wrong. Introduced when three pinned peer tools took
     #: graph.json 7.6 MiB past the 512 MiB cap.
     scope: str = "corpus"
+    #: Whether `kb-build` extracts this source at all. `include` (default) builds
+    #: it; `skip` leaves it registered — the pin, and therefore the provenance
+    #: Invariant 3 is about, are untouched — but no clone, no detect preflight and
+    #: no AST pass happen for it.
+    #:
+    #: A THIRD axis, for the same reason `scope` is a second one. `scope` says
+    #: which graph a source lands IN; this says whether it is built AT ALL, and a
+    #: source can be excluded from the build while remaining, on the record, an
+    #: object of study. Collapsing the two would force a choice between "forget
+    #: what it was for" and "keep failing the build", and both are wrong.
+    #:
+    #: `skip` is deliberately expensive to use: `skip_reason` is REQUIRED and the
+    #: build prints one line per skipped source. A silent exclusion is a way to
+    #: make a red build green by dropping the source that was telling the truth.
+    build: str = "include"
+    #: Why this source is `build = skip`. Required and non-empty when it is.
+    skip_reason: str = ""
 
     @property
     def clone_dir(self) -> Path:
@@ -52,12 +69,43 @@ def _parse(text: str) -> dict[str, str]:
     return fields
 
 
+#: Every value each enumerated manifest field accepts. These are VALIDATED, and
+#: were not until 2026-08-20: `scope` had exactly one reader (`m.scope == "study"`)
+#: and no check, so any misspelling of `study` silently fell through to the
+#: `corpus` default and merged a peer tool into the aggregate — the precise
+#: outcome the field was introduced to prevent, reachable by one keystroke and
+#: visible in no output. (The misspelling is described rather than written: the
+#: `typos` step corrects one written literally, which is how the test covering
+#: this first shipped asserting that a VALID value raises.)
+#: A field whose typo is indistinguishable from its default is not a setting.
+_ENUMS: dict[str, frozenset[str]] = {
+    "kind": frozenset({"code", "docs"}),
+    "scope": frozenset({"corpus", "study"}),
+    "build": frozenset({"include", "skip"}),
+}
+
+
 def load(path: Path) -> Manifest:
     """Parse and validate one manifest file into a Manifest (raises on missing fields)."""
     f = _parse(path.read_text(encoding="utf-8"))
     missing = {"url", "ref", "commit"} - f.keys()
     if missing:
         raise ValueError(f"{path}: manifest missing required field(s): {sorted(missing)}")
+    for field, allowed in _ENUMS.items():
+        value = f.get(field)
+        if value is not None and value not in allowed:
+            raise ValueError(
+                f"{path}: {field} = {value!r} is not one of {sorted(allowed)} — "
+                "an unrecognised value would otherwise fall through to the default"
+            )
+    build = f.get("build", "include")
+    skip_reason = f.get("skip_reason", "")
+    if build == "skip" and not skip_reason:
+        raise ValueError(
+            f"{path}: build = skip requires a non-empty `skip_reason` — a source dropped "
+            "from the build without a stated reason is indistinguishable from one nobody "
+            "noticed was missing"
+        )
     return Manifest(
         name=path.stem,
         path=path,
@@ -66,6 +114,8 @@ def load(path: Path) -> Manifest:
         commit=f["commit"],
         kind=f.get("kind", "code"),
         scope=f.get("scope", "corpus"),
+        build=build,
+        skip_reason=skip_reason,
     )
 
 

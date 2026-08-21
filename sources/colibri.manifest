@@ -4,3 +4,23 @@ url = https://github.com/JustVugg/colibri
 ref = v1.5.0
 commit = 5e4b5c6a2179b5b7559657a6db100bed0cd45209
 kind = code
+# EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,
+# and triage after the graphify extraction). Not a de-registration: the pin above
+# stays committed and fingerprinted.
+#
+# `kb-build` fails closed on 11 partially-extracted files, all GPU-backend C:
+# `c/backend_cuda.cu`, `c/backend_cuda.h`, `c/backend_cuda_ink.h`,
+# `c/backend_gpu_compat.h`, `c/backend_metal.h` and 6 more. This is a FOURTH
+# distinct cause, not the vendored-grammar shape of the earlier skips: these are
+# colibri's OWN sources, and graphify's C grammar does not read CUDA/Metal
+# dialect extensions. `backend_cuda.cu` still yields 148 symbols, so the loss is
+# partial rather than total — and unmeasured, which is why this is skipped
+# rather than approved. Same multi-file wall as codegraph: the partial-extraction
+# approver handles ONE file per source by design.
+#
+# Note what remains reachable while skipped: this source was ingested to evaluate
+# colibri as the answer to graphify agent-work token burn, and that evaluation
+# reads the CLONE, not the aggregate graph. Tracked in #417.
+# Restore by deleting these two lines.
+build = skip
+skip_reason = #417: 11 partially-extracted GPU-backend C files (CUDA/Metal dialect, colibri's own code) and the partial approver handles one file per source; skipped under Ray's 2026-08-20 ruling

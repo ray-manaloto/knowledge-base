@@ -247,6 +247,119 @@ _EXPECTED_METADATA_ONLY = (
 # refs". This file has no imports at all, so the rescue recovers nothing.
 # Upstream #2551 is watched in `currency.toml` so its close surfaces as movement.
 _EXPECTED_PARTIAL_EXTRACTION = (
+    # OpenSymphony's deliberately-broken python fixture — 53 bytes, one function
+    # with a missing colon, and the file is NAMED `malformed.py`. Being
+    # unparsable is its entire purpose as a test input, so the warning is
+    # expected forever rather than pending a fix.
+    #
+    # MEASURED, not inferred, and the measurement is the reason this entry is
+    # cheap: graphify says "1 symbol(s) extracted", and the sub-graph carries
+    # TWO nodes for the path — the file stub `malformed.py` AND `broken()`. The
+    # file defines exactly one symbol, so **nothing is lost** and
+    # `lost_symbols` is 0. That is the opposite of the Attacca `.astro` entry
+    # below, where 1 node is the stub alone and 25 named symbols are gone; do not
+    # read the two entries as the same situation because they share a warning.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="OpenSymphony",
+        relative_path="crates/opensymphony-code-intel/fixtures/python/malformed.py",
+        content_sha256="5812469eaff4436903f09258c1dc76da0ff4a8057c3a3fa083dc29bb3d158e6f",
+        first_error_line=2,
+        extracted_nodes=2,
+        lost_symbols=0,
+        reason=(
+            "a 53-byte fixture named malformed.py whose only function omits a colon; "
+            "tree-sitter error recovery still yields the file stub and broken(), so "
+            "the partial extraction loses nothing"
+        ),
+    ),
+    # cclint's control-character security test. Line 28 embeds a literal NUL and
+    # 0x1f — verified by reading the bytes, not the rendered text, which displays
+    # them as spaces — because the test's subject IS rejecting control characters.
+    # tree-sitter cannot parse past them, so the loss is permanent and expected.
+    #
+    # MEASURED from the sub-graph: exactly 1 node survives (the file stub), and
+    # the file names 21 `describe`/`it` blocks, all lost. Same shape as the
+    # `.astro` entry below and the OPPOSITE of the `malformed.py` entry above,
+    # where recovery was complete — which is why each entry carries its own
+    # numbers rather than sharing a class.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="cclint",
+        relative_path="tests/unit/infrastructure/security/PathValidator.test.ts",
+        content_sha256="8bacc406e7f3b40412570618c0ad219820ec2838d8a7f2d9d7c4f719cabb2c44",
+        first_error_line=28,
+        extracted_nodes=1,
+        lost_symbols=21,
+        reason=(
+            "the file embeds literal NUL and 0x1f bytes as the fixture for a "
+            "control-character rejection test; tree-sitter cannot parse past them "
+            "and recovers no symbols"
+        ),
+    ),
+    # code-review-graph's Luau fixture. graphify has no `.luau` dispatch of its
+    # own and parses the file with the LUA grammar, which has no syntax for the
+    # type annotations that are Luau's whole point — so it errors on the
+    # `type Vector3 = {…}` alias at line 10 and recovers at the metatable block
+    # on L34.
+    #
+    # MEASURED, and the control arm changed the number. The file holds 12
+    # function definitions and the sub-graph carries 10 nodes (file stub + 9),
+    # which reads as 3 lost. It is 2. The sibling `tests/fixtures/sample.lua` —
+    # the same fixture without type annotations, parsing cleanly — extracts 11 of
+    # its OWN 13 definitions, and the two it misses are `local transform =
+    # function` and `local validate = function`. graphify's Lua extractor does
+    # not graph that form at all, so `transform` here was never going to appear
+    # and is not loss from this error. Only `greet` (L19) and `add` (L25) are.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="code-review-graph",
+        relative_path="tests/fixtures/sample.luau",
+        content_sha256="6618eb68fe06399b930d70c71773ec9872bb9d91db64b61439de7e6df02a919c",
+        first_error_line=10,
+        extracted_nodes=10,
+        lost_symbols=2,
+        reason=(
+            "graphify parses .luau with the Lua grammar, which cannot read Luau type "
+            "annotations; the `type Vector3` alias at line 10 errors and recovery "
+            "resumes at the metatable block, losing greet() and add()"
+        ),
+    ),
+    # graphify's OWN Luau fixture — the same #2520 mechanism as the
+    # code-review-graph entry above, and the opposite outcome. `.luau` dispatches
+    # to `extract_lua` -> `tree_sitter_lua`, which has no syntax for the type
+    # annotations Luau adds, so the `type ServerConfig = {` alias at line 8 errors.
+    #
+    # MEASURED: the file defines exactly FOUR functions — Server.new (L13),
+    # Server:start (L20), Server:stop (L24), main (L28) — and the sub-graph carries
+    # all four plus the file stub. `lost_symbols = 0`: tree-sitter recovers past the
+    # type alias and every declaration survives. Control arm: 110 other
+    # `tests/fixtures/*` files are present in the same sub-graph, so a zero here
+    # would have been an absence rather than a broken lookup.
+    #
+    # DO NOT read the fixture's own header comment as the warrant. It says
+    # tree-sitter-lua "extracts function declarations and call edges fine", and the
+    # SIBLING fixture at sources/code-review-graph carries an equally reassuring
+    # header while losing 2 of its 11 functions (entry above). Loss under #2520 is
+    # per-file, so this number is measured for THIS file at THIS pin.
+    #
+    # DELIBERATELY NOT CITED: graphify's published self-graph release asset. It is
+    # built by `graphify extract graphify/ --out .` over the PACKAGE directory only
+    # (82 .py files) with `*.md`/`*.txt` appended to .graphifyignore, so it contains
+    # no `tests/` path at all and never had this fixture as an input. Citing it as
+    # "upstream sees the same loss" would be a true-sounding warrant for something
+    # it never measured. Upstream #2520 is open, confirmed by EXECUTING the
+    # installed 0.9.48 grammar rather than by reading the tracker.
+    graphify_health.ExpectedPartialExtraction(
+        source_name="graphify",
+        relative_path="tests/fixtures/sample.luau",
+        content_sha256="c1aa998580d46b917014567ad39fe125c2a63ac540c3840fd27813d2004d2bd5",
+        first_error_line=8,
+        extracted_nodes=5,
+        lost_symbols=0,
+        reason=(
+            "graphify parses .luau with the Lua grammar, which cannot read the "
+            "`type ServerConfig` alias at line 8 (#2520); recovery resumes and all "
+            "four function declarations survive, so the partial extraction loses nothing"
+        ),
+    ),
     graphify_health.ExpectedPartialExtraction(
         source_name="Attacca",
         relative_path="website/src/pages/index.astro",
@@ -257,6 +370,58 @@ _EXPECTED_PARTIAL_EXTRACTION = (
         reason=(
             "graphify extract_astro parses the whole .astro file as JS and "
             "regex-rescues imports only; this file has none (#2551)"
+        ),
+    ),
+)
+
+# Files in a language graphify has NO AST extractor for (#1689). Separate from
+# `_EXPECTED_PARTIAL_EXTRACTION` above because the two expire on different
+# events: a partial extraction changes when the FILE or the grammar changes,
+# while these change only when UPSTREAM ships an extractor.
+#
+# Upstream state, verified 2026-08-20 against the tracker AND the installed
+# 0.9.48, because the tracker alone has already been wrong about this once:
+#   * #1689 is OPEN and is exactly this warning. The maintainer shipped the
+#     warning itself in v8 (377dc7f) and said the extractor "is the natural
+#     follow-up".
+#   * #2116 ("Native Tree-sitter Support for R") is CLOSED as COMPLETED and
+#     nothing shipped — a commenter documented the same thing at 0.9.27.
+#   * The installed 0.9.48 has 30 files in `graphify/extractors/` and no `r.py`
+#     (the r-prefixed ones are razor, resolution, rust). The gap is real at the
+#     version we run, which is the only version whose behaviour this gates.
+# So the loss below is accepted as CURRENT, never as permanent: the zero-node
+# check in `approve_unsupported_language_warning` expires each entry the moment
+# an extractor lands, and the build reports that rather than absorbing it.
+_EXPECTED_UNSUPPORTED_LANGUAGE = (
+    # code-review-graph is a multi-language parser and carries one fixture per
+    # language it claims to handle. These two are its R pair, and R is precisely
+    # the language #1689 was filed about.
+    #
+    # MEASURED from the sub-graph, control-armed: 53 other `tests/fixtures/*`
+    # files ARE present in it, so a zero here is an absence and not a broken
+    # probe.
+    graphify_health.ExpectedUnsupportedLanguage(
+        source_name="code-review-graph",
+        relative_path="tests/fixtures/sample.R",
+        content_sha256="3e3d48a842d2fcf26d288fda088a1fe0f218165b8f1a01b1b899fbf401e7613b",
+        language=".r",
+        lost_symbols=6,
+        reason=(
+            "graphify has no tree-sitter-r dispatch (#1689), so this 30-line CRAN-style "
+            "fixture contributes zero nodes; add(), multiply(), MyClass, greet(), "
+            "get_age() and process_data() are all absent"
+        ),
+    ),
+    graphify_health.ExpectedUnsupportedLanguage(
+        source_name="code-review-graph",
+        relative_path="tests/fixtures/test_sample.R",
+        content_sha256="2c643bf1eb0749fe0af797b46c119325f62169bb06763f42054b81f1fa0fb702",
+        language=".r",
+        lost_symbols=1,
+        reason=(
+            "the R half of code-review-graph's test-detection fixtures; no tree-sitter-r "
+            "dispatch (#1689), so test_add() is absent. The testthat block is a call, "
+            "not a definition, and is not counted as loss"
         ),
     ),
 )
@@ -430,6 +595,7 @@ def _extract_code(repo_root: Path, name: str) -> bool:
         nodes = raw_nodes
     inventory = tuple(item for item in _EXPECTED_METADATA_ONLY if item.source_name == name)
     partial = tuple(item for item in _EXPECTED_PARTIAL_EXTRACTION if item.source_name == name)
+    unsupported = tuple(item for item in _EXPECTED_UNSUPPORTED_LANGUAGE if item.source_name == name)
     approved, residual = graphify_sdk.account_for_extract_stderr(
         source_root,
         proc.stderr or "",
@@ -437,6 +603,7 @@ def _extract_code(repo_root: Path, name: str) -> bool:
             source_name=name,
             metadata_inventory=inventory,
             partial_inventory=partial,
+            unsupported_language_inventory=unsupported,
             extracted_nodes_by_path=_nodes_by_source_file(nodes),
         ),
     )
@@ -2353,6 +2520,27 @@ def _cluster_study_graph(repo_root: Path, study_out: Path) -> None:
         shutil.copy(staged, study_out)
 
 
+def _drop_skipped_builds(manifests: list[mf.Manifest]) -> list[mf.Manifest]:
+    """Partition off `build = skip` sources, announcing each with its reason.
+
+    Called BEFORE the clone, the detect preflight and the AST pass — those are the
+    three things that cost, and the two that fail. Never silently: the hazard of
+    this field is that it can turn a red build green by removing the source that
+    was reporting a real problem, so every exclusion states why on its own line.
+
+    A skipped manifest is NOT dropped from the input fingerprints `build` takes
+    first: the pin stays committed and fingerprinted, so the source remains
+    reproducible-by-reference. It is excluded from this build, not from the record.
+    """
+    kept = [m for m in manifests if m.build != "skip"]
+    if not kept:
+        raise SystemExit("every sources/*.manifest is build = skip — nothing to build")
+    for m in manifests:
+        if m.build == "skip":
+            print(f"  [excluded] {m.name}: build = skip — {m.skip_reason}")
+    return kept
+
+
 def build(repo_root: Path) -> None:
     """Reproduce the full graph from committed inputs (deterministic, no LLM)."""
     sources = repo_root / "sources"
@@ -2409,6 +2597,8 @@ def build(repo_root: Path) -> None:
             f"{len(collisions)} cross-chunk source_file collision(s) — refusing to build:\n  "
             + "\n  ".join(collisions)
         )
+
+    manifests = _drop_skipped_builds(manifests)
 
     print(f"[kb-build] {len(manifests)} source(s)")
     for m in manifests:

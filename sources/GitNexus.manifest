@@ -8,3 +8,13 @@ kind = code
 # far worse than 1:1 (71 MB once added >=155 MiB). Aggregate headroom measured
 # 2026-08-02 at ~147 MiB against graphify's 512 MiB cap, so this one stays out.
 scope = study
+# EXCLUDED FROM THE BUILD 2026-08-20 (Ray's call, #409). Not a de-registration:
+# the pin above stays committed and fingerprinted, so provenance is intact.
+# `kb-build` fails closed on this source — 79 zero-node and 15 partially-extracted
+# files against a committed inventory of 12 and 1 — and that inventory is
+# per-file, content-hash-pinned, so clearing it by hand means 94 hand-written
+# entries. That is #409 ("the reviewed-warning inventories do not scale"), and it
+# blocks a graph nothing else needs this source for: scope = study already keeps
+# it out of the aggregate. Restore by deleting these two lines once #409 lands.
+build = skip
+skip_reason = #409: 94 reviewed-warning inventory entries would be needed by hand; scope=study, so the aggregate does not need it

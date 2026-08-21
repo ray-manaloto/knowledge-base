@@ -249,11 +249,21 @@ def test_exact_graphify_cost_advisory_has_separate_review_authority(tmp_path: Pa
             "detector_git_object": graphify_semantic_corpus._ACCEPTED_GRAPHIFY_DETECT_OBJECT,
             "file_count_threshold": 500,
             "message": (
-                "Large corpus: 803 files · ~1,415,411 words. Semantic extraction will be "
+                "Large corpus: 807 files · ~1,425,243 words. Semantic extraction will be "
                 "expensive (many Claude tokens). Consider running on a subfolder."
             ),
-            "observed_files": 803,
-            "observed_words": 1_415_411,
+            # v0.9.47 -> v0.9.48 moved the OBSERVED census only: 803 -> 807 files
+            # and 1,415,411 -> 1,425,243 words, over the whole tree. Both
+            # thresholds, the advisory code, the detector object and
+            # `review_status` are unchanged, and the ADMITTED workload did not
+            # move at all (374 detected / 479 discovered / 475 admitted units /
+            # 58 chunks / 370 unique paths, measured either side). An observation
+            # moving is not a decision moving — which is exactly why this test
+            # pins the numbers rather than the shape: a census that moved
+            # BECAUSE the admitted set moved would look identical here if the
+            # counts were not asserted.
+            "observed_files": 807,
+            "observed_words": 1_425_243,
             "review_status": "provisional",
             "word_count_threshold": 500_000,
         }

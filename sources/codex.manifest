@@ -30,3 +30,21 @@ ref = rust-v0.148.0
 commit = ab52d1794d47d47ecaeb0ec37fc00fa31593ecf3
 kind = code
 added = 2026-08-02
+# EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,
+# and triage after the graphify extraction). Not a de-registration: the pin above
+# stays committed and fingerprinted, and the INVARIANT above still binds — this
+# manifest must keep tracking the version we run, skipped or not.
+#
+# ⚠️ THIS IS A TOOLCHAIN SOURCE, so the loss has a specific shape: while skipped,
+# the corpus cannot answer questions about a tool this repo actually RUNS. That
+# is the failure the invariant above was written to prevent, arrived at from the
+# other direction. Tracked in #417.
+#
+# `kb-build` fails closed on ONE file: `Cargo.toml` produced zero nodes (#1666).
+# One entry would normally be trivial, but the reviewed-metadata approver is
+# JSON-only by construction — `graphify_sdk` calls `extract_json(path)` on every
+# inventory item and compares graphify's own `skipped` disposition — so a TOML
+# file cannot be approved through it without new machinery.
+# Restore by deleting these two lines.
+build = skip
+skip_reason = #417: Cargo.toml produces zero nodes (#1666) and the reviewed-metadata approver is JSON-only, so a TOML file needs new machinery; skipped under Ray's 2026-08-20 ruling. TOOLCHAIN source, so the corpus cannot describe a tool we run while this holds

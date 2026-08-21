@@ -224,8 +224,8 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.47"
-_ACCEPTED_GRAPHIFY_REF = "v0.9.47"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.48"
+_ACCEPTED_GRAPHIFY_REF = "v0.9.48"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -254,15 +254,15 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
-    "sdist_sha256": "26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
+    "wheel_sha256": "4f745d72d6c5165ef7132bf8b2819ef59707aa70cd99efd3a4fbc8c4ba43b4b9",
+    "sdist_sha256": "14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="b14b52e94ec3d9840413d81777f4c134eac0a40d",
-    source_tree="cef4315aa8b20beb314c3a00f09b3db4d6b01eca",
-    catalog_sha256="5f32d9f356f8fe05dc0e41a0975fa3895c627bd103cc49f3bbd25bef2fc50df1",
-    source_manifest_sha256="fce48f42fe9e661eb9fdfb60c22944acd17c24a2f86549f0a04967add2e462a4",
+    source_commit="b2cd36267456c166788c95be6e68574064a92a42",
+    source_tree="be8636735370ed82708bb53eba33170e85acc369",
+    catalog_sha256="80a3f9796b278891d2a7bf2be89c18e7ae9dc60edffb06036a64a1b7ac904c26",
+    source_manifest_sha256="df726ec1e518a7a453326ece51d9f8e1d50b2bb0cf31b1236d7e09f3364ed2c6",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried

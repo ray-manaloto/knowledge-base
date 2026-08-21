@@ -368,14 +368,45 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # the fingerprint being byte-identical: the changed code is inside the
 # response-reading path, not on the signature of `llm.extract_corpus_parallel`.
 # The absence-of-llm.py test would have PASSED at 0.9.45 and been FALSE here.
+# ADVANCED AGAIN to 0.9.48 — and this bump is repairing a LIVE BREAK, not just
+# keeping up. The 0.9.47 advance moved this object and left the literal it is
+# PAIRED with at "0.9.46" (`_runtime_reasons`, below), so the pair had been
+# unmatchable ever since: a real non-authority run was rejected with BOTH
+# `receipt-runtime-mismatch` and `receipt-graphify-version-mismatch`.
+#
+# The comment beside that pairing PREDICTED this exact failure, in these words —
+# "a literal left beside a newer runtime makes the pair unmatchable and the
+# non-authority path rejects every run under the installed version" — and it was
+# written because it had already happened once at 0.9.46. It then happened again
+# one bump later, in the file that says so. A warning is not a mechanism; that is
+# why this advance ships `test_non_authority_graphify_pairs_*` instead of a
+# third restatement of the same paragraph.
+#
+# NOTHING CAUGHT IT: the suite was rc=0 the whole time, because no test exercised
+# the non-authority path. CodeRabbit did, on PR #422, after a cold cross-family
+# lane and the author both read the diff and missed it.
+#
+# All three digests MEASURED against the installed 0.9.48 via
+# `graphify_baseline.runtime_identity`, never carried:
+# `sdk_fingerprint_sha256` is UNCHANGED at b10406f9… — the value 0.9.45, 0.9.46
+# and 0.9.47 all recorded, so the public SDK surface is identical at four
+# consecutive releases — while the wheel and sdist digests moved because each
+# distribution is a new build.
+#
+# ⚠️ WHAT IS NOT UNCHANGED AT 0.9.48, and does not belong to this constant:
+# `semantic_api_fingerprint()` MOVED (43122fca… -> 6047cf0e…) because
+# `extract_corpus_parallel`'s `max_retry_depth: int = 3` became
+# `int | None = None` (upstream #2880). That is a different digest with a
+# different owner — see `_ACCEPTED_SEMANTIC_FINGERPRINT_SHA256` — and it is
+# still stale on the non-authority path. Deliberately NOT changed here.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.47",
-    cli_version="0.9.47",
-    sdk_version="0.9.47",
+    version="0.9.48",
+    cli_version="0.9.48",
+    sdk_version="0.9.48",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
-    sdist_sha256="26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
+    wheel_sha256="4f745d72d6c5165ef7132bf8b2819ef59707aa70cd99efd3a4fbc8c4ba43b4b9",
+    sdist_sha256="14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e",
 )
 # The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
 # authority for it — `_receipt_reasons` compares the retained receipt against
@@ -444,9 +475,25 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # reported nothing, and the COLD LANE found it a SECOND time (P0, review of
 # fe57f996). Two independent misses by the same blind spot is not an anecdote —
 # it is the evidence for #393, which is why that issue cites it.
-_CURRENT_CLAUDE_VERSION = "2.1.236"
+#
+# 2.1.236 -> 2.1.238 advanced 2026-08-20. `claude` self-updated in place TWICE
+# (2.1.237 was never installed here long enough to be recorded), so leaving this
+# at 2.1.236 asserted an identity the host contradicts and the corpus preflight
+# would have refused. Measured, not carried, and through this module's OWN
+# `claude_child_environment` rather than a shell — `shutil.which("claude")`
+# resolves to `~/.local/share/claude/versions/2.1.238`, `--version` reports
+# `2.1.238 (Claude Code)`, and the digest below is
+# `sha256(Path(which("claude")).read_bytes())`.
+#
+# THE `--help` DIGEST DID NOT MOVE — still 71ad650f…, the value 2.1.232 through
+# 2.1.236 all recorded, re-hashed against the INSTALLED 2.1.238. So every flag
+# this path depends on is spelled identically and only the implementation moved.
+# That is the FIFTH consecutive advance with this shape, which is the whole
+# reason the shape is worth stating: it is what makes a version bump a
+# re-record rather than a review.
+_CURRENT_CLAUDE_VERSION = "2.1.238"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "6bc4ba992d2786cbf0237c4453ca53c1fdf0c3b3d83ffa0025c0d8190ed27848"
+    "1c196c456373b57818ae87df84aecee96cb659448c0d6a6bbb401ac5758431b2"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (
@@ -1303,30 +1350,38 @@ def _adapter_reasons(metadata: object, receipt: SemanticReceipt, fragment: objec
 
 
 def _runtime_reasons(runtime: ClaudePreflight, *, enforce_authority: bool) -> list[str]:
-    accepted_graphify_pairs = (
-        ((_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),)
+    # The version half is DERIVED from the runtime half, never restated beside
+    # it. That is the fix for a defect this site carried twice.
+    #
+    # The pair exists to catch CLI/SDK SKEW: `graphify_runtime` is the installed
+    # runtime identity and `graphify_version` is what the SDK reports, derived
+    # separately, and a run where they disagree is one nobody reviewed. What the
+    # pair must NOT do is police the two halves of an ACCEPTED entry against each
+    # other — an accepted runtime's own version is not a second opinion about
+    # itself, it is the same fact written twice, and a fact written twice drifts.
+    #
+    # It drifted. The 0.9.46 -> 0.9.47 bump advanced `_CURRENT_GRAPHIFY_RUNTIME`
+    # and left its literal at "0.9.46", so this tuple became unmatchable and the
+    # non-authority path rejected EVERY run under the installed version — with
+    # both `receipt-runtime-mismatch` and `receipt-graphify-version-mismatch`.
+    # The comment that used to sit here predicted precisely that ("a literal left
+    # beside a newer runtime makes the pair unmatchable"), having been written
+    # after the same thing happened at 0.9.46 — and the prediction did not
+    # prevent the recurrence, because prose cannot. Deriving it can.
+    #
+    # The two entries still DIVERGE by design, which is the reason there are two:
+    # the AUTHORITY pair stays at the version where the committed slice evidence
+    # was produced and never advances on a pin bump alone (that would assert an
+    # identity the receipt on disk contradicts), while the CURRENT pair moves
+    # with the pin. They converge only when the slice re-runs and commits a new
+    # receipt under the installed version.
+    accepted_graphify_runtimes_for_path = (
+        (_ACCEPTED_GRAPHIFY_RUNTIME,)
         if enforce_authority
-        else (
-            # The two pairs DIVERGE here: the AUTHORITY pair stays at 0.9.45
-            # because that is where the committed slice evidence was produced
-            # (it never advances on a pin bump alone, which would assert an
-            # identity the receipt on disk contradicts), while the CURRENT pair
-            # moved with the pin to 0.9.46. They converge again only when the
-            # slice re-runs and commits a new receipt under the installed
-            # version.
-            #
-            # Worth keeping: the comment this replaces PREDICTED this exact
-            # state ("they diverge again the moment the pin moves ahead of the
-            # committed receipt") and then opened "Both pairs now read 0.9.45"
-            # once it arrived. A comment that forecasts its own obsolescence
-            # still needs something to move it. Each version string has to
-            # move WITH its runtime (the two are checked as a pair), so a
-            # literal left beside a newer runtime makes the pair unmatchable and
-            # the non-authority path rejects every run under the installed
-            # version.
-            (_ACCEPTED_GRAPHIFY_RUNTIME, "0.9.45"),
-            (_CURRENT_GRAPHIFY_RUNTIME, "0.9.46"),
-        )
+        else (_ACCEPTED_GRAPHIFY_RUNTIME, _CURRENT_GRAPHIFY_RUNTIME)
+    )
+    accepted_graphify_pairs = tuple(
+        (identity, identity.version) for identity in accepted_graphify_runtimes_for_path
     )
     accepted_graphify_runtimes = tuple(pair[0] for pair in accepted_graphify_pairs)
     names = set(runtime.environment_names)

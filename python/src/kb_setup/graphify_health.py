@@ -12,6 +12,31 @@ import msgspec
 
 APPROVED_METADATA_ZERO_NODE_WARNING = "approved-reviewed-metadata-zero-node"
 APPROVED_PARTIAL_EXTRACTION_WARNING = "approved-reviewed-partial-extraction"
+#: A SAME-FILE id collision: one entity the extractor labelled twice, one label
+#: discarded. Approved because graphify itself draws this distinction and says
+#: what it costs — `dedup.py:_report_id_collision` emits a lower-case `note:`
+#: here and states that "the structural entity and its edges survive", reserving
+#: `WARNING:` for the different-FILE case where "they are distinct entities and
+#: one is genuinely lost".
+#:
+#: The severity split is the whole reason this is a separate token rather than a
+#: widening of an existing one. Approving the `note:` must not approve the
+#: `WARNING:`: that one IS the #231 silent-loss shape and has to keep blocking.
+APPROVED_SAME_FILE_ID_COLLISION_NOTE = "approved-same-file-id-collision-note"
+#: A language Graphify has NO extractor for at all (#1689). Deliberately its own
+#: token rather than a widening of `APPROVED_PARTIAL_EXTRACTION_WARNING`, because
+#: the two describe opposite situations and only one of them can be fixed here:
+#: a partial extraction means the parser RAN and recovered some of the file, so
+#: the loss moves when the file or the grammar changes; a missing extractor means
+#: no parser exists, so every file in that language contributes zero forever and
+#: the loss moves only when UPSTREAM ships one.
+#:
+#: Keeping them apart is what makes the eventual fix visible. Graphify's own
+#: `extract.py` draws the same line — the #1666 zero-node warning "deliberately
+#: skips these (it only fires when an extractor exists)" — and flattening it here
+#: would let an upstream R extractor land without anything in this repo noticing
+#: that a reviewed loss had stopped being real.
+APPROVED_UNSUPPORTED_LANGUAGE_WARNING = "approved-reviewed-unsupported-language"
 
 
 class GraphifyOperation(StrEnum):
@@ -120,6 +145,38 @@ class ExpectedPartialExtraction(msgspec.Struct, frozen=True, forbid_unknown_fiel
     #: sub-graph, never trusted from this file.
     extracted_nodes: int
     #: Named symbols absent from the graph — the reviewed measurement.
+    lost_symbols: int
+    reason: str
+
+
+class ExpectedUnsupportedLanguage(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """Reviewed file in a language Graphify has no AST extractor for, loss COUNTED.
+
+    The #1689 warning names EXTENSIONS and counts, never paths — so unlike
+    `ExpectedPartialExtraction`, the warning text alone cannot say which files it
+    is about. The paths come from this inventory and are verified two ways: the
+    bytes must still hash to `content_sha256`, and the sub-graph must carry ZERO
+    nodes for the path. That second check is what stops this from becoming a
+    blanket per-language allowlist: the moment upstream ships an extractor the
+    file starts producing nodes, the entry stops matching, and the build says so
+    rather than quietly keeping an approval for loss that no longer happens.
+
+    `lost_symbols` is the reviewed count of named definitions the file contains
+    and the graph therefore does not. It is not derivable from the warning — the
+    warning's number counts FILES — so registering an entry without it would
+    approve an unmeasured quantity of corpus loss, the #231 shape.
+    """
+
+    source_name: str
+    relative_path: str
+    content_sha256: str
+    #: The lower-cased suffix Graphify groups the warning by, e.g. `.r`. Stored
+    #: rather than derived from `relative_path` because the warning is matched on
+    #: THIS, and a file whose extension case differs (`.R` on disk, `.r` in the
+    #: warning) must still be matched by the token graphify actually printed.
+    language: str
+    #: Named definitions in the file that are absent from the graph — the
+    #: reviewed measurement, counted by reading the file.
     lost_symbols: int
     reason: str
 

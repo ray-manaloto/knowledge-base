@@ -471,10 +471,145 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # `graphify_semantic_corpus.py` and `graphify_semantic_slice.py`, and recording
 # before it would have staled these values exactly as the note above describes
 # happening at 31c63d4d.
+# RE-RECORDED 2026-08-20 (i), for the graphify v0.9.47 -> v0.9.48 currency bump
+# and the claude 2.1.236 -> 2.1.238 self-update. **NO NEW JUDGEMENT.** Every
+# decision field is unchanged and that was VERIFIED field by field against the
+# previous plan rather than asserted:
+#
+#     max_total_cost_usd        100.0  ->  100.0
+#     max_cost_usd               25.0  ->   25.0
+#     claude_max_output_tokens  64000  ->  64000
+#     timeout_seconds             900  ->    900
+#     concurrency                   1  ->      1
+#     max_turns                     3  ->      3
+#     graphify_max_retry_depth      2  ->      2
+#
+# Ray's standing ruling for a graphify advance is MEASURE THE ADMITTED INVENTORY
+# FIRST and re-record only if it is unchanged — otherwise the cost moved and it
+# is a fresh review. It is unchanged, and that is the whole justification.
+# Measured through `plan_source` with the real `planned_max_output_tokens`
+# resolver, exactly as `_exact_graphify_plan` does, and diffed against the plan
+# on disk (whose four digests match the values this block replaces, so it IS the
+# authorized plan and not a look-alike):
+#
+#     detected sources       374   (0.9.47: 374)
+#     discovered units       479   (0.9.47: 479)
+#     admitted units         475   (0.9.47: 475)
+#     chunks                  58   (0.9.47:  58)
+#     unique admitted paths  370   (0.9.47: 370) — zero added, zero removed,
+#                                   compared as SETS so an over-covering plan
+#                                   would fail too rather than pass by count
+#
+# Estimated tokens moved 1,037,295 -> 1,038,052 (+757, +0.07%), all of it
+# CHANGELOG.md and README.md growing at the release. Six of 58 chunks differ and
+# every one of those differences is that growth plus a one-slot `unit_ordinal`
+# shift behind it — no unit entered or left. The projected spend is unmoved.
+#
+# THIRTEEN of 44 config fields moved, and every one is IDENTITY or derived:
+#
+# * `graphify_ref` / `graphify_commit` / `graphify_tree` / `graphify_llm_sha256`
+#   — the pin.
+# * `claude_version` / `claude_executable_sha256` 2.1.236 -> 2.1.238. `claude`
+#   self-updated in place twice; 2.1.237 was never resident here long enough to
+#   be recorded. The `--help` digest did NOT move — still 71ad650f…, the value
+#   2.1.232 through 2.1.236 all recorded, re-hashed against the INSTALLED
+#   binary through the slice's own `claude_child_environment` — so every flag
+#   this path pins is spelled identically and only the implementation moved.
+# * `planner_sha256` / `semantic_slice_sha256` and the four digests derived from
+#   the plan's own members — ordinary code identity.
+#
+# TWO THINGS MOVED THAT THIS FILE HAS NEVER RECORDED MOVING, and neither is a
+# decision. Both were checked rather than reasoned about, because each one is
+# exactly the shape that would carry a real change in disguise:
+#
+# 1. `exclusions.json` ENTRY BYTES moved — a first. `docs/graph-hero.png` and
+#    `docs/logo.png` carry `evidence_git_objects` / `evidence_sha256` binding
+#    them to the README that DESCRIBES them, and that README changed at 0.9.48.
+#    The two entries whose evidence did not change — `docs/demo-path.svg` and
+#    `worked/rsl-siege-manager/graph.html` — are byte-identical. So the evidence
+#    DOCUMENT moved under an unchanged judgement: still the same four
+#    exclusions, still each one derived or presentational with its semantic
+#    authority left in the corpus. No scope question is re-opened.
+#
+# 2. `graphify_semantic_fingerprint_sha256` moved (43122fca… -> 6047cf0e…) —
+#    a REAL signature change in the one API this run calls.
+#    `extract_corpus_parallel`'s `max_retry_depth: int = 3` became
+#    `int | None = None`, resolved by a new `_resolve_max_retry_depth()` that
+#    honours `GRAPHIFY_MAX_RETRY_DEPTH` (upstream #2880, so an operator can cap
+#    retry spend from the CLI). It has NO EFFECT HERE, and that was established
+#    by reading the call sites rather than the release note: the driver passes
+#    `max_retry_depth=config.graphify_max_retry_depth` EXPLICITLY at all three
+#    of them, and the new default resolution — and therefore the environment
+#    variable — is reachable only when the argument is `None`. Worth recording
+#    rather than waving through, because a fingerprint that moves is the one
+#    signal this plan has that the surface it depends on changed, and the
+#    correct response to it is to go and read what changed.
+#
+# `advisories.json` moved only in the OBSERVED CENSUS: 803 -> 807 files and
+# 1,415,411 -> 1,425,243 words. Same advisory code, same 500-file and
+# 500,000-word thresholds, same `detector_git_object` (d16b5800…), same
+# `provisional` status. An observation moving is not a decision moving — and
+# `review_status` STAYS `provisional` deliberately: `verify_plan` requires that
+# exact value, and `cost-advisory-review-required` is emitted only inside the
+# `if not authorized` branch alongside `plan-authority-mismatch`. Those two
+# reasons are companions to the mismatch, never independent gates, so
+# "clear the advisory" is not a thing that can be done to this plan — recording
+# it because a handoff read them as three separate blockers and they are one.
+#
+# ORDERING, the rule this file has now had to restate eight times: this block
+# was written AFTER the claude constant advanced in `graphify_semantic_slice.py`
+# and after the census assertion in `tests/test_graphify_semantic_corpus.py` was
+# updated, so `semantic_slice_sha256` was final when the four digests below were
+# computed. The test file is not digested; the slice is.
+# RE-RECORDED 2026-08-20 (j), after PR #422's bot round found a LIVE BREAK in
+# `graphify_semantic_slice`. **NO NEW JUDGEMENT**, and the narrowest re-plan in
+# this file: exactly TWO of 44 fields, `semantic_slice_sha256` and the
+# `cache_namespace_sha256` derived from it. `advisories.json` and
+# `exclusions.json` are BYTE-IDENTICAL to the (i) values above — both digests
+# carrying a reviewed DECISION are untouched — as are `source-inventory.json`
+# and `chunk-ledger.json`, so the workload is the same 475 units / 58 chunks.
+# Every decision field is unchanged: 100.0 / 25.0 / 64000 / 900 / 1 / 3 / 2.
+#
+# WHY THE SLICE MOVED, because it is worth more than its digest:
+# `_runtime_reasons` matched `(graphify_runtime, graphify_version)` against
+# accepted pairs whose version half was HAND-WRITTEN beside the runtime half.
+# The 0.9.46 -> 0.9.47 bump advanced `_CURRENT_GRAPHIFY_RUNTIME` and left its
+# literal at "0.9.46", so the pair was unmatchable and the non-authority path
+# rejected EVERY run under the installed version. The fix DERIVES the version
+# half from the runtime half, and advances the constant to the measured 0.9.48.
+#
+# THREE THINGS ABOUT IT ARE WORTH RECORDING RATHER THAN JUST FIXING:
+#
+# 1. The comment at that site PREDICTED this failure in these words — "a literal
+#    left beside a newer runtime makes the pair unmatchable and the non-authority
+#    path rejects every run under the installed version" — having been written
+#    after the same slip at 0.9.46. It then happened again one bump later. Prose
+#    that forecasts a defect does not prevent it; deriving the value does.
+# 2. NOTHING IN THIS REPO CAUGHT IT. The suite was rc=0 throughout, because no
+#    test exercised the non-authority path. A cold cross-family lane read the
+#    diff and missed it; so did the author. CodeRabbit — which this repo's own
+#    doctrine correctly calls advisory rather than a gate — is what found it.
+#    An advisory reviewer being the only one to see something is an argument
+#    about the gates, not about the reviewer.
+# 3. THE FIX'S OWN FIRST TEST WAS INSUFFICIENT, and a mutation sweep is what
+#    said so. `kb-arms` R5 reverted the constant to 0.9.47 and SURVIVED: the
+#    self-consistency test proves the pair agrees with ITSELF, which stays true
+#    when both halves are stale. It caught the RESTATEMENT half of the defect and
+#    not the STALENESS half. A second test binds the constant to
+#    `sources/graphify.manifest`'s pinned ref, and the sweep then ran 5/5 died,
+#    1/1 control held.
+#
+# WHAT WAS DELIBERATELY NOT FIXED, so its absence is not read as its absence
+# being unnoticed: `receipt-semantic-fingerprint-mismatch` compares against
+# `_ACCEPTED_SEMANTIC_FINGERPRINT_SHA256` on BOTH paths, and that digest moved
+# at 0.9.48 (the `max_retry_depth` signature change, upstream #2880). It is the
+# same class — a frozen-evidence constant applied to the non-authority path —
+# but it has a different owner and changing it is a judgement about what the
+# authority split means, not a typo repair.
 AUTHORITY_JSON = (
-    b'{"advisories_sha256":"2d3dcc7b6783205ee40a61dd1a4bd0161cb42efe9d937d26759102c1559d13ac",'
-    b'"execution_config_sha256":"0594d4347f76e517de6dae24bb90f128b0ba5332b243bd979058aeeb8225e244",'
-    b'"exclusions_sha256":"6a97e1cda84b3187ff06595950549abb0f20db2c0741f2620b25def5144ed3a5",'
-    b'"plan_manifest_sha256":"d4e95c0c2a33f95ee417fe0bfb4d42c97d16a51dd6583e4a6562d3c519420956",'
+    b'{"advisories_sha256":"ff7323b1921752cf195f0869b17f348903ffd8a196248be3c5edcece4fcc93d9",'
+    b'"execution_config_sha256":"83a1fc8da307c9f86daa414ff064b9135eda4066a54644ae9ce93230b635bc92",'
+    b'"exclusions_sha256":"1a63e48336f7130a1f68c57340706fd5cea3cbacf12c363bb339a7cae3e5b67e",'
+    b'"plan_manifest_sha256":"25612cb450dcdb4e538c1e92b46a42a0db8f83223761659e98c5b19c57ef7d03",'
     b'"schema_version":1}\n'
 )
