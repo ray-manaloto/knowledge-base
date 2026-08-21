@@ -51,6 +51,12 @@ next-task options. Nothing is written before that answer — no work-memory, no
 handoff, no auto-memory, no commit. Automatic invocation buys the EARLY ask, not
 an unattended write, and that is the whole of the difference.
 
+On *"not now"*, **stop**: write nothing and resume whatever the session was
+doing. That answer defers on the same terms as step 7's *"not yet"* — it expires
+on the next qualifying trigger listed there, so it is a deferral rather than a
+refusal, and the skill will offer again rather than either nagging or going
+silent for the rest of the window.
+
 The handoff's "next task" section is only as good as this step. If the task
 admits multiple readings, a scope fork, an undecided B-vs-C, or an unstated
 end-goal, surface each one, get the answer, and encode it **verbatim** — a
