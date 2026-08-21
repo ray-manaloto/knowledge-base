@@ -10,3 +10,26 @@ kind = code
 # because a query over the AGGREGATE could reach them. A peer in study-graph.json
 # sits in a file nothing routinely queries. 16 MB / 678 files, MIT.
 scope = corpus
+# EXCLUDED FROM THE BUILD 2026-08-20 (Ray's ruling: skip any blocker, file it,
+# and triage after the graphify extraction). Not a de-registration: the pin above
+# stays committed and fingerprinted, so provenance is intact.
+#
+# ⚠️ THIS ONE IS REAL CORPUS LOSS, unlike the other skips. `scope = corpus` above
+# is deliberate and argued, so excluding this source removes the closest
+# functional peer to graphify (678 files) from the AGGREGATE — the exact place
+# the comment above says the peer-tool track pays off. Tracked in #417.
+#
+# `kb-build` fails closed here on two warnings: 1 file with no AST extractor
+# (`.r`, #1689) and 11 partially extracted. NINE of the 11 are vendored
+# tree-sitter grammar headers (`codegraph-kernel/grammars/*/tree_sitter/alloc.h`)
+# — third-party C inside a third-party clone, not codegraph's own code — and the
+# partial-extraction approver handles ONE file per source by design, so the
+# multi-file warning form cannot be approved without widening it.
+#
+# The likely real fix is native and is recorded in #417: `graphify extract
+# --exclude <pattern>` exists in 0.9.48 and persists into the build config
+# (upstream #1886), so one vendored-grammar pattern would plausibly clear this
+# source and the others without any new approval machinery.
+# Restore by deleting these two lines.
+build = skip
+skip_reason = #417: 1 unsupported-language + 11 partial-extraction warnings, 9 of them vendored tree-sitter grammar headers; skipped under Ray's 2026-08-20 ruling to reach the graphify extraction. scope=corpus, so this IS aggregate loss

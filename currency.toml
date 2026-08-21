@@ -869,7 +869,43 @@ setting, and task/lockfile/python fixes."""
 # `_ACCEPTED_CLAUDE_VERSION` advance a mechanical bump instead of a new review —
 # every flag the semantic path requires is spelled the same and only the
 # implementation changed.
-expected = "2.1.236"
+#
+# 2.1.236 -> 2.1.238, reviewed 2026-08-20 (the binary self-updated twice under
+# the session; 2.1.237 was never resident here long enough to be recorded).
+# TWO releases, and five items touch this repo:
+#
+# * **Subagent tool results are released once they leave the recent display
+#   window** (2.1.238), fixing unbounded memory growth in long interactive
+#   sessions. This is the single most relevant line in either release: the
+#   `kb-extract` fan-out, the `kb-review` lanes and the session-review workflow
+#   are all long sessions holding many subagent results, and context blowout is
+#   a recurring failure here.
+# * **`ListAgents`/`SendMessage` fixes** (2.1.238) — they were reporting
+#   "Remote Control is not connected" in server-mode/host sessions, and were
+#   exposing the pre-warmed idle worker as if it were a live agent.
+#   `ListAgents` is this repo's recorded way to establish subagent liveness, so
+#   a phantom row in it is a false positive on exactly that probe.
+# * **Bash-tool permission checking improved for zsh-specific syntax in shell
+#   conditionals** (2.1.238). Every guard in `kb_setup.hook_guard` runs against
+#   the command string the harness passes, and this shell is zsh; the guards'
+#   only measured defects have been false positives on quoting.
+# * **Leftover `/tmp/claude-*-cwd` files on a killed/timed-out/interrupted Bash
+#   command are fixed** (2.1.238) — this repo kills wedged long-running
+#   commands by policy, so it was generating those.
+# * **A built-in "Concise" output style** (2.1.237).
+#
+# THE CLI CONTRACT DID NOT MOVE, measured rather than assumed: `claude --help`
+# hashes to 71ad650f… at 2.1.238, byte-identical to the value 2.1.232 through
+# 2.1.236 recorded, re-hashed against the INSTALLED binary through
+# `graphify_semantic_slice.claude_child_environment` rather than a shell. That
+# is what makes `_CURRENT_CLAUDE_VERSION`'s advance a mechanical bump.
+#
+# The tags here are LIGHTWEIGHT — `v2.1.238` and `v2.1.238^{commit}` both
+# resolve to 8a8e81d0 — so the annotated-tag trap that has bitten
+# `sources/mise.manifest` does not apply. Control-armed rather than assumed:
+# the outgoing manifest commit 084ca20b equals `v2.1.236^{commit}`, so the
+# derivation that produced it is the one used here.
+expected = "2.1.238"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted

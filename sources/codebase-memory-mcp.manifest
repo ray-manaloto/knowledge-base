@@ -4,3 +4,19 @@ ref = main
 commit = d6be58ef9d43c574a2d1b0827ecc1e3c4846f0fe
 kind = code
 scope = study
+# EXCLUDED FROM THE BUILD 2026-08-20 (Ray's call, on GitNexus's precedent).
+# Not a de-registration: the pin above stays committed and fingerprinted, so
+# provenance is intact and this stays on the record as what it was FOR.
+# `kb-build` fails closed here on 233 partially-extracted files. The reviewed
+# inventory is per-file and content-hash-pinned by design, so clearing it by
+# hand means 233 measured entries — at the ~10-15 min per entry this round
+# measured, tens of hours. That is #409 ("the reviewed-warning inventories do
+# not scale"), the same wall GitNexus hit at 94.
+#
+# It also buys nothing: 877 of the 1,496 `.c`/`.h` files sit under
+# `internal/cbm/vendored/` and are vendored tree-sitter grammar headers —
+# third-party C inside a third-party clone, not the study subject's own code —
+# and `scope = study` already keeps this source out of the aggregate.
+# Restore by deleting these two lines once #409 lands.
+build = skip
+skip_reason = #409: 233 reviewed-warning inventory entries would be needed by hand, most for vendored tree-sitter grammar headers; scope=study, so the aggregate does not need it

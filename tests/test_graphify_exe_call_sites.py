@@ -101,7 +101,17 @@ def test_no_operational_module_hard_codes_a_bare_graphify() -> None:
         f"{name}:{n}"
         for name in _OPERATIONAL
         for n, line in enumerate((src / name).read_text(encoding="utf-8").splitlines(), 1)
-        if '"graphify",' in line or line.strip() == '"graphify",'
+        if ('"graphify",' in line or line.strip() == '"graphify",')
+        # ...but NOT a keyword argument whose VALUE is the string "graphify".
+        # argv[0] appears as a bare list element; a kwarg has `=` immediately
+        # before the quote. Without this the check fires on
+        # `source_name="graphify"` — a reviewed-warning inventory entry for the
+        # graphify SOURCE, which has nothing to do with a subprocess argv and
+        # will recur for every future graphify entry. The mutation this test
+        # exists to catch (`graphify_exe(repo_root)` -> `"graphify"`) leaves the
+        # literal preceded by `[` or a space, never by `=`, so narrowing here
+        # costs the test nothing — armed both directions.
+        and '="graphify",' not in line.replace(" ", "")
     ]
     assert not offenders, (
         f"bare `graphify` argv[0] in an operational module: {offenders}. "

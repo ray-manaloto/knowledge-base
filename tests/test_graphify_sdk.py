@@ -14,6 +14,7 @@ from kb_setup.graphify_health import (
     ExpectedMetadataOnly,
     ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
+    ExpectedUnsupportedLanguage,
     GraphifyState,
     IncompleteGraphifyOperationError,
     SourceCoveragePolicy,
@@ -886,3 +887,198 @@ def test_the_retired_2551_wording_is_no_longer_accepted(tmp_path: Path) -> None:
         f"{_ASTRO_PATH} (first error at line 1) (#2551)"
     )
     assert graphify_sdk.approve_partial_extraction_warning(tmp_path, retired, review) == ()
+
+
+_R_PATHS = ("tests/fixtures/sample.R", "tests/fixtures/test_sample.R")
+# graphify 0.9.48's #1689 wording, taken from the f-string in its own
+# `extract.py` (line 5673) rather than from one observed line — the same reason
+# `_PARTIAL_WARNING` above is sourced that way. Note it names EXTENSIONS and
+# counts, never paths: the text alone cannot say which files were lost, which is
+# exactly why the approver requires a measured inventory.
+_UNSUPPORTED_WARNING = (
+    "  warning: 2 file(s) are classified as code but graphify has no AST extractor "
+    "for their language, so they contributed nothing to the graph: .r (2). "
+    "Please open an issue to request support for these (#1689).\n"
+)
+
+
+def _unsupported_review(
+    directory: Path, *, extracted_nodes_by_path: dict[str, int] | None = None
+) -> graphify_sdk.ExtractWarningReview:
+    import hashlib
+
+    inventory = []
+    for relative in _R_PATHS:
+        path = directory / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"f <- function(x) {{ x }}  # {relative}\n", encoding="utf-8")
+        inventory.append(
+            ExpectedUnsupportedLanguage(
+                source_name="reviewed-source",
+                relative_path=relative,
+                content_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                language=".r",
+                lost_symbols=1,
+                reason="graphify has no tree-sitter-r dispatch (#1689)",
+            )
+        )
+    return graphify_sdk.ExtractWarningReview(
+        source_name="reviewed-source",
+        unsupported_language_inventory=tuple(inventory),
+        # Both files contribute nothing, so neither appears in the sub-graph map.
+        extracted_nodes_by_path=extracted_nodes_by_path or {},
+    )
+
+
+def test_reviewed_unsupported_language_is_approved(tmp_path: Path) -> None:
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path, _UNSUPPORTED_WARNING.rstrip(), _unsupported_review(tmp_path)
+    )
+
+    assert approved == ("approved-reviewed-unsupported-language",)
+
+
+def test_unsupported_language_approval_expires_when_an_extractor_lands(tmp_path: Path) -> None:
+    """The FIX direction, which is the only one that will actually happen here.
+
+    #1689's loss ends when upstream ships a tree-sitter-r dispatch, not when the
+    fixture changes. At that moment the file starts producing nodes while the
+    warning may still be printed for some OTHER extension — so an approval keyed
+    only on the warning text would silently keep absorbing a loss that had
+    stopped existing. The sub-graph check is what expires it.
+    """
+    review = _unsupported_review(tmp_path, extracted_nodes_by_path={_R_PATHS[0]: 7})
+
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path, _UNSUPPORTED_WARNING.rstrip(), review
+    )
+
+    assert approved == ()
+
+
+def test_unsupported_language_refuses_when_the_reviewed_bytes_moved(tmp_path: Path) -> None:
+    review = _unsupported_review(tmp_path)
+    (tmp_path / _R_PATHS[0]).write_text("g <- function(y) { y }\n", encoding="utf-8")
+
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path, _UNSUPPORTED_WARNING.rstrip(), review
+    )
+
+    assert approved == ()
+
+
+def test_unsupported_language_refuses_a_file_the_inventory_never_saw(tmp_path: Path) -> None:
+    """Graphify counted 3, the inventory covers 2 — the third is unreviewed loss."""
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path,
+        _UNSUPPORTED_WARNING.replace("2 file(s)", "3 file(s)").replace(".r (2)", ".r (3)").rstrip(),
+        _unsupported_review(tmp_path),
+    )
+
+    assert approved == ()
+
+
+def test_unsupported_language_refuses_a_second_language_it_did_not_review(tmp_path: Path) -> None:
+    """A NEW unsupported language must block, not ride in on R's approval.
+
+    graphify groups this warning by extension and comma-joins the groups, so a
+    corpus that gains its first `.ets` file emits one line covering both. The
+    per-language comparison is what keeps the reviewed `.r` entries from
+    approving a language nobody measured.
+    """
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path,
+        _UNSUPPORTED_WARNING.replace("2 file(s)", "3 file(s)")
+        .replace(".r (2)", ".r (2), .ets (1)")
+        .rstrip(),
+        _unsupported_review(tmp_path),
+    )
+
+    assert approved == ()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "line"),
+    [
+        ("total-disagrees-with-groups", _UNSUPPORTED_WARNING.replace("2 file(s)", "5 file(s)")),
+        ("unparsable-group", _UNSUPPORTED_WARNING.replace(".r (2)", "r files (2)")),
+        # A group list where ONE group parses and another does not. This is the
+        # case a lenient parser gets wrong and the all-unparsable case above
+        # cannot catch: skipping the bad chunk leaves `{".r": 2}`, whose sum
+        # still equals the stated total and whose languages still match the
+        # reviewed inventory — so the warning is approved while a whole
+        # language's loss goes unreviewed. Found by a SURVIVING mutation arm.
+        ("one-good-group-one-unparsable", _UNSUPPORTED_WARNING.replace(".r (2)", ".r (2), oops")),
+        ("duplicated-group", _UNSUPPORTED_WARNING.replace(".r (2)", ".r (1), .r (1)")),
+        ("wrong-issue-number", _UNSUPPORTED_WARNING.replace("#1689", "#1666")),
+        ("not-this-warning", "  warning: something else entirely\n"),
+        (
+            "the-1745-sibling",
+            (
+                "  warning: 2 file(s) are classified as code but graphify's extractor for "
+                "their language could not load, so they contributed nothing to the graph: "
+                ".sql (2). Install the [sql] extra (#1745).\n"
+            ),
+        ),
+    ],
+)
+def test_unsupported_language_mutations_do_not_approve(
+    tmp_path: Path, mutation: str, line: str
+) -> None:
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path, line.rstrip(), _unsupported_review(tmp_path)
+    )
+
+    assert approved == (), mutation
+
+
+def test_unsupported_language_needs_an_inventory_at_all(tmp_path: Path) -> None:
+    """CONTROL ARM on the whole approver: with no reviewed entries it must refuse.
+
+    Without this, an approver that returned its token unconditionally would pass
+    every test above that asserts approval and only fail the refusals — and the
+    refusals all mutate the LINE, so a broken inventory check would survive them.
+    """
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path,
+        _UNSUPPORTED_WARNING.rstrip(),
+        graphify_sdk.ExtractWarningReview(source_name="reviewed-source"),
+    )
+
+    assert approved == ()
+
+
+def test_unsupported_language_does_not_approve_another_sources_inventory(tmp_path: Path) -> None:
+    review = _unsupported_review(tmp_path)
+    other = graphify_sdk.ExtractWarningReview(
+        source_name="a-different-source",
+        unsupported_language_inventory=review.unsupported_language_inventory,
+        extracted_nodes_by_path=review.extracted_nodes_by_path,
+    )
+
+    approved = graphify_sdk.approve_unsupported_language_warning(
+        tmp_path, _UNSUPPORTED_WARNING.rstrip(), other
+    )
+
+    assert approved == ()
+
+
+def test_the_unsupported_language_approver_is_wired_into_stderr_accounting(
+    tmp_path: Path,
+) -> None:
+    """The approver must be REACHED, not merely correct.
+
+    Every test above calls `approve_unsupported_language_warning` directly, so
+    all of them stay green if the call is deleted from
+    `account_for_extract_stderr` — the helper would be fully tested and
+    completely unreachable, which is exactly the arm that survived the first
+    sweep on `build = skip` (#409). This is the only test that fails on that
+    deletion: it asks the accounting function, and an unreached approver leaves
+    the warning in the residual, where it blocks the build.
+    """
+    classifications, residual = graphify_sdk.account_for_extract_stderr(
+        tmp_path, _UNSUPPORTED_WARNING, _unsupported_review(tmp_path)
+    )
+
+    assert classifications == ("approved-reviewed-unsupported-language",)
+    assert residual == ""

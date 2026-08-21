@@ -444,9 +444,25 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # reported nothing, and the COLD LANE found it a SECOND time (P0, review of
 # fe57f996). Two independent misses by the same blind spot is not an anecdote —
 # it is the evidence for #393, which is why that issue cites it.
-_CURRENT_CLAUDE_VERSION = "2.1.236"
+#
+# 2.1.236 -> 2.1.238 advanced 2026-08-20. `claude` self-updated in place TWICE
+# (2.1.237 was never installed here long enough to be recorded), so leaving this
+# at 2.1.236 asserted an identity the host contradicts and the corpus preflight
+# would have refused. Measured, not carried, and through this module's OWN
+# `claude_child_environment` rather than a shell — `shutil.which("claude")`
+# resolves to `~/.local/share/claude/versions/2.1.238`, `--version` reports
+# `2.1.238 (Claude Code)`, and the digest below is
+# `sha256(Path(which("claude")).read_bytes())`.
+#
+# THE `--help` DIGEST DID NOT MOVE — still 71ad650f…, the value 2.1.232 through
+# 2.1.236 all recorded, re-hashed against the INSTALLED 2.1.238. So every flag
+# this path depends on is spelled identically and only the implementation moved.
+# That is the FIFTH consecutive advance with this shape, which is the whole
+# reason the shape is worth stating: it is what makes a version bump a
+# re-record rather than a review.
+_CURRENT_CLAUDE_VERSION = "2.1.238"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "6bc4ba992d2786cbf0237c4453ca53c1fdf0c3b3d83ffa0025c0d8190ed27848"
+    "1c196c456373b57818ae87df84aecee96cb659448c0d6a6bbb401ac5758431b2"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (

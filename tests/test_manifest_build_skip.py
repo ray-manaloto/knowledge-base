@@ -74,7 +74,22 @@ def test_every_committed_manifest_still_loads() -> None:
     root = Path(__file__).resolve().parents[1]
     loaded = mf.load_all(root / "sources")
     assert loaded, "no manifests found — the probe would pass vacuously"
-    assert [m.name for m in loaded if m.build == "skip"] == ["GitNexus"]
+    # An INVENTORY PIN, not a count: every `build = skip` is a source excluded
+    # from the graph, so a new one must be a deliberate decision someone made,
+    # never a line that slid in. Compared as a SET so the assertion survives a
+    # change in `load_all`'s ordering — exactness is the point, order is not.
+    #
+    # GitNexus is #409. The other four were skipped 2026-08-20 under Ray's
+    # ruling to skip any blocker, file it, and triage after the graphify
+    # extraction; all four are registered in #417, which also records that
+    # `codegraph` is the one whose `scope = corpus` makes it real aggregate loss.
+    assert {m.name for m in loaded if m.build == "skip"} == {
+        "GitNexus",
+        "codebase-memory-mcp",
+        "codegraph",
+        "codex",
+        "colibri",
+    }
 
 
 def test_gitnexus_is_skipped_but_still_pinned() -> None:
