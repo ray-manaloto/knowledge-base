@@ -10,11 +10,29 @@
 #
 # SCOPE. NOT armed here: the two EXISTING inventory checks this change did not
 # touch (`inventory-unit-identity-duplicate`, `inventory-slice-sequence-invalid`
-# already have no arm and this change doesn't alter their logic); the count
-# invariants' arithmetic beyond R5 (the second invariant is the same shape as
-# the first, reverted by the same review); and the CLI print ordering
-# (`_dedupe_summary` before the manifest line) — no test asserts stdout
-# interleaving, so there is nothing for an arm to catch there.
+# already have no arm and this change doesn't alter their logic); and the CLI
+# print ordering (`_dedupe_summary` before the manifest line) — no test asserts
+# stdout interleaving, so there is nothing for an arm to catch there.
+#
+# R6 corrects an earlier decision here (round 2, answering the cold review of
+# `3d9bb3ff`): this file used to decline an arm for the second count invariant
+# (`discovered-unit-count-mismatch`) as "the same shape as the first, reverted
+# by the same review" (R5). That argument was wrong (P2-4): the first
+# invariant sums excluded PATHS alone; the second mixes a UNIT total with a
+# PATH count, so reverting one says nothing about the other. R6 arms it
+# directly, the same way R5 arms the first.
+#
+# FULL SWEEP NOT run here, and not merely "per spec": the two group-invalid /
+# group-order-invalid reasons, the kind/suffix-class plan-time asserts, and
+# the new `exclusion-multi-unit` assert all gained DIRECT FAIL-direction
+# tests this round, but none has an arm row yet. Adding those rows and
+# running the real (non-`--dry-run`) sweep is the architect's, after the
+# re-plan that re-signs `AUTHORITY_JSON` — this round's cap change
+# (140.0 -> 63.0) un-authorizes the committed plan, so the baseline suite
+# (`test_recorded_authority_authorizes_this_plan_and_only_this_plan`) is
+# expected-red until then, and `arms.py`'s own baseline-red guard would abort
+# a real sweep regardless (cold review P1-2). Only `--dry-run` (string-match,
+# no pytest) ran this round.
 
 suites = ["tests/test_graphify_semantic_corpus.py"]
 
@@ -88,3 +106,21 @@ old = '''    if inventory.detected_source_count != (
         reasons.append("detected-source-count-mismatch")'''
 new = '''    if inventory.detected_source_count != len(admitted_paths) + len(paths):
         reasons.append("detected-source-count-mismatch")'''
+
+# ── R6: the second count invariant reverted to its pre-dedupe form ─────────
+# Corrects the SCOPE note above (cold review of #414, P2-4): unlike a simple
+# duplicate of R5, this invariant already held before dedupe existed by
+# coincidence alone (every `_INTENTIONAL_EXCLUSIONS` entry is a non-splittable
+# single-unit file), so reverting it also under-counts by the dropped-unit
+# total and fires spuriously on a CORRECT plan with real duplicates — same
+# verdict shape as R5, on a different invariant with a different mixed unit.
+[[arm]]
+id = "R6"
+test = "test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    if inventory.discovered_unit_count != (
+        inventory.admitted_unit_count + len(paths) + inventory.duplicate_dropped_unit_count
+    ):
+        reasons.append("discovered-unit-count-mismatch")'''
+new = '''    if inventory.discovered_unit_count != inventory.admitted_unit_count + len(paths):
+        reasons.append("discovered-unit-count-mismatch")'''

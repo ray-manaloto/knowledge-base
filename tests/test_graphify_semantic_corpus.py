@@ -109,7 +109,57 @@ def _duplicated_source(root: Path) -> tuple[str, str]:
     (root / "copies" / "a" / "guide.md").write_text(text, encoding="utf-8")
     (root / "copies" / "b" / "guide.md").write_text(text, encoding="utf-8")
     (root / "distinct.md").write_text("# Distinct\n\nnot a copy of guide.\n", encoding="utf-8")
-    _git(root, "add", "-A")
+    _git(
+        root,
+        "add",
+        "guide.md",
+        "copies/a/guide.md",
+        "copies/b/guide.md",
+        "distinct.md",
+    )
+    _git(root, "commit", "-qm", "source")
+    return _git(root, "rev-parse", "HEAD"), _git(root, "rev-parse", "HEAD^{tree}")
+
+
+def _suffix_class_dedupe_source(root: Path) -> tuple[str, str]:
+    """Two byte-identical paths in different `is_splittable_text` classes.
+
+    (#414 P1-3; pv-lane3r2 M2): `guide.html` is NOT splittable (1 unit) while
+    `guide.md` IS (24 slices at this word count), so a correct implementation
+    must refuse to collapse them into one duplicate group even though they
+    share a `parent_sha256`. `guide.html` sorts before `guide.md`, so it is
+    canonical; the suffix-class assert fires on the non-canonical `guide.md`.
+    """
+    root.mkdir()
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "corpus@example.invalid")
+    _git(root, "config", "user.name", "Corpus Contract")
+    words = "semantic " * 50_100
+    text = f"# Guide\n\n{words}\n"
+    (root / "guide.html").write_text(text, encoding="utf-8")
+    (root / "guide.md").write_text(text, encoding="utf-8")
+    _git(root, "add", "guide.html", "guide.md")
+    _git(root, "commit", "-qm", "source")
+    return _git(root, "rev-parse", "HEAD"), _git(root, "rev-parse", "HEAD^{tree}")
+
+
+def _kind_dedupe_source(root: Path) -> tuple[str, str]:
+    """Two byte-identical paths Graphify detects as different KINDS.
+
+    (#414 P1-3; pv-lane3r2 M2): `guide.md` is `document`, `guide.svg` is
+    `image`. `guide.md` sorts before `guide.svg`, so it is canonical; the
+    kind assert fires on the non-canonical `guide.svg`, before any slice
+    count is even computed.
+    """
+    root.mkdir()
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "corpus@example.invalid")
+    _git(root, "config", "user.name", "Corpus Contract")
+    words = "semantic " * 50_100
+    text = f"# Guide\n\n{words}\n"
+    (root / "guide.md").write_text(text, encoding="utf-8")
+    (root / "guide.svg").write_text(text, encoding="utf-8")
+    _git(root, "add", "guide.md", "guide.svg")
     _git(root, "commit", "-qm", "source")
     return _git(root, "rev-parse", "HEAD"), _git(root, "rev-parse", "HEAD^{tree}")
 
@@ -1928,6 +1978,157 @@ def test_duplicate_totals_that_disagree_with_the_groups_are_refused(
     assert "source-inventory-recomputation-mismatch" in result.reasons
 
 
+def test_a_duplicate_group_with_a_tampered_field_is_refused(
+    unset_authority, tmp_path: Path
+) -> None:
+    """Arm `inventory-duplicate-group-invalid` (#414 P1-3).
+
+    Nothing in the diff made `_duplicate_group_is_well_formed` return `False`
+    before this test — tampering the recorded `reason` string is the
+    cheapest way to break exactly one of its 16 conjuncts without disturbing
+    any other invariant.
+    """
+    source = tmp_path / "source"
+    commit, tree = _duplicated_source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    inventory_path = candidate / "source-inventory.json"
+    payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    payload["duplicate_groups"][0]["reason"] = "hostile-reason"
+    inventory_path.write_bytes(_canonical(payload))
+    _inventory_tamper_recipe(candidate)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    assert result.state == "failed"
+    assert "inventory-duplicate-group-invalid:copies/a/guide.md" in result.reasons
+    assert "source-inventory-recomputation-mismatch" in result.reasons
+
+
+def test_duplicate_groups_out_of_order_are_refused(unset_authority, tmp_path: Path) -> None:
+    """Arm `inventory-duplicate-group-order-invalid` (#414 P1-3).
+
+    This reason is inherently unreachable with a single well-formed group (a
+    1-tuple is always "sorted", and a lone group's own `canonical_path`/
+    `dropped_paths` are already disjoint by construction) — it requires TWO
+    groups that collide, which nothing in this fixture provides on its own.
+    Repeating the one real group is the cheapest construction that collides.
+    """
+    source = tmp_path / "source"
+    commit, tree = _duplicated_source(source)
+    candidate = tmp_path / "candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+        max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+    )
+    inventory_path = candidate / "source-inventory.json"
+    payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    payload["duplicate_groups"] = payload["duplicate_groups"] * 2
+    inventory_path.write_bytes(_canonical(payload))
+    _inventory_tamper_recipe(candidate)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
+    assert result.state == "failed"
+    assert "inventory-duplicate-group-order-invalid" in result.reasons
+    assert "source-inventory-recomputation-mismatch" in result.reasons
+
+
+def test_a_suffix_class_mismatch_within_a_duplicate_group_is_refused(tmp_path: Path) -> None:
+    """Arm the plan-time suffix-class assert (#414 P1-3).
+
+    Two byte-identical files whose suffixes put them in different
+    `is_splittable_text` classes must never be collapsed into one duplicate
+    group, even though they share a `parent_sha256` — see
+    `_suffix_class_dedupe_source`.
+    """
+    source = tmp_path / "source"
+    commit, tree = _suffix_class_dedupe_source(source)
+    with pytest.raises(
+        graphify_semantic_corpus.DuplicateGroupMismatchError,
+        match=re.escape("duplicate-group-suffix-class-mismatch:guide.md"),
+    ):
+        graphify_semantic_corpus.plan_source(
+            source,
+            tmp_path / "candidate",
+            source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+            max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+        )
+
+
+def test_a_kind_mismatch_within_a_duplicate_group_is_refused(tmp_path: Path) -> None:
+    """Arm the plan-time kind assert (#414 P1-3).
+
+    Two byte-identical files Graphify detects as different KINDS must never
+    be collapsed into one duplicate group — see `_kind_dedupe_source`.
+    """
+    source = tmp_path / "source"
+    commit, tree = _kind_dedupe_source(source)
+    with pytest.raises(
+        graphify_semantic_corpus.DuplicateGroupMismatchError,
+        match=re.escape("duplicate-group-kind-mismatch:guide.svg"),
+    ):
+        graphify_semantic_corpus.plan_source(
+            source,
+            tmp_path / "candidate",
+            source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
+            max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
+        )
+
+
+def test_a_duplicate_group_mismatch_is_reported_by_name_not_as_a_snapshot_failure(
+    tmp_path: Path,
+) -> None:
+    """`_source_reasons` must report a mismatch by name, not as a snapshot failure.
+
+    It must not erase a `DuplicateGroupMismatchError` into the generic
+    `source-snapshot-unavailable` catch (#414 P1-5, cold review of
+    `3d9bb3ff`). The exception is raised INSIDE `_inventory`'s recomputation,
+    before it can complete, so `_source_reasons` returns the mismatch reason
+    ALONE — `source-inventory-recomputation-mismatch` never co-occurs on this
+    path, unlike the inventory-TAMPER tests above where the recomputation
+    completes and both reasons fire together (pv-lane3r2 M6). The other four
+    plan members are never read on this path (the exception fires before
+    `_source_reasons` gets to comparing anything), so dummy values are fine.
+    """
+    mismatched_source = tmp_path / "kind-mismatch-source"
+    _kind_dedupe_source(mismatched_source)
+    inventory = graphify_semantic_corpus.SourceInventory(
+        source_ref="test-ref",
+        source_commit=_git(mismatched_source, "rev-parse", "HEAD"),
+        source_tree=_git(mismatched_source, "rev-parse", "HEAD^{tree}"),
+        source_manifest_sha256="m" * 64,
+        detected_source_count=0,
+        discovered_unit_count=0,
+        admitted_unit_count=0,
+        units=(),
+        warnings=(),
+        duplicate_groups=(),
+        duplicate_dropped_path_count=0,
+        duplicate_dropped_unit_count=0,
+        duplicate_dropped_estimated_tokens=0,
+        admitted_estimated_tokens=0,
+    )
+    advisories = graphify_semantic_corpus.AdvisoryCatalog(
+        source_commit="c" * 40, source_tree="t" * 40, entries=()
+    )
+    exclusions = graphify_semantic_corpus.ExclusionCatalog(
+        source_commit="c" * 40, source_tree="t" * 40, entries=()
+    )
+    ledger = graphify_semantic_corpus.ChunkLedger(token_budget=1, unit_count=0, chunks=())
+
+    reasons = graphify_semantic_corpus._source_reasons(
+        mismatched_source, inventory, advisories, exclusions, ledger
+    )
+
+    assert reasons == ["duplicate-group-kind-mismatch:guide.svg"]
+
+
 def test_dedupe_summary_states_the_measurement() -> None:
     inventory = graphify_semantic_corpus.SourceInventory(
         source_ref="test-ref",
@@ -1961,10 +2162,76 @@ def test_dedupe_summary_states_the_measurement() -> None:
     summary = graphify_semantic_corpus._dedupe_summary(inventory)
 
     assert summary == (
-        "duplicate-content: 1 groups · 2 paths / 2 units dropped · "
+        "duplicate-content: 1 group · 2 paths / 2 units dropped · "
         "200 of 500 estimated tokens (40.0%) not re-extracted · "
         "admitted 3 units / 300 tokens"
     )
+
+
+def test_schema_version_reasons_catches_any_of_the_five_typed_members(tmp_path: Path) -> None:
+    """Every typed plan member's `schema_version` is now checked (#414 M4/nit-2).
+
+    Nothing checked this before, for any of the five typed plan members —
+    widened to all five rather than only `SourceInventory` (whose
+    `schema_version` this change bumped to 2), or a fix at one layer would
+    leave the other four unguarded.
+    """
+    candidate = _exact_graphify_plan(tmp_path)
+    members = graphify_semantic_corpus._typed_members(candidate)
+    assert graphify_semantic_corpus._schema_version_reasons(members) == []
+
+    inventory, advisories, exclusions, ledger, config = members
+    hostile_inventory = msgspec.structs.replace(inventory, schema_version=1)
+    assert graphify_semantic_corpus._schema_version_reasons(
+        (hostile_inventory, advisories, exclusions, ledger, config)
+    ) == ["schema-version-invalid:source-inventory"]
+
+    hostile_config = msgspec.structs.replace(config, schema_version=2)
+    assert graphify_semantic_corpus._schema_version_reasons(
+        (inventory, advisories, exclusions, ledger, hostile_config)
+    ) == ["schema-version-invalid:execution-config"]
+
+
+def test_corpus_main_plan_survives_an_unreadable_dedupe_read_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A plan that WROTE successfully must not traceback on its own read-back.
+
+    nit-5 (cold review of #414): `corpus_main`'s `plan` action re-reads its
+    own just-written plan, UNGUARDED, to build the dedupe-summary event —
+    while every other decode site in this module wraps the same call
+    (`verify_plan`).
+    """
+    output = tmp_path / "output"
+    fake_manifest = graphify_semantic_corpus.PlanManifest(
+        schema_id=graphify_semantic_corpus._SCHEMA,
+        source_commit="c" * 40,
+        source_tree="t" * 40,
+        members=(),
+        warnings=(),
+    )
+
+    def fake_admit_source(repo_root: Path, destination: Path) -> graphify_semantic_corpus.SourcePin:
+        return graphify_semantic_corpus.SourcePin(ref="test-ref", commit="c" * 40, tree="t" * 40)
+
+    def fake_plan_source(*args: object, **kwargs: object) -> graphify_semantic_corpus.PlanManifest:
+        output.mkdir(parents=True, exist_ok=True)
+        return fake_manifest
+
+    def hostile_typed_members(candidate: Path) -> Never:
+        raise msgspec.DecodeError("hostile: unreadable plan")
+
+    def fake_planned_max_output_tokens(*args: object, **kwargs: object) -> int:
+        return 64_000
+
+    monkeypatch.setattr(graphify_semantic_corpus, "admit_source", fake_admit_source)
+    monkeypatch.setattr(graphify_semantic_corpus, "plan_source", fake_plan_source)
+    monkeypatch.setattr(
+        graphify_semantic_corpus, "planned_max_output_tokens", fake_planned_max_output_tokens
+    )
+    monkeypatch.setattr(graphify_semantic_corpus, "_typed_members", hostile_typed_members)
+
+    assert graphify_semantic_corpus.corpus_main(tmp_path, ["plan", str(output)]) == 0
 
 
 def test_run_is_a_typed_refusal_before_execution_authority(tmp_path: Path, capsys) -> None:
@@ -2832,7 +3099,7 @@ def test_the_cumulative_spend_cap_is_in_the_plan_and_is_not_the_per_chunk_one(
     )
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
-    assert config["max_total_cost_usd"] == 140.0
+    assert config["max_total_cost_usd"] == 63.0
     assert config["max_total_cost_usd"] != config["max_cost_usd"]
 
 

@@ -93,10 +93,18 @@ old = '''        (metadata.argv == expected_argv, "provider-adapter-argv-mismatc
         (effort_valid, "provider-effort-mismatch"),'''
 new = '''        (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),'''
 
-# ── R4: revert the whole-run cost cap to the superseded 100.0 ──────────────
+# ── R4: revert the whole-run cost cap to a superseded value ────────────────
+# Re-derived round 2 (#414 landed the same day and deduped the corpus 58 ->
+# 26 chunks, which moved the cap 140.0 -> 63.0 under the SAME "one restart,
+# +~8% margin" rule — see `_MAX_TOTAL_COST_USD`'s comment). The anchor below
+# necessarily changed with the constant it targets; `new` now reverts AWAY
+# from the current 63.0 to the immediately-preceding, pre-dedupe derivation
+# (140.0) rather than to the original 100.0 two rulings back — either wrong
+# value breaks the same named test, but 140.0 is the realistic regression
+# (reverting THIS commit), not an arbitrary one.
 [[arm]]
 id = "R4"
 test = "test_the_cumulative_spend_cap_is_in_the_plan_and_is_not_the_per_chunk_one"
 file = "python/src/kb_setup/graphify_semantic_corpus.py"
-old = '''_MAX_TOTAL_COST_USD = 140.0'''
-new = '''_MAX_TOTAL_COST_USD = 100.0'''
+old = '''_MAX_TOTAL_COST_USD = 63.0'''
+new = '''_MAX_TOTAL_COST_USD = 140.0'''

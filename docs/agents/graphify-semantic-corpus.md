@@ -413,10 +413,11 @@ sequenceDiagram
 
 ## Launching the corpus run
 
-The full run is projected at roughly 10.6h of wall clock (58 chunks at
-concurrency 1, ~11 minutes/chunk measured), and a single Bash tool call is
-capped at roughly 600s regardless of a larger `timeout` argument — so it cannot
-be driven from one foreground call.
+The full run is projected at roughly 4.8h of wall clock (26 chunks, post-dedupe
+per #414 — was 58 chunks / ~10.6h pre-dedupe — at concurrency 1, ~11
+minutes/chunk measured), and a single Bash tool call is capped at roughly 600s
+regardless of a larger `timeout` argument — so it cannot be driven from one
+foreground call.
 
 - **Verify before spending.** `mise run kb-graphify-semantic-corpus -- verify`
   is provider-free and fast; confirm `execution_authorized: true` before
@@ -428,9 +429,10 @@ be driven from one foreground call.
   reaped when the turn goes idle — the harness background run stays tracked
   across turns; a shell `&` does not (`long-running-command-hangs.md` rule 2).
 - **The mise `timeout` is a wall-clock hang guard, not the spend cap.** The
-  money is bounded separately by `_MAX_TOTAL_COST_USD` (140.0; see its comment
-  in `graphify_semantic_corpus.py` for the arithmetic). The task's own
-  `timeout = "16h"` is roughly 1.5x the projected 10.6h, sized to catch a
+  money is bounded separately by `_MAX_TOTAL_COST_USD` (63.0, post-dedupe; was
+  140.0 pre-dedupe — see its comment in `graphify_semantic_corpus.py` for the
+  arithmetic). The task's own `timeout = "16h"` is roughly 3.3x the projected
+  4.8h (was roughly 1.5x the projected 10.6h pre-dedupe), sized to catch a
   genuinely wedged run without firing on ordinary chunk-to-chunk variance.
 - **A restart re-publishes already-staged evidence; it does not re-buy anything
   for free.** `_verified_stages` re-publishes every chunk whose stage directory

@@ -186,8 +186,8 @@ class _Spend:
     Mutable and un-frozen on purpose — it is the one thing in this module that
     accumulates. It exists because nothing summed anything: the plan capped
     ``max_cost_usd`` PER CHUNK and ``--max-budget-usd`` per provider invocation,
-    so 58 chunks each individually within authority could spend far past any
-    total anyone had approved.
+    so 26 chunks (post-dedupe, #414; was 58 pre-dedupe) each individually
+    within authority could spend far past any total anyone had approved.
 
     FOR ONE PLAN, NOT ONE PROCESS, and that distinction is the whole reason this
     class writes to disk. The first version seeded at 0.0 and summed records
@@ -196,9 +196,9 @@ class _Spend:
     closed laptop, a SIGKILL — resumed with a fresh cap and could spend the whole
     limit again. Measured on the first real chunk: three restarts is three times
     the approved total, and nothing on disk would have said so, because
-    ``ChunkStageReceipt`` carries no cost field either. The 58-chunk run takes
-    ~10.6 h at concurrency 1, which makes a restart the expected case rather than
-    the unlucky one.
+    ``ChunkStageReceipt`` carries no cost field either. The 26-chunk run takes
+    ~4.8 h at concurrency 1 (was 58 chunks / ~10.6 h pre-dedupe), which makes a
+    restart the expected case rather than the unlucky one.
     """
 
     def __init__(self, limit_usd: float, ledger_dir: Path | None = None) -> None:

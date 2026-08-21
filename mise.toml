@@ -710,11 +710,12 @@ run = "uv run kb-setup graphify-semantic-corpus"
 # not duplicated, but Graphify re-buys every chunk in the corpus at full price
 # on every restart (no incremental-cache read on this entry point — see the
 # `graphify_no_incremental_cache` comment in `graphify_semantic_corpus.py`).
-# 58 chunks at the measured ~11 min/chunk projects to ~10.6h; 16h is roughly
-# 1.5x that, so a genuinely wedged run is caught without the guard firing on
-# ordinary variance. One task dispatches `plan`/`run`/`verify` by argument, so
-# this same 16h leash also bounds the provider-free `plan` and `verify`
-# actions — mise has no per-argument timeout.
+# 26 chunks (post-dedupe, #414; was 58 pre-dedupe) at the measured ~11
+# min/chunk projects to ~4.8h; 16h is roughly 3.3x that (was ~1.5x pre-dedupe),
+# so a genuinely wedged run is caught without the guard firing on ordinary
+# variance. One task dispatches `plan`/`run`/`verify` by argument, so this
+# same 16h leash also bounds the provider-free `plan` and `verify` actions —
+# mise has no per-argument timeout.
 timeout = "16h"
 
 [tasks.kb-graphify-semantic-corpus-merge]
