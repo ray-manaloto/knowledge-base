@@ -37,7 +37,7 @@
 # `currency.toml`'s `expected` and `sources/mise.manifest`. All three now name
 # one version, so any disagreement between them is drift by definition. (They
 # drifted once under the old two-tier rule and the cold lane caught it.)
-min_version = { hard = "2026.8.9", soft = "2026.8.9" }
+min_version = { hard = "2026.8.10", soft = "2026.8.10" }
 
 [tools]
 # Pins mirror ray-manaloto/dotfiles/.config/mise/conf.d/shared.toml (known-good).
@@ -51,7 +51,7 @@ typos = "1.49.0"
 # supply it. Required for `graphify add <youtube-url>`. conda backend (prebuilt).
 "conda:ffmpeg" = "9.0.1"
 taplo = "0.10.0"
-rumdl = "0.2.57"
+rumdl = "0.2.58"
 gitleaks = "8.30.1"
 # agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
 # Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
@@ -92,7 +92,7 @@ doppler = "3.76.5"
 # This is Ray's standing "we should not rely on tools managed by
 # `~/.config/mise/mise.toml`" applied to the one unpinned tool that could break
 # shipping. Pinned to the version this repo has actually been shipping with.
-gh = "2.97.0"
+gh = "2.98.0"
 # NO `git` PIN, and that is a measurement rather than an omission. mise's registry
 # has **no `git` entry at all** — `mise registry | grep '^git '` returns nothing,
 # against a control of `gh` on the line above, which returns
@@ -139,8 +139,8 @@ gh = "2.97.0"
 # `1.1.5` install dir reported 1.1.10. The directory name is mise's label, not
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
-codex = "0.148.0"
-antigravity-cli = "1.1.15"
+codex = "0.149.0"
+antigravity-cli = "1.1.17"
 
 [deps.uv]
 auto = true
@@ -440,7 +440,8 @@ description = "Resolve Claude models' max output tokens (+ --write --observed-at
 # then it RAISES: a hardcoded default here would be the defect it exists to
 # remove. `--write` re-baselines `docs/model-limits/snapshot.json` and prints the
 # delta, on `kb-skill-score`'s precedent — a record nobody diffs ages silently.
-run = "uv run kb-setup model-limits {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup model-limits"
+raw_args = true
 
 [tasks.kb-graph-counts]
 description = "Print graph.json's node/link/hyperedge counts (+ --by-source)"
@@ -450,20 +451,27 @@ description = "Print graph.json's node/link/hyperedge counts (+ --by-source)"
 # edges" finding into a handoff, a memory record AND a commit message, because
 # graph.json spells it `links` and a `.get("edges", [])` probe returns 0 on a
 # perfectly healthy graph. Deciding that spelling once is the whole point.
-run = "uv run kb-setup graph-counts {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup graph-counts"
+raw_args = true
 
 [tasks.kb-reclaim]
 description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --apply to reclaim"
 # REPORT-ONLY by default and there is no config key that changes that: reclaiming
-# needs `-- --apply` on every run. A deleter whose destructive mode can be armed
-# from a config file is a destructive action at a distance, which is precisely
-# what `reclaim.toml` must not become.
+# needs an explicit `--apply` on every run (`mise run kb-reclaim -- --apply`). A
+# deleter whose destructive mode can be armed from a config file is a destructive
+# action at a distance, which is precisely what `reclaim.toml` must not become.
+# The guard is that per-run flag in argv (`reclaim.main`), NOT mise's `--`
+# separator: probed 2026-08-21 on a scratch task — and reproduced independently by
+# the round-2 cold lane — the old `{{arg(...)}}` template forwarded `--apply`
+# WITHOUT `--` exactly as `raw_args = true` does, so the two spellings were always
+# the same deliberate act (cold review of 90be7169 / 4343a38a).
 #
 # Policy lives in `reclaim.toml` — every category can be disabled, re-scoped or
 # re-thresholded there, and `--only`/`--skip` narrow a single run. Docker cleanup
 # is ONE category, not the tool: adding a reclaimer is a scanner plus a config
 # block. See `.claude/skills/kb-reclaim/SKILL.md`.
-run = "uv run kb-setup reclaim {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup reclaim"
+raw_args = true
 
 [tasks.kb-session-reflect]
 description = "What did THIS round do by hand that a task already owns? (advisory)"
@@ -482,7 +490,8 @@ description = "What did THIS round do by hand that a task already owns? (advisor
 #
 # Advisory by construction: always exits 0 and gates nothing. An un-automated
 # step is a statement about future cost, not a failure.
-run = "uv run kb-setup session-reflect {{arg(name='args', var=true, default='')}}"
+run = "uv run kb-setup session-reflect"
+raw_args = true
 
 [tasks.kb-attribute-write]
 description = "What ran when a tracked file was written behind our back? (advisory)"
@@ -564,7 +573,8 @@ description = "Check specific paths (ruff + format + ty + their tests) with REAL
 # everything wrong with the file. Exits non-zero if any tool failed AND if
 # nothing applicable was given — "I did not understand your argument" must not
 # read as "your file is clean".
-run = "uv run kb-setup check {{arg(name='paths', var=true, default='')}}"
+run = "uv run kb-setup check"
+raw_args = true
 
 # ---------------------------------------------------------------------------
 # Knowledge-base tasks — the reason this repo exists

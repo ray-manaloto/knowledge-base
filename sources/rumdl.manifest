@@ -5,7 +5,7 @@
 #
 # ⚠️ INVARIANT: this pin MUST track the version we actually run.
 #   version source: mise.toml `[tools] rumdl`
-#   pinned here:    v0.2.57
+#   pinned here:    v0.2.58
 # A pin that drifts from the installed version makes the corpus answer questions
 # about code we are not running. Not hypothetical — `sources/graphify.manifest`
 # records exactly that failure: it sat two releases behind for weeks, so every
@@ -20,7 +20,7 @@
 # SOURCE and skips every .md by design — the tool's DOCS are a separate
 # `kind = docs` mirror (#123), not this manifest.
 url = https://github.com/rvben/rumdl
-ref = v0.2.57
-commit = 8dd9628aac594930ff2525af66c968b44e8697c9
+ref = v0.2.58
+commit = 023027472dbcb502aeb89760f4122e2235d36490
 kind = code
 added = 2026-08-02

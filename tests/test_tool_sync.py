@@ -370,3 +370,108 @@ def test_public_mise_task_forwards_tool_after_double_dash() -> None:
     assert proc.returncode != 0
     assert "unknown or duplicated" in proc.stdout
     assert "usage_args" not in proc.stderr
+
+
+_LOCK_STDERR = (
+    "mise lock                                probe@1.2.3 linux-x64\n"
+    "mise lock                                probe@1.2.3 linux-arm64-musl\n"
+    "mise lock                                probe@1.2.3 macos-arm64\n"
+    "mise lock                                probe@1.2.3 windows-x64-baseline\n"
+    "mise lock                              ✓ 4 platform entries\n"
+)
+"""`mise lock <key>` stderr, captured verbatim on mise 2026.8.10 (no TTY), key
+substituted: the progress bar's remnants. The narrative (`→ Targeting …`,
+`✓ Lockfile written …`) went to stdout in the same capture."""
+
+
+def test_mise_lock_platform_progress_on_stderr_is_not_a_warning(tmp_path) -> None:
+    _root, spec = _repo(tmp_path)
+    assert tool_sync._mise_lock_progress_only(_LOCK_STDERR, spec)
+    # Anything that is not one of the two bounded shapes still refuses.
+    assert not tool_sync._mise_lock_progress_only(_LOCK_STDERR + "warning: source changed\n", spec)
+    assert not tool_sync._mise_lock_progress_only(
+        "→ Targeting 4 platform(s) for mise.lock: linux-x64\n", spec
+    )
+    assert not tool_sync._mise_lock_progress_only(
+        _LOCK_STDERR.replace("probe@1.2.3", "other@1.2.3"), spec
+    )
+    assert not tool_sync._mise_lock_progress_only("", spec)
+    # The install recognizer does NOT accept lock progress — the two are separate
+    # shapes on purpose, so the lock step's tolerance cannot leak into install.
+    assert not tool_sync._mise_progress_only(_LOCK_STDERR, spec)
+
+
+def test_lock_progress_on_stderr_does_not_refuse(tmp_path, monkeypatch, capsys) -> None:
+    """The lock step tolerates mise's per-platform progress on stderr (#438).
+
+    It used to refuse every `mise lock`: mise writes that progress to stderr and
+    the step treated ANY stderr as a refusal, so `kb-tool-sync` could not pass its
+    first step for any tool.
+    """
+    root, _spec = _repo(tmp_path)
+
+    def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        if argv[:2] == ["mise", "lock"] and "--dry-run" not in argv:
+            (cwd / "mise.lock").write_text(_NEW_LOCK, encoding="utf-8")
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                stdout="→ Targeting 4 platform(s) for mise.lock: linux-x64\n"
+                "→ Processing 1 tool(s): probe@1.2.3\n"
+                "✓ Updated 4 platform entries (0 skipped)\n"
+                "✓ Lockfile written to mise.lock\n",
+                stderr=_LOCK_STDERR,
+            )
+        return _success(argv, cwd)
+
+    monkeypatch.setattr(tool_sync, "_run", run)
+    assert tool_sync.main(root, ["probe"]) == 0
+    assert "lock, install, and version verified" in capsys.readouterr().out
+    assert (root / "mise.lock").read_text() == _NEW_LOCK
+
+
+_INSTALL_STDERR = (
+    "hk removed hook: ~/dev/kb/.git/hooks/commit-msg\n"
+    "hk removed hook: ~/dev/kb/.git/hooks/pre-commit\n"
+    "hk Installed hk hook: /Users/me/dev/kb/.git/hooks/pre-commit\n"
+    "hk Installed hk hook: /Users/me/dev/kb/.git/hooks/commit-msg\n"
+)
+"""`mise install <key>` stderr on an already-installed pin, captured verbatim on
+mise 2026.8.10 / hk 1.56.0 (paths shortened): mise prints nothing of its own and
+the repo's `[hooks].postinstall` (`mise reshim && hk install --mise`) prints these
+four lines. It was the WHOLE stderr, and the install step refused it (#438)."""
+
+
+def test_postinstall_hook_output_is_not_a_warning_on_install(tmp_path) -> None:
+    _root, spec = _repo(tmp_path)
+    assert tool_sync._mise_progress_only(_INSTALL_STDERR, spec)
+    # A checkout under a directory with a space in its name is legitimate (cold
+    # review of 90be7169, P2): the path part must not be matched with `[^\s]+`.
+    assert tool_sync._mise_progress_only(
+        _INSTALL_STDERR.replace("/Users/me/dev/kb", "/Users/me/My Dev/kb"), spec
+    )
+    # Mixed with the ordinary install-status line: still ordinary.
+    assert tool_sync._mise_progress_only(
+        "mise probe@1.2.3                ⇢ installed\n" + _INSTALL_STDERR, spec
+    )
+    # A hook this repo does not install, a stray line, or a warning: refused.
+    assert not tool_sync._mise_progress_only(
+        _INSTALL_STDERR.replace("commit-msg", "post-checkout"), spec
+    )
+    assert not tool_sync._mise_progress_only(_INSTALL_STDERR + "hk something else\n", spec)
+    assert not tool_sync._mise_progress_only(_INSTALL_STDERR + "warning: x\n", spec)
+
+
+def test_install_step_tolerates_postinstall_hook_output(tmp_path, monkeypatch, capsys) -> None:
+    root, _spec = _repo(tmp_path)
+
+    def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        if argv[:2] == ["mise", "lock"] and "--dry-run" not in argv:
+            (cwd / "mise.lock").write_text(_NEW_LOCK, encoding="utf-8")
+        if argv[:2] == ["mise", "install"]:
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr=_INSTALL_STDERR)
+        return _success(argv, cwd)
+
+    monkeypatch.setattr(tool_sync, "_run", run)
+    assert tool_sync.main(root, ["probe"]) == 0
+    assert "lock, install, and version verified" in capsys.readouterr().out

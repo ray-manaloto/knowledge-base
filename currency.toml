@@ -595,7 +595,7 @@ os = ["macos"]
 # "lower than", so a floor never fires on a self-update, which always moves up.
 [tool.mise]
 binary = "mise"
-expected = "2026.8.9"
+expected = "2026.8.10"
 # ADDED 2026-08-08 (#242). The same SKIP-whose-reason-stopped-being-true hole
 # `[tool.hk]` records below, one tool over: `sources/mise.manifest` existed and
 # this table never named it, so `sync.py` reported a clean SKIP while the
@@ -1592,12 +1592,12 @@ manifest = "sources/uv.manifest"
 
 [tool.ruff]
 # NOT a `[tools]` pin: ruff is a `dev` dependency in the root pyproject.toml
-# (`ruff==0.16.2`), reached as `uv run ruff`. So there is no `mise_key` — the
+# (`ruff==0.16.4`), reached as `uv run ruff`. So there is no `mise_key` — the
 # engine offers exactly three managers and none of them is uv, which is why this
 # takes `expected` (the version we have REVIEWED) rather than pretending mise
 # owns it. Bump `expected` and the pyproject pin in the same change, or this row
 # asserts a review that did not happen.
-expected = "0.16.3"
+expected = "0.16.4"
 binary = "ruff"
 github = "astral-sh/ruff"
 pypi = "ruff"

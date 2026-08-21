@@ -1,6 +1,6 @@
 # Source manifest — reproducible-by-reference (Invariant 3).
 # Official Anthropic Python SDK. kb_setup.model_limits uses client.models.retrieve for the authoritative max_output/max_input; pinned as a source so 'how does the SDK do X' is a graph query, not a web fetch.
 url = https://github.com/anthropics/anthropic-sdk-python
-ref = main
-commit = ad53cac8eeeb1608c162081f883755427ac3a26f
+ref = v1.0.0
+commit = 23cf45839f4e4beae970c83de1a13e0f24430318
 kind = code

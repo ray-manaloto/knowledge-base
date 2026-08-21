@@ -1,7 +1,7 @@
 ---
 name: clear-prep
-description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Invoke explicitly as /clear-prep [next-task]."
-disable-model-invocation: true
+description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Use it PROACTIVELY, without being asked, as soon as the session's context passes ~20% of the model's window, or when a round is ending — PR open and gates green, BEFORE kb-land (the corpus loop must close while the reviewed commit is still an ancestor) — or whenever the user asks to /clear, asks for a handoff or a wrap-up, or asks what the next session should do; and explicitly as /clear-prep [next-task]. It prepares the handoff and then ASKS the user to /clear; it never clears."
+disable-model-invocation: false
 argument-hint: "[one-line description of the next task, optional]"
 ---
 
@@ -19,13 +19,21 @@ a guess the user never saw is a guess nobody corrected.
 Work top-to-bottom. The ordering in step 2 is not stylistic; it is the one thing
 in this skill that cannot be reordered without losing work.
 
-> **This skill is model-invisible on purpose.** `disable-model-invocation: true`
-> removes it from the skill listing entirely, so it fires only when a human types
-> `/clear-prep`. That is deliberate — a handoff that auto-triggers mid-task
-> writes a handoff for work that is not finished. It also means the
-> `triggering_accuracy` dimension in `mise run kb-skill-score` is permanently
-> low for this skill and should be ignored here: it measures a trigger this
-> skill is designed not to have.
+> **Model-invocable since 2026-08-21 (Ray, verbatim: "it should also be able to be
+> triggered by an agent so that it runs when context hits over 20% — so toggle this
+> flag").** Until then `disable-model-invocation: true` hid it from the listing so only a
+> human could fire it; the 2026-08-21 session review measured why that failed — 20% of
+> context was crossed 15 minutes in and the ask came at ~75%. The trigger is still a
+> question, never a silent run: an agent that invokes this skill does so to PREPARE the
+> handoff and then asks the user to `/clear` (AskUserQuestion), and the intended
+> mechanical trigger is a DENY-style guard on context usage (session-review R1, #431/#433
+> neighbours) — not built yet, so until it lands the trigger is the description above
+> plus the agent's own context reading. The description is what model invocation
+> matches on, so it now names the triggers (context past ~20%, a round ending, the user
+> asking for a handoff); the `triggering_accuracy` dimension in `mise run
+> kb-skill-score` therefore measures a real trigger for this skill from 2026-08-21 on —
+> re-baseline it (`-- --write`) rather than reading the old "inert" note. Step 7 is
+> where the "asks the user" half is made concrete.
 
 ## 0. Resolve next-task ambiguity FIRST (Ray, 2026-07-08)
 
@@ -34,6 +42,20 @@ user via `AskUserQuestion`** — and keep asking across rounds until nothing
 material is unresolved. Every question goes through that tool, including a plain
 yes/no; a question in prose at the end of a message is easy to miss and gives
 the user nothing to click (`clarify-before-acting.md`).
+
+**On a model-invoked run this step is also the consent gate.** The skill can
+trigger itself (`disable-model-invocation: false` — Ray, 2026-08-21: *"flip the
+flag so this can be automated"*), so when the user did not type `/clear-prep`,
+say so in this first `AskUserQuestion` and offer *"not now"* alongside the
+next-task options. Nothing is written before that answer — no work-memory, no
+handoff, no auto-memory, no commit. Automatic invocation buys the EARLY ask, not
+an unattended write, and that is the whole of the difference.
+
+On *"not now"*, **stop**: write nothing and resume whatever the session was
+doing. That answer defers on the same terms as step 7's *"not yet"* — it expires
+on the next qualifying trigger listed there, so it is a deferral rather than a
+refusal, and the skill will offer again rather than either nagging or going
+silent for the rest of the window.
 
 The handoff's "next task" section is only as good as this step. If the task
 admits multiple readings, a scope fork, an undecided B-vs-C, or an unstated
@@ -374,6 +396,25 @@ handoff to point at. `/kb-resume` handles that case itself, falling back to the
 newest tracked `docs/direction/*.md` plus `git log`, so `/kb-resume` stays the
 right prompt to print either way.
 
+**Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
+never by clearing yourself.** This is the "asks the user" half of the banner,
+and it is the last act of the skill whether a human typed `/clear-prep` or an
+agent invoked it on its own at ~20% context: one question, options *"/clear now
+(then `/kb-resume`)"* and *"not yet — keep going in this session"*, with the
+handoff path and the resume line in the question text so the answer is one
+click. Only the user runs `/clear`; an agent that invoked this skill has
+prepared for it. On *"not yet"*, resume the work you were doing — the handoff
+stays valid until something changes — and do not ask again until the NEXT
+qualifying trigger: a further PR opened or landed, a new directive, the user
+raising it, **or roughly another 25 percentage points of context consumed since
+the deferral** (so a *"not yet"* at ~20% asks again near ~45%, and again near
+~70% — bounded, and never *never*). Both banner triggers therefore survive a
+deferral, which is the point: re-asking on the very next turn is the nagging
+this skill must not become, but a deferral that never expires is the other
+failure, and it is the one that leaves a session writing its handoff at the end
+of the window instead of the start. On *"/clear now"*, stop: the next thing that
+happens is the user's `/clear` and then `/kb-resume`.
+
 ## Keeping this skill honest over time
 
 This repo can measure its own skills, so use that rather than taste:
@@ -388,7 +429,9 @@ This repo can measure its own skills, so use that rather than taste:
 - Read the number with its condition attached. `triggering_accuracy` is a regex
   over the description, so it rewards the literal words "proactively" and
   "automatically". Chasing it is keyword-stuffing; fixing a genuinely vague
-  description is not. For this skill the dimension is inert (see the banner).
+  description is not. For this skill the dimension was inert while it was
+  human-only; since 2026-08-21 it measures a real trigger (see the banner), so
+  re-baseline after the description change and read the Δ.
 - SkillOpt's mutable marketplace plugin is disabled while its immutable
   provenance/API contract is established. `/skillopt-sleep` is intentionally
   unavailable until a later project-local adapter preserves explicit adoption.
@@ -410,6 +453,7 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate.
 - [ ] Resume prompt printed — `/kb-resume` (skipped on 2026-08-19; the next session had no idea where to start).
+- [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both are valid outcomes, and only the user ever clears.
 
 ## See also
 

@@ -1,0 +1,57 @@
+# Mutation arms for #438 (kb-tool-sync refused every `mise lock`, then every
+# `mise install`, because the lifecycle treated ANY stderr as a refusal while
+# mise writes its per-platform lock progress there and this repo's own
+# `[hooks].postinstall` — `mise reshim && hk install --mise` — writes four hk
+# lines there after every install). Format follows
+# `docs/research/reports/2026-08-20-422-runtime-pair-arms.toml`.
+#
+# SCOPE. Armed: the lock step's recognizer WIRING (R1 — the realistic break is
+# wiring the install recognizer back in, which is exactly the pre-fix
+# behaviour), the lock recognizer's closing-summary shape (R3), and the install
+# recognizer's tolerance for the postinstall hook's lines (R2). The per-platform
+# `mise lock <key>@<v> <platform>` shape is exercised by the same tests as R1/R3
+# (every fixture line must match), so it has no separate arm. All three arms
+# run against stubbed `_run` — no real mise is reached by a survival.
+
+suites = ["tests/test_tool_sync.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/tool_sync.py"
+old = '''_TIMEOUT = 600'''
+new = '''_TIMEOUT = 600  # control'''
+
+# ── R1: wire the INSTALL recognizer back into the LOCK step (the pre-fix state)
+[[arm]]
+id = "R1"
+test = "test_lock_progress_on_stderr_does_not_refuse"
+file = "python/src/kb_setup/tool_sync.py"
+old = '''            progress=_mise_lock_progress_only,'''
+new = '''            progress=_mise_progress_only,'''
+
+# ── R2: drop the install recognizer's tolerance for the postinstall hook lines
+[[arm]]
+id = "R2"
+test = "test_install_step_tolerates_postinstall_hook_output"
+file = "python/src/kb_setup/tool_sync.py"
+old = '''        pattern.fullmatch(line) is not None or hook.fullmatch(line) is not None for line in lines'''
+new = '''        pattern.fullmatch(line) is not None for line in lines'''
+
+# ── R3: narrow the lock recognizer's closing summary so the real capture no longer matches
+[[arm]]
+id = "R3"
+test = "test_mise_lock_platform_progress_on_stderr_is_not_a_warning"
+file = "python/src/kb_setup/tool_sync.py"
+old = '''    summary = re.compile(r"^mise lock\s+✓ \d+ platform entr(?:y|ies)$")'''
+new = '''    summary = re.compile(r"^mise lock\s+✓ \d{3,} platform entr(?:y|ies)$")'''
+
+# ── R4: re-narrow the hook path to `[^\s]+` (the round-1 cold-review P2: a checkout
+#        path with a space must still be recognised) ─────────────────────────────
+[[arm]]
+id = "R4"
+test = "test_postinstall_hook_output_is_not_a_warning_on_install"
+file = "python/src/kb_setup/tool_sync.py"
+old = '''        r"^hk (?:removed hook|Installed hk hook): .+/\.git/hooks/(?:pre-commit|commit-msg)$"'''
+new = '''        r"^hk (?:removed hook|Installed hk hook): [^\s]+/\.git/hooks/(?:pre-commit|commit-msg)$"'''
