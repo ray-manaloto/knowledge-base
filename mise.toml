@@ -1045,6 +1045,18 @@ description = 'Await terminal checks + review receipt → SHA-pinned squash-merg
 # watch and no container re-validation — this repo has neither. Logic in kb_setup.pr.
 run = "uv run kb-setup land"
 
+[tasks.kb-context]
+description = 'Report this session CONTEXT-WINDOW occupancy: mise run kb-context'
+# The /clear-prep trigger ("context past ~20% of the window") was UNOBSERVABLE from
+# inside a session: the only signal a model gets is `<total_tokens>N tokens left`,
+# which is a SPEND BUDGET, not window occupancy. Measured on transcript 672f23a4:
+# real occupancy peaked at 475,917 (47.6% of a 1M window) while that reminder read
+# 14,981,005/15,000,000 left — 99.9% remaining. A trigger nothing reports can never
+# fire. This task is what makes the condition checkable. Logic in
+# kb_setup.context_usage. Exit codes are a SIGNAL, never a gate: 0 under, 10 at or
+# over the threshold, 3 not the main thread, 127 could not measure.
+run = "uv run kb-setup context"
+
 [tasks.kb-manifest-add]
 description = 'Pin a new repo source: mise run kb-manifest-add -- <url> [--ref R --kind K --name N --comment C --force]'
 # Resolves upstream HEAD via git ls-remote (no clone) + writes sources/<name>.manifest.

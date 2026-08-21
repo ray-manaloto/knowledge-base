@@ -1,6 +1,6 @@
 ---
 name: clear-prep
-description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Use it PROACTIVELY, without being asked, as soon as the session's context passes ~20% of the model's window, or when a round is ending — PR open and gates green, BEFORE kb-land (the corpus loop must close while the reviewed commit is still an ancestor) — or whenever the user asks to /clear, asks for a handoff or a wrap-up, or asks what the next session should do; and explicitly as /clear-prep [next-task]. It prepares the handoff and then ASKS the user to /clear; it never clears."
+description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. MAIN SESSION THREAD ONLY — never from a subagent, fork, or agent team. Use it PROACTIVELY, without being asked, when a round is ending (PR open and gates green, BEFORE kb-land, so the corpus loop closes while the reviewed commit is still an ancestor); whenever the user asks to /clear, asks for a handoff or a wrap-up, or asks what the next session should do; explicitly as /clear-prep [next-task]; and on a context threshold you must MEASURE with `mise run kb-context` rather than estimate — the token countdown in your context is a SPEND BUDGET, not window occupancy, so it will read as roomy at 48% full. It prepares the handoff and then ASKS the user to /clear; it never clears."
 disable-model-invocation: false
 argument-hint: "[one-line description of the next task, optional]"
 ---
@@ -11,6 +11,30 @@ Run this **before** `/clear` so the next session loses nothing. Three jobs, in
 this order: (1) find out what the next task actually is, (2) put everything
 worth keeping somewhere that survives the clear, (3) print one line to paste
 afterwards.
+
+## The context trigger: MEASURE it, and only on the main thread
+
+**You cannot see your own context occupancy, and the number you CAN see is a
+different quantity.** The "~20% of the window" trigger never once fired, because
+nothing reports what it names: the only context-ish signal a session gets is
+`<total_tokens>N tokens left</total_tokens>`, a **spend budget**. Measured on
+transcript `672f23a4` — real occupancy **475,917, 47.6% of a 1M window**, while
+that reminder read **14,981,005 of 15,000,000 left, 99.9% remaining**, so a
+session concludes it has room at twice the threshold. Flipping
+`disable-model-invocation` could not fix that: the flag governs whether you MAY
+invoke this skill, not whether you can tell the condition holds.
+
+So the trigger is `mise run kb-context`, never an estimate — run it when a round
+feels long, after a large read or fan-out, and before deciding you have room.
+Exit **10** at or over threshold · **0** under · **127** could not measure (which
+is *not* "you are fine") · **3** not the main thread.
+
+**Main session thread only** (Ray, 2026-08-21: *"not on subtasks or spawned
+agents or agent teams"*) — a subagent offering a handoff is offering to end a
+session it does not own. **Your session id will not tell you which you are**: a
+live fork carries the *same* `CLAUDE_CODE_SESSION_ID` as its parent and reads the
+same transcript. `kb-context` checks the environment markers that do separate
+them; rc=3 is your answer — report to your caller instead.
 
 `$ARGUMENTS` is the next task, if the user named one. If it is empty, infer the
 next task from open issues and the prior handoff, and *say what you inferred* —
