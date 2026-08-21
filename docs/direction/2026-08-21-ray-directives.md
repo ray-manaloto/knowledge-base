@@ -91,3 +91,34 @@ Two items were measured while filing and are already answered:
 `ingest_turns`/`recall` unused, 0 against a control of 19 for `save-result`,
 rated above ten external candidates). It must be re-derived or labelled
 unverified, never restated as a finding.
+
+## Addendum, same day (session `kb-20260821.03`, at the round-2 review bound) — VERBATIM
+
+Asked (AskUserQuestion) whether to run a bounded round 3 for the confirmed
+cold-review residuals, ship-and-file, or fix truths only:
+
+> /clear-prep
+>
+> option 1 on new session after /clear
+>
+> context is getting full. But, run session-review workflow:
+> - to find all issues/repeated mistakes and manual commands that should be wrapped in a modular skill -> mise task -> python library module/function
+> - find all occurrences of a skill not triggering
+> - should have triggered or requested a /clear-prep to have been run since we went over the 20% context of current model
+> - make sure we the goal is to complete the graphify full deep extraction/reflection/generated artifacts
+
+**Decisions recorded:** round 3 (option 1 = one bounded codex lane for the
+truth/correctness residuals plus the two cheap design fixes — lowercase proxy
+names in the refusal/exemption sets, a typed CLI refusal instead of a traceback
+— then one cold pass, then re-plan / authority (k) / sweeps / gates / kb-review /
+kb-ship) runs in the NEXT session after `/clear`. `/clear-prep` is
+user-invocable only, so the session prepared the handoff inputs and asked Ray to
+run it. The session-review workflow is to be run with the four foci above, and
+**a /clear-prep should have been requested when context passed 20% of the
+model's window** — recorded as a standing expectation.
+
+Also decided this session (AskUserQuestion, all "Recommended"): re-run the slice
+at 0.9.48 (G2); #426 = derive the runtime and refuse at verify AND execute; the
+cap follows the ONE-FULL-RESTART rule (first ≈$140 at 58 chunks, re-derived to
+$63 at the measured 26 post-dedupe chunks); #414 dedupe IN the bundle; NO new
+lint suppression — refactor instead.
