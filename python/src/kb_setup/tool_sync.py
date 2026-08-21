@@ -72,8 +72,11 @@ def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
         rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+⇢\s+"
         r"(?:already installed|installed)$"
     )
+    # `.+` for the path, not `[^\s]+`: a checkout under a directory with a space
+    # in its name is legitimate, and refusing it here would fail `kb-tool-sync` on
+    # that host for every tool (cold review of 90be7169, P2).
     hook = re.compile(
-        r"^hk (?:removed hook|Installed hk hook): [^\s]+/\.git/hooks/(?:pre-commit|commit-msg)$"
+        r"^hk (?:removed hook|Installed hk hook): .+/\.git/hooks/(?:pre-commit|commit-msg)$"
     )
     return bool(lines) and all(
         pattern.fullmatch(line) is not None or hook.fullmatch(line) is not None for line in lines

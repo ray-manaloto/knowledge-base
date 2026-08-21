@@ -46,3 +46,12 @@ test = "test_mise_lock_platform_progress_on_stderr_is_not_a_warning"
 file = "python/src/kb_setup/tool_sync.py"
 old = '''    summary = re.compile(r"^mise lock\s+✓ \d+ platform entr(?:y|ies)$")'''
 new = '''    summary = re.compile(r"^mise lock\s+✓ \d{3,} platform entr(?:y|ies)$")'''
+
+# ── R4: re-narrow the hook path to `[^\s]+` (the round-1 cold-review P2: a checkout
+#        path with a space must still be recognised) ─────────────────────────────
+[[arm]]
+id = "R4"
+test = "test_postinstall_hook_output_is_not_a_warning_on_install"
+file = "python/src/kb_setup/tool_sync.py"
+old = '''        r"^hk (?:removed hook|Installed hk hook): .+/\.git/hooks/(?:pre-commit|commit-msg)$"'''
+new = '''        r"^hk (?:removed hook|Installed hk hook): [^\s]+/\.git/hooks/(?:pre-commit|commit-msg)$"'''

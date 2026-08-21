@@ -460,6 +460,10 @@ description = "Report reclaimable disk (docker/ollama/caches/mise/downloads); --
 # needs `-- --apply` on every run. A deleter whose destructive mode can be armed
 # from a config file is a destructive action at a distance, which is precisely
 # what `reclaim.toml` must not become.
+# The guard is the explicit per-run `--apply` in argv (`reclaim.main`), NOT mise's
+# `--` separator: probed 2026-08-21 on a scratch task, the old `{{arg(...)}}`
+# template forwarded `--apply` WITHOUT `--` exactly as `raw_args = true` does, so
+# the two spellings were always the same deliberate act (cold review of 90be7169).
 #
 # Policy lives in `reclaim.toml` — every category can be disabled, re-scoped or
 # re-thresholded there, and `--only`/`--skip` narrow a single run. Docker cleanup

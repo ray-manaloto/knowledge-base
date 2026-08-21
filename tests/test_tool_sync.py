@@ -445,6 +445,11 @@ four lines. It was the WHOLE stderr, and the install step refused it (#438)."""
 def test_postinstall_hook_output_is_not_a_warning_on_install(tmp_path) -> None:
     _root, spec = _repo(tmp_path)
     assert tool_sync._mise_progress_only(_INSTALL_STDERR, spec)
+    # A checkout under a directory with a space in its name is legitimate (cold
+    # review of 90be7169, P2): the path part must not be matched with `[^\s]+`.
+    assert tool_sync._mise_progress_only(
+        _INSTALL_STDERR.replace("/Users/me/dev/kb", "/Users/me/My Dev/kb"), spec
+    )
     # Mixed with the ordinary install-status line: still ordinary.
     assert tool_sync._mise_progress_only(
         "mise probe@1.2.3                ⇢ installed\n" + _INSTALL_STDERR, spec
