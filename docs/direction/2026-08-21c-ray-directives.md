@@ -61,3 +61,32 @@ command (`mise use` / `mise config set` / `uv add` / `uv remove` / `uv lock`);
 hk steps that catch the RESULT of a hand edit — a lockfile that disagrees with
 its manifest (`uv lock --check`; the mise-lock equivalent); and a
 session-review lane that counts hand edits of those files across transcripts.
+
+## At `/clear-prep` step 0 (AskUserQuestion), same session — VERBATIM
+
+Asked how to treat Repowise's advisory code-health FAIL on PR #439 (its two
+findings live only on a JS report page). Ray:
+
+> do more research on getting this information
+> i just setup repowise to index the project: https://www.repowise.dev/s/82747d64d7c1/overview
+> they provide an mcp server we might be able to utilize:
+> - claude mcp add --transport http repowise https://api.repowise.dev/mcp/ray-manaloto/knowledge-base \ --header "Authorization: Bearer rw_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+> - i added the api key under key name 'REPOWISE_KNOWLEDGE_BASE_API_KEY'
+>   - use the fnox/doppler/macos keychain sync we've been using to get the keys as environment variables
+>     - MAKE SURE TO NOT LEAK THE KEYS
+
+**Decided in the same step:** the small tooling PR after #439 carries all six
+items (#437, #428, #429, #430, #431, the /clear-prep context DENY guard), then
+round 3; when `corpus-gate-bundle-0821` is rebased onto main, the two clear-prep
+`SKILL.md` copies conflict and **main's version wins** (`0a88507f`+ supersedes
+`842a1f9e`).
+
+**Probe at the time (no secret printed):** the key was not yet in this session's
+shell env (0 hits; the shell predates the key), `fnox get` resolved 0 bytes in
+this process, `mcp2cli` is installed, and the MCP endpoint answers 405 to a
+bare GET — live, and expecting the streamable-HTTP POST. Next session: fresh
+shell → confirm the variable by COUNT only → `mcp2cli` against the endpoint with
+the bearer taken from the environment → read PR #439's findings → decide on a
+project-scoped `.mcp.json` entry whose header is `${REPOWISE_KNOWLEDGE_BASE_API_KEY}`
+(never the literal; `research-doc-sources.md`: mcp2cli first, register when
+frequent).

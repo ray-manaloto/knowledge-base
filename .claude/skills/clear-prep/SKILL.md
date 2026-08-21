@@ -1,6 +1,6 @@
 ---
 name: clear-prep
-description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Use it PROACTIVELY, without being asked, as soon as the session's context passes ~20% of the model's window, when a round is ending (PR open or landed, gates green), or whenever the user says clear, handoff, wrap up, or asks what the next session should do — and explicitly as /clear-prep [next-task]. It prepares the handoff and then ASKS the user to /clear; it never clears."
+description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Use it PROACTIVELY, without being asked, as soon as the session's context passes ~20% of the model's window, or when a round is ending — PR open and gates green, BEFORE kb-land (the corpus loop must close while the reviewed commit is still an ancestor) — or whenever the user asks to /clear, asks for a handoff or a wrap-up, or asks what the next session should do; and explicitly as /clear-prep [next-task]. It prepares the handoff and then ASKS the user to /clear; it never clears."
 disable-model-invocation: false
 argument-hint: "[one-line description of the next task, optional]"
 ---
@@ -369,15 +369,6 @@ knows how to jump to handoff so there is less copy/paste needed."*
 failure this step exists to prevent. A handoff nobody is told to read is a
 handoff nobody reads.
 
-**Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
-never by clearing yourself.** This is the "asks the user" half of the banner,
-and it is the last act of the skill whether a human typed `/clear-prep` or an
-agent invoked it on its own at ~20% context: one question, options *"/clear now
-(then `/kb-resume`)"* and *"not yet — keep going in this session"*, with the
-handoff path and the resume line in the question text so the answer is
-one click. Only the user runs `/clear`; an agent that invoked this skill has
-prepared for it and stops here.
-
 The older form still works when the next session should read a SPECIFIC handoff
 rather than the newest:
 
@@ -390,6 +381,20 @@ a fresh clone: `.agent/` is gitignored, so a missing `.agent/` directory has no
 handoff to point at. `/kb-resume` handles that case itself, falling back to the
 newest tracked `docs/direction/*.md` plus `git log`, so `/kb-resume` stays the
 right prompt to print either way.
+
+**Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
+never by clearing yourself.** This is the "asks the user" half of the banner,
+and it is the last act of the skill whether a human typed `/clear-prep` or an
+agent invoked it on its own at ~20% context: one question, options *"/clear now
+(then `/kb-resume`)"* and *"not yet — keep going in this session"*, with the
+handoff path and the resume line in the question text so the answer is one
+click. Only the user runs `/clear`; an agent that invoked this skill has
+prepared for it. On *"not yet"*, resume the work you were doing — the handoff
+stays valid until something changes — and do not ask again until the NEXT
+qualifying trigger (a further PR opened or landed, a new directive, or the user
+raising it); re-asking on the next turn is the nagging this skill must not
+become. On *"/clear now"*, stop: the next thing that happens is the user's
+`/clear` and then `/kb-resume`.
 
 ## Keeping this skill honest over time
 
