@@ -1413,7 +1413,7 @@ def _fresh_plan(tmp_path: Path, repo_root: Path) -> Path:
             tree=_git(source, "rev-parse", "HEAD^{tree}"),
         ),
         max_output_tokens=64_000,
-        repo_root=repo_root,
+        options=graphify_semantic_corpus.PlanSourceOptions(repo_root=repo_root),
     )
     return candidate
 
@@ -1423,19 +1423,21 @@ def test_the_pre_spend_runtime_guard_refuses_a_runtime_that_moved_since_the_plan
 ) -> None:
     """The guard `execute()` calls right after `preflight` must actually refuse (#426).
 
-    This tests `_assert_graphify_runtime_unchanged_since_plan` DIRECTLY rather
-    than driving the full `execute()` to completion. `execute()`'s body calls
-    this exact function immediately after `preflight_receipt = ...` and before
-    anything else — the call site is one line, read directly rather than
-    exercised end-to-end here — because a few steps further into `execute()`
-    sits a REAL Claude CLI subprocess call. A mutation that neuters this guard
-    must not be free to reach that far during an automated `kb-arms` sweep; a
-    direct unit test of the guard itself proves the same behavior with no such
-    exposure.
+    This tests `_assert_graphify_runtime_unchanged_since_plan` DIRECTLY, as one
+    layer; the CALL SITE inside `execute()` is armed separately, and safely, by
+    `test_execute_refuses_before_any_spend_path_when_the_runtime_moved_since_plan`
+    below — that test drives `execute()` itself with `preflight` stubbed and
+    every reachable spend path stubbed to raise loudly if reached, which is
+    what keeps a mutation that deletes the guard's call line from being free to
+    reach the REAL Claude CLI subprocess a few steps further into `execute()`.
+    Before that sibling test existed, deleting the one-line call site left
+    every test in this file green (cold review P2-1); a direct unit test of
+    the helper alone could not have detected that.
 
-    Both directions are armed: a moved runtime must raise, and an unchanged one
-    (the positive control) must not — a guard that always raised would satisfy
-    the first half while refusing every legitimate run.
+    Both directions are armed here for the helper itself: a moved runtime must
+    raise, and an unchanged one (the positive control) must not — a guard that
+    always raised would satisfy the first half while refusing every
+    legitimate run.
     """
     repo_root = Path(__file__).resolve().parents[1]
     candidate = _fresh_plan(tmp_path, repo_root)
@@ -1473,3 +1475,66 @@ def test_the_pre_spend_runtime_guard_refuses_a_runtime_that_moved_since_the_plan
     graphify_semantic_corpus_run._assert_graphify_runtime_unchanged_since_plan(
         consistent_preflight, config
     )
+
+
+def test_execute_refuses_before_any_spend_path_when_the_runtime_moved_since_plan(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`execute()`'s pre-spend guard CALL SITE must fire, not just its helper (#426 round 2).
+
+    Cold review P2-1: deleting the one line that wires
+    `_assert_graphify_runtime_unchanged_since_plan` into `execute()` left every
+    existing test green, because the only test of the guard called the helper
+    directly (above) — the arms toml named this call site explicitly as NOT
+    armed. This drives `execute()` itself, with `preflight` stubbed to return a
+    runtime that disagrees with the plan and EVERY reachable spend path --
+    `seeded_spend` and the extraction call `_extract_corpus` -- stubbed to
+    raise loudly if reached. A mutation that deletes the guard's call line then
+    surfaces as the WRONG exception (`AssertionError`, from a stub) rather than
+    as a silent green run that walked past the point where a real Claude
+    subprocess would launch: `execute()`'s own ordering puts nothing that
+    spends between `preflight` and the guard (routing scrub, `_load_plan`,
+    `_run_namespace` are all providers-free), so the stub is never reached on
+    the unmutated path and this test is fast.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _fresh_plan(tmp_path, repo_root)
+    config = graphify_semantic_corpus_run._load_plan(candidate)[2]
+    stale_runtime = msgspec.structs.replace(config.graphify_runtime, version="0.9.1")
+    assert stale_runtime != config.graphify_runtime, "mutation was inert"
+
+    def _stale_preflight(
+        *_args: object, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
+        return graphify_semantic_slice.ClaudePreflight(
+            executable="claude",
+            executable_sha256=config.claude_executable_sha256,
+            version=config.claude_version,
+            help_sha256=config.claude_help_sha256,
+            required_flags=config.claude_required_flags,
+            auth=graphify_semantic_slice.AuthIdentity(
+                logged_in=True,
+                auth_method="claude.ai",
+                api_provider="firstParty",
+                subscription_type="max",
+            ),
+            environment_names=(),
+            graphify_runtime=stale_runtime,
+            graphify_version="0.9.1",
+            graphify_semantic_fingerprint_sha256=config.graphify_semantic_fingerprint_sha256,
+        )
+
+    def _spend_path_reached(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("spend path reached")
+
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", _stale_preflight)
+    monkeypatch.setattr(graphify_semantic_corpus_run, "seeded_spend", _spend_path_reached)
+    monkeypatch.setattr(graphify_semantic_corpus_run, "_extract_corpus", _spend_path_reached)
+
+    with pytest.raises(ValueError, match="Graphify runtime changed after plan"):
+        graphify_semantic_corpus_run.execute(
+            candidate,
+            tmp_path / "cache",
+            tmp_path / "source",
+            repo_root=repo_root,
+        )

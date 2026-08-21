@@ -795,6 +795,10 @@ def _stage_completed_chunk(
                 adapter_metadata_raw=metadata_raw,
             ),
         ),
+        # The RUN's one live measurement, taken once by `execute()`'s preflight
+        # -- never the plan's own recorded value, which would make the staging
+        # comparison a tautology (#426 round 2, cold review P2-2).
+        live_runtime=context.preflight_receipt.graphify_runtime,
     )
     return ChunkOutcome(
         ordinal=chunk.ordinal,
@@ -1036,13 +1040,24 @@ def _assert_graphify_runtime_unchanged_since_plan(
     provider — the same window `_adapter_overlay`'s check exists to close for
     Claude.
     """
-    if (
-        preflight_receipt.graphify_runtime != config.graphify_runtime
-        or preflight_receipt.graphify_version != config.graphify_version
-    ):
+    live, plan = preflight_receipt.graphify_runtime, config.graphify_runtime
+    differing = [
+        field.name
+        for field in msgspec.structs.fields(live)
+        if getattr(live, field.name) != getattr(plan, field.name)
+    ]
+    if preflight_receipt.graphify_version != config.graphify_version:
+        differing.append("graphify_version")
+    if differing:
+        # Name the fields that differ, not just the two top-level version
+        # strings: those agree whenever it is `RuntimeIdentity`'s whole-struct
+        # comparison that actually fired -- a re-locked wheel digest, a moved
+        # executable path, or an SDK signature change at one version all used
+        # to print `plan=0.9.48 live=0.9.48`, a refusal asserting that two
+        # identical values differ (cold review P2-4).
         raise ValueError(
-            "Graphify runtime changed after plan: "
-            f"plan={config.graphify_version} live={preflight_receipt.graphify_version}"
+            f"Graphify runtime changed after plan: differing field(s) {', '.join(differing)} -- "
+            f"plan={config.graphify_runtime!r} live={preflight_receipt.graphify_runtime!r}"
         )
 
 

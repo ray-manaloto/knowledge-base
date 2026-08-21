@@ -432,11 +432,11 @@ be driven from one foreground call.
   in `graphify_semantic_corpus.py` for the arithmetic). The task's own
   `timeout = "16h"` is roughly 1.5x the projected 10.6h, sized to catch a
   genuinely wedged run without firing on ordinary chunk-to-chunk variance.
-- **A restart resumes; it does not restart from zero at the mise layer.**
-  `_verified_stages` re-publishes every chunk whose stage directory already
-  holds verified evidence before staging the rest, so an interrupted run picks
-  up where it left off rather than re-publishing completed chunks. This does
-  NOT make a restart free: `seeded_spend` still carries the prior run's
-  cumulative cost forward, and Graphify itself re-buys any chunk it re-attempts
-  at full price — which is exactly why the cap above is sized for one full
-  restart rather than for one full run.
+- **A restart re-publishes already-staged evidence; it does not re-buy anything
+  for free.** `_verified_stages` re-publishes every chunk whose stage directory
+  already holds verified evidence, so a restart does not write duplicate
+  artifacts for what is already staged. This does NOT make a restart free:
+  `seeded_spend` still carries the prior run's cumulative cost forward, and
+  Graphify itself re-buys EVERY chunk in the corpus at full price on every
+  restart — not only the ones it ends up re-publishing — which is exactly why
+  the cap above is sized for one full restart rather than for one full run.

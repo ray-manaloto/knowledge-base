@@ -185,7 +185,7 @@ def test_plan_artifact_verifier_rehashes_real_source_bytes(unset_authority, tmp_
         candidate,
         source=graphify_semantic_corpus.SourcePin(ref="test-ref", commit=commit, tree=tree),
         max_output_tokens=_TEST_MAX_OUTPUT_TOKENS,
-        token_budget=20_000,
+        options=graphify_semantic_corpus.PlanSourceOptions(token_budget=20_000),
     )
 
     complete = graphify_semantic_corpus.verify_plan(candidate, source_root=source)
@@ -1996,11 +1996,23 @@ class _StageOverrides(msgspec.Struct, frozen=True):
     run_namespace: str | None = None
 
 
+def _plan_runtime(candidate: Path) -> graphify_baseline.RuntimeIdentity:
+    """The plan's own recorded runtime.
+
+    The default LIVE runtime every `_stage_real`/`_run_artifact` fixture
+    stages against, except the one test that deliberately passes a
+    disagreeing `live_runtime` (#426 round 2).
+    """
+    return graphify_semantic_corpus._typed_members(candidate)[4].graphify_runtime
+
+
 def _stage_real(
     candidate: Path,
     cache_root: Path,
     repo_root: Path,
     overrides: _StageOverrides | None = None,
+    *,
+    live_runtime: graphify_baseline.RuntimeIdentity | None = None,
 ) -> tuple[graphify_semantic_corpus.ChunkStageReceipt, str, graphify_semantic_corpus.PlannedChunk]:
     overrides = overrides or _StageOverrides()
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
@@ -2023,6 +2035,7 @@ def _stage_real(
                 overrides.metadata_raw or real_metadata_raw,
             ),
         ),
+        live_runtime=live_runtime if live_runtime is not None else _plan_runtime(candidate),
     )
     return receipt, resolved_namespace, chunk
 
@@ -2454,6 +2467,7 @@ def _run_artifact(
                 provider_raw, metadata_raw
             ),
         ),
+        live_runtime=_plan_runtime(candidate),
     )
     assert stage_receipt.status == "failed"
     run_root = cache_root / spec.run_namespace
@@ -2768,30 +2782,11 @@ def test_an_implausible_output_cap_is_named_rather_than_accepted(
         # be measuring the digest guard while claiming to measure this one.
         max_output_tokens=cap,
     )
-    decode = msgspec.json.decode
-    config = decode(
-        (candidate / "execution-config.json").read_bytes(),
-        type=graphify_semantic_corpus.CorpusExecutionConfig,
-        strict=True,
-    )
+    members = graphify_semantic_corpus._typed_members(candidate)
+    config = members[4]
     reasons = graphify_semantic_corpus._config_reasons(
         candidate,
-        decode(
-            (candidate / "source-inventory.json").read_bytes(),
-            type=graphify_semantic_corpus.SourceInventory,
-            strict=True,
-        ),
-        decode(
-            (candidate / "exclusions.json").read_bytes(),
-            type=graphify_semantic_corpus.ExclusionCatalog,
-            strict=True,
-        ),
-        decode(
-            (candidate / "chunk-ledger.json").read_bytes(),
-            type=graphify_semantic_corpus.ChunkLedger,
-            strict=True,
-        ),
-        config,
+        members,
         # This test's fixed point is the output-cap bound, not runtime drift —
         # the plan's OWN recorded runtime, so this call cannot introduce a
         # spurious `plan-graphify-runtime-mismatch`/`config-contract-mismatch`
@@ -2858,15 +2853,15 @@ def test_plan_records_the_measured_graphify_runtime_not_a_frozen_literal(
     """
     repo_root = Path(__file__).resolve().parents[1]
     candidate = _execution_plan(tmp_path, repo_root)
-    config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
+    # The WHOLE typed struct (msgspec strict-decodes `graphify_runtime` as a
+    # `RuntimeIdentity`), not a raw JSON dict compared field by field: the
+    # previous version compared 5 of `RuntimeIdentity`'s 8 fields and silently
+    # omitted `executable`, `sdk_fingerprint_sha256` and `schema_version`.
+    config = graphify_semantic_corpus._typed_members(candidate)[4]
     measured = graphify_baseline.runtime_identity(repo_root)
 
-    assert config["graphify_runtime"]["version"] == measured.version
-    assert config["graphify_runtime"]["cli_version"] == measured.cli_version
-    assert config["graphify_runtime"]["sdk_version"] == measured.sdk_version
-    assert config["graphify_runtime"]["wheel_sha256"] == measured.wheel_sha256
-    assert config["graphify_runtime"]["sdist_sha256"] == measured.sdist_sha256
-    assert config["graphify_version"] == measured.version
+    assert config.graphify_runtime == measured
+    assert config.graphify_version == measured.version
 
     with (repo_root / "uv.lock").open("rb") as stream:
         lock = tomllib.load(stream)
@@ -2875,7 +2870,7 @@ def test_plan_records_the_measured_graphify_runtime_not_a_frozen_literal(
         for package in lock["package"]
         if isinstance(package, dict) and package.get("name") == "graphifyy"
     )
-    assert config["graphify_version"] == locked["version"]
+    assert config.graphify_version == locked["version"]
     assert not hasattr(graphify_semantic_corpus, "_ACCEPTED_GRAPHIFY_RUNTIME")
 
 
@@ -2921,25 +2916,75 @@ def test_verify_plan_refuses_a_measured_runtime_that_disagrees_with_the_plan(
     assert "config-contract-mismatch" in result.reasons
 
 
-def test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising(
-    monkeypatch, tmp_path: Path
+def test_stage_chunk_compares_against_the_live_runtime_not_the_plans_own(
+    tmp_path: Path,
 ) -> None:
-    """`runtime_identity` can raise; `verify_plan` must stay TOTAL regardless (#426).
+    """The staging path must cross-check the LIVE runtime, not the plan's own (#426 round 2).
+
+    Before this round `_stage_plan_context` passed `config.graphify_runtime`
+    into `_cross_reasons` — comparing the plan's recorded runtime against
+    itself, a tautology that made `plan-graphify-runtime-mismatch` unreachable
+    on the staging path and blinded the runtime half of
+    `config-contract-mismatch` (cold review P2-2). A live runtime that
+    disagrees with the plan must now be named here too, the same as it
+    already is at verify time.
+    """
+    repo_root = Path(__file__).parent.parent
+    candidate = _execution_plan(tmp_path, repo_root)
+    plan_runtime = _plan_runtime(candidate)
+    disagreeing = msgspec.structs.replace(plan_runtime, wheel_sha256="f" * 64)
+    assert disagreeing != plan_runtime, "mutation was inert"
+
+    receipt, _, _ = _stage_real(candidate, tmp_path / "cache", repo_root, live_runtime=disagreeing)
+
+    assert receipt.status == "failed"
+    assert "plan-graphify-runtime-mismatch" in receipt.reasons
+    assert "config-contract-mismatch" in receipt.reasons
+
+    # Control: staging under the plan's OWN runtime (the default) must not
+    # raise this pair. This fixture always trips OTHER reasons (real slice
+    # evidence replayed against an unrelated config — see
+    # `test_chunk_staging_retains_inherited_real_candidate_but_refuses_it_for_
+    # corpus_execution`), which is irrelevant to what this test checks.
+    consistent, _, _ = _stage_real(candidate, tmp_path / "cache-control", repo_root)
+    assert "plan-graphify-runtime-mismatch" not in consistent.reasons
+
+
+@pytest.mark.parametrize(
+    "raised",
+    [
+        pytest.param(
+            ValueError("Graphify release, CLI, SDK, and locked distribution versions do not agree"),
+            id="value-error",
+        ),
+        pytest.param(
+            TypeError("Graphify uv.lock entry has no source distribution"), id="type-error"
+        ),
+        pytest.param(
+            SystemExit("[graphify] REFUSING an unverified Graphify operation"), id="system-exit"
+        ),
+    ],
+)
+def test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising(
+    monkeypatch, tmp_path: Path, capsys, raised: BaseException
+) -> None:
+    """`runtime_identity` can raise several ways; `verify_plan` must stay TOTAL regardless (#426).
 
     `corpus_main`'s `verify` route must always print a verdict and its `run`
-    route must always reach `_abort` — neither holds if this function can raise
-    a `ValueError` or a `SystemExit` (the latter is exactly what
-    `graphify_env.assert_pinned_graphify` raises on a stale-PATH runtime, a
-    scenario this repo has hit for real).
+    route must always reach `_abort` — neither held before #426 round 2 if the
+    raise was a `TypeError` (exactly what `graphify_baseline.runtime_identity`
+    raises when the locked `graphifyy` entry has no source distribution,
+    graphify_baseline.py:361): the catch named only `(ValueError, SystemExit)`,
+    so that arm is the one that used to escape uncaught (cold review P1-1).
+    `SystemExit` is exactly what `graphify_env.assert_pinned_graphify` raises
+    on a stale-PATH runtime, a scenario this repo has hit for real.
     """
     repo_root = Path(__file__).resolve().parents[1]
     candidate = _execution_plan(tmp_path, repo_root)
     source_root = candidate.parent / "source"
 
     def _unmeasurable(_root: Path) -> Never:
-        raise ValueError(
-            "Graphify release, CLI, SDK, and locked distribution versions do not agree"
-        )
+        raise raised
 
     monkeypatch.setattr(graphify_semantic_corpus, "_measured_runtime", _unmeasurable)
 
@@ -2948,6 +2993,18 @@ def test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising(
     assert result.execution_authorized is False
     assert result.structural_complete is False
     assert result.reasons == ("plan-graphify-runtime-unmeasurable",)
+
+    # `corpus_main`'s `verify` route must print a verdict, never raise.
+    assert graphify_semantic_corpus.corpus_main(repo_root, ["verify", str(candidate)]) == 2
+    verdict = json.loads(capsys.readouterr().out)
+    assert verdict["reasons"] == ["plan-graphify-runtime-unmeasurable"]
+
+    # `corpus_main`'s `run` route must reach `_abort`, never raise.
+    assert graphify_semantic_corpus.corpus_main(repo_root, ["run", str(candidate)]) == 2
+    abort = json.loads(capsys.readouterr().out)
+    assert abort["schema_id"] == graphify_semantic_corpus._ABORT_SCHEMA
+    assert abort["status"] == "aborted"
+    assert abort["reasons"] == ["plan-graphify-runtime-unmeasurable"]
 
 
 def test_a_chunk_whose_argv_carries_the_wrong_effort_value_is_staged_failed(

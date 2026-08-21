@@ -197,8 +197,8 @@ _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
 _ACCEPTED_GRAPHIFY_DETECT_OBJECT = "d16b5800ce19ba36aa5276a204e77ecccc1dbe5c"
 # The repo root this module's own file lives under, resolved for the caller who
 # does not have one handy (a test, or a future entry point). Verified: this file
-# is `python/src/kb_setup/graphify_semantic_corpus.py`, three parents up from the
-# repository root.
+# is `python/src/kb_setup/graphify_semantic_corpus.py`, so the repository root
+# is three parents up from the file (`parents[3]`), not the other way around.
 _DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -1439,6 +1439,30 @@ def _ledger(
     return ChunkLedger(token_budget=budget, unit_count=len(units), chunks=tuple(chunks))
 
 
+class PlanSourceOptions(msgspec.Struct, frozen=True):
+    """`plan_source`'s two rarely-overridden keyword axes, bundled together.
+
+    `plan_source` had grown to 6 parameters (#426 round 2, cold review P2-7):
+    `source_root`, `output`, `source`, `max_output_tokens` — the four every
+    caller reasons about at the call site — plus these two, which almost every
+    caller leaves at their default. Bundling only these two (not
+    `max_output_tokens` too) is the smallest change that clears ruff's
+    PLR0913 ceiling: it puts `plan_source` at 5 parameters and touches only
+    the call sites that actually set a non-default `token_budget`/`repo_root`
+    — 3 of 19 today; the other 16 are unaffected.
+    """
+
+    token_budget: int = _DEFAULT_TOKEN_BUDGET
+    # `corpus_main` passes its own `repo_root` explicitly (the actual repo
+    # root); every other caller leaves this at the default and gets
+    # `_DEFAULT_REPO_ROOT`, which IS the same repo root resolved a different
+    # way. 19 `plan_source` call sites exist today (18 across the two test
+    # modules, plus `corpus_main`) — a required field here would break every
+    # one of them for a value that is the actual repo root in every case that
+    # matters.
+    repo_root: Path | None = None
+
+
 def plan_source(
     source_root: Path,
     output: Path,
@@ -1448,16 +1472,10 @@ def plan_source(
     # why. Required rather than defaulted so no path can plan under a literal
     # again: a default here would be the 8192 this replaced, wearing a new name.
     max_output_tokens: int,
-    token_budget: int = _DEFAULT_TOKEN_BUDGET,
-    # Optional rather than required: `plan_source` has 14 call sites (13 in
-    # tests, plus `corpus_main`), and a required parameter would have broken
-    # every one of them for a value that is the actual repo root in every case
-    # that matters. `corpus_main` passes its own `repo_root` explicitly; every
-    # other caller gets `_DEFAULT_REPO_ROOT`, which IS the same repo root
-    # resolved a different way.
-    repo_root: Path | None = None,
+    options: PlanSourceOptions | None = None,
 ) -> PlanManifest:
     """Atomically publish a deterministic, provider-free plan for one Git tree."""
+    options = options if options is not None else PlanSourceOptions()
     if output.exists():
         raise ValueError(f"semantic corpus plan already exists: {output}")
     if source.commit != _git(source_root, "rev-parse", "HEAD"):
@@ -1469,14 +1487,15 @@ def plan_source(
     # never be written against a runtime `_measured_runtime` cannot vouch for.
     # `verify_plan` performs the sibling measurement on the verify path, where the
     # same raise is instead caught and turned into a named reason.
-    runtime = _measured_runtime(repo_root if repo_root is not None else _DEFAULT_REPO_ROOT)
+    repo_root = options.repo_root if options.repo_root is not None else _DEFAULT_REPO_ROOT
+    runtime = _measured_runtime(repo_root)
     inventory, advisories, exclusions, admitted = _inventory(
         source_root,
         source_ref=source.ref,
         source_commit=source.commit,
         source_tree=source.tree,
     )
-    ledger = _ledger(source_root, inventory.units, admitted, token_budget)
+    ledger = _ledger(source_root, inventory.units, admitted, options.token_budget)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f".{output.name}-", dir=output.parent) as raw_stage:
         stage = Path(raw_stage)
@@ -1487,7 +1506,7 @@ def plan_source(
         config = _effective_config(
             source,
             runtime=runtime,
-            token_budget=token_budget,
+            token_budget=options.token_budget,
             max_output_tokens=max_output_tokens,
             members=_MemberDigests(
                 inventory_sha256=_sha(inventory_raw),
@@ -1565,15 +1584,23 @@ def _manifest_reasons(candidate: Path, manifest: PlanManifest) -> list[str]:
     return reasons
 
 
-def _typed_members(
-    candidate: Path,
-) -> tuple[
+# The exact 5-tuple `_typed_members` returns, named so `_config_reasons` and
+# `_cross_reasons` (#426 round 2, cold review P2-7) can take it as ONE
+# parameter instead of four separately-spelled ones. Both callers already hold
+# this tuple in hand (they just decoded it via `_typed_members`), so passing it
+# on is a forward, not a re-derivation — `advisories` rides along unused by
+# either function, which is cheaper than a second, narrower type only they
+# would use.
+_PlanMembers = tuple[
     SourceInventory,
     AdvisoryCatalog,
     ExclusionCatalog,
     ChunkLedger,
     CorpusExecutionConfig,
-]:
+]
+
+
+def _typed_members(candidate: Path) -> _PlanMembers:
     inventory = msgspec.json.decode(
         (candidate / "source-inventory.json").read_bytes(),
         type=SourceInventory,
@@ -1855,12 +1882,10 @@ def _ledger_reasons(inventory: SourceInventory, ledger: ChunkLedger) -> list[str
 
 def _config_reasons(
     candidate: Path,
-    inventory: SourceInventory,
-    exclusions: ExclusionCatalog,
-    ledger: ChunkLedger,
-    config: CorpusExecutionConfig,
+    members: _PlanMembers,
     runtime: graphify_baseline.RuntimeIdentity,
 ) -> list[str]:
+    inventory, _advisories, exclusions, ledger, config = members
     reasons: list[str] = []
     # A NAMED reason ahead of the general contract check below, so a runtime
     # mismatch reads as what it is rather than as an undifferentiated
@@ -1909,16 +1934,14 @@ def _config_reasons(
 
 def _cross_reasons(
     candidate: Path,
-    inventory: SourceInventory,
-    exclusions: ExclusionCatalog,
-    ledger: ChunkLedger,
-    config: CorpusExecutionConfig,
+    members: _PlanMembers,
     runtime: graphify_baseline.RuntimeIdentity,
 ) -> list[str]:
+    inventory, _advisories, exclusions, ledger, _config = members
     reasons = _inventory_reasons(inventory)
     reasons.extend(_exclusion_reasons(inventory, exclusions))
     reasons.extend(_ledger_reasons(inventory, ledger))
-    reasons.extend(_config_reasons(candidate, inventory, exclusions, ledger, config, runtime))
+    reasons.extend(_config_reasons(candidate, members, runtime))
     return reasons
 
 
@@ -1998,7 +2021,16 @@ def verify_plan(
     # own `repo_root` explicitly; every other caller gets `_DEFAULT_REPO_ROOT`.
     repo_root: Path | None = None,
 ) -> PlanVerification:
-    """Rehash and cross-check a plan without mutating it or invoking Graphify."""
+    """Rehash and cross-check a plan without mutating it.
+
+    NOT provider-free of Graphify itself: the runtime measurement below spawns
+    `graphify --version` (via `graphify_env.assert_pinned_graphify`) and
+    imports the Graphify SDK (via `graphify_sdk.public_api_fingerprint`) —
+    twice each, once directly and once again inside the version-agreement
+    check `runtime_identity` performs on itself. It never spends a provider
+    call or writes to the candidate; "without invoking Graphify" overstated
+    that.
+    """
     manifest = _load_manifest(candidate)
     if manifest is None:
         return _verdict(
@@ -2013,30 +2045,43 @@ def verify_plan(
             reasons=tuple(dict.fromkeys(reasons)),
         )
     try:
-        inventory, advisories, exclusions, ledger, config = _typed_members(candidate)
+        members = _typed_members(candidate)
     except msgspec.DecodeError:
         return _verdict(
             "failed", structural=False, authorized=False, reasons=("typed-member-invalid",)
         )
-    # Measured ONCE per verify call, on this TOTAL function's behalf.
-    # `runtime_identity` raises `ValueError` on a version/lock disagreement and
-    # `SystemExit` (via `graphify_env.assert_pinned_graphify`) when the pin
-    # disagrees with the running binary — either way, the live runtime cannot be
-    # vouched for, so it is refused by name. Folded into the SAME `if reasons`
-    # branch below (via `try/except/else`) rather than an early return of its
-    # own, so this stays a function every other reason already funnels through
-    # — never a distinct exit `corpus_main`'s `verify` route or `run` route
-    # would have to know about separately. What this reason can express is
-    # necessarily `plan != (pin == live)`: a live binary that disagrees with the
-    # pin is the unmeasurable case, never a silent match, because
-    # `runtime_identity` refuses to describe it.
+    inventory, advisories, exclusions, ledger, _config = members
+    # Measured ONCE per verify call, on this TOTAL function's behalf. The
+    # property being asserted is "the live runtime cannot be vouched for", not
+    # any one specific failure — so the union below is named by every raise
+    # site this measurement's call chain can reach, not by the two it happened
+    # to hit first. `ValueError` covers `runtime_identity`'s own version/lock/
+    # wheel/sdist/executable checks; `TypeError` covers a locked `graphifyy`
+    # entry with no source distribution (graphify_baseline.py:361);
+    # `ImportError` covers `PackageNotFoundError` from `running_sdk_version`
+    # when the SDK distribution is not installed (graphify_sdk.py:184, reached
+    # at graphify_baseline.py:375); `RuntimeError` covers `assert_public_sdk`'s
+    # own contract failure (graphify_sdk.py:250), reached through
+    # `assert_pinned_graphify` (graphify_env.py:195); `SystemExit` covers
+    # `assert_pinned_graphify` refusing outright when the pin disagrees with
+    # (or cannot ask) the running binary (graphify_env.py:179-192).
+    # `LookupError`/`OSError` name the same two stdlib failure classes this
+    # chain's own file read and metadata lookup already convert to `ValueError`
+    # today — kept in case a future release stops converting one. Folded into
+    # the SAME `if reasons` branch below (via `try/except/else`) rather than an
+    # early return of its own, so this stays a function every other reason
+    # already funnels through — never a distinct exit `corpus_main`'s `verify`
+    # route or `run` route would have to know about separately. What this
+    # reason can express is necessarily `plan != (pin == live)`: a live binary
+    # that disagrees with the pin is the unmeasurable case, never a silent
+    # match, because `runtime_identity` refuses to describe it.
     try:
         runtime = _measured_runtime(repo_root if repo_root is not None else _DEFAULT_REPO_ROOT)
-    except ValueError, SystemExit:
+    except ValueError, TypeError, LookupError, OSError, ImportError, RuntimeError, SystemExit:
         reasons = ["plan-graphify-runtime-unmeasurable"]
     else:
         reasons = _advisory_reasons(inventory, advisories)
-        reasons.extend(_cross_reasons(candidate, inventory, exclusions, ledger, config, runtime))
+        reasons.extend(_cross_reasons(candidate, members, runtime))
         reasons.extend(_source_reasons(source_root, inventory, advisories, exclusions, ledger))
     if reasons:
         return _verdict(
@@ -2500,9 +2545,11 @@ def stage_chunk(
     candidate: Path,
     cache_root: Path,
     request: ChunkStageRequest,
+    *,
+    live_runtime: graphify_baseline.RuntimeIdentity,
 ) -> ChunkStageReceipt:
     """Retain and atomically publish exact real-provider evidence for one chunk."""
-    inventory, config, plan_reasons = _stage_plan_context(candidate, request)
+    inventory, config, plan_reasons = _stage_plan_context(candidate, request, live_runtime)
     chunk = request.chunk
     provider_evidence = request.provider_evidence
     destination = _chunk_dir(cache_root, request.run_namespace, chunk.ordinal)
@@ -2586,23 +2633,26 @@ def _decode_adapter_metadata(
 
 
 def _stage_plan_context(
-    candidate: Path, request: ChunkStageRequest
+    candidate: Path, request: ChunkStageRequest, live_runtime: graphify_baseline.RuntimeIdentity
 ) -> tuple[SourceInventory, CorpusExecutionConfig, list[str]]:
     manifest = _load_manifest(candidate)
     if manifest is None:
         raise ValueError("staged chunk plan manifest is unavailable")
-    inventory, advisories, exclusions, ledger, config = _typed_members(candidate)
+    members = _typed_members(candidate)
+    inventory, advisories, exclusions, ledger, config = members
     reasons = _manifest_reasons(candidate, manifest)
     reasons.extend(_advisory_reasons(inventory, advisories))
-    # The plan's OWN recorded runtime, not a fresh measurement -- staging one
-    # chunk is not the moment this driver re-asks "has the environment moved
-    # since the plan was written". That question is `verify_plan`'s, asked once
-    # before `run` starts, and `execute`'s own pre-spend check asks it again once
-    # more before the loop begins; re-measuring per chunk here would spend a
-    # subprocess call 58 times for a question already answered twice.
-    reasons.extend(
-        _cross_reasons(candidate, inventory, exclusions, ledger, config, config.graphify_runtime)
-    )
+    # The RUN's live measurement (taken once, by `execute()`'s preflight), not
+    # the plan's own recorded value: comparing the plan's runtime against
+    # itself made `plan-graphify-runtime-mismatch` unreachable on this path and
+    # blinded the runtime half of `config-contract-mismatch` (#426 round 2,
+    # cold review P2-2). Reusing that ONE measurement costs nothing extra here
+    # -- no additional subprocess call, contrary to what this comment used to
+    # argue for keeping the tautology. `verify_plan` still takes its OWN
+    # separate measurement for the pre-`run` verdict (it runs before `execute`
+    # exists); this function and `execute`'s pre-spend guard both read the
+    # SAME preflight measurement rather than each taking a fresh one.
+    reasons.extend(_cross_reasons(candidate, members, live_runtime))
     reasons.extend(_source_reasons(request.source_root, inventory, advisories, exclusions, ledger))
     expected = next(
         (chunk for chunk in ledger.chunks if chunk.ordinal == request.chunk.ordinal),
@@ -3503,7 +3553,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             # Resolved HERE, at the one entry point that plans for real, so the
             # network call happens once per plan and never on the verify path.
             max_output_tokens=planned_max_output_tokens(repo_root, os.environ),
-            repo_root=repo_root,
+            options=PlanSourceOptions(repo_root=repo_root),
         )
     # Outside the `with`: the temp source root is gone by now, so the summary
     # depends only on the written plan, never on the source tree — it reads

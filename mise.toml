@@ -690,21 +690,31 @@ run = "uv run kb-setup graphify-baseline"
 [tasks.kb-graphify-semantic-slice]
 description = "Preflight, run, or verify the pinned real-Claude Graphify semantic slice"
 run = "uv run kb-setup graphify-semantic-slice"
-# A wall-clock hang guard, not a budget: this is one provider call, and the
-# measured chunk-1 lower bound is 659.5s (see `_INFERENCE_TIMEOUT_SECONDS`'s
-# comment in `graphify_semantic_corpus.py`). 30m is ample headroom above that
-# without being so loose it stops meaning anything.
+# A wall-clock hang guard, not a budget: this is one provider call under
+# SLICE_PROFILE (Haiku, `max_output_tokens=4096`, `effort=""`) — a much smaller,
+# faster profile than the corpus's CORPUS_PROFILE (Opus, 8192, effort high)
+# that `_INFERENCE_TIMEOUT_SECONDS`'s 659.5s lower bound describes; that figure
+# sizes the CORPUS task below, not this one. The one committed slice run took
+# 54.6s elapsed and cost $0.0557 (`graphify-out/graphify-semantic-slice/
+# adapter-metadata.json`: duration_ms 54203, total_cost_usd 0.0557). 30m is
+# headroom sized for outlier variance (retries, a slow network) above THAT
+# measured shape, not a reuse of the corpus's much larger one.
 timeout = "30m"
 
 [tasks.kb-graphify-semantic-corpus]
 description = "Plan, run, or verify complete pinned Graphify semantic coverage"
 run = "uv run kb-setup graphify-semantic-corpus"
 # A wall-clock hang guard, NOT the spend cap — `_MAX_TOTAL_COST_USD` already
-# bounds the money, and the run is resumable (`_verified_stages` re-publishes
-# already-staged chunks, so a restart does not redo completed work at the mise
-# layer). 58 chunks at the measured ~11 min/chunk projects to ~10.6h; 16h is
-# roughly 1.5x that, so a genuinely wedged run is caught without the guard
-# firing on ordinary variance.
+# bounds the money. A restart is NOT free at this layer either:
+# `_verified_stages` re-publishes already-staged chunks so their evidence is
+# not duplicated, but Graphify re-buys every chunk in the corpus at full price
+# on every restart (no incremental-cache read on this entry point — see the
+# `graphify_no_incremental_cache` comment in `graphify_semantic_corpus.py`).
+# 58 chunks at the measured ~11 min/chunk projects to ~10.6h; 16h is roughly
+# 1.5x that, so a genuinely wedged run is caught without the guard firing on
+# ordinary variance. One task dispatches `plan`/`run`/`verify` by argument, so
+# this same 16h leash also bounds the provider-free `plan` and `verify`
+# actions — mise has no per-argument timeout.
 timeout = "16h"
 
 [tasks.kb-graphify-semantic-corpus-merge]
