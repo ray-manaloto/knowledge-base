@@ -1,0 +1,79 @@
+# Mutation arms for the non-authority runtime-pair fix (PR #422, CodeRabbit Major).
+#
+# The defect: `_runtime_reasons` matched `(graphify_runtime, graphify_version)`
+# against pairs whose version half was HAND-WRITTEN beside the runtime half. The
+# 0.9.46 -> 0.9.47 bump moved the runtime and left the literal, so the pair was
+# unmatchable and the non-authority path rejected every run under the installed
+# version — with the suite green, because nothing exercised that path.
+#
+# The fix DERIVES the version half from the runtime half, so the skew is no
+# longer representable. These arms reintroduce the historical break and the
+# relaxations a careless fix would leave behind.
+#
+# SCOPE, so a clean sweep is not over-read. NOT armed here:
+#   - `receipt-semantic-fingerprint-mismatch`, which is stale at 0.9.48 by the
+#     same class of defect but has a different owner and was deliberately left.
+#   - whether the two-constant ACCEPTED/CURRENT split is the right design. These
+#     arms assume it and test its mechanics; the judgement is prose.
+
+suites = ["tests/test_graphify_semantic_slice.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = '''    accepted_graphify_pairs = tuple('''
+new = '''    accepted_graphify_pairs = tuple(  # control'''
+
+# ── R1: the ACTUAL historical defect — a restated, stale literal ───────────
+[[arm]]
+id = "R1"
+test = "test_non_authority_path_accepts_the_current_graphify_runtime"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = '''        (identity, identity.version) for identity in accepted_graphify_runtimes_for_path'''
+new = '''        (identity, "0.9.46") for identity in accepted_graphify_runtimes_for_path'''
+
+# ── R2: the CURRENT runtime dropped from the non-authority path ────────────
+[[arm]]
+id = "R2"
+test = "test_non_authority_path_accepts_the_current_graphify_runtime"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = '''        else (_ACCEPTED_GRAPHIFY_RUNTIME, _CURRENT_GRAPHIFY_RUNTIME)'''
+new = '''        else (_ACCEPTED_GRAPHIFY_RUNTIME,)'''
+
+# ── R3: the fix's MIRROR — authority path relaxed to admit the current ─────
+# This is what a "just make the test pass" edit produces, and it is the more
+# dangerous direction: it authorises a runtime the committed receipt contradicts.
+[[arm]]
+id = "R3"
+test = "test_authority_path_still_refuses_the_current_graphify_runtime"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = '''        (_ACCEPTED_GRAPHIFY_RUNTIME,)
+        if enforce_authority'''
+new = '''        (_ACCEPTED_GRAPHIFY_RUNTIME, _CURRENT_GRAPHIFY_RUNTIME)
+        if enforce_authority'''
+
+# ── R4: the pair check neutered — is CLI/SDK skew still caught? ────────────
+[[arm]]
+id = "R4"
+test = "test_a_version_skewed_from_its_runtime_is_still_refused"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = '''            (runtime.graphify_runtime, runtime.graphify_version) in accepted_graphify_pairs,'''
+new = '''            runtime.graphify_runtime in accepted_graphify_runtimes,'''
+
+# ── R5: the stale 0.9.47 identity this bump repaired ───────────────────────
+# R5 SURVIVED against the self-consistency test — correctly, because that test
+# asserts the pair agrees with ITSELF and a uniformly-reverted constant still
+# does. The survivor NAMED the gap, and
+# `test_the_current_graphify_runtime_tracks_the_pinned_manifest_ref` closes it.
+[[arm]]
+id = "R5"
+test = "test_the_current_graphify_runtime_tracks_the_pinned_manifest_ref"
+file = "python/src/kb_setup/graphify_semantic_slice.py"
+old = '''    version="0.9.48",
+    cli_version="0.9.48",
+    sdk_version="0.9.48",'''
+new = '''    version="0.9.47",
+    cli_version="0.9.47",
+    sdk_version="0.9.47",'''

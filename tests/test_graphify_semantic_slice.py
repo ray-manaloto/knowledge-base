@@ -901,3 +901,127 @@ def test_the_corpus_plan_pins_the_current_claude_not_the_accepted_one() -> None:
     assert current.version == graphify_semantic_corpus._CLAUDE_VERSION
     assert current.executable_sha256 == graphify_semantic_corpus._CLAUDE_EXECUTABLE_SHA256
     assert current.help_sha256 == graphify_semantic_corpus._CLAUDE_HELP_SHA256
+
+
+def _preflight_for(
+    runtime: graphify_baseline.RuntimeIdentity, graphify_version: str
+) -> graphify_semantic_slice.ClaudePreflight:
+    """A preflight that differs from an accepted one ONLY in the graphify pair.
+
+    Every other field is set to what `_runtime_reasons` accepts, so any reason it
+    returns is attributable to the pair under test rather than to the fixture.
+    """
+    return graphify_semantic_slice.ClaudePreflight(
+        executable="claude",
+        executable_sha256=graphify_semantic_slice._ACCEPTED_CLAUDE_EXECUTABLE_SHA256,
+        version=graphify_semantic_slice._ACCEPTED_CLAUDE_VERSION,
+        help_sha256=graphify_semantic_slice._ACCEPTED_CLAUDE_HELP_SHA256,
+        required_flags=(*graphify_semantic_slice._REQUIRED_CLAUDE_FLAGS, "--max-turns"),
+        # `_runtime_reasons` does not inspect auth, so any well-formed identity
+        # keeps this fixture from being the thing under test.
+        auth=graphify_semantic_slice.AuthIdentity(
+            logged_in=True,
+            auth_method="subscription",
+            api_provider="firstParty",
+            subscription_type="max",
+        ),
+        environment_names=tuple(sorted({*graphify_semantic_slice._CHILD_CONTROL_ENV, "PATH"})),
+        graphify_runtime=runtime,
+        graphify_version=graphify_version,
+        graphify_semantic_fingerprint_sha256=(
+            graphify_semantic_slice._ACCEPTED_SEMANTIC_FINGERPRINT_SHA256
+        ),
+    )
+
+
+_PAIR_REASONS = frozenset({"receipt-runtime-mismatch", "receipt-graphify-version-mismatch"})
+
+
+def test_non_authority_path_accepts_the_current_graphify_runtime() -> None:
+    """The CURRENT runtime must be matchable on the non-authority path.
+
+    This is the test that was missing, and its absence is why a failure this
+    file DOCUMENTED IN ADVANCE shipped twice. `_runtime_reasons` matches
+    `(graphify_runtime, graphify_version)` against accepted pairs. The
+    0.9.46 -> 0.9.47 bump advanced `_CURRENT_GRAPHIFY_RUNTIME` and left its
+    hand-written partner literal at "0.9.46", so the pair became unmatchable and
+    the non-authority path rejected EVERY run under the installed version —
+    while the suite stayed green, because nothing exercised this path. The
+    comment at the pairing site had predicted exactly that, having been written
+    after the same slip at 0.9.46.
+
+    Asserted on the CONSTANT rather than on the installed binary on purpose: the
+    installed version moves under the session, and a test that reads it would go
+    red on a self-update instead of on the defect it is here to catch.
+    """
+    current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
+    reasons = graphify_semantic_slice._runtime_reasons(
+        _preflight_for(current, current.version), enforce_authority=False
+    )
+    assert _PAIR_REASONS.isdisjoint(reasons), reasons
+
+
+def test_authority_path_still_refuses_the_current_graphify_runtime() -> None:
+    """The FAIL direction, and the reason the two entries are separate.
+
+    The authority path accepts only the runtime the committed slice receipt was
+    produced under, so the current runtime must be refused there. Without this
+    arm the test above could be satisfied by an `accepted` tuple that admits
+    everything, which is the defect it would then be hiding rather than catching.
+    """
+    current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
+    accepted = graphify_semantic_slice._ACCEPTED_GRAPHIFY_RUNTIME
+    assert current.version != accepted.version, (
+        "this arm is vacuous while the two constants agree — they converge only "
+        "when the slice re-runs and commits a receipt under the installed version, "
+        "and at that point this test needs re-deriving rather than deleting"
+    )
+    reasons = graphify_semantic_slice._runtime_reasons(
+        _preflight_for(current, current.version), enforce_authority=True
+    )
+    assert "receipt-runtime-mismatch" in reasons
+
+
+def test_a_version_skewed_from_its_runtime_is_still_refused() -> None:
+    """CLI/SDK skew must still be caught — that is what the pair is FOR.
+
+    Deriving the version half from the runtime half removed a restatement that
+    drifted twice; it must not have removed the check. A preflight whose SDK
+    reports a different version than its runtime identity is exactly the skew
+    nobody reviewed, and it is refused on both paths.
+    """
+    current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
+    skewed = _preflight_for(current, "0.0.0-not-the-runtime-version")
+    for enforce in (True, False):
+        reasons = graphify_semantic_slice._runtime_reasons(skewed, enforce_authority=enforce)
+        assert "receipt-graphify-version-mismatch" in reasons, (enforce, reasons)
+
+
+def test_the_current_graphify_runtime_tracks_the_pinned_manifest_ref() -> None:
+    """The CURRENT runtime must not lag the pin — the OTHER half of the defect.
+
+    `test_non_authority_path_accepts_the_current_graphify_runtime` proves the
+    pair agrees with ITSELF, which is the restatement bug. It stays green with
+    both halves left a release behind, so it cannot see STALENESS — measured, not
+    assumed: a `kb-arms` mutation reverting this constant to 0.9.47 SURVIVED that
+    test. This is the arm that kills it.
+
+    Bound to `sources/graphify.manifest` rather than to the installed binary on
+    purpose. `_CURRENT_GRAPHIFY_RUNTIME` declares what a NEW run may use, and the
+    manifest is the committed statement of what this repo runs — stable, reviewed,
+    and moved deliberately. Reading `graphify --version` here would instead redden
+    the suite whenever the host updates out from under it, which is a fact about
+    the machine and not about this constant.
+    """
+    from kb_setup import manifest
+
+    pinned = manifest.load(Path("sources/graphify.manifest")).ref
+    current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
+    assert pinned == f"v{current.version}", (
+        f"sources/graphify.manifest pins {pinned} but _CURRENT_GRAPHIFY_RUNTIME "
+        f"declares {current.version}. A bump moves BOTH, and the version half of "
+        f"every accepted pair derives from this object — so leaving it behind "
+        f"rejects every non-authority run under the installed version."
+    )
+    assert current.cli_version == current.version, "cli_version drifted from version"
+    assert current.sdk_version == current.version, "sdk_version drifted from version"

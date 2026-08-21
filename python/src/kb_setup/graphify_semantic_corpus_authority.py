@@ -561,10 +561,55 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # and after the census assertion in `tests/test_graphify_semantic_corpus.py` was
 # updated, so `semantic_slice_sha256` was final when the four digests below were
 # computed. The test file is not digested; the slice is.
+# RE-RECORDED 2026-08-20 (j), after PR #422's bot round found a LIVE BREAK in
+# `graphify_semantic_slice`. **NO NEW JUDGEMENT**, and the narrowest re-plan in
+# this file: exactly TWO of 44 fields, `semantic_slice_sha256` and the
+# `cache_namespace_sha256` derived from it. `advisories.json` and
+# `exclusions.json` are BYTE-IDENTICAL to the (i) values above — both digests
+# carrying a reviewed DECISION are untouched — as are `source-inventory.json`
+# and `chunk-ledger.json`, so the workload is the same 475 units / 58 chunks.
+# Every decision field is unchanged: 100.0 / 25.0 / 64000 / 900 / 1 / 3 / 2.
+#
+# WHY THE SLICE MOVED, because it is worth more than its digest:
+# `_runtime_reasons` matched `(graphify_runtime, graphify_version)` against
+# accepted pairs whose version half was HAND-WRITTEN beside the runtime half.
+# The 0.9.46 -> 0.9.47 bump advanced `_CURRENT_GRAPHIFY_RUNTIME` and left its
+# literal at "0.9.46", so the pair was unmatchable and the non-authority path
+# rejected EVERY run under the installed version. The fix DERIVES the version
+# half from the runtime half, and advances the constant to the measured 0.9.48.
+#
+# THREE THINGS ABOUT IT ARE WORTH RECORDING RATHER THAN JUST FIXING:
+#
+# 1. The comment at that site PREDICTED this failure in these words — "a literal
+#    left beside a newer runtime makes the pair unmatchable and the non-authority
+#    path rejects every run under the installed version" — having been written
+#    after the same slip at 0.9.46. It then happened again one bump later. Prose
+#    that forecasts a defect does not prevent it; deriving the value does.
+# 2. NOTHING IN THIS REPO CAUGHT IT. The suite was rc=0 throughout, because no
+#    test exercised the non-authority path. A cold cross-family lane read the
+#    diff and missed it; so did the author. CodeRabbit — which this repo's own
+#    doctrine correctly calls advisory rather than a gate — is what found it.
+#    An advisory reviewer being the only one to see something is an argument
+#    about the gates, not about the reviewer.
+# 3. THE FIX'S OWN FIRST TEST WAS INSUFFICIENT, and a mutation sweep is what
+#    said so. `kb-arms` R5 reverted the constant to 0.9.47 and SURVIVED: the
+#    self-consistency test proves the pair agrees with ITSELF, which stays true
+#    when both halves are stale. It caught the RESTATEMENT half of the defect and
+#    not the STALENESS half. A second test binds the constant to
+#    `sources/graphify.manifest`'s pinned ref, and the sweep then ran 5/5 died,
+#    1/1 control held.
+#
+# WHAT WAS DELIBERATELY NOT FIXED, so its absence is not read as its absence
+# being unnoticed: `receipt-semantic-fingerprint-mismatch` compares against
+# `_ACCEPTED_SEMANTIC_FINGERPRINT_SHA256` on BOTH paths, and that digest moved
+# at 0.9.48 (the `max_retry_depth` signature change, upstream #2880). It is the
+# same class — a frozen-evidence constant applied to the non-authority path —
+# but it has a different owner and changing it is a judgement about what the
+# authority split means, not a typo repair.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ff7323b1921752cf195f0869b17f348903ffd8a196248be3c5edcece4fcc93d9",'
-    b'"execution_config_sha256":"6607f47cb7efb827b57e4d7db5006a49fc0461ef89b95cdc2d556ab53774f304",'
+    b'"execution_config_sha256":"83a1fc8da307c9f86daa414ff064b9135eda4066a54644ae9ce93230b635bc92",'
     b'"exclusions_sha256":"1a63e48336f7130a1f68c57340706fd5cea3cbacf12c363bb339a7cae3e5b67e",'
-    b'"plan_manifest_sha256":"926db115ac3c7fb259d6a48474ae0c48ff59b8d4721c73d45ee2579b9704aadd",'
+    b'"plan_manifest_sha256":"25612cb450dcdb4e538c1e92b46a42a0db8f83223761659e98c5b19c57ef7d03",'
     b'"schema_version":1}\n'
 )
