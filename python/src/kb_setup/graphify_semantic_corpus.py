@@ -72,12 +72,24 @@ _FILE_CHAR_CAP = 20_000
 #: ~10.6 h. Chunking differently does not change that total; only concurrency would.
 _INFERENCE_TIMEOUT_SECONDS = 900
 _DEFAULT_TOKEN_BUDGET = 20_000
-# Ray's ruling, 2026-08-17. The whole-run authority, in dollars, against a
-# projected corpus cost of roughly 65 — so it is headroom for a run that goes
-# somewhat wrong, and a stop for one that goes badly wrong. It is deliberately
-# not derived from the per-chunk cap times the chunk count: that product (1,450)
-# is the number this constant exists to make unreachable.
-_MAX_TOTAL_COST_USD = 100.0
+# Ray's ruling, 2026-08-17 (SUPERSEDED 2026-08-21, see below). The whole-run
+# authority, in dollars, against a projected corpus cost of roughly 65 — so it
+# is headroom for a run that goes somewhat wrong, and a stop for one that goes
+# badly wrong. It is deliberately not derived from the per-chunk cap times the
+# chunk count: that product (1,450) is the number this constant exists to make
+# unreachable.
+#
+# Ray's ruling, 2026-08-21. 100.0 left an interrupted run past chunk ~31
+# uncompletable inside its own cap: `seeded_spend` carries a run's cumulative
+# cost forward across a restart (see `execute`), and a restart re-buys the WHOLE
+# corpus rather than resuming it (see `graphify_no_incremental_cache` below) —
+# so the worst case is one full run's cost stacked on another's. Sized for
+# exactly that: 58 chunks at the measured 1.12 USD/chunk is 64.96; one full
+# restart on top of an interruption that had already spent nearly that much is
+# 2 x 64.96 = 129.92; +~8% margin -> 140.0. The per-chunk ceiling product
+# (1,450) above is unchanged and remains the number this constant exists to
+# make unreachable.
+_MAX_TOTAL_COST_USD = 140.0
 # The upper bound the VERIFIER will accept for a plan's resolved output cap. Not
 # the ceiling itself — only the Models API knows that, and asking it on the verify
 # path is the thing this design avoids. It is set well above any published Claude
@@ -182,17 +194,37 @@ _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
 # for the currency machinery: a fingerprint that stops moving on a no-op run is
 # the behaviour `kb_setup.currency.views` needs.
 _ACCEPTED_GRAPHIFY_DETECT_OBJECT = "d16b5800ce19ba36aa5276a204e77ecccc1dbe5c"
-_ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.47",
-    cli_version="0.9.47",
-    sdk_version="0.9.47",
-    executable=".venv/bin/graphify",
-    # Unchanged, and MEASURED rather than carried forward — see
-    # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
-    sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
-    sdist_sha256="26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
-)
+# The repo root this module's own file lives under, resolved for the caller who
+# does not have one handy (a test, or a future entry point). Verified: this file
+# is `python/src/kb_setup/graphify_semantic_corpus.py`, three parents up from the
+# repository root.
+_DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _measured_runtime(repo_root: Path) -> graphify_baseline.RuntimeIdentity:
+    """The ONE seam a plan or a verify call measures the live Graphify runtime through.
+
+    A frozen `_ACCEPTED_GRAPHIFY_RUNTIME` literal used to stand where this
+    function's result now flows: read only at `_effective_config`, restated by
+    hand at every graphify bump. It went stale exactly once — 0.9.48 installed
+    against a 0.9.47 literal — before anything caught it, because nothing ever
+    recomputed it. `plan_source` calls this once at plan time (letting a raise
+    propagate: a plan must not be written against a runtime that cannot be
+    measured); `verify_plan` calls this once at verify time (catching a raise
+    and turning it into `plan-graphify-runtime-unmeasurable`, since a verifier
+    must stay total). Both write or compare the value THIS measures — never a
+    value spelled beside it.
+
+    A single named function, rather than calling `graphify_baseline.runtime_identity`
+    inline at each of those two call sites, is what lets a test simulate a runtime
+    disagreement by patching one name in this module, instead of reaching past
+    `graphify_baseline` or monkeypatching a lower-level primitive the way the only
+    existing precedents do (`graphify_env.assert_pinned_graphify`, patched directly
+    in `test_graphify_semantic_slice.py` and `test_graphify_baseline.py`).
+    """
+    return graphify_baseline.runtime_identity(repo_root)
+
+
 _PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
@@ -417,6 +449,17 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     claude_max_retries: int
     structured_output_retries: int
     max_turns: int
+    # The Claude reasoning-effort level this run's chunks were planned against
+    # (`CORPUS_PROFILE.effort`, reaching the CLI as `--effort`). Before this
+    # field, the level reached a run only through the adapter argv, compared for
+    # equality after the provider had already been paid for the chunk
+    # (`provider-adapter-argv-mismatch`) — so an effort change was recoverable
+    # only from that per-chunk evidence, never from the plan itself.
+    #
+    # No default, deliberately — the same fail-closed precedent as
+    # `max_total_cost_usd` below: a plan written before this field existed must
+    # be REFUSED by strict decode, not silently run at an effort nobody recorded.
+    effort: str
     max_cost_usd: float
     # The cap on the WHOLE run, which nothing expressed before. `max_cost_usd` is
     # per chunk and `--max-budget-usd` is per provider invocation, so 58 chunks
@@ -715,6 +758,12 @@ def cache_namespace_for(config: CorpusExecutionConfig | dict[str, object]) -> st
 def _effective_config(
     source: SourcePin,
     *,
+    # Measured ONCE by the caller — `plan_source` at plan time, `_config_reasons`
+    # at verify time — via the one `_measured_runtime` seam, and passed in rather
+    # than measured here. This function is also the VERIFIER's expectation (it is
+    # recomputed and compared field by field), so measuring inside it would spend
+    # the subprocess/file read twice per verify call instead of once.
+    runtime: graphify_baseline.RuntimeIdentity,
     token_budget: int,
     # Passed IN rather than resolved here, because this function is also the
     # VERIFIER's expectation: it recomputes the config and compares field by
@@ -738,13 +787,14 @@ def _effective_config(
         graphify_ref=source.ref,
         graphify_commit=source.commit,
         graphify_tree=source.tree,
-        # Read from the runtime identity rather than spelled again: this literal
-        # said "0.9.43" while `_ACCEPTED_GRAPHIFY_RUNTIME` next to it said 0.9.44,
-        # so every plan written since the pin bump recorded two different versions
-        # for one run. A version that is transcribed can disagree with the version
-        # that ran; a version that is READ cannot.
-        graphify_version=_ACCEPTED_GRAPHIFY_RUNTIME.version,
-        graphify_runtime=_ACCEPTED_GRAPHIFY_RUNTIME,
+        # Read from the MEASURED runtime parameter rather than spelled again: a
+        # frozen module literal here once said "0.9.43" while the runtime beside
+        # it said 0.9.44, so every plan written after the pin bump recorded two
+        # different versions for one run. A version that is transcribed can
+        # disagree with the version that ran; a version that is MEASURED — once,
+        # by `_measured_runtime`, before this function is ever called — cannot.
+        graphify_version=runtime.version,
+        graphify_runtime=runtime,
         graphify_semantic_fingerprint_sha256=semantic_fingerprint,
         graphify_llm_sha256=graphify_llm_sha,
         planner_sha256=_sha_file(Path(__file__)),
@@ -775,6 +825,7 @@ def _effective_config(
         claude_max_retries=int(_PROFILE.max_retries),
         structured_output_retries=1,
         max_turns=int(_PROFILE.max_turns),
+        effort=_PROFILE.effort,
         max_cost_usd=_PROFILE.max_cost_usd,
         max_total_cost_usd=_MAX_TOTAL_COST_USD,
         # 0 -> 2 alongside `claude_max_retries`: one blip over 57 chunks is likely
@@ -1301,6 +1352,13 @@ def plan_source(
     # again: a default here would be the 8192 this replaced, wearing a new name.
     max_output_tokens: int,
     token_budget: int = _DEFAULT_TOKEN_BUDGET,
+    # Optional rather than required: `plan_source` has 14 call sites (13 in
+    # tests, plus `corpus_main`), and a required parameter would have broken
+    # every one of them for a value that is the actual repo root in every case
+    # that matters. `corpus_main` passes its own `repo_root` explicitly; every
+    # other caller gets `_DEFAULT_REPO_ROOT`, which IS the same repo root
+    # resolved a different way.
+    repo_root: Path | None = None,
 ) -> PlanManifest:
     """Atomically publish a deterministic, provider-free plan for one Git tree."""
     if output.exists():
@@ -1310,6 +1368,11 @@ def plan_source(
     if source.tree != _git(source_root, "rev-parse", "HEAD^{tree}"):
         raise ValueError("source tree does not match materialized HEAD")
     before = graphify_baseline.source_manifest(source_root, commit=source.commit, tree=source.tree)
+    # Measured ONCE here, on the PLAN path, where a raise is correct: a plan must
+    # never be written against a runtime `_measured_runtime` cannot vouch for.
+    # `verify_plan` performs the sibling measurement on the verify path, where the
+    # same raise is instead caught and turned into a named reason.
+    runtime = _measured_runtime(repo_root if repo_root is not None else _DEFAULT_REPO_ROOT)
     inventory, advisories, exclusions, admitted = _inventory(
         source_root,
         source_ref=source.ref,
@@ -1326,6 +1389,7 @@ def plan_source(
         ledger_raw = _write(stage / _PLAN_MEMBERS[3], ledger)
         config = _effective_config(
             source,
+            runtime=runtime,
             token_budget=token_budget,
             max_output_tokens=max_output_tokens,
             members=_MemberDigests(
@@ -1607,8 +1671,18 @@ def _config_reasons(
     exclusions: ExclusionCatalog,
     ledger: ChunkLedger,
     config: CorpusExecutionConfig,
+    runtime: graphify_baseline.RuntimeIdentity,
 ) -> list[str]:
     reasons: list[str] = []
+    # A NAMED reason ahead of the general contract check below, so a runtime
+    # mismatch reads as what it is rather than as an undifferentiated
+    # `config-contract-mismatch` (which also fires here, from the recomputation
+    # below, since `runtime` feeds `expected` too — that is intentional
+    # redundancy, not a bug: the two reasons describe the same disagreement from
+    # two different mechanisms, and keeping both is cheaper than deciding which
+    # one a future reader would rather see missing).
+    if runtime != config.graphify_runtime:
+        reasons.append("plan-graphify-runtime-mismatch")
     source = SourcePin(
         ref=inventory.source_ref,
         commit=inventory.source_commit,
@@ -1616,6 +1690,7 @@ def _config_reasons(
     )
     expected = _effective_config(
         source,
+        runtime=runtime,
         token_budget=ledger.token_budget,
         # The plan's OWN value, so this one field is not re-derived here. It is
         # resolved once at plan time from the model's real ceiling, and re-running
@@ -1650,11 +1725,12 @@ def _cross_reasons(
     exclusions: ExclusionCatalog,
     ledger: ChunkLedger,
     config: CorpusExecutionConfig,
+    runtime: graphify_baseline.RuntimeIdentity,
 ) -> list[str]:
     reasons = _inventory_reasons(inventory)
     reasons.extend(_exclusion_reasons(inventory, exclusions))
     reasons.extend(_ledger_reasons(inventory, ledger))
-    reasons.extend(_config_reasons(candidate, inventory, exclusions, ledger, config))
+    reasons.extend(_config_reasons(candidate, inventory, exclusions, ledger, config, runtime))
     return reasons
 
 
@@ -1727,6 +1803,12 @@ def verify_plan(
     source_root: Path,
     *,
     authority_path: Path | None = None,
+    # Optional for the same reason `plan_source` makes it optional: 17 existing
+    # callers (13 tests, 2 positional in `graphify_semantic_corpus_prototype.py`,
+    # `verify_execution_modes`, `corpus_main`) would break for a value that is
+    # the actual repo root in every case that matters. `corpus_main` passes its
+    # own `repo_root` explicitly; every other caller gets `_DEFAULT_REPO_ROOT`.
+    repo_root: Path | None = None,
 ) -> PlanVerification:
     """Rehash and cross-check a plan without mutating it or invoking Graphify."""
     manifest = _load_manifest(candidate)
@@ -1748,9 +1830,26 @@ def verify_plan(
         return _verdict(
             "failed", structural=False, authorized=False, reasons=("typed-member-invalid",)
         )
-    reasons = _advisory_reasons(inventory, advisories)
-    reasons.extend(_cross_reasons(candidate, inventory, exclusions, ledger, config))
-    reasons.extend(_source_reasons(source_root, inventory, advisories, exclusions, ledger))
+    # Measured ONCE per verify call, on this TOTAL function's behalf.
+    # `runtime_identity` raises `ValueError` on a version/lock disagreement and
+    # `SystemExit` (via `graphify_env.assert_pinned_graphify`) when the pin
+    # disagrees with the running binary — either way, the live runtime cannot be
+    # vouched for, so it is refused by name. Folded into the SAME `if reasons`
+    # branch below (via `try/except/else`) rather than an early return of its
+    # own, so this stays a function every other reason already funnels through
+    # — never a distinct exit `corpus_main`'s `verify` route or `run` route
+    # would have to know about separately. What this reason can express is
+    # necessarily `plan != (pin == live)`: a live binary that disagrees with the
+    # pin is the unmeasurable case, never a silent match, because
+    # `runtime_identity` refuses to describe it.
+    try:
+        runtime = _measured_runtime(repo_root if repo_root is not None else _DEFAULT_REPO_ROOT)
+    except ValueError, SystemExit:
+        reasons = ["plan-graphify-runtime-unmeasurable"]
+    else:
+        reasons = _advisory_reasons(inventory, advisories)
+        reasons.extend(_cross_reasons(candidate, inventory, exclusions, ledger, config, runtime))
+        reasons.extend(_source_reasons(source_root, inventory, advisories, exclusions, ledger))
     if reasons:
         return _verdict(
             "failed",
@@ -2165,6 +2264,14 @@ def _adapter_config_reasons(
     # run would have failed as an argv-shape mismatch with nothing pointing at the
     # formatting. The profile owns the literal precisely so it is never re-derived.
     expected_argv = graphify_semantic_slice.expected_adapter_argv(_PROFILE, schema or "")
+    # `expected_adapter_argv` emits `--effort` only `if profile.effort`, so
+    # `_argv_value` returns `None` for a profile with no effort at all — which is
+    # why this is not a bare `!= config.effort`: an empty `config.effort` must
+    # require the flag ABSENT, not require it present-and-empty. `CORPUS_PROFILE`
+    # always carries `effort="high"`, so in practice this always takes the first
+    # branch; the second exists so the check stays correct if that ever changes.
+    observed_effort = _argv_value(metadata.argv, "--effort")
+    effort_valid = observed_effort == config.effort if config.effort else observed_effort is None
     usage_valid = (
         len(metadata.model_usage) == 1
         and metadata.model_usage[0].model == config.claude_model
@@ -2184,6 +2291,7 @@ def _adapter_config_reasons(
             "provider-adapter-version-mismatch",
         ),
         (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
+        (effort_valid, "provider-effort-mismatch"),
         (not forbidden_environment, "provider-adapter-endpoint-policy-mismatch"),
         # BOTH bounds. The upper one alone accepted `total_cost_usd = -1.0` — an
         # impossible cost, and exactly the shape a missing-value sentinel takes,
@@ -2298,7 +2406,15 @@ def _stage_plan_context(
     inventory, advisories, exclusions, ledger, config = _typed_members(candidate)
     reasons = _manifest_reasons(candidate, manifest)
     reasons.extend(_advisory_reasons(inventory, advisories))
-    reasons.extend(_cross_reasons(candidate, inventory, exclusions, ledger, config))
+    # The plan's OWN recorded runtime, not a fresh measurement -- staging one
+    # chunk is not the moment this driver re-asks "has the environment moved
+    # since the plan was written". That question is `verify_plan`'s, asked once
+    # before `run` starts, and `execute`'s own pre-spend check asks it again once
+    # more before the loop begins; re-measuring per chunk here would spend a
+    # subprocess call 58 times for a question already answered twice.
+    reasons.extend(
+        _cross_reasons(candidate, inventory, exclusions, ledger, config, config.graphify_runtime)
+    )
     reasons.extend(_source_reasons(request.source_root, inventory, advisories, exclusions, ledger))
     expected = next(
         (chunk for chunk in ledger.chunks if chunk.ordinal == request.chunk.ordinal),
@@ -3160,7 +3276,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
         with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-verify-") as raw_source:
             source_root = Path(raw_source) / "graphify"
             admit_source(repo_root, source_root)
-            verification = verify_plan(output, source_root)
+            verification = verify_plan(output, source_root, repo_root=repo_root)
         if action == "verify":
             print(_encode(verification).decode().rstrip())
             return 0 if verification.state == "complete" else 2
@@ -3177,6 +3293,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             # Resolved HERE, at the one entry point that plans for real, so the
             # network call happens once per plan and never on the verify path.
             max_output_tokens=planned_max_output_tokens(repo_root, os.environ),
+            repo_root=repo_root,
         )
     print(_encode(manifest).decode().rstrip())
     return 0

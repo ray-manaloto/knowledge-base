@@ -7,6 +7,7 @@ import errno
 import itertools
 import os
 import shutil
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -570,6 +571,9 @@ def test_plan_records_the_running_graphify_version_and_the_corpus_profile() -> N
     # `--effort` is proven by the preflight and therefore lands in the receipt's
     # flag list, which is compared for EQUALITY — so the config must carry it.
     assert "--effort" in config.claude_required_flags
+    # The level itself, not just proof the flag exists (#411 G5) — recorded on
+    # the plan rather than reachable only from a completed chunk's argv.
+    assert config.effort == profile.effort
 
 
 @pytest.mark.skipif(not _PLAN.is_dir(), reason="corpus plan has not been generated here")
@@ -1357,3 +1361,98 @@ def test_an_unreadable_ledger_reads_as_zero_rather_than_raising(tmp_path: Path) 
 
     assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path) == 0.0
     assert graphify_semantic_corpus_run.read_spend_ledger(tmp_path / "absent") == 0.0
+
+
+def _git(root: Path, *args: str) -> str:
+    completed = subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
+    return completed.stdout.strip()
+
+
+def _fresh_plan(tmp_path: Path, repo_root: Path) -> Path:
+    """A plan carrying whatever the CURRENT planner writes (#426, #411 G5).
+
+    Including `effort` and the measured Graphify runtime identity. The committed
+    `_PLAN` fixture at the top of this file predates both fields,
+    so any test that needs `_load_plan` to actually strict-decode must build its
+    own plan rather than read the on-disk one -- a tiny synthetic source, the
+    same shape `test_graphify_semantic_corpus.py`'s `_execution_plan` uses,
+    rather than the real (slow) pinned Graphify clone.
+    """
+    source = tmp_path / "fresh-source"
+    source.mkdir()
+    _git(source, "init", "-q")
+    _git(source, "config", "user.email", "corpus@example.invalid")
+    _git(source, "config", "user.name", "Corpus Contract")
+    (source / "tiny.md").write_text("tiny\n", encoding="utf-8")
+    _git(source, "add", "tiny.md")
+    _git(source, "commit", "-qm", "source")
+    candidate = tmp_path / "fresh-candidate"
+    graphify_semantic_corpus.plan_source(
+        source,
+        candidate,
+        source=graphify_semantic_corpus.SourcePin(
+            ref="test-ref",
+            commit=_git(source, "rev-parse", "HEAD"),
+            tree=_git(source, "rev-parse", "HEAD^{tree}"),
+        ),
+        max_output_tokens=64_000,
+        repo_root=repo_root,
+    )
+    return candidate
+
+
+def test_the_pre_spend_runtime_guard_refuses_a_runtime_that_moved_since_the_plan(
+    tmp_path: Path,
+) -> None:
+    """The guard `execute()` calls right after `preflight` must actually refuse (#426).
+
+    This tests `_assert_graphify_runtime_unchanged_since_plan` DIRECTLY rather
+    than driving the full `execute()` to completion. `execute()`'s body calls
+    this exact function immediately after `preflight_receipt = ...` and before
+    anything else — the call site is one line, read directly rather than
+    exercised end-to-end here — because a few steps further into `execute()`
+    sits a REAL Claude CLI subprocess call. A mutation that neuters this guard
+    must not be free to reach that far during an automated `kb-arms` sweep; a
+    direct unit test of the guard itself proves the same behavior with no such
+    exposure.
+
+    Both directions are armed: a moved runtime must raise, and an unchanged one
+    (the positive control) must not — a guard that always raised would satisfy
+    the first half while refusing every legitimate run.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _fresh_plan(tmp_path, repo_root)
+    config = graphify_semantic_corpus_run._load_plan(candidate)[2]
+    stale_runtime = msgspec.structs.replace(config.graphify_runtime, version="0.9.1")
+    assert stale_runtime != config.graphify_runtime, "mutation was inert"
+    stale_preflight = graphify_semantic_slice.ClaudePreflight(
+        executable="claude",
+        executable_sha256=config.claude_executable_sha256,
+        version=config.claude_version,
+        help_sha256=config.claude_help_sha256,
+        required_flags=config.claude_required_flags,
+        auth=graphify_semantic_slice.AuthIdentity(
+            logged_in=True,
+            auth_method="claude.ai",
+            api_provider="firstParty",
+            subscription_type="max",
+        ),
+        environment_names=(),
+        graphify_runtime=stale_runtime,
+        graphify_version="0.9.1",
+        graphify_semantic_fingerprint_sha256=config.graphify_semantic_fingerprint_sha256,
+    )
+
+    with pytest.raises(ValueError, match="Graphify runtime changed after plan"):
+        graphify_semantic_corpus_run._assert_graphify_runtime_unchanged_since_plan(
+            stale_preflight, config
+        )
+
+    consistent_preflight = msgspec.structs.replace(
+        stale_preflight,
+        graphify_runtime=config.graphify_runtime,
+        graphify_version=config.graphify_version,
+    )
+    graphify_semantic_corpus_run._assert_graphify_runtime_unchanged_since_plan(
+        consistent_preflight, config
+    )

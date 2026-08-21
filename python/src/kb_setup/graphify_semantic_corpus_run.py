@@ -1022,6 +1022,30 @@ def _load_plan(
     return inventory, ledger, config
 
 
+def _assert_graphify_runtime_unchanged_since_plan(
+    preflight_receipt: graphify_semantic_slice.ClaudePreflight,
+    config: graphify_semantic_corpus.CorpusExecutionConfig,
+) -> None:
+    """Refuse to spend when the Graphify runtime moved since the plan was written (#426).
+
+    Mirrors `_adapter_overlay`'s "Claude executable changed after preflight" check
+    above, for the Graphify half of the identity rather than the Claude half.
+    `verify_plan` already refused a plan whose recorded runtime disagreed with the
+    installed one at VERIFY time; this catches the runtime moving in the gap
+    BETWEEN a verified `run` dispatch and the moment `execute` actually reaches a
+    provider — the same window `_adapter_overlay`'s check exists to close for
+    Claude.
+    """
+    if (
+        preflight_receipt.graphify_runtime != config.graphify_runtime
+        or preflight_receipt.graphify_version != config.graphify_version
+    ):
+        raise ValueError(
+            "Graphify runtime changed after plan: "
+            f"plan={config.graphify_version} live={preflight_receipt.graphify_version}"
+        )
+
+
 def execute(
     candidate: Path,
     cache_root: Path,
@@ -1046,6 +1070,8 @@ def execute(
     preflight_receipt = graphify_semantic_slice.preflight(
         repo_root, require_max_turns=True, profile=_PROFILE
     )
+    # BEFORE anything that spends.
+    _assert_graphify_runtime_unchanged_since_plan(preflight_receipt, config)
     outcomes: list[ChunkOutcome] = []
     repaid: list[int] = []
     # Persistent, and keyed on the CACHE namespace rather than the run namespace,

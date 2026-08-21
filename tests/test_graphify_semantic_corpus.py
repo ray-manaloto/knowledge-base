@@ -16,6 +16,7 @@ import re
 import runpy
 import shutil
 import subprocess
+import tomllib
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -26,6 +27,7 @@ import msgspec
 import pytest
 from kb_setup import (
     cli,
+    graphify_baseline,
     graphify_semantic_adapter,
     graphify_semantic_corpus,
     graphify_semantic_corpus_authority,
@@ -2507,6 +2509,11 @@ def test_an_implausible_output_cap_is_named_rather_than_accepted(
         max_output_tokens=cap,
     )
     decode = msgspec.json.decode
+    config = decode(
+        (candidate / "execution-config.json").read_bytes(),
+        type=graphify_semantic_corpus.CorpusExecutionConfig,
+        strict=True,
+    )
     reasons = graphify_semantic_corpus._config_reasons(
         candidate,
         decode(
@@ -2524,11 +2531,12 @@ def test_an_implausible_output_cap_is_named_rather_than_accepted(
             type=graphify_semantic_corpus.ChunkLedger,
             strict=True,
         ),
-        decode(
-            (candidate / "execution-config.json").read_bytes(),
-            type=graphify_semantic_corpus.CorpusExecutionConfig,
-            strict=True,
-        ),
+        config,
+        # This test's fixed point is the output-cap bound, not runtime drift —
+        # the plan's OWN recorded runtime, so this call cannot introduce a
+        # spurious `plan-graphify-runtime-mismatch`/`config-contract-mismatch`
+        # from measuring a second time in the same process.
+        config.graphify_runtime,
     )
 
     assert ("config-output-cap-implausible" in reasons) is flagged
@@ -2569,5 +2577,149 @@ def test_the_cumulative_spend_cap_is_in_the_plan_and_is_not_the_per_chunk_one(
     )
     config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
 
-    assert config["max_total_cost_usd"] == 100.0
+    assert config["max_total_cost_usd"] == 140.0
     assert config["max_total_cost_usd"] != config["max_cost_usd"]
+
+
+def test_plan_records_the_measured_graphify_runtime_not_a_frozen_literal(
+    tmp_path: Path,
+) -> None:
+    """The plan's runtime identity must be MEASURED, never a module constant (#426).
+
+    A frozen `_ACCEPTED_GRAPHIFY_RUNTIME` literal used to be read at
+    `_effective_config`, and it went stale exactly once — 0.9.48 installed
+    against a 0.9.47 literal — before anything caught it. This compares the
+    plan's recorded identity against the SAME independent measurement
+    `graphify_baseline.runtime_identity` performs directly (not against a copy
+    pasted from this test), so a re-introduced literal that merely happened to
+    agree today would still be caught the next time the pin moved. It also
+    cross-checks the version against `uv.lock` directly, since that is the
+    ground truth `runtime_identity` itself is required to agree with.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _execution_plan(tmp_path, repo_root)
+    config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
+    measured = graphify_baseline.runtime_identity(repo_root)
+
+    assert config["graphify_runtime"]["version"] == measured.version
+    assert config["graphify_runtime"]["cli_version"] == measured.cli_version
+    assert config["graphify_runtime"]["sdk_version"] == measured.sdk_version
+    assert config["graphify_runtime"]["wheel_sha256"] == measured.wheel_sha256
+    assert config["graphify_runtime"]["sdist_sha256"] == measured.sdist_sha256
+    assert config["graphify_version"] == measured.version
+
+    with (repo_root / "uv.lock").open("rb") as stream:
+        lock = tomllib.load(stream)
+    (locked,) = (
+        package
+        for package in lock["package"]
+        if isinstance(package, dict) and package.get("name") == "graphifyy"
+    )
+    assert config["graphify_version"] == locked["version"]
+    assert not hasattr(graphify_semantic_corpus, "_ACCEPTED_GRAPHIFY_RUNTIME")
+
+
+def test_plan_records_the_corpus_profiles_effort(tmp_path: Path) -> None:
+    """The plan must record the reasoning-effort level chunks will run at (#411 G5).
+
+    Before this field the level reached a run only through the adapter argv,
+    checked for equality after the provider had already been paid — recoverable
+    only from per-chunk evidence, never from the plan itself.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _execution_plan(tmp_path, repo_root)
+    config = json.loads((candidate / "execution-config.json").read_text(encoding="utf-8"))
+
+    assert config["effort"] == graphify_semantic_slice.CORPUS_PROFILE.effort
+    assert config["effort"] == "high"
+
+
+def test_verify_plan_refuses_a_measured_runtime_that_disagrees_with_the_plan(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A live runtime that no longer matches what the plan recorded must be named (#426).
+
+    `_config_reasons`' existing recomputation ALSO fires `config-contract-mismatch`
+    here, because the measured runtime feeds its `expected` recomputation too —
+    that is intentional redundancy (two mechanisms, one disagreement), not a bug.
+    The named reason must be present in addition, so the refusal reads as what
+    it is rather than as an undifferentiated contract mismatch.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _execution_plan(tmp_path, repo_root)
+    source_root = candidate.parent / "source"
+    real_runtime = graphify_semantic_corpus._measured_runtime(repo_root)
+    disagreeing = msgspec.structs.replace(real_runtime, wheel_sha256="f" * 64)
+    assert disagreeing != real_runtime, "mutation was inert"
+    monkeypatch.setattr(graphify_semantic_corpus, "_measured_runtime", lambda _root: disagreeing)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
+
+    assert result.execution_authorized is False
+    assert result.structural_complete is False
+    assert "plan-graphify-runtime-mismatch" in result.reasons
+    assert "config-contract-mismatch" in result.reasons
+
+
+def test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """`runtime_identity` can raise; `verify_plan` must stay TOTAL regardless (#426).
+
+    `corpus_main`'s `verify` route must always print a verdict and its `run`
+    route must always reach `_abort` — neither holds if this function can raise
+    a `ValueError` or a `SystemExit` (the latter is exactly what
+    `graphify_env.assert_pinned_graphify` raises on a stale-PATH runtime, a
+    scenario this repo has hit for real).
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _execution_plan(tmp_path, repo_root)
+    source_root = candidate.parent / "source"
+
+    def _unmeasurable(_root: Path) -> Never:
+        raise ValueError(
+            "Graphify release, CLI, SDK, and locked distribution versions do not agree"
+        )
+
+    monkeypatch.setattr(graphify_semantic_corpus, "_measured_runtime", _unmeasurable)
+
+    result = graphify_semantic_corpus.verify_plan(candidate, source_root=source_root)
+
+    assert result.execution_authorized is False
+    assert result.structural_complete is False
+    assert result.reasons == ("plan-graphify-runtime-unmeasurable",)
+
+
+def test_a_chunk_whose_argv_carries_the_wrong_effort_value_is_staged_failed(
+    tmp_path: Path,
+) -> None:
+    """The retained argv's `--effort` value must equal the plan's, not merely be present.
+
+    The real slice evidence replayed into corpus tests carries NO `--effort`
+    flag at all (`SLICE_PROFILE.effort == ""`), so an unmodified replay already
+    differs from the corpus plan's `effort == "high"` on the ABSENT branch alone.
+    This test exercises the other one deliberately: a PRESENT but WRONG value,
+    which a check for mere membership (`"--effort" in argv`) would miss.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _execution_plan(tmp_path, repo_root)
+    provider_raw, metadata_raw = _real_provider_evidence(repo_root)
+    provider = json.loads(provider_raw)
+    metadata = json.loads(metadata_raw)
+    assert "--effort" not in metadata["argv"]
+    metadata["argv"] = [*metadata["argv"], "--effort", "low"]
+    changed_metadata = _canonical(metadata)
+    provider["adapter_metadata_sha256"] = hashlib.sha256(changed_metadata).hexdigest()
+
+    receipt, _, _ = _stage_real(
+        candidate,
+        tmp_path / "wrong-effort",
+        repo_root,
+        _StageOverrides(
+            provider_raw=_canonical(provider),
+            metadata_raw=changed_metadata,
+        ),
+    )
+
+    assert receipt.status == "failed"
+    assert "provider-effort-mismatch" in receipt.reasons

@@ -177,6 +177,15 @@ ignore = [
 # through to the next source. A resolver built on layered fallback cannot let
 # one source's exception become the run's exception.
 "python/src/kb_setup/model_limits.py" = ["S310", "BLE001"]
+# #426: `_config_reasons`/`_cross_reasons` recompute a plan's expected config
+# against a MEASURED Graphify runtime identity rather than a frozen literal, and
+# `plan_source` accepts an optional repo root for the same measurement — one
+# more parameter on functions that already carried five (candidate, the four
+# typed plan members, or the planner's own five). Every parameter is read
+# directly in the body; wrapping the existing five in a new struct just to stay
+# under the count would be a second, separately-reviewable refactor, not a
+# consequence of this one.
+"python/src/kb_setup/graphify_semantic_corpus.py" = ["PLR0913", "PLR0917"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

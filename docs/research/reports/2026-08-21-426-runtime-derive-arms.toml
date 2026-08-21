@@ -1,0 +1,82 @@
+# Mutation arms for #426 (derive the corpus plan's Graphify runtime identity
+# rather than freeze it) and G5/#411 (record the Claude effort level on the
+# plan). Format follows `docs/research/reports/2026-08-20-422-runtime-pair-arms.toml`.
+#
+# SCOPE. Armed here: the new named verify-time reason
+# (`plan-graphify-runtime-mismatch`), the new pre-spend run-time guard
+# (`_assert_graphify_runtime_unchanged_since_plan`), the new per-chunk effort
+# check (`provider-effort-mismatch`), and the raised whole-run cost cap
+# (`_MAX_TOTAL_COST_USD`). NOT armed:
+#   - `plan-graphify-runtime-unmeasurable` (the `(ValueError, SystemExit)` catch
+#     around `_measured_runtime` in `verify_plan`) — reaching it requires
+#     patching `graphify_baseline.runtime_identity` or `graphify_env` to raise,
+#     which is a heavier fixture than this spec's other rows; the positive test
+#     (`test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising`)
+#     already exercises it directly, and a control-armed harness verdict adds
+#     little a direct assertion has not already shown.
+#   - the `config-contract-mismatch` co-firing this rule's own comment
+#     describes — it is asserted alongside the named reason in
+#     `test_verify_plan_refuses_a_measured_runtime_that_disagrees_with_the_plan`
+#     and needs no separate arm to be exercised by R1 below.
+#
+# SAFETY NOTE (why R2 targets a pure helper, never `execute()` itself):
+# `execute()` reaches a REAL Claude CLI subprocess a few steps past its
+# pre-spend guard. The guard's OWN logic lives in the extracted
+# `_assert_graphify_runtime_unchanged_since_plan` (graphify_semantic_corpus_run.py),
+# called from `execute()` immediately after `preflight_receipt = ...` — read
+# directly rather than exercised end-to-end. R2 neuters that helper's
+# condition and is checked against a test that calls the helper DIRECTLY, so an
+# undetected survival during an automated sweep can never reach past this
+# helper into `execute()`'s later, unsafe machinery.
+
+suites = [
+  "tests/test_graphify_semantic_corpus.py",
+  "tests/test_graphify_semantic_corpus_run.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    return graphify_baseline.runtime_identity(repo_root)'''
+new = '''    return graphify_baseline.runtime_identity(repo_root)  # control'''
+
+# ── R1: neuter the VERIFY-time named runtime-mismatch reason ───────────────
+[[arm]]
+id = "R1"
+test = "test_verify_plan_refuses_a_measured_runtime_that_disagrees_with_the_plan"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    if runtime != config.graphify_runtime:
+        reasons.append("plan-graphify-runtime-mismatch")'''
+new = '''    if False and runtime != config.graphify_runtime:
+        reasons.append("plan-graphify-runtime-mismatch")'''
+
+# ── R2: neuter the PRE-SPEND runtime guard `execute()` calls before anything
+# reaches a provider ────────────────────────────────────────────────────────
+[[arm]]
+id = "R2"
+test = "test_the_pre_spend_runtime_guard_refuses_a_runtime_that_moved_since_the_plan"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = '''    if (
+        preflight_receipt.graphify_runtime != config.graphify_runtime
+        or preflight_receipt.graphify_version != config.graphify_version
+    ):'''
+new = '''    if False:'''
+
+# ── R3: drop the per-chunk `provider-effort-mismatch` row ──────────────────
+[[arm]]
+id = "R3"
+test = "test_a_chunk_whose_argv_carries_the_wrong_effort_value_is_staged_failed"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''        (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
+        (effort_valid, "provider-effort-mismatch"),'''
+new = '''        (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),'''
+
+# ── R4: revert the whole-run cost cap to the superseded 100.0 ──────────────
+[[arm]]
+id = "R4"
+test = "test_the_cumulative_spend_cap_is_in_the_plan_and_is_not_the_per_chunk_one"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''_MAX_TOTAL_COST_USD = 140.0'''
+new = '''_MAX_TOTAL_COST_USD = 100.0'''

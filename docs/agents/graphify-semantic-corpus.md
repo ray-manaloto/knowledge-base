@@ -410,3 +410,33 @@ sequenceDiagram
     Evidence-->>Review: Hashes and typed reasons, raw response excluded
     Note over Adapter,CLI: Provider inference unknown; no retry or full-corpus run
 ```
+
+## Launching the corpus run
+
+The full run is projected at roughly 10.6h of wall clock (58 chunks at
+concurrency 1, ~11 minutes/chunk measured), and a single Bash tool call is
+capped at roughly 600s regardless of a larger `timeout` argument — so it cannot
+be driven from one foreground call.
+
+- **Verify before spending.** `mise run kb-graphify-semantic-corpus -- verify`
+  is provider-free and fast; confirm `execution_authorized: true` before
+  spending anything on `run`.
+- **Use the harness background run, with in-turn polling.** Launch the `run`
+  action as a background run and poll its log in later turns rather than
+  holding one foreground call open across chunks.
+- **Never `&`-detach a local `mise run`.** A backgrounded local task gets
+  reaped when the turn goes idle — the harness background run stays tracked
+  across turns; a shell `&` does not (`long-running-command-hangs.md` rule 2).
+- **The mise `timeout` is a wall-clock hang guard, not the spend cap.** The
+  money is bounded separately by `_MAX_TOTAL_COST_USD` (140.0; see its comment
+  in `graphify_semantic_corpus.py` for the arithmetic). The task's own
+  `timeout = "16h"` is roughly 1.5x the projected 10.6h, sized to catch a
+  genuinely wedged run without firing on ordinary chunk-to-chunk variance.
+- **A restart resumes; it does not restart from zero at the mise layer.**
+  `_verified_stages` re-publishes every chunk whose stage directory already
+  holds verified evidence before staging the rest, so an interrupted run picks
+  up where it left off rather than re-publishing completed chunks. This does
+  NOT make a restart free: `seeded_spend` still carries the prior run's
+  cumulative cost forward, and Graphify itself re-buys any chunk it re-attempts
+  at full price — which is exactly why the cap above is sized for one full
+  restart rather than for one full run.
