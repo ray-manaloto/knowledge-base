@@ -43,6 +43,14 @@ material is unresolved. Every question goes through that tool, including a plain
 yes/no; a question in prose at the end of a message is easy to miss and gives
 the user nothing to click (`clarify-before-acting.md`).
 
+**On a model-invoked run this step is also the consent gate.** The skill can
+trigger itself (`disable-model-invocation: false` — Ray, 2026-08-21: *"flip the
+flag so this can be automated"*), so when the user did not type `/clear-prep`,
+say so in this first `AskUserQuestion` and offer *"not now"* alongside the
+next-task options. Nothing is written before that answer — no work-memory, no
+handoff, no auto-memory, no commit. Automatic invocation buys the EARLY ask, not
+an unattended write, and that is the whole of the difference.
+
 The handoff's "next task" section is only as good as this step. If the task
 admits multiple readings, a scope fork, an undecided B-vs-C, or an unstated
 end-goal, surface each one, get the answer, and encode it **verbatim** — a
@@ -391,10 +399,15 @@ handoff path and the resume line in the question text so the answer is one
 click. Only the user runs `/clear`; an agent that invoked this skill has
 prepared for it. On *"not yet"*, resume the work you were doing — the handoff
 stays valid until something changes — and do not ask again until the NEXT
-qualifying trigger (a further PR opened or landed, a new directive, or the user
-raising it); re-asking on the next turn is the nagging this skill must not
-become. On *"/clear now"*, stop: the next thing that happens is the user's
-`/clear` and then `/kb-resume`.
+qualifying trigger: a further PR opened or landed, a new directive, the user
+raising it, **or roughly another 25 percentage points of context consumed since
+the deferral** (so a *"not yet"* at ~20% asks again near ~45%, and again near
+~70% — bounded, and never *never*). Both banner triggers therefore survive a
+deferral, which is the point: re-asking on the very next turn is the nagging
+this skill must not become, but a deferral that never expires is the other
+failure, and it is the one that leaves a session writing its handoff at the end
+of the window instead of the start. On *"/clear now"*, stop: the next thing that
+happens is the user's `/clear` and then `/kb-resume`.
 
 ## Keeping this skill honest over time
 
@@ -434,7 +447,7 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
 - [ ] Branch is not `main`; commit made if appropriate.
 - [ ] Resume prompt printed — `/kb-resume` (skipped on 2026-08-19; the next session had no idea where to start).
-- [ ] The user ASKED to `/clear` via `AskUserQuestion` (step 7) — the skill prepares; it never clears.
+- [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both are valid outcomes, and only the user ever clears.
 
 ## See also
 
