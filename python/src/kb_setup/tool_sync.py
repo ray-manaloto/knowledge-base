@@ -18,6 +18,8 @@ from kb_setup.currency import config, skill, sync
 from kb_setup.graphify_env import clean_env
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from kb_setup.currency.config import ToolSpec
 
 _TIMEOUT = 600
@@ -56,13 +58,47 @@ def _run(argv: list[str], repo_root: Path) -> subprocess.CompletedProcess[str]:
 
 
 def _mise_progress_only(stderr: str, spec: ToolSpec) -> bool:
-    """Recognize only mise's bounded ordinary install-status lines."""
+    """Recognize only mise's bounded ordinary install-status lines.
+
+    Plus the two line shapes this repo's own `[hooks].postinstall`
+    (`mise reshim && hk install --mise`) prints on stderr after every install —
+    `hk removed hook: …/.git/hooks/<hook>` and `hk Installed hk hook:
+    …/.git/hooks/<hook>` for the two hooks it manages. On an already-installed
+    pin mise itself prints nothing, so that hook output was the WHOLE stderr
+    and the install step refused it (#438). Anything else still refuses.
+    """
     lines = stderr.splitlines()
     pattern = re.compile(
         rf"^mise {re.escape(spec.mise_key)}@[^\s]+\s+⇢\s+"
         r"(?:already installed|installed)$"
     )
-    return bool(lines) and all(pattern.fullmatch(line) is not None for line in lines)
+    hook = re.compile(
+        r"^hk (?:removed hook|Installed hk hook): [^\s]+/\.git/hooks/(?:pre-commit|commit-msg)$"
+    )
+    return bool(lines) and all(
+        pattern.fullmatch(line) is not None or hook.fullmatch(line) is not None for line in lines
+    )
+
+
+def _mise_lock_progress_only(stderr: str, spec: ToolSpec) -> bool:
+    """Recognize only mise's bounded ordinary lock-progress lines.
+
+    `mise lock <key>` (2026.8.10, no TTY) writes its narrative to STDOUT —
+    `→ Targeting N platform(s) …`, `✓ Lockfile written to …` — and its
+    progress bar's remnants to STDERR: one `mise lock <key>@<v> <platform>`
+    line per platform and a closing `mise lock ✓ N platform entries`. The
+    stderr half is what the lock step used to refuse wholesale (#438), which
+    left `kb-tool-sync` unable to pass its first step for any tool. Stdout is
+    still screened by `_WARNING`; anything on stderr that is not one of these
+    two shapes still refuses.
+    """
+    lines = stderr.splitlines()
+    key = re.escape(spec.mise_key)
+    entry = re.compile(rf"^mise lock\s+{key}@[^\s]+\s+[^\s]+$")
+    summary = re.compile(r"^mise lock\s+✓ \d+ platform entr(?:y|ies)$")
+    return bool(lines) and all(
+        entry.fullmatch(line) is not None or summary.fullmatch(line) is not None for line in lines
+    )
 
 
 def _checked(
@@ -71,10 +107,11 @@ def _checked(
     repo_root: Path,
     *,
     progress_spec: ToolSpec | None = None,
+    progress: Callable[[str, ToolSpec], bool] = _mise_progress_only,
 ) -> subprocess.CompletedProcess[str]:
     proc = _run(argv, repo_root)
     stderr_refused = bool(proc.stderr) and not (
-        progress_spec is not None and _mise_progress_only(proc.stderr, progress_spec)
+        progress_spec is not None and progress(proc.stderr, progress_spec)
     )
     warning = stderr_refused or _WARNING.search(proc.stdout) is not None
     if proc.returncode != 0 or warning:
@@ -307,7 +344,13 @@ def _sync(repo_root: Path, spec: ToolSpec, pinned: str) -> None:
             raise ToolSyncError("transaction paths overlap")
     snapshot = _snapshot(paths)
     try:
-        _checked("lock", ["mise", "lock", spec.mise_key], repo_root)
+        _checked(
+            "lock",
+            ["mise", "lock", spec.mise_key],
+            repo_root,
+            progress_spec=spec,
+            progress=_mise_lock_progress_only,
+        )
         _lock_converged(repo_root, spec, pinned)
         _checked(
             "install",
