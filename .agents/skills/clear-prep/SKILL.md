@@ -1,7 +1,7 @@
 ---
 name: clear-prep
 description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Invoke explicitly as /clear-prep [next-task]."
-disable-model-invocation: true
+disable-model-invocation: false
 argument-hint: "[one-line description of the next task, optional]"
 ---
 
@@ -19,10 +19,15 @@ a guess the user never saw is a guess nobody corrected.
 Work top-to-bottom. The ordering in step 2 is not stylistic; it is the one thing
 in this skill that cannot be reordered without losing work.
 
-> **This skill is model-invisible on purpose.** `disable-model-invocation: true`
-> removes it from the skill listing entirely, so it fires only when a human types
-> `/clear-prep`. That is deliberate — a handoff that auto-triggers mid-task
-> writes a handoff for work that is not finished. It also means the
+> **Model-invocable since 2026-08-21 (Ray, verbatim: "it should also be able to be
+> triggered by an agent so that it runs when context hits over 20% — so toggle this
+> flag").** Until then `disable-model-invocation: true` hid it from the listing so only a
+> human could fire it; the 2026-08-21 session review measured why that failed — 20% of
+> context was crossed 15 minutes in and the ask came at ~75%. The trigger is still a
+> question, never a silent run: an agent that invokes this skill does so to PREPARE the
+> handoff and then asks the user to `/clear` (AskUserQuestion), and the intended
+> mechanical trigger is a DENY-style guard on context usage (session-review R1, #431/#433
+> neighbours), not a warning. It also means the
 > `triggering_accuracy` dimension in `mise run kb-skill-score` is permanently
 > low for this skill and should be ignored here: it measures a trigger this
 > skill is designed not to have.
