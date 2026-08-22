@@ -99,6 +99,58 @@ def test_the_pair_must_be_the_same_variable():
 
 
 # --------------------------------------------------------------------------
+# Heredocs — the guard's first FALSE POSITIVE, and its mirror.
+#
+# Both arms below were produced by this guard in one session, twenty minutes
+# apart, from the same rule. Only one of them was a defect.
+# --------------------------------------------------------------------------
+
+
+def test_a_quoted_heredoc_body_is_allowed():
+    """THE FALSE POSITIVE. `<<'EOF'` never expands, so nothing can leak.
+
+    Writing a file whose TEXT described the paired substitution was denied.
+    A guard that stops you documenting the trap it guards is the routed-around
+    kind.
+    """
+    command = "cat > notes.md <<'EOF'\nbeware ${TOKEN:+SET}${TOKEN:-ABSENT}\nEOF"
+    assert secret_guard.decide(command) is None
+
+
+def test_an_unquoted_heredoc_body_is_still_denied():
+    """THE ARM THAT PROVES THE FIX IS NOT JUST "HEREDOCS ARE EXEMPT".
+
+    `<<EOF` with a bare delimiter DOES expand, so the same bytes really do
+    print the value. Same shape as the test above; only the quoting differs.
+    """
+    command = "cat > notes.md <<EOF\nbeware ${TOKEN:+SET}${TOKEN:-ABSENT}\nEOF"
+    assert secret_guard.decide(command) is not None
+
+
+def test_a_double_quoted_argument_is_still_denied():
+    """THE TRUE POSITIVE this guard scored on its own author.
+
+    `gh issue comment --body "…"` is expanded by the shell before `gh` sees it,
+    so a real credential name would have reached a public issue. Recorded as a
+    test so a later "reduce false positives" pass cannot quietly take it out.
+    """
+    command = 'gh issue comment 441 --body "note: ${TOKEN:+SET}${TOKEN:-ABSENT} prints it"'
+    assert secret_guard.decide(command) is not None
+
+
+def test_an_unterminated_quoted_heredoc_is_allowed():
+    """No closing delimiter means the body runs to the end — still inert."""
+    command = "cat > notes.md <<'EOF'\nbeware ${TOKEN:+SET}${TOKEN:-ABSENT}"
+    assert secret_guard.decide(command) is None
+
+
+def test_a_leak_before_a_quoted_heredoc_is_still_denied():
+    """Stripping the body must not strip what precedes it."""
+    command = "fnox get SOME_KEY; cat > x <<'EOF'\ninert\nEOF"
+    assert secret_guard.decide(command) is not None
+
+
+# --------------------------------------------------------------------------
 # ALLOW — the sanctioned probes. A guard that refuses these is worse than none.
 # --------------------------------------------------------------------------
 

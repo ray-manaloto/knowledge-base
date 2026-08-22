@@ -184,13 +184,58 @@ def _security_reason(words: list[str]) -> str | None:
     )
 
 
-def _substitution_reason(tokens: list[str]) -> str | None:
+#: A heredoc opener whose delimiter is QUOTED (`<<'EOF'`, `<<-"EOF"`).
+#:
+#: Quoting the delimiter is what makes the body literal — the shell performs no
+#: expansion inside it — so a substitution written there leaks nothing. An
+#: UNQUOTED `<<EOF` does expand and is deliberately NOT matched here.
+#:
+#: Not `graph_first.HEREDOC`: that one matches the opener of either kind, because
+#: it answers "is there a heredoc?" while this must answer "is this body inert?".
+#: Sharing it would have made this guard skip the expanding form, which is the
+#: half that can actually leak.
+_QUOTED_HEREDOC = re.compile(r"<<-?\s*(['\"])(\w+)\1")
+
+
+def _without_quoted_heredocs(command: str) -> str:
+    """`command` with every QUOTED heredoc body removed.
+
+    THE GUARD'S FIRST FALSE POSITIVE, twenty minutes after its first true one.
+    Writing a file through `cat > x <<'EOF'` whose text *described* the paired
+    substitution was denied — but a quoted heredoc never expands, so there was
+    nothing to leak. Its true positive minutes earlier was the mirror image: a
+    DOUBLE-QUOTED `gh issue comment --body "…"` really is expanded by the shell
+    before `gh` sees it, so that one would have posted a value.
+
+    Both come from the same rule, and only one is a defect. That is why the body
+    is stripped rather than the rule relaxed.
+    """
+    out = command
+    while True:
+        opener = _QUOTED_HEREDOC.search(out)
+        if opener is None:
+            return out
+        delimiter = opener.group(2)
+        rest = out[opener.end() :]
+        closer = re.search(rf"^\s*{re.escape(delimiter)}\s*$", rest, re.MULTILINE)
+        # No closer means the heredoc runs to the end of the command — strip the
+        # remainder rather than nothing, or an unterminated body stays scannable
+        # and the false positive survives in its most common interactive shape.
+        stop = opener.end() + (closer.end() if closer else len(rest))
+        out = out[: opener.start()] + out[stop:]
+
+
+def _substitution_reason(text: str) -> str | None:
     """The `${NAME:+…}${NAME:-…}` presence probe that prints the value.
 
     Matched on the PAIR for one NAME, never on `${NAME:-default}` alone — see
     the module docstring for why that narrowness is deliberate.
+
+    Takes the RAW command rather than tokens: `shlex` discards the quoting, and
+    quoting is exactly what decides whether the shell expands this. The caller
+    strips quoted-heredoc bodies first.
     """
-    joined = " ".join(tokens)
+    joined = text
     plus = set(_SUBST_PLUS.findall(joined))
     dash = set(_SUBST_DASH.findall(joined))
     both = plus & dash
@@ -215,15 +260,17 @@ def decide(command: str) -> str | None:
     """
     if not command or not command.strip():
         return None
+    # Once, on the RAW command, before tokenising: `shlex` discards the quoting
+    # that decides whether the shell expands a substitution at all.
+    reason = _substitution_reason(_without_quoted_heredocs(command))
+    if reason:
+        return reason
     segs = check_first.segments(command)
     if segs is None:
         return None
     for tokens in segs:
         if not tokens:
             continue
-        reason = _substitution_reason(tokens)
-        if reason:
-            return reason
         # BEFORE `command_word`, which strips `env` as a transparent prefix and
         # would hand back an empty list for the bare dump this catches.
         if len(tokens) == 1 and posixpath.basename(tokens[0]) in _BARE_DUMPERS:
