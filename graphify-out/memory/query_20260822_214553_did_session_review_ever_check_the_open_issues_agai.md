@@ -10,9 +10,11 @@ outcome: "useful"
 
 ## Answer
 
-NO — and it could not have. session-review's eight committed lanes all read
-TRANSCRIPTS. Control-armed: `grep -c "gh issue" .claude/workflows/session-review.js`
--> 0, against `grep -c "transcript"` -> 13.
+NO — and, before `db7f9991` (the commit this same round then made), it could not
+have: the eight lanes committed at that point all read TRANSCRIPTS. Control-armed at
+that state: `grep -c "gh issue" .claude/workflows/session-review.js` -> 0, against
+`grep -c "transcript"` -> 13. (From `db7f9991` on, the ninth lane below reads the
+issue backlog; this paragraph describes the state the question was asked in.)
 
 An `extraction-readiness` lane DID run once, ad hoc, on 2026-08-21, producing
 F1-F13 and finding the corpus P0 (#426). It was NEVER in `LANES` — zero hits across
