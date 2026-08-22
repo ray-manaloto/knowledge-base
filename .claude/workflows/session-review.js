@@ -542,8 +542,13 @@ settled block names. Cite the exact commands.`,
 were run again today, on the graphify version currently pinned. This lane's input is
 the OPEN ISSUE BACKLOG and the code, not the transcripts.
 
-Sweep EVERY open issue — \`gh issue list --state open --limit 300 --json number,title,body\`
-— and filter on BODIES, not titles (L2). A title is a spelling bound: the last full
+Sweep EVERY open issue, and PROVE the sweep was whole — \`--limit\` is a bound, and
+\`gh issue list\` truncates at it silently. Count first
+(\`gh issue list --state open --limit 1000 --json number --jq length\`), fetch with the
+same limit (\`gh issue list --state open --limit 1000 --json number,title,body\`), and
+report both numbers: if they differ, or either EQUALS the limit, the sweep was
+truncated — raise the limit and re-fetch rather than reporting a partial sweep as
+"every". Filter on BODIES, not titles (L2). A title is a spelling bound: the last full
 sweep found that filtering 222 open issues by title alone missed most of the set, while
 title+body gave 154 candidates. Then read down to the ones that can gate a run.
 
@@ -570,8 +575,11 @@ COVERAGE DEBT INHERITED FROM 2026-08-21, still unclosed — say explicitly wheth
 reached each, and do not report clean while any is unread:
   - \`python/src/kb_setup/graphify_semantic_corpus_authority.py\` and \`_prototype.py\`
     — never opened by any lane;
-  - \`python/src/kb_setup/graphify_semantic_slice.py:1356-1410\` — the receipt-verification
-    path, unaudited;
+  - the receipt-verification path in \`python/src/kb_setup/graphify_semantic_slice.py\`:
+    \`_receipt_reasons\` (the top-level receipt verifier) and the \`_runtime_reasons\` it
+    calls — unaudited. Find them by NAME (\`grep -n 'def _receipt_reasons'\`), never by
+    line: the range this brief first carried (:1356-1410) had already drifted off both
+    functions (they sat at :1461 and :1368 on 2026-08-22);
   - issue #409 (reviewed-warning inventories do not scale) — read by no lane, and it is
     the primary ticket for one of the \`build = skip\` sources.
 
@@ -580,10 +588,15 @@ dependency and are not one: the run needs only the pinned source tree, while the
 writes into \`graphify-out/graph.json\`. Getting this backwards has already misordered
 the plan once.
 
-STATE THE HONEST BOUND (L7). Nobody has ever OBSERVED this run reach a provider at the
-current pin — every claim about what it will do is inference from source. A lane that
-establishes the run will FAIL has not established that fixing those failures makes it
-succeed. Say which of your findings are observations and which are inference.
+STATE THE HONEST BOUND (L7). First CHECK, never assume, whether anyone has OBSERVED this
+run reach a provider at the current pin: look for a run artifact produced under the
+pinned graphify version (a receipt, a staged chunk, a provider log), and control-arm the
+absence against an artifact you CAN find from an earlier pin. On 2026-08-22 none existed,
+so every claim about what the run would do was inference from source — that is a finding
+to RE-DERIVE each run, not a premise to restate; this lane stays in the default set while
+a run is pending, and a future run may have reached a provider and failed before landing.
+A lane that establishes the run will FAIL has not established that fixing those failures
+makes it succeed. Say which of your findings are observations and which are inference.
 
 End with the COVERAGE line L6 requires: which issues you did not open, which modules you
 did not read, and which claims you could not arm.`,
