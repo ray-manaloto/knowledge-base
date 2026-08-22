@@ -573,13 +573,16 @@ no field at all.
 
 COVERAGE DEBT INHERITED FROM 2026-08-21, still unclosed — say explicitly whether you
 reached each, and do not report clean while any is unread:
-  - \`python/src/kb_setup/graphify_semantic_corpus_authority.py\` and \`_prototype.py\`
-    — never opened by any lane;
+  - \`python/src/kb_setup/graphify_semantic_corpus_authority.py\` and
+    \`python/src/kb_setup/graphify_semantic_corpus_prototype.py\` — never opened by any lane;
   - the receipt-verification path in \`python/src/kb_setup/graphify_semantic_slice.py\`:
     \`_receipt_reasons\` (the top-level receipt verifier) and the \`_runtime_reasons\` it
-    calls — unaudited. Find them by NAME (\`grep -n 'def _receipt_reasons'\`), never by
-    line: the range this brief first carried (:1356-1410) had already drifted off both
-    functions (they sat at :1461 and :1368 on 2026-08-22);
+    calls — unaudited. Find them by NAME and AT THE COMMIT you are reporting on
+    (\`git grep -n 'def _receipt_reasons' HEAD -- python/src/kb_setup/graphify_semantic_slice.py\`
+    — the working tree may be dirty on that file, and a dirty tree is protected evidence here,
+    not something to audit as if it were HEAD), never by line: the range this brief first
+    carried (:1356-1410) had already drifted off both functions (they sat at :1461 and :1368
+    on 2026-08-22);
   - issue #409 (reviewed-warning inventories do not scale) — read by no lane, and it is
     the primary ticket for one of the \`build = skip\` sources.
 
