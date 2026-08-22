@@ -107,11 +107,98 @@ _CLUSTERED_SHORT_OPTS = re.compile(r"-[A-Za-z]{2,}")
 #: `command_word` already answers — it returns `[]` for exactly the dumping
 #: shapes and the real utility for the wrapping ones.
 #:
-#: Known residue, stated rather than left to be rediscovered: `command_word` does
-#: not model per-flag arity, so `env -u FOO` reads `FOO` as the utility and is
-#: still allowed even though it dumps. Fixing that means teaching `check_first`
-#: flag arity, which changes what every guard sharing that tokeniser sees.
+#: That residue is now closed by `_env_reaches_a_utility` below rather than by
+#: `command_word`, so no other guard's view of a command changes.
 _BARE_DUMPERS = frozenset({"env", "printenv", "set"})
+
+#: `env` options that consume the NEXT token as their argument. Without this
+#: `env -u FOO` looks like "utility FOO" and was allowed, though it dumps —
+#: CodeRabbit proved it live on #453 while the cold lane raised the same class.
+_ENV_FLAGS_WITH_A_VALUE = frozenset({"-u", "--unset", "-C", "--chdir", "-S", "--split-string"})
+
+#: Variable names whose VALUE is a credential, for `printenv NAME`.
+#:
+#: `printenv NAME` prints one variable's value, so it leaks exactly when NAME is
+#: a credential — and the guard cannot know the environment. A blanket deny
+#: would refuse `printenv PATH`, which this repo's own ALLOW fixtures contain,
+#: and false positives are the direction that actually costs here. So the rule
+#: is the NAME, matched on the substrings that mean "this is a credential".
+#:
+#: `_KEY` rather than bare `KEY`, and no bare `AUTH`, so `SSH_AUTH_SOCK` (a
+#: socket path), `KEYBOARD_LAYOUT` and `MONKEY` do not match while
+#: `GEMINI_API_KEY` and `REPOWISE_KNOWLEDGE_BASE_API_KEY` do. `APIKEY` is listed
+#: separately because the unseparated spelling has no underscore to anchor on:
+#: the first pass used `APIKEY` alone and let `GEMINI_API_KEY` through, caught by
+#: running the arm rather than by reading the tuple.
+_CREDENTIAL_NAME_HINTS = (
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "PASSWD",
+    "CREDENTIAL",
+    "APIKEY",
+    "_KEY",
+)
+
+
+def _env_reaches_a_utility(tokens: list[str]) -> bool:
+    """Does this `env …` segment end up running something, or just print?
+
+    `env` with no COMMAND prints the environment. Walking its own options is the
+    only way to tell: assignments and flags are consumed by `env` itself, and
+    what remains — if anything — is the utility.
+    """
+    rest = tokens[1:]
+    index = 0
+    while index < len(rest):
+        word = rest[index]
+        if word == "--":
+            return index + 1 < len(rest)
+        if word in _ENV_FLAGS_WITH_A_VALUE:
+            index += 2  # the flag AND the value it consumes
+            continue
+        if word.startswith("-") or "=" in word:
+            index += 1
+            continue
+        return True  # a bare word that env does not consume IS the utility
+    return False
+
+
+def _dumper_reason(tokens: list[str], name: str, words: list[str]) -> str | None:
+    """The three ways a segment prints environment rather than running something.
+
+    Split out of `decide` to keep that function under the complexity gate — and
+    because these three share a subject (`what does this print?`) that the verb
+    handlers below do not.
+    """
+    # `env` needs its own options walked: `command_word` has no flag arity, so
+    # `env -u FOO` reads as "utility FOO" and was allowed though it dumps.
+    if name == "env" and not _env_reaches_a_utility(tokens):
+        return (
+            "`env` with no COMMAND to run dumps the WHOLE environment of a "
+            f"secret-injected process. {_PROBE_INSTEAD} {_ATTRIB}"
+        )
+    # One token covers bare `printenv`/`set`; the empty `command_word` covers
+    # the `env` shapes, which reduce to nothing because `env` is a transparent
+    # prefix with no command left after it.
+    if name in _BARE_DUMPERS and (len(tokens) == 1 or not words):
+        return (
+            f"A bare `{name}` dumps the WHOLE environment of a "
+            f"secret-injected process. {_PROBE_INSTEAD} {_ATTRIB}"
+        )
+    if name == "printenv" and len(tokens) > 1:
+        named = (t for t in tokens[1:] if not t.startswith("-"))
+        leaky = next(
+            (n for n in named if any(h in n.upper() for h in _CREDENTIAL_NAME_HINTS)),
+            None,
+        )
+        if leaky is not None:
+            return (
+                f"`printenv {leaky}` prints that variable's VALUE, and the "
+                f"name says it is a credential. {_PROBE_INSTEAD} {_ATTRIB}"
+            )
+    return None
+
 
 #: Every command this guard judges is `<binary> <subcommand> …`, so a segment with
 #: fewer tokens cannot be one of them. A bare `fnox` prints usage and leaks
@@ -339,15 +426,10 @@ def decide(command: str) -> str | None:
             continue
         name = posixpath.basename(tokens[0])
         words = check_first.command_word(tokens)
-        # A dumper that never reaches a utility IS the dump. One token covers
-        # bare `printenv`/`set`; the empty `command_word` covers `env`, `env -0`
-        # and `env FOO=1`, which `command_word` reduces to nothing precisely
-        # because `env` is a transparent prefix with no command left after it.
-        if name in _BARE_DUMPERS and (len(tokens) == 1 or not words):
-            return (
-                f"A bare `{name}` dumps the WHOLE environment of a "
-                f"secret-injected process. {_PROBE_INSTEAD} {_ATTRIB}"
-            )
+        # A dumper that never reaches a utility IS the dump.
+        reason = _dumper_reason(tokens, name, words)
+        if reason:
+            return reason
         if not words:
             continue
         for handler in (_fnox_reason, _doppler_reason, _security_reason):

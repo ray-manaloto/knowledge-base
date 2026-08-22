@@ -314,6 +314,76 @@ def test_a_real_leak_outside_the_heredoc_is_still_denied():
 
 
 # --------------------------------------------------------------------------
+# The two dumper gaps BOTH reviewers found independently on PR #453.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "env -u UNRELATED",  # CodeRabbit proved this one with a live probe
+        "env -u A -u B",
+        "env -C /tmp",
+        "env --",
+    ],
+)
+def test_env_whose_flags_consume_everything_is_a_dump(command):
+    """`command_word` does not model per-flag arity, so `-u FOO` read as a utility.
+
+    Fixed in this module rather than in `check_first`: teaching the shared
+    tokeniser flag arity would change what all five guards see, and this is the
+    only one that needs the answer.
+    """
+    assert secret_guard.decide(command) is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "env -u FOO pytest tests/",  # the flag consumes FOO; pytest is the utility
+        "env -- ls",
+        "env -C /tmp ls",
+        "env -i sh -c true",
+        "env FOO=1 gemini -p",
+    ],
+)
+def test_env_that_does_reach_a_utility_is_still_allowed(command):
+    """THE ARM. Walking env's options must not swallow the real command."""
+    assert secret_guard.decide(command) is None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "printenv DOPPLER_TOKEN",
+        "printenv GEMINI_API_KEY",
+        "printenv REPOWISE_KNOWLEDGE_BASE_API_KEY",
+    ],
+)
+def test_printenv_of_a_credential_name_is_denied(command):
+    """`printenv NAME` prints one value, so it leaks when NAME is a credential."""
+    assert secret_guard.decide(command) is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "printenv PATH",
+        "printenv HOME",
+        "printenv SSH_AUTH_SOCK",  # a socket path — why bare AUTH is not a hint
+        "printenv KEYBOARD_LAYOUT",  # why the hint is `_KEY`, not bare KEY
+        "printenv MONKEY",
+    ],
+)
+def test_printenv_of_an_ordinary_name_is_allowed(command):
+    """THE ARM, and it is what keeps the rule a NAME rule rather than a ban.
+
+    A blanket `printenv NAME` deny would refuse this repo's own ALLOW fixtures.
+    """
+    assert secret_guard.decide(command) is None
+
+
+# --------------------------------------------------------------------------
 # ALLOW — the sanctioned probes. A guard that refuses these is worse than none.
 # --------------------------------------------------------------------------
 

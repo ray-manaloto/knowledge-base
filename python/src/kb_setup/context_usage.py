@@ -270,10 +270,23 @@ def own_transcript(repo_root: Path, env: dict[str, str] | None = None) -> Path |
     safe rather than behavioural — for the fork case, id-selection and
     mtime-selection resolve to the same file.
 
-    mtime survives as the fallback for the case the id cannot serve: no
-    `CLAUDE_CODE_SESSION_ID` in the environment (a hook shell, a test), or an id
-    naming a file that does not exist yet. That direction fails the safe way —
-    back to exactly the behaviour that shipped before.
+    mtime survives for the ONE case the id cannot serve: no
+    `CLAUDE_CODE_SESSION_ID` in the environment at all (a hook shell, a test).
+    There, mtime is the only signal there is.
+
+    **An id that names no file returns None instead, and that changed on
+    `37684723`.** It used to fall through to mtime as well, and the paragraph
+    here called that "failing the safe way". It is not safe: knowing WHO WE ARE
+    and that our transcript is absent is positive evidence that the newest file
+    belongs to someone else, so the fallback handed `clear-prep` a stranger's
+    occupancy under a heading claiming it was ours — spuriously firing or
+    suppressing the 20% trigger. Both the cold lane and CodeRabbit raised it
+    independently.
+
+    None here surfaces as exit **127, "could not measure"**, which the caller
+    already renders as explicitly NOT "you are fine" — this repo's own
+    *could-not-check-is-never-green* doctrine, which the old fallback violated
+    by manufacturing a number rather than admitting it had none.
     """
     directory = session_select.transcript_dir(repo_root, env)
     if not directory.is_dir():
@@ -284,8 +297,10 @@ def own_transcript(repo_root: Path, env: dict[str, str] | None = None) -> Path |
     session_id = str(source.get("CLAUDE_CODE_SESSION_ID") or "").strip()
     if session_id:
         own = directory / f"{session_id}.jsonl"
-        if own.is_file():
-            return own
+        # Known identity, absent file: report UNMEASURABLE rather than electing
+        # a stranger's transcript. The mtime fallback below is for not knowing
+        # who we are, never for knowing and not finding ourselves.
+        return own if own.is_file() else None
     found = sorted(directory.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
     return found[0] if found else None
 

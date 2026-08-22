@@ -168,7 +168,10 @@ landing is not an issue closing, and the exit condition tracks the *build*, not 
 **Whether this entry should have been registered at all is UNSETTLED and is Ray's call**,
 not this document's — it sits against his 2026-08-02 directive (*"we should be integrating
 the graphify python library instead of the graphify cli/mcp"*) and against CLAUDE.md
-invariant 4, which describes one MCP server per graph and does not acknowledge this one.
+invariant 4, which describes one MCP server per graph. That invariant now DOES acknowledge
+this one — `CLAUDE.md:25-27` records that `.mcp.json` also registers a hosted graphify and
+that it is a 2-repo workspace rather than this corpus. The sentence here said it did not,
+which was true when written and stale by the time #450 landed the note.
 Tracked as **#450**, which carries the three dispositions and the measurements above; do
 not resolve it by editing this file.
 

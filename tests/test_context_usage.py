@@ -327,15 +327,35 @@ def test_own_transcript_falls_back_to_mtime_with_no_session_id(tmp_path):
     assert context_usage.own_transcript(tmp_path, env) == newest
 
 
-def test_own_transcript_falls_back_when_the_id_names_no_file(tmp_path):
-    """An id with no transcript yet must not resolve to nothing.
+def test_own_transcript_refuses_a_stranger_when_the_id_names_no_file(tmp_path):
+    """A known identity with an absent file is UNMEASURABLE, not someone else.
 
-    The first turn of a session can run before its own file exists; failing to
-    the pre-existing mtime rule is the safe direction, returning None is not.
+    This test asserted the opposite until `37684723`, on the reasoning that
+    "failing to the pre-existing mtime rule is the safe direction". It is not:
+    knowing who we are AND that our transcript is absent is positive evidence
+    that the newest file belongs to another session, so the fallback handed
+    `clear-prep` a stranger's occupancy as though it were ours.
+
+    None surfaces as exit 127, which this module's caller already renders as
+    explicitly NOT "you are fine" — a real answer, where the old behaviour
+    manufactured a number. Raised independently by the cold lane and CodeRabbit.
+    """
+    env, directory = _projects(tmp_path)
+    _write(directory, "bbbb2222-0000-4000-8000-000000000002", mtime=9_000)
+    env["CLAUDE_CODE_SESSION_ID"] = "cccc3333-0000-4000-8000-000000000003"
+
+    assert context_usage.own_transcript(tmp_path, env) is None
+
+
+def test_own_transcript_still_uses_mtime_when_there_is_no_id_at_all(tmp_path):
+    """THE ARM. Not knowing who we are is the one case mtime still serves.
+
+    Without this the change above would read as "never fall back", which would
+    break every hook shell and test that has no `CLAUDE_CODE_SESSION_ID`.
     """
     env, directory = _projects(tmp_path)
     newest = _write(directory, "bbbb2222-0000-4000-8000-000000000002", mtime=9_000)
-    env["CLAUDE_CODE_SESSION_ID"] = "cccc3333-0000-4000-8000-000000000003"
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
 
     assert context_usage.own_transcript(tmp_path, env) == newest
 

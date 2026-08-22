@@ -49,9 +49,14 @@ This repo's "prose to a CLI goes via a FILE" lesson, arriving for the fourth tim
 
 FALSE POSITIVE, twenty minutes later: writing THIS file through a QUOTED heredoc
 (`<<'EOF'`) was denied too. A quoted heredoc never expands, so there was nothing
-to leak. Fixed by stripping quoted-heredoc bodies before the substitution scan
-and reusing `graph_first.HEREDOC` rather than writing a second matcher — an
-UNQUOTED heredoc still expands and is still scanned. The pair is the lesson: the
+to leak. Fixed by stripping quoted-heredoc bodies before the substitution scan,
+using a NEW matcher `_QUOTED_HEREDOC` — an UNQUOTED heredoc still expands and is
+still scanned. (This record said the fix REUSED `graph_first.HEREDOC`. It does
+not, and the module says why it cannot: `graph_first.HEREDOC` matches an opener
+of either kind, because it answers "is there a heredoc?" while this must answer
+"is this body inert?" — sharing it would have made the guard skip the expanding
+form, which is the half that can actually leak. Corrected on `#453` after
+CodeRabbit caught the false implementation dependency this had put in the graph.) The pair is the lesson: the
 same rule produced the guard's best catch and its first false alarm within one
 session, and only the second one is a defect.
 
