@@ -158,6 +158,20 @@ fnox sync --global -p age KEY_NAME
 `$MDE_PROJECT_DIR/.venv/bin/mde-py secrets add KEY` and `eval`s the emitted
 `export` line so the value lands in the *current* shell. It covers **steps 3–7**.
 
+🔴 **It has been BROKEN on this host since at least 2026-08-21, and still is —
+re-measured 2026-08-22.** mde's venv `python` is a dangling symlink to mise's
+python **3.14.4**, which mise no longer has installed; control-armed both times,
+3.14.7 resolves and 3.14.4 does not. You get a raw `bad interpreter` and rc≠0,
+**not** the wrapper's friendly "run `uv sync`" message, because its guard tests
+`[[ ! -x "$_bin" ]]` (`50-mde-secrets.zsh:46`) and `mde-py` *is* executable — it
+is the interpreter in its shebang that is gone. Evidence:
+`docs/research/reports/dotfiles-secret-management.md:331-355`.
+
+**Fix before using this path:** `cd "$MDE_PROJECT_DIR" && uv sync`. Until then
+the nine-step procedure above is not a fallback, it is THE path — it depends on
+nothing but `doppler` and `fnox`. This section is headed "which command actually
+adds one, today", so it has to say when that command does not run.
+
 `which mde-py` returning rc=1 proves nothing — it is never on `$PATH`; only the
 function reaches it (control: `which doppler` resolves).
 
@@ -181,14 +195,24 @@ was wrong (Ray, 2026-08-21: *"i dont want to invent a new way"*).
 for the SAME case**, and the cold lane on `870c020c` is what noticed. Both
 address "in Doppler, reaches no shell": this one says `bootstrap-config`, that
 one says `fnox set` + `fnox sync --global`. The distinction the file failed to
-state is **scope**: `bootstrap-config` regenerates the WHOLE config from the
-reviewed baseline and is right when several names are stranded or the baseline
-itself moved; the two-command form touches ONE name and is what
+state is **scope**: `bootstrap-config` operates on the WHOLE config rather than
+one name, and is right when several names are stranded or the baseline itself
+moved; the two-command form touches ONE name and is what
 `add_secret`'s own `_fnox_declare` runs (`manage.py:275`), which is why it is
 sanctioned rather than a hand-write. The `fnox set --global` banned above is a
 third thing — the *unscoped* form that writes outside the managed config.
 Prefer `bootstrap-config`; reach for the two commands when one name is stranded
-and regenerating everything would be the larger blast radius. **Do not
+and the whole-config path would be the larger blast radius.
+
+⚠️ **"REGENERATES the whole config" was the PRE-FIX description, and this
+paragraph carried it.** Since mde#83 (squash-merged as `716b17d`)
+`bootstrap-config` **reconciles declarations through `fnox`** rather than
+rewriting the config from a template — `grep -c _reconcile_declarations
+src/mde/secrets/manage.py` → **2**, control a bogus symbol → **0**
+(`docs/research/reports/dotfiles-secret-management.md:59-65`). That matters
+because the old wording is what made "regenerating everything" sound like the
+risk being traded off, when the fixed code no longer does it. Caught by
+CodeRabbit on #453. **Do not
 re-litigate this without reading dotfiles' `docs/specs/secrets-takeover.md`
 first** — D5 drops fnox entirely, so the durable answer may be neither.
 
