@@ -138,7 +138,7 @@
 
 export const meta = {
   name: 'session-review',
-  description: 'What a round looks like from outside it: circles, forgotten requirements, contradicted instructions, unpinned tools, context blowouts',
+  description: 'What a round looks like from outside it: circles, forgotten requirements, contradicted instructions, unpinned tools, context blowouts, and whether the pinned deep extraction would actually run',
   whenToUse: 'End of a multi-session round, or when the user says work is going in circles. Invoked by the kb-session-review skill, which runs the AskUserQuestion preflight first.',
   phases: [
     { title: 'Sweep', detail: 'independent lanes, each blind to the others', model: 'haiku/sonnet/opus per lane' },
@@ -188,7 +188,7 @@ if (typeof cfg === 'string') {
 // which is what turns this from a nicer draft into a checked one.
 // `output` DECIDES THE ARTIFACT. `lanes` decides the work. They were ONE flag
 // (`mode`) until now, and conflating them cost a real capability: there was no
-// way to ask for a full eight-lane sweep that ends in a handoff, or a three-lane
+// way to ask for a full nine-lane sweep that ends in a handoff, or a three-lane
 // quick report. The lane set is now a DEFAULT of the output shape, not a
 // consequence of it.
 //
@@ -217,17 +217,30 @@ if (OUTPUT === 'handoff' && !(typeof cfg.handoffOut === 'string' && cfg.handoffO
   )
 }
 
-// The six a handoff is actually made of: what was asked and dropped, what is
+// The seven a handoff is actually made of: what was asked and dropped, what is
 // unlanded, what got redone, what drifted, what a bot flagged that nobody
 // actioned, and what was done by hand that a task already owns. `tooling-gap`
 // joined on 2026-08-19: the heredoc, shell-chain and repeated-mistake checks
 // live in its brief, and the clear-prep handoff path is how this workflow
 // actually gets invoked, so leaving the lane out of handoff mode meant those
 // detectors never ran at all (the round's own finding: detectors that nothing
-// invokes run zero times). `unpinned` and `context` stay round-level questions
+// invokes run zero times). `extraction-readiness` joined on 2026-08-22 for the
+// SAME reason a second time, and a worse version of it: that lane was never in
+// `LANES` at all, so the ad-hoc run that found #426 could not repeat, and five of
+// its thirteen findings sat unfiled until a fresh sweep re-derived them from
+// scratch. It stays here while a corpus run is pending — see its entry in `LANES`
+// for when to retire it. `unpinned` and `context` stay round-level questions
 // and are not worth a session-end agent each. A DEFAULT now — pass `lanes` to
 // override in either direction.
-const HANDOFF_LANES = new Set(['forgotten', 'pending-work', 'circles', 'contradicted', 'bot-reviews', 'tooling-gap'])
+const HANDOFF_LANES = new Set([
+  'forgotten',
+  'pending-work',
+  'circles',
+  'contradicted',
+  'bot-reviews',
+  'tooling-gap',
+  'extraction-readiness',
+])
 
 // `sessions` REPLACES `transcriptDir` + `since`, and comes from
 // `mise run kb-session-select` rather than from whoever is typing the call.
@@ -494,6 +507,87 @@ unlanded unique commits are the finding. Work from git commands run inside the
 repo — do not walk external directory trees except a backup directory the
 settled block names. Cite the exact commands.`,
   },
+  {
+    key: 'extraction-readiness',
+    // Opus/high because its failure mode is the most expensive one this repo has:
+    // the 58-chunk corpus run costs ~$65 and, on 2026-08-21, was measured to stage
+    // 58/58 FAILED while `verify` reported `execution_authorized:true` (#426). A
+    // lane that misreads that says "ready" about a five-figure-token, ten-hour run.
+    //
+    // WHY THIS LANE EXISTS AT ALL — and it is this file's own worked failure.
+    // An `extraction-readiness` lane was dispatched AD HOC during the 2026-08-21
+    // round and produced 13 findings (F1..F13). It found #426. It was NEVER in this
+    // array: control-armed across all four historical revisions of this file
+    // (`b30a80c9`, `d6641b98`, `dcd0b07f`, `2b364443`) -> zero hits. So the question
+    // became unaskable the moment that round ended, and FIVE of its thirteen
+    // findings were still unfiled a day later — the restart trap (#456), the
+    // effort-value gap (#411), the run-vs-merge ordering (#397) and the stale skip
+    // register (#417) — every one of them re-derived from scratch on 2026-08-22
+    // because nothing carried them. That is the `tooling-gap` lesson at :225
+    // ("detectors that nothing invokes run zero times") arriving a second time, in
+    // the same file, about the lane list rather than about a task.
+    //
+    // IN HANDOFF_LANES DELIBERATELY. Making it opt-in would rebuild exactly the
+    // failure above. It stays in the default set while a corpus run is pending;
+    // when the extraction has landed and been merged, retire it or repoint it —
+    // but do that by DECIDING, not by leaving it out and forgetting.
+    //
+    // The ONE lane whose primary input is the ISSUE BACKLOG rather than the
+    // transcripts. Everything else here greps `.jsonl`; this reads `gh issue` and
+    // the code. That is why L5's delegate-the-transcript-reads rule barely applies
+    // to it and L2's sweep-bodies-not-titles rule applies doubly.
+    model: 'opus',
+    effort: 'high',
+    prompt: `Find whether the pinned graphify DEEP EXTRACTION would actually work if it
+were run again today, on the graphify version currently pinned. This lane's input is
+the OPEN ISSUE BACKLOG and the code, not the transcripts.
+
+Sweep EVERY open issue — \`gh issue list --state open --limit 300 --json number,title,body\`
+— and filter on BODIES, not titles (L2). A title is a spelling bound: the last full
+sweep found that filtering 222 open issues by title alone missed most of the set, while
+title+body gave 154 candidates. Then read down to the ones that can gate a run.
+
+Rank what you find into: (A) the run cannot start or produces nothing; (B) it completes
+and the result is wrong, lossy or unresumable; (C) provenance — what the run records
+about ITSELF; (D) scope and follow-on. For each, say whether it is FILED (with the
+number), PARTIAL (filed for a different code path — say which), or UNFILED.
+
+RE-DERIVE, NEVER INHERIT. Every claim you carry from a prior report, a handoff, or
+MEMORY.md is an inherited number with no control arm attached. Re-measure it against the
+code at the CURRENT sha and say you did. The prior lane's own completeness audit scored
+it 13 findings / 5 verified / 8 UNVERIFIED — so its findings are leads, not evidence.
+
+PROVENANCE IS IN SCOPE AND IS ROUTINELY MISSED. Ask what the run records about the work
+it did: which model, at what EFFORT, over which files, at which content hash, under
+which graphify version. Check the actual artifact
+(\`graphify-out/graphify-semantic-corpus/execution-config.json\`) rather than the code
+that writes it, and control-arm every absence — a field you cannot find is a search miss
+until a field you CAN find proves the probe discriminates. The known example: \`--effort\`
+appears only as a flag NAME in \`claude_required_flags\`, while its VALUE ("high") is in
+no field at all.
+
+COVERAGE DEBT INHERITED FROM 2026-08-21, still unclosed — say explicitly whether you
+reached each, and do not report clean while any is unread:
+  - \`python/src/kb_setup/graphify_semantic_corpus_authority.py\` and \`_prototype.py\`
+    — never opened by any lane;
+  - \`python/src/kb_setup/graphify_semantic_slice.py:1356-1410\` — the receipt-verification
+    path, unaudited;
+  - issue #409 (reviewed-warning inventories do not scale) — read by no lane, and it is
+    the primary ticket for one of the \`build = skip\` sources.
+
+DISTINGUISH WHAT BLOCKS THE RUN FROM WHAT BLOCKS THE MERGE. They are scheduled as one
+dependency and are not one: the run needs only the pinned source tree, while the merge
+writes into \`graphify-out/graph.json\`. Getting this backwards has already misordered
+the plan once.
+
+STATE THE HONEST BOUND (L7). Nobody has ever OBSERVED this run reach a provider at the
+current pin — every claim about what it will do is inference from source. A lane that
+establishes the run will FAIL has not established that fixing those failures makes it
+succeed. Say which of your findings are observations and which are inference.
+
+End with the COVERAGE line L6 requires: which issues you did not open, which modules you
+did not read, and which claims you could not arm.`,
+  },
 ]
 
 // Filtered ONCE, here, and every downstream count derives from `ACTIVE_LANES`
@@ -501,7 +595,7 @@ settled block names. Cite the exact commands.`,
 // "did not return" when they were never dispatched, which is precisely the
 // never-ran-vs-ran-and-found-nothing conflation this file exists to refuse.
 // LANES are chosen INDEPENDENTLY of the output shape. `cfg.lanes` wins; failing
-// that, a handoff defaults to HANDOFF_LANES and a report to all eight.
+// that, a handoff defaults to HANDOFF_LANES and a report to all nine.
 //
 // An unknown lane name THROWS rather than silently narrowing the sweep — a
 // review that ran four lanes because one was misspelled reports as confidently
@@ -560,8 +654,8 @@ const sweeps = await parallel(
           //
           // `workflows.md:316` makes the OUTPUT SCHEMA part of the cache key:
           // agents share a prefix only when model, effort, agent type, tools,
-          // output schema and cwd all match. Pinning the key per lane gave eight
-          // lanes eight schemas, so the native fan-out prefix hold (`:318` —
+          // output schema and cwd all match. Pinning the key per lane gave nine
+          // lanes nine schemas, so the native fan-out prefix hold (`:318` —
           // hold all but the first, release together once the first response
           // begins) could never engage, and reordering the prompt above would
           // have bought nothing.
