@@ -172,6 +172,21 @@ Doppler that reaches no shell**, where reconciling is the whole fix.
 edit by hand."* An earlier version of this section recommended exactly that, and
 was wrong (Ray, 2026-08-21: *"i dont want to invent a new way"*).
 
+⚠️ **This paragraph and § "Fixing a stranded name" prescribe DIFFERENT commands
+for the SAME case**, and the cold lane on `870c020c` is what noticed. Both
+address "in Doppler, reaches no shell": this one says `bootstrap-config`, that
+one says `fnox set` + `fnox sync --global`. The distinction the file failed to
+state is **scope**: `bootstrap-config` regenerates the WHOLE config from the
+reviewed baseline and is right when several names are stranded or the baseline
+itself moved; the two-command form touches ONE name and is what
+`add_secret`'s own `_fnox_declare` runs (`manage.py:275`), which is why it is
+sanctioned rather than a hand-write. The `fnox set --global` banned above is a
+third thing — the *unscoped* form that writes outside the managed config.
+Prefer `bootstrap-config`; reach for the two commands when one name is stranded
+and regenerating everything would be the larger blast radius. **Do not
+re-litigate this without reading dotfiles' `docs/specs/secrets-takeover.md`
+first** — D5 drops fnox entirely, so the durable answer may be neither.
+
 ## Diagnosing "the credential is missing"
 
 **A name written to Doppler but never declared in fnox reaches no shell, and
@@ -213,6 +228,15 @@ zsh -ic 'eval "$(fnox hook-env -s zsh)"; [[ -v KEY_NAME ]] && print present || p
 
 # or just open a new terminal
 ```
+
+⚠️ **Never run `fnox hook-env` BARE to "see what it does."** Its zsh renderer
+emits `export KEY=<value>` lines (`sources/fnox/src/shell/zsh.rs:92-94`), so the
+form above is safe only because `$(…)` feeds them straight into `eval` and
+nothing reaches stdout. Two things break that and both are one keystroke away:
+running it unredirected, and `set -x` tracing, which prints the substitution's
+result before `eval` consumes it. The cold lane on `870c020c` rated the fence
+itself a leak; it is not, under normal execution — but the bare invocation two
+characters away from it is, which is the caveat that was missing.
 
 `fnox exec -- …` resolving while the shell does not is the guide's documented
 "REAL FAULT" signature — but only once the probe itself is sound.
@@ -296,15 +320,38 @@ through fnox at all; they are ordinary inherited environment variables by the
 time mise runs. The *effect* that note describes is real and still bites; the
 *cause* it names is not configured on this host.
 
-## What this repo does NOT enforce
+## What this repo enforces — and what it still does not
 
-dotfiles denies the value-revealing commands at its PreToolUse hook. **This repo
-has no equivalent** — `kb_setup.hook_guard` has no `secret_value_substitution`
-and no `fnox get` / `doppler secrets get` redirect (armed 2026-08-21: 0 matches,
-against a control of four guards that do exist here — `absent_binary`,
-`check_first`, `graph_first`, `stage_explicitly`).
+**The value-revealing verbs are now DENIED here** (`kb_setup.secret_guard`,
 
-That gap is not theoretical. The session that wrote this file ran
+# 441, 2026-08-22). It is the first of the five stateless Bash guards, ahead of
+
+the gate redirects: the others compete on whose advice is better, while a
+credential in a transcript is irreversible, so a command that both leaks and
+hand-runs a gate reports the leak.
+
+Denied: `fnox get`/`export`, `fnox list --values`/`-V`,
+`doppler secrets get`/`download`, **bare `doppler secrets`** (its own `--help`
+says `--only-names` is what *"omit[s] all values"*, so the default prints them —
+an amendment to #441's proposed list, control-armed against the installed CLI),
+`security find-*-password -w`/`-g`, a bare `env`/`printenv`/`set`, and the
+`${NAME:+…}${NAME:-…}` pair.
+
+Still allowed, and the tests that pin it are half the file: `[[ -v NAME ]]`,
+`fnox list`/`check`/`config-files`/`profiles`/`doctor`,
+`doppler secrets --only-names`, and `doppler secrets set` — the nine-step add
+above runs that last one, and a guard that refused the procedure it protects
+would be worse than none.
+
+**Three things it still does not do**, stated because a guard's silence reads as
+coverage. It is a *redirect* guard, not a sandbox — `$(…)`, `sh -c`, `eval` and
+aliases all get through by design, the same precision-over-recall trade the other
+four make. It cannot see a verb nobody thought of, which no mutation sweep can
+detect either. And it does not touch the **vendored** `sources/media/**` docs: a
+dangerous fence there still reaches the graph and can still be quoted back at
+you — the guard is what stops it being *run*.
+
+The gap it closed was not theoretical. The session that wrote this file ran
 `fnox get GEMINI_API_KEY | wc -c` as a control arm — no value printed or stored,
 but a forbidden verb, run precisely because the contract forbidding it was
 unreachable from here. This repo's own measurement says a warning does not fix

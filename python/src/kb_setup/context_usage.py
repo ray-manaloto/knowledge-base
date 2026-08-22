@@ -173,6 +173,12 @@ def _last_usage(path: Path) -> tuple[int, str, int]:
                 record = json.loads(line)
             except ValueError, TypeError:
                 continue
+            # A bare `null`, number or string is VALID JSON, so it decodes without
+            # raising and the except above never sees it — then `.get` raises
+            # AttributeError and the whole measurement dies on one odd line.
+            # The except clause guards the parse; this guards the parse's RESULT.
+            if not isinstance(record, dict):
+                continue
             message = record.get("message")
             if not isinstance(message, dict):
                 continue
@@ -193,25 +199,49 @@ def _last_usage(path: Path) -> tuple[int, str, int]:
     return occupancy, model, turns
 
 
-def newest_transcript(repo_root: Path, env: dict[str, str] | None = None) -> Path | None:
-    """The most recently MODIFIED transcript for ``repo_root``.
+def own_transcript(repo_root: Path, env: dict[str, str] | None = None) -> Path | None:
+    """THIS session's transcript, by id — or the newest by mtime as a fallback.
 
-    Newest-by-mtime is the right rule here and only here: this reports on the
-    session that is running NOW, and the running session is the one still being
-    written to. `session_select` deliberately uses birthtime instead, because it
-    answers a different question — which sessions a review COVERS — and there
-    mtime is not when a session ran.
+    A transcript is named `<CLAUDE_CODE_SESSION_ID>.jsonl`, so the id names the
+    file exactly. Measured: `CLAUDE_CODE_SESSION_ID` is 36 chars, uuid-shaped,
+    and `<that id>.jsonl` exists in the transcript directory.
+
+    Newest-by-mtime was the ONLY rule until the cold lane on `870c020c` found
+    that it answers a different question — "which transcript was written most
+    recently" — and those diverge the moment a SECOND session runs against this
+    repo. Whichever session wrote last wins, so a concurrent Claude Code or
+    Codex session hands `mise run kb-context` the other session's occupancy, and
+    `clear-prep` treats that number as authoritative for its 20% trigger.
+
+    **A fork does not create that divergence, and the module docstring above is
+    why**: a fork's `CLAUDE_CODE_SESSION_ID` is *identical* to its parent's and
+    it writes the same transcript. That measurement is what makes this change
+    safe rather than behavioural — for the fork case, id-selection and
+    mtime-selection resolve to the same file.
+
+    mtime survives as the fallback for the case the id cannot serve: no
+    `CLAUDE_CODE_SESSION_ID` in the environment (a hook shell, a test), or an id
+    naming a file that does not exist yet. That direction fails the safe way —
+    back to exactly the behaviour that shipped before.
     """
     directory = session_select.transcript_dir(repo_root, env)
     if not directory.is_dir():
         return None
+    import os
+
+    source = os.environ if env is None else env
+    session_id = str(source.get("CLAUDE_CODE_SESSION_ID") or "").strip()
+    if session_id:
+        own = directory / f"{session_id}.jsonl"
+        if own.is_file():
+            return own
     found = sorted(directory.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
     return found[0] if found else None
 
 
 def measure(repo_root: Path, env: dict[str, str] | None = None) -> Usage | None:
     """Measure the newest transcript's context occupancy, or None if there is none."""
-    path = newest_transcript(repo_root, env)
+    path = own_transcript(repo_root, env)
     if path is None:
         return None
     occupancy, model, turns = _last_usage(path)

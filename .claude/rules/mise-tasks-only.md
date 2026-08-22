@@ -119,6 +119,25 @@ explicitly allowed by the guard: `graphify path`, `explain`, `god-nodes`,
    author meant to do. Shares `check_first`'s tokeniser (`segments` /
    `command_word`, promoted to public for exactly this) rather than carrying a
    second copy to drift. See `long-running-command-hangs.md` rule 3a.
+2d. **The SAME hook also denies a command that would PRINT a credential value**
+   (`kb_setup.secret_guard`, #441). `fnox get`/`export`, `fnox list --values`,
+   `doppler secrets get`/`download`, bare `doppler secrets` (its default prints
+   values — `--only-names` is what omits them), `security find-*-password -w`/`-g`,
+   a bare `env`/`printenv`/`set`, and the `${NAME:+…}${NAME:-…}` pair, which reads
+   as a presence probe and is not one.
+
+   It runs **FIRST**, and that is the one place this file's "narrowest remedy
+   wins" ordering does not apply. The other four compete on whose advice is
+   better; this one is not advice. A credential in a transcript is stored,
+   searched and fed onward, and no later remedy unsends it — so a command that
+   both leaks and hand-runs a gate must report the leak.
+
+   The ALLOW set is pinned by half the test file, for the reason this rule's
+   *Extending* section already states: `[[ -v NAME ]]`, `fnox list`/`check`/
+   `doctor`, `doppler secrets --only-names`, and `doppler secrets set` — the
+   sanctioned add path. A guard refusing the procedure it protects is worse than
+   no guard. Shares `check_first`'s tokeniser, so `git commit -m "…fnox get…"`
+   is one quoted token and never a command position.
 3. **This rule + the skills.** `.claude/skills/kb-curator/SKILL.md` carries the
    MANDATE and the full ingestion workflow; markdown alone is "relying on the
    LLM", so it is never the only layer.

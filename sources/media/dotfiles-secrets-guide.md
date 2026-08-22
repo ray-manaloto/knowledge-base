@@ -9,7 +9,7 @@ source_commit: "6c9c5273df898c47aba7e9223a18cee77cb75fa1"
 captured_at: 2026-08-21
 provenance: primary
 fetch_note: >-
-  Vendored rather than pinned as a sources/*.manifest because manifest kind is code|docs whole-repo with no subpath scoping (kb_setup/manifest.py:82). dotfiles is 449 markdown files; kind=code skips every one of them and kind=docs would be a ~449-file semantic extraction. These three files are the part this repo needs. dotfiles is PUBLIC, so this is a copy of public content, and it holds no secret values by its own contract.
+  Vendored rather than pinned as a sources/*.manifest because manifest kind is code|docs whole-repo with no subpath scoping (python/src/kb_setup/manifest.py:82). dotfiles is 449 markdown files; kind=code skips every one of them and kind=docs would be a ~449-file semantic extraction. These three files are the part this repo needs. dotfiles is PUBLIC, so this is a copy of public content, and it holds no secret values by its own contract.
 issue_refs: >-
   ⚠️ Bare `#N` references in this file belong to ANOTHER repository's tracker —
   `ray-manaloto/dotfiles` or `ray-manaloto/macos-development-environment` — and

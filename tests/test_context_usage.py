@@ -10,10 +10,11 @@ mistaken for occupancy.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
-from kb_setup import context_usage
+from kb_setup import context_usage, session_select
 
 
 def _turn(
@@ -87,7 +88,7 @@ def test_main_measures_when_no_marker_is_set(tmp_path, monkeypatch):
 
 def test_occupancy_sums_all_three_usage_fields(tmp_path, monkeypatch):
     p = _transcript(tmp_path, [_turn(1_000, 2_000, 3_000)])
-    monkeypatch.setattr(context_usage, "newest_transcript", lambda *_a, **_k: p)
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
     usage = context_usage.measure(tmp_path)
     assert usage is not None
     assert usage.occupancy == 6_000, "cache_read and cache_creation ARE context the model held"
@@ -101,7 +102,7 @@ def test_occupancy_is_the_last_turn_not_the_sum_of_turns(tmp_path, monkeypatch):
     a broken measurement.
     """
     p = _transcript(tmp_path, [_turn(100_000), _turn(200_000), _turn(300_000)])
-    monkeypatch.setattr(context_usage, "newest_transcript", lambda *_a, **_k: p)
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
     usage = context_usage.measure(tmp_path)
     assert usage is not None
     assert usage.occupancy == 300_000
@@ -110,7 +111,7 @@ def test_occupancy_is_the_last_turn_not_the_sum_of_turns(tmp_path, monkeypatch):
 
 def test_a_transcript_with_no_usage_is_unmeasurable_not_zero(tmp_path, monkeypatch):
     p = _transcript(tmp_path, [{"type": "user", "message": {"content": "hi"}}])
-    monkeypatch.setattr(context_usage, "newest_transcript", lambda *_a, **_k: p)
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
     assert context_usage.measure(tmp_path) is None
 
 
@@ -119,7 +120,7 @@ def test_unparsable_lines_are_skipped_not_fatal(tmp_path, monkeypatch):
     d.mkdir()
     p = d / "s.jsonl"
     p.write_text("{not json\n" + json.dumps(_turn(5_000)) + "\n", encoding="utf-8")
-    monkeypatch.setattr(context_usage, "newest_transcript", lambda *_a, **_k: p)
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
     usage = context_usage.measure(tmp_path)
     assert usage is not None
     assert usage.occupancy == 5_000
@@ -233,9 +234,91 @@ def test_the_budget_reminder_is_never_read_as_occupancy(tmp_path, monkeypatch):
         },
     ]
     p = _transcript(tmp_path, records)
-    monkeypatch.setattr(context_usage, "newest_transcript", lambda *_a, **_k: p)
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
     usage = context_usage.measure(tmp_path)
     assert usage is not None
     assert usage.occupancy == 475_917, "must be occupancy, never the budget countdown"
     assert usage.over_threshold
     assert context_usage.render(usage)[1] == 10
+
+
+# --------------------------------------------------------------------------
+# Which transcript is OURS — id first, mtime only as the fallback.
+#
+# The cold lane on `870c020c` found that newest-by-mtime answers a different
+# question than "this session", and the two diverge the moment a second session
+# runs against the repo. `clear-prep` treats `kb-context` as authoritative for
+# its 20% trigger, so picking the wrong transcript reports a stranger's number.
+# --------------------------------------------------------------------------
+
+
+def _projects(tmp_path: Path) -> tuple[dict[str, str], Path]:
+    """A real transcript directory for `tmp_path`, plus the env that finds it."""
+    env = {"CLAUDE_CONFIG_DIR": str(tmp_path / "cfg")}
+    directory = session_select.transcript_dir(tmp_path, env)
+    directory.mkdir(parents=True, exist_ok=True)
+    return env, directory
+
+
+def _write(directory: Path, stem: str, mtime: float) -> Path:
+    p = directory / f"{stem}.jsonl"
+    p.write_text(json.dumps(_turn(1_000)) + "\n", encoding="utf-8")
+    os.utime(p, (mtime, mtime))
+    return p
+
+
+def test_own_transcript_prefers_this_sessions_id_over_a_newer_stranger(tmp_path):
+    """THE FINDING: a concurrent session wrote more recently than we did.
+
+    Without the id, `kb-context` reports the other session's occupancy — and
+    `clear-prep` acts on it. The stranger is deliberately the mtime winner, so
+    an implementation that ignores the id cannot pass this by accident.
+    """
+    env, directory = _projects(tmp_path)
+    mine = _write(directory, "aaaa1111-0000-4000-8000-000000000001", mtime=1_000)
+    _write(directory, "bbbb2222-0000-4000-8000-000000000002", mtime=9_000)
+    env["CLAUDE_CODE_SESSION_ID"] = mine.stem
+
+    assert context_usage.own_transcript(tmp_path, env) == mine
+
+
+def test_own_transcript_falls_back_to_mtime_with_no_session_id(tmp_path):
+    """The control arm: without an id this is the behaviour that already shipped.
+
+    It is also the arm that proves the test above is not just "returns whatever
+    the id names" — same two files, same mtimes, only the id is absent.
+    """
+    env, directory = _projects(tmp_path)
+    _write(directory, "aaaa1111-0000-4000-8000-000000000001", mtime=1_000)
+    newest = _write(directory, "bbbb2222-0000-4000-8000-000000000002", mtime=9_000)
+
+    assert context_usage.own_transcript(tmp_path, env) == newest
+
+
+def test_own_transcript_falls_back_when_the_id_names_no_file(tmp_path):
+    """An id with no transcript yet must not resolve to nothing.
+
+    The first turn of a session can run before its own file exists; failing to
+    the pre-existing mtime rule is the safe direction, returning None is not.
+    """
+    env, directory = _projects(tmp_path)
+    newest = _write(directory, "bbbb2222-0000-4000-8000-000000000002", mtime=9_000)
+    env["CLAUDE_CODE_SESSION_ID"] = "cccc3333-0000-4000-8000-000000000003"
+
+    assert context_usage.own_transcript(tmp_path, env) == newest
+
+
+def test_a_bare_null_line_does_not_crash_the_measurement(tmp_path, monkeypatch):
+    """`json.loads("null")` RAISES NOTHING — it returns None, and `.get` then dies.
+
+    The except clause guards the parse; it cannot guard the parse's result. One
+    odd line in a transcript took down the whole measurement.
+    """
+    p = tmp_path / "s.jsonl"
+    p.write_text("null\n123\n" + json.dumps(_turn(5_000)) + "\n", encoding="utf-8")
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
+
+    usage = context_usage.measure(tmp_path)
+
+    assert usage is not None
+    assert usage.occupancy == 5_000, "the real turn is still measured past the junk lines"

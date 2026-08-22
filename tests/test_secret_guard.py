@@ -1,0 +1,213 @@
+# Copyright (c) 2026 Raymond Manaloto
+"""Both directions of `kb_setup.secret_guard` (#441).
+
+The ALLOW arms carry as much weight as the DENY arms here, and deliberately more
+of the file. Every measured defect in this repo's PreToolUse guards has been a
+false positive, never an evasion — and a secret guard that refuses `fnox list`
+or `[[ -v NAME ]]` is a guard people route around, which leaves the leak
+unguarded AND costs the trust the other four guards run on.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from kb_setup import secret_guard
+from kb_setup.hook_guard import check_hook_call
+from kb_setup.result import Ok
+
+# --------------------------------------------------------------------------
+# DENY — the commands whose SUCCESS case writes a credential to stdout.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "fnox get GEMINI_API_KEY",
+        "fnox get GEMINI_API_KEY | wc -c",
+        "fnox export --format shell",
+        "fnox list --values",
+        "fnox list -V",
+        "doppler secrets get STRIPE_KEY",
+        "doppler secrets download --no-file",
+        "doppler secrets",
+        "doppler secrets --project dotfiles --config dev_personal",
+        "security find-generic-password -s doppler -w",
+        "security find-internet-password -g -a me",
+        "env",
+        "printenv",
+        "set",
+    ],
+)
+def test_a_value_printing_command_is_denied(command):
+    assert secret_guard.decide(command) is not None, command
+
+
+def test_the_denial_names_the_probe_that_replaces_it():
+    """A refusal with no alternative is what gets routed around."""
+    reason = secret_guard.decide("fnox get SOME_KEY")
+    assert reason is not None
+    assert "[[ -v NAME ]]" in reason
+    assert "fnox list" in reason, "the allowed names-only listing must be named"
+
+
+def test_a_leak_behind_a_transparent_prefix_is_still_denied():
+    """`env FOO=1 fnox get X` runs `fnox get`; the wrapper must not hide it."""
+    assert secret_guard.decide("env FOO=1 fnox get SOME_KEY") is not None
+
+
+def test_a_leak_in_a_later_pipeline_segment_is_denied():
+    """Segments are judged individually — the leak is rarely the first word."""
+    assert secret_guard.decide("echo hi && fnox get SOME_KEY") is not None
+
+
+def test_an_absolute_path_to_the_binary_is_still_denied():
+    """`basename` is applied, so `/opt/homebrew/bin/fnox get` cannot slip past."""
+    assert secret_guard.decide("/opt/homebrew/bin/fnox get SOME_KEY") is not None
+
+
+# --------------------------------------------------------------------------
+# The substitution trap — the shape that LOOKS like a presence probe.
+# --------------------------------------------------------------------------
+
+
+def test_the_paired_substitution_probe_is_denied():
+    """`${X:+SET}${X:-ABSENT}` prints X's VALUE when X is set."""
+    reason = secret_guard.decide('echo "${DOPPLER_TOKEN:+SET}${DOPPLER_TOKEN:-ABSENT}"')
+    assert reason is not None
+    assert "DOPPLER_TOKEN" in reason
+    assert "[[ -v DOPPLER_TOKEN ]]" in reason
+
+
+def test_a_lone_default_substitution_is_allowed():
+    """THE FALSE-POSITIVE ARM, and the reason the rule is the PAIR.
+
+    `${HOME:-/tmp}` is one of the most common idioms in shell. A guard that
+    denied it would fire constantly on code that leaks nothing, and this guard's
+    false positives are the direction that actually costs.
+    """
+    assert secret_guard.decide("cd ${HOME:-/tmp}") is None
+    assert secret_guard.decide('echo "${SOME_KEY:-unset}"') is None
+
+
+def test_the_pair_must_be_the_same_variable():
+    """Two different names are two ordinary defaults, not the probe idiom."""
+    assert secret_guard.decide('echo "${FOO:+yes}${BAR:-no}"') is None
+
+
+# --------------------------------------------------------------------------
+# ALLOW — the sanctioned probes. A guard that refuses these is worse than none.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "[[ -v REPOWISE_KNOWLEDGE_BASE_API_KEY ]]",
+        "fnox list",
+        "fnox check",
+        "fnox config-files",
+        "fnox profiles",
+        "fnox doctor",
+        "mise run doctor",
+        "doppler secrets --only-names",
+        "doppler secrets --project dotfiles --config dev_personal --only-names",
+        "doppler secrets set NEW_KEY",
+        "command -v fnox",
+        "which doppler",
+        "type security",
+        "env FOO=1 pytest tests/",
+        "printenv PATH | tr : '\\n'",
+        "git status --short",
+    ],
+)
+def test_a_sanctioned_probe_is_allowed(command):
+    assert secret_guard.decide(command) is None, command
+
+
+def test_the_add_procedure_is_not_denied():
+    """`docs/secrets.md`'s nine-step add runs `doppler secrets set`.
+
+    A write verb takes a value as INPUT rather than printing one. Denying it
+    would be the guard refusing the very procedure it exists to protect.
+    """
+    assert secret_guard.decide("doppler secrets set REPOWISE_KEY") is None
+
+
+def test_prose_mentioning_a_denied_command_is_allowed():
+    """THE CLASS EVERY FALSE POSITIVE HERE HAS COME FROM.
+
+    A regex sees `fnox get` inside the commit message; the tokeniser sees one
+    quoted token that can never sit at a command position.
+    """
+    assert secret_guard.decide('git commit -m "docs: explain why fnox get is banned"') is None
+    assert secret_guard.decide('echo "never run doppler secrets download"') is None
+
+
+def test_an_unparsable_command_is_allowed_rather_than_regex_matched():
+    """No regex fallback — a bare-word fallback would fire on ordinary prose."""
+    assert secret_guard.decide('fnox get "unbalanced') is None
+
+
+@pytest.mark.parametrize("command", ["", "   ", "\n"])
+def test_an_empty_command_is_allowed(command):
+    assert secret_guard.decide(command) is None
+
+
+# --------------------------------------------------------------------------
+# Wiring — a guard nothing calls is not a guard.
+# --------------------------------------------------------------------------
+
+
+def _call(command: str, tmp_path: Path) -> str | None:
+    """The deny-reason the whole PreToolUse chain returns for `command`.
+
+    Asserts `Ok` rather than reaching straight for `.value`: the boundary can
+    also return `Err`, and a helper that blew up on it would make every test
+    below report a type error instead of the guard's verdict.
+    """
+    result = check_hook_call(
+        json.dumps(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": command},
+                "cwd": str(tmp_path),
+                "session_id": "s1",
+            }
+        )
+    )
+    assert isinstance(result, Ok), f"boundary did not run for {command!r}: {result!r}"
+    return result.value
+
+
+def test_the_guard_is_wired_into_the_bash_chain(tmp_path: Path):
+    """The realistic break for an added guard is the WIRING, not the logic."""
+    reason = _call("fnox get SOME_KEY", tmp_path)
+    assert reason is not None
+    assert "secret_guard" in reason
+
+
+def test_an_ordinary_command_still_passes_the_chain(tmp_path: Path):
+    """CONTROL ARM for the two wiring tests — without it they prove nothing."""
+    assert _call("git status --short", tmp_path) is None
+
+
+def test_it_runs_before_the_gate_redirects(tmp_path: Path):
+    """A command that both leaks and hand-runs a gate must report the LEAK.
+
+    Ordering is the contract: the other guards compete on whose advice is
+    better, but a printed credential is irreversible and outranks advice.
+    """
+    reason = _call("fnox get SOME_KEY && uv run ruff check python/", tmp_path)
+    assert reason is not None
+    assert "secret_guard" in reason, "the leak must win over the kb-check redirect"
+
+
+def test_the_gate_redirect_still_fires_on_its_own(tmp_path: Path):
+    """The arm that proves the test above measures ORDER, not a dead redirect."""
+    reason = _call("uv run ruff check python/", tmp_path)
+    assert reason is not None
+    assert "kb-check" in reason
