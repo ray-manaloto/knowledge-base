@@ -139,7 +139,7 @@ _ATTRIB = (
 
 def _fnox_reason(words: list[str]) -> str | None:
     """`fnox get`/`export` always; `fnox list` only when it asks for values."""
-    if len(words) < _NEEDS_A_SUBCOMMAND:
+    if len(words) < _NEEDS_A_SUBCOMMAND or words[0] != "fnox":
         return None
     sub = words[1]
     if sub in _VALUE_SUBCOMMANDS["fnox"]:
@@ -165,7 +165,7 @@ def _doppler_reason(words: list[str]) -> str | None:
     A guard that denied the two explicit verbs and waved through the bare
     command would have missed the shortest way to dump the project.
     """
-    if len(words) < _NEEDS_A_SUBCOMMAND or words[1] != "secrets":
+    if len(words) < _NEEDS_A_SUBCOMMAND or words[0] != "doppler" or words[1] != "secrets":
         return None
     rest = words[2:]
     if "--only-names" in rest:
@@ -213,7 +213,7 @@ def _declustered(words: list[str]) -> list[str]:
 
 def _security_reason(words: list[str]) -> str | None:
     """The macOS `security find-*-password` verbs print the password with `-w`/`-g`."""
-    if len(words) < _NEEDS_A_SUBCOMMAND or words[1] not in _SECURITY_FIND:
+    if len(words) < _NEEDS_A_SUBCOMMAND or words[0] != "security" or words[1] not in _SECURITY_FIND:
         return None
     flags = _declustered(words[2:])
     if not any(flag in _SECURITY_VALUE_FLAGS for flag in flags):
@@ -319,10 +319,19 @@ def decide(command: str) -> str | None:
         return None
     # Once, on the RAW command, before tokenising: `shlex` discards the quoting
     # that decides whether the shell expands a substitution at all.
-    reason = _substitution_reason(_without_quoted_heredocs(command))
+    inert_stripped = _without_quoted_heredocs(command)
+    reason = _substitution_reason(inert_stripped)
     if reason:
         return reason
-    segs = check_first.segments(command)
+    # THE VERB SCAN READS THE STRIPPED TEXT TOO. It read the RAW command until
+    # `7be78efc`, so a quoted heredoc BODY — inert by definition, which is the
+    # whole premise of #441's false-positive fix — was still tokenised into
+    # segments and judged. That is not hypothetical: this guard denied its own
+    # author's commit, because a message containing the words "secrets summary"
+    # produced a segment whose second word was `secrets`. Stripping for one
+    # check and not the other meant the module disagreed with itself about
+    # which bytes the shell will run.
+    segs = check_first.segments(inert_stripped)
     if segs is None:
         return None
     for tokens in segs:

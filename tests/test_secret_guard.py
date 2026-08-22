@@ -263,6 +263,57 @@ def test_declustering_does_not_invent_a_value_flag(command):
 
 
 # --------------------------------------------------------------------------
+# A handler must check ITS OWN command word — the widest false positive here.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "make export",
+        "just secrets",
+        "npm get registry",
+        "terraform get",
+        "git secrets --scan",
+    ],
+)
+def test_another_tool_with_the_same_subcommand_is_allowed(command):
+    """`_fnox_reason`/`_doppler_reason` matched `words[1]` and never `words[0]`.
+
+    So ANY command whose second word happened to be `get`, `export` or
+    `secrets` was reported as a credential leak. All five of these denied
+    before the fix, and none of them touches a credential.
+
+    This is the direction that actually costs: every measured defect in this
+    repo's PreToolUse guards has been a false positive, never an evasion.
+    """
+    assert secret_guard.decide(command) is None
+
+
+def test_a_forbidden_verb_inside_a_quoted_heredoc_body_is_allowed():
+    """The verb scan read the RAW command; the substitution scan read stripped.
+
+    So the module disagreed with itself about which bytes the shell will run,
+    and writing a runbook whose body line IS `fnox get SOME_KEY` was denied —
+    the same class as #441's original false positive, one check further along.
+
+    The body line must START with the verb for the raw scan to reach it, which
+    is why this fixture is a bare command line rather than prose mentioning one.
+    The first version of this test used prose ("the secrets summary…") and
+    SURVIVED its own mutation arm: the command-word fix alone already made it
+    pass, so it measured that fix and not this one.
+    """
+    command = "cat > runbook.md <<'EOF'\nfnox get SOME_KEY\nEOF"
+    assert secret_guard.decide(command) is None
+
+
+def test_a_real_leak_outside_the_heredoc_is_still_denied():
+    """THE ARM for the test above — stripping must not blind the verb scan."""
+    command = "fnox get SOME_KEY && git commit -F - <<'MSG'\ninert\nMSG"
+    assert secret_guard.decide(command) is not None
+
+
+# --------------------------------------------------------------------------
 # ALLOW — the sanctioned probes. A guard that refuses these is worse than none.
 # --------------------------------------------------------------------------
 
