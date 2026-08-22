@@ -226,11 +226,21 @@ def _last_usage(path: Path) -> tuple[int, str, int]:
             usage = message.get("usage")
             if not isinstance(usage, dict):
                 continue
-            total = (
-                int(usage.get("input_tokens") or 0)
-                + int(usage.get("cache_read_input_tokens") or 0)
-                + int(usage.get("cache_creation_input_tokens") or 0)
-            )
+            # THE SAME LESSON AS THE COMMENT ABOVE, one step further in. Guarding
+            # the parse and the parse's RESULT still left the FIELDS unguarded:
+            # `{"input_tokens": "unknown"}` is a dict, so it reaches here, and
+            # `int()` then raises ValueError out of the whole function — killing
+            # the measurement of every later well-formed turn over one odd line.
+            # Reproduced: a good/bad/good transcript raised instead of returning
+            # the good turns. (Cold lane, `e2b697c9`.)
+            try:
+                total = (
+                    int(usage.get("input_tokens") or 0)
+                    + int(usage.get("cache_read_input_tokens") or 0)
+                    + int(usage.get("cache_creation_input_tokens") or 0)
+                )
+            except ValueError, TypeError:
+                continue
             if total <= 0:
                 continue
             turns += 1

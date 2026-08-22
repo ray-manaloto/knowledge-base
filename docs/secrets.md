@@ -10,9 +10,14 @@
 > what RUNS, not what was intended to last. See "The takeover" below before
 > treating any of it as the end state.
 
-This repo consumes credentials; it does not own them. The mechanism, the
-authority and the enforcement all live in the sibling
-[`ray-manaloto/dotfiles`](https://github.com/ray-manaloto/dotfiles), and this
+This repo consumes credentials; it does not own them. The mechanism and the
+authority live in the sibling
+[`ray-manaloto/dotfiles`](https://github.com/ray-manaloto/dotfiles) — and so did
+the enforcement, until #441. **On the value-printing verbs the enforcement is
+now HERE**, in `kb_setup.secret_guard`, and dotfiles' gap on them is tracked as
+dotfiles#780; see § *What the guard denies* below. This sentence said
+"enforcement" pointed at dotfiles too, which sent a reader to the wrong repo to
+inspect or repair exactly the half this repo owns. This
 file exists because none of that was reachable from here — a session asking
 "how do I add a secret?" got nothing from `docs/`, nothing from `CLAUDE.md`, and
 **zero nodes from the graph** (`fnox` → 0, against a 955-node `graphify`
@@ -220,10 +225,14 @@ lines, the new key among them, and the known-good control **not at all** — bec
 `hook-env` is a **delta emitter** and the control was already inherited. A probe
 whose control looks broken is usually the probe.
 
-The honest forms:
+The honest forms — **both of which assume xtrace is OFF; see the warning
+directly below, which applies to the first block, not only to a bare
+invocation**:
 
 ```sh
-# fire the hook, as a prompt would
+# fire the hook, as a prompt would.
+# `set +x` first if you are in a traced shell: xtrace prints the substitution's
+# result BEFORE `eval` consumes it, so the export lines land in the transcript.
 zsh -ic 'eval "$(fnox hook-env -s zsh)"; [[ -v KEY_NAME ]] && print present || print ABSENT'
 
 # or just open a new terminal
@@ -359,7 +368,10 @@ aliases all get through by design, the same precision-over-recall trade the othe
 four make. It cannot see a verb nobody thought of, which no mutation sweep can
 detect either. And it does not touch the **vendored** `sources/media/**` docs: a
 dangerous fence there still reaches the graph and can still be quoted back at
-you — the guard is what stops it being *run*.
+you — the guard is what stops it being run **as a direct invocation**. Not
+unconditionally: quoted through `sh -c`, `eval` or a substitution it is the same
+bypass named two sentences up, so "stops it being run" was an assurance this
+paragraph had already contradicted itself about (cold lane, `e2b697c9`).
 
 The gap it closed was not theoretical. The session that wrote this file ran
 `fnox get GEMINI_API_KEY | wc -c` as a control arm — no value printed or stored,

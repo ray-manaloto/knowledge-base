@@ -354,3 +354,33 @@ def test_a_bare_null_line_does_not_crash_the_measurement(tmp_path, monkeypatch):
 
     assert usage is not None
     assert usage.occupancy == 5_000, "the real turn is still measured past the junk lines"
+
+
+def test_a_non_numeric_usage_field_does_not_crash_the_measurement(tmp_path, monkeypatch):
+    """THE SAME LESSON ONE STEP FURTHER IN, and the test above could not see it.
+
+    `{"input_tokens": "unknown"}` is a dict, so every `isinstance` guard above
+    passes it through — and `int()` then raised ValueError out of `_last_usage`,
+    killing the measurement of every LATER well-formed turn over one odd line.
+    The bare-null test cannot catch this: its junk lines die at `.get`, before
+    the arithmetic.
+
+    The malformed record is deliberately in the MIDDLE, so a fix that merely
+    stopped the crash without continuing the scan would still fail this.
+    """
+    p = tmp_path / "s.jsonl"
+    p.write_text(
+        json.dumps(_turn(1_000))
+        + "\n"
+        + json.dumps({"message": {"usage": {"input_tokens": "unknown"}}})
+        + "\n"
+        + json.dumps(_turn(7_000))
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(context_usage, "own_transcript", lambda *_a, **_k: p)
+
+    usage = context_usage.measure(tmp_path)
+
+    assert usage is not None
+    assert usage.occupancy == 7_000, "the LAST good turn, measured past the malformed one"

@@ -70,13 +70,17 @@ fnox → env), the nine-step add procedure, and the agent contract.
 
 Two lines of it bind every session here, which is why they are repeated rather
 than only linked. **`fnox get`, `fnox export`, `fnox list --values`,
-`doppler secrets get`/`download`, `security … -w`/`-g`, `printenv`/`env`/`set`
+`doppler secrets get`/`download`, **bare `doppler secrets`** (its default prints
+values — `--only-names` is what omits them), `security … -w`/`-g`,
+`printenv`/`env`/`set`
 inside a secret-injected process, and emitting a credential value to stdout in
 ANY form are FORBIDDEN** — probe presence with `[[ -v KEY_NAME ]]`, never
 `${FOO:+SET}${FOO:-ABSENT}`, which *prints the value* when set and looks perfect
 on an unset control arm. This summary dropped `download`, `-g` and the
 `printenv` clause until the cold lane on `870c020c` read it against
-`docs/secrets.md:89-92`; a partial restatement of a binding rule is worse than
+`docs/secrets.md:89-92`, and dropped **bare `doppler secrets`** until the cold
+lane on `e2b697c9` read it again — the same failure mode, a second time, with a
+different verb. A partial restatement of a binding rule is worse than
 the link alone, because it reads as the whole rule. And **any figure `mise run`
 prints may be mangled** by redaction (a no-word-boundary literal replace), so
 re-read SHAs, branches and PR numbers from `uv run kb-setup …` or plain `git`.
@@ -85,7 +89,8 @@ re-read SHAs, branches and PR numbers from `uv run kb-setup …` or plain `git`.
 2026-08-22) — first of the five stateless Bash guards, because a leaked
 credential is irreversible while every other guard only offers better advice.
 It does not touch vendored `sources/media/**` docs: a dangerous fence there
-still reaches the graph, and the guard is what stops it being *run*. This line
+still reaches the graph, and the guard is what stops it being run **as a direct
+invocation** — not through `sh -c`/`eval`/`$(…)`, which it lets past by design. This line
 said dotfiles already had it and we did not; **measured 2026-08-22, dotfiles
 guards only the `${VAR:…}` shape and none of the verbs** (dotfiles#780), so on
 the verbs this repo is the only guarded one.

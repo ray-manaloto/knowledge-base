@@ -86,13 +86,31 @@ _FNOX_LIST_VALUE_FLAGS = frozenset({"--values", "-V"})
 _SECURITY_FIND = frozenset({"find-generic-password", "find-internet-password"})
 _SECURITY_VALUE_FLAGS = frozenset({"-w", "-g"})
 
+#: A cluster of short options (`-wa`), which POSIX lets you write for `-w -a`.
+#: Deliberately NOT matching `--long`, nor anything containing `=`.
+_CLUSTERED_SHORT_OPTS = re.compile(r"-[A-Za-z]{2,}")
+
 #: Bare, these dump the whole environment of a secret-injected process.
 #:
 #: Checked against the RAW segment rather than `command_word`, which is not a
 #: nicety: `env` is in `check_first._TRANSPARENT_PREFIXES`, so `command_word`
 #: strips it and returns an EMPTY list for a bare `env` — the guard would look
-#: straight past the exact command it is meant to catch. `env FOO=1 cmd` still
-#: passes, because that segment has tokens after the wrapper.
+#: straight past the exact command it is meant to catch.
+#:
+#: `env FOO=1 cmd` passes, and the note here USED to justify that as "the segment
+#: has tokens after the wrapper" — reasoning about token COUNT rather than about
+#: what `env` does. That is the bug the cold lane on `e2b697c9` found: `env` with
+#: no COMMAND argument prints the environment, so `env -0` and `env FOO=1` are
+#: dumps with two tokens each, and a `len(tokens) == 1` test waved both through
+#: (reproduced: both returned ALLOW while bare `env` returned DENY). The
+#: condition is now "does this segment resolve to a utility at all", which
+#: `command_word` already answers — it returns `[]` for exactly the dumping
+#: shapes and the real utility for the wrapping ones.
+#:
+#: Known residue, stated rather than left to be rediscovered: `command_word` does
+#: not model per-flag arity, so `env -u FOO` reads `FOO` as the utility and is
+#: still allowed even though it dumps. Fixing that means teaching `check_first`
+#: flag arity, which changes what every guard sharing that tokeniser sees.
 _BARE_DUMPERS = frozenset({"env", "printenv", "set"})
 
 #: Every command this guard judges is `<binary> <subcommand> …`, so a segment with
@@ -171,11 +189,34 @@ def _doppler_reason(words: list[str]) -> str | None:
     )
 
 
+def _declustered(words: list[str]) -> list[str]:
+    """`['-wa']` -> `['-w', '-a']`, leaving long options and operands alone.
+
+    POSIX/macOS short options cluster, and `security find-generic-password -wa
+    ACCOUNT` is the ORDINARY way to write this — not an evasion. Matching `-w`
+    by exact token equality therefore missed the common form while catching the
+    spelled-out one, which is the shape a guard is least likely to be caught on
+    by its own tests (cold lane, `e2b697c9`; reproduced — `-w -a` denied, `-wa`
+    allowed).
+
+    Only `-` + letters is split. `--wait` keeps its long-option meaning, and a
+    token carrying `=` is an assignment rather than a cluster.
+    """
+    out: list[str] = []
+    for word in words:
+        if _CLUSTERED_SHORT_OPTS.fullmatch(word):
+            out.extend(f"-{letter}" for letter in word[1:])
+        else:
+            out.append(word)
+    return out
+
+
 def _security_reason(words: list[str]) -> str | None:
     """The macOS `security find-*-password` verbs print the password with `-w`/`-g`."""
     if len(words) < _NEEDS_A_SUBCOMMAND or words[1] not in _SECURITY_FIND:
         return None
-    if not any(flag in _SECURITY_VALUE_FLAGS for flag in words[2:]):
+    flags = _declustered(words[2:])
+    if not any(flag in _SECURITY_VALUE_FLAGS for flag in flags):
         return None
     return (
         f"`security {words[1]} -w`/`-g` prints the stored password itself (`-g` "
@@ -216,13 +257,29 @@ def _without_quoted_heredocs(command: str) -> str:
         if opener is None:
             return out
         delimiter = opener.group(2)
-        rest = out[opener.end() :]
-        closer = re.search(rf"^\s*{re.escape(delimiter)}\s*$", rest, re.MULTILINE)
+        # A heredoc BODY starts on the next physical line. Everything between the
+        # opener and that newline is ordinary shell that runs regardless of the
+        # body — `cat <<'EOF' && echo "$…"` is the shape — so it must survive the
+        # strip. Slicing from `opener.end()` deleted it, which meant a leak
+        # riding after a heredoc opener was invisible to the guard: residue for
+        # that command was `'cat '`. Found by the cold lane on `e2b697c9`, which
+        # diagnosed it as the missing-closer case; reproducing it showed the
+        # CLOSED heredoc loses the trailing command too, so the fix is here at
+        # the line boundary rather than in the `closer is None` branch.
+        newline = out.find("\n", opener.end())
+        if newline == -1:
+            # No body at all — the opener is the last thing on the last line, so
+            # there is nothing to strip but the opener itself.
+            out = out[: opener.start()] + out[opener.end() :]
+            continue
+        same_line = out[opener.end() : newline]
+        body = out[newline + 1 :]
+        closer = re.search(rf"^\s*{re.escape(delimiter)}\s*$", body, re.MULTILINE)
         # No closer means the heredoc runs to the end of the command — strip the
         # remainder rather than nothing, or an unterminated body stays scannable
         # and the false positive survives in its most common interactive shape.
-        stop = opener.end() + (closer.end() if closer else len(rest))
-        out = out[: opener.start()] + out[stop:]
+        stop = newline + 1 + (closer.end() if closer else len(body))
+        out = out[: opener.start()] + same_line + out[stop:]
 
 
 def _substitution_reason(text: str) -> str | None:
@@ -271,15 +328,17 @@ def decide(command: str) -> str | None:
     for tokens in segs:
         if not tokens:
             continue
-        # BEFORE `command_word`, which strips `env` as a transparent prefix and
-        # would hand back an empty list for the bare dump this catches.
-        if len(tokens) == 1 and posixpath.basename(tokens[0]) in _BARE_DUMPERS:
-            name = posixpath.basename(tokens[0])
+        name = posixpath.basename(tokens[0])
+        words = check_first.command_word(tokens)
+        # A dumper that never reaches a utility IS the dump. One token covers
+        # bare `printenv`/`set`; the empty `command_word` covers `env`, `env -0`
+        # and `env FOO=1`, which `command_word` reduces to nothing precisely
+        # because `env` is a transparent prefix with no command left after it.
+        if name in _BARE_DUMPERS and (len(tokens) == 1 or not words):
             return (
                 f"A bare `{name}` dumps the WHOLE environment of a "
                 f"secret-injected process. {_PROBE_INSTEAD} {_ATTRIB}"
             )
-        words = check_first.command_word(tokens)
         if not words:
             continue
         for handler in (_fnox_reason, _doppler_reason, _security_reason):

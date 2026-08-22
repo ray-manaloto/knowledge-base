@@ -27,7 +27,8 @@ invoke this skill, not whether you can tell the condition holds.
 So the trigger is `mise run kb-context`, never an estimate — run it when a round
 feels long, after a large read or fan-out, and before deciding you have room.
 Exit **10** at or over threshold · **0** under · **127** could not measure (which
-is *not* "you are fine") · **3** not the main thread.
+is *not* "you are fine") · **3** not the main thread — reserved and UNREACHABLE,
+`CHILD_MARKERS` being empty since #451, which is why the next line enforces it.
 
 **Main session thread only** (Ray, 2026-08-21: *"not on subtasks or spawned
 agents or agent teams"*) — **nothing tells you which you are, so this instruction
@@ -205,9 +206,8 @@ it answers *was a program written twice?* A step done by hand ONCE, in one
 session, has no frequency to mine and is invisible to it: a directive violated
 at a rate, a probe that answered without asking, a run of adjacent tasks wanting
 one wrapper. Its largest group is the hand-written mutation harness, rebuilt as
-a fresh scratchpad every round while `kb-arms` has existed to replace it since
-
-# 160 — re-derive that count from a live run rather than repeating one here
+a fresh scratchpad every round while `kb-arms` has existed to replace it since issue
+160 — re-derive that count from a live run rather than repeating one here.
 
 Both read the same transcripts through one reader (`distill.tool_uses`), and
 both are advisory. Read `.claude/skills/kb-session-reflect/SKILL.md` when a

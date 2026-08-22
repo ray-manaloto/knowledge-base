@@ -150,6 +150,118 @@ def test_a_leak_before_a_quoted_heredoc_is_still_denied():
     assert secret_guard.decide(command) is not None
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        # Closed heredoc — the case the cold lane did NOT predict.
+        "cat <<'EOF' && echo \"${TOKEN:+SET}${TOKEN:-ABSENT}\"\nbody\nEOF",
+        # Unclosed — the case it did.
+        "cat <<'EOF' && echo \"${TOKEN:+SET}${TOKEN:-ABSENT}\"",
+    ],
+)
+def test_a_leak_after_a_heredoc_opener_on_the_same_line_is_denied(command):
+    """A heredoc BODY starts on the next line; the opener's line is real shell.
+
+    Slicing from the end of the `<<'EOF'` match deleted the rest of that
+    physical line, so `cat <<'EOF' && echo "$…"` reduced to `'cat '` and the
+    trailing leak was never scanned. The cold lane on `e2b697c9` found this and
+    diagnosed it as the missing-closer branch; reproducing it showed the CLOSED
+    form loses the trailing command too — both residues were `'cat '` — so the
+    fix is at the line boundary, not in `if closer is None`.
+
+    Parametrised over both because a fix in the `closer is None` branch alone
+    passes the second row and fails the first.
+    """
+    assert secret_guard.decide(command) is not None
+
+
+def test_the_same_line_rescue_does_not_resurrect_the_false_positive():
+    """THE ARM. Preserving the opener's line must not un-strip the BODY.
+
+    This is the #441 false positive itself — a quoted heredoc documenting the
+    trap. If the fix above had kept too much, this would go red.
+    """
+    command = "cat > notes.md <<'EOF'\nbeware ${TOKEN:+SET}${TOKEN:-ABSENT}\nEOF\necho done"
+    assert secret_guard.decide(command) is None
+
+
+# --------------------------------------------------------------------------
+# The dumpers — `env` prints the environment when it has no COMMAND to run.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "env -0",  # NUL-separated dump
+        "env FOO=1",  # assignment, then nothing to run
+        "env -0 | grep TOKEN",
+    ],
+)
+def test_env_with_no_utility_left_is_a_dump_and_is_denied(command):
+    """`env` with no COMMAND argument PRINTS the environment.
+
+    The original test was `len(tokens) == 1`, which reasoned about token count
+    rather than about what `env` does — so these two-token dumps were allowed
+    while bare `env` was denied. `command_word` already answers the real
+    question, returning `[]` for exactly these and the utility for a wrapper.
+    """
+    assert secret_guard.decide(command) is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "env FOO=1 gemini -p",  # the documented ai-cli-invocation wrapper
+        "env -i sh -c true",
+        "set -e",
+        "set -o pipefail",
+    ],
+)
+def test_a_dumper_that_does_reach_a_utility_is_allowed(command):
+    """THE FALSE-POSITIVE ARM. `env` as a wrapper is ordinary and must pass.
+
+    `ai-cli-invocation.md` prescribes `env GEMINI_FORCE_FILE_STORAGE=true
+    gemini …`; a guard denying its own documented invocation is the
+    routed-around kind.
+    """
+    assert secret_guard.decide(command) is None
+
+
+# --------------------------------------------------------------------------
+# Clustered short options — the ORDINARY spelling, not an evasion.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "security find-generic-password -wa ACCOUNT",
+        "security find-internet-password -gs example.com",
+    ],
+)
+def test_a_clustered_value_flag_is_denied(command):
+    """`-wa` IS `-w -a`. Exact token equality matched only the spelled-out form.
+
+    Reproduced before the fix: `-w -a` denied, `-wa` allowed — the guard caught
+    the spelling nobody writes and missed the one everybody does.
+    """
+    assert secret_guard.decide(command) is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "security find-generic-password -a ACCOUNT",  # metadata only
+        "security find-generic-password --wait ACCOUNT",  # long opt, not a cluster
+        "security list-keychains",
+    ],
+)
+def test_declustering_does_not_invent_a_value_flag(command):
+    """THE ARM. Splitting `--wait` into letters would deny a benign long option."""
+    assert secret_guard.decide(command) is None
+
+
 # --------------------------------------------------------------------------
 # ALLOW — the sanctioned probes. A guard that refuses these is worse than none.
 # --------------------------------------------------------------------------
