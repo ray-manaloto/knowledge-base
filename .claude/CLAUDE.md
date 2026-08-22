@@ -81,8 +81,11 @@ the link alone, because it reads as the whole rule. And **any figure `mise run`
 prints may be mangled** by redaction (a no-word-boundary literal replace), so
 re-read SHAs, branches and PR numbers from `uv run kb-setup …` or plain `git`.
 
-**The first line is now hook-DENIED here too** (`kb_setup.secret_guard`, #441,
-closed 2026-08-22) — first of the five stateless Bash guards, because a leaked
+**The first line is now hook-DENIED** (`kb_setup.secret_guard`, #441, closed
+2026-08-22) — first of the five stateless Bash guards, because a leaked
 credential is irreversible while every other guard only offers better advice.
 It does not touch vendored `sources/media/**` docs: a dangerous fence there
-still reaches the graph, and the guard is what stops it being *run*.
+still reaches the graph, and the guard is what stops it being *run*. This line
+said dotfiles already had it and we did not; **measured 2026-08-22, dotfiles
+guards only the `${VAR:…}` shape and none of the verbs** (dotfiles#780), so on
+the verbs this repo is the only guarded one.

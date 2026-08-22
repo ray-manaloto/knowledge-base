@@ -1,11 +1,22 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Deny the credential commands that PRINT A VALUE (#441).
 
-The sibling `ray-manaloto/dotfiles` repo denies these at its own PreToolUse hook.
-This repo did not, and `docs/secrets.md` carried the contract in prose only —
-the layer this repo has twice measured as not working: the warning-only
-graph-first rule was complied with **0 times out of 19**, while the DENY that
-replaced it took its violations **62 → 0**.
+`docs/secrets.md` carried the forbidden-verb contract in prose only — the layer
+this repo has twice measured as not working: the warning-only graph-first rule
+was complied with **0 times out of 19**, while the DENY that replaced it took its
+violations **62 → 0**.
+
+⚠️ **NEITHER REPO ENFORCED THE VERBS, and #441 said dotfiles did.** That premise
+was refuted 2026-08-22 by reading the installed source rather than the ticket:
+`dotfiles_setup/hook_guard.py` has exactly ONE secret rule,
+`secret_value_substitution` (line 531), covering the `${VAR:…}` printing shape
+alone — `fnox get`, `fnox export`, `fnox list --values`,
+`doppler secrets get`/`download` and `security … -w`/`-g` are **0 hits there**,
+against a control of the rule names that do exist. So this module is not a
+catch-up with the sibling; on the verbs it is the only guard in either repo, and
+dotfiles has the gap filed as its own #780. Corrected here rather than only in
+the ticket, because the false version had already reached four artifacts —
+`docs/secrets.md`, `.claude/CLAUDE.md`, #441's body, and this docstring.
 
 What the guard is FOR, stated because it is narrower than it looks
 ------------------------------------------------------------------

@@ -103,9 +103,9 @@ declared, fire the activation hook or open a new terminal — see "Diagnosing" b
 ⚠️ **`${FOO:+SET}${FOO:-ABSENT}` PRINTS THE VALUE when the variable is set.** It
 opens with the recommended construct so it reads as compliant, and on an *unset*
 variable it looks perfect — so an unset-only control arm certifies nothing. A
-live Doppler token reached a transcript this way on 2026-08-02. dotfiles denies
-it at the hook (`secret_value_substitution`); **this repo does not** — see
-"What this repo does not enforce" below.
+live Doppler token reached a transcript this way on 2026-08-02. **Both repos now
+deny it** — dotfiles as `secret_value_substitution`, and here as
+`kb_setup.secret_guard` (#441) — see "What this repo enforces" below.
 
 ## Adding a secret — the nine steps
 
@@ -322,13 +322,23 @@ time mise runs. The *effect* that note describes is real and still bites; the
 
 ## What this repo enforces — and what it still does not
 
-**The value-revealing verbs are now DENIED here** (`kb_setup.secret_guard`,
+**The value-revealing verbs are now DENIED here** (`kb_setup.secret_guard`, #441,
+2026-08-22). It is the first of the five stateless Bash guards, ahead of the gate
+redirects: the others compete on whose advice is better, while a credential in a
+transcript is irreversible, so a command that both leaks and hand-runs a gate
+reports the leak.
 
-# 441, 2026-08-22). It is the first of the five stateless Bash guards, ahead of
-
-the gate redirects: the others compete on whose advice is better, while a
-credential in a transcript is irreversible, so a command that both leaks and
-hand-runs a gate reports the leak.
+⚠️ **This file, `.claude/CLAUDE.md` and #441's body all said dotfiles already
+denied these verbs and that we were catching up. That was FALSE**, and it
+survived because nobody read the sibling's source. Measured 2026-08-22 in
+`dotfiles_setup/hook_guard.py`: exactly ONE secret rule,
+`secret_value_substitution` (line 531), covering the `${VAR:…}` printing shape
+alone — `fnox get`/`export`/`list --values`, `doppler secrets get`/`download`
+and `security … -w`/`-g` are **0 hits** there, against a control of the rule
+names that do exist. So on the verbs this repo is now the ONLY guarded one, and
+the sibling's gap is its own dotfiles#780. The lesson is this repo's own
+(`probes-need-a-control-arm.md`): **source beats issue tracker**, and a claim
+about another repo's code is a claim you have to go and read.
 
 Denied: `fnox get`/`export`, `fnox list --values`/`-V`,
 `doppler secrets get`/`download`, **bare `doppler secrets`** (its own `--help`
