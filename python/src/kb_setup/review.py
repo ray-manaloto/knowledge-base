@@ -28,6 +28,7 @@ import json
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -1068,6 +1069,129 @@ def _exempt_delta_note(repo_root: Path, candidate: str, sha: str) -> tuple[bool,
 
     covered = _summarise(sorted(paths)) if paths else "an identical tree"
     return True, f"covered by the receipt for {candidate[:12]}; since then only {covered}", 0
+
+
+class HeadClaimState(Enum):
+    """How a document's stated HEAD relates to the commit git is actually on.
+
+    Six states rather than a boolean, on this module's standing rule that
+    "could not check" must never render as the clean answer — and with one
+    further split that a boolean cannot express at all. A handoff whose HEAD is
+    behind by nothing but :data:`EXEMPT_PATHS` is behind by ITS OWN CLOSING
+    COMMITS, which is a different fact from a handoff that missed real work.
+    """
+
+    #: The claim names the commit git is on. Nothing to report.
+    CURRENT = "current"
+    #: An ancestor of HEAD, and every path changed since is in `EXEMPT_PATHS` —
+    #: the round's own `kb-remember` / `kb-goal-outcome` output, committed after
+    #: the handoff was written. Stale, but only by artifacts the handoff itself
+    #: caused, and no receipt or gate result is invalidated by them.
+    CLOSING_COMMITS = "closing-commits"
+    #: An ancestor of HEAD, but reviewed files changed since. The handoff
+    #: describes a commit that is no longer the tip, and the difference is work.
+    STALE = "stale"
+    #: HEAD does not descend from the claim — a squash-merge, a rebase or a
+    #: branch switch. A different line of history, so nothing here can speak to
+    #: the claim either way. This is the ORDINARY state of an old handoff read
+    #: after its branch landed, and calling it wrong would train readers to
+    #: ignore the check.
+    NOT_ANCESTOR = "not-ancestor"
+    #: No such commit in this repo. A citation nobody can look up.
+    UNKNOWN_COMMIT = "unknown-commit"
+    #: git could not be asked.
+    UNREADABLE = "unreadable"
+
+
+def _claim_ancestry(
+    repo_root: Path, claimed: str, head: str
+) -> tuple[str, tuple[HeadClaimState, str] | None]:
+    """Resolve ``claimed`` and settle every relation that needs no delta.
+
+    Returns ``(full sha, verdict)``, where a verdict of None means "an ancestor
+    of HEAD, and the delta decides" — the one case the caller must go on to read
+    files for. Split out of :func:`head_claim_state` so each half stays under
+    ruff's return-count ceiling, which is a real signal here: the two halves ask
+    different questions of git and only one of them touches the tree.
+
+    The ancestor test is `merge-base` rather than `merge-base --is-ancestor`
+    deliberately. The latter answers by EXIT CODE, and rc=1 is its ordinary
+    "no" — which :func:`_git_result` prints as a git failure, putting a scary
+    line under a perfectly normal answer. Comparing the merge-base to the claim
+    asks the same question through a channel where "" means only "could not
+    read", which is the invariant every other caller here relies on.
+    """
+    # `^{commit}` rather than a bare rev-parse: a tag or a tree resolves fine
+    # without it, and a handoff claiming a non-commit object is claiming
+    # something no ancestry question below can be asked about.
+    full = _git(repo_root, "rev-parse", "--verify", f"{claimed}^{{commit}}")
+    if not full:
+        return "", (HeadClaimState.UNKNOWN_COMMIT, f"no commit {claimed[:12]} in this repo")
+    if full == head:
+        return full, (HeadClaimState.CURRENT, f"HEAD is {full[:12]}")
+    base = _git(repo_root, "merge-base", "--", full, head)
+    if not base:
+        return full, (
+            HeadClaimState.UNREADABLE,
+            f"the merge-base of {full[:12]} and HEAD could not be read",
+        )
+    if base != full:
+        return full, (
+            HeadClaimState.NOT_ANCESTOR,
+            (
+                f"HEAD ({head[:12]}) does not descend from {full[:12]} — a squash-merge, "
+                "a rebase or a branch switch, so nothing here can speak to the claim"
+            ),
+        )
+    return full, None
+
+
+def head_claim_state(repo_root: Path, claimed: str) -> tuple[HeadClaimState, str]:
+    """Return how ``claimed`` relates to HEAD, and a sentence saying why.
+
+    This exists because `/clear-prep` writes the handoff BEFORE it commits the
+    round's closing artifacts, so the HEAD it records is the parent of the
+    commit it is about to make — every round, structurally, not occasionally.
+    Nothing checked it, so the defect recurred silently until a later session
+    reconciled by hand and found the handoff a commit behind.
+
+    The ancestor test is `merge-base` rather than `merge-base --is-ancestor`
+    deliberately. The latter answers by EXIT CODE, and rc=1 is its ordinary
+    "no" — which :func:`_git_result` prints as a git failure, putting a scary
+    line under a perfectly normal answer. Comparing the merge-base to the claim
+    asks the same question through a channel where "" means only "could not
+    read", which is the invariant every other caller here relies on.
+    """
+    head = head_sha(repo_root)
+    if not head:
+        return HeadClaimState.UNREADABLE, "HEAD could not be read"
+    full, settled = _claim_ancestry(repo_root, claimed, head)
+    if settled is not None:
+        return settled
+    paths = _delta_paths(repo_root, full, head)
+    if paths is None:
+        return (
+            HeadClaimState.UNREADABLE,
+            f"the delta from {full[:12]} to HEAD could not be read",
+        )
+    reviewed = sorted(p for p in paths if not _is_exempt(p))
+    if reviewed:
+        return (
+            HeadClaimState.STALE,
+            f"HEAD is {head[:12]}, and {_summarise(reviewed)} changed since {full[:12]}",
+        )
+    # An empty delta is a real answer, not an absent one: an empty commit, or a
+    # range whose endpoints happen to hold identical trees. `_exempt_delta_note`
+    # words the same case the same way, and `_summarise([])` would render it as
+    # the empty string — a sentence that trails off where its evidence should be.
+    changed = _summarise(sorted(paths)) if paths else "nothing (an identical tree)"
+    return (
+        HeadClaimState.CLOSING_COMMITS,
+        (
+            f"HEAD is {head[:12]}; since {full[:12]} only {changed} changed "
+            "— the round's own closing artifacts, written after the handoff"
+        ),
+    )
 
 
 def _summarise(paths: list[str]) -> str:

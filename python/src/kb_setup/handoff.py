@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Verify a handoff's checkable claims — `mise run kb-handoff-check`.
 
-FIVE CHECKS, AND THEY ARE NOT ALL STATIC. Four ask the filesystem: do the cited
+SIX CHECKS, AND THEY ARE NOT ALL STATIC. Four ask the filesystem: do the cited
 paths exist (including whether a citation's EXTENSION is mistyped, #154), does
 anything match a citation whose middle is ELIDED (`review-8a46d08…-cold.md`,
 #148), is every `file:line` real, is every named task declared in `mise.toml`.
@@ -12,8 +12,19 @@ the tree, which is why a claim can come back UNVERIFIABLE here and never can for
 a path. This paragraph said "static claims" and enumerated only the first three
 until #157; `mise.toml` and `.claude/skills/clear-prep/SKILL.md` had already been
 corrected, so the source was the stale one — the worse direction. The count has
-now gone stale twice, which is why it is spelled out rather than left as "the
-checks below".
+now gone stale three times, which is why it is spelled out rather than left as
+"the checks below".
+
+The sixth asks GIT, and it is the only one about the handoff ITSELF rather than
+about something it cites: is the `- **HEAD**: `<sha>`` in its lead still the
+commit this repo is on (:func:`_check_head_claims`)? It exists because the
+answer was structurally NO. `/clear-prep` writes the handoff at its step 4b and
+commits the round's closing artifacts at step 5, so the recorded HEAD was the
+PARENT of the commit the handoff was written about — every round, not
+occasionally. Nothing checked it, so a later session reconciling by hand kept
+rediscovering the same one-commit lie. A handoff behind by nothing but
+`review.EXEMPT_PATHS` is AMBIGUOUS, not FAIL: those are precisely the paths that
+cannot invalidate a receipt or a gate result.
 
 WHAT THIS REPLACES. `/clear-prep` step 6 asks the agent to self-verify the
 handoff it has just written, at the end of a long session, from memory. That is
@@ -123,6 +134,60 @@ def check(repo_root: Path, text: str) -> list[Finding]:
     findings.extend(_check_line_ref(repo_root, c, index) for c in citations.line_citations(text))
     findings.extend(_check_tasks(text, declared))
     findings.extend(_check_gate_claims(repo_root, text, declared))
+    findings.extend(_check_head_claims(repo_root, text))
+    return findings
+
+
+#: What a `HEAD` claim's relation to the real HEAD MEANS for a handoff. Written
+#: as an exhaustive map rather than a chain of `if`s for the reason the gate
+#: version above gives: adding a state must be a type error, not a silent
+#: default to the strictest verdict.
+#:
+#: The split worth defending is CLOSING_COMMITS -> AMBIGUOUS. It is the case
+#: that recurs every round — `/clear-prep` writes the handoff, then commits the
+#: `kb-remember` output the handoff describes — and it is genuinely a caveat
+#: rather than a defect: `review.EXEMPT_PATHS` is exactly the set that cannot
+#: invalidate a receipt or a gate result, so the handoff's other claims still
+#: hold. Reporting it is what lets the next session stop rediscovering it by
+#: hand; FAILing it would block a ship over a memory file.
+#:
+#: NOT_ANCESTOR is UNVERIFIABLE, not FAIL, and that is not leniency. After
+#: `kb-land` squash-merges, EVERY handoff for the branch stops being an ancestor
+#: of `main` — the healthy end state. A checker that calls the normal case wrong
+#: is one people learn to ignore, which this module's own header warns about.
+_HEAD_VERDICT_OF: dict[review.HeadClaimState, Verdict] = {
+    review.HeadClaimState.CURRENT: Verdict.OK,
+    review.HeadClaimState.CLOSING_COMMITS: Verdict.AMBIGUOUS,
+    review.HeadClaimState.STALE: Verdict.FAIL,
+    review.HeadClaimState.NOT_ANCESTOR: Verdict.UNVERIFIABLE,
+    review.HeadClaimState.UNKNOWN_COMMIT: Verdict.FAIL,
+    review.HeadClaimState.UNREADABLE: Verdict.UNVERIFIABLE,
+}
+
+
+def _check_head_claims(repo_root: Path, text: str) -> list[Finding]:
+    """Check every `- **HEAD**: `<sha>`` in the lead against the commit git is on.
+
+    The sixth check, and the first that can catch a handoff which is wrong about
+    ITSELF rather than about something it cites. It closes a defect that was
+    structural in `/clear-prep`: the handoff is written at step 4b and the
+    round's closing artifacts are committed at step 5, so the recorded HEAD was
+    the parent of the commit the handoff was about — every round, and nothing
+    looked. Step 5 now says **"re-pin the handoff to the commit you just made"**
+    and this is the arm that proves it happened.
+
+    That sentence is quoted rather than paraphrased on purpose. The first draft
+    of this docstring said the skill "re-snapshots", which appeared nowhere in
+    `SKILL.md` — a comment asserting an instruction that did not exist, which is
+    the same class of defect as the one being fixed and is invisible to every
+    test here. Grep the skill for the quoted words before changing them.
+    """
+    findings: list[Finding] = []
+    for claim in citations.head_claims(text):
+        state, detail = review.head_claim_state(repo_root, claim.sha)
+        findings.append(
+            Finding("head", _HEAD_VERDICT_OF[state], f"HEAD `{claim.sha}`", claim.line, detail)
+        )
     return findings
 
 

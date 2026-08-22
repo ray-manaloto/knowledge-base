@@ -942,3 +942,61 @@ def test_an_extensionless_elided_token_is_still_not_a_citation():
     review lanes. Recall given up knowingly. (Spec lane, F2/F3.)
     """
     assert citations.elided_citations("see `review-bd30397…`\n") == []
+
+
+# --------------------------------------------------------- HEAD claims ----
+
+
+def test_a_head_label_in_the_lead_is_a_claim():
+    """Positive control for the negatives below."""
+    text = '# H\n\n- **HEAD**: `b499aecaf761` ("a message")\n\n## Detail\n'
+
+    assert [(c.sha, c.line) for c in citations.head_claims(text)] == [("b499aecaf761", 3)]
+
+
+def test_a_table_row_and_a_bare_label_are_claims_too():
+    """The three shapes this repo's handoffs actually write."""
+    for line in ("| HEAD | `abc1234` |", "HEAD: `abc1234`", "* **HEAD**: `abc1234`"):
+        assert [c.sha for c in citations.head_claims(f"# H\n\n{line}\n")] == ["abc1234"], line
+
+
+def test_the_word_head_in_prose_is_not_a_claim():
+    """A handoff says "HEAD" constantly. Only a LABEL binds a commit to it.
+
+    Every string here is from a real handoff or rule file in this repo.
+    """
+    prose = (
+        "# H\n\n"
+        "- pin the handoff to the current HEAD, `b499aecaf761` is the tip\n"
+        "- recorded at `abc1234`, but HEAD moved during the run\n"
+        "- the head: `abc1234` of the list\n"
+    )
+
+    assert citations.head_claims(prose) == []
+
+
+def test_a_commit_below_the_lead_is_not_a_head_claim():
+    """The body is full of other commits — a shipped table, a reconciliation.
+
+    Binding a HEAD claim to one of those would manufacture what is being tested.
+    """
+    text = "# H\n\n- **branch**: `work`\n\n## What shipped\n\n- **HEAD**: `b499aecaf761`\n"
+
+    assert citations.head_claims(text) == []
+
+
+def test_a_head_label_naming_a_ref_rather_than_a_commit_yields_nothing():
+    """`main` has moved since; reading it as a commit invents the binding."""
+    assert citations.head_claims("# H\n\n- **HEAD**: `main`\n") == []
+
+
+def test_only_the_first_commit_on_a_head_line_is_the_claim():
+    """What follows the sha is the author's gloss, not a second claim."""
+    text = "# H\n\n- **HEAD**: `abc1234` (was `def5678` before the amend)\n"
+
+    assert [c.sha for c in citations.head_claims(text)] == ["abc1234"]
+
+
+def test_a_bare_head_pipe_without_an_opening_pipe_is_not_a_table_row():
+    """The arm for splitting the regex in two rather than making `|` optional."""
+    assert citations.head_claims("# H\n\nHEAD | `abc1234`\n") == []

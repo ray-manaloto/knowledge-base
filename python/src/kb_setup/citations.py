@@ -215,6 +215,28 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
 #: heading, a table row, or a block quote. Blank lines break a block too.
 _BLOCK_BREAK_RE = re.compile(r"^\s*(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|\||>)")
 
+#: A line whose LABEL is `HEAD`, in the two shapes this repo's handoffs write:
+#: a labelled line (`- **HEAD**: `<sha>``, or bare `HEAD: `<sha>``) and a table
+#: row (`| HEAD | `<sha>` |`). The table arm is not speculative — `recorded_branch`
+#: documents a real `| branch | `main` |` row, so a State table is a shape these
+#: documents genuinely take, and a checker blind to it would be silently absent
+#: from exactly the handoffs that use one.
+#:
+#: ANCHORED, and the delimiter must follow the label IMMEDIATELY, because a
+#: handoff says the word "HEAD" in prose constantly — "HEAD moved during the
+#: run", "pin the handoff to the current HEAD" — and every one of those is
+#: commentary, not a claim about which commit the document describes. The two
+#: arms are spelled out separately rather than as one optional prefix so that a
+#: bare `HEAD |` cannot be read as a table row without its opening pipe.
+#:
+#: Case-sensitive: git spells it `HEAD`, and a lowercase "head:" is a sentence.
+_HEAD_CLAIM_RE = re.compile(
+    r"^[ \t]*(?:"
+    r"\|[ \t]*\*{0,2}HEAD\*{0,2}[ \t]*\|"
+    r"|(?:[-*+][ \t]+)?\*{0,2}HEAD\*{0,2}[ \t]*:"
+    r")"
+)
+
 #: The character an author writes for the part of a path they are abbreviating —
 #: almost always the tail of a sha inside an otherwise concrete report filename
 #: (`review-8a46d08…-cold.md`). It is in :data:`_NON_PATH_CHARS`, so a token
@@ -398,6 +420,20 @@ class GateClaim:
         commit" rather than as a wrong binding.
         """
         return self.shas[0] if len(self.shas) == 1 else ""
+
+
+@dataclass(frozen=True)
+class HeadClaim:
+    """A claim that the document's own HEAD is a particular commit.
+
+    NOT a citation, for the same reason :class:`BranchMention` is not: nothing
+    here can be answered by the filesystem. Whether the claimed commit is still
+    HEAD is a question for git, so `kb_setup.review` answers it and
+    `kb_setup.handoff` decides what the answer MEANS.
+    """
+
+    sha: str
+    line: int
 
 
 def strip_fences(text: str) -> str:
@@ -932,6 +968,36 @@ def gate_claims(text: str) -> list[GateClaim]:
                     continue
                 distributed.add((name, rc))
                 claims.append(GateClaim(name, rc, shas, line_of(cite.start())))
+    return claims
+
+
+def head_claims(text: str) -> list[HeadClaim]:
+    """Every claim in the LEAD that names the commit this document is about.
+
+    Scoped to :func:`document_lead` on that function's own stated grounds: the
+    lead is where a handoff states its coordinates, and this repo's
+    `uv run kb-setup session-state` block puts the branch, the HEAD sha and the
+    PR state there. The bound matters more here than for a branch, because the
+    body of a handoff is FULL of other commits — a "what shipped" table, a
+    reconciliation section, a gotcha quoting a review — and binding a HEAD claim
+    to any of them would manufacture the very thing the check exists to test.
+
+    The first commit-shaped span on the line wins. A real bullet reads
+    ``- **HEAD**: `b499aecaf761` ("merge the direction docs…")``, and anything
+    after the sha is the author's gloss, not a second claim.
+
+    A `HEAD` label with no commit-shaped span yields NOTHING rather than an
+    empty-sha claim: `- **HEAD**: `main`` binds to a ref that has moved since,
+    which is exactly what :data:`_COMMIT_RE` refuses to read as a commit.
+    """
+    claims: list[HeadClaim] = []
+    for i, line in enumerate(document_lead(text).split("\n")):
+        if not _HEAD_CLAIM_RE.match(line):
+            continue
+        for m in _SPAN_RE.finditer(line):
+            if _COMMIT_RE.match(m.group("body")):
+                claims.append(HeadClaim(m.group("body"), i + 1))
+                break
     return claims
 
 
