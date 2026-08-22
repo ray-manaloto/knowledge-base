@@ -905,7 +905,84 @@ setting, and task/lockfile/python fixes."""
 # `sources/mise.manifest` does not apply. Control-armed rather than assumed:
 # the outgoing manifest commit 084ca20b equals `v2.1.236^{commit}`, so the
 # derivation that produced it is the one used here.
-expected = "2.1.238"
+#
+# 2.1.238 -> 2.1.240, reviewed 2026-08-22 (Ray asked for the resync after
+# restarting the terminal onto the new build). TWO releases, and the asymmetry
+# is the first thing to know: **2.1.240's notes are one line** — "Bug fixes and
+# reliability improvements" — so it contributes NOTHING to review. Everything
+# below is 2.1.239, which is enormous (~70 entries). A silent release is not a
+# safe one; it is an unreviewable one, and saying so is the honest record.
+#
+# NINE items touch this repo:
+#
+# * **`ListAgents` gains two fixes, and they are FALSE-NEGATIVE fixes** — live
+#   teammates were not listed at all ("a reachable teammate looked absent"), and
+#   a session whose title starts with `/` was unaddressable by `SendMessage` and
+#   shown as "(untitled)". `ListAgents` is this repo's RECORDED way to establish
+#   subagent liveness (never `pgrep`). 2.1.238 fixed a phantom row — a false
+#   POSITIVE; these are the other direction, which is the worse one for a
+#   liveness probe: an absent row reads as "the agent died".
+# * **OpenTelemetry trace fragmentation on `PreToolUse`-deferred tools** is
+#   fixed — a deferred execution now resumes in the original turn's trace. This
+#   repo runs FIVE stateless `PreToolUse` Bash guards (`secret_guard`,
+#   `hook_guard`, `check_first`, `graph_first`, `absent_binary`), so every
+#   deferred tool call here was starting a new trace.
+# * **An agent/skill/command `.md` starting with a UTF-8 BOM was SILENTLY
+#   ignored.** Probed here: **0 of 75** instruction files carry one. Recorded
+#   with its control because the FIRST version of that probe was broken and
+#   could only ever answer 0 — `head -c3 | od -An -tx1` separates bytes with
+#   TWO spaces, so `grep "ef bb bf"` never matched. Re-armed with `tr -s ' '`:
+#   a deliberately BOM'd file is now DETECTED and `CLAUDE.md` is not.
+# * **`claudeMdExcludes` did not exclude a symlinked `.claude/rules` file.**
+#   Probed: **0 symlinks** under `.claude` (control: `find -type l` does return
+#   a link elsewhere, so the zero is real).
+# * **Hooks failed with `posix_spawn ENOENT` after the session's working
+#   directory was deleted**; they now run from the project root. Every hook here
+#   is `uv run kb-setup …` resolved from the repo root.
+# * **`/goal` check-in cadence CHANGED**: repeat check-ins on long-running
+#   background work now back off 30 min -> 1 h -> every 2 h. The 2.1.234 review
+#   above recorded the flat 30-minute cadence, so that note is now historical.
+#   Resuming from `claude --resume` also restores the active goal. `docs/goals/`
+#   and the `goal-engineering` skill rest on this page.
+# * **`/resume` no longer reorders a session merely because its file was
+#   touched.** Nothing to change — `kb-session-select` already refuses to treat
+#   mtime as when a session ran (birthtime, cross-checked against each
+#   transcript's own first record). Recorded because the harness has now moved
+#   to the same position this repo reached independently.
+# * **`claude -c`/resume picked up sessions from a directory differing only by
+#   `_`, `-` or `.`.** The per-project transcript directory here is
+#   `-Users-rmanaloto-dev-github-ray-manaloto-knowledge-base` — all hyphens —
+#   and `kb_setup.distill` plus the session-review workflow read that path.
+# * **Alpine/musl add-ons now load** (musl-built binaries instead of glibc ones
+#   the runtime refused). Cross-referenced only: the musl class this repo tracks
+#   through bot reviews (#385/#391) is about `mise.lock`'s conda portability
+#   slots and is NOT this — recorded so the coincidence of the word is not read
+#   as a fix for it.
+#
+# Not actionable, recorded so it is not re-run: **`/claude-api upgrade`**
+# (2.1.239) migrates a Python project from `anthropic` 0.x to 1.x. This repo
+# already declares `anthropic>=1.0.0`, added in the 2026-08-21 pin-sync round.
+#
+# THE CLI CONTRACT DID NOT MOVE, measured rather than assumed: `claude --help`
+# hashes to 71ad650f… at 2.1.240 — byte-identical to the value 2.1.232 through
+# 2.1.238 recorded — re-hashed against the INSTALLED binary through
+# `graphify_semantic_slice.claude_child_environment` rather than a shell. That
+# is the SIXTH consecutive advance with this shape, and it is what makes
+# `_CURRENT_CLAUDE_VERSION`'s advance a re-record rather than a review.
+#
+# `v2.1.240` is LIGHTWEIGHT too — `git ls-remote` returns one row,
+# 5cfc0a19, with no `^{}` peel. Control-armed rather than assumed: the same
+# command shape on `v2.1.238` returns one row equal to 8a8e81d0, the commit the
+# outgoing manifest already records, so this derivation is the one that produced
+# it.
+#
+# One non-finding, recorded so nobody chases it: `shutil.which("claude")` now
+# answers `~/.local/bin/claude` where the 2.1.238 note says
+# `~/.local/share/claude/versions/2.1.238`. That is not an installer-layout
+# change — `~/.local/bin/claude` is a SYMLINK to
+# `~/.local/share/claude/versions/2.1.240`, and the digest is of the target
+# either way, since `Path.read_bytes()` follows it.
+expected = "2.1.240"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted

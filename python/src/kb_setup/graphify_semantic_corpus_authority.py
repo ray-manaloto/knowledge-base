@@ -606,10 +606,54 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # same class — a frozen-evidence constant applied to the non-authority path —
 # but it has a different owner and changing it is a judgement about what the
 # authority split means, not a typo repair.
+#
+# RE-RECORDED 2026-08-22 for claude 2.1.238 -> 2.1.240, and for NOTHING ELSE.
+# graphify stays at 0.9.48; the only input that moved is `_CURRENT_CLAUDE_*` in
+# `graphify_semantic_slice.py`, which the execution config carries.
+#
+# RAY'S RULING — measure the admitted inventory first, re-record only if it is
+# unchanged — is met, and met by a TWO-ARM measurement rather than by re-quoting
+# counts from the last re-record. Both arms build the real plan through
+# `plan_source` with the real `planned_max_output_tokens` resolver, differing
+# ONLY in the claude constants:
+#
+#   member                  control (2.1.238)   this change (2.1.240)
+#   advisories.json         ff7323b1…          ff7323b1…   UNCHANGED
+#   exclusions.json         1a63e483…          1a63e483…   UNCHANGED
+#   chunk-ledger.json       37aaa462…          37aaa462…   UNCHANGED
+#   source-inventory.json   f626c002…          f626c002…   UNCHANGED
+#   execution-config.json   83a1fc8d…          710dbbfb…   moved
+#   manifest.json           25612cb4…          b4b741b5…   moved
+#
+# `source-inventory.json` and `chunk-ledger.json` coming back BYTE-IDENTICAL is
+# a stronger statement than the counts the ruling asks for, and it subsumes them:
+# `detected_source_count`, `discovered_unit_count`, `admitted_unit_count`,
+# `unit_count`, `token_budget`, `source_ref`/`source_commit`, the chunk count and
+# the SET digest of every unit path were each compared and each identical. An
+# inventory cannot be unchanged in every field and changed as a set while its
+# whole file digest holds.
+#
+# THE CONTROL ARM ALSO PROVES THE RECORDED AUTHORITY IS THIS PLAN, not a
+# look-alike — the same check the 0.9.48 re-record made. The control's
+# `execution-config.json` (83a1fc8d…) and `manifest.json` (25612cb4…) are
+# EXACTLY the two values being replaced below, so the plan on disk at 2.1.238 is
+# the authorized one and the two moving digests are the only delta.
+#
+# The two that moved are identity, not judgement: the claude version and
+# executable digest live in the execution config, and the manifest contains that
+# config's digest. `advisories_sha256` and `exclusions_sha256` have still never
+# changed, which is the invariant this block has asserted since it was written.
+#
+# WHY THIS RE-RECORD EXISTS AT ALL, since the alternative was cheaper: advancing
+# `_CURRENT_CLAUDE_VERSION` un-authorizes the plan, and `verify_plan` then emits
+# `plan-authority-mismatch` with its two companions — which is ONE blocker, not
+# three (they are constructed inside the same `if not authorized` branch). The
+# cheap alternative was to leave the constant at 2.1.238 and file the drift, but
+# that asserts an identity the host contradicts. Ray ruled re-record, 2026-08-22.
 AUTHORITY_JSON = (
     b'{"advisories_sha256":"ff7323b1921752cf195f0869b17f348903ffd8a196248be3c5edcece4fcc93d9",'
-    b'"execution_config_sha256":"83a1fc8da307c9f86daa414ff064b9135eda4066a54644ae9ce93230b635bc92",'
+    b'"execution_config_sha256":"710dbbfb2d15ac05c9857bd6f0e14ed03a9b7a858e85936a9adbda568938d9da",'
     b'"exclusions_sha256":"1a63e48336f7130a1f68c57340706fd5cea3cbacf12c363bb339a7cae3e5b67e",'
-    b'"plan_manifest_sha256":"25612cb450dcdb4e538c1e92b46a42a0db8f83223761659e98c5b19c57ef7d03",'
+    b'"plan_manifest_sha256":"b4b741b5f0bb992c16f42b57f1e855c751e2de1c331dde1f979c1b80c8fad719",'
     b'"schema_version":1}\n'
 )
