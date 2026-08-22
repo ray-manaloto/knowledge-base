@@ -1,6 +1,6 @@
 ---
 name: clear-prep
-description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. Use it PROACTIVELY, without being asked, as soon as the session's context passes ~20% of the model's window, or when a round is ending — PR open and gates green, BEFORE kb-land (the corpus loop must close while the reviewed commit is still an ancestor) — or whenever the user asks to /clear, asks for a handoff or a wrap-up, or asks what the next session should do; and explicitly as /clear-prep [next-task]. It prepares the handoff and then ASKS the user to /clear; it never clears."
+description: "Prepare for a /clear in the knowledge-base repo: drive the next task to zero ambiguity, close the corpus loop (kb-remember + kb-reflect + kb-goal-outcome) BEFORE shipping, sync docs, persist memory + a self-sufficient handoff, and emit a one-line resume prompt. MAIN SESSION THREAD ONLY — never from a subagent, fork, or agent team. Use it PROACTIVELY, without being asked, when a round is ending (PR open and gates green, BEFORE kb-land, so the corpus loop closes while the reviewed commit is still an ancestor); whenever the user asks to /clear, asks for a handoff or a wrap-up, or asks what the next session should do; explicitly as /clear-prep [next-task]; and on a context threshold you must MEASURE with `mise run kb-context` rather than estimate — the token countdown in your context is a SPEND BUDGET, not window occupancy, so it will read as roomy at 48% full. It prepares the handoff and then ASKS the user to /clear; it never clears."
 disable-model-invocation: false
 argument-hint: "[one-line description of the next task, optional]"
 ---
@@ -11,6 +11,31 @@ Run this **before** `/clear` so the next session loses nothing. Three jobs, in
 this order: (1) find out what the next task actually is, (2) put everything
 worth keeping somewhere that survives the clear, (3) print one line to paste
 afterwards.
+
+## The context trigger: MEASURE it, and only on the main thread
+
+**You cannot see your own context occupancy, and the number you CAN see is a
+different quantity.** The "~20% of the window" trigger never once fired, because
+nothing reports what it names: the only context-ish signal a session gets is
+`<total_tokens>N tokens left</total_tokens>`, a **spend budget**. Measured on
+transcript `672f23a4` — real occupancy **475,917, 47.6% of a 1M window**, while
+that reminder read **14,981,005 of 15,000,000 left, 99.9% remaining**, so a
+session concludes it has room at twice the threshold. Flipping
+`disable-model-invocation` could not fix that: the flag governs whether you MAY
+invoke this skill, not whether you can tell the condition holds.
+
+So the trigger is `mise run kb-context`, never an estimate — run it when a round
+feels long, after a large read or fan-out, and before deciding you have room.
+Exit **10** at or over threshold · **0** under · **127** could not measure (which
+is *not* "you are fine") · **3** not the main thread — reserved and UNREACHABLE,
+`CHILD_MARKERS` being empty since #451, which is why the next line enforces it.
+
+**Main session thread only** (Ray, 2026-08-21: *"not on subtasks or spawned
+agents or agent teams"*) — **nothing tells you which you are, so this instruction
+IS the enforcement.** A fork carries its parent's session id and transcript, and
+the two env vars that looked like the answer are a Bash-subprocess marker and an
+operator enable-flag, set on the main thread too — so `kb-context` refused there
+100% of the time until 2026-08-22 (#451). If you are a subagent, report back.
 
 `$ARGUMENTS` is the next task, if the user named one. If it is empty, infer the
 next task from open issues and the prior handoff, and *say what you inferred* —
@@ -175,19 +200,14 @@ Read its output as **leads**. It always exits 0 and gates nothing; an
 undistilled probe is a statement about future cost, not a failure. **Nothing to
 propose is the common, correct result** — a session of one-off work should
 produce an empty report, and that is what makes a non-empty one worth reading.
-The measured backdrop: 785 ad-hoc scripts across 40 sessions, of which
-`python/src/kb_setup` (patch a source file, run tests, restore) is the largest
-group — i.e. the mutation harness, hand-written five times and still tracked as
-open in #160.
-
 **`kb-session-reflect` is the fourth, and it asks what distill cannot.** distill
-is a FREQUENCY miner — it groups scripts across 50 sessions by import signature,
-so it answers *was a program written twice?* A step done by hand ONCE, in one
+is a FREQUENCY miner — it groups scripts across sessions by import signature, so
+it answers *was a program written twice?* A step done by hand ONCE, in one
 session, has no frequency to mine and is invisible to it: a directive violated
 at a rate, a probe that answered without asking, a run of adjacent tasks wanting
-one wrapper. That gap has a number on it — distill's largest group is now **149**
-hand-written mutation harnesses across 21 sessions, every one a fresh scratchpad,
-while `kb-arms` has existed to replace them since #160.
+one wrapper. Its largest group is the hand-written mutation harness, rebuilt as
+a fresh scratchpad every round while `kb-arms` has existed to replace it since issue
+160 — re-derive that count from a live run rather than repeating one here.
 
 Both read the same transcripts through one reader (`distill.tool_uses`), and
 both are advisory. Read `.claude/skills/kb-session-reflect/SKILL.md` when a
@@ -264,7 +284,8 @@ rather than overwriting an existing handoff for the same day.
 
 It must be **self-sufficient**: step 7's resume prompt only points here, so
 everything the next session needs is in this file. Include state at handoff
-(branch, PR, gate results with their real exit codes), what shipped, the next
+(branch, a backticked-sha `- **HEAD**:` bullet in the lead, PR, gate results
+with their real exit codes), what shipped, the next
 task with preload pointers, and the gotchas — especially any probe that
 misled you, since that is what the next session would otherwise repeat.
 
@@ -328,6 +349,13 @@ Stage specific paths rather than `git add .`. If you are on `main`, branch
 and the next commit lands on the default branch (`do-not.md` #7). Open a PR only
 if the user asked; the handoff and auto-memory are not committed.
 
+**Then re-pin the handoff to the commit you just made.** Step 4b wrote its
+`- **HEAD**:` bullet before this commit existed, so it names that commit's
+PARENT — every round, by construction, since what you are committing IS step 2's
+`kb-remember` output. Re-run `uv run kb-setup session-state`; correct the sha and
+the ahead-count. It costs nothing — `.agent/` is gitignored, so the handoff is
+never committed and there was no ordering paradox, only a missing step.
+
 ## 6. Self-verify the handoff against reality
 
 The handoff is written from memory, and a wrong detail costs the next session
@@ -348,6 +376,9 @@ more than a missing one. Before printing the resume prompt:
   contradicts you; `UNVER` nothing can speak to it (no record at that commit, or
   that gate was not in the run); `AMBIG` it holds with a caveat — usually that
   the tree was dirty, so the result describes that tree and not the commit;
+- **the HEAD in its lead is still HEAD** — `kb-handoff-check`'s `head` row FAILS
+  one behind by real work, AMBIGs one behind by only `review.EXEMPT_PATHS` (step
+  5's closing commit), and UNVERs one whose branch was squash-merged away;
 - every number it repeats was measured *this* session, or is labelled as
   inherited and unverified (`probes-need-a-control-arm.md` rule 6).
 
@@ -379,9 +410,8 @@ that i can just run a slash command and/or skill on the next session that just
 knows how to jump to handoff so there is less copy/paste needed."*
 
 **Print this line even when the round ended untidily.** It was skipped on
-2026-08-19 and the next session had no idea where to start, which is the whole
-failure this step exists to prevent. A handoff nobody is told to read is a
-handoff nobody reads.
+2026-08-19 and the next session had no idea where to start. A handoff nobody is
+told to read is a handoff nobody reads.
 
 The older form still works when the next session should read a SPECIFIC handoff
 rather than the newest:
@@ -390,10 +420,9 @@ rather than the newest:
 Read and follow .agent/plans/session-<date>.md
 ```
 
-(`/kb-resume <path>` does the same and keeps the repo checks.) It is no use on
-a fresh clone: `.agent/` is gitignored, so a missing `.agent/` directory has no
-handoff to point at. `/kb-resume` handles that case itself, falling back to the
-newest tracked `docs/direction/*.md` plus `git log`, so `/kb-resume` stays the
+(`/kb-resume <path>` does the same and keeps the repo checks.) On a fresh clone
+`.agent/` is gitignored and there is no handoff to point at; `/kb-resume` falls
+back to the newest tracked `docs/direction/*.md` plus `git log`, so it stays the
 right prompt to print either way.
 
 **Then ASK the user to `/clear` — via `AskUserQuestion`, never in prose, and
@@ -432,9 +461,6 @@ This repo can measure its own skills, so use that rather than taste:
   description is not. For this skill the dimension was inert while it was
   human-only; since 2026-08-21 it measures a real trigger (see the banner), so
   re-baseline after the description change and read the Δ.
-- SkillOpt's mutable marketplace plugin is disabled while its immutable
-  provenance/API contract is established. `/skillopt-sleep` is intentionally
-  unavailable until a later project-local adapter preserves explicit adoption.
 - The durable record of how a round went is `mise run kb-remember` (step 2), not
   a comment in this file.
 
@@ -451,13 +477,11 @@ This repo can measure its own skills, so use that rather than taste:
 - [ ] Every findings-bearing agent report on disk verbatim; load-bearing ones promoted to `docs/research/`.
 - [ ] Auto-memory written + `MEMORY.md` pointer added.
 - [ ] Handoff written and self-verified (paths, `file:line`, task names, gate rcs, inherited numbers labelled).
-- [ ] Branch is not `main`; commit made if appropriate.
+- [ ] Branch is not `main`; commit made if appropriate — then the handoff's HEAD re-pinned to it (step 5).
 - [ ] Resume prompt printed — `/kb-resume` (skipped on 2026-08-19; the next session had no idea where to start).
 - [ ] Step 7's `AskUserQuestion` was PUT to the user and the answer recorded — `/clear now` **or** `not yet`; both are valid outcomes, and only the user ever clears.
 
 ## See also
-
-Related skills and rules this one defers to rather than restating:
 
 - `.claude/skills/kb-review/SKILL.md` — the review that must precede `kb-ship`;
   its receipt is what step 2's ordering trap is about.

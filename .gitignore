@@ -113,6 +113,14 @@ graphify-out/.build-failure.json
 # reports "prior count unknown" and re-establishes it.
 graphify-out/.graph-counts.json
 graphify-out/.merge-counts.tmp.json
+# The marker `graphify label` drops when it SKIPS the HTML export because the graph
+# is past `GRAPHIFY_VIZ_NODE_LIMIT` (5,000 nodes; the aggregate is ~492k, so this is
+# the permanent state here, not an anomaly). Derived and machine-local like every
+# other line above. Listed for the same reason the two before it are: this directory
+# is an ALLOWLIST, not a wildcard, so each new derived artifact surfaces as untracked
+# exactly once and a human decides. `graphify-out/.graphify_*` does not cover it —
+# the name does not start with `.graphify`. First appeared 2026-08-21.
+graphify-out/.graph.html.stale
 # committed under graphify-out/: ONLY memory/ (authored work-memory).
 # graph.json / manifest.json / .graphify_* (labels, learning overlay) are derived.
 

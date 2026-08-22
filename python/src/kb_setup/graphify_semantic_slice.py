@@ -491,9 +491,25 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # That is the FIFTH consecutive advance with this shape, which is the whole
 # reason the shape is worth stating: it is what makes a version bump a
 # re-record rather than a review.
-_CURRENT_CLAUDE_VERSION = "2.1.238"
+#
+# 2.1.238 -> 2.1.240 advanced 2026-08-22, same shape, SIXTH consecutive. Measured
+# through this module's own `claude_child_environment`, not a shell:
+# `--version` reports `2.1.240 (Claude Code)` and the digest below is
+# `sha256(Path(which("claude")).read_bytes())`.
+#
+# `shutil.which("claude")` now answers `~/.local/bin/claude` where the note above
+# says `~/.local/share/claude/versions/2.1.238`. NOT an installer-layout change:
+# `~/.local/bin/claude` is a SYMLINK to `~/.local/share/claude/versions/2.1.240`,
+# and `Path.read_bytes()` follows it, so the digest is of the same target file
+# either way. Recorded because two different-looking paths across two notes is
+# exactly the shape someone re-derives.
+#
+# THE `--help` DIGEST DID NOT MOVE — still 71ad650f…, the value 2.1.232 through
+# 2.1.238 all recorded, re-hashed against the INSTALLED 2.1.240. So every flag
+# this path depends on is spelled identically and only the implementation moved.
+_CURRENT_CLAUDE_VERSION = "2.1.240"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "1c196c456373b57818ae87df84aecee96cb659448c0d6a6bbb401ac5758431b2"
+    "8917e01c99ea0ce6ed887a1729a4cda693c758fe542747be71756987b145c772"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (

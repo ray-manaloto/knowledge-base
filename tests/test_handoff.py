@@ -1144,3 +1144,119 @@ def test_handoff_int_wrapper_is_exit_code_of_boundary(tmp_path: Path):
 
     for args in ([str(root / "ok.md")], [str(root / "bad.md")], [str(root / "gone.md")]):
         assert handoff.main(args, root) == exit_code(handoff.check_handoff(args, root))
+
+
+# --------------------------------------------------------- HEAD claims ----
+#
+# The sixth check, and the only one about the handoff ITSELF. Every arm below
+# uses the `git` fixture rather than a bare tmp_path, because the question is
+# ancestry and a directory has none. The five states share one shape so that a
+# verdict difference is visibly the STATE's doing and not the fixture's.
+
+
+def _head_findings(root: Path, sha: str) -> list[handoff.Finding]:
+    text = f"# Session handoff\n\n- **branch**: `work`\n- **HEAD**: `{sha}`\n\n## Detail\n"
+    return [f for f in handoff.check(root, text) if f.check == "head"]
+
+
+def test_a_head_claim_naming_the_current_commit_is_ok(commit_file, tmp_path: Path):
+    """Positive control for every HEAD arm below — without it they prove nothing."""
+    sha = commit_file("docs/a.md")
+
+    got = _head_findings(tmp_path, sha)
+
+    assert [f.verdict for f in got] == [handoff.Verdict.OK]
+
+
+def test_a_head_claim_behind_by_only_exempt_paths_is_ambiguous_not_broken(
+    commit_file, tmp_path: Path
+):
+    """THE RECURRING CASE: the handoff names its own closing commit's parent.
+
+    `/clear-prep` writes the handoff at step 4b and commits the `kb-remember`
+    output at step 5, so the recorded HEAD is that commit's parent every round.
+
+    AMBIGUOUS rather than FAIL because `review.EXEMPT_PATHS` is exactly the set
+    that cannot invalidate a receipt or a gate result — and because a check that
+    blocks a ship over a `kb-remember` file is one people route around.
+    """
+    sha = commit_file("docs/a.md")
+    commit_file("graphify-out/memory/query_20260822_x.md")
+
+    got = _head_findings(tmp_path, sha)
+
+    assert [f.verdict for f in got] == [handoff.Verdict.AMBIGUOUS]
+    assert "closing artifacts" in got[0].detail
+
+
+def test_a_head_claim_behind_by_reviewed_work_fails(commit_file, tmp_path: Path):
+    """The arm that proves the test above is not just "behind is always AMBIG".
+
+    Same shape, same distance behind — only the PATH of the later commit differs.
+    """
+    sha = commit_file("docs/a.md")
+    commit_file("python/src/kb_setup/thing.py")
+
+    got = _head_findings(tmp_path, sha)
+
+    assert [f.verdict for f in got] == [handoff.Verdict.FAIL]
+    assert "python/src/kb_setup/thing.py" in got[0].detail
+
+
+def test_a_head_claim_mixing_exempt_and_reviewed_paths_fails(git, commit_file, tmp_path: Path):
+    """One reviewed path is enough. A delta is exempt only if ALL of it is.
+
+    Without this arm the exempt branch could be reached by an `any()` and the
+    two tests above would both still pass.
+    """
+    sha = commit_file("docs/a.md")
+    (tmp_path / "graphify-out" / "memory").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "graphify-out" / "memory" / "q.md").write_text("x\n", encoding="utf-8")
+    (tmp_path / "python").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "python" / "thing.py").write_text("x\n", encoding="utf-8")
+    git("add", "--", "graphify-out/memory/q.md", "python/thing.py")
+    git("commit", "-q", "-m", "both")
+
+    got = _head_findings(tmp_path, sha)
+
+    assert [f.verdict for f in got] == [handoff.Verdict.FAIL]
+
+
+def test_a_head_claim_on_another_line_of_history_is_unverifiable(git, commit_file, tmp_path: Path):
+    """A squash-merge, a rebase or a branch switch — the ORDINARY end state.
+
+    `kb-land` squash-merges, so after it every handoff for the landed branch
+    names a commit `main` does not descend from. Calling that wrong would train
+    readers to ignore the check, which this module's header warns against.
+    """
+    git("checkout", "-q", "-b", "other")
+    elsewhere = commit_file("docs/other.md")
+    git("checkout", "-q", "work")
+    commit_file("docs/a.md")
+
+    got = _head_findings(tmp_path, elsewhere)
+
+    assert [f.verdict for f in got] == [handoff.Verdict.UNVERIFIABLE]
+
+
+def test_a_head_claim_naming_no_such_commit_fails(commit_file, tmp_path: Path):
+    """A sha nobody can look up is a broken citation, the same class as a path."""
+    commit_file("docs/a.md")
+
+    got = _head_findings(tmp_path, "0" * 40)
+
+    assert [f.verdict for f in got] == [handoff.Verdict.FAIL]
+
+
+def test_a_stale_head_claim_makes_the_run_exit_1(commit_file, tmp_path: Path):
+    """The strict/advisory split, end to end: STALE is wrongness, so it exits 1.
+
+    Asserted at `main` rather than inferred from the verdict, because the exit
+    code is what `kb-ship` reads.
+    """
+    sha = commit_file("docs/a.md")
+    commit_file("python/thing.py")
+    body = f"# Session handoff\n\n- **branch**: `work`\n- **HEAD**: `{sha}`\n\n## Detail\n"
+    (tmp_path / "h.md").write_text(body, encoding="utf-8")
+
+    assert handoff.main([str(tmp_path / "h.md")], tmp_path) == 1

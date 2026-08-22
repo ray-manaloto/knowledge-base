@@ -380,6 +380,21 @@ description = "Eval harness: tiers 1+2 (offline, gated). `-- --live` lane doctor
 #      rediscovering: `mise env --json-extended` reports `source=None` for all
 #      three while naming the file for ordinary `[env]` vars, so do not expect it
 #      to attribute a plugin-provided directive.
+#
+#      ⚠️ CORRECTION, 2026-08-21: item 1's ATTRIBUTION is stale. `_.fnox-env` is
+#      COMMENTED OUT in `~/.config/mise/config.toml` (now line 90), and the
+#      plugin, while still registered under `[plugins]`, is deliberately
+#      disabled — enabling it spawned runaway `fnox config-files` subprocesses
+#      (10+ concurrent at 100% CPU, login shells hanging;
+#      macos-development-environment#75). Secrets reach the shell through
+#      `fnox activate zsh`'s chpwd/precmd hooks instead, so by the time mise runs
+#      they are ORDINARY INHERITED ENV VARS, not a mise env directive. The arm
+#      described above was sound when it ran; the config changed under it. The
+#      redaction EFFECT below is unaffected and still bites — only the cause
+#      named here is wrong. Item 3 is stale too: `env = "exec"` was reversed to
+#      `env = true` (dotfiles' own rule file dates that 2026-08-02), so all ~50
+#      credentials are in the shell again. Full chain and the agent contract:
+#      `docs/secrets.md`.
 #   2. Before 2026-07-27, fnox defaulted to `env = true` and exposed all 49
 #      declared secrets, several with short values (one-character telemetry
 #      flags). The literal string `1` was therefore IN the redaction set.
@@ -1029,6 +1044,18 @@ description = 'Await terminal checks + review receipt → SHA-pinned squash-merg
 # so a commit pushed between check and merge cannot ride in unverified. No main-CI
 # watch and no container re-validation — this repo has neither. Logic in kb_setup.pr.
 run = "uv run kb-setup land"
+
+[tasks.kb-context]
+description = 'Report this session CONTEXT-WINDOW occupancy: mise run kb-context'
+# The /clear-prep trigger ("context past ~20% of the window") was UNOBSERVABLE from
+# inside a session: the only signal a model gets is `<total_tokens>N tokens left`,
+# which is a SPEND BUDGET, not window occupancy. Measured on transcript 672f23a4:
+# real occupancy peaked at 475,917 (47.6% of a 1M window) while that reminder read
+# 14,981,005/15,000,000 left — 99.9% remaining. A trigger nothing reports can never
+# fire. This task is what makes the condition checkable. Logic in
+# kb_setup.context_usage. Exit codes are a SIGNAL, never a gate: 0 under, 10 at or
+# over the threshold, 3 not the main thread, 127 could not measure.
+run = "uv run kb-setup context"
 
 [tasks.kb-manifest-add]
 description = 'Pin a new repo source: mise run kb-manifest-add -- <url> [--ref R --kind K --name N --comment C --force]'

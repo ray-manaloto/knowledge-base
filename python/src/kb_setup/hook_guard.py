@@ -280,13 +280,25 @@ def check_hook_call(raw: str) -> Result[str | None]:
         return Ok(None)
     tool_input = payload.get("tool_input") or {}
     if tool_name == "Bash":
-        # ORDER IS THE CONTRACT, so the guards are a sequence rather than three
-        # `if reason: return` blocks — a fourth would have been a fourth return,
-        # and the third already pushed this function past the return-count limit.
+        # ORDER IS THE CONTRACT, so the guards are a sequence rather than a stack
+        # of `if reason: return` blocks — each addition would otherwise be another
+        # return, and the third already pushed this function past the limit.
         # Each is STATELESS and they run before the stateful graph-first check;
         # among themselves the oldest and most specific remedy wins, so a command
         # that trips two reports the one whose advice is narrower.
-        for guard in (_graphify_redirect, _check_first, _stage_explicitly, _absent_binary):
+        #
+        # `_secret_guard` is the ONE exception to that ordering rule and goes
+        # FIRST (#441). The others compete on whose advice is better; this one is
+        # not advice. A credential printed into a transcript is irreversible —
+        # stored, searched, fed onward — so if a command both leaks a value and
+        # hand-runs a gate, the leak is the thing to say.
+        for guard in (
+            _secret_guard,
+            _graphify_redirect,
+            _check_first,
+            _stage_explicitly,
+            _absent_binary,
+        ):
             reason = guard(tool_input)
             if reason:
                 return Ok(reason)
@@ -344,6 +356,27 @@ def _stage_explicitly(tool_input: dict) -> str | None:
         from kb_setup import stage_explicitly
 
         return stage_explicitly.decide(command)
+    except Exception:
+        return None
+
+
+def _secret_guard(tool_input: dict) -> str | None:
+    """Deny a command that would PRINT a credential value. Never raises.
+
+    FIRST of the stateless Bash guards, and the only one whose ordering is about
+    harm rather than about advice. The other three redirect you to a better way
+    of doing what you meant; this one stops an irreversible disclosure — once a
+    value is in the transcript it is stored, searched and fed onward, and no
+    later remedy unsends it. A command that trips this AND a gate redirect must
+    report this one.
+    """
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return None
+    try:
+        from kb_setup import secret_guard
+
+        return secret_guard.decide(command)
     except Exception:
         return None
 

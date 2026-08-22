@@ -120,7 +120,7 @@ relay only rewrites JSON-RPC on the child's pipes, so it could not enforce the
 allowlist over a listener socket, and serving unfiltered under a "narrowed to N"
 banner is worse than not filtering.
 
-### The HOSTED server in `.mcp.json` is an INTERIM BRIDGE — delete it on the condition below
+### The HOSTED server in `.mcp.json` is an INTERIM BRIDGE — delete the ENTRY on the condition below
 
 `.mcp.json` registers `graphify` at `https://api.graphify.com/mcp` (Ray's self-hosted
 workspace, OAuth on first use, no key). It is **not** the server above and does not serve
@@ -128,14 +128,52 @@ this corpus:
 
 | | `mise run kb-serve` | `.mcp.json` → `api.graphify.com` |
 |---|---|---|
-| content | the 71-source aggregate corpus | **this repository's own code** (9.2K nodes) |
-| tools | 10 + 6 resources | `query_graph`, `get_node`, `path`, `explain_style` |
+| content | the 71-source aggregate corpus | a **workspace of TWO repos** — `ray-manaloto/knowledge-base` (10,497 nodes) and `ray-manaloto/dotfiles` (7,776), both `queryable: true` |
+| tools | 10 + 6 resources | **23** — `query_graph`, `graphify_node`, `shortest_path`, `graphify_trace`, `impact_and_risk`, `remember`/`recall`, … |
 | built from | `graphify-out/graph.json` | the workspace's index of `main` |
 
+Both right-hand cells are **re-measured, not carried** (`list_repositories`, 2026-08-22).
+The row previously read *"this repository's own code (9.2K nodes)"* and named four tools
+(`get_node`, `path`, `explain_style`) that **do not exist on the live surface** — the node
+count had moved, the tool names were never these, and the second repository went unmentioned,
+so an agent reading this table could not have predicted what it would reach. Node counts go
+stale by construction; the durable facts are *two repos, not one* and *a workspace index of
+`main`, not this corpus*.
+
 It exists because `graphify-out/graph.json` was missing and `kb-build` fails closed
-(#289), so the repo had no queryable graph at all. **Delete `.mcp.json` when
+(#289), so the repo had no queryable graph at all. **Delete the `graphify` ENTRY when
 `mise run kb-query` exits 0 against a freshly built graph** — that is the whole exit
 condition.
+
+**The entry, not the file.** Since 2026-08-22 (`25cb30f7`) `.mcp.json` also registers
+`repowise`, which is a permanent registration with its own justification (`sources/REGISTRY.md`
+row 108) and no exit condition. This paragraph said *"delete `.mcp.json`"* until that sentence
+became an instruction to destroy an unrelated registration.
+
+**Exit condition RE-TESTED 2026-08-22 — half met, so the entry stays for now.** The
+2026-08-17 session review's finding C4 was that nobody had ever re-tested it; this is that
+test, recorded so the next session reads a measurement instead of re-deriving one.
+
+| half | verdict | evidence |
+|---|---|---|
+| `mise run kb-query` exits 0 | **MET** | `rc=0`, read directly from `$?` with no pipe |
+| against a **freshly built** graph | **NOT MET** | `graphify-out/.currency-stamp.json` is **absent** — no successful build has stamped here — while `graphify-out/.build-failure.json` records `stage: build`, `failed_at: 2026-08-21T17:56:05Z`. A `graph.json` exists (772 MB, later mtime) but was written by something other than a successful `kb-build`, which is precisely the state `kb-currency-check` reports as *version unknown* rather than green |
+
+The blocker is no longer #289's detect preflight (`5308c69c` cleared that) but #397/#417 —
+three `pyproject.toml` sources producing zero nodes. **Note that #289 is still OPEN**: the
+2026-08-17 review recorded it as "closed two commits later", and its timeline carries no
+`closed` event at all (control-armed against #242, which returns `closed 2026-08-08`). A fix
+landing is not an issue closing, and the exit condition tracks the *build*, not the ticket.
+
+**Whether this entry should have been registered at all is UNSETTLED and is Ray's call**,
+not this document's — it sits against his 2026-08-02 directive (*"we should be integrating
+the graphify python library instead of the graphify cli/mcp"*) and against CLAUDE.md
+invariant 4, which describes one MCP server per graph. That invariant now DOES acknowledge
+this one — `CLAUDE.md:25-27` records that `.mcp.json` also registers a hosted graphify and
+that it is a 2-repo workspace rather than this corpus. The sentence here said it did not,
+which was true when written and stale by the time #450 landed the note.
+Tracked as **#450**, which carries the three dispositions and the measurements above; do
+not resolve it by editing this file.
 
 Two things that make this safe to commit rather than hide: Claude Code **prompts** before
 using a project-scoped MCP server, so no clone is silently connected; and any machine can

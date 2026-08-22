@@ -1014,6 +1014,7 @@ codegen = [
     { name = "datamodel-code-generator" },
 ]
 dev = [
+    { name = "mcp2cli" },
     { name = "pytest" },
     { name = "pytest-xdist" },
     { name = "ruff" },
@@ -1035,6 +1036,7 @@ provides-extras = ["fetch"]
 [package.metadata.requires-dev]
 codegen = [{ name = "datamodel-code-generator", specifier = "==0.74.0" }]
 dev = [
+    { name = "mcp2cli", specifier = "==3.6.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-xdist", specifier = "==3.8.0" },
     { name = "ruff", specifier = "==0.16.4" },
@@ -1283,6 +1285,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bb/56/9b8e1c152f61f6c6b07c4b5896c88c7d0ae90bac6ee6306f852fcc5c1eb0/mcp_types-2.0.0.tar.gz", hash = "sha256:d7d939b9285c9961ae8866ba75ef85da34d12bafe276efbf4eb6a131786d8379", size = 66632, upload-time = "2026-07-28T13:45:33.804Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f5/4c/c78d78c3d52b0ac594ad7cc8ef5972adfe070e3597a8a4c6ce0cd39196ea/mcp_types-2.0.0-py3-none-any.whl", hash = "sha256:6b2de797ca2797f568b79529e1b25948e34de511bcc0bd82fef1039a6d1b8eb0", size = 69649, upload-time = "2026-07-28T13:45:30.713Z" },
+]
+
+[[package]]
+name = "mcp2cli"
+version = "3.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "mcp" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/d2/5878e65afe78efe1ffbec117fb4729dd0e29ddcb7217d9724f93b64f4487/mcp2cli-3.6.0.tar.gz", hash = "sha256:c62cee41beeb82d0ea4a85559bced431f13624434de8b7e6a9277dcbddc4f206", size = 45708, upload-time = "2026-08-19T07:42:42.131Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/31/129d0629b7cb4e9deaf932576adbcbaaaaf847b6a9ad66183b30f209f0ad/mcp2cli-3.6.0-py3-none-any.whl", hash = "sha256:ee232ea402c5b424d810dda9d5a6dc6ce3d3396930a5044136f66fa5fc4755ef", size = 46612, upload-time = "2026-08-19T07:42:41.129Z" },
 ]
 
 [[package]]
