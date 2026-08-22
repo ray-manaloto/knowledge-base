@@ -3,6 +3,13 @@
     "graphify": {
       "type": "http",
       "url": "https://api.graphify.com/mcp"
+    },
+    "repowise": {
+      "type": "http",
+      "url": "https://api.repowise.dev/mcp/ray-manaloto/knowledge-base",
+      "headers": {
+        "Authorization": "Bearer ${REPOWISE_KNOWLEDGE_BASE_API_KEY}"
+      }
     }
   }
 }
