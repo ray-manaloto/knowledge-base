@@ -30,11 +30,11 @@ Exit **10** at or over threshold · **0** under · **127** could not measure (wh
 is *not* "you are fine") · **3** not the main thread.
 
 **Main session thread only** (Ray, 2026-08-21: *"not on subtasks or spawned
-agents or agent teams"*) — a subagent offering a handoff is offering to end a
-session it does not own. **Your session id will not tell you which you are**: a
-live fork carries the *same* `CLAUDE_CODE_SESSION_ID` as its parent and reads the
-same transcript. `kb-context` checks the environment markers that do separate
-them; rc=3 is your answer — report to your caller instead.
+agents or agent teams"*) — **nothing tells you which you are, so this instruction
+IS the enforcement.** A fork carries its parent's session id and transcript, and
+the two env vars that looked like the answer are a Bash-subprocess marker and an
+operator enable-flag, set on the main thread too — so `kb-context` refused there
+100% of the time until 2026-08-22 (#451). If you are a subagent, report back.
 
 `$ARGUMENTS` is the next task, if the user named one. If it is empty, infer the
 next task from open issues and the prior handoff, and *say what you inferred* —

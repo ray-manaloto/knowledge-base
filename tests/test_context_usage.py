@@ -46,39 +46,71 @@ def _transcript(tmp_path, records, name="s.jsonl") -> Path:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("marker", context_usage.CHILD_MARKERS)
-def test_every_declared_child_marker_is_detected(marker):
-    assert context_usage.child_marker({marker: "1"}) == marker
+@pytest.mark.parametrize("retired", ["CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_FORK_SUBAGENT"])
+def test_the_two_retired_names_are_not_treated_as_markers(retired):
+    """The refutation, pinned by name so putting either back goes red.
+
+    Both were read as "this is a subagent" and neither is. Per the vendor docs
+    this repo has ingested, `CLAUDE_CODE_CHILD_SESSION` marks ANY subprocess
+    Claude Code spawns — every Bash tool call, main thread included
+    (`env-vars.md:208`) — and `CLAUDE_CODE_FORK_SUBAGENT` is an operator-set flag
+    that ENABLES forking (`changelog.md:2211`). Measured on the main thread
+    2026-08-22: both present, so the old detector refused 100% of the time.
+
+    This is the test the module never had. The retired one asserted the POSITIVE
+    case only — that a declared marker is detected — which stays true of a marker
+    that means nothing, so it could not have caught this.
+    """
+    assert retired not in context_usage.CHILD_MARKERS
+    assert context_usage.child_marker({retired: "1"}) is None
 
 
-def test_main_thread_has_no_marker():
-    assert context_usage.child_marker({"CLAUDE_CODE_SESSION_ID": "abc", "CLAUDECODE": "1"}) is None
+def test_a_declared_marker_would_still_be_detected(monkeypatch):
+    """The seam still works, so the retirement is not a silent amputation.
+
+    `CHILD_MARKERS` is empty because nothing belongs in it, not because the
+    mechanism was removed. Armed with a stand-in rather than a real variable
+    name — using a real one here would re-assert the claim just refuted.
+    """
+    monkeypatch.setattr(context_usage, "CHILD_MARKERS", ("A_REAL_DISCRIMINATOR",))
+    assert context_usage.child_marker({"A_REAL_DISCRIMINATOR": "1"}) == "A_REAL_DISCRIMINATOR"
+    assert context_usage.child_marker({"SOMETHING_ELSE": "1"}) is None
 
 
-def test_an_empty_marker_is_absent_not_present():
+def test_an_empty_marker_is_absent_not_present(monkeypatch):
     """An exported-but-empty var is how a shell says 'unset'.
 
     Treating it as present would silence the MAIN session in exactly the
     environments that export placeholders — a failure that looks like the
     original defect and would be blamed on it.
     """
-    assert context_usage.child_marker({"CLAUDE_CODE_CHILD_SESSION": ""}) is None
-    assert context_usage.child_marker({"CLAUDE_CODE_CHILD_SESSION": "   "}) is None
+    monkeypatch.setattr(context_usage, "CHILD_MARKERS", ("A_REAL_DISCRIMINATOR",))
+    assert context_usage.child_marker({"A_REAL_DISCRIMINATOR": ""}) is None
+    assert context_usage.child_marker({"A_REAL_DISCRIMINATOR": "   "}) is None
 
 
-def test_main_returns_3_and_measures_nothing_when_a_child_marker_is_set(tmp_path, monkeypatch):
+def test_main_measures_on_the_main_thread_despite_the_retired_vars(tmp_path, monkeypatch):
+    """The bug, armed end-to-end: this env IS the main thread's real env.
+
+    Before 2026-08-22 this returned 3 and measured nothing, which is what made
+    `/clear-prep`'s context trigger inert on every session that ever ran it.
+    """
     monkeypatch.setenv("CLAUDE_CODE_CHILD_SESSION", "1")
+    monkeypatch.setenv("CLAUDE_CODE_FORK_SUBAGENT", "1")
+    called: list[int] = []
+    monkeypatch.setattr(context_usage, "measure", lambda *_a, **_k: called.append(1))
+    assert context_usage.main([], tmp_path) == 127
+    assert called, "the main thread must MEASURE, not decline"
+
+
+def test_main_still_declines_for_a_genuine_marker(tmp_path, monkeypatch):
+    """rc=3 is retained, not deleted — it just has nothing to fire on today."""
+    monkeypatch.setattr(context_usage, "CHILD_MARKERS", ("A_REAL_DISCRIMINATOR",))
+    monkeypatch.setenv("A_REAL_DISCRIMINATOR", "1")
     called = []
     monkeypatch.setattr(context_usage, "measure", lambda *_a, **_k: called.append(1))
     assert context_usage.main([], tmp_path) == 3
     assert not called, "a subagent must not even measure — it has nothing to report on"
-
-
-def test_main_measures_when_no_marker_is_set(tmp_path, monkeypatch):
-    for name in context_usage.CHILD_MARKERS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(context_usage, "measure", lambda *_a, **_k: None)
-    assert context_usage.main([], tmp_path) == 127
 
 
 # --------------------------------------------------------------------------

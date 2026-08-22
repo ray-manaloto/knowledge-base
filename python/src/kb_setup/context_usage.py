@@ -44,27 +44,62 @@ reader to assume.
 It deliberately does NOT read the `total_tokens` reminder. Reporting a budget
 under a heading that says "context" is how this defect was born.
 
-Main thread only
-----------------
+Main thread only — AND WHY THIS MODULE NO LONGER CLAIMS TO DETECT IT
+-------------------------------------------------------------------
 Ray, 2026-08-21: this must *"only trigger on the main session thread/agent — not
 on subtasks or spawned agents or agent teams"*. A subagent offering to prepare a
-handoff is offering to end a session it does not own.
+handoff is offering to end a session it does not own. That requirement stands;
+what changed on 2026-08-22 is the claim that THIS MODULE could enforce it.
 
-**A session id cannot make that distinction**, and that is the trap. Measured on
-a live fork subagent: its `CLAUDE_CODE_SESSION_ID` is **identical** to the main
-session's, and it reads the same transcript — so id comparison, transcript
-ownership and `isSidechain` all say "main". What actually separates them is the
-environment: a child carries `CLAUDE_CODE_CHILD_SESSION=1`, and a fork
-additionally carries `CLAUDE_CODE_FORK_SUBAGENT=1`.
+**A session id cannot make the distinction** — measured on a live fork, whose
+`CLAUDE_CODE_SESSION_ID` is identical to the main session's, which reads the same
+transcript, and for which id comparison, transcript ownership and `isSidechain`
+all say "main". That part was true and remains true.
 
-Control arm, and the honest limit on it: the POSITIVE case is observed — both
-markers were read from a live fork while writing this module. The NEGATIVE case
-(a main session carrying neither) is **not** directly observed from inside a
-subagent, so it is asserted, not measured. The failure direction is the safe one:
-a main session wrongly detected as a child would merely stay silent, which is the
-behaviour that already existed. A child wrongly detected as main is the harmful
-direction, and that requires the marker to be absent where it is documented to be
-set.
+The module then reached for two environment markers, and **both readings were
+wrong**. It declined to report on the main thread 100% of the time, from the day
+it was written until 2026-08-22 — a check that could only refuse, which is
+`probes-need-a-control-arm.md`'s subject in its purest form. The docstring here
+even named the hole: the negative case (a main session carrying neither marker)
+was *"asserted, not measured"*. It is now measured, and it is false.
+
+What the two markers actually mean, per the vendor's own documentation, which
+**this repo had already ingested** — so `research-doc-sources.md` step 0 would
+have answered it before a line was written:
+
+* `CLAUDE_CODE_CHILD_SESSION` is *"Set to 1 in subprocesses Claude Code spawns
+  via the Bash, PowerShell, and Monitor tools, hook commands, and status line
+  commands"*
+  (`sources/agent-harness-docs/docs/claude-code/env-vars.md:208`). It marks a
+  **subprocess**, not an agent. Every Bash tool call carries it — from the main
+  thread exactly as much as from a subagent — so it holds ZERO information about
+  which agent issued the call, and `kb-setup context` runs in precisely such a
+  subprocess.
+* `CLAUDE_CODE_FORK_SUBAGENT` is a **capability flag the operator sets to enable
+  forking**, not a marker the harness sets to announce being a fork:
+  *"Forked subagents can now be enabled on external builds by setting
+  CLAUDE_CODE_FORK_SUBAGENT=1"* and *"SDK and `claude -p`:
+  CLAUDE_CODE_FORK_SUBAGENT=1 now works in non-interactive sessions"*
+  (`changelog.md:2211` and `:2060`). Where forking is enabled it is set for
+  everyone, main thread included.
+
+Measured on the main thread, 2026-08-22, with the sanctioned presence form:
+both markers PRESENT; control `HOME` PRESENT and a bogus name ABSENT, so the
+probe discriminates. The original "positive case observed on a live fork" was
+never evidence — the markers are present in both arms, so observing them in one
+arm could not distinguish anything. **A probe run in only one arm cannot
+discriminate no matter how carefully it is run.**
+
+So the environment does not expose the answer, and this module stops pretending
+otherwise: it MEASURES, and the main-thread requirement lives where it is
+actually enforceable — in `clear-prep`'s own instruction to the model, which is
+where it always really lived. A subagent that runs this now gets a number
+instead of a refusal; that is not a regression from working enforcement, it is
+the removal of a placebo that only ever silenced the caller it was written for.
+
+If a genuine discriminator ever appears, it belongs here and the guard comes
+back with an arm on BOTH directions — a fork and a main session — because that
+is the arm this module skipped.
 """
 
 from __future__ import annotations
@@ -95,21 +130,27 @@ _WINDOWS: tuple[tuple[str, int], ...] = (
 )
 
 
-#: Environment markers that mean "this is NOT the main session thread".
+#: Environment variables once mistaken for "this is NOT the main session thread".
 #:
-#: `CLAUDE_CODE_FORK_SUBAGENT` was read from a live fork; `CLAUDE_CODE_CHILD_SESSION`
-#: was set on that same fork and is the broader of the two. Both are treated as
-#: disqualifying, and the tuple is the extension point: a new spawn kind (agent
-#: teams, a future task runner) adds its marker here rather than growing a second
-#: detector somewhere else.
-CHILD_MARKERS: tuple[str, ...] = (
-    "CLAUDE_CODE_CHILD_SESSION",
-    "CLAUDE_CODE_FORK_SUBAGENT",
-)
+#: RETIRED 2026-08-22. Kept as a NAMED, EMPTY tuple rather than deleted so the
+#: refutation has an anchor: this is the extension point a future discriminator
+#: would use, and an empty one says "we looked and there is nothing" where a
+#: deleted symbol would say nothing at all.
+#:
+#: Neither of the two it held is an agent-identity marker — see the module
+#: docstring for the citations. `CLAUDE_CODE_CHILD_SESSION` marks any subprocess
+#: Claude Code spawns (every Bash tool call, main thread included) and
+#: `CLAUDE_CODE_FORK_SUBAGENT` is an operator-set capability flag. Putting either
+#: back reinstates a check that can only refuse.
+CHILD_MARKERS: tuple[str, ...] = ()
 
 
 def child_marker(env: dict[str, str] | None = None) -> str | None:
-    """The first child/subagent marker present, or None on the main thread.
+    """The first genuine child/subagent marker present, or None.
+
+    Always None while :data:`CHILD_MARKERS` is empty, which it is: no environment
+    variable known to this repo distinguishes a subagent's Bash call from the
+    main thread's. Retained as the seam a real discriminator would fill.
 
     A marker set to an empty string is treated as ABSENT: an exported-but-empty
     variable is how a shell says "unset" in practice, and treating it as present
