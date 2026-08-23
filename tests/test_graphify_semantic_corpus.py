@@ -3230,6 +3230,20 @@ def test_stage_chunk_compares_against_the_live_runtime_not_the_plans_own(
         pytest.param(
             SystemExit("[graphify] REFUSING an unverified Graphify operation"), id="system-exit"
         ),
+        # The remaining four classes `verify_plan`'s runtime-measurement clause
+        # catches. Without a row each, a later narrowing of that clause would
+        # leave the path uncaught while this test stayed green (CodeRabbit on
+        # PR #463).
+        pytest.param(
+            LookupError("Graphify distribution metadata has no Version"), id="lookup-error"
+        ),
+        pytest.param(OSError("Graphify executable is not readable"), id="os-error"),
+        pytest.param(
+            ImportError("graphify is not importable from the locked venv"), id="import-error"
+        ),
+        pytest.param(
+            RuntimeError("Graphify runtime identity could not be measured"), id="runtime-error"
+        ),
     ],
 )
 def test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising(

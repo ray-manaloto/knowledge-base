@@ -208,10 +208,14 @@ The supported public seam is:
 
 ```text
 mise run kb-graphify-semantic-corpus -- plan|run|verify [PATH]
+mise run kb-graphify-semantic-corpus -- record [--plan-dir PATH] [--accept] [--accept-decision-change NAME[,NAME]]
 ```
 
 - `plan` materializes the immutable pin, detects and expands the source, packs
   units, and atomically publishes the plan directory.
+- `record` re-plans into a scratch directory (or stages an existing `--plan-dir`),
+  classifies the digest delta against the recorded authority, and re-authorizes
+  only on `--accept` — "Recording plan authority" above is the full contract.
 - `verify` materializes the exact pinned source snapshot and independently reruns
   detection, advisory counts/message, exclusions, inventory, and ledger before it can
   consider authority. The library verifier requires this snapshot argument; there is
