@@ -1,6 +1,6 @@
 ---
 name: kb-session-review
-description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts, the ignored bot reviews, the pending work stranded on worktrees and branches — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
+description: Review a whole ROUND from outside it — the circles, the forgotten requirements, the contradicted instructions, the unpinned tools, the context blowouts, the ignored bot reviews, the pending work stranded on worktrees and branches, and whether the pinned graphify deep extraction would actually run — then apply what it finds. Use when the user says work is going in circles, asks what this round got wrong, asks for a review of the last N sessions, or wants the project to self-correct. Distinct from kb-session-reflect, which counts what one transcript DID; this asks what the round should have done and did not.
 argument-hint: "[a kb-session-select selector, e.g. --last 3 | --current | --since 2026-08-15]"
 ---
 
@@ -100,7 +100,7 @@ ending in a handoff. An unknown value for either now THROWS rather than silently
 falling back — a run that swept four lanes because one was misspelled reports as
 confidently as one that swept five.
 
-Eight lanes sweep independently, the highest-cost findings are adversarially
+Nine lanes sweep independently, the highest-cost findings are adversarially
 refuted, then one ranked synthesis. It returns findings; it changes nothing. The
 two lanes the 2026-08-18 directive added carry their own preflight needs:
 `bot-reviews` discovers the window's PRs itself with `gh`, and `pending-work`
@@ -116,6 +116,7 @@ spent 78 agents and died before writing its report:
 | `context`, `unpinned` | `haiku` / `medium` — registry lookups and counting jq |
 | `forgotten`, `bot-reviews`, `pending-work`, `tooling-gap`, `contradicted` | `sonnet` / `high` |
 | `circles` | `opus` / `high` — the round's highest-value lane, and judgment-heavy |
+| `extraction-readiness` | `opus` / `high` — its failure mode is a ~$65, ten-hour run that stages 58/58 failed |
 | Cross-check | `kb-adversarial-verifier` (the roster's own refuter, opus/high) |
 | Synthesise | `kb-synthesist` on **`fable`**, falling back to `opus`/`xhigh` |
 
@@ -198,7 +199,7 @@ in the shape it does. Write it, in the report, before you close.
 
 ## What this does not claim
 
-Eight lanes of an LLM reading a round. `NO FINDINGS` from a lane means that lane
+Nine lanes of an LLM reading a round. `NO FINDINGS` from a lane means that lane
 found nothing — never that the area is sound. The cross-check refutes findings;
 it cannot manufacture the ones nobody looked for. Its value is the *routes* it
 takes, not a proof of completeness.
@@ -224,7 +225,7 @@ recollect; they read.
 ```text
 mise run kb-session-select -- --current
 Workflow({ name: 'session-review', args: {
-  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the six below
+  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the seven below
   handoffOut: '.agent/plans/session-<date>-<letter>.md',
   sessions, handoffs, answered,
 }})
@@ -236,7 +237,12 @@ repeat), `contradicted` (docs that drifted), `bot-reviews` (findings nobody
 actioned), `tooling-gap` (hand-run work a task already owns, including the
 heredoc, shell-chain and repeated-mistake checks; excluded until 2026-08-19,
 which is why those detectors ran zero times on the path that actually invokes
-this workflow). `unpinned` and `context` are round-level and stand down.
+this workflow), and `extraction-readiness` (whether the pinned graphify deep
+extraction would actually work if run again — added 2026-08-22 for the same
+reason a second time, and a worse version of it: that lane was never in the
+lane list AT ALL, so the ad-hoc run that found the #426 P0 could not repeat and
+five of its thirteen findings sat unfiled until a fresh sweep re-derived them).
+`unpinned` and `context` are round-level and stand down.
 
 The composer is told the shape `kb-handoff-check` parses — branch in the lead,
 every gate claim carrying its commit with the sha backticked, `(absent)` on any
