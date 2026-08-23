@@ -90,6 +90,7 @@ def _print_usage() -> int:
         "graphify-semantic-corpus record [--plan-dir PATH] [--accept] "
         "[--accept-decision-change NAME[,NAME]] | "
         "graphify-semantic-corpus-merge <name> [PLAN_DIR] [--partial] | "
+        "corpus-integrity | "
         "skillopt-contract | "
         "tool-sync <currency-tool-name> | "
         "skillopt-reviewed --packet P --target T --backend mock|handoff | "
@@ -162,6 +163,7 @@ def _run(argv: list[str] | None = None) -> int:
         "graphify-semantic-slice",
         "graphify-semantic-corpus",
         "graphify-semantic-corpus-merge",
+        "corpus-integrity",
         "skillopt-contract",
     }:
         return _dispatch_contract(repo_root, cmd, rest)
@@ -256,6 +258,10 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import graphify_semantic_corpus
 
         return graphify_semantic_corpus.corpus_main(repo_root, rest)
+    if cmd == "corpus-integrity":
+        from kb_setup import corpus_integrity
+
+        return corpus_integrity.integrity_main(repo_root, rest)
     if cmd == "graphify-semantic-corpus-merge":
         from kb_setup import graphify_semantic_corpus_merge
 

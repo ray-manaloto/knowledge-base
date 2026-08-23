@@ -136,7 +136,21 @@ SHA_ABBREV = 12
 #: died reports rc=0 forever. Wrapped rather than run bare because `hk test`
 #: exits 0 when it runs NOTHING (measured on 1.56.0), so `kb_setup.hk_test`
 #: asserts a floor on the count before it reads hk's rc.
-GATE_TASKS = ("lint", "test", "brain-audit", "eval", "graph-size", "hk-test")
+GATE_TASKS = (
+    "lint",
+    "test",
+    "brain-audit",
+    "eval",
+    "graph-size",
+    "hk-test",
+    "kb-corpus-integrity",
+)
+#: `kb-corpus-integrity` is here rather than in `hk.pkl` deliberately. It scans
+#: the whole staged-evidence tree, so it belongs with the other whole-repo
+#: audits (`brain-audit`, `eval`) at the ship boundary, not on every commit
+#: that happens to touch an unrelated file. Placement is NOT severity: it is a
+#: hard gate here, and `kb-ship` refuses to push while it is red — altered
+#: provider evidence must never leave this machine.
 
 #: Gates that may run CONCURRENTLY with each other. Everything not named here
 #: runs EXCLUSIVE — alone, with nothing else in flight — and that default is the

@@ -731,6 +731,10 @@ timeout = "16h"
 description = "Assemble staged Graphify semantic-corpus chunks into one committed doc chunk"
 run = "uv run kb-setup graphify-semantic-corpus-merge"
 
+[tasks.kb-corpus-integrity]
+description = "Staged provider evidence still hashes to what its receipts recorded"
+run = "uv run kb-setup corpus-integrity"
+
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
 run = "uv run kb-setup skillopt-contract"
