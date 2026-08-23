@@ -30,6 +30,7 @@ fine — `gh pr view` is how you resolve whether a bare `#42` is an issue or a P
 
 - When the session model is Fable, without being reminded: non-trivial implementation runs the fable-orchestrator architect-as-orchestrator flow — invoke the fable-orchestrator:orchestration skill before delegating and follow it as authoritative for routing, verification, review tiers, and advisor consults.
 - fable-orchestrator: implementation lane = codex
+- fable-orchestrator: codex effort = xhigh
 
 The first line is the **trigger**, Fable-gated by design (sessions on other models skip the
 flow). Until 2026-07-24 only the mode line existed, which the plugin's setup wizard calls
