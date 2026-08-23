@@ -468,10 +468,19 @@ _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
 #
 # ADVANCED to 2.1.238 (2026-08-21), for the reason the paragraph above says is
 # the only valid one: the COMMITTED RECEIPT was re-produced at this version, as
-# part of the graphify 0.9.48 re-attest. It now equals `_CURRENT_CLAUDE_VERSION`
-# below — evidence converging with intent, not the two questions collapsing —
-# and all three values are MEASURED from the same preflight that produced the
-# new receipt. The help digest is unchanged, still `71ad650f…`.
+# part of the graphify 0.9.48 re-attest — and all three values are MEASURED from
+# the same preflight that produced the new receipt. The help digest is unchanged,
+# still `71ad650f…`.
+#
+# #464 (fixed 2026-08-23): this comment used to end "It now equals
+# `_CURRENT_CLAUDE_VERSION` below". That was true for about a day. It went stale
+# the moment `_CURRENT_` advanced to 2.1.240 and stayed wrong through 2.1.241 —
+# a comment contradicting the constant three lines beneath it, which is the
+# worst place for a stale claim to live because the reader trusts proximity.
+# The two values are DIFFERENT BY DESIGN: `_ACCEPTED_` is what a committed
+# receipt was produced under, `_CURRENT_` is what a new run may use. They
+# converge only by coincidence, so no comment here should ever assert they are
+# equal — it can only ever be a snapshot that rots.
 _ACCEPTED_CLAUDE_VERSION = "2.1.238"
 _ACCEPTED_CLAUDE_EXECUTABLE_SHA256 = (
     "1c196c456373b57818ae87df84aecee96cb659448c0d6a6bbb401ac5758431b2"
@@ -556,11 +565,16 @@ _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6d
 # exactly the shape someone re-derives.
 #
 # THE `--help` DIGEST DID NOT MOVE — still 71ad650f…, the value 2.1.232 through
-# 2.1.238 all recorded, re-hashed against the INSTALLED 2.1.240. So every flag
+# 2.1.241 all recorded, re-hashed against the INSTALLED 2.1.241. So every flag
 # this path depends on is spelled identically and only the implementation moved.
-_CURRENT_CLAUDE_VERSION = "2.1.240"
+#
+# 2.1.241 (2026-08-23): hashed live before the bump rather than assumed, because
+# the help digest is an ALIAS of `_ACCEPTED_CLAUDE_HELP_SHA256` below — had it
+# moved, this would not have been a two-constant edit. `claude --help | shasum
+# -a 256` returned 71ad650f… byte-identical, so the alias stands.
+_CURRENT_CLAUDE_VERSION = "2.1.241"
 _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
-    "8917e01c99ea0ce6ed887a1729a4cda693c758fe542747be71756987b145c772"
+    "1495eb7c42d3b4451f5f1cd38b6d498d22a4a38c802bc2be5c1cf1795e64820d"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
 # ADVANCED 43122fca… -> 6047cf0e… (2026-08-21): the value the re-run's own

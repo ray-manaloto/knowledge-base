@@ -980,9 +980,9 @@ setting, and task/lockfile/python fixes."""
 # answers `~/.local/bin/claude` where the 2.1.238 note says
 # `~/.local/share/claude/versions/2.1.238`. That is not an installer-layout
 # change — `~/.local/bin/claude` is a SYMLINK to
-# `~/.local/share/claude/versions/2.1.240`, and the digest is of the target
+# `~/.local/share/claude/versions/2.1.241`, and the digest is of the target
 # either way, since `Path.read_bytes()` follows it.
-expected = "2.1.240"
+expected = "2.1.241"
 binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
