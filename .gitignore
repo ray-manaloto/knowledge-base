@@ -55,6 +55,12 @@ graphify-out/cache/
 graphify-out/transcripts/
 graphify-out/converted/
 graphify-out/graphify-semantic-corpus/
+# The record verb (`kb-setup graphify-semantic-corpus record --accept`) retains the
+# previous canonical plan beside it as `graphify-semantic-corpus.superseded-<UTC ts>/`
+# — machine-local evidence of what was replaced, never committed. Listed explicitly
+# because this directory is an ALLOWLIST, not a wildcard: the first accept left its
+# retained dir untracked and `kb-ship` refused the dirty tree.
+graphify-out/graphify-semantic-corpus.superseded-*/
 # The merge step's intermediate per-chunk files. Unambiguously derived: every byte
 # of it is re-produced from the staged chunk evidence by
 # `kb-graphify-semantic-corpus-merge`, and the artifact that matters is the
