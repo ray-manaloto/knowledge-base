@@ -115,6 +115,7 @@ spent 78 agents and died before writing its report:
 |---|---|
 | `context`, `unpinned` | `haiku` / `medium` — registry lookups and counting jq |
 | `forgotten`, `bot-reviews`, `pending-work`, `tooling-gap`, `contradicted` | `sonnet` / `high` |
+| `telemetry` | `sonnet` / `medium` — jq field extraction over the raw-API-body sink at `.agent/telemetry/`, never a Read of a file body |
 | `circles` | `opus` / `high` — the round's highest-value lane, and judgment-heavy |
 | `extraction-readiness` | `opus` / `high` — its failure mode is a ~$65, ten-hour run that stages 58/58 failed |
 | Cross-check | `kb-adversarial-verifier` (the roster's own refuter, opus/high) |
@@ -124,11 +125,38 @@ The fallback is reported as `synthesis_ran_on` in the return value. **It heals
 model exhaustion only** — a session or weekly limit is shared across models, so
 switching cannot escape it.
 
-**The cross-check is capped** at `MAX_REFUTERS` (14) findings, ranked by
-`cost_rank`, which keeps the whole run under the 25-agent advisory ceiling.
+**The cross-check is capped** at `MAX_REFUTERS`, DERIVED rather than a fixed
+literal — `Math.max(6, 25 - 2 - ACTIVE_LANES.length - JUDGE_AGENTS_WORST)` —
+so the worst-case agent count stays under the 25-agent advisory ceiling no
+matter how many lanes are active. With today's lane sets this evaluates to
+**11** in both output modes; the exact figure moves with the lane count, so
+read `run_meta.max_refuters` on the return rather than assuming a number.
 Anything past the cap is returned as **`not_triaged`** — a fourth state beside
 `confirmed`, `refuted` and `unverified`, and logged per finding. Read it: it
 means the review did not look, not that it looked and found nothing.
+
+**Every run now leaves a detailed synthesis report on disk, in BOTH output
+modes.** `output: 'handoff'` composes the handoff AND runs the full ranked
+synthesis, so a handoff-mode run never leaves the caller to hand-write an
+account of what it found. The return's `report` key is always the synthesis;
+`handoff` carries the composed handoff text (null in report mode); and
+`artifacts` names every path the run wrote or was told to write — the
+`session-review-archive` step below reads exactly this shape.
+
+**Archive the run immediately after it returns:**
+
+```bash
+mise run kb-session-review-archive -- --run-json <path-to-the-return> \
+  [--handoff <path-if-output-was-handoff>]
+```
+
+This writes the TRACKED `docs/session-review/runs/<date>-<n>/` — the synthesis,
+every lane report, every `refute-*.md`, and (in handoff mode) the handoff —
+verbatim, and regenerates `docs/session-review/README.md`. It **refuses rather
+than overwriting or partially writing**: no synthesis on disk is rc 2 with
+nothing archived (that IS the "always a report" contract from the previous
+section, made checkable), and an existing `<date>-<n>/` directory is rc 2
+rather than a silent merge. `--dry-run` previews the plan without writing.
 
 ### 4. Read the coverage before the findings
 
@@ -239,12 +267,16 @@ repeat), `contradicted` (docs that drifted), `bot-reviews` (findings nobody
 actioned), `tooling-gap` (hand-run work a task already owns, including the
 heredoc, shell-chain and repeated-mistake checks; excluded until 2026-08-19,
 which is why those detectors ran zero times on the path that actually invokes
-this workflow), and `extraction-readiness` (whether the pinned graphify deep
+this workflow), `extraction-readiness` (whether the pinned graphify deep
 extraction would actually work if run again — added 2026-08-22 for the same
 reason a second time, and a worse version of it: that lane was never in the
 lane list AT ALL, so the ad-hoc run that found the #426 P0 could not repeat and
-five of its thirteen findings sat unfiled until a fresh sweep re-derived them).
-`unpinned` and `context` are round-level and stand down.
+five of its thirteen findings sat unfiled until a fresh sweep re-derived them),
+and `telemetry` (cost attribution over `.agent/telemetry/`, joined 2026-08-23
+for the same reason: a lane not in the default set runs zero times, and this
+lane's whole purpose — closing #461's "a 2.5 GB sink nobody reads" — only
+matters on the path this workflow is actually invoked from). `unpinned` and
+`context` are round-level and stand down.
 
 The composer is told the shape `kb-handoff-check` parses — branch in the lead,
 every gate claim carrying its commit with the sha backticked, `(absent)` on any

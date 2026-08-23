@@ -1221,6 +1221,30 @@ description = "Resolve WHICH session transcripts a run covers: mise run kb-sessi
 # matches nothing looks exactly like a round with no sessions.
 run = "uv run kb-setup session-select"
 
+[tasks.kb-session-review-archive]
+description = "Archive a session-review run's return into docs/session-review/runs/<date>-<n>/ and regenerate the README: mise run kb-session-review-archive -- --run-json PATH [--report-dir DIR] [--handoff PATH] [--date YYYY-MM-DD] [--dry-run]"
+# The other half of "every session-review run always leaves a detailed
+# report" (session-review.js). Until now docs/session-review/runs/<date>-<n>/
+# was assembled BY HAND for every run, and the failure that motivated this task
+# already happened twice on the same root cause: a fresh run with no dated
+# reportDir argument defaults to the SAME shared `.agent/kb/reports/agents`
+# root as the previous one, so the next run's lane reports overwrite the prior
+# run's before anyone gets around to archiving them (#431).
+# REFUSES rather than partially archiving: no synthesis on disk at the report
+# dir is rc 2 with NOTHING written -- "a run always leaves a report" is the
+# contract this task exists to enforce, not merely document. An existing
+# destination directory is rc 2 too, never a silent merge. Staged into a
+# `.archive-*` temp sibling and only renamed into place once every copy has
+# succeeded, so a killed run leaves no partial destination.
+# Every copy is VERBATIM bytes (read_bytes -> write_bytes) -- this is the other
+# half of `docs/session-review/runs/**` being formatter-exempt in hk.pkl's
+# proseExclude; a copy that reformatted what an agent wrote would defeat the
+# exclusion at the point of ingest rather than the point of lint.
+# `--dry-run` reports the plan (destination name, files that would copy, lane
+# reports that are missing) without writing anything. Logic in
+# kb_setup.session_review_archive.
+run = "uv run kb-setup session-review-archive"
+
 [tasks.kb-session-state]
 description = "Print the session's working state as a paste-ready handoff block: mise run kb-session-state [-- --no-pr]"
 # Replaces the by-hand half of /clear-prep step 1, which asks an agent to run four

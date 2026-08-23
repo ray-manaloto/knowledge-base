@@ -240,6 +240,7 @@ const HANDOFF_LANES = new Set([
   'bot-reviews',
   'tooling-gap',
   'extraction-readiness',
+  'telemetry',
 ])
 
 // `sessions` REPLACES `transcriptDir` + `since`, and comes from
@@ -622,6 +623,79 @@ makes it succeed. Say which of your findings are observations and which are infe
 End with the COVERAGE line L6 requires: which issues you did not open, which modules you
 did not read, and which claims you could not arm.`,
   },
+  {
+    key: 'telemetry',
+    // Sonnet/medium: this lane is jq field-extraction over ~4.7k small JSON
+    // files, closer to `unpinned`'s registry lookups than to `circles`'
+    // judgment. NOT haiku: `context`'s own history above (:448-450) is a haiku
+    // agent ignoring a StructuredOutput rejection seven times running on a
+    // comparably mechanical job — this lane needs a model that reads its own
+    // tool error and corrects rather than repeating it.
+    //
+    // IN HANDOFF_LANES DELIBERATELY, joined 2026-08-23 for the SAME reason
+    // `tooling-gap` and `extraction-readiness` did: a lane not in the default
+    // set runs zero times, and the path this workflow is ACTUALLY invoked from
+    // is handoff mode via `/clear-prep`. Leaving this opt-in would answer
+    // #461's "a 2.5 GB sink nobody reads" with a lane that never runs on the
+    // one path that matters, which is the exact mistake `extraction-readiness`'s
+    // own comment above already made once about itself.
+    model: 'sonnet',
+    effort: 'medium',
+    prompt: `Find what the transcripts CANNOT show: report on Claude Code's native raw-API-body
+sink at .agent/telemetry/ (~4.7k <uuid>.request.json, ~2.47 GB total; ~4.7k
+req_<id>.response.json, ~16 MB total — LIVE, it grows every request, so state
+the count you actually saw rather than any number quoted in this prompt).
+
+NEVER read a telemetry file into context. Every figure comes from field
+extraction — jq -c '{...}', ls -S, stat -f %z, wc -c — never a Read of a file's
+body. Requests run up to 2.4 MB each and total roughly 2.5 GB; responses are
+~3.5 KB each and total roughly 16 MB, so read ALL responses in one jq pass and
+extract ONLY named fields from requests, never a whole request body.
+
+SCOPE to the sessions under review by .metadata.user_id — a JSON STRING
+containing "session_id":"<uuid>":
+  jq -r '.metadata.user_id' *.request.json | grep -o 'session_id[^,}]*'
+Report requests matched per session, and requests matching none. Control-arm
+this: a session id you KNOW is under review must match more than zero requests
+— if it matches zero, the probe is broken, not the corpus.
+
+PER REQUEST extract: model, output_config.effort, thinking.type, max_tokens,
+(.messages|length), (.system|tostring|length), (.tools|length), and the file's
+own byte size. PER RESPONSE extract: model, stop_reason, and usage TAKEN
+WHOLE — it carries eleven keys (cache_creation, an object;
+cache_creation_input_tokens; cache_read_input_tokens; inference_geo;
+input_tokens; iterations; output_tokens; output_tokens_details;
+server_tool_use; service_tier; speed) — sum the four token counts for a total
+and keep the rest for the report rather than discarding them.
+
+PAIRING IS KNOWN, use it: a request's diagnostics.previous_message_id equals
+the id (msg_...) of the PRECEDING response. The response FILENAME
+(req_<id>.response.json) is NOT that id, even though the two share an
+8-character prefix — NEVER join on the filename. Build a {response.id -> file}
+map from the cheap response side first (one jq pass, ~16 MB), then join each
+request's previous_message_id against it. Responses carry no metadata or
+session_id, so a per-session usage total is reachable ONLY through this chain.
+TWO classes are unjoinable and must be counted and reported SEPARATELY —
+neither is a broken join: a request whose previous_message_id is null (the
+first request of a conversation), and the last response of a session (it has
+no successor request).
+
+FINDINGS ARE COST-SHAPED, ranked by cost: the top-5 largest requests with
+their message counts (the O(n^2) context-resend pattern, measured elsewhere at
+roughly 1.17 MB/request and 95.7 MB over one long round); calls made at
+effort xhigh/max whose paired response was trivial (small output_tokens,
+stop_reason end_turn); large requests with cache_read_input_tokens == 0; the
+model mix per session.
+
+REPORT session_id ONLY. NEVER copy account_uuid, device_id, message content,
+system prompts, or tool schemas into the report or into any finding — those
+stay in the source files and do not belong in what you write.
+
+Write ${reportDir}/telemetry.md AS YOU GO, like every lane, and end with the
+standard COVERAGE line: files examined of files present (state the count you
+actually saw, since the sink is live), fields you could not read, and sessions
+you could not match.`,
+  },
 ]
 
 // Filtered ONCE, here, and every downstream count derives from `ACTIVE_LANES`
@@ -822,9 +896,36 @@ const live = lanes.flatMap((l) => l.findings.filter((f) => f.still_live).map((f)
 // them on run wf_8af76005-9bd, which is 88% of that run's 78 agents and the
 // direct cause of its death.
 //
-// `workflows.md:360` warns past 25 agents. This budget keeps the whole run under
-// that ceiling: 8 sweeps + MAX_REFUTERS + 1 synthesise <= 25 gives 16; 14 leaves
-// margin for a lane that spawns a helper.
+// `workflows.md:360` (Claude Code's own docs, NOT in this repo — treated as the
+// authority here because THIS file already cited it and a 78-agent run died)
+// warns past 25 agents. The INVARIANT this budget holds is that the worst-case
+// TOTAL agent count stays <= 23 (25 minus a margin of 2) — not any particular
+// refuter count. Two things changed the arithmetic since the old "8 sweeps +
+// MAX_REFUTERS + 1 synthesise <= 25" sentence, which was already stale (the
+// file has NINE sweep lanes, :632 says "all nine", now TEN with `telemetry`)
+// and wrong in kind: `judge()` dispatches up to TWO agents per call (the fable
+// attempt, then the opus fallback), and handoff mode now makes TWO judge calls
+// (compose-handoff, then synthesise) where report mode makes one — so the
+// judge phase alone can cost up to 4 agents in handoff mode and 2 in report
+// mode, not a flat 1.
+//
+//   const JUDGE_AGENTS_WORST = (OUTPUT === 'handoff' ? 2 : 1) * 2
+//   const MAX_REFUTERS = Math.max(6, 25 - 2 - ACTIVE_LANES.length - JUDGE_AGENTS_WORST)
+//
+// `OUTPUT` and `ACTIVE_LANES` are both declared above this point, so the
+// formula can read them directly rather than re-deriving either. By
+// construction: 1 sweep agent per active lane + MAX_REFUTERS +
+// JUDGE_AGENTS_WORST <= 23. With TODAY's ten lanes (report mode) / eight lanes
+// (handoff mode, after `telemetry` joined `HANDOFF_LANES`) this evaluates to
+// 11 in BOTH modes — but do NOT hardcode 11 anywhere that reads this: a
+// narrowed run (e.g. `cfg.lanes: ['circles']`) correctly raises the cap to 20
+// (1 + 20 + 2 = 23), and a reader who was told "11" will "fix" that back down.
+// The floor of 6 exists so a heavily narrowed lane set never starves the
+// cross-check entirely.
+//
+// The price of the extra lane, stated rather than discovered later: NOT
+// TRIAGED grows by 3 under the default lane sets (14 -> 11) relative to the
+// fixed literal this replaces.
 //
 // This is deliberately the SIMPLEST bound that works — rank by cost_rank, refute
 // the top slice, report the rest. Batching several findings into one refuter
@@ -833,7 +934,8 @@ const live = lanes.flatMap((l) => l.findings.filter((f) => f.still_live).map((f)
 // verdicts back without silently misattributing all of them) were audited as
 // undefined, and a wrong zip corrupts every verdict in a batch instead of losing
 // one. Cheap and honest now; batching once it is specified.
-const MAX_REFUTERS = 14
+const JUDGE_AGENTS_WORST = (OUTPUT === 'handoff' ? 2 : 1) * 2
+const MAX_REFUTERS = Math.max(6, 25 - 2 - ACTIVE_LANES.length - JUDGE_AGENTS_WORST)
 const ranked = [...live].sort((a, b) => (a.cost_rank ?? 999) - (b.cost_rank ?? 999))
 const behavioural = ranked.slice(0, MAX_REFUTERS)
 // NOT dropped silently — that is the failure this whole workflow exists to catch.
@@ -1163,8 +1265,30 @@ ${JSON.stringify(lanes.map((l) => ({ lane: l.lane, coverage: l.coverage })), nul
 PARTIAL LANES: ${JSON.stringify(interrupted.map((l) => l.lane))}
 LANES THAT DID NOT RETURN AT ALL (they cover NOTHING): ${JSON.stringify(missing)}`
 
-const synthesised = await judge(OUTPUT === 'handoff' ? HANDOFF_PROMPT : REPORT_PROMPT, {
-  label: OUTPUT === 'handoff' ? 'compose-handoff' : 'synthesise',
+// EVERY run now leaves a detailed synthesis report on disk, in BOTH output
+// modes. Until now, handoff mode ran ONE judge call (HANDOFF_PROMPT, mislabelled
+// into `report`) and a handoff-mode run left no ranked account of what it found
+// — the caller hand-wrote one after the 2026-08-23 run, because nothing else
+// existed to promote.
+//
+// SEQUENTIAL, not parallel, and in this order: compose-handoff runs FIRST
+// because it is the artifact the caller is actually waiting on; synthesise runs
+// second. Both go through the existing `judge()` so both keep its fable->opus
+// fallback and its own `ranOn` — and with DISTINCT labels now: one ternary used
+// to pick a single label for whichever prompt ran, so a handoff-mode run's one
+// judge call was logged as `compose-handoff` even though its OUTPUT became
+// `report`. Splitting the call is what makes the label describe the artifact
+// it actually produced.
+const composed =
+  OUTPUT === 'handoff'
+    ? await judge(HANDOFF_PROMPT, {
+        label: 'compose-handoff',
+        phase: 'Synthesise',
+        agentType: 'kb-synthesist',
+      })
+    : null
+const synthesised = await judge(REPORT_PROMPT, {
+  label: 'synthesise',
   phase: 'Synthesise',
   agentType: 'kb-synthesist',
 })
@@ -1185,8 +1309,43 @@ return {
   // The budget ran out before these; nobody checked them. Distinct from
   // `unverified`, where an agent was dispatched and did not come back.
   not_triaged: notTriaged,
+  // ALWAYS the ranked synthesis (REPORT_PROMPT), in BOTH output modes now.
+  // Was: only in 'report' mode, with 'handoff' mode's `report` actually holding
+  // the HANDOFF text — see the comment above `composed`.
   report: synthesised.value,
   // Which model actually produced the report. A fallback that nothing records is
   // a fallback nobody can audit afterwards.
   synthesis_ran_on: synthesised.ranOn,
+  // The composed handoff text — null in report mode, since there is nothing to
+  // compose. `composed` is only ever awaited when OUTPUT === 'handoff', so
+  // `composed.value`/`composed.ranOn` are only read in the branch where it is
+  // not null.
+  handoff: OUTPUT === 'handoff' ? composed.value : null,
+  handoff_ran_on: OUTPUT === 'handoff' ? composed.ranOn : null,
+  // Names every artifact this run wrote (or, for `synthesis`, was TOLD to
+  // write — REPORT_PROMPT names the path, this does not re-verify the file
+  // landed), so a caller can archive the run without guessing paths.
+  artifacts: {
+    report_dir: reportDir,
+    synthesis: `${reportDir}/session-review-synthesis.md`,
+    handoff_out: OUTPUT === 'handoff' ? cfg.handoffOut : null,
+    lane_reports: ACTIVE_LANES.map((l) => `${reportDir}/${l.key}.md`),
+    // EXPECTED, not actual: refuters are handed the literal
+    // `${reportDir}/refute-<lane>.md` path (see REFUTE_CONTRACT above) and
+    // substitute freely — 6 of 11 files in runs/2026-08-18-1 carry no lane key
+    // at all, and runs/2026-08-23-1 has several files per lane. A consumer
+    // must glob, never trust this list as a manifest.
+    refute_reports_expected: [...new Set(behavioural.map((f) => f.lane))].map(
+      (l) => `${reportDir}/refute-${l}.md`,
+    ),
+    refute_glob: `${reportDir}/refute-*.md`,
+  },
+  run_meta: {
+    output: OUTPUT,
+    lanes: ACTIVE_LANES.map((l) => l.key),
+    sessions: cfg.sessions,
+    directive: cfg.directive ?? null,
+    handoffs: cfg.handoffs ?? [],
+    max_refuters: MAX_REFUTERS,
+  },
 }

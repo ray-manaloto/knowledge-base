@@ -76,6 +76,8 @@ def _print_usage() -> int:
         "session-state [--no-pr] | context | "
         "session-select (--current | --sessions <id>... | --last N | "
         "--since <ISO> [--until <ISO>]) | "
+        "session-review-archive --run-json PATH [--report-dir DIR] "
+        "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
         "remember --question Q [--answer A|--answer-file F] "
         "[--outcome useful|dead_end|corrected] "
         "[--correction C|--correction-file F] [--nodes N...] | remember --audit | "
@@ -402,6 +404,10 @@ def _dispatch_record(repo_root: Path, cmd: str, rest: list[str]) -> int | None:
         from kb_setup import session_select
 
         return session_select.main(rest, repo_root)
+    if cmd == "session-review-archive":
+        from kb_setup import session_review_archive
+
+        return session_review_archive.main(rest, repo_root)
     if cmd == "context":
         from kb_setup import context_usage
 
@@ -531,7 +537,10 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "md-budget | skill-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
-        "session-state [--no-pr] | remember [--audit] | cc | cc-doctor | "
+        "session-state [--no-pr] | "
+        "session-review-archive --run-json PATH [--report-dir DIR] "
+        "[--handoff PATH] [--date YYYY-MM-DD] [--dry-run] | "
+        "remember [--audit] | cc | cc-doctor | "
         "eval [--live] [--slow] | "
         "validate-chunks <chunk...> | fetch-verify <pages.toml...> | "
         "ship [--title T] | land <PR#> | ensure-deps | version)",

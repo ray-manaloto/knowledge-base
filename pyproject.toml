@@ -170,6 +170,14 @@ ignore = [
 "python/src/kb_setup/_merge_docs.py" = ["BLE001", "N806"]
 # The CLI main() is a flat command dispatch — branchy by nature, not complex logic.
 "python/src/kb_setup/cli.py" = ["C901", "PLR0911", "PLR0912"]
+# `archive()`'s six keyword-only parameters are a FIXED external interface
+# (session-review-report-always spec §3b): each mirrors one CLI flag
+# (`--run-json`/`--report-dir`/`--handoff`/`--date`/`--dry-run`) 1:1, so
+# bundling them into a request object would only rename this same information
+# rather than reduce it. The function's BODY complexity (C901/PLR0911/PLR0912)
+# is not ignored — it is decomposed into named `_resolve_*`/`_load_*` helpers
+# instead, each under the limit on its own.
+"python/src/kb_setup/session_review_archive.py" = ["PLR0913"]
 # S310: the only URL this module opens is the module-level DOCS_URL constant, an
 # https platform.claude.com docs path — never a caller-supplied string, so the
 # audited hazard (an attacker-chosen scheme such as file://) is unreachable.
