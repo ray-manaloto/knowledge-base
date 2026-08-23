@@ -91,6 +91,9 @@ def _print_usage() -> int:
         "[--accept-decision-change NAME[,NAME]] | "
         "graphify-semantic-corpus-merge <name> [PLAN_DIR] [--partial] | "
         "corpus-integrity | "
+        "graphify-native-extract [--out DIR] [--target DIR] [--token-budget N] "
+        "[--max-concurrency N] [--model NAME] [--allow-parallel-claude-cli] [--cluster] "
+        "[--dry-run] | "
         "skillopt-contract | "
         "tool-sync <currency-tool-name> | "
         "skillopt-reviewed --packet P --target T --backend mock|handoff | "
@@ -164,6 +167,7 @@ def _run(argv: list[str] | None = None) -> int:
         "graphify-semantic-corpus",
         "graphify-semantic-corpus-merge",
         "corpus-integrity",
+        "graphify-native-extract",
         "skillopt-contract",
     }:
         return _dispatch_contract(repo_root, cmd, rest)
@@ -262,6 +266,10 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
         from kb_setup import corpus_integrity
 
         return corpus_integrity.integrity_main(repo_root, rest)
+    if cmd == "graphify-native-extract":
+        from kb_setup import graphify_native_extract
+
+        return graphify_native_extract.native_extract_main(repo_root, rest)
     if cmd == "graphify-semantic-corpus-merge":
         from kb_setup import graphify_semantic_corpus_merge
 

@@ -74,6 +74,25 @@ paths = [
   # would need to fix. Narrowed to `telemetry/` alone, so the rest of `.agent/`
   # (including agent reports and receipts) stays scanned.
   '''^\.agent/telemetry/''',
+  # `mise run kb-graphify-native-extract`'s own output tree — a THIRD instance
+  # of the identical shape `.self-graph/` and `^\.agent/telemetry/` already
+  # cover: `gitleaks dir` walks directories rather than tracked files, so a
+  # brand-new gitignored output tree lands in scope the moment it exists. Hit
+  # the first real run produced (2026-08-23): 2 findings on
+  # `graphify-out/cache/stat-index.json`'s `hashes` field (confirmed by
+  # inspecting the file's own schema — `{size, mtime_ns, indexed_at_ns, hashes,
+  # word_count}` per entry — not assumed from the redacted gitleaks output).
+  # Content hashes read as generic-api-key noise at moderate entropy, same as
+  # the `.self-graph/` case.
+  #
+  # Narrowed to `native-extract/` alone, not all of `.agent/`, for the same
+  # reason `^\.agent/telemetry/` is narrow rather than `^\.agent/`: the rest of
+  # `.agent/` (reports, receipts, the notepad) is AUTHORED content that must
+  # stay scanned — `.agent/kb/reports/agents/a-report.md` is the control arm
+  # `tests/test_gitleaks_scope.py` pins for exactly that. Only
+  # `graphify_native_extract.py`'s own subprocess ever writes under
+  # `.agent/kb/native-extract/`.
+  '''^\.agent/kb/native-extract/''',
   '''^graphify-out/[^/]+\.[A-Za-z0-9_]+$''',
   '''^graphify-out/(cache|converted|obsidian|reflections|transcripts|wiki)/''',
   '''^graphify-out/[0-9]{4}-[0-9]{2}-[0-9]{2}/''',
