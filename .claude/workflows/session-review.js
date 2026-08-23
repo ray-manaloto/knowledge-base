@@ -661,8 +661,9 @@ this: a session id you KNOW is under review must match more than zero requests
 
 PER REQUEST extract: model, output_config.effort, thinking.type, max_tokens,
 (.messages|length), (.system|tostring|length), (.tools|length), and the file's
-own byte size. PER RESPONSE extract: model, stop_reason, and usage TAKEN
-WHOLE — it carries eleven keys (cache_creation, an object;
+own byte size. PER RESPONSE extract: id (the join key the pairing step below
+needs to build its {response.id -> file} map — do not skip it), model,
+stop_reason, and usage TAKEN WHOLE — it carries eleven keys (cache_creation, an object;
 cache_creation_input_tokens; cache_read_input_tokens; inference_geo;
 input_tokens; iterations; output_tokens; output_tokens_details;
 server_tool_use; service_tier; speed) — sum the four token counts for a total
@@ -920,8 +921,19 @@ const live = lanes.flatMap((l) => l.findings.filter((f) => f.still_live).map((f)
 // 11 in BOTH modes — but do NOT hardcode 11 anywhere that reads this: a
 // narrowed run (e.g. `cfg.lanes: ['circles']`) correctly raises the cap to 20
 // (1 + 20 + 2 = 23), and a reader who was told "11" will "fix" that back down.
-// The floor of 6 exists so a heavily narrowed lane set never starves the
-// cross-check entirely.
+//
+// THE FLOOR OF 6 DOES NOT PROTECT A NARROWED LANE SET — say this precisely,
+// because the opposite reading is the natural one and it is backwards.
+// Narrowing SHRINKS `ACTIVE_LANES.length`, which makes the raw formula
+// `25 - 2 - L - J` LARGER, not smaller — a narrowed run needs the floor least
+// of all. The floor can only bind when L is unusually LARGE: past 15 lanes in
+// report mode (J=2) or past 13 in handoff mode (J=4) — far beyond today's ten.
+// It exists to guard a FUTURE lane explosion from starving the cross-check to
+// zero refuters, and it has a stated price: once it actually binds, the
+// worst-case total BREAKS the <= 23 invariant above (16 lanes + 6 refuters +
+// 2 judge = 24). That trade is deliberate — a starved cross-check is worse
+// than a run slightly over budget — but the invariant is no longer absolute
+// past that lane count, and a reader relying on it there must know so.
 //
 // The price of the extra lane, stated rather than discovered later: NOT
 // TRIAGED grows by 3 under the default lane sets (14 -> 11) relative to the

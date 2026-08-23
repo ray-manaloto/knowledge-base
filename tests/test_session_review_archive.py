@@ -162,6 +162,36 @@ def test_archive_refuses_when_dest_already_exists(
     assert list(existing.iterdir()) == []
 
 
+def test_archive_refuses_when_a_copy_fails_mid_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`_stage` raises `OSError` on a copy failure, by its own docstring.
+
+    `_write` must convert that into a refusal (rc 2) rather than let it
+    propagate as an uncaught traceback out of `archive()`. Also asserts the
+    `.archive-*` staging directory is not left behind.
+    """
+    repo = _repo(tmp_path)
+    report_dir = _write_report_dir(repo, "r1")
+    result = _bare_result(lanes=["circles"], report_dir=str(report_dir.relative_to(repo)))
+    run_json = _write_run_json(repo / "run.json", result)
+    monkeypatch.setattr(
+        archive_mod,
+        "_copy_verbatim",
+        lambda *_a: (_ for _ in ()).throw(OSError("disk gremlin")),
+    )
+
+    outcome = archive_mod.archive(
+        repo, run_json=run_json, report_dir=None, handoff=None, date="2026-08-23"
+    )
+    assert outcome.refusal is not None
+    assert "staging failed" in outcome.refusal
+    assert "disk gremlin" in outcome.refusal
+    assert outcome.dest is None
+    runs_root = repo / "docs" / "session-review" / "runs"
+    assert list(runs_root.iterdir()) == [], "no dest dir AND no .archive-* leftover"
+
+
 def test_archive_refuses_when_given_handoff_path_does_not_exist(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     report_dir = _write_report_dir(repo, "r1")
@@ -198,6 +228,57 @@ def test_archive_copies_reports_verbatim_byte_for_byte(tmp_path: Path) -> None:
     dest = repo / _dest_of(outcome)
     copied = (dest / "session-review-synthesis.md").read_bytes()
     assert copied == _FORMATTER_HOSTILE_BODY.encode("utf-8")
+
+
+def test_relative_or_absolute_handles_a_report_dir_outside_the_repo(tmp_path: Path) -> None:
+    """`--report-dir` accepts any absolute path, inside the repo or outside it.
+
+    `_abs` never requires it stay inside the repo, and a scratchpad path is a
+    realistic input. `Path.relative_to` raises `ValueError` for a path outside
+    `repo_root`; `_relative_or_absolute` must record the absolute form instead
+    of raising.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    outside = tmp_path / "scratchpad" / "reports"
+    assert archive_mod._relative_or_absolute(outside, repo) == str(outside)
+
+
+def test_relative_or_absolute_prefers_the_relative_form_inside_the_repo(tmp_path: Path) -> None:
+    """The control arm for the outside-the-repo test above.
+
+    A path genuinely inside `repo_root` still gets the shorter, portable
+    relative form — the absolute-path fallback must not swallow the common
+    case too.
+    """
+    repo = tmp_path / "repo"
+    inside = repo / ".agent" / "kb" / "reports" / "r1"
+    assert archive_mod._relative_or_absolute(inside, repo) == ".agent/kb/reports/r1"
+
+
+def test_archive_with_a_report_dir_outside_the_repo_does_not_raise(tmp_path: Path) -> None:
+    """End-to-end version of the two unit tests above.
+
+    A `--report-dir` outside `repo_root` must archive successfully rather
+    than crash on `run.json`'s `report_dir` field.
+    """
+    repo = _repo(tmp_path)
+    outside_report_dir = tmp_path / "scratchpad" / "reports"
+    outside_report_dir.mkdir(parents=True)
+    (outside_report_dir / "session-review-synthesis.md").write_text("s", encoding="utf-8")
+    result = _bare_result(lanes=["circles"], report_dir=str(outside_report_dir))
+    run_json = _write_run_json(repo / "run.json", result)
+
+    outcome = archive_mod.archive(
+        repo,
+        run_json=run_json,
+        report_dir=outside_report_dir,
+        handoff=None,
+        date="2026-08-23",
+    )
+    assert outcome.refusal is None
+    written = json.loads((repo / _dest_of(outcome) / "run.json").read_text(encoding="utf-8"))
+    assert written["archive"]["report_dir"] == str(outside_report_dir)
 
 
 def test_archive_copies_the_handoff_when_given(tmp_path: Path) -> None:
@@ -265,6 +346,36 @@ def test_archive_records_missing_lane_reports_without_failing(tmp_path: Path) ->
     )
     assert outcome.refusal is None
     assert set(outcome.missing) == {"circles.md", "forgotten.md"}
+
+
+def test_archive_records_an_auto_detected_handoff_that_is_missing(tmp_path: Path) -> None:
+    """`result.artifacts.handoff_out` names a path that was never written.
+
+    A report-mode run whose return still carries a stale or hypothetical
+    `handoff_out`, or a composer that died before writing, both look like
+    this. It must NOT refuse the archive — only a `--handoff` explicitly
+    passed and missing refuses — but it must be RECORDED, not silently
+    dropped.
+    """
+    repo = _repo(tmp_path)
+    report_dir = _write_report_dir(repo, "r1")
+    result = _bare_result(
+        lanes=["circles"],
+        report_dir=str(report_dir.relative_to(repo)),
+        handoff_out=".agent/plans/session-2026-08-23-a.md",
+    )
+    run_json = _write_run_json(repo / "run.json", result)
+    # No file written at .agent/plans/session-2026-08-23-a.md.
+
+    outcome = archive_mod.archive(
+        repo, run_json=run_json, report_dir=None, handoff=None, date="2026-08-23"
+    )
+    assert outcome.refusal is None
+    assert any("handoff_out" in m and "session-2026-08-23-a.md" in m for m in outcome.missing)
+    dest = repo / _dest_of(outcome)
+    assert not (dest / "handoff.md").exists()
+    written = json.loads((dest / "run.json").read_text(encoding="utf-8"))
+    assert any("handoff_out" in m for m in written["archive"]["missing"])
 
 
 def test_archive_default_date_from_run_meta_sessions_started_at(tmp_path: Path) -> None:
@@ -470,6 +581,28 @@ def test_regenerate_readme_sorts_by_name_and_skips_archive_temp_dirs(tmp_path: P
     readme = (repo / "docs" / "session-review" / "README.md").read_text(encoding="utf-8")
     assert readme.index("2026-08-18-1") < readme.index("2026-08-23-1")
     assert ".archive-" not in readme
+
+
+def test_regenerate_readme_sorts_run_numbers_numerically_not_lexicographically(
+    tmp_path: Path,
+) -> None:
+    """`sorted(iterdir())` sorts PATHS as strings — the exact defect this pins.
+
+    That put `-10` before `-2` within one date. `-1` must lead, `-2` second,
+    `-10` last, for the SAME date.
+    """
+    repo = _repo(tmp_path)
+    runs_root = repo / "docs" / "session-review" / "runs"
+    (runs_root / "2026-08-23-10").mkdir()
+    (runs_root / "2026-08-23-2").mkdir()
+    (runs_root / "2026-08-23-1").mkdir()
+
+    archive_mod.regenerate_readme(repo)
+    readme = (repo / "docs" / "session-review" / "README.md").read_text(encoding="utf-8")
+    pos_1 = readme.index("2026-08-23-1]")
+    pos_2 = readme.index("2026-08-23-2]")
+    pos_10 = readme.index("2026-08-23-10]")
+    assert pos_1 < pos_2 < pos_10, "run numbers must sort numerically within one date"
 
 
 def test_regenerate_readme_with_no_runs_at_all_is_still_valid(tmp_path: Path) -> None:

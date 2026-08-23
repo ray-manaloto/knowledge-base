@@ -77,6 +77,7 @@ write at all.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -274,23 +275,35 @@ def _check_synthesis(synthesis_src: Path) -> ArchiveOutcome | None:
 
 def _resolve_handoff(
     repo_root: Path, handoff: Path | None, result: dict
-) -> Path | ArchiveOutcome | None:
+) -> tuple[Path | None, str | None] | ArchiveOutcome:
     """`--handoff` (refused if given but missing), else the AUTO-DETECTED one.
 
-    Auto-detection only fires when `result.artifacts.handoff_out` names a path
-    that actually exists on disk — an un-run handoff-mode composer, or a
-    report-mode run with no handoff at all, both leave this None rather than
-    inventing a refusal for a file nobody claimed should exist.
+    Returns `(resolved_path_or_None, missing_note_or_None)`. Auto-detection
+    only RESOLVES to a path when `result.artifacts.handoff_out` names one that
+    actually exists on disk — an un-run handoff-mode composer, or a
+    report-mode run with no handoff at all, both leave the first element None
+    with NO missing note, since nothing was ever claimed to exist.
+
+    When `handoff_out` DOES name a path and that path is not on disk, the
+    first element stays None (the spec keeps this a non-refusal — a missing
+    handoff must not block archiving the rest of the run), but the second
+    element now RECORDS what was missing rather than dropping it silently, so
+    it reaches `run.json["archive"]["missing"]` and the CLI's "missing (not
+    fatal)" lines like any other absent artifact.
     """
     if handoff is not None:
         resolved = _abs(repo_root, handoff)
         if not resolved.is_file():
             return ArchiveOutcome(dest=None, refusal=f"--handoff {resolved} does not exist")
-        return resolved
+        return resolved, None
     artifacts = result.get("artifacts")
     candidate = artifacts.get("handoff_out") if isinstance(artifacts, dict) else None
-    auto = _abs(repo_root, candidate) if candidate else None
-    return auto if auto is not None and auto.is_file() else None
+    if not candidate:
+        return None, None
+    auto = _abs(repo_root, candidate)
+    if auto.is_file():
+        return auto, None
+    return None, f"handoff_out: {candidate} (named by the run, not found on disk)"
 
 
 def _resolve_date(date: str | None, result: dict) -> str | ArchiveOutcome:
@@ -340,9 +353,10 @@ def archive(
     if refusal is not None:
         return refusal
 
-    resolved_handoff = _resolve_handoff(repo_root, handoff, result)
-    if isinstance(resolved_handoff, ArchiveOutcome):
-        return resolved_handoff
+    handoff_result = _resolve_handoff(repo_root, handoff, result)
+    if isinstance(handoff_result, ArchiveOutcome):
+        return handoff_result
+    resolved_handoff, handoff_missing = handoff_result
 
     resolved_date = _resolve_date(date, result)
     if isinstance(resolved_date, ArchiveOutcome):
@@ -358,6 +372,7 @@ def archive(
         report_dir=resolved_report_dir,
         synthesis_src=synthesis_src,
         handoff_src=resolved_handoff,
+        handoff_missing=handoff_missing,
         dest=dest,
         run_json=run_json,
     )
@@ -374,6 +389,12 @@ class _Plan:
     report_dir: Path
     synthesis_src: Path
     handoff_src: Path | None
+    #: The auto-detected `artifacts.handoff_out` path, when it was NAMED by
+    #: the run's return but not found on disk. None in every other case
+    #: (nothing named, or the named path resolved and was copied). Reaches
+    #: the `missing` list `_preview`/`_stage` build, rather than being
+    #: dropped the way it was before this field existed.
+    handoff_missing: str | None
     dest: Path
     run_json: Path
 
@@ -383,7 +404,11 @@ def _lane_and_refute_sources(plan: _Plan) -> tuple[list[tuple[str, Path]], list[
 
     Split out of `_write`/`_preview` so both share the exact same file list —
     a dry-run must preview the plan the real run would execute, not a
-    re-derivation that could disagree with it.
+    re-derivation that could disagree with it. `missing` also carries
+    `plan.handoff_missing` when the run NAMED a handoff that was not found on
+    disk — the same list, because both are "the run claimed this artifact and
+    it was not there", and a reader of `run.json["archive"]["missing"]` should
+    not have to check two places for the same kind of gap.
     """
     present: list[tuple[str, Path]] = []
     missing: list[str] = []
@@ -393,6 +418,8 @@ def _lane_and_refute_sources(plan: _Plan) -> tuple[list[tuple[str, Path]], list[
             present.append((f"{lane_key}.md", src))
         else:
             missing.append(f"{lane_key}.md")
+    if plan.handoff_missing is not None:
+        missing.append(plan.handoff_missing)
     refute_files = sorted(plan.report_dir.glob("refute-*.md"))
     return present, missing, refute_files
 
@@ -428,12 +455,28 @@ def _preview(repo_root: Path, plan: _Plan) -> ArchiveOutcome:
     )
 
 
+def _relative_or_absolute(path: Path, repo_root: Path) -> str:
+    """`path` relative to `repo_root` when it is inside it, else the absolute form.
+
+    `--report-dir` accepts any absolute path — `_abs` does not require it stay
+    inside the repo, and a scratchpad path outside the tree is a realistic
+    input — so `Path.relative_to` can raise `ValueError`. Record the more
+    useful relative form when possible and never raise otherwise; the archive
+    record is evidence, and evidence that crashes the write is worse than
+    evidence spelled with an absolute path.
+    """
+    try:
+        return str(path.relative_to(repo_root))
+    except ValueError:
+        return str(path)
+
+
 def _stage(repo_root: Path, plan: _Plan, tmp_dir: Path) -> tuple[list[str], list[str], list[str]]:
     """Copy every artifact into `tmp_dir` and write its `run.json`.
 
     Returns `(files_written, missing, warnings)`. Raises on any `OSError` from
-    a copy — the caller is responsible for cleaning up `tmp_dir` when this
-    does not return normally; staging never touches `plan.dest`.
+    a copy — the caller (`_write`) catches it and converts it into a refusal;
+    staging never touches `plan.dest`.
     """
     files_written: list[str] = [_SYNTHESIS_NAME]
     _copy_verbatim(plan.synthesis_src, tmp_dir / _SYNTHESIS_NAME)
@@ -458,7 +501,7 @@ def _stage(repo_root: Path, plan: _Plan, tmp_dir: Path) -> tuple[list[str], list
     combined = dict(plan.data)
     combined["archive"] = {
         "archived_from": str(plan.run_json.resolve()),
-        "report_dir": str(plan.report_dir.relative_to(repo_root)),
+        "report_dir": _relative_or_absolute(plan.report_dir, repo_root),
         "input_shape": plan.input_shape,
         "files": list(files_written),
         "missing": list(missing),
@@ -476,15 +519,21 @@ def _write(repo_root: Path, runs_root: Path, plan: _Plan) -> ArchiveOutcome:
 
     `renamed` tracks whether the rename actually landed the directory at
     `plan.dest`: the `finally` block removes `tmp_dir` on every OTHER path
-    (a staging exception, an existing `plan.dest`, or a failed rename) and
-    leaves it alone on success, since a renamed directory no longer exists at
-    the temp path there is nothing left to remove.
+    (a caught staging `OSError`, an existing `plan.dest`, or a failed rename)
+    and leaves it alone on success, since a renamed directory no longer
+    exists at the temp path there is nothing left to remove. A staging
+    failure is returned as a refusal, never left to propagate as a
+    traceback — every failure mode of this module reaches the caller through
+    `ArchiveOutcome.refusal`, not an uncaught exception.
     """
     runs_root.mkdir(parents=True, exist_ok=True)
     tmp_dir = Path(tempfile.mkdtemp(dir=runs_root, prefix=".archive-"))
     renamed = False
     try:
-        files_written, missing, warnings = _stage(repo_root, plan, tmp_dir)
+        try:
+            files_written, missing, warnings = _stage(repo_root, plan, tmp_dir)
+        except OSError as exc:
+            return ArchiveOutcome(dest=None, refusal=f"staging failed: {exc}")
 
         if plan.dest.exists():
             return ArchiveOutcome(
@@ -661,6 +710,28 @@ def _render_readme(rows: list[_Row]) -> str:
     return "\n".join(lines) + "\n"
 
 
+#: `<YYYY-MM-DD>-<n>`, `n` unanchored so it matches any width.
+_RUN_DIR_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d+)$")
+
+
+def _run_dir_sort_key(path: Path) -> tuple[int, str, int, str]:
+    """Sort `<date>-<n>` dirs by `(date, int(n))`; anything else after, by name.
+
+    `sorted(iterdir())` — the previous implementation — sorts PATHS
+    lexicographically, so a plain string compare puts `2026-08-23-10` before
+    `2026-08-23-2`: `n` is compared as a STRING, not a number, the moment a
+    date ever reaches a second-digit run count. Parsing `n` as an int fixes
+    the within-date order; the leading `0`/`1` discriminant keeps a
+    non-matching directory name (a stray or hand-made one) sorting after
+    every real run rather than interleaving into the middle of the table by
+    lexicographic accident.
+    """
+    match = _RUN_DIR_NAME.match(path.name)
+    if match:
+        return (0, match.group(1), int(match.group(2)), "")
+    return (1, "", 0, path.name)
+
+
 def regenerate_readme(repo_root: Path) -> int:
     """Rebuild `docs/session-review/README.md` from every `runs/<date>-<n>/` dir.
 
@@ -674,8 +745,10 @@ def regenerate_readme(repo_root: Path) -> int:
     if runs_root.is_dir():
         rows = [
             _readme_row(entry)
-            for entry in sorted(runs_root.iterdir())
-            if entry.is_dir() and not entry.name.startswith(".")
+            for entry in sorted(
+                (p for p in runs_root.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                key=_run_dir_sort_key,
+            )
         ]
     readme_path = repo_root / "docs" / "session-review" / "README.md"
     readme_path.write_text(_render_readme(rows), encoding="utf-8")
