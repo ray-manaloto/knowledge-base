@@ -653,3 +653,50 @@ def test_merge_main_reports_the_scope_exclusion_it_made(repo, capsys) -> None:
     assert "9 nodes, 1 edges, 1 hyperedges" in out
     assert "chunk 0001: excluded 1/10 out-of-scope node(s) (10.0%)" in out
     assert "chunk-0001-scope-exclusions.json" in out
+
+
+@pytest.mark.parametrize(
+    ("bad_id", "expected_reason"),
+    [
+        (None, "semantic-node-identity-invalid"),
+        ("readme_1", "duplicate-semantic-node-identity"),
+    ],
+    ids=["non-string-id", "id-collides-with-an-in-scope-node"],
+)
+def test_a_malformed_node_id_refuses_upstream_and_never_reaches_sanitization(
+    repo, bad_id: object, expected_reason: str
+) -> None:
+    """Both reaching cases for "exclusion by id mishandles a node" — REFUSED upstream.
+
+    Read in isolation, deriving `kept_nodes` from an id set rather than from the
+    predicate that built `excluded_nodes` is wrong in two opposite directions: a
+    node with no string `id` would be COUNTED as excluded and then KEPT (counts
+    and bytes diverge), and an in-scope node sharing an id with an excluded one
+    would be DROPPED (silent loss, under-counted). The cold lane on `0e088a04`
+    raised the first and argued the `emptied` guard made the second impossible.
+
+    Neither is reachable end-to-end, and this test is how that was established
+    rather than reasoned: staging validates node identity first and emits a
+    reason that is NOT one of the two survivable scope reasons, so such a
+    fragment refuses before `_sanitize_scope` runs at all.
+    `probes-need-a-control-arm.md` rule 9 — "unreachable by construction" is
+    earned by building the reaching case and watching it be rejected, never by a
+    chain of true premises. Both cases were built; both were rejected.
+
+    The fix in `_sanitize_scope` stands anyway, because it costs nothing and
+    makes the two lists exact complements by construction instead of by
+    coincidence — but it is a latent-trap removal, not a live-bug fix, and this
+    test is what stops the next reader believing otherwise or "simplifying" the
+    predicate back to an id lookup.
+    """
+    out_of_scope = "worked/x/graph.json"
+    fragment = _scope_fragment((out_of_scope,))
+    nodes = fragment["nodes"]
+    assert isinstance(nodes, list)
+    nodes[-1] = {**nodes[-1], "id": bad_id}
+
+    candidate = _scope_plan(repo, (_SCOPE_A, _SCOPE_B))
+    _stage_fragment(candidate, fragment, (_SCOPE_A, _SCOPE_B))
+
+    with pytest.raises(ValueError, match=expected_reason):
+        merge.assemble(repo, candidate, "corpus-probe")

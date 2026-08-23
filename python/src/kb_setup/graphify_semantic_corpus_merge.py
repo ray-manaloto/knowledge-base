@@ -344,8 +344,39 @@ def _sanitize_scope(
         bound_pct = f"{_MAX_EXCLUDED_SHARE:.0%}"
         share_reason = f"scope-exclusion-share-exceeded:{len(excluded_nodes)}/{total}>{bound_pct}"
         return fragment, None, [share_reason]
+    # `excluded_ids` is for the EDGE/HYPEREDGE cascade only — those cite nodes by
+    # id, so an id set is the right shape there.
+    #
+    # `kept_nodes` must NOT be derived from it, and the first draft of this
+    # function was: it filtered `n.get("id") in excluded_ids`, which asks a
+    # DIFFERENT question from the one `excluded_nodes` answered. Read in
+    # isolation that is wrong in two opposite directions — a node with no string
+    # `id` would be COUNTED as excluded and then KEPT (counts and bytes diverge),
+    # and an in-scope node sharing an id with an excluded one would be DROPPED
+    # (silent loss, under-counted).
+    #
+    # NEITHER IS REACHABLE END-TO-END, and that is measured rather than argued:
+    # staging validates node identity first and emits
+    # `semantic-node-identity-invalid` / `duplicate-semantic-node-identity`,
+    # neither of which is a survivable scope reason, so such a fragment refuses
+    # before this function runs. Both reaching cases were CONSTRUCTED and watched
+    # to be rejected — `probes-need-a-control-arm.md` rule 9 — and that arm is
+    # pinned by `test_a_malformed_node_id_refuses_upstream_and_never_reaches_sanitization`.
+    #
+    # So this is a latent-trap removal, not a live-bug fix; do not read it as
+    # evidence the upstream guard is absent. It is kept because it costs nothing
+    # and makes the two lists exact complements BY CONSTRUCTION rather than by
+    # coincidence — the property the counts depend on, and one that would quietly
+    # stop holding if that upstream identity check ever moved.
+    #
+    # (Cold lane, 0e088a04, finding 1 — and its finding 2 argued the `emptied`
+    # guard below was unreachable on the assumption that exclusion was by
+    # `source_file`. With the predicate restored here, that assumption is now
+    # true, which is the other reason to prefer this shape.)
     excluded_ids = {n["id"] for n in excluded_nodes if isinstance(n.get("id"), str)}
-    kept_nodes = [n for n in nodes if not (isinstance(n, dict) and n.get("id") in excluded_ids)]
+    kept_nodes = [
+        n for n in nodes if not (isinstance(n, dict) and n.get("source_file") not in declared)
+    ]
     remaining_files = {n.get("source_file") for n in kept_nodes if isinstance(n, dict)}
     emptied = sorted(declared - remaining_files)
     if emptied:

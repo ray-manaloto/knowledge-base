@@ -213,3 +213,41 @@ def test_run_the_real_committed_workflows_is_clean() -> None:
     result = workflow_lint.run(repo_root)
     assert isinstance(result, External), result
     assert result.code == 0, result.message
+
+
+def test_a_root_biome_config_is_reported_rather_than_silently_ignored(tmp_path, capsys) -> None:
+    """Report a repo-root biome config rather than silently ignoring it.
+
+    Biome resolves config by walking UP from the linted file, so a root config
+    never reaches the temp copies. That is by design; being SILENT about it is not.
+
+    The failure this prevents is the one the cold lane named on `0e088a04`: a
+    maintainer edits the project's biome rules, this gate ignores them, and the
+    only symptom is an edit that appears to do nothing.
+    """
+    (tmp_path / ".claude" / "workflows").mkdir(parents=True)
+    (tmp_path / ".claude" / "workflows" / "w.js").write_text(
+        "export const meta = { name: 'w' }\nreturn { ok: 1 }\n", encoding="utf-8"
+    )
+    (tmp_path / "biome.json").write_text("{}\n", encoding="utf-8")
+
+    workflow_lint.run(tmp_path)
+
+    out = capsys.readouterr().out
+    assert "biome.json exists at the repo root" in out
+    assert "does NOT read it" in out
+
+
+def test_no_root_biome_config_means_no_note(tmp_path, capsys) -> None:
+    """The control arm: the note must not fire when there is nothing to warn about.
+
+    Without this, the test above passes on a function that prints unconditionally.
+    """
+    (tmp_path / ".claude" / "workflows").mkdir(parents=True)
+    (tmp_path / ".claude" / "workflows" / "w.js").write_text(
+        "export const meta = { name: 'w' }\nreturn { ok: 1 }\n", encoding="utf-8"
+    )
+
+    workflow_lint.run(tmp_path)
+
+    assert "repo root" not in capsys.readouterr().out

@@ -184,6 +184,30 @@ def run(repo_root: Path) -> Result[int]:
         except ShapeError as exc:
             return Err(str(exc), Rc.FINDINGS)
 
+        # `_BIOME_CONFIG` is written INTO the temp dir and biome runs with
+        # `cwd=tmp_path`, so biome resolves this config and no other. That is
+        # deliberate — the config disables a rule that only fires because of the
+        # transform — but it has a consequence a reader will not guess: biome
+        # resolves config by walking UP from the linted file, so a `biome.json`
+        # at the repo root would be silently ignored by this gate.
+        #
+        # There is none today (measured 2026-08-23). Rather than leave that as a
+        # trap for whoever adds one, say so out loud: a root config appearing is
+        # a real divergence between "the project's biome rules" and "the rules
+        # this gate enforces", and it must not be discovered by wondering why an
+        # edit had no effect. Refusing is the wrong shape (a root config is not a
+        # defect), so this reports and continues. (Cold lane, 0e088a04, finding 4.)
+        root_config = next(
+            (p for p in (repo_root / name for name in ("biome.json", "biome.jsonc")) if p.exists()),
+            None,
+        )
+        if root_config is not None:
+            print(
+                f"workflow-lint: NOTE — {root_config.name} exists at the repo root and this "
+                "gate does NOT read it. The workflow scripts are linted as transformed copies "
+                "in a temp dir under a self-contained config; rules added at the root do not "
+                "reach them. Fold any rule you want enforced here into `_BIOME_CONFIG`."
+            )
         (tmp_path / "biome.jsonc").write_text(_BIOME_CONFIG, encoding="utf-8")
 
         argv = ["biome", "lint", *(s.name for s in sources)]
