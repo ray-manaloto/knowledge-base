@@ -72,3 +72,43 @@ comments. `[code]smith` is Blacksmith's autofix upsell check (always `skipping`)
   fixture that depended on repo state.
 - `graphify_semantic_corpus_run.py` is digested into every plan (`runner_sha256`):
   even a message-wording edit there is a re-authorization.
+
+## ADDENDUM — the 2026-08-23 landing session — VERBATIM
+
+Written 2026-08-23 at `/clear-prep` by the session that landed PR #463 (Fable 5,
+effort max; `implementation lane = codex`, `codex effort = xhigh` from that PR on).
+
+### On the unreceipted commit on top of PR #463
+
+`/kb-resume` found HEAD `d85f2835…` (the one-line `fable-orchestrator: codex effort =
+xhigh` in `.claude/CLAUDE.md`) local-only and unreceipted above the PR head. Asked how
+to land, Ray, VERBATIM:
+
+> i made that change to make change to 'fable-orchestrator: codex effort = xhigh'
+> can we just do a quick git push and land since that change shouldn't affect actual code or changes we were working on
+
+Done as a kb-review §4 fix-round (no new lane round; the gate would have refused a
+bare push + `kb-land`): report at the new SHA, receipt, `kb-ship`, bots read by
+body, 2 real CodeRabbit items fixed in `f0659e51…` (second fix-round), `kb-land`.
+**#464** carries the two deferred items.
+
+### On how every landing/resync session must END — VERBATIM (rejecting the first plan)
+
+> automatically run /clear-prep with the session-review workflow as step 8
+> - the next session will work on the Claude resync 2.1.240 → 2.1.241
+>   - and automaically [sic] run /clear-prep again with the session-review workflow after that
+
+Encoded: a session does not end on `kb-land`; it ends on `clear-prep` invoked WITH
+`kb-session-select -- --current` → `Workflow session-review {output:'handoff'}` →
+`kb-handoff-check`, then the `/clear` question. The same for the resync session.
+
+### On the resync session's scope (AskUserQuestion, clear-prep step 0)
+
+Asked whether session N+1 stops after the resync lands or also re-scopes #455–#458
+and starts the deep extraction: *"Resync only, then clear-prep (Recommended)"*. So:
+N+1 = slice constants (`_CURRENT_CLAUDE_*`, re-hash the installed `claude`, re-check
+the `--help` digest) + `sources/claude-code.manifest` + `currency.toml
+[tool.claude-code]` + the #464 comment, ninth `record --accept` by tool, `verify`
+authorized, review/ship/land, `/clear-prep` + session-review. N+2 = re-scope #455
+#456 #411 #457 #458, then `kb-graphify-semantic-corpus -- run` (26 chunks, cap $63,
+effort high), supervised.
