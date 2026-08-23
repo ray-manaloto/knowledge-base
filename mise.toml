@@ -149,7 +149,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 codex = "0.149.0"
-antigravity-cli = "1.1.17"
+antigravity-cli = "1.1.19"
 
 [deps.uv]
 auto = true
