@@ -180,8 +180,35 @@ local proseExclude = baseExclude
   + List("graphify-out/memory/**", "docs/research/**", "docs/goals/*-goal.md", "docs/direction/**",
       "docs/session-review/runs/**",
       "sources/**",
+      "graphify-out/graphify-semantic-corpus-chunks/**",
+      "graphify-out/graphify-semantic-corpus/**",
       "**/graphify-out/.*.tmp",
       "**/graphify-semantic-corpus-authority-ledger.md")
+// `graphify-out/graphify-semantic-corpus-chunks/**` and
+// `graphify-out/graphify-semantic-corpus/**` — retained provider evidence and the
+// plan it was executed against. Ray, 2026-08-23: *"we shouldnt be checking typos
+// on graphify sources since that is not our data — we just need to take in what
+// they have."* Same category as `sources/**` two lines up, and the same argument
+// as every entry here: these bytes are a record of what a provider returned, and
+// a spell-checker "fixing" one edits the evidence.
+//
+// Measured on the run that prompted it: `typos` returns rc=2 against the staged
+// chunks, objecting eight times to one three-letter prefix — the same
+// wrongly-flagged prefix the ledger entry below is about — inside
+// model-generated extraction output. Those are not typos in anything authored
+// here, and they recur on every run: the corpus is ABOUT code, so the model
+// reaches for that prefix constantly when describing something resolved,
+// attributed or bound to the wrong thing.
+//
+// The prefix is deliberately NOT spelled anywhere in this file, for the reason
+// the ledger entry already records: `hk.pkl` is not on any exclusion list, so
+// naming it here re-breaks this very step. Measured twice now — the first draft
+// of THIS comment quoted four examples and turned the step red on its own text.
+//
+// FORMATTERS AND typos ONLY, per the asymmetry this whole list rests on:
+// `check_added_large_files` still reads this tree, which is deliberate — it is
+// the check that caught a superseded 2.8 MB cache namespace sitting there, and
+// removing that coverage would have hidden exactly the thing worth finding.
 // `docs/agents/graphify-semantic-corpus-authority-ledger.md` — the append-only
 // ledger `kb-setup graphify-semantic-corpus record --accept` writes: one bullet
 // of hashes per re-authorization. Machine-written, same class as

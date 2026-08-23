@@ -1497,3 +1497,140 @@ structured report is an error state, not a success"*.
   at all.
 - Touch anything outside the project (`do-not.md` #11) — which is why
   `/antigravity:migrate` is **answered rather than run**.
+
+## Execution log — 2026-08-23, the session that ran this plan
+
+Appended rather than edited into the units above: a plan rewritten in parts ends
+up arguing with itself, and the value of this record is the DELTA between what
+was planned and what happened. Where a line below contradicts a unit above, this
+section is the later measurement.
+
+### First action 1 — the Artifact is published
+
+<https://claude.ai/code/artifact/10c800a8-0bd3-4d2e-960b-2e1a92ae79a2>
+
+Four figures, every number re-read from `.claude/workflows/session-review.js`
+rather than carried from this document: the three-phase pipeline, a before/after
+of PR #466 drawn as the three edges that changed, the ten-lane inventory with
+per-lane model and effort, and the refuter-cap formula evaluated for all three
+run shapes. That last one answers Ray's *"why is there only 1 agent"* directly —
+`25 - 2 - 1 - 4 = 18`, so the one-lane validation run FREED seven agents into
+verification. The durability contract now has both halves: this tracked document
+and that page.
+
+### U2a — the run executed, and failed closed on its first pass
+
+| | |
+|---|---|
+| chunks | 26 planned, **20 completed, 6 failed**, 0 repaid, 0 skipped |
+| spend | **$20.864456** against the $63.00 cap — 33% |
+| graph | 1,666 nodes, 2,478 edges, 60 hyperedges |
+| rate | **$0.948 / chunk** measured over 22 charges |
+
+**Decision 1 is discharged and decision 12 with it.** The early-stop measurement
+Ray ruled for is what produced the rate, at the live `effort: high` config, for
+free. The pre-existing $1.32/chunk figure was flagged as possibly a FLOOR under
+`effort: high`; measured, it is **$0.948 — lower**. The cap was never in play and
+needed no `record --accept`. **Zero records this pass**, which is the outcome the
+ruling was designed to reach.
+
+**The six failures are TWO classes, and only one of them is transient.** Reading
+them as one number would have cost the second finding:
+
+| class | chunks | staged? | charged? | what happened |
+|---|---|---|---|---|
+| provider error | 3, 8, 11, 23 | no | **no** | `claude -p` exited 1 with a well-formed result envelope reporting an error |
+| validation reject | 12, 26 | **yes** | **yes** | real output (40 and 46 nodes) rejected on `fragment-source-scope-mismatch` + `fragment-source-coverage-mismatch` |
+
+The first class names EIGHT rejection reasons at once, which reads as eight
+problems and is one: `result-type-invalid` and `turn-bound-exceeded` did NOT
+fire, so the envelope was well-formed and every downstream validity check failed
+for want of a valid result. `probes-need-a-control-arm.md`'s uniform-negative
+shape, in a provider's voice.
+
+The ledger is honest about the difference — 22 charges against 22 staged chunks,
+and the four missing stage directories are exactly 3, 8, 11 and 23. **A provider
+failure costs nothing.**
+
+The second class is the one worth carrying: it is a MODEL-BEHAVIOUR failure, not
+a transport one, and graphify reported it twice more in the same run — 3
+out-of-scope nodes dropped (`graph.html`, `graph.json`, `manifest.json`, its #1895)
+and **18 of 113 dispatched files producing no nodes at all**. Those two
+chunks are already staged, so a resume may skip them and leave `failed = 2`
+permanently.
+
+### U0 — the re-run hypothesis is REFUTED, and the cause is named
+
+U0's own first instruction was followed: `mise run kb-build` was re-run and read
+for its real rc. **rc = 1, identical failure, no drift.** graphify's *"a re-run
+will retry them"* was tried and it persists, so by this plan's own branch this is
+the #409 reviewed-warning inventory problem and not #397.
+
+Diagnosed to one line, control-armed:
+
+- Four `pyproject.toml` exist in the `datamodel-code-generator` clone. **Exactly
+  one** carries a `[project]` table with a `name`. The other three open on
+  `[tool.ruff]`, `[tool.isort]` and `[tool.black]` and have no `[project]` table.
+- graphify routes `pyproject.toml` to `extract_package_manifest` **by filename**,
+  before suffix dispatch, and that extractor's zero-node path is exactly
+  `if not info or not info.get("name")`. So the three legitimately produce zero
+  nodes and **nothing is being lost** — the gate is refusing a non-loss.
+- The reviewed-warning approver that exists to absorb this verifies the claim by
+  calling `extract_json`. It is **JSON-only**, so a TOML manifest has no route to
+  approval at all. That is precisely what the `codex` source's own `build = skip`
+  reason already said: *"the reviewed-metadata approver is JSON-only, so a TOML
+  file needs new machinery."*
+- graphify ships **no TOML extractor module** — `graphify/extractors/` holds
+  `json_config.py` and nothing TOML-shaped — which is why this is the package
+  manifest path's problem and not the unsupported-language one.
+
+**So decision 14's `build = skip` is the wrong first move here.** The repair is
+one class of machinery, and it unblocks `codex` too — a TOOLCHAIN source, so
+while it stays skipped the corpus cannot describe a tool this repo runs. Decision
+14 remains in reserve if the repair does not land.
+
+### U7 — the `.codex/config.toml` writer hunt is ALREADY DISCHARGED
+
+This unit lists it as a lane the drafts dropped, evidenced by
+`grep "codex/config.toml"` over this plan returning 0. That is true of the plan
+and **false of the world**: the hunt was answered on 2026-08-21.
+
+Running `mise run kb-attribute-write` at the file's mtime returns only a session
+investigating *itself* — because the current mtime is that investigation's own
+`git checkout --` revert, not the writer's touch. **The instrument was pointed at
+a moment a later remediation had overwritten**, which is a bound worth
+remembering the next time this task is reached for.
+
+The writer is the **ChatGPT desktop app's "Import from another AI app" with
+autosync on**, established from the app's own Import screen. Eleven candidate
+writers were refuted across two incidents because every probe was scoped to
+processes this repo runs, and no transcript, `pgrep` or liveness check can see a
+GUI application on a sync timer.
+
+The report was gitignored while four tracked issues cited it. Promoted to
+`docs/research/reports/2026-08-21-codex-config-writer.md` and indexed. **Take
+this item off U7**; the general writer-attribution lane keeps its value.
+
+### U9b — the four absent sources are registered
+
+`sources/REGISTRY.md` rows 110-113. Control-armed: the first control token
+returned 0 as well, and only a second control at 68 hits established that the
+file reads and the negatives are real — a token-spelling bound, caught.
+
+Each row carries the U0 ingestion gate and row 47's truncation arm, because a
+fetch that returns a table of contents and looks like a successful ingestion is
+this corpus's recorded failure, not a hypothetical.
+
+### What this session learned about its own lanes
+
+Both dispatched lanes went idle **without delivering a report** — the #432
+pattern, now in its third round. The tree was checked before anything else per
+the unsettled-lane rule (HEAD unmoved, no lane edits, no surviving process), then
+both were nudged. Worth noting for U7's tooling-gap brief: this is not an
+occasional slip, it is the default outcome, and the remedy is already recorded.
+
+Separately, the plugin's premise gate **refused a well-formed dispatch** because
+its PREMISES rows were written as a markdown table: it requires each row to BEGIN
+with its type letter, and a row beginning with `|` is invisible to it. Both spec
+files written this session used the table form, so the bounce is waiting for
+every future dispatch that copies their shape.
