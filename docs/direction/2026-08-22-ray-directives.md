@@ -52,6 +52,9 @@ comments. `[code]smith` is Blacksmith's autofix upsell check (always `skipping`)
   `_CURRENT_CLAUDE_VERSION = "2.1.240"` + executable digest will refuse the run's
   preflight until the claude resync advances them — which moves
   `semantic_slice_sha256`, so the ninth record is one `record --accept` by the tool.
+  [SUPERSEDED 2026-08-23 — see 'On the review's CONFIRMED P1' below: preflight does
+  NOT refuse on the Claude identity; the compare is post-hoc per chunk, which is why
+  the resync also closes that window.]
   Assumption recorded: the run keeps effort high / cap $63 unless Ray says otherwise.
 
 ## On clear-prep — the answer to the 73.5% context offer
@@ -72,3 +75,92 @@ comments. `[code]smith` is Blacksmith's autofix upsell check (always `skipping`)
   fixture that depended on repo state.
 - `graphify_semantic_corpus_run.py` is digested into every plan (`runner_sha256`):
   even a message-wording edit there is a re-authorization.
+
+## ADDENDUM — the 2026-08-23 landing session — VERBATIM
+
+Written 2026-08-23 at `/clear-prep` by the session that landed PR #463 (Fable 5,
+effort max; `implementation lane = codex`, `codex effort = xhigh` from that PR on).
+
+### On the unreceipted commit on top of PR #463
+
+`/kb-resume` found HEAD `d85f2835…` (the one-line `fable-orchestrator: codex effort =
+xhigh` in `.claude/CLAUDE.md`) local-only and unreceipted above the PR head. Asked how
+to land, Ray, VERBATIM:
+
+> i made that change to make change to 'fable-orchestrator: codex effort = xhigh'
+> can we just do a quick git push and land since that change shouldn't affect actual code or changes we were working on
+
+Done as a kb-review §4 fix-round (no new lane round; the gate would have refused a
+bare push + `kb-land`): report at the new SHA, receipt, `kb-ship`, bots read by
+body, 2 real CodeRabbit items fixed in `f0659e51…` (second fix-round), `kb-land`.
+**#464** carries the two deferred items.
+
+### On how every landing/resync session must END — VERBATIM (rejecting the first plan)
+
+> automatically run /clear-prep with the session-review workflow as step 8
+> - the next session will work on the Claude resync 2.1.240 → 2.1.241
+>   - and automaically [sic] run /clear-prep again with the session-review workflow after that
+
+Encoded: a session does not end on `kb-land`; it ends on `clear-prep` invoked WITH
+`kb-session-select -- --current` → `Workflow session-review {output:'handoff'}` →
+`kb-handoff-check`, then the `/clear` question. The same for the resync session.
+
+### On the resync session's scope (AskUserQuestion, clear-prep step 0)
+
+Asked whether session N+1 stops after the resync lands or also re-scopes #455–#458
+and starts the deep extraction: *"Resync only, then clear-prep (Recommended)"*. So:
+N+1 = slice constants (`_CURRENT_CLAUDE_*`, re-hash the installed `claude`, re-check
+the `--help` digest) + `sources/claude-code.manifest` + `currency.toml
+[tool.claude-code]` + the #464 comment, ninth `record --accept` by tool, `verify`
+authorized, review/ship/land, `/clear-prep` + session-review. N+2 = re-scope #455 #456 #411 #457 #458, then `kb-graphify-semantic-corpus -- run` (26 chunks, cap $63, effort high), supervised.
+
+### On the review's CONFIRMED P1 and on the review itself (AskUserQuestion, after the session-review workflow ran)
+
+The session-review workflow's P1: `verify` says `execution_authorized` at claude
+2.1.241 against a plan recorded at 2.1.240 — the run's preflight checks the graphify
+half only, the Claude compare is post-hoc per chunk, so a run would spend the cap
+staging 26/26 failed. Asked whether the resync session also closes that window:
+*"Yes — close it in the resync (Recommended)"*. Encoded: the resync makes the run's
+preflight compare the LIVE claude identity against the plan's and refuse before any
+spend; both modules are digested, so it is the same single re-record.
+
+Asked to `/clear`, Ray instead asked, VERBATIM:
+
+> what did we do w the results of the session-review workflow?
+> what actions where taken? did it do any self-improvement to this project?
+
+Answered honestly: consumed, not applied — the handoff was checked, one composer
+claim refuted (stale remote-tracking refs), the P1 turned into the question above,
+memories written, lane reports copied to a dated dir; **no repo change from the
+review until that question**. Then applied the cheap CONFIRMED items before the
+clear: the `AGENTS.md` contradiction (`md-size-budgets.md:81`, `md_budget.py:123`),
+the stale 499 MB figure in `CLAUDE.md`, and a dated `reportDir` in the
+kb-session-review invoke snippet (#431's collision). The lesson is the skill's own
+§5 — the apply half is the half that gets skipped — and the standing brief is now:
+**a session-review run ends with its CONFIRMED findings applied or filed, named one
+by one, before the `/clear` question is asked.**
+
+### On the session-review workflow itself — VERBATIM, and built the same session
+
+Asked right after the "what did we do with the results" exchange:
+
+> update the session-review workflow to always create a detailed report in order to track exactly what was done?
+> is the session-review workflow parsing the telemetry files? if not, why not?
+
+Answered: handoff mode wrote only the handoff (report mode wrote the synthesis) and
+the tracked `docs/session-review/runs/<date>-<n>/` was hand-assembled every time; the
+telemetry sink (`.agent/telemetry/`, Claude Code's `OTEL_LOG_RAW_API_BODIES=file:`
+sink, enabled 2026-08-17 "maximum capture for self-learning", 2.5 GB) had NO reader —
+a sink with no consumer, the #461 shape. Scheduling answers (AskUserQuestion, verbatim):
+
+> /fable-orchestrator:orchestration implement option 1
+
+(option 1 = build the report-always change + the `kb-session-review-archive` task now,
+before `/clear`) and, on a telemetry lane: *"Yes — build it now with the report change"*.
+
+Built this session through the orchestration flow (spec rev3, two premise-verifier
+rounds, codex lane at xhigh, Gemini cold review ×2, live validation run archived by
+the new task): PR #466 `session-review-report-always`. The standing brief it adds:
+**every session-review run leaves its ranked synthesis on disk in both output modes and
+is archived by `mise run kb-session-review-archive`, never by hand; the `telemetry`
+lane is in the default handoff set.**

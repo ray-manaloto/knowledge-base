@@ -120,7 +120,8 @@ _MAX_IMPORT_DEPTH = 4
 # that imports it." So an AGENTS.md reaches context ONLY through its stub's
 # @import, and is budgeted as a member of that closure — never standalone.
 # Budgeting it twice would both double-count the eager total and blame the
-# wrong file. This repo is Claude-only and ships no AGENTS.md at all; dotfiles
+# wrong file. This repo's AGENTS.md is a tracked SIBLING of CLAUDE.md (codex's
+# minimum, not an @import stub), so no budget counts it here; dotfiles
 # separately guarantees every AGENTS.md has its stub (`claude_agents_md_pairs`),
 # which is what makes the closure-only treatment safe there: none is orphaned.
 _ENTRY_RE = re.compile(r"(^|/)CLAUDE\.md$")

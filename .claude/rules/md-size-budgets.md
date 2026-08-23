@@ -78,9 +78,11 @@ rule — which is why it is recorded rather than quietly fixed.
 | `rule_scoped` — `.claude/rules/*.md` with `paths:` | "only load into context when Claude works with matching files" | **400** | 32,000 |
 | `skill` — `.claude/skills/**/SKILL.md` | on invocation/relevance only | **500** | 32,000 |
 
-This repo is **Claude-only and ships no `AGENTS.md`**, so AGM-003's 12,000-char
-ceiling never binds here — but the shared engine still must not re-adopt the
-figure, and a test pins that.
+This repo is **Claude-only**; its `AGENTS.md` (tracked, 51 lines, codex's minimum)
+is a SIBLING of `CLAUDE.md`, not an `@import` stub, so no budget counts it and
+AGM-003's 12,000-char ceiling never binds here — but the shared engine still must
+not re-adopt the figure, and a test pins that. (This line said "ships no
+`AGENTS.md`" until the 2026-08-23 session review read it against `git ls-files`.)
 
 Plus the skill-listing budget — **two** mechanisms, recorded here as one until
 2026-07-30 (#76 docs review; `skills.md` § *Skill descriptions are cut short*):
