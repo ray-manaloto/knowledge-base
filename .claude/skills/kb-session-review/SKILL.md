@@ -227,6 +227,8 @@ mise run kb-session-select -- --current
 Workflow({ name: 'session-review', args: {
   output: 'handoff',          // the ARTIFACT; `lanes` defaults to the seven below
   handoffOut: '.agent/plans/session-<date>-<letter>.md',
+  reportDir: '.agent/kb/reports/agents/<date>-session-review',   // DATED — the root default
+                                                                  // overwrote prior evidence twice (#431)
   sessions, handoffs, answered,
 }})
 ```

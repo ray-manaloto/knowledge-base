@@ -112,3 +112,29 @@ the `--help` digest) + `sources/claude-code.manifest` + `currency.toml
 authorized, review/ship/land, `/clear-prep` + session-review. N+2 = re-scope #455
 #456 #411 #457 #458, then `kb-graphify-semantic-corpus -- run` (26 chunks, cap $63,
 effort high), supervised.
+
+### On the review's CONFIRMED P1 and on the review itself (AskUserQuestion, after the session-review workflow ran)
+
+The session-review workflow's P1: `verify` says `execution_authorized` at claude
+2.1.241 against a plan recorded at 2.1.240 — the run's preflight checks the graphify
+half only, the Claude compare is post-hoc per chunk, so a run would spend the cap
+staging 26/26 failed. Asked whether the resync session also closes that window:
+*"Yes — close it in the resync (Recommended)"*. Encoded: the resync makes the run's
+preflight compare the LIVE claude identity against the plan's and refuse before any
+spend; both modules are digested, so it is the same single re-record.
+
+Asked to `/clear`, Ray instead asked, VERBATIM:
+
+> what did we do w the results of the session-review workflow?
+> what actions where taken? did it do any self-improvement to this project?
+
+Answered honestly: consumed, not applied — the handoff was checked, one composer
+claim refuted (stale remote-tracking refs), the P1 turned into the question above,
+memories written, lane reports copied to a dated dir; **no repo change from the
+review until that question**. Then applied the cheap CONFIRMED items before the
+clear: the `AGENTS.md` contradiction (`md-size-budgets.md:81`, `md_budget.py:123`),
+the stale 499 MB figure in `CLAUDE.md`, and a dated `reportDir` in the
+kb-session-review invoke snippet (#431's collision). The lesson is the skill's own
+§5 — the apply half is the half that gets skipped — and the standing brief is now:
+**a session-review run ends with its CONFIRMED findings applied or filed, named one
+by one, before the `/clear` question is asked.**
