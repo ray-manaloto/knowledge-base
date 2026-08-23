@@ -11,6 +11,7 @@ import pytest
 from kb_setup import graphify_baseline, graphify_sdk
 from kb_setup.currency import config as currency_config
 from kb_setup.graphify_health import (
+    EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ExpectedMetadataOnly,
     ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
@@ -757,6 +758,155 @@ def test_metadata_skip_mutations_do_not_approve(
     )
 
     assert approved == ()
+
+
+# --- U0: the package-manifest zero-node route --------------------------------
+#
+# graphify's `_get_extractor` (extract.py:5207-5208) routes every
+# `PACKAGE_MANIFEST_NAMES` filename (`Cargo.toml`, `pyproject.toml`, `go.mod`,
+# `pom.xml`, `apm.yml`/`apm.yaml`) to `extract_package_manifest` ahead of all
+# suffix dispatch, including `.json`. `extract_package_manifest` never reports a
+# `skipped` reason on its zero-node path (a table with no `name`), unlike
+# `extract_json` — so these fixtures exercise a DIFFERENT extractor stub and a
+# DIFFERENT disposition check than the JSON tests above.
+
+_MANIFEST_WARNING = (
+    "  warning: 1 source file(s) produced zero nodes and are absent from the graph: "
+    "Cargo.toml. A re-run will retry them (empties are no longer cached); if it persists, "
+    "please report the file(s) (#1666).\n"
+)
+
+
+def _refuse_extract_json(_path: Path) -> dict[str, object]:
+    """Fail the test if the approver falls back to the JSON extractor.
+
+    Mirroring graphify's own dispatch means a package-manifest path must never
+    reach `extract_json`.
+    """
+    raise AssertionError("extract_json must not run for a package-manifest path")
+
+
+def _manifest_inventory(
+    path: Path, *, digest: str | None = None, disposition: str | None = None
+) -> tuple[ExpectedMetadataOnly, ...]:
+    import hashlib
+
+    return (
+        ExpectedMetadataOnly(
+            source_name="reviewed-source",
+            relative_path="Cargo.toml",
+            content_sha256=digest or hashlib.sha256(path.read_bytes()).hexdigest(),
+            skipped_disposition=disposition or EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+        ),
+    )
+
+
+def test_package_manifest_zero_node_warning_approves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A no-name `[workspace]` `Cargo.toml` is a CORRECT zero-node result.
+
+    Dispatched to `extract_package_manifest` (never `extract_json`) and
+    approved via the `EXPECTED_PACKAGE_MANIFEST_NO_NAME` sentinel, since
+    graphify itself reports nothing to pin to for this case.
+    """
+    path = tmp_path / "Cargo.toml"
+    path.write_text('[workspace]\nmembers = ["crates/a"]\n', encoding="utf-8")
+    monkeypatch.setattr(
+        graphify_sdk, "extract_package_manifest", lambda _path: {"nodes": [], "edges": []}
+    )
+    monkeypatch.setattr(graphify_sdk, "extract_json", _refuse_extract_json)
+
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        tmp_path, "reviewed-source", _MANIFEST_WARNING, _manifest_inventory(path)
+    )
+
+    assert approved == ("approved-reviewed-metadata-zero-node",)
+
+
+@pytest.mark.parametrize(
+    "mutation", ["hash", "disposition", "nodes", "edges", "error", "unregistered", "wrong-route"]
+)
+def test_package_manifest_zero_node_mutations_do_not_approve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    path = tmp_path / "Cargo.toml"
+    path.write_text('[workspace]\nmembers = ["crates/a"]\n', encoding="utf-8")
+    extraction: dict[str, object] = {"nodes": [], "edges": []}
+    if mutation == "nodes":
+        extraction["nodes"] = [{"id": "pkg:demo", "label": "demo"}]
+    if mutation == "edges":
+        extraction["edges"] = [{"source": "pkg:demo", "target": "pkg:dep"}]
+    if mutation == "error":
+        extraction["error"] = "manifest parse error: bad toml"
+    monkeypatch.setattr(graphify_sdk, "extract_package_manifest", lambda _path: extraction)
+
+    digest = "0" * 64 if mutation == "hash" else None
+    # "wrong-route": registered with a real JSON `skipped` string even though the
+    # PATH is a package manifest. Dispatch is by path, not by which string a
+    # reviewer chose, so this must still refuse — and it exercises the sentinel
+    # equality check independently of the extractor-result checks above.
+    disposition = "unexpected" if mutation == "disposition" else None
+    if mutation == "wrong-route":
+        disposition = _SKIPPED
+    inventory = _manifest_inventory(path, digest=digest, disposition=disposition)
+    if mutation == "unregistered":
+        # A different basename entirely: fails both the missing-file hash check
+        # AND (independently) the warning's basename multiset — a zero-node
+        # manifest nobody registered must refuse, not fall through to the one
+        # registered entry.
+        inventory = (
+            ExpectedMetadataOnly(
+                source_name="reviewed-source",
+                relative_path="elsewhere/go.mod",
+                content_sha256=inventory[0].content_sha256,
+                skipped_disposition=EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+            ),
+        )
+
+    approved = graphify_sdk.approve_metadata_zero_node_warning(
+        tmp_path, "reviewed-source", _MANIFEST_WARNING, inventory
+    )
+
+    assert approved == (), mutation
+
+
+def test_metadata_inventory_may_not_mix_manifest_and_json_routes(tmp_path: Path) -> None:
+    """M2: graphify's own `_empty_sources` excludes any result carrying `skipped`.
+
+    Excluded from its zero-node COUNT, specifically. Every JSON-route entry
+    resolves a real `skipped` string; no manifest-route entry ever does. So a
+    source registering BOTH would make `len(warned)` count more files than
+    graphify's printed `count` ever will — approval becomes structurally
+    impossible. Encoded as a loud failure (not a silent refusal) so this is
+    caught the moment it is written, not rediscovered later as an inexplicable
+    red build.
+    """
+    import hashlib
+
+    json_path = tmp_path / "plugin.json"
+    json_path.write_text("{}\n", encoding="utf-8")
+    manifest_path = tmp_path / "Cargo.toml"
+    manifest_path.write_text("[workspace]\n", encoding="utf-8")
+    inventory = (
+        ExpectedMetadataOnly(
+            source_name="reviewed-source",
+            relative_path="plugin.json",
+            content_sha256=hashlib.sha256(json_path.read_bytes()).hexdigest(),
+            skipped_disposition=_SKIPPED,
+        ),
+        ExpectedMetadataOnly(
+            source_name="reviewed-source",
+            relative_path="Cargo.toml",
+            content_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+            skipped_disposition=EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="mixes package-manifest and JSON"):
+        graphify_sdk.approve_metadata_zero_node_warning(
+            tmp_path, "reviewed-source", _WARNING, inventory
+        )
 
 
 def test_detection_policy_allows_only_safe_root_metadata(tmp_path: Path) -> None:

@@ -34,6 +34,7 @@ from graphify.export import prune_dangling_edges, to_json
 from graphify.extract import collect_files, extract
 from graphify.extractors.json_config import extract_json
 from graphify.llm import extract_corpus_parallel
+from graphify.manifest_ingest import extract_package_manifest, is_package_manifest_path
 from graphify.reflect import build_learning_overlay, reflect
 
 from kb_setup.graphify_health import (
@@ -41,6 +42,7 @@ from kb_setup.graphify_health import (
     APPROVED_PARTIAL_EXTRACTION_WARNING,
     APPROVED_SAME_FILE_ID_COLLISION_NOTE,
     APPROVED_UNSUPPORTED_LANGUAGE_WARNING,
+    EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ExpectedMetadataOnly,
     ExpectedPartialExtraction,
     ExpectedUnclassifiedFile,
@@ -515,6 +517,49 @@ def _relative_paths(root: Path, paths: object) -> tuple[str, ...]:
     return tuple(relative)
 
 
+def _reject_mixed_metadata_routes(source_name: str, is_manifest_route: tuple[bool, ...]) -> None:
+    """Refuse loudly if one source's inventory mixes the two zero-node routes.
+
+    `extract.py:5613-5614` excludes any result carrying `skipped` from graphify's
+    own zero-node count. Every JSON-route entry resolves a `skipped` string; no
+    manifest-route entry ever does (see `EXPECTED_PACKAGE_MANIFEST_NO_NAME`'s
+    docstring). So a source's inventory mixing the two kinds would make
+    `len(warned)` in the caller count more files than graphify's printed `count`
+    ever will, and approval becomes structurally impossible — fail loudly with a
+    clear message here rather than a silent, confusing refusal there (no source
+    registered today mixes them; see `graph.py`'s `_EXPECTED_METADATA_ONLY`
+    comment).
+    """
+    if any(is_manifest_route) and not all(is_manifest_route):
+        msg = (
+            f"{source_name}: metadata inventory mixes package-manifest and JSON "
+            "zero-node entries. graphify excludes any `skipped` result from its "
+            "own zero-node count, so these two kinds can never be approved "
+            "together for one source — split them across sources or file a "
+            "widening of _zero_node_warning_matches instead of registering both."
+        )
+        raise ValueError(msg)
+
+
+def _package_manifest_item_is_reviewed(root: Path, item: ExpectedMetadataOnly) -> bool:
+    """True iff `item`'s package-manifest re-run still matches its review."""
+    result = extract_package_manifest(root / item.relative_path)
+    if result.get("error") or result.get("nodes") or result.get("edges"):
+        return False
+    # `extract_package_manifest` never reports a `skipped` key on this path
+    # (unlike `extract_json`) — this equality checks OUR sentinel
+    # classification, never a value graphify produced.
+    return item.skipped_disposition == EXPECTED_PACKAGE_MANIFEST_NO_NAME
+
+
+def _json_metadata_item_is_reviewed(root: Path, item: ExpectedMetadataOnly) -> bool:
+    """True iff `item`'s JSON re-run still matches its review."""
+    result = extract_json(root / item.relative_path)
+    if result.get("error") or result.get("nodes") or result.get("edges"):
+        return False
+    return result.get("skipped") == item.skipped_disposition
+
+
 def approve_metadata_zero_node_warning(
     root: Path,
     source_name: str,
@@ -529,8 +574,17 @@ def approve_metadata_zero_node_warning(
     """
     if not inventory or any(item.source_name != source_name for item in inventory):
         return ()
+    # graphify's own `_get_extractor` (extract.py:5207-5208) routes every
+    # `PACKAGE_MANIFEST_NAMES` filename to `extract_package_manifest` ahead of all
+    # suffix dispatch, including `.json`. Mirror that decision per item — never a
+    # `try: extract_json(...) except: extract_package_manifest(...)` fallback,
+    # which would give an errored JSON file a second, unreviewed bite at approval.
+    is_manifest_route = tuple(
+        is_package_manifest_path(root / item.relative_path) for item in inventory
+    )
+    _reject_mixed_metadata_routes(source_name, is_manifest_route)
     valid = True
-    for item in inventory:
+    for item, routed_to_manifest in zip(inventory, is_manifest_route, strict=True):
         path = root / item.relative_path
         try:
             content_hash = _sha256_file(path)
@@ -540,12 +594,12 @@ def approve_metadata_zero_node_warning(
         if content_hash != item.content_sha256:
             valid = False
             break
-        result = extract_json(path)
-        if result.get("error") or result.get("nodes") or result.get("edges"):
-            valid = False
-            break
-        actual_disposition = result.get("skipped")
-        if actual_disposition != item.skipped_disposition:
+        item_is_reviewed = (
+            _package_manifest_item_is_reviewed(root, item)
+            if routed_to_manifest
+            else _json_metadata_item_is_reviewed(root, item)
+        )
+        if not item_is_reviewed:
             valid = False
             break
     warned = tuple(item for item in inventory if not item.skipped_disposition.startswith("error:"))

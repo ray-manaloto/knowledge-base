@@ -116,8 +116,41 @@ class SourceCoveragePolicy(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
     unsupported_language_paths: tuple[str, ...] = ()
 
 
+#: Sentinel `ExpectedMetadataOnly.skipped_disposition` for a package manifest
+#: (`pyproject.toml`/`Cargo.toml`/`go.mod`/...) whose zero-node route is
+#: graphify's `extract_package_manifest`, never `extract_json` — #1377 routes
+#: every `PACKAGE_MANIFEST_NAMES` filename there ahead of all suffix dispatch.
+#: That extractor never emits a `skipped` reason on its zero-node case
+#: (`manifest_ingest.py:66-67` returns a bare `{"nodes": [], "edges": []}` when
+#: the parsed table has no `[project]`/`[package]` name — a workspace root or a
+#: manifest holding only `[tool.*]` configuration) — so unlike every other value
+#: of this field, this one is never graphify's own output. It is this repo's own
+#: reviewed classification, checked for an EXACT match anyway
+#: (`graphify_sdk.approve_metadata_zero_node_warning`) so an item misrouted to
+#: the wrong extractor still refuses.
+#:
+#: Deliberately does NOT start with `"error:"` — `graphify_sdk.py`'s `warned`
+#: filter drops any entry whose disposition does, which would silently remove
+#: every manifest entry from the zero-node count and present as an inexplicable
+#: refusal rather than the mistake it is.
+EXPECTED_PACKAGE_MANIFEST_NO_NAME = "reviewed-package-manifest-no-name"
+
+
 class ExpectedMetadataOnly(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
-    """Reviewed file whose exact bytes intentionally produce no graph nodes."""
+    """Reviewed file whose exact bytes intentionally produce no graph nodes.
+
+    Two disjoint routes share this one struct, distinguished by
+    `graphify.manifest_ingest.is_package_manifest_path` at verification time —
+    never a `try/except` fallback between extractors, which would give an
+    errored file a second bite at approval:
+
+    - an ordinary JSON file `extract_json` skips (e.g. an MCP/plugin config it
+      declines as "not a config/manifest"): `skipped_disposition` is the exact
+      string graphify's own `skipped` key reports.
+    - a package manifest `extract_package_manifest` parses but finds no
+      `name` in: `skipped_disposition` is the `EXPECTED_PACKAGE_MANIFEST_NO_NAME`
+      sentinel above, since graphify reports nothing to pin to for this case.
+    """
 
     source_name: str
     relative_path: str
