@@ -319,6 +319,12 @@ def _delta(candidate: Path, canonical: Path) -> dict[str, object]:
 
 
 def _dedupe_summary(inventory: SourceInventory) -> str:
+    # A deliberate copy of the planner's private `_dedupe_summary`, not an import:
+    # reaching for the planner's private name trips ruff SLF001, and exporting
+    # it would edit `graphify_semantic_corpus.py`, whose own bytes are digested
+    # into every plan (`planner_sha256`) — a re-authorization for a helper. The
+    # fresh-plan path promises the same dedupe line `plan` prints (cold review,
+    # round 2, P3).
     groups = len(inventory.duplicate_groups)
     noun = "group" if groups == 1 else "groups"
     dropped_tokens = inventory.duplicate_dropped_estimated_tokens
