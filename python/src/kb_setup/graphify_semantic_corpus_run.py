@@ -186,8 +186,8 @@ class _Spend:
     Mutable and un-frozen on purpose — it is the one thing in this module that
     accumulates. It exists because nothing summed anything: the plan capped
     ``max_cost_usd`` PER CHUNK and ``--max-budget-usd`` per provider invocation,
-    so 58 chunks each individually within authority could spend far past any
-    total anyone had approved.
+    so 26 chunks (post-dedupe, #414; was 58 pre-dedupe) each individually
+    within authority could spend far past any total anyone had approved.
 
     FOR ONE PLAN, NOT ONE PROCESS, and that distinction is the whole reason this
     class writes to disk. The first version seeded at 0.0 and summed records
@@ -196,9 +196,9 @@ class _Spend:
     closed laptop, a SIGKILL — resumed with a fresh cap and could spend the whole
     limit again. Measured on the first real chunk: three restarts is three times
     the approved total, and nothing on disk would have said so, because
-    ``ChunkStageReceipt`` carries no cost field either. The 58-chunk run takes
-    ~10.6 h at concurrency 1, which makes a restart the expected case rather than
-    the unlucky one.
+    ``ChunkStageReceipt`` carries no cost field either. The 26-chunk run takes
+    ~4.8 h at concurrency 1 (was 58 chunks / ~10.6 h pre-dedupe), which makes a
+    restart the expected case rather than the unlucky one.
     """
 
     def __init__(self, limit_usd: float, ledger_dir: Path | None = None) -> None:
@@ -795,6 +795,10 @@ def _stage_completed_chunk(
                 adapter_metadata_raw=metadata_raw,
             ),
         ),
+        # The RUN's one live measurement, taken once by `execute()`'s preflight
+        # -- never the plan's own recorded value, which would make the staging
+        # comparison a tautology (#426 round 2, cold review P2-2).
+        live_runtime=context.preflight_receipt.graphify_runtime,
     )
     return ChunkOutcome(
         ordinal=chunk.ordinal,
@@ -1022,6 +1026,41 @@ def _load_plan(
     return inventory, ledger, config
 
 
+def _assert_graphify_runtime_unchanged_since_plan(
+    preflight_receipt: graphify_semantic_slice.ClaudePreflight,
+    config: graphify_semantic_corpus.CorpusExecutionConfig,
+) -> None:
+    """Refuse to spend when the Graphify runtime moved since the plan was written (#426).
+
+    Mirrors `_adapter_overlay`'s "Claude executable changed after preflight" check
+    above, for the Graphify half of the identity rather than the Claude half.
+    `verify_plan` already refused a plan whose recorded runtime disagreed with the
+    installed one at VERIFY time; this catches the runtime moving in the gap
+    BETWEEN a verified `run` dispatch and the moment `execute` actually reaches a
+    provider — the same window `_adapter_overlay`'s check exists to close for
+    Claude.
+    """
+    live, plan = preflight_receipt.graphify_runtime, config.graphify_runtime
+    differing = [
+        field.name
+        for field in msgspec.structs.fields(live)
+        if getattr(live, field.name) != getattr(plan, field.name)
+    ]
+    if preflight_receipt.graphify_version != config.graphify_version:
+        differing.append("graphify_version")
+    if differing:
+        # Name the fields that differ, not just the two top-level version
+        # strings: those agree whenever it is `RuntimeIdentity`'s whole-struct
+        # comparison that actually fired -- a re-locked wheel digest, a moved
+        # executable path, or an SDK signature change at one version all used
+        # to print `plan=0.9.48 live=0.9.48`, a refusal asserting that two
+        # identical values differ (cold review P2-4).
+        raise ValueError(
+            f"Graphify runtime changed after plan: differing field(s) {', '.join(differing)} -- "
+            f"plan={config.graphify_runtime!r} live={preflight_receipt.graphify_runtime!r}"
+        )
+
+
 def execute(
     candidate: Path,
     cache_root: Path,
@@ -1036,11 +1075,23 @@ def execute(
     than raising on a failed chunk, because a run that dies on chunk 40 of 58
     should still leave the first 39 staged and say so.
     """
+    # Scrubbed before ANYTHING else — before the plan even loads — so a forbidden
+    # routing name ambient in this process can never reach the preflight below or
+    # any `claude` child this run spawns (#334). See
+    # `graphify_semantic_slice.scrub_route_overrides`. Reported through
+    # `report_routing_scrub`, the same as the slice's own call sites (cold
+    # review P1-1): the removed names are emitted, never their values, so a
+    # scrubbed run is distinguishable from a clean one after the fact.
+    graphify_semantic_slice.report_routing_scrub(
+        "execute", graphify_semantic_slice.scrub_route_overrides()
+    )
     inventory, ledger, config = _load_plan(candidate)
     run_namespace = _run_namespace(candidate, config.cache_namespace_sha256)
     preflight_receipt = graphify_semantic_slice.preflight(
         repo_root, require_max_turns=True, profile=_PROFILE
     )
+    # BEFORE anything that spends.
+    _assert_graphify_runtime_unchanged_since_plan(preflight_receipt, config)
     outcomes: list[ChunkOutcome] = []
     repaid: list[int] = []
     # Persistent, and keyed on the CACHE namespace rather than the run namespace,

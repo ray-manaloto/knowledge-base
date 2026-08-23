@@ -180,7 +180,19 @@ local proseExclude = baseExclude
   + List("graphify-out/memory/**", "docs/research/**", "docs/goals/*-goal.md", "docs/direction/**",
       "docs/session-review/runs/**",
       "sources/**",
-      "**/graphify-out/.*.tmp")
+      "**/graphify-out/.*.tmp",
+      "**/graphify-semantic-corpus-authority-ledger.md")
+// `docs/agents/graphify-semantic-corpus-authority-ledger.md` — the append-only
+// ledger `kb-setup graphify-semantic-corpus record --accept` writes: one bullet
+// of hashes per re-authorization. Machine-written, same class as
+// `graphify-out/memory/**`. Measured 2026-08-23 on its very first bullet: the
+// `typos --write-changes` commit hook read a 12-char digest prefix and the
+// 8-char commit id as words and REWROTE the commit id (one letter inserted) —
+// a corrupted hash in an authorization record. The bullets now carry full
+// 40/64-hex hashes (which typos' hex heuristic skips), and this exclusion keeps
+// any future token from being "corrected" the same way. agnix (`lint-docs`)
+// still validates its frontmatter. (The offending prefixes are deliberately
+// not quoted here — quoting them re-triggers the same check on this file.)
 // `docs/session-review/runs/**` — the promoted output of a session-review run:
 // per-lane reports, refutation reports and the synthesis, kept VERBATIM as the
 // evidence behind the issues they produced. Same argument as `docs/research/**`

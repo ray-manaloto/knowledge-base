@@ -1,8 +1,15 @@
 # Copyright (c) 2026 Raymond Manaloto
 """Review-owned #301 authority roots, intentionally outside planner identity."""
 
+from pathlib import Path
+
 PROTOTYPE_CONTRACT_SHA256 = "b7a41ea639efc28a714e1f1faa47dcdc69c6d5b8cdf17719c7a78fffaa583848"
 PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88ec4577cd9fb428"
+
+# The executable roots now live in the sibling JSON data file. The historical
+# review narrative remains below; new human-readable records append to
+# docs/agents/graphify-semantic-corpus-authority-ledger.md.
+_AUTHORITY_PATH = Path(__file__).with_name("graphify_semantic_corpus_authority.json")
 
 # RE-AUTHORIZED by Ray, 2026-08-16, against the plan regenerated at graphify
 # 0.9.45 (source commit 0738af37): 792 files / ~1,394,475 words -> 474 units / 58
@@ -650,10 +657,7 @@ PROTOTYPE_LAUNCHER_SHA256 = "f8810dc9d069260c4d4976c312f117386b1d1a134720180e88e
 # three (they are constructed inside the same `if not authorized` branch). The
 # cheap alternative was to leave the constant at 2.1.238 and file the drift, but
 # that asserts an identity the host contradicts. Ray ruled re-record, 2026-08-22.
-AUTHORITY_JSON = (
-    b'{"advisories_sha256":"ff7323b1921752cf195f0869b17f348903ffd8a196248be3c5edcece4fcc93d9",'
-    b'"execution_config_sha256":"710dbbfb2d15ac05c9857bd6f0e14ed03a9b7a858e85936a9adbda568938d9da",'
-    b'"exclusions_sha256":"1a63e48336f7130a1f68c57340706fd5cea3cbacf12c363bb339a7cae3e5b67e",'
-    b'"plan_manifest_sha256":"b4b741b5f0bb992c16f42b57f1e855c751e2de1c331dde1f979c1b80c8fad719",'
-    b'"schema_version":1}\n'
-)
+try:
+    AUTHORITY_JSON = _AUTHORITY_PATH.read_bytes()
+except OSError as exc:
+    raise RuntimeError(f"recorded authority file missing: {_AUTHORITY_PATH}") from exc

@@ -1,0 +1,110 @@
+# Mutation arms for #426 (derive the corpus plan's Graphify runtime identity
+# rather than freeze it) and G5/#411 (record the Claude effort level on the
+# plan). Format follows `docs/research/reports/2026-08-20-422-runtime-pair-arms.toml`.
+#
+# SCOPE. Armed here: the new named verify-time reason
+# (`plan-graphify-runtime-mismatch`), the new pre-spend run-time guard's pure
+# HELPER (`_assert_graphify_runtime_unchanged_since_plan`, R2) AND its CALL
+# SITE inside `execute()` (R2b — added #426 round 2, cold review P2-1, which
+# found the call site itself unarmed even though the helper was), the new
+# per-chunk effort check (`provider-effort-mismatch`), and the raised
+# whole-run cost cap (`_MAX_TOTAL_COST_USD`). NOT armed here (each is instead
+# covered by a direct test, argued below):
+#   - `plan-graphify-runtime-unmeasurable` (the measurement-failure catch
+#     around `_measured_runtime` in `verify_plan` — now a NAMED union of seven
+#     types, not `(ValueError, SystemExit)`; #426 round 2, cold review P1-1) —
+#     reaching it requires patching `graphify_baseline.runtime_identity` or
+#     `graphify_env` to raise, which is a heavier fixture than this spec's
+#     other rows. The positive test
+#     (`test_verify_plan_refuses_an_unmeasurable_runtime_rather_than_raising`)
+#     now parametrizes over THREE of those types (`ValueError`, `TypeError`,
+#     `SystemExit`) and additionally drives `corpus_main`'s `verify`/`run`
+#     routes, so a mutation that narrows the union back down fails it directly
+#     (a `TypeError` would propagate uncaught) — a control-armed harness
+#     verdict would add little that direct assertion does not already show.
+#   - the `config-contract-mismatch` co-firing this rule's own comment
+#     describes — it is asserted alongside the named reason in
+#     `test_verify_plan_refuses_a_measured_runtime_that_disagrees_with_the_plan`
+#     and needs no separate arm to be exercised by R1 below.
+#
+# SAFETY NOTE (R2 targets the pure helper; R2b targets `execute()`'s CALL SITE,
+# safely, by stubbing every reachable spend path — #426 round 2):
+# `execute()` reaches a REAL Claude CLI subprocess a few steps past its
+# pre-spend guard, which is why R2 exercises the guard's OWN logic — extracted
+# into `_assert_graphify_runtime_unchanged_since_plan`
+# (graphify_semantic_corpus_run.py) — via a test that calls the helper
+# DIRECTLY, never through `execute()`. R2b (added #426 round 2, cold review
+# P2-1) DOES target the one-line call site inside `execute()`, via
+# `test_execute_refuses_before_any_spend_path_when_the_runtime_moved_since_plan`
+# — this is safe, not a reversal of the caution above, because that test stubs
+# `graphify_semantic_slice.preflight` (to force the disagreement) AND every
+# spend path a neutered guard could still reach (`seeded_spend`,
+# `_extract_corpus`) to raise `AssertionError` instead of doing real work. A
+# survival of R2b during an automated sweep therefore still cannot reach a real
+# subprocess — it surfaces as the WRONG exception type in that same test, which
+# is exactly the verdict a `kb-arms` sweep reads.
+
+suites = [
+  "tests/test_graphify_semantic_corpus.py",
+  "tests/test_graphify_semantic_corpus_run.py",
+]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    return graphify_baseline.runtime_identity(repo_root)'''
+new = '''    return graphify_baseline.runtime_identity(repo_root)  # control'''
+
+# ── R1: neuter the VERIFY-time named runtime-mismatch reason ───────────────
+[[arm]]
+id = "R1"
+test = "test_verify_plan_refuses_a_measured_runtime_that_disagrees_with_the_plan"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    if runtime != config.graphify_runtime:
+        reasons.append("plan-graphify-runtime-mismatch")'''
+new = '''    if False and runtime != config.graphify_runtime:
+        reasons.append("plan-graphify-runtime-mismatch")'''
+
+# ── R2: neuter the PRE-SPEND runtime guard HELPER's own condition ──────────
+[[arm]]
+id = "R2"
+test = "test_the_pre_spend_runtime_guard_refuses_a_runtime_that_moved_since_the_plan"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = '''    if differing:'''
+new = '''    if False:'''
+
+# ── R2b: delete the guard's CALL SITE inside `execute()` (#426 round 2, cold
+# review P2-1) — safe because the test stubs every reachable spend path ────
+[[arm]]
+id = "R2b"
+test = "test_execute_refuses_before_any_spend_path_when_the_runtime_moved_since_plan"
+file = "python/src/kb_setup/graphify_semantic_corpus_run.py"
+old = '''    _assert_graphify_runtime_unchanged_since_plan(preflight_receipt, config)'''
+new = '''    pass  # R2b: guard call site removed'''
+
+# ── R3: drop the per-chunk `provider-effort-mismatch` row ──────────────────
+[[arm]]
+id = "R3"
+test = "test_a_chunk_whose_argv_carries_the_wrong_effort_value_is_staged_failed"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''        (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
+        (effort_valid, "provider-effort-mismatch"),'''
+new = '''        (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),'''
+
+# ── R4: revert the whole-run cost cap to a superseded value ────────────────
+# Re-derived round 2 (#414 landed the same day and deduped the corpus 58 ->
+# 26 chunks, which moved the cap 140.0 -> 63.0 under the SAME "one restart,
+# +~8% margin" rule — see `_MAX_TOTAL_COST_USD`'s comment). The anchor below
+# necessarily changed with the constant it targets; `new` now reverts AWAY
+# from the current 63.0 to the immediately-preceding, pre-dedupe derivation
+# (140.0) rather than to the original 100.0 two rulings back — either wrong
+# value breaks the same named test, but 140.0 is the realistic regression
+# (reverting THIS commit), not an arbitrary one.
+[[arm]]
+id = "R4"
+test = "test_the_cumulative_spend_cap_is_in_the_plan_and_is_not_the_per_chunk_one"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''_MAX_TOTAL_COST_USD = 63.0'''
+new = '''_MAX_TOTAL_COST_USD = 140.0'''

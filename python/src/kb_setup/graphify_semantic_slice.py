@@ -13,13 +13,13 @@ import stat
 import subprocess
 import tempfile
 import warnings
-from collections.abc import Generator, Mapping
+from collections.abc import Generator, Mapping, MutableMapping
 from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
 
 import msgspec
 
-from kb_setup import graphify_baseline
+from kb_setup import events, graphify_baseline
 from kb_setup.graphify_baseline import RuntimeIdentity
 
 _CLAUDE_MODEL = "claude-haiku-4-5-20251001"
@@ -36,16 +36,17 @@ CLAUDE_MODEL = _CLAUDE_MODEL
 PROFILE_ENV_NAME = "KB_SEMANTIC_PROFILE"
 GRAPHIFY_SCHEMA_SHA256 = "69d307d23913e0cccf5809316a3432b85210776bd5626a4ad0af1317d6113324"
 
-# Only the SNAPSHOT identity moves v0.9.42 -> v0.9.44. The file itself is
-# BYTE-IDENTICAL across those two releases — same blob object, same size, same
-# digest — so the three lines below it are unchanged, and that is a measurement,
-# not an assumption. The derivation discriminates: run against `uv.lock` over the
-# same two commits it returns two different objects.
-SOURCE_REF = "v0.9.45"
-SOURCE_COMMIT = "0738af373af9cf5c95f862cc5f3327fd96b4ea23"
-SOURCE_TREE = "e0e089a404dd0b9f6d01273b869c80197c0cc03c"
+# Only the SNAPSHOT identity moves v0.9.45 -> v0.9.48 (2026-08-21 re-attest). The
+# file itself is BYTE-IDENTICAL across the two tags — same blob, same size, same
+# digest, so `SOURCE_GIT_OBJECT`/`SOURCE_SHA256`/`SOURCE_SIZE` below do not move —
+# and that is a measurement: `git -C sources/graphify rev-parse v0.9.48`,
+# `rev-parse 'v0.9.48^{tree}'`, and `rev-parse v0.9.48:docs/how-it-works.md`
+# against the pinned clone, not carried forward from the v0.9.45 round.
+SOURCE_REF = "v0.9.48"
+SOURCE_COMMIT = "b2cd36267456c166788c95be6e68574064a92a42"
+SOURCE_TREE = "be8636735370ed82708bb53eba33170e85acc369"
 SOURCE_PATH = "docs/how-it-works.md"
-# UNCHANGED across v0.9.44 -> v0.9.45, so the slice's INPUT is byte-identical and
+# UNCHANGED across v0.9.45 -> v0.9.48, so the slice's INPUT is byte-identical and
 # the re-run only re-attests it under the new runtime. Measured by three routes
 # that agree: the contents API at each of the two commits, and `git hash-object`
 # on the local clone. `SOURCE_TREE` above moved in the same derivation, which is
@@ -55,8 +56,12 @@ SOURCE_GIT_OBJECT = "e0e6e5275dfec50b25c38590f151ebd9e263f383"
 SOURCE_SHA256 = "cd4a67001704eddc557d67eaa783d0608cd200302fa1b89c3f1a4819497cdc26"
 SOURCE_SIZE = 5147
 _CANDIDATE_SCHEMA = "graphify-real-semantic-slice/v0"
+# ADVANCED alongside the graphify 0.9.48 re-attest (2026-08-21): the sha256 of
+# the CANDIDATE manifest.json the re-run published, replacing the 0.9.45 value.
+# Advanced only AFTER `build_candidate` published that evidence and `verify`
+# was observed reporting `candidate-authority-mismatch` against the prior value.
 _ACCEPTED_CANDIDATE_MANIFEST_SHA256 = (
-    "4621b26e2e5c4d4a0e24764289d1acc5c7deea0e0473ea623ee3bd2aad7db7b2"
+    "61006e39d3d6ea20e1bb41deff64ff3cffbcf1894db92920a9006924c19f4cc9"
 )
 _MAX_SEMANTIC_ARGS = 2
 _PROVIDER_BOUNDARY_MEMBER = "provider-boundary-start.json"
@@ -140,6 +145,36 @@ _ROUTE_OVERRIDE_NAMES = frozenset(
         "AZURE_OPENAI_ENDPOINT",
         "AZURE_API_KEY",
         "ANTHROPIC_CUSTOM_HEADERS",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+    }
+)
+
+# EXCLUDED from `scrub_route_overrides` (cold review P2-4) — `preflight`'s
+# refusal still fires on all four, unchanged, because they stay IN
+# `_ROUTE_OVERRIDE_NAMES` above; only the scrub leaves them alone. Egress
+# configuration is not a routing credential, and scrubbing it from THIS
+# process is not the same decision as scrubbing it from the `claude` CHILD.
+# `claude_child_environment` (below) builds a closed allowlist that never
+# copies a proxy name regardless of what this process's own `os.environ`
+# carries, so the child was always proxy-free downstream of `preflight` — that
+# is the true scope of "the child environment already did this", and it does
+# not extend to the parent. The parent-scope consumers a scrub WOULD touch are
+# `git` (`_admit_source` -> `graph.materialize_source_snapshot`) and the
+# in-process graphify SDK, whose httpx client defaults to `trust_env=True`. On
+# a host actually behind a proxy, deleting these four turns `preflight`'s loud
+# refusal into a silent direct connection or an opaque clone failure — worse
+# than the refusal it would have replaced. Verified before excluding: no proxy
+# name appears anywhere in graphify's installed source (`grep -rq
+# 'HTTP_PROXY\|HTTPS_PROXY\|ALL_PROXY\|NO_PROXY'
+# .venv/lib/python3.14/site-packages/graphify/` -> absent; control
+# `GEMINI_API_KEY` -> present), so excluding them from the scrub cannot open a
+# non-Claude routing path — the invariant `do-not.md` #4 exists to protect is
+# unaffected.
+_ROUTE_OVERRIDE_PROXY_NAMES = frozenset(
+    {
         "HTTP_PROXY",
         "HTTPS_PROXY",
         "ALL_PROXY",
@@ -303,37 +338,43 @@ class SemanticVerification(msgspec.Struct, frozen=True, forbid_unknown_fields=Tr
 
 
 _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    # Moved 0.9.44 -> 0.9.45 because the COMMITTED EVIDENCE moved: the slice was
-    # re-run at 0.9.45 in the same change. This constant is the authority for that
-    # receipt, so it may only advance when the receipt does — never as part of a
-    # pin bump on its own, which would assert an identity the evidence contradicts.
-    # The ORDER that condition implies is load-bearing and was followed: the pin
-    # moved, the slice re-ran and produced a 0.9.45 receipt, `verify` reported
-    # `candidate-authority-mismatch` against this still-0.9.44 value, and only
-    # then did this advance. Advancing it first would have made that check pass
-    # by construction and proved nothing.
-    version="0.9.45",
-    cli_version="0.9.45",
-    sdk_version="0.9.45",
+    # ADVANCED 0.9.45 -> 0.9.48 (2026-08-21): the COMMITTED EVIDENCE moved — the
+    # slice was re-run at 0.9.48 in the same change, and this constant is the
+    # authority for THAT receipt, so it may only advance when the receipt does.
+    # Order followed, same discipline as the 0.9.44 -> 0.9.45 advance before it:
+    # the pin moved, the slice re-ran and produced a 0.9.48 receipt, `verify`
+    # reported `candidate-authority-mismatch` against this still-0.9.45 value
+    # (the ONLY reason — `_verify_candidate` returns as soon as any manifest-level
+    # reason exists, before it ever reaches the runtime-pair checks), and only
+    # then did this advance.
+    version="0.9.48",
+    cli_version="0.9.48",
+    sdk_version="0.9.48",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="134250477dbcf2e465b5794b7f09c38dcbe0006b1284718beb962bd704865663",
-    sdist_sha256="ba27f7b797fc3b8c21c46e5e7bd75d8f9136582e38af98eedee0cebb339fd1e7",
+    wheel_sha256="4f745d72d6c5165ef7132bf8b2819ef59707aa70cd99efd3a4fbc8c4ba43b4b9",
+    sdist_sha256="14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e",
 )
 # The runtime a NON-authority run may additionally use. `_ACCEPTED_…` above now
-# reads 0.9.45 because the COMMITTED receipt was re-produced at 0.9.45 in the
-# same change: it is the authority for that receipt, which is evidence about a
-# run that happened, and it moved because the evidence moved, never because the
-# pin did.
+# reads 0.9.48, re-attested 2026-08-21 in `a67cbac4` (cold review P2-1 — this
+# paragraph said "reads 0.9.45" long after that stopped being true). It read
+# 0.9.45 when this paragraph was first written, at the 0.9.44 -> 0.9.45 bump
+# described below: it is the authority for whichever receipt is committed, and
+# it moves only because the evidence moves, never because the pin does.
 #
 # `sdk_fingerprint_sha256` is UNCHANGED across 0.9.44 -> 0.9.45, and that is a
 # measurement rather than a copy-forward, re-derived against the INSTALLED 0.9.45:
-# `public_api_fingerprint()` hashes to b10406f9… and `semantic_api_fingerprint()`
-# to 43122fca…, both byte-identical to the 0.9.44 records. The one signature the
-# semantic path depends on — `llm.extract_corpus_parallel` — did not change, which
-# is what `assert_semantic_sdk`'s "review the release before inference" gate is
-# actually asking about. Cross-checked against the release diff: `graphify/llm.py`
-# does not appear in `compare/v0.9.43...v0.9.45` at all, against a 30-file control.
+# `public_api_fingerprint()` hashed to b10406f9… and `semantic_api_fingerprint()`
+# to 43122fca… AT THAT BUMP, both byte-identical to the 0.9.44 records — see the
+# ⚠️ block below for where and why `semantic_api_fingerprint()` later moved to
+# 6047cf0e… at 0.9.48 (cold review P2-1 again: citing 43122fca… with nothing
+# beside it reads as current, and by 0.9.48 it no longer is);
+# `public_api_fingerprint()` is still b10406f9… today. The one signature the
+# semantic path depends on — `llm.extract_corpus_parallel` — did not change AT
+# THIS BUMP, which is what `assert_semantic_sdk`'s "review the release before
+# inference" gate is actually asking about. Cross-checked against the release
+# diff: `graphify/llm.py` does not appear in `compare/v0.9.43...v0.9.45` at all,
+# against a 30-file control.
 #
 # The wheel/sdist digests DID move, because the distribution is a new build; they
 # are read from `uv.lock`, which is the same source `graphify_baseline` derives
@@ -379,8 +420,11 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # non-authority path rejects every run under the installed version" — and it was
 # written because it had already happened once at 0.9.46. It then happened again
 # one bump later, in the file that says so. A warning is not a mechanism; that is
-# why this advance ships `test_non_authority_graphify_pairs_*` instead of a
-# third restatement of the same paragraph.
+# why this advance ships
+# `test_non_authority_path_accepts_the_current_graphify_runtime`
+# (tests/test_graphify_semantic_slice.py) instead of a third restatement of the
+# same paragraph. (Cold review nit 4: this comment used to cite
+# `test_non_authority_graphify_pairs_*`, a name that test never had.)
 #
 # NOTHING CAUGHT IT: the suite was rc=0 the whole time, because no test exercised
 # the non-authority path. CodeRabbit did, on PR #422, after a cold cross-family
@@ -393,12 +437,12 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # consecutive releases — while the wheel and sdist digests moved because each
 # distribution is a new build.
 #
-# ⚠️ WHAT IS NOT UNCHANGED AT 0.9.48, and does not belong to this constant:
-# `semantic_api_fingerprint()` MOVED (43122fca… -> 6047cf0e…) because
-# `extract_corpus_parallel`'s `max_retry_depth: int = 3` became
-# `int | None = None` (upstream #2880). That is a different digest with a
-# different owner — see `_ACCEPTED_SEMANTIC_FINGERPRINT_SHA256` — and it is
-# still stale on the non-authority path. Deliberately NOT changed here.
+# ⚠️ WHAT DOES NOT BELONG TO THIS CONSTANT: `semantic_api_fingerprint()` MOVED
+# (43122fca… -> 6047cf0e…) at 0.9.48 because `extract_corpus_parallel`'s
+# `max_retry_depth: int = 3` became `int | None = None` (upstream #2880). That
+# is a different digest with a different owner —
+# `_ACCEPTED_SEMANTIC_FINGERPRINT_SHA256` below — which moved in THIS round's
+# re-attest once the slice re-ran under 0.9.48; see that constant's own comment.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
     version="0.9.48",
     cli_version="0.9.48",
@@ -421,9 +465,16 @@ _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # edit here can change what already ran. The corpus planner's need is a DIFFERENT
 # question — what will run next — and it now reads `_CURRENT_CLAUDE_*` below.
 # Two constants, because there are two questions.
-_ACCEPTED_CLAUDE_VERSION = "2.1.233"
+#
+# ADVANCED to 2.1.238 (2026-08-21), for the reason the paragraph above says is
+# the only valid one: the COMMITTED RECEIPT was re-produced at this version, as
+# part of the graphify 0.9.48 re-attest. It now equals `_CURRENT_CLAUDE_VERSION`
+# below — evidence converging with intent, not the two questions collapsing —
+# and all three values are MEASURED from the same preflight that produced the
+# new receipt. The help digest is unchanged, still `71ad650f…`.
+_ACCEPTED_CLAUDE_VERSION = "2.1.238"
 _ACCEPTED_CLAUDE_EXECUTABLE_SHA256 = (
-    "bc466b6cde63edafc773f471a1fb98787fabb31f52240c8616ce7e1f587b212d"
+    "1c196c456373b57818ae87df84aecee96cb659448c0d6a6bbb401ac5758431b2"
 )
 _ACCEPTED_CLAUDE_HELP_SHA256 = "71ad650f59e08ae40ede14c534db4f49d8590ee5a4f92f6da2882d3a5560fea6"
 
@@ -512,8 +563,12 @@ _CURRENT_CLAUDE_EXECUTABLE_SHA256 = (
     "8917e01c99ea0ce6ed887a1729a4cda693c758fe542747be71756987b145c772"
 )
 _CURRENT_CLAUDE_HELP_SHA256 = _ACCEPTED_CLAUDE_HELP_SHA256
+# ADVANCED 43122fca… -> 6047cf0e… (2026-08-21): the value the re-run's own
+# preflight measured under graphify 0.9.48 (see the runtime comment above for
+# why it moved). Same discipline as `_ACCEPTED_GRAPHIFY_RUNTIME` — may only
+# advance when the receipt does.
 _ACCEPTED_SEMANTIC_FINGERPRINT_SHA256 = (
-    "43122fca6fdda78fa16630a89ede645f06b7fdbded00377cd27188f627d371d9"
+    "6047cf0eeec29b0fc7d1730a5e45f21b9765bbf4b71c34226b4040a2fcd987f9"
 )
 _ACCEPTED_EXECUTION_CONFIG = ExecutionConfig(
     api_timeout_ms=120_000,
@@ -773,6 +828,78 @@ def recorded_schema(argv: tuple[str, ...], profile: ClaudeProfile) -> str:
 def route_override_names(environment: Mapping[str, str]) -> tuple[str, ...]:
     """Return only forbidden routing variable names; never inspect their values."""
     return tuple(sorted(name for name in environment if name in _ROUTE_OVERRIDE_NAMES))
+
+
+def scrub_route_overrides(
+    environment: MutableMapping[str, str] | None = None,
+) -> tuple[str, ...]:
+    """Delete every forbidden ROUTING name so the refusal never has to fire (#334).
+
+    `preflight`'s routing check is untouched and still raises on any of the
+    full 37-name `_ROUTE_OVERRIDE_NAMES` set this misses — that refusal is the
+    backstop, not the mechanism. This is the mechanism: every CLI entry that
+    reaches `preflight` calls this FIRST, so the ambient `AWS_*`/`ANTHROPIC_*`
+    names an ordinary login shell carries cannot reach it in the first place,
+    rather than relying on an operator to remember `env -u` at every launch.
+    Every call site passes the return value to `report_routing_scrub` (never
+    the values themselves) so a run that had to remove something and a run
+    that never had anything to remove are no longer byte-indistinguishable
+    after the fact — this function stays silent itself; it only deletes and
+    returns what it deleted, to its own caller.
+
+    Deletes, never reads — reuses `route_override_names` for the candidate set
+    and only ever calls `del`, so this cannot leak a value it never inspected.
+
+    EXCLUDES the four proxy variables (`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/
+    `NO_PROXY`) from the 37-name set, scrubbing only the remaining 33
+    (cold review P2-4; see `_ROUTE_OVERRIDE_PROXY_NAMES`'s own comment for the
+    full reasoning). `preflight` keeps refusing all 37, proxies included —
+    only the SCRUB leaves them alone. A prior version of this docstring
+    justified scrubbing the proxies too by pointing at
+    `claude_child_environment`'s allowlist: true of the `claude` CHILD, which
+    never copies a proxy name regardless of what this function does, but
+    irrelevant to what this function actually mutates — `os.environ` for THIS
+    process, which is also what `git` (`_admit_source`) and the in-process
+    graphify SDK's httpx client (`trust_env=True`) read. Scrubbing the
+    parent's proxy configuration changed THEIR egress, not the child's, which
+    is why it no longer happens.
+
+    Defaults to the REAL process environment, deliberately: a `claude` child
+    inherits `os.environ`, not a filtered mapping handed only to `preflight`, so
+    scrubbing anything less would leave the forbidden names live for every
+    subprocess this module spawns. Idempotent — a second call finds nothing
+    left to remove and returns `()`.
+    """
+    target = os.environ if environment is None else environment
+    removed = tuple(
+        name for name in route_override_names(target) if name not in _ROUTE_OVERRIDE_PROXY_NAMES
+    )
+    for name in removed:
+        del target[name]
+    return removed
+
+
+def report_routing_scrub(site: str, removed: tuple[str, ...]) -> None:
+    """Emit a WARNING naming the routing names `site`'s scrub removed (never their values).
+
+    Every `scrub_route_overrides()` call site (`build_candidate`, `semantic_main`
+    here, and `graphify_semantic_corpus_run.execute`) passes its return value
+    straight here. Before this existed, all three discarded it as a bare
+    statement, so a host that had a forbidden name scrubbed produced a receipt
+    byte-indistinguishable from a host that never had one — the refusal
+    `preflight` still carries could not fire from any production caller,
+    because the scrub always ran first (cold review P1-1). A no-op call
+    (`removed == ()`) emits nothing, matching a clean host's silence — this is
+    the one place that decision lives, so every call site's own complexity
+    stays a single line.
+    """
+    if not removed:
+        return
+    events.warn(
+        "semantic.routing_scrub",
+        f"{site}: scrubbed forbidden routing environment names: " + ", ".join(removed),
+        names=removed,
+    )
 
 
 def classify_auth(raw: bytes) -> AuthIdentity:
@@ -1868,6 +1995,13 @@ def build_candidate(repo_root: Path, output: Path) -> CandidateManifest:
     from kb_setup import graphify_baseline, graphify_sdk
     from kb_setup.graphify_semantic_adapter import AdapterMetadata
 
+    # Scrubbed here too, even though `semantic_main` already scrubs before
+    # dispatching to this function: `build_candidate` is public and may be
+    # called directly, bypassing that entry point (#334). `report_routing_scrub`
+    # is what makes a run that had to remove something distinguishable, after
+    # the fact, from one that never had anything to remove — the two used to
+    # be byte-indistinguishable (cold review P1-1).
+    report_routing_scrub("build_candidate", scrub_route_overrides())
     if output.exists():
         raise ValueError(f"semantic output already exists: {output}")
     # `require_max_turns` follows the boundary marker: the adapter adds
@@ -1998,6 +2132,14 @@ def build_candidate(repo_root: Path, output: Path) -> CandidateManifest:
 
 def semantic_main(repo_root: Path, args: list[str]) -> int:
     """Preflight, build, or independently verify the #300 semantic slice."""
+    # Scrub before ANY dispatch, including a usage error: `preflight` (called
+    # directly below) and `build_candidate` (which preflights internally) must
+    # never see a forbidden routing name that this process could have removed
+    # itself (#334) — see `scrub_route_overrides`. Reported through
+    # `report_routing_scrub` (cold review P1-1); when this one already found
+    # and removed everything, `build_candidate`'s own scrub below is
+    # idempotent and reports nothing further.
+    report_routing_scrub("semantic_main", scrub_route_overrides())
     if not args or args[0] not in {"preflight", "run", "verify"} or len(args) > _MAX_SEMANTIC_ARGS:
         print("kb-setup graphify-semantic-slice preflight|run|verify [PATH]")
         return 2

@@ -308,6 +308,14 @@ HOW TO WORK:
 * A bound-limited search (-maxdepth, head -N, --limit, a time window, 2>/dev/null)
   is suspect by construction. Either remove the bound or prove the target is in it.
 * Cite file:line or the exact command for every claim, or label it "unverified".
+* SHAPE OF EVERY FINDING (the StructuredOutput schema enforces it, and a lane
+  that keeps sending another shape returns NOTHING — measured: one run's
+  "context" lane sent the code-review shape {file, summary, failure_scenario}
+  seven times, was rejected seven times, and the whole lane was dropped):
+  each finding is EXACTLY {claim, evidence, cost_rank, still_live} plus the
+  optional {control_arm, remedy} — no other keys. "claim" is the one-line
+  finding; "evidence" is file:line / the exact command / the word "unverified".
+  If the tool rejects your output, READ the error and fix the keys.
 
 HOW TO FINISH — this is not optional:
 End your report with a COVERAGE line naming, explicitly:
@@ -434,8 +442,12 @@ finding. Run the currency tooling WITH its arguments.`,
   },
   {
     key: 'context',
-    // Counting jq over transcripts. Mechanical by construction.
-    model: 'haiku',
+    // Counting jq over transcripts — mechanical by construction, but NOT
+    // haiku: on 2026-08-21 the haiku agent ignored the StructuredOutput
+    // rejection seven times in a row and the lane returned null, which made
+    // the review partial on the one focus this lane owns. `unpinned` (also
+    // haiku) complied, so the drift is per-agent; sonnet reads the error back.
+    model: 'sonnet',
     effort: 'medium',
     prompt: `Find CONTEXT BLOWOUTS: which sessions exceeded the context target, by
 how much, and whether they compacted. Then the load-bearing half — for the worst

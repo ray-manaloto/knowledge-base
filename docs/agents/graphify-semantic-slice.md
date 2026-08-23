@@ -1,12 +1,12 @@
 ---
 name: graphify-semantic-slice
-description: Real Graphify 0.9.42 and Claude Max semantic extraction certificate.
+description: Real Graphify 0.9.48 and Claude Max semantic extraction certificate.
 ---
 
 # Graphify real-Claude semantic slice
 
 Issue [#300](https://github.com/ray-manaloto/knowledge-base/issues/300) proves the
-smallest real semantic path through the exact Graphify 0.9.42 source and Claude Code
+smallest real semantic path through the exact Graphify 0.9.48 source and Claude Code
 Max subscription. It complements the deterministic AST candidate from issue #299; it
 does not replace or rebuild that candidate.
 
@@ -14,15 +14,15 @@ does not replace or rebuild that candidate.
 
 ```mermaid
 flowchart LR
-    PIN["Graphify v0.9.42 trust root<br/>commit + tree + Git blob + SHA-256"] --> SNAP["Detached immutable snapshot"]
+    PIN["Graphify v0.9.48 trust root<br/>commit + tree + Git blob + SHA-256"] --> SNAP["Detached immutable snapshot"]
     SNAP --> DOC["docs/how-it-works.md<br/>5,147 exact bytes"]
     PREFLIGHT["Read-only preflight<br/>Graphify SDK + Claude CLI + Max OAuth"] --> ADAPTER["KB executable-boundary adapter"]
     DOC --> GRAPHIFY["Graphify extract_corpus_parallel<br/>one chunk, concurrency 1, retry depth 0"]
     GRAPHIFY --> ADAPTER
     ADAPTER --> CLAUDE["Real Claude Code<br/>dated Haiku, no tools, safe mode"]
     CLAUDE --> ADAPTER
-    ADAPTER --> FRAGMENT["Exact validated structured fragment<br/>16 nodes + 14 edges + 2 hyperedges"]
-    FRAGMENT --> BUILD["Graphify build_checked<br/>16 nodes + 14 edges"]
+    ADAPTER --> FRAGMENT["Exact validated structured fragment<br/>18 nodes + 17 edges + 2 hyperedges"]
+    FRAGMENT --> BUILD["Graphify build_checked<br/>18 nodes + 17 edges"]
     ADAPTER --> RECEIPT["Public-safe envelope metadata"]
     BUILD --> CANDIDATE["Atomic content-addressed candidate"]
     RECEIPT --> CANDIDATE
@@ -42,7 +42,7 @@ Graphify. It does not patch Graphify or fabricate provider behavior.
 sequenceDiagram
     participant Task as kb-setup task
     participant Verify as Preflight/verifier
-    participant G as Graphify 0.9.42
+    participant G as Graphify 0.9.48
     participant A as KB Claude adapter
     participant C as Claude Code Max
     Task->>Verify: prove pin, SDK signature, CLI flags, OAuth route
@@ -81,21 +81,21 @@ counts, cost/duration/token consistency, public digest formats, and all negative
 ## Retained first real result
 
 - Candidate manifest SHA-256:
-  `8d3407f5cca4c2ddca54d9a4f25df0727cbd5fd2fd378754d48afced220e94a7`.
-- Source: Graphify `v0.9.42`, commit
-  `7fe58b0b0f3873be9a21c30106b8b8527c353aa6`, tree
-  `15ca81a8dbd3ded7083c4b573197140e62e95fcc`, and exact 5,147-byte
-  `docs/how-it-works.md` blob.
-- Runtime: Graphify `0.9.42`; Claude Code `2.1.232`; Claude.ai first-party Max;
+  `61006e39d3d6ea20e1bb41deff64ff3cffbcf1894db92920a9006924c19f4cc9`.
+- Source: Graphify `v0.9.48`, commit
+  `b2cd36267456c166788c95be6e68574064a92a42`, tree
+  `be8636735370ed82708bb53eba33170e85acc369`, and exact 5,147-byte
+  `docs/how-it-works.md` blob (byte-identical to the v0.9.42/v0.9.45 snapshots).
+- Runtime: Graphify `0.9.48`; Claude Code `2.1.238`; Claude.ai first-party Max;
   sole `claude-haiku-4-5-20251001` model.
 - Bounds: one Graphify chunk, concurrency one, adaptive retry depth zero, API retries
   zero, at most one structured repair, 120 seconds, no tools/MCP/browser, and a
   `$0.25` ceiling.
 - Observed: one subprocess attempt, three turns, `tool_use` stop with success/completed
   state, zero stderr, warnings, errors, denials, fallback, uncovered files, failed chunks,
-  or out-of-scope drops; `$0.0910219` estimated subscription usage.
-- Output: 16 semantic nodes, 14 edges, two hyperedges; Graphify rebuilt 16 nodes and
-  14 edges; the public verifier returned `real_semantic_complete=true` with no reasons.
+  or out-of-scope drops; `$0.0556709` estimated subscription usage.
+- Output: 18 semantic nodes, 17 edges, two hyperedges; Graphify rebuilt 18 nodes and
+  17 edges; the public verifier returned `real_semantic_complete=true` with no reasons.
 
 The candidate under `graphify-out/graphify-semantic-slice/` contains only the exact
 semantic fragment, public-safe adapter metadata, receipt, and manifest. It excludes the

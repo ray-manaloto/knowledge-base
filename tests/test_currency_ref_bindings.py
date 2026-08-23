@@ -320,7 +320,7 @@ def _unhealthy_bindings(repo_root, spec) -> set[tuple[str, str, str]]:
     return unhealthy
 
 
-def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
+def test_all_graphify_ref_bindings_agree_with_the_manifest():
     """The suite must SEE a ref-binding drift, not just that patterns match.
 
     `test_this_repos_bindings_all_resolve_to_a_real_anchor` above asserts each
@@ -329,40 +329,22 @@ def test_only_the_frozen_receipt_bindings_may_lag_the_manifest():
     `kb-currency-check` reported the graphify bindings in DRIFT, and the
     disagreement was visible only to whoever happened to run the check by hand.
 
-    The ONE permitted exception is named rather than tolerated in general:
-    `graphify_semantic_slice.SOURCE_REF`/`SOURCE_COMMIT` are the authority for a
-    COMMITTED SLICE RECEIPT, and that module forbids advancing them "as part of a
-    pin bump on its own, which would assert an identity the evidence
-    contradicts". Every OTHER binding must track the manifest, and a new laggard
-    fails here instead of waiting for someone to run the check.
+    Until the graphify 0.9.48 re-attest, `graphify_semantic_slice.SOURCE_REF`/
+    `SOURCE_COMMIT` legitimately lagged the manifest — they are the authority for
+    a COMMITTED SLICE RECEIPT, which may only advance when the receipt does,
+    never as part of a pin bump alone — and this test used to carve out exactly
+    those two rows as the one permitted exception. The re-attest committed that
+    receipt AT the pinned version, so every binding now agrees and an exemption
+    naming rows that are no longer unhealthy would be a probe that can only
+    pass (`probes-need-a-control-arm.md`). Deleted per its own prior assertion's
+    message, not widened: `currency.toml`'s two `graphify_semantic_slice.py`
+    bindings stay declared and are now checked like every other row, so a
+    future re-lag is caught here again rather than waiting for someone to run
+    `kb-currency-check` by hand.
     """
     repo_root = Path(__file__).resolve().parents[1]
     spec = next(s for s in config.load(repo_root) if s.name == "graphify")
 
-    slice_path = "python/src/kb_setup/graphify_semantic_slice.py"
-    allowed = {(b.path, b.field, b.pattern) for b in spec.ref_bindings if b.path == slice_path}
-    assert allowed, f"expected declared bindings in {slice_path}; the exemption names no rows"
-
     unhealthy = _unhealthy_bindings(repo_root, spec)
 
-    unexpected = unhealthy - allowed
-    assert not unexpected, (
-        "only the slice's frozen receipt bindings may lag the manifest; these are "
-        f"also unhealthy and must be advanced with the pin: "
-        f"{sorted((p, f) for p, f, _ in unexpected)}"
-    )
-    # BOTH directions. The subset check above only asks "is anything unexpected
-    # lagging"; on its own it also passes when the exemption covers NOTHING,
-    # because an empty `unhealthy` trivially has no unexpected members. That
-    # silently keeps a dead exemption alive, and a dead exemption is a hole
-    # waiting for the next drift in that file to fall through.
-    #
-    # The previous form asserted exact equality and had this property for free;
-    # the rewrite to structural keying dropped it. Restored explicitly, and
-    # graphify's PR bot on #385 is what caught the loss.
-    assert unhealthy, (
-        f"every binding now agrees, including {slice_path}'s — the slice receipt "
-        "has been re-produced, so this exemption is DEAD. Delete it and let the "
-        "plain 'all bindings agree' assertion stand, or the next drift in that "
-        "file passes unnoticed."
-    )
+    assert not unhealthy, f"ref bindings out of sync with the pin: {sorted(unhealthy)}"

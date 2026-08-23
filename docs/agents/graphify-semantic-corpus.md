@@ -23,6 +23,42 @@ If you are new to this project, start with these four facts:
 4. **Claude is now bounded to three turns.** The option is documented and parser-
    supported in Claude Code 2.1.232 even though the short help text omits it.
 
+## Recording plan authority
+
+Run `kb-setup` from the repository root; the CLI intentionally treats the current
+working directory as `repo_root`. The record verb plans into a retained
+`.agent/kb/replan-<UTC timestamp>/` directory by default, or examines an existing
+plan without modifying it:
+
+```text
+mise run kb-graphify-semantic-corpus -- record
+mise run kb-graphify-semantic-corpus -- record --plan-dir .agent/kb/replan-<timestamp>
+```
+
+The verb copies only the six plan members into an isolated staging directory,
+verifies that staged copy, and reports the exact digest delta. Changes to
+`advisories_sha256` or `exclusions_sha256` are classified as reviewed DECISION
+changes; changes to `plan_manifest_sha256` or `execution_config_sha256` are
+IDENTITY/census changes. A dry run writes neither the canonical plan, authority,
+nor ledger. Naming a decision digest that did not move is also refused.
+
+Recording requires `--accept`. If a DECISION digest moved, the command additionally
+requires `--accept-decision-change` with exactly the moved names, comma-separated:
+
+```text
+mise run kb-graphify-semantic-corpus -- record --plan-dir .agent/kb/replan-<timestamp> --accept
+mise run kb-graphify-semantic-corpus -- record --plan-dir .agent/kb/replan-<timestamp> --accept --accept-decision-change advisories_sha256,exclusions_sha256
+```
+
+Acceptance preserves the old canonical directory as a timestamped `superseded`
+directory, promotes only the verified member files, atomically rewrites
+`python/src/kb_setup/graphify_semantic_corpus_authority.json`, and atomically appends
+one bullet to `graphify-semantic-corpus-authority-ledger.md`. It then verifies the
+new canonical plan against the JSON path explicitly. Any failure after mutation
+restores the prior directory and both tracked files. Candidate verification and
+post-accept verification each measure the live Graphify runtime (about four process
+spawns in total on acceptance), but neither makes a provider call.
+
 ## Current exact scope
 
 | Boundary | Exact result |
@@ -172,10 +208,14 @@ The supported public seam is:
 
 ```text
 mise run kb-graphify-semantic-corpus -- plan|run|verify [PATH]
+mise run kb-graphify-semantic-corpus -- record [--plan-dir PATH] [--accept] [--accept-decision-change NAME[,NAME]]
 ```
 
 - `plan` materializes the immutable pin, detects and expands the source, packs
   units, and atomically publishes the plan directory.
+- `record` re-plans into a scratch directory (or stages an existing `--plan-dir`),
+  classifies the digest delta against the recorded authority, and re-authorizes
+  only on `--accept` — "Recording plan authority" above is the full contract.
 - `verify` materializes the exact pinned source snapshot and independently reruns
   detection, advisory counts/message, exclusions, inventory, and ledger before it can
   consider authority. The library verifier requires this snapshot argument; there is
@@ -309,8 +349,10 @@ plain `json.loads`, bypassing the strict array contract. Both are now corrected:
 execution config binds the semantic-policy module hash, hostile policy drift yields
 `config-contract-mismatch`, and the launcher calls the adapter's strict normalizer.
 An independent exact-digest re-review accepted only the frozen prototype-contract and
-launcher identities. `AUTHORITY_JSON` remains empty: code identity says which reviewed
-program would run, while empty content roots still prevent that program from running.
+launcher identities. The executable plan digests now live in
+`python/src/kb_setup/graphify_semantic_corpus_authority.json`; the Python module reads
+those bytes at import and fails closed if the data file is missing. Human-readable
+transitions continue in `graphify-semantic-corpus-authority-ledger.md`.
 
 A later cold whole-branch review caught three compatibility regressions outside those
 two frozen identities. The shared current manifest had made the historical v0.9.42 AST
@@ -410,3 +452,35 @@ sequenceDiagram
     Evidence-->>Review: Hashes and typed reasons, raw response excluded
     Note over Adapter,CLI: Provider inference unknown; no retry or full-corpus run
 ```
+
+## Launching the corpus run
+
+The full run is projected at roughly 4.8h of wall clock (26 chunks, post-dedupe
+per #414 — was 58 chunks / ~10.6h pre-dedupe — at concurrency 1, ~11
+minutes/chunk measured), and a single Bash tool call is capped at roughly 600s
+regardless of a larger `timeout` argument — so it cannot be driven from one
+foreground call.
+
+- **Verify before spending.** `mise run kb-graphify-semantic-corpus -- verify`
+  is provider-free and fast; confirm `execution_authorized: true` before
+  spending anything on `run`.
+- **Use the harness background run, with in-turn polling.** Launch the `run`
+  action as a background run and poll its log in later turns rather than
+  holding one foreground call open across chunks.
+- **Never `&`-detach a local `mise run`.** A backgrounded local task gets
+  reaped when the turn goes idle — the harness background run stays tracked
+  across turns; a shell `&` does not (`long-running-command-hangs.md` rule 2).
+- **The mise `timeout` is a wall-clock hang guard, not the spend cap.** The
+  money is bounded separately by `_MAX_TOTAL_COST_USD` (63.0, post-dedupe; was
+  140.0 pre-dedupe — see its comment in `graphify_semantic_corpus.py` for the
+  arithmetic). The task's own `timeout = "16h"` is roughly 3.3x the projected
+  4.8h (was roughly 1.5x the projected 10.6h pre-dedupe), sized to catch a
+  genuinely wedged run without firing on ordinary chunk-to-chunk variance.
+- **A restart re-publishes already-staged evidence; it does not re-buy anything
+  for free.** `_verified_stages` re-publishes every chunk whose stage directory
+  already holds verified evidence, so a restart does not write duplicate
+  artifacts for what is already staged. This does NOT make a restart free:
+  `seeded_spend` still carries the prior run's cumulative cost forward, and
+  Graphify itself re-buys EVERY chunk in the corpus at full price on every
+  restart — not only the ones it ends up re-publishing — which is exactly why
+  the cap above is sized for one full restart rather than for one full run.

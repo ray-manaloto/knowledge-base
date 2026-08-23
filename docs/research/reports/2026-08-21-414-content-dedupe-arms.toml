@@ -1,0 +1,126 @@
+# Mutation arms for content-hash dedupe in the corpus planner (#414).
+#
+# The change: `_inventory`'s unit loop now drops every non-canonical path
+# sharing a `parent_sha256` with an already-admitted path (measured 55.1% /
+# 571,462 of 1,038,052 estimated tokens on the real corpus — 28 groups, 257
+# paths, 305 units), records each drop as a `DuplicateGroup`, and the verifier
+# refuses a plan that re-admits a dropped duplicate or disagrees with its own
+# recorded totals. These arms reintroduce the failure modes a careless
+# implementation of that shape would leave behind.
+#
+# SCOPE. NOT armed here: the two EXISTING inventory checks this change did not
+# touch (`inventory-unit-identity-duplicate`, `inventory-slice-sequence-invalid`
+# already have no arm and this change doesn't alter their logic); and the CLI
+# print ordering (`_dedupe_summary` before the manifest line) — no test asserts
+# stdout interleaving, so there is nothing for an arm to catch there.
+#
+# R6 corrects an earlier decision here (round 2, answering the cold review of
+# `3d9bb3ff`): this file used to decline an arm for the second count invariant
+# (`discovered-unit-count-mismatch`) as "the same shape as the first, reverted
+# by the same review" (R5). That argument was wrong (P2-4): the first
+# invariant sums excluded PATHS alone; the second mixes a UNIT total with a
+# PATH count, so reverting one says nothing about the other. R6 arms it
+# directly, the same way R5 arms the first.
+#
+# FULL SWEEP NOT run here, and not merely "per spec": the two group-invalid /
+# group-order-invalid reasons, the kind/suffix-class plan-time asserts, and
+# the new `exclusion-multi-unit` assert all gained DIRECT FAIL-direction
+# tests this round, but none has an arm row yet. Adding those rows and
+# running the real (non-`--dry-run`) sweep is the architect's, after the
+# re-plan that re-signs `AUTHORITY_JSON` — this round's cap change
+# (140.0 -> 63.0) un-authorizes the committed plan, so the baseline suite
+# (`test_recorded_authority_authorizes_this_plan_and_only_this_plan`) is
+# expected-red until then, and `arms.py`'s own baseline-red guard would abort
+# a real sweep regardless (cold review P1-2). Only `--dry-run` (string-match,
+# no pytest) ran this round.
+
+suites = ["tests/test_graphify_semantic_corpus.py"]
+
+# ── the control ────────────────────────────────────────────────────────────
+[[arm]]
+id = "C0"
+control = true
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''        canonical = canonical_by_parent.setdefault(member.sha256, relative)'''
+new = '''        canonical = canonical_by_parent.setdefault(member.sha256, relative)  # control'''
+
+# ── R1: the dedupe forgotten — recorded as dropped but still admitted ──────
+[[arm]]
+id = "R1"
+test = "test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''            dropped_tokens[member.sha256] = dropped_tokens.get(
+                member.sha256, 0
+            ) + _estimate_file_tokens(unit)
+            continue'''
+new = '''            dropped_tokens[member.sha256] = dropped_tokens.get(
+                member.sha256, 0
+            ) + _estimate_file_tokens(unit)'''
+
+# ── R2: last path wins as canonical, not the first (non-deterministic-       ─
+#        looking, and picks a different authority than the design measured) ──
+[[arm]]
+id = "R2"
+test = "test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''        canonical = canonical_by_parent.setdefault(member.sha256, relative)'''
+new = '''        canonical = canonical_by_parent.setdefault(member.sha256, relative)
+        canonical_by_parent[member.sha256] = relative'''
+
+# ── R3: the measurement lies — raw bytes counted as tokens ─────────────────
+[[arm]]
+id = "R3"
+test = "test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''            dropped_tokens[member.sha256] = dropped_tokens.get(
+                member.sha256, 0
+            ) + _estimate_file_tokens(unit)'''
+new = '''            dropped_tokens[member.sha256] = dropped_tokens.get(
+                member.sha256, 0
+            ) + len(_unit_bytes(unit))'''
+
+# ── R4: the verifier relaxed — a hand-re-admitted duplicate passes ─────────
+[[arm]]
+id = "R4"
+test = "test_a_dropped_duplicate_re_admitted_by_hand_is_refused"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''        if admitted_paths.intersection(group.dropped_paths):
+            reasons.append("inventory-duplicate-path-admitted")'''
+new = '''        if admitted_paths.intersection(group.dropped_paths):
+            pass  # reasons.append("inventory-duplicate-path-admitted")'''
+
+# ── R5: a count invariant reverted to its pre-dedupe form ──────────────────
+# Neither invariant had ANY test coverage before this change (pv-lane3 MISSING
+# #4) — this is the arm that gives `detected-source-count-mismatch` one. On a
+# real plan with duplicates the reverted form under-counts `detected_source_
+# count` by the dropped-path total, so it fires spuriously on a CORRECT plan —
+# caught here as an extra reason breaking test 1's exact `("plan-authority-
+# unset",)` tuple, not as a missed detection.
+[[arm]]
+id = "R5"
+test = "test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    if inventory.detected_source_count != (
+        len(admitted_paths) + len(paths) + inventory.duplicate_dropped_path_count
+    ):
+        reasons.append("detected-source-count-mismatch")'''
+new = '''    if inventory.detected_source_count != len(admitted_paths) + len(paths):
+        reasons.append("detected-source-count-mismatch")'''
+
+# ── R6: the second count invariant reverted to its pre-dedupe form ─────────
+# Corrects the SCOPE note above (cold review of #414, P2-4): unlike a simple
+# duplicate of R5, this invariant already held before dedupe existed by
+# coincidence alone (every `_INTENTIONAL_EXCLUSIONS` entry is a non-splittable
+# single-unit file), so reverting it also under-counts by the dropped-unit
+# total and fires spuriously on a CORRECT plan with real duplicates — same
+# verdict shape as R5, on a different invariant with a different mixed unit.
+[[arm]]
+id = "R6"
+test = "test_duplicate_content_is_admitted_once_and_recorded_with_its_canonical"
+file = "python/src/kb_setup/graphify_semantic_corpus.py"
+old = '''    if inventory.discovered_unit_count != (
+        inventory.admitted_unit_count + len(paths) + inventory.duplicate_dropped_unit_count
+    ):
+        reasons.append("discovered-unit-count-mismatch")'''
+new = '''    if inventory.discovered_unit_count != inventory.admitted_unit_count + len(paths):
+        reasons.append("discovered-unit-count-mismatch")'''

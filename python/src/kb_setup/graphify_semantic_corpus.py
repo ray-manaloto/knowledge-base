@@ -39,6 +39,7 @@ from graphify.llm import (
 
 from kb_setup import (
     atomic,
+    events,
     graphify_baseline,
     graphify_sdk,
     graphify_semantic_adapter,
@@ -53,7 +54,8 @@ _FILE_CHAR_CAP = 20_000
 
 #: How long ONE provider call may take, in seconds. Authorized by Ray 2026-08-17 at
 #: 900 s, from a measurement rather than a guess: chunk 1 (7 members, 18,218 estimated
-#: tokens — a MEDIAN chunk, since the 58 range 13,067 to 19,989) completed in
+#: tokens — a MEDIAN chunk, since the post-dedupe (#414) 26-chunk range is 12,912 to
+#: 19,979, median 18,569) completed in
 #: **659.5 s at rc=0**, returning 434 KB. That measurement is a LOWER BOUND, taken on
 #: graphify's own argv, which omits the `--effort high` and `--max-turns 3` the adapter
 #: adds; 900 s is 1.36x it, which is the headroom that gap needs.
@@ -68,16 +70,41 @@ _FILE_CHAR_CAP = 20_000
 #: which meant raising this constant alone would have changed only WHICH 120-second
 #: ceiling killed the call (#335).
 #:
-#: At `concurrency = 1` — kept, a reviewed decision — 58 chunks at ~11 minutes each is
-#: ~10.6 h. Chunking differently does not change that total; only concurrency would.
+#: At `concurrency = 1` — kept, a reviewed decision — 26 chunks at ~11 minutes each is
+#: ~4.8 h (measured post-dedupe, #414; was 58 chunks / ~10.6 h pre-dedupe). Chunking
+#: differently does not change that total; only concurrency would.
 _INFERENCE_TIMEOUT_SECONDS = 900
 _DEFAULT_TOKEN_BUDGET = 20_000
-# Ray's ruling, 2026-08-17. The whole-run authority, in dollars, against a
-# projected corpus cost of roughly 65 — so it is headroom for a run that goes
-# somewhat wrong, and a stop for one that goes badly wrong. It is deliberately
-# not derived from the per-chunk cap times the chunk count: that product (1,450)
-# is the number this constant exists to make unreachable.
-_MAX_TOTAL_COST_USD = 100.0
+# Ray's ruling, 2026-08-17 (SUPERSEDED 2026-08-21, see below). The whole-run
+# authority, in dollars, against a projected corpus cost of roughly 65 — so it
+# is headroom for a run that goes somewhat wrong, and a stop for one that goes
+# badly wrong. It is deliberately not derived from the per-chunk cap times the
+# chunk count: that product is the number this constant exists to make
+# unreachable.
+#
+# Ray's ruling, 2026-08-21 (RE-DERIVED the same day, see below). 100.0 left an
+# interrupted run past chunk ~31 uncompletable inside its own cap: `seeded_
+# spend` carries a run's cumulative cost forward across a restart (see
+# `execute`), and a restart re-buys the WHOLE corpus rather than resuming it
+# (see `graphify_no_incremental_cache` below) — so the worst case is one full
+# run's cost stacked on another's. The RULE this ruling set is "size for one
+# full restart, +~8% margin" — not a specific number. Applied, at the time, to
+# the pre-dedupe 58-chunk workload at the measured 1.12 USD/chunk: 58 x 1.12 =
+# 64.96; one full restart on top of an interruption that had already spent
+# nearly that much is 2 x 64.96 = 129.92; +~8% margin -> 140.0.
+#
+# RE-DERIVED the same day (#414 landed immediately after this ruling and
+# deduped the corpus from 58 to 26 chunks — plan-time content-hash dedupe
+# removes 305 byte-identical units, 571,462 of 1,038,052 estimated tokens,
+# ~55%). The per-chunk rate transfers: pre-dedupe 1,038,052/58 ≈ 17,897
+# tokens/chunk vs post-dedupe 466,590/26 ≈ 17,946 — essentially unchanged
+# chunk size, fewer chunks. Applying the SAME rule to the measured 26-chunk
+# workload: 26 x 1.12 = 29.12; 2 x 29.12 = 58.24; +~8% margin -> 62.8992 ->
+# 63.0. This SUPERSEDES the 140.0 derivation above, which described a
+# workload that no longer exists — the rule did not change, the chunk count
+# did. The per-chunk ceiling product is still the number this constant exists
+# to make unreachable, and it moved too: 26 x 25 = 650 (was 58 x 25 = 1,450).
+_MAX_TOTAL_COST_USD = 63.0
 # The upper bound the VERIFIER will accept for a plan's resolved output cap. Not
 # the ceiling itself — only the Models API knows that, and asking it on the verify
 # path is the thing this design avoids. It is set well above any published Claude
@@ -182,17 +209,37 @@ _ACCEPTED_BASELINE_SOURCE_MANIFEST_SHA256 = (
 # for the currency machinery: a fingerprint that stops moving on a no-op run is
 # the behaviour `kb_setup.currency.views` needs.
 _ACCEPTED_GRAPHIFY_DETECT_OBJECT = "d16b5800ce19ba36aa5276a204e77ecccc1dbe5c"
-_ACCEPTED_GRAPHIFY_RUNTIME = graphify_baseline.RuntimeIdentity(
-    version="0.9.47",
-    cli_version="0.9.47",
-    sdk_version="0.9.47",
-    executable=".venv/bin/graphify",
-    # Unchanged, and MEASURED rather than carried forward — see
-    # `graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME` for the re-derivation.
-    sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="2a8b13ccd53d507d16dcc12aebe488517c369afa547938464474fd3e772938ab",
-    sdist_sha256="26e5766f50f40591edc681c62a9f85084838983c489d3803d086f9b83dae1b1d",
-)
+# The repo root this module's own file lives under, resolved for the caller who
+# does not have one handy (a test, or a future entry point). Verified: this file
+# is `python/src/kb_setup/graphify_semantic_corpus.py`, so the repository root
+# is three parents up from the file (`parents[3]`), not the other way around.
+_DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _measured_runtime(repo_root: Path) -> graphify_baseline.RuntimeIdentity:
+    """The ONE seam a plan or a verify call measures the live Graphify runtime through.
+
+    A frozen `_ACCEPTED_GRAPHIFY_RUNTIME` literal used to stand where this
+    function's result now flows: read only at `_effective_config`, restated by
+    hand at every graphify bump. It went stale exactly once — 0.9.48 installed
+    against a 0.9.47 literal — before anything caught it, because nothing ever
+    recomputed it. `plan_source` calls this once at plan time (letting a raise
+    propagate: a plan must not be written against a runtime that cannot be
+    measured); `verify_plan` calls this once at verify time (catching a raise
+    and turning it into `plan-graphify-runtime-unmeasurable`, since a verifier
+    must stay total). Both write or compare the value THIS measures — never a
+    value spelled beside it.
+
+    A single named function, rather than calling `graphify_baseline.runtime_identity`
+    inline at each of those two call sites, is what lets a test simulate a runtime
+    disagreement by patching one name in this module, instead of reaching past
+    `graphify_baseline` or monkeypatching a lower-level primitive the way the only
+    existing precedents do (`graphify_env.assert_pinned_graphify`, patched directly
+    in `test_graphify_semantic_slice.py` and `test_graphify_baseline.py`).
+    """
+    return graphify_baseline.runtime_identity(repo_root)
+
+
 _PROFILE = graphify_semantic_slice.CORPUS_PROFILE
 _CORPUS_WORD_UPPER = 500_000
 _CORPUS_FILE_UPPER = 500
@@ -291,6 +338,60 @@ class SourceUnit(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     estimated_tokens: int
 
 
+# The record's own stated reason a duplicate group is absent from admission —
+# so a reader of `source-inventory.json` never has to know the planner to see
+# WHY a path is missing. Verifier-checked in `_inventory_reasons`.
+_DUPLICATE_REASON = "duplicate-content-of-canonical-path"
+
+
+class DuplicateGroupMismatchError(ValueError):
+    """A duplicate-group member disagrees on something equal `sha256` alone does not guarantee.
+
+    A path sharing a `parent_sha256` with an admitted canonical disagrees
+    with it on something content-hash equality does NOT already guarantee
+    (#414 P1-1/P1-5, cold review of `3d9bb3ff`): its detected `kind`, its
+    computed slice count, or — inside `_INTENTIONAL_EXCLUSIONS` handling —
+    its unit count. Raised at plan time by `_inventory` and caught BY NAME in
+    `_source_reasons`, ahead of the generic recomputation-failure catch, so
+    the reason reaches a verdict instead of being reported as an unrelated
+    `source-snapshot-unavailable`.
+    """
+
+
+class DuplicateGroup(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    """One set of byte-identical paths (#414) collapsed to a single admission.
+
+    `canonical_path` is the lexicographically-first path detected for
+    `parent_sha256` (tied to the same `sorted(kinds)` order `_inventory`
+    already iterates in); every other path carrying the identical bytes is
+    named in `dropped_paths`. `kind`/`source_git_object`/`parent_size` are the
+    CANONICAL's values. Only TWO of those are independently asserted at plan
+    time — `kind`, and the computed slice count (the real content-behavior
+    discriminator: two byte-identical files with different suffixes can slice
+    differently — see `_estimate_file_tokens`/`expand_oversized_files`).
+    `source_git_object` and `parent_size` need no check of their own: equal
+    `sha256` already implies equal bytes (a git blob id and its length are
+    both pure functions of content, and `graphify_baseline.source_manifest`
+    hashes and sizes the same filter-free blob it records the object id for),
+    so a third comparison of those two fields could only ever pass — a check
+    that can only pass is not a check (`probes-need-a-control-arm.md`, cold
+    review P1-1). One edge case is real but harmless here: file MODE is not
+    part of a blob id, so a symlink whose target string equalled a regular
+    file's bytes would dedupe with it; `DuplicateGroup` records no mode, and
+    this repo's own corpus has no such pair.
+    """
+
+    parent_sha256: str
+    source_git_object: str
+    parent_size: int
+    kind: str
+    canonical_path: str
+    dropped_paths: tuple[str, ...]
+    dropped_unit_count: int
+    dropped_estimated_tokens: int
+    reason: str
+
+
 class SourceInventory(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     """Complete detected semantic inventory before reviewed dispositions."""
 
@@ -303,7 +404,12 @@ class SourceInventory(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     admitted_unit_count: int
     units: tuple[SourceUnit, ...]
     warnings: tuple[str, ...]
-    schema_version: int = 1
+    duplicate_groups: tuple[DuplicateGroup, ...]
+    duplicate_dropped_path_count: int
+    duplicate_dropped_unit_count: int
+    duplicate_dropped_estimated_tokens: int
+    admitted_estimated_tokens: int
+    schema_version: int = 2
 
 
 class CorpusAdvisory(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
@@ -417,12 +523,23 @@ class CorpusExecutionConfig(msgspec.Struct, frozen=True, forbid_unknown_fields=T
     claude_max_retries: int
     structured_output_retries: int
     max_turns: int
+    # The Claude reasoning-effort level this run's chunks were planned against
+    # (`CORPUS_PROFILE.effort`, reaching the CLI as `--effort`). Before this
+    # field, the level reached a run only through the adapter argv, compared for
+    # equality after the provider had already been paid for the chunk
+    # (`provider-adapter-argv-mismatch`) — so an effort change was recoverable
+    # only from that per-chunk evidence, never from the plan itself.
+    #
+    # No default, deliberately — the same fail-closed precedent as
+    # `max_total_cost_usd` below: a plan written before this field existed must
+    # be REFUSED by strict decode, not silently run at an effort nobody recorded.
+    effort: str
     max_cost_usd: float
     # The cap on the WHOLE run, which nothing expressed before. `max_cost_usd` is
-    # per chunk and `--max-budget-usd` is per provider invocation, so 58 chunks
-    # each individually within authority could spend an unbounded total: chunk 1
-    # measured 1.12 USD, 58 chunks project to roughly 65, and the per-chunk
-    # ceiling permits about 1,450.
+    # per chunk and `--max-budget-usd` is per provider invocation, so 26 chunks
+    # (post-dedupe, #414; was 58 pre-dedupe) each individually within authority
+    # could spend an unbounded total: chunk 1 measured 1.12 USD, 26 chunks
+    # project to roughly 29, and the per-chunk ceiling permits about 650.
     #
     # No default, deliberately. A plan written before this field existed decodes
     # into a struct that forbids unknown fields and requires this one, so an old
@@ -715,6 +832,12 @@ def cache_namespace_for(config: CorpusExecutionConfig | dict[str, object]) -> st
 def _effective_config(
     source: SourcePin,
     *,
+    # Measured ONCE by the caller — `plan_source` at plan time, `_config_reasons`
+    # at verify time — via the one `_measured_runtime` seam, and passed in rather
+    # than measured here. This function is also the VERIFIER's expectation (it is
+    # recomputed and compared field by field), so measuring inside it would spend
+    # the subprocess/file read twice per verify call instead of once.
+    runtime: graphify_baseline.RuntimeIdentity,
     token_budget: int,
     # Passed IN rather than resolved here, because this function is also the
     # VERIFIER's expectation: it recomputes the config and compares field by
@@ -738,13 +861,14 @@ def _effective_config(
         graphify_ref=source.ref,
         graphify_commit=source.commit,
         graphify_tree=source.tree,
-        # Read from the runtime identity rather than spelled again: this literal
-        # said "0.9.43" while `_ACCEPTED_GRAPHIFY_RUNTIME` next to it said 0.9.44,
-        # so every plan written since the pin bump recorded two different versions
-        # for one run. A version that is transcribed can disagree with the version
-        # that ran; a version that is READ cannot.
-        graphify_version=_ACCEPTED_GRAPHIFY_RUNTIME.version,
-        graphify_runtime=_ACCEPTED_GRAPHIFY_RUNTIME,
+        # Read from the MEASURED runtime parameter rather than spelled again: a
+        # frozen module literal here once said "0.9.43" while the runtime beside
+        # it said 0.9.44, so every plan written after the pin bump recorded two
+        # different versions for one run. A version that is transcribed can
+        # disagree with the version that ran; a version that is MEASURED — once,
+        # by `_measured_runtime`, before this function is ever called — cannot.
+        graphify_version=runtime.version,
+        graphify_runtime=runtime,
         graphify_semantic_fingerprint_sha256=semantic_fingerprint,
         graphify_llm_sha256=graphify_llm_sha,
         planner_sha256=_sha_file(Path(__file__)),
@@ -775,6 +899,7 @@ def _effective_config(
         claude_max_retries=int(_PROFILE.max_retries),
         structured_output_retries=1,
         max_turns=int(_PROFILE.max_turns),
+        effort=_PROFILE.effort,
         max_cost_usd=_PROFILE.max_cost_usd,
         max_total_cost_usd=_MAX_TOTAL_COST_USD,
         # 0 -> 2 alongside `claude_max_retries`: one blip over 57 chunks is likely
@@ -1182,6 +1307,20 @@ def _inventory(
     admitted: list[Path | FileSlice] = []
     units: list[SourceUnit] = []
     members = {member.path: member for member in manifest.members}
+    # Content-hash dedupe (#414): the first path seen for a `parent_sha256`,
+    # in this same `sorted(kinds)` order, is canonical; every later path
+    # carrying the identical bytes is dropped whole rather than sliced and
+    # admitted a second time. `canonical_slice_total` exists because two
+    # byte-identical files can still slice differently if their suffixes put
+    # them in different `is_splittable_text` classes (graphify's
+    # `expand_oversized_files`) — that divergence is the real content-behavior
+    # discriminator, so it is asserted directly off the computed slice count
+    # rather than re-deriving graphify's own suffix rule.
+    canonical_by_parent: dict[str, str] = {}
+    canonical_slice_total: dict[str, int] = {}
+    dropped_paths: dict[str, set[str]] = {}
+    dropped_unit_counts: dict[str, int] = {}
+    dropped_tokens: dict[str, int] = {}
     for unit in expanded:
         parent = unit_path(unit)
         relative = _relative(source_root, parent)
@@ -1189,6 +1328,16 @@ def _inventory(
         if member is None:
             raise ValueError(f"semantic source is absent from Git inventory: {relative}")
         if relative in _INTENTIONAL_EXCLUSIONS:
+            # `_exclusion_reasons`' unit-count invariant (below) adds exactly
+            # ONE unit per excluded path — safe only because every entry in
+            # `_INTENTIONAL_EXCLUSIONS` today is a non-splittable single-unit
+            # file. A multi-unit excluded file would silently under-count by
+            # (N-1) units on a plan that is otherwise CORRECT (#414 nit-1,
+            # cold review M5/P2-4); refuse it here, directly, rather than
+            # leave that invariant to discover it indirectly on a plan it
+            # cannot even name.
+            if isinstance(unit, FileSlice):
+                raise DuplicateGroupMismatchError(f"exclusion-multi-unit:{relative}")
             if not any(entry.path == relative for entry in exclusions):
                 exclusions.append(
                     _intentional_exclusion(
@@ -1199,6 +1348,20 @@ def _inventory(
                         members=members,
                     )
                 )
+            continue
+        canonical = canonical_by_parent.setdefault(member.sha256, relative)
+        if kinds[relative] != kinds[canonical]:
+            raise DuplicateGroupMismatchError(f"duplicate-group-kind-mismatch:{relative}")
+        slice_total = unit.total if isinstance(unit, FileSlice) else 1
+        expected_slice_total = canonical_slice_total.setdefault(member.sha256, slice_total)
+        if slice_total != expected_slice_total:
+            raise DuplicateGroupMismatchError(f"duplicate-group-suffix-class-mismatch:{relative}")
+        if relative != canonical:
+            dropped_paths.setdefault(member.sha256, set()).add(relative)
+            dropped_unit_counts[member.sha256] = dropped_unit_counts.get(member.sha256, 0) + 1
+            dropped_tokens[member.sha256] = dropped_tokens.get(
+                member.sha256, 0
+            ) + _estimate_file_tokens(unit)
             continue
         admitted.append(unit)
         raw = _unit_bytes(unit)
@@ -1222,6 +1385,25 @@ def _inventory(
                 estimated_tokens=_estimate_file_tokens(unit),
             )
         )
+    duplicate_groups = tuple(
+        sorted(
+            (
+                DuplicateGroup(
+                    parent_sha256=parent_sha256,
+                    source_git_object=members[canonical_by_parent[parent_sha256]].git_object,
+                    parent_size=members[canonical_by_parent[parent_sha256]].size,
+                    kind=kinds[canonical_by_parent[parent_sha256]],
+                    canonical_path=canonical_by_parent[parent_sha256],
+                    dropped_paths=tuple(sorted(group_dropped_paths)),
+                    dropped_unit_count=dropped_unit_counts[parent_sha256],
+                    dropped_estimated_tokens=dropped_tokens[parent_sha256],
+                    reason=_DUPLICATE_REASON,
+                )
+                for parent_sha256, group_dropped_paths in dropped_paths.items()
+            ),
+            key=lambda group: group.canonical_path,
+        )
+    )
     return (
         SourceInventory(
             source_ref=source_ref,
@@ -1233,6 +1415,17 @@ def _inventory(
             admitted_unit_count=len(units),
             units=tuple(units),
             warnings=warnings,
+            duplicate_groups=duplicate_groups,
+            duplicate_dropped_path_count=sum(
+                len(group.dropped_paths) for group in duplicate_groups
+            ),
+            duplicate_dropped_unit_count=sum(
+                group.dropped_unit_count for group in duplicate_groups
+            ),
+            duplicate_dropped_estimated_tokens=sum(
+                group.dropped_estimated_tokens for group in duplicate_groups
+            ),
+            admitted_estimated_tokens=sum(unit.estimated_tokens for unit in units),
         ),
         AdvisoryCatalog(
             source_commit=source_commit,
@@ -1291,6 +1484,30 @@ def _ledger(
     return ChunkLedger(token_budget=budget, unit_count=len(units), chunks=tuple(chunks))
 
 
+class PlanSourceOptions(msgspec.Struct, frozen=True):
+    """`plan_source`'s two rarely-overridden keyword axes, bundled together.
+
+    `plan_source` had grown to 6 parameters (#426 round 2, cold review P2-7):
+    `source_root`, `output`, `source`, `max_output_tokens` — the four every
+    caller reasons about at the call site — plus these two, which almost every
+    caller leaves at their default. Bundling only these two (not
+    `max_output_tokens` too) is the smallest change that clears ruff's
+    PLR0913 ceiling: it puts `plan_source` at 5 parameters and touches only
+    the call sites that actually set a non-default `token_budget`/`repo_root`
+    — 3 of 19 today; the other 16 are unaffected.
+    """
+
+    token_budget: int = _DEFAULT_TOKEN_BUDGET
+    # `corpus_main` passes its own `repo_root` explicitly (the actual repo
+    # root); every other caller leaves this at the default and gets
+    # `_DEFAULT_REPO_ROOT`, which IS the same repo root resolved a different
+    # way. 19 `plan_source` call sites exist today (18 across the two test
+    # modules, plus `corpus_main`) — a required field here would break every
+    # one of them for a value that is the actual repo root in every case that
+    # matters.
+    repo_root: Path | None = None
+
+
 def plan_source(
     source_root: Path,
     output: Path,
@@ -1300,9 +1517,10 @@ def plan_source(
     # why. Required rather than defaulted so no path can plan under a literal
     # again: a default here would be the 8192 this replaced, wearing a new name.
     max_output_tokens: int,
-    token_budget: int = _DEFAULT_TOKEN_BUDGET,
+    options: PlanSourceOptions | None = None,
 ) -> PlanManifest:
     """Atomically publish a deterministic, provider-free plan for one Git tree."""
+    options = options if options is not None else PlanSourceOptions()
     if output.exists():
         raise ValueError(f"semantic corpus plan already exists: {output}")
     if source.commit != _git(source_root, "rev-parse", "HEAD"):
@@ -1310,13 +1528,19 @@ def plan_source(
     if source.tree != _git(source_root, "rev-parse", "HEAD^{tree}"):
         raise ValueError("source tree does not match materialized HEAD")
     before = graphify_baseline.source_manifest(source_root, commit=source.commit, tree=source.tree)
+    # Measured ONCE here, on the PLAN path, where a raise is correct: a plan must
+    # never be written against a runtime `_measured_runtime` cannot vouch for.
+    # `verify_plan` performs the sibling measurement on the verify path, where the
+    # same raise is instead caught and turned into a named reason.
+    repo_root = options.repo_root if options.repo_root is not None else _DEFAULT_REPO_ROOT
+    runtime = _measured_runtime(repo_root)
     inventory, advisories, exclusions, admitted = _inventory(
         source_root,
         source_ref=source.ref,
         source_commit=source.commit,
         source_tree=source.tree,
     )
-    ledger = _ledger(source_root, inventory.units, admitted, token_budget)
+    ledger = _ledger(source_root, inventory.units, admitted, options.token_budget)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f".{output.name}-", dir=output.parent) as raw_stage:
         stage = Path(raw_stage)
@@ -1326,7 +1550,8 @@ def plan_source(
         ledger_raw = _write(stage / _PLAN_MEMBERS[3], ledger)
         config = _effective_config(
             source,
-            token_budget=token_budget,
+            runtime=runtime,
+            token_budget=options.token_budget,
             max_output_tokens=max_output_tokens,
             members=_MemberDigests(
                 inventory_sha256=_sha(inventory_raw),
@@ -1404,15 +1629,23 @@ def _manifest_reasons(candidate: Path, manifest: PlanManifest) -> list[str]:
     return reasons
 
 
-def _typed_members(
-    candidate: Path,
-) -> tuple[
+# The exact 5-tuple `_typed_members` returns, named so `_config_reasons` and
+# `_cross_reasons` (#426 round 2, cold review P2-7) can take it as ONE
+# parameter instead of four separately-spelled ones. Both callers already hold
+# this tuple in hand (they just decoded it via `_typed_members`), so passing it
+# on is a forward, not a re-derivation — `advisories` rides along unused by
+# either function, which is cheaper than a second, narrower type only they
+# would use.
+_PlanMembers = tuple[
     SourceInventory,
     AdvisoryCatalog,
     ExclusionCatalog,
     ChunkLedger,
     CorpusExecutionConfig,
-]:
+]
+
+
+def _typed_members(candidate: Path) -> _PlanMembers:
     inventory = msgspec.json.decode(
         (candidate / "source-inventory.json").read_bytes(),
         type=SourceInventory,
@@ -1478,6 +1711,100 @@ def _inventory_reasons(inventory: SourceInventory) -> list[str]:
             or totals != {len(group)}
         ):
             reasons.append(f"inventory-slice-sequence-invalid:{path}")
+    reasons.extend(_duplicate_group_reasons(inventory))
+    return reasons
+
+
+def _duplicate_group_is_well_formed(
+    group: DuplicateGroup, canonical_units: list[SourceUnit]
+) -> bool:
+    """Structural validity of one `DuplicateGroup` record (#414).
+
+    Split out of `_duplicate_group_reasons` purely to keep both functions'
+    branch count low — this is one boolean property, not a separate reason.
+    """
+    return (
+        group.reason == _DUPLICATE_REASON
+        and _valid_sha(group.parent_sha256)
+        and len(group.source_git_object) == _GIT_OBJECT_LENGTH
+        and all(char in "0123456789abcdef" for char in group.source_git_object)
+        and group.parent_size > 0
+        and group.kind in {"document", "paper", "image"}
+        and bool(group.canonical_path)
+        and not group.canonical_path.startswith("/")
+        and ".." not in Path(group.canonical_path).parts
+        and bool(group.dropped_paths)
+        and group.dropped_paths == tuple(sorted(set(group.dropped_paths)))
+        and group.canonical_path not in group.dropped_paths
+        and all(
+            bool(path) and not path.startswith("/") and ".." not in Path(path).parts
+            for path in group.dropped_paths
+        )
+        and group.dropped_unit_count > 0
+        and group.dropped_estimated_tokens > 0
+        and bool(canonical_units)
+        and all(unit.parent_sha256 == group.parent_sha256 for unit in canonical_units)
+    )
+
+
+def _duplicate_group_reasons(inventory: SourceInventory) -> list[str]:
+    """Content-hash dedupe (#414) verifier checks.
+
+    First an independent property of `units` alone — two admitted units at
+    different paths must never share a `parent_sha256` — then the
+    `duplicate_groups` records themselves.
+
+    These are DEFENCE-IN-DEPTH over `_source_reasons`' full recomputation, not
+    independent detection on their own: a self-consistent hand-edited
+    `SourceInventory` — every `DuplicateGroup` field copied from a real
+    admitted unit, every count here re-derived to match — passes every reason
+    below and is caught only by `source-inventory-recomputation-mismatch`
+    (cold review of #414, P1-4). That is a defensible design, since the
+    recomputation IS the actual ground truth; it means these checks exist to
+    catch an ACCIDENTALLY malformed record cheaply, not an adversarially
+    self-consistent one.
+    """
+    reasons: list[str] = []
+    units = inventory.units
+    admitted_paths = {unit.path for unit in units}
+    parent_paths: dict[str, set[str]] = {}
+    for unit in units:
+        parent_paths.setdefault(unit.parent_sha256, set()).add(unit.path)
+    if any(len(paths) > 1 for paths in parent_paths.values()):
+        reasons.append("inventory-parent-content-duplicate")
+    for group in inventory.duplicate_groups:
+        canonical_units = [unit for unit in units if unit.path == group.canonical_path]
+        if not _duplicate_group_is_well_formed(group, canonical_units):
+            reasons.append(f"inventory-duplicate-group-invalid:{group.canonical_path}")
+        if not canonical_units:
+            reasons.append("inventory-duplicate-canonical-not-admitted")
+        if admitted_paths.intersection(group.dropped_paths):
+            reasons.append("inventory-duplicate-path-admitted")
+    canonical_paths = tuple(group.canonical_path for group in inventory.duplicate_groups)
+    parent_shas = tuple(group.parent_sha256 for group in inventory.duplicate_groups)
+    group_paths: list[str] = []
+    for group in inventory.duplicate_groups:
+        group_paths.append(group.canonical_path)
+        group_paths.extend(group.dropped_paths)
+    if (
+        canonical_paths != tuple(sorted(canonical_paths))
+        or len(parent_shas) != len(set(parent_shas))
+        or len(group_paths) != len(set(group_paths))
+    ):
+        reasons.append("inventory-duplicate-group-order-invalid")
+    expected_dropped_paths = sum(len(group.dropped_paths) for group in inventory.duplicate_groups)
+    expected_dropped_units = sum(group.dropped_unit_count for group in inventory.duplicate_groups)
+    expected_dropped_tokens = sum(
+        group.dropped_estimated_tokens for group in inventory.duplicate_groups
+    )
+    expected_admitted_tokens = sum(unit.estimated_tokens for unit in units)
+    if (
+        inventory.duplicate_dropped_path_count != expected_dropped_paths
+        or inventory.duplicate_dropped_unit_count != expected_dropped_units
+        or inventory.duplicate_dropped_estimated_tokens != expected_dropped_tokens
+        or inventory.admitted_estimated_tokens != expected_admitted_tokens
+    ):
+        reasons.append("inventory-duplicate-totals-mismatch")
     return reasons
 
 
@@ -1549,9 +1876,25 @@ def _exclusion_reasons(inventory: SourceInventory, exclusions: ExclusionCatalog)
     admitted_paths = {unit.path for unit in inventory.units}
     if admitted_paths.intersection(paths):
         reasons.append("exclusion-admission-overlap")
-    if inventory.detected_source_count != len(admitted_paths) + len(paths):
+    # Content-hash dedupe (#414) removes whole paths before admission, so a
+    # dropped duplicate path is neither an admitted path nor an intentional
+    # exclusion — both invariants below must account for it, or the real
+    # corpus's own plan fails these on arrival every time it dedupes anything.
+    if inventory.detected_source_count != (
+        len(admitted_paths) + len(paths) + inventory.duplicate_dropped_path_count
+    ):
         reasons.append("detected-source-count-mismatch")
-    if inventory.discovered_unit_count != inventory.admitted_unit_count + len(paths):
+    # This invariant mixes a UNIT total with a PATH count (`len(paths)`,
+    # excluded paths) and holds only because every `_INTENTIONAL_EXCLUSIONS`
+    # entry today is a non-splittable single-unit file — one unit per
+    # excluded path (#414 nit-1, cold review P2-4: it is NOT "the same shape"
+    # as the invariant above, which sums paths alone). A multi-unit excluded
+    # file would break it silently on an otherwise CORRECT plan; `_inventory`'s
+    # exclusion branch asserts that condition directly (`exclusion-multi-unit`)
+    # so this invariant never has to detect it after the fact.
+    if inventory.discovered_unit_count != (
+        inventory.admitted_unit_count + len(paths) + inventory.duplicate_dropped_unit_count
+    ):
         reasons.append("discovered-unit-count-mismatch")
     return reasons
 
@@ -1603,12 +1946,20 @@ def _ledger_reasons(inventory: SourceInventory, ledger: ChunkLedger) -> list[str
 
 def _config_reasons(
     candidate: Path,
-    inventory: SourceInventory,
-    exclusions: ExclusionCatalog,
-    ledger: ChunkLedger,
-    config: CorpusExecutionConfig,
+    members: _PlanMembers,
+    runtime: graphify_baseline.RuntimeIdentity,
 ) -> list[str]:
+    inventory, _advisories, exclusions, ledger, config = members
     reasons: list[str] = []
+    # A NAMED reason ahead of the general contract check below, so a runtime
+    # mismatch reads as what it is rather than as an undifferentiated
+    # `config-contract-mismatch` (which also fires here, from the recomputation
+    # below, since `runtime` feeds `expected` too — that is intentional
+    # redundancy, not a bug: the two reasons describe the same disagreement from
+    # two different mechanisms, and keeping both is cheaper than deciding which
+    # one a future reader would rather see missing).
+    if runtime != config.graphify_runtime:
+        reasons.append("plan-graphify-runtime-mismatch")
     source = SourcePin(
         ref=inventory.source_ref,
         commit=inventory.source_commit,
@@ -1616,6 +1967,7 @@ def _config_reasons(
     )
     expected = _effective_config(
         source,
+        runtime=runtime,
         token_budget=ledger.token_budget,
         # The plan's OWN value, so this one field is not re-derived here. It is
         # resolved once at plan time from the model's real ceiling, and re-running
@@ -1644,17 +1996,46 @@ def _config_reasons(
     return reasons
 
 
+def _schema_version_reasons(members: _PlanMembers) -> list[str]:
+    """Every typed plan member's `schema_version` against its struct default.
+
+    Nothing inside the planner checked this before (#414 M4/nit-2): a plan
+    member decoding at an OLDER `schema_version` than its struct's current
+    default is accepted by `strict=True` decode (the field carries a
+    default) and would otherwise be caught only by `_source_reasons`' full
+    recomputation — the same defence-in-depth shape as an unchecked
+    `DuplicateGroup` field. This checks all FIVE typed members, not only
+    `SourceInventory` (whose `schema_version` this round bumped to 2): a fix
+    guarding one and leaving the other four unguarded would repeat the exact
+    shape this round is correcting elsewhere (`a-fix-at-one-layer-leaves-the-
+    next`). No `schema_version` VALUE changes here — only this check.
+    """
+    inventory, advisories, exclusions, ledger, config = members
+    expected = (
+        ("source-inventory", inventory, 2),
+        ("advisories", advisories, 1),
+        ("exclusions", exclusions, 1),
+        ("chunk-ledger", ledger, 1),
+        ("execution-config", config, 1),
+    )
+    return [
+        f"schema-version-invalid:{name}"
+        for name, member, version in expected
+        if member.schema_version != version
+    ]
+
+
 def _cross_reasons(
     candidate: Path,
-    inventory: SourceInventory,
-    exclusions: ExclusionCatalog,
-    ledger: ChunkLedger,
-    config: CorpusExecutionConfig,
+    members: _PlanMembers,
+    runtime: graphify_baseline.RuntimeIdentity,
 ) -> list[str]:
+    inventory, _advisories, exclusions, ledger, _config = members
     reasons = _inventory_reasons(inventory)
     reasons.extend(_exclusion_reasons(inventory, exclusions))
     reasons.extend(_ledger_reasons(inventory, ledger))
-    reasons.extend(_config_reasons(candidate, inventory, exclusions, ledger, config))
+    reasons.extend(_config_reasons(candidate, members, runtime))
+    reasons.extend(_schema_version_reasons(members))
     return reasons
 
 
@@ -1675,6 +2056,17 @@ def _source_reasons(
         expected_ledger = _ledger(
             source_root, expected_inventory.units, admitted, ledger.token_budget
         )
+    except DuplicateGroupMismatchError as exc:
+        # Caught BY NAME, ahead of the generic catch below (#414 P1-5, cold
+        # review of `3d9bb3ff`): this fires INSIDE `_inventory`'s
+        # recomputation, before it can complete, so it is the ONLY reason —
+        # `source-inventory-recomputation-mismatch` never co-occurs on this
+        # path (contrast the inventory-TAMPER tests, where the recomputation
+        # completes and both reasons fire together). Reporting it as
+        # `source-snapshot-unavailable` would read as an environment failure
+        # (`persistence-gate-retry.md`'s retry-once class) when it is the
+        # opposite: a genuine content-class divergence.
+        return [str(exc)]
     except OSError, ValueError:
         return ["source-snapshot-unavailable"]
     reasons: list[str] = []
@@ -1727,8 +2119,23 @@ def verify_plan(
     source_root: Path,
     *,
     authority_path: Path | None = None,
+    # Optional for the same reason `plan_source` makes it optional: 17 existing
+    # callers (13 tests, 2 positional in `graphify_semantic_corpus_prototype.py`,
+    # `verify_execution_modes`, `corpus_main`) would break for a value that is
+    # the actual repo root in every case that matters. `corpus_main` passes its
+    # own `repo_root` explicitly; every other caller gets `_DEFAULT_REPO_ROOT`.
+    repo_root: Path | None = None,
 ) -> PlanVerification:
-    """Rehash and cross-check a plan without mutating it or invoking Graphify."""
+    """Rehash and cross-check a plan without mutating it.
+
+    NOT provider-free of Graphify itself: the runtime measurement below spawns
+    `graphify --version` (via `graphify_env.assert_pinned_graphify`) and
+    imports the Graphify SDK (via `graphify_sdk.public_api_fingerprint`) —
+    twice each, once directly and once again inside the version-agreement
+    check `runtime_identity` performs on itself. It never spends a provider
+    call or writes to the candidate; "without invoking Graphify" overstated
+    that.
+    """
     manifest = _load_manifest(candidate)
     if manifest is None:
         return _verdict(
@@ -1743,14 +2150,44 @@ def verify_plan(
             reasons=tuple(dict.fromkeys(reasons)),
         )
     try:
-        inventory, advisories, exclusions, ledger, config = _typed_members(candidate)
+        members = _typed_members(candidate)
     except msgspec.DecodeError:
         return _verdict(
             "failed", structural=False, authorized=False, reasons=("typed-member-invalid",)
         )
-    reasons = _advisory_reasons(inventory, advisories)
-    reasons.extend(_cross_reasons(candidate, inventory, exclusions, ledger, config))
-    reasons.extend(_source_reasons(source_root, inventory, advisories, exclusions, ledger))
+    inventory, advisories, exclusions, ledger, _config = members
+    # Measured ONCE per verify call, on this TOTAL function's behalf. The
+    # property being asserted is "the live runtime cannot be vouched for", not
+    # any one specific failure — so the union below is named by every raise
+    # site this measurement's call chain can reach, not by the two it happened
+    # to hit first. `ValueError` covers `runtime_identity`'s own version/lock/
+    # wheel/sdist/executable checks; `TypeError` covers a locked `graphifyy`
+    # entry with no source distribution (graphify_baseline.py:361);
+    # `ImportError` covers `PackageNotFoundError` from `running_sdk_version`
+    # when the SDK distribution is not installed (graphify_sdk.py:184, reached
+    # at graphify_baseline.py:375); `RuntimeError` covers `assert_public_sdk`'s
+    # own contract failure (graphify_sdk.py:250), reached through
+    # `assert_pinned_graphify` (graphify_env.py:195); `SystemExit` covers
+    # `assert_pinned_graphify` refusing outright when the pin disagrees with
+    # (or cannot ask) the running binary (graphify_env.py:179-192).
+    # `LookupError`/`OSError` name the same two stdlib failure classes this
+    # chain's own file read and metadata lookup already convert to `ValueError`
+    # today — kept in case a future release stops converting one. Folded into
+    # the SAME `if reasons` branch below (via `try/except/else`) rather than an
+    # early return of its own, so this stays a function every other reason
+    # already funnels through — never a distinct exit `corpus_main`'s `verify`
+    # route or `run` route would have to know about separately. What this
+    # reason can express is necessarily `plan != (pin == live)`: a live binary
+    # that disagrees with the pin is the unmeasurable case, never a silent
+    # match, because `runtime_identity` refuses to describe it.
+    try:
+        runtime = _measured_runtime(repo_root if repo_root is not None else _DEFAULT_REPO_ROOT)
+    except ValueError, TypeError, LookupError, OSError, ImportError, RuntimeError, SystemExit:
+        reasons = ["plan-graphify-runtime-unmeasurable"]
+    else:
+        reasons = _advisory_reasons(inventory, advisories)
+        reasons.extend(_cross_reasons(candidate, members, runtime))
+        reasons.extend(_source_reasons(source_root, inventory, advisories, exclusions, ledger))
     if reasons:
         return _verdict(
             "failed",
@@ -2165,6 +2602,14 @@ def _adapter_config_reasons(
     # run would have failed as an argv-shape mismatch with nothing pointing at the
     # formatting. The profile owns the literal precisely so it is never re-derived.
     expected_argv = graphify_semantic_slice.expected_adapter_argv(_PROFILE, schema or "")
+    # `expected_adapter_argv` emits `--effort` only `if profile.effort`, so
+    # `_argv_value` returns `None` for a profile with no effort at all — which is
+    # why this is not a bare `!= config.effort`: an empty `config.effort` must
+    # require the flag ABSENT, not require it present-and-empty. `CORPUS_PROFILE`
+    # always carries `effort="high"`, so in practice this always takes the first
+    # branch; the second exists so the check stays correct if that ever changes.
+    observed_effort = _argv_value(metadata.argv, "--effort")
+    effort_valid = observed_effort == config.effort if config.effort else observed_effort is None
     usage_valid = (
         len(metadata.model_usage) == 1
         and metadata.model_usage[0].model == config.claude_model
@@ -2184,6 +2629,7 @@ def _adapter_config_reasons(
             "provider-adapter-version-mismatch",
         ),
         (metadata.argv == expected_argv, "provider-adapter-argv-mismatch"),
+        (effort_valid, "provider-effort-mismatch"),
         (not forbidden_environment, "provider-adapter-endpoint-policy-mismatch"),
         # BOTH bounds. The upper one alone accepted `total_cost_usd = -1.0` — an
         # impossible cost, and exactly the shape a missing-value sentinel takes,
@@ -2204,9 +2650,11 @@ def stage_chunk(
     candidate: Path,
     cache_root: Path,
     request: ChunkStageRequest,
+    *,
+    live_runtime: graphify_baseline.RuntimeIdentity,
 ) -> ChunkStageReceipt:
     """Retain and atomically publish exact real-provider evidence for one chunk."""
-    inventory, config, plan_reasons = _stage_plan_context(candidate, request)
+    inventory, config, plan_reasons = _stage_plan_context(candidate, request, live_runtime)
     chunk = request.chunk
     provider_evidence = request.provider_evidence
     destination = _chunk_dir(cache_root, request.run_namespace, chunk.ordinal)
@@ -2290,15 +2738,26 @@ def _decode_adapter_metadata(
 
 
 def _stage_plan_context(
-    candidate: Path, request: ChunkStageRequest
+    candidate: Path, request: ChunkStageRequest, live_runtime: graphify_baseline.RuntimeIdentity
 ) -> tuple[SourceInventory, CorpusExecutionConfig, list[str]]:
     manifest = _load_manifest(candidate)
     if manifest is None:
         raise ValueError("staged chunk plan manifest is unavailable")
-    inventory, advisories, exclusions, ledger, config = _typed_members(candidate)
+    members = _typed_members(candidate)
+    inventory, advisories, exclusions, ledger, config = members
     reasons = _manifest_reasons(candidate, manifest)
     reasons.extend(_advisory_reasons(inventory, advisories))
-    reasons.extend(_cross_reasons(candidate, inventory, exclusions, ledger, config))
+    # The RUN's live measurement (taken once, by `execute()`'s preflight), not
+    # the plan's own recorded value: comparing the plan's runtime against
+    # itself made `plan-graphify-runtime-mismatch` unreachable on this path and
+    # blinded the runtime half of `config-contract-mismatch` (#426 round 2,
+    # cold review P2-2). Reusing that ONE measurement costs nothing extra here
+    # -- no additional subprocess call, contrary to what this comment used to
+    # argue for keeping the tautology. `verify_plan` still takes its OWN
+    # separate measurement for the pre-`run` verdict (it runs before `execute`
+    # exists); this function and `execute`'s pre-spend guard both read the
+    # SAME preflight measurement rather than each taking a fresh one.
+    reasons.extend(_cross_reasons(candidate, members, live_runtime))
     reasons.extend(_source_reasons(request.source_root, inventory, advisories, exclusions, ledger))
     expected = next(
         (chunk for chunk in ledger.chunks if chunk.ordinal == request.chunk.ordinal),
@@ -3143,6 +3602,34 @@ def _execute_authorized(repo_root: Path, output: Path) -> int:
     return completeness_rc(summary)
 
 
+def _dedupe_summary(inventory: SourceInventory) -> str:
+    """Human line for the plan's content-hash dedupe (#414) — never stored.
+
+    Every number here is read straight off the inventory's own fields; the
+    percentage is the only DERIVED value — dropped / (admitted + dropped),
+    i.e. every NON-EXCLUDED unit, admitted or dropped, not the whole detected
+    corpus (cold review nit-8) — computed here at print time so no float ever
+    enters a digested plan member. The token counts are from the same
+    estimator `_estimate_file_tokens` uses everywhere else in this module —
+    tiktoken's `cl100k_base` when installed, a chars/4 heuristic otherwise —
+    never a measured provider cost.
+    """
+    groups = len(inventory.duplicate_groups)
+    noun = "group" if groups == 1 else "groups"
+    dropped_tokens = inventory.duplicate_dropped_estimated_tokens
+    total_tokens = inventory.admitted_estimated_tokens + dropped_tokens
+    ratio = (dropped_tokens / total_tokens) if total_tokens else 0.0
+    return (
+        f"duplicate-content: {groups} {noun} · "
+        f"{inventory.duplicate_dropped_path_count} paths / "
+        f"{inventory.duplicate_dropped_unit_count} units dropped · "
+        f"{dropped_tokens:,} of {total_tokens:,} estimated tokens "
+        f"({ratio:.1%}) not re-extracted · "
+        f"admitted {inventory.admitted_unit_count} units / "
+        f"{inventory.admitted_estimated_tokens:,} tokens"
+    )
+
+
 def corpus_main(repo_root: Path, args: list[str]) -> int:
     """CLI boundary for provider-free planning and read-only verification."""
     if not args or args[0] not in {"plan", "run", "verify"} or len(args) > _MAX_ARGS:
@@ -3160,7 +3647,7 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
         with tempfile.TemporaryDirectory(prefix="kb-graphify-corpus-verify-") as raw_source:
             source_root = Path(raw_source) / "graphify"
             admit_source(repo_root, source_root)
-            verification = verify_plan(output, source_root)
+            verification = verify_plan(output, source_root, repo_root=repo_root)
         if action == "verify":
             print(_encode(verification).decode().rstrip())
             return 0 if verification.state == "complete" else 2
@@ -3177,6 +3664,30 @@ def corpus_main(repo_root: Path, args: list[str]) -> int:
             # Resolved HERE, at the one entry point that plans for real, so the
             # network call happens once per plan and never on the verify path.
             max_output_tokens=planned_max_output_tokens(repo_root, os.environ),
+            options=PlanSourceOptions(repo_root=repo_root),
+        )
+    # Outside the `with`: the temp source root is gone by now, so the summary
+    # depends only on the written plan, never on the source tree — it reads
+    # back the SAME `source-inventory.json` `plan_source` just wrote.
+    try:
+        inventory: SourceInventory | None = _typed_members(output)[0]
+    except msgspec.DecodeError, OSError:
+        # The plan was already written successfully above; a read-back
+        # failure here is a defect in reading the dedupe summary back, not in
+        # the plan itself, so it must not turn a successful `plan` action
+        # into a traceback (nit-5, cold review of #414) — `verify_plan`
+        # wraps this same decode for the identical reason on the verify path.
+        inventory = None
+    if inventory is not None:
+        events.say(
+            "corpus_plan.dedupe",
+            _dedupe_summary(inventory),
+            groups=len(inventory.duplicate_groups),
+            dropped_path_count=inventory.duplicate_dropped_path_count,
+            dropped_units=inventory.duplicate_dropped_unit_count,
+            dropped_tokens=inventory.duplicate_dropped_estimated_tokens,
+            total_tokens=inventory.admitted_estimated_tokens
+            + inventory.duplicate_dropped_estimated_tokens,
         )
     print(_encode(manifest).decode().rstrip())
     return 0

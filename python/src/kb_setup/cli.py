@@ -85,6 +85,8 @@ def _print_usage() -> int:
         "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
         "graphify-semantic-slice preflight|run|verify [PATH] | "
         "graphify-semantic-corpus plan|run|verify [PATH] | "
+        "graphify-semantic-corpus record [--plan-dir PATH] [--accept] "
+        "[--accept-decision-change NAME[,NAME]] | "
         "graphify-semantic-corpus-merge <name> [PLAN_DIR] [--partial] | "
         "skillopt-contract | "
         "tool-sync <currency-tool-name> | "
@@ -245,6 +247,10 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
 
         return graphify_semantic_slice.semantic_main(repo_root, rest)
     if cmd == "graphify-semantic-corpus":
+        if rest[:1] == ["record"]:
+            from kb_setup import graphify_semantic_corpus_record
+
+            return graphify_semantic_corpus_record.record_main(repo_root, rest[1:])
         from kb_setup import graphify_semantic_corpus
 
         return graphify_semantic_corpus.corpus_main(repo_root, rest)
