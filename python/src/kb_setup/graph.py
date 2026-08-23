@@ -189,6 +189,80 @@ _ATTACCA_METADATA_ONLY_PATHS = (
     ("template/settings.json", "20a9b142dd55131bf2968632b84bdf63a9a7359e238bf6a5ff46d94e2008a3a1"),
 )
 
+# U0 (#397 follow-on): package manifests `extract_package_manifest` parses
+# CLEANLY but finds no `[project]`/`[package]` name in — a Rust `[workspace]`
+# root, or a `pyproject.toml` holding only `[tool.*]` configuration. That is a
+# correct zero-node result, not a loss, but #1666 cannot tell the two apart, so
+# these are reviewed the same way the JSON metadata-only files below are:
+# registered with `graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME` (never a
+# `skipped` string — `extract_package_manifest`'s zero-node route never sets
+# one) and re-verified against the pinned bytes at build time.
+#
+# Enumerated through graphify's own `detect()` (the collector `graphify
+# extract` uses) -> `is_package_manifest_path` -> `extract_package_manifest`
+# -> `extract.py:5613-5616`'s `_empty_sources` predicate, applied literally, at
+# each source's pinned commit. `GitNexus` and `codex` carry the identical shape
+# but stay `build = skip` and are deliberately NOT registered — out of scope.
+_DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS = (
+    (
+        "docs/assets/playground/pyproject.toml",
+        "166ee2157a5378ab77b3840949c6980d3aae2c446d6b1fbda6da9c18dd5de3a9",
+    ),
+    (
+        "tests/data/project/pyproject.toml",
+        "3e526b9cb2cf84697fa6d7a77e5ad419b344effeeca9301db5157892824d42a7",
+    ),
+    (
+        "tests/data/pyproject.toml",
+        "26ba53e71ceeed18ae3213780516622051ce28c7650cb4bb7d6089b3aa8357dd",
+    ),
+)
+
+_RUFF_MANIFEST_PATHS = (
+    ("Cargo.toml", "663c169e08caaab92de7b8f74a0466e3ac03a98c6adcade6b369078a52871b0f"),
+    (
+        "crates/ruff/resources/test/fixtures/include-test/nested-project/pyproject.toml",
+        "d5573471176b520beaa0a57b853d6d6fa3f2d127e633f5196a85a58becffd52e",
+    ),
+    (
+        "crates/ruff/resources/test/fixtures/include-test/pyproject.toml",
+        "9a6fb4fd87d571c062895c2477a43ea9cdafd7e377d180a9d265b5c30f35e2fa",
+    ),
+    (
+        "crates/ruff_linter/resources/test/fixtures/isort/detect_same_package/pyproject.toml",
+        "8b9e2e1721f6a41749be1c72a6a0255dd36839ba575ca988654b83deca223f7d",
+    ),
+    (
+        "crates/ruff_linter/resources/test/fixtures/isort/pyproject.toml",
+        "d5fb898253c8fb80efb47839b71800fa2260c7e3b526a6bf8173bb4a64788ea3",
+    ),
+    (
+        "crates/ruff_linter/resources/test/package/pyproject.toml",
+        "a6dfcf9a7978996757e9d45522e9850d964d73a5e8edf20a83eb9a236413e1a1",
+    ),
+    (
+        "crates/ruff_linter/resources/test/project/examples/.dotfiles/pyproject.toml",
+        # sha256 of the EMPTY string — this fixture's pyproject.toml is 0 bytes.
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ),
+    (
+        "crates/ruff_linter/resources/test/project/pyproject.toml",
+        "55ec825d571ea65cfd853ae33a0b2f102d4dd31075fd6e89c839ba5266d71fec",
+    ),
+)
+
+_UV_MANIFEST_PATHS = (
+    ("Cargo.toml", "deb1b5b79721a1c62f107d0d956fad87031355e11b721e393c68ea4bdaa82b58"),
+    (
+        "test/workspaces/albatross-groups-only/pyproject.toml",
+        "70ae71d05636b4496820087106ae2c8e8673e5ef4c4ea0c5fc709c9e493c0b34",
+    ),
+    (
+        "test/workspaces/albatross-virtual-workspace/pyproject.toml",
+        "801a95e145a5e0b6d761053ce671618225e2d29f917d46f9afd2331f8bf60da0",
+    ),
+)
+
 _EXPECTED_METADATA_ONLY = (
     graphify_health.ExpectedMetadataOnly(
         source_name="10x-Team",
@@ -225,6 +299,69 @@ _EXPECTED_METADATA_ONLY = (
             skipped_disposition="data json (not a config/manifest)",
         )
         for relative_path, content_sha256 in _ATTACCA_METADATA_ONLY_PATHS
+    ),
+    # Package-manifest zero-node entries (U0) — see the comment above
+    # `_DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS`. None of these eight sources has
+    # an existing JSON metadata-only entry above, which is required:
+    # `graphify_sdk.approve_metadata_zero_node_warning` refuses outright if a
+    # source's inventory ever mixes the two kinds (M2 — graphify's own count
+    # excludes any `skipped` result, so a mix can never match).
+    *(
+        graphify_health.ExpectedMetadataOnly(
+            source_name="datamodel-code-generator",
+            relative_path=relative_path,
+            content_sha256=content_sha256,
+            skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+        )
+        for relative_path, content_sha256 in _DATAMODEL_CODE_GENERATOR_MANIFEST_PATHS
+    ),
+    *(
+        graphify_health.ExpectedMetadataOnly(
+            source_name="ruff",
+            relative_path=relative_path,
+            content_sha256=content_sha256,
+            skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+        )
+        for relative_path, content_sha256 in _RUFF_MANIFEST_PATHS
+    ),
+    *(
+        graphify_health.ExpectedMetadataOnly(
+            source_name="uv",
+            relative_path=relative_path,
+            content_sha256=content_sha256,
+            skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+        )
+        for relative_path, content_sha256 in _UV_MANIFEST_PATHS
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="picologging",
+        relative_path="pyproject.toml",
+        content_sha256="2ad0ed12418773f0f98bd2b4f9ceca5d2a82db2ba93f5a77e88bf44ebb326c5c",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="logbook",
+        relative_path="Cargo.toml",
+        content_sha256="35e0e98ef730ec11aa7917ac076784d38de19f96938f5977ff03b484c5256b3b",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="taplo",
+        relative_path="Cargo.toml",
+        content_sha256="948071c255f61f3f514db829faa5929f82f5c3a942bf6916c8988dad1c0b7165",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="typos",
+        relative_path="Cargo.toml",
+        content_sha256="35ec168d87130bfaed7231ab6c65eb0f00f55ecfd801c2ef72adcf8069c037a6",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
+    ),
+    graphify_health.ExpectedMetadataOnly(
+        source_name="pensyve",
+        relative_path="Cargo.toml",
+        content_sha256="ac98f98e7bc6843a3c04a80ac106df2dd85377660cd729bd3b1cf431e1f3c883",
+        skipped_disposition=graphify_health.EXPECTED_PACKAGE_MANIFEST_NO_NAME,
     ),
 )
 

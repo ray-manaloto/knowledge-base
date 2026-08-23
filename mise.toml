@@ -52,6 +52,15 @@ typos = "1.49.0"
 "conda:ffmpeg" = "9.0.1"
 taplo = "0.10.0"
 rumdl = "0.2.58"
+# biome: the JS/TS linter for `.claude/workflows/*.js` (U8b0). Rust-native, per
+# this repo's toolset comment in hk.pkl. Was installed and used unpinned before
+# this — `grep -c biome mise.toml` returned 0 — so the `workflow_lint` gate
+# would have run whatever biome a given host happened to have. 2.5.10 is the
+# version this gate was built and measured against (`biome --version`,
+# 2026-08-23): its `noUnusedVariables` underscore-prefix exemption and its lack
+# of an `allowReturnOutsideFunction`-equivalent parser flag are both read from
+# THIS pinned version, not assumed from its docs.
+biome = "2.5.10"
 gitleaks = "8.30.1"
 # agnix: agent-documentation validator (CLAUDE.md / .claude/** / settings.json).
 # Same pin as dotfiles' shared set. Run with --strict everywhere — agnix exits 0
@@ -140,7 +149,7 @@ gh = "2.98.0"
 # what runs, so `mise which` never answers "which version" for this tool —
 # ask the binary. Same class as the `fnox`/`latest` note above.
 codex = "0.149.0"
-antigravity-cli = "1.1.17"
+antigravity-cli = "1.1.19"
 
 [deps.uv]
 auto = true

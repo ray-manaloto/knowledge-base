@@ -164,3 +164,42 @@ the new task): PR #466 `session-review-report-always`. The standing brief it add
 **every session-review run leaves its ranked synthesis on disk in both output modes and
 is archived by `mise run kb-session-review-archive`, never by hand; the `telemetry`
 lane is in the default handoff set.**
+
+### ADDENDUM (b) — 2026-08-23, after PR #466 landed — VERBATIM (the next session's first commit appends this to `docs/direction/2026-08-22-ray-directives.md`)
+
+Asked to `/clear` (clear-prep step 7) after PR #466 landed, Ray answered the clarify prompt with a directive instead. VERBATIM, including the original spelling:
+
+> /fable-orchestrator:orchestration
+> option 1
+> make this be the next task to run in /kb-resume
+> run the /fable-orchestrator:orchestration skill to process the following:
+> 1. this doesn't look correct. why is there only 1 agent in the sweep lane? did we lose functionality?
+>    - create visual artifacts of the the components and their dependencies and architecture/workflow/sequence diagrams of what exited before and what it is now
+>      - the visual artifacts need to be durable and kept in sync w the session-review workflow on any changes
+>      - ensure that it is ingested/deeply extracted/reflected/generate all graphify artifacts
+>      - the generated summaries also need to follow this visual artifact generation
+>      - and use the AST tree sitter and setup a modern LSP for this code to help navigate the code and lint/type-checked/static analysis to ensure it is correct
+>      - there are lanes missing from the aggregation/triage of github issues that need to be added to the session-review workflow:
+>        - convert to /clear-prep to only use the session-review workflow
+>          - refactor it take in arguments/parameters/hints so it can work properly in all modes
+>          - processing the telmetry should uncover manual commands being run that should be converted to modular skill(s) -> mise task(s) -> python library module(s)/function(s)
+>          - universal loggers
+>          - manual commands that should be calling skills
+>          - profilers to get performance metrics
+>          - self-heal/self-optimize/self-improve/self-improve the session-workflow itself based on the telemetry from the session and/or synthesis of the session(s)
+>          - those are just a few i can remember, but there are a lot more missing that the previous session-review workflow runs are missing/skipping and/or have not been acitioned upon from the aggregation/triage
+> 2. update mise.toml:
+>    - resync antigravity-cli to 1.1.19
+>      - the gemini/antigravity reviews always need to be on the latest version of agy/antigravity-cli
+>    - review if we are using the antigravity @ antigravity-for-claude-code plugin properly for cross-family review for antigravity/gemini?
+>      - and if we properly set it up with /antigravity:setup and if we need to run /antigravity:migrate ?
+>      - such as model and effort and other agy cli settins we might not be properly setting up
+>      - we should be using /antigravity:review [--adversarial]
+>      - https://github.com/yuting0624/antigravity-for-claude-code should be a currency/critical dependency that is in sync w the latest version of the antigravity @ antigravity-for-claude-code plugin
+
+Answered in-session (the "1 agent" question): no functionality was lost — the 1-sweep-lane run was the deliberate VALIDATION run of PR #466's change, invoked with `lanes: ['telemetry']` to exercise the new lane cheaply (its derived cap rose to 18 accordingly); the default handoff set is EIGHT lanes (the seven of `runs/2026-08-23-1` + `telemetry`), report mode ten.
+
+Measured at the moment of the directive, for item 2 (re-derive before acting):
+- `mise.toml:143` pins `antigravity-cli = "1.1.17"`, yet the binary at `~/.local/share/mise/installs/antigravity-cli/1.1.17/agy` prints **`1.1.19`** — the install dir name and the binary disagree (a self-update or a stale-PATH-class skew; `the-stale-path-skew-is-live`). `currency.toml:1777` carries `[tool.antigravity-cli]` (mise_key, `binary = "agy"`, `github = "google-antigravity/antigravity-cli"`), so `mise run kb-currency-check` is the instrument.
+- The plugin cache holds `antigravity-for-claude-code/antigravity/0.23.0` and `0.24.0`; this session's Gemini reviews ran through `agy-delegate` from `0.24.0` with `--tier pro --sandbox --mode plan`, prompt + diff on stdin (the kb-review skill names `antigravity:review` as the cold lane for codex-authored diffs; the `--adversarial` flag was NOT used). `.claude/settings.json:81` enables `antigravity@antigravity-for-claude-code`, `:99-102` names the marketplace `yuting0624/antigravity-for-claude-code`.
+- `sources/` has `antigravity-plugin-cc-chris` and `antigravity-plugin-cc-marcos` manifests, NOT yuting0624's plugin — it is neither a corpus source nor a currency row today.

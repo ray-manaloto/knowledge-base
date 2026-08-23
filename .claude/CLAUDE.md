@@ -44,8 +44,15 @@ Opus fallback) and `antigravity@antigravity-for-claude-code` (Google Antigravity
 
 Four more were enabled 2026-08-03 without needing a note here — `pr-review-toolkit`,
 `skill-creator`, `claude-md-management` (all `@claude-plugins-official`) and
-`mise@brentmitchell25`, all Ray's, all ordinary tooling. **Nine plugins are enabled in
-total**, which is what `md-size-budgets.md` § the skill-listing budget is about.
+`mise@brentmitchell25`, all Ray's, all ordinary tooling. Since then, three more of the
+same kind: `codex@openai-codex`, `mcp2cli@claude-community`, and
+`eli5@claude-community` (2026-08-23, plain-language explainers).
+**TWELVE plugins are enabled** — which is what `md-size-budgets.md` § the
+skill-listing budget is about, and that budget scales with the COUNT, so the number
+matters more than the names. **Re-derive it, never quote this line**: it read "Nine"
+until 2026-08-23 and was stale by three, having drifted silently across three
+separate enablements. `jq '.enabledPlugins | to_entries | map(select(.value)) | length'`
+over this directory's `settings.json` is the measurement.
 
 One is enabled for skill self-improvement and DOES need a note, PROJECT-scope
 (`do-not.md` #11 — `extraKnownMarketplaces` + `enabledPlugins` here, never a write to

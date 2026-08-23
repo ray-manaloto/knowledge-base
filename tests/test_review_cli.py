@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 from kb_setup import cli, review
+from kb_setup.currency import sync
 
 _ALL_LANES = "standards,spec,cold:codex,silent-failure"
 
@@ -271,3 +272,110 @@ def test_unresolvable_fixed_point_is_refused(repo: Path, monkeypatch: pytest.Mon
     monkeypatch.setattr(review, "base_sha", lambda _root, _fp, **_kw: "")
     _reports(repo, "standards", "spec", "cold", "silent-failure")
     assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0", "--fixed-point", "no-such-ref") == 2
+
+
+# ------------------------------------------------------ reviewer CLI pin gate ----
+#
+# U4b: a `cold:<variant>` lane names an external reviewer CLI, and a receipt
+# used to record WHICH lane ran but never WHICH VERSION of it — so a drifted
+# `agy`/`codex` binary silently turned the review gate into a stale review
+# gate. `_reviewer_pin_gap` (`review.py`) closes that at write time.
+#
+# `config.load` reads `<repo_root>/currency.toml` and `pinned_version` reads
+# `<repo_root>/mise.toml`; `repo` has neither, which is why every OTHER test in
+# this file (all using `cold:codex` in `_ALL_LANES`) already passes through
+# this gate as "no pin recorded here" — that IS arm 3 (absence), exercised
+# implicitly by the whole rest of the suite. These tests write the two config
+# files so the gate has something to compare, and stub `sync.observed_version`
+# per the spec: never shell out to a real `agy`/`codex` in a test.
+
+
+def _pin_codex(repo_root: Path, version: str) -> None:
+    """Pin `codex` in both config files the gate reads, at `version`."""
+    (repo_root / "mise.toml").write_text(f'[tools]\ncodex = "{version}"\n', encoding="utf-8")
+    (repo_root / "currency.toml").write_text(
+        '[tool.codex]\nmise_key = "codex"\nbinary = "codex"\n', encoding="utf-8"
+    )
+
+
+def test_reviewer_pin_agreement_is_accepted(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PASS arm: the `cold:codex` lane's live `codex` matches the `mise.toml` pin."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "1.0.0")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+    assert review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_reviewer_pin_drift_is_refused_before_any_write(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FAIL arm: the SAME receipt, but the live `codex` disagrees with the pin.
+
+    Matches `test_invented_lane_is_refused_before_any_write`'s shape: nothing is
+    written, so `kb-ship` later refuses for "no receipt", not for a bad one.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "2.0.0")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 2
+    err = capsys.readouterr().err
+    assert "codex 2.0.0" in err
+    assert "pins codex 1.0.0" in err
+    assert "mise use codex@2.0.0" in err
+    assert not review.receipt_path(repo, "a" * 40).exists()
+
+
+def test_reviewer_pin_check_ignores_a_lane_with_no_variant(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ARM 3a: a bare `cold` (no `:variant`) names no reviewer CLI — must pass.
+
+    The pin is deliberately made to disagree (`observed_version` never called
+    for `codex` here); if this failed, the gate would be firing on lane
+    identity alone rather than on the variant it is supposed to read.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "9.9.9")
+    lanes = "standards,spec,cold,silent-failure"
+    assert _run(repo, "--lanes", lanes, "--blocking", "0") == 0
+
+
+def test_reviewer_pin_check_ignores_an_unknown_variant(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ARM 3b: a variant naming no known reviewer CLI must pass, not refuse."""
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "9.9.9")
+    lanes = "standards,spec,cold:claude-fallback-SAME-FAMILY,silent-failure"
+    assert _run(repo, "--lanes", lanes, "--blocking", "0") == 0
+
+
+def test_reviewer_pin_check_is_open_when_the_binary_is_absent(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ARM 3c: absence is not drift — an unreadable `--version` must pass.
+
+    `observed_version` itself returns `""` for a missing binary, a non-zero
+    exit, or a non-matching pattern (`currency/sync.py`); this stubs that
+    single "could not ask" outcome rather than a `shutil.which` miss
+    specifically, matching how the gate reads the return value.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    _pin_codex(repo, "1.0.0")
+    monkeypatch.setattr(sync, "observed_version", lambda *_a, **_kw: "")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0
+
+
+def test_reviewer_pin_check_is_open_with_no_currency_config(repo: Path) -> None:
+    """CONTROL ARM: with no `currency.toml`/`mise.toml` at all, the gate is open.
+
+    This is the state every OTHER test in this file is in, and it is what makes
+    `_ALL_LANES`'s `cold:codex` safe to reuse everywhere else without those
+    tests ever touching this gate. `observed_version` is left unstubbed on
+    purpose — if this test reached it, it would shell out to a real `codex`.
+    """
+    _reports(repo, "standards", "spec", "cold", "silent-failure")
+    assert _run(repo, "--lanes", _ALL_LANES, "--blocking", "0") == 0

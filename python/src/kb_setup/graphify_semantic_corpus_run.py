@@ -1061,6 +1061,74 @@ def _assert_graphify_runtime_unchanged_since_plan(
         )
 
 
+def _assert_claude_identity_matches_plan(
+    preflight_receipt: graphify_semantic_slice.ClaudePreflight,
+    config: graphify_semantic_corpus.CorpusExecutionConfig,
+) -> None:
+    """Refuse to spend when the CLAUDE identity disagrees with the plan (#426's other half).
+
+    The graphify half above has had a plan-vs-live check since #426. The Claude
+    half did not, and the asymmetry was invisible because two OTHER checks look
+    like they cover it and do not:
+
+    * `_adapter_overlay` compares the live executable against
+      `runtime.executable_sha256` -- but that is the PREFLIGHT RECEIPT, measured
+      live moments earlier. Both sides are current, so it is a tautology with
+      respect to the plan; it closes only the preflight->overlay window.
+    * `_provider_runtime_reasons` DOES compare against the plan -- but it takes a
+      `SemanticReceipt`, which exists only once a provider call has been paid
+      for. It is post-hoc by construction.
+
+    So a Claude that self-updated between plan and run reached the provider.
+    `_dispose` then appends a failed outcome WITHOUT raising, so the loop
+    continues and every remaining chunk is bought and staged failed. Measured
+    2026-08-23: `verify` reported `execution_authorized: true` with the live
+    binary at 2.1.241 against a plan recorded at 2.1.240 -- the control arm for
+    "no pre-spend plan-vs-live Claude check exists", since any such check would
+    have refused there.
+
+    Claude self-updated three times in 29 hours against a ~4.8 hour run, so this
+    is the likely case, not the exotic one.
+    """
+    differing = [
+        name
+        for name, live, planned in (
+            ("claude_version", preflight_receipt.version, config.claude_version),
+            (
+                "claude_executable_sha256",
+                preflight_receipt.executable_sha256,
+                config.claude_executable_sha256,
+            ),
+            ("claude_help_sha256", preflight_receipt.help_sha256, config.claude_help_sha256),
+        )
+        if live != planned
+    ]
+    if differing:
+        # Name the fields AND both values: "plan=2.1.240 live=2.1.241" is the
+        # whole diagnosis, and the remedy (advance the slice constants, re-record)
+        # follows directly from it. A refusal that only says "identity changed"
+        # sends the reader back to the code to find out which half moved.
+        detail = ", ".join(
+            f"{name} plan={planned!r} live={live!r}"
+            for name, live, planned in (
+                ("claude_version", preflight_receipt.version, config.claude_version),
+                (
+                    "claude_executable_sha256",
+                    preflight_receipt.executable_sha256,
+                    config.claude_executable_sha256,
+                ),
+                ("claude_help_sha256", preflight_receipt.help_sha256, config.claude_help_sha256),
+            )
+            if name in differing
+        )
+        raise ValueError(
+            f"Claude identity changed after plan: differing field(s) "
+            f"{', '.join(differing)} -- {detail}. Advance the `_CURRENT_CLAUDE_*` "
+            f"constants in graphify_semantic_slice.py and re-record the plan "
+            f"(`graphify-semantic-corpus record --accept`) before running."
+        )
+
+
 def execute(
     candidate: Path,
     cache_root: Path,
@@ -1090,8 +1158,11 @@ def execute(
     preflight_receipt = graphify_semantic_slice.preflight(
         repo_root, require_max_turns=True, profile=_PROFILE
     )
-    # BEFORE anything that spends.
+    # BEFORE anything that spends. BOTH halves of the identity -- the graphify
+    # one has been checked since #426; the Claude one was post-hoc until #426's
+    # other half closed it (see each function's docstring).
     _assert_graphify_runtime_unchanged_since_plan(preflight_receipt, config)
+    _assert_claude_identity_matches_plan(preflight_receipt, config)
     outcomes: list[ChunkOutcome] = []
     repaid: list[int] = []
     # Persistent, and keyed on the CACHE namespace rather than the run namespace,

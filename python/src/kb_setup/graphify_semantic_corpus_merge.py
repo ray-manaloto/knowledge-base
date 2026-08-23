@@ -38,6 +38,25 @@ semantic-SLICE run left behind, so neither cost a provider call to find:
    its own ordinal-bearing name, so the refusal names something a reader can act
    on and the gate does not depend on a caller's naming discipline.
 
+A THIRD CASE THIS CLOSES, measured 2026-08-23 on the real 26-chunk corpus run:
+a chunk whose ONLY fault is a minority of nodes the model attributed to a file
+it was never dispatched to read. Chunk 26's scope is three files, one of which
+is a report *describing* `graph.json`/`graph.html`/`manifest.json`; the model
+made a node per described artifact and attributed it to the artifact rather
+than to the report it actually read. Chunk 12's scope is five translated
+READMEs that *link to* four other docs; same mechanism. graphify's own #1895
+already drops exactly these nodes from the graph — so refusing the whole chunk
+over them was discarding 79 good nodes (3/46 + 4/40) to stop 7 that were never
+going to be kept. `_sanitize_scope` excludes those nodes on the way into
+assembly, cascades the exclusion to any edge/hyperedge that cites one (or
+`chunks.assemble`'s own dangling-reference check would refuse the sanitized
+fragment anyway — just later, and less legibly than naming the cause up
+front), RECORDS exactly what was dropped next to the assembled chunk
+(`chunk-NNNN-scope-exclusions.json`) rather than dropping it silently, and
+still refuses outright above `_MAX_EXCLUDED_SHARE` or when the exclusion would
+leave a declared file with zero nodes — the OMISSION direction, a different
+problem this module has never tried to paper over.
+
 WHAT THIS MODULE DOES NOT DO. It never calls a provider and never merges. It
 refuses on any doubt about the staged evidence rather than assembling a partial
 corpus quietly, because a short graph that merged cleanly is the failure mode that
@@ -87,8 +106,55 @@ def cache_root_for(candidate: Path) -> Path:
     return candidate.parent / f"{candidate.name}-chunks"
 
 
+class ScopeExcludedNode(msgspec.Struct, frozen=True):
+    """One node `_sanitize_scope` dropped: its id and the file it was misattributed to."""
+
+    id: str
+    source_file: str
+
+
+class ScopeExcludedEdge(msgspec.Struct, frozen=True):
+    """One edge dropped because an endpoint was an excluded node.
+
+    Edges carry no `id` in the adapter's own schema (`_EDGE_REQUIRED` in
+    `chunks.py` has none), so `(source, target, relation)` is what a reader has
+    to find one by.
+    """
+
+    source: str
+    target: str
+    relation: str
+
+
+class ScopeSanitization(msgspec.Struct, frozen=True):
+    """What `_sanitize_scope` dropped from one chunk's fragment, and why it is safe.
+
+    Written next to the assembled chunk as `chunk-NNNN-scope-exclusions.json` —
+    see `assemble()` — so the drop is discoverable without re-deriving it from
+    the fragment. `excluded_count`/`excluded_share` are carried explicitly rather
+    than left for a reader to recompute from `len(excluded_nodes)`, because a
+    record whose own arithmetic must be redone to trust it is most of the way to
+    the silent drop this module exists to avoid.
+    """
+
+    ordinal: int
+    total_node_count: int
+    excluded_nodes: tuple[ScopeExcludedNode, ...]
+    excluded_count: int
+    excluded_share: float
+    excluded_edges: tuple[ScopeExcludedEdge, ...]
+    excluded_hyperedge_ids: tuple[str, ...]
+
+
 class StagedChunk(msgspec.Struct, frozen=True):
-    """One staged chunk that passed every local integrity check."""
+    """One staged chunk that passed every local integrity check.
+
+    `node_count`/`edge_count`/`hyperedge_count` are the counts that will actually
+    reach `chunks.assemble` — the receipt's own counts when `scope_sanitization`
+    is `None`, and the post-exclusion counts when it is not. A summary printed
+    from the receipt's raw counts on a sanitized chunk would overstate what was
+    merged by exactly the excluded share.
+    """
 
     ordinal: int
     total: int
@@ -98,6 +164,7 @@ class StagedChunk(msgspec.Struct, frozen=True):
     edge_count: int
     hyperedge_count: int
     source_paths: tuple[str, ...]
+    scope_sanitization: ScopeSanitization | None = None
 
 
 def _plan_members(candidate: Path) -> tuple[ChunkLedger, _ConfigView]:
@@ -158,6 +225,211 @@ def _chunk_reasons(
     if receipt.execution_config_sha256 != sha256_path(candidate / "execution-config.json"):
         reasons.append("chunk-execution-config-mismatch")
     return reasons
+
+
+#: The two `_chunk_reasons` outputs `_sanitize_scope` can resolve — the
+#: `run-reason:` prefix `_chunk_reasons` (above) wraps onto every
+#: `receipt.reasons` entry verbatim, and these are the only two
+#: `graphify_semantic_slice._fragment_source_reasons` ever emits
+#: (`graphify_semantic_slice.py:1265`).
+_SCOPE_MISMATCH_REASONS = frozenset(
+    {
+        "run-reason:fragment-source-scope-mismatch",
+        "run-reason:fragment-source-coverage-mismatch",
+    }
+)
+
+#: Author-chosen from a sample of two real refusals (6.5% and 10% of a chunk's
+#: nodes), NOT a measured limit — see the module docstring's "A THIRD CASE"
+#: section. Move this on evidence from more chunks landing here, not on taste.
+#: A named module constant rather than a literal at the callsite so that move
+#: is a one-line diff.
+_MAX_EXCLUDED_SHARE = 0.20
+
+
+def _is_scope_sanitizable(problems: list[str]) -> bool:
+    """True when `_sanitize_scope` might resolve every one of `problems`.
+
+    `chunk-status-failed` is admitted alongside the two `run-reason:` scope
+    strings even though it is not one of them, and that is deliberate rather
+    than a loophole: `stage_chunk` sets `status="failed" if reasons else
+    "complete"` over the SAME tuple that becomes `receipt.reasons`
+    (`graphify_semantic_corpus.py:2688`), so a receipt whose `reasons` are
+    entirely the two scope mismatches ALWAYS also fails status — that failure
+    is a restatement of the two `run-reason:` entries, not independent
+    information. Treating it as blocking on its own would make this whole path
+    unreachable for exactly the chunks it exists to unblock. `receipt.errors`
+    is a genuinely separate field (never folded into `reasons`/`status`), so a
+    real provider/run error is never disguised this way — see
+    `graphify_semantic_corpus.py:2673-2710`, where `provider_errors` is
+    computed and assigned to `errors=` independently of `reasons=`.
+
+    Everything else `_chunk_reasons` can emit — a digest mismatch, a namespace
+    mismatch, a ledger-binding failure, any OTHER `run-reason:` or `run-error:`
+    — still refuses, because none of them says anything about which nodes are
+    in or out of scope; sanitizing scope cannot repair a chunk that is not
+    verifiably this plan's own evidence in the first place.
+
+    NOTE ON A REASON THIS FUNCTION NEVER SEES: a resumed run's
+    `chunk-stage-unverifiable: <reason>` prefix (`graphify_semantic_corpus_run.
+    py:921`) is written into that RUN's outcome ledger when a chunk's stage
+    directory already existed on a later pass — a different artifact this
+    module never reads. `_chunk_reasons` reads only `receipt.json`, which
+    `_resolve_existing_stage` never rewrites (`graphify_semantic_corpus_run.py`
+    docstring: "There is no repair path from here"), so that prefixed form
+    cannot reach this function. Handling it here would be handling a string
+    this code path structurally cannot receive.
+    """
+    if not problems:
+        return False
+    survivable = _SCOPE_MISMATCH_REASONS | {"chunk-status-failed"}
+    return set(problems) <= survivable
+
+
+def _sanitize_scope(
+    fragment: dict[str, object],
+    source_paths: tuple[str, ...],
+    ordinal: int,
+) -> tuple[dict[str, object], ScopeSanitization | None, list[str]]:
+    """Drop nodes graphify's own #1895 already drops, and whatever cites them.
+
+    Mirrors graphify's definition of out-of-scope exactly, and invents no
+    second rule: a node is out of scope when its `source_file` is not one of
+    THIS CHUNK's declared member paths — the same test
+    `_fragment_source_reasons` reads the other direction
+    (`observed_paths.issubset(accepted_paths)` is exactly "not excluded";
+    `graphify_semantic_slice.py:1265`).
+
+    The exclusion CASCADES to edges and hyperedges that cite a dropped node —
+    not a second scope rule, but referential necessity: leaving them in would
+    hand `chunks.assemble` a dangling reference, and its own `validate()`
+    refuses that as a genuine agent error (`chunks.py` `_edge_issues` /
+    `_hyperedge_member_issues`), so a fragment sanitized at the node level only
+    would still refuse assembly — later, and far less legibly than naming the
+    real cause here. An edge is dropped when EITHER endpoint is excluded. A
+    hyperedge is dropped OUTRIGHT the moment ANY member is excluded, rather
+    than having its member list shrunk and kept: stripping members would
+    assert a narrower relationship than the extraction ever claimed, and that
+    is exactly the kind of unrecorded semantic change this module exists to
+    stop making silently — see `agent-report-persistence.md`.
+
+    Returns `(fragment, None, [])`, UNCHANGED, when there is nothing out of
+    scope — the caller should not have reached here in that case, but this
+    stays a pure decision function rather than raising on it. Returns
+    `(fragment, None, [reason, ...])`, UNCHANGED, on refusal: the excluded
+    share crossed `_MAX_EXCLUDED_SHARE`, or excluding would leave a declared
+    file with zero remaining nodes — the OMISSION direction, which is a
+    different problem and must refuse rather than be papered over (spec
+    premise A). Only on success does it return the sanitized fragment and a
+    populated `ScopeSanitization` record.
+    """
+    nodes = fragment.get("nodes")
+    edges = fragment.get("edges")
+    hyperedges = fragment.get("hyperedges")
+    if (
+        not isinstance(nodes, list)
+        or not isinstance(edges, list)
+        or not isinstance(hyperedges, list)
+    ):
+        return fragment, None, ["scope-exclusion-fragment-shape-invalid"]
+    declared = set(source_paths)
+    total = len(nodes)
+    excluded_nodes = [
+        n for n in nodes if isinstance(n, dict) and n.get("source_file") not in declared
+    ]
+    if not excluded_nodes:
+        return fragment, None, []
+    share = len(excluded_nodes) / total if total else 1.0
+    if share > _MAX_EXCLUDED_SHARE:
+        bound_pct = f"{_MAX_EXCLUDED_SHARE:.0%}"
+        share_reason = f"scope-exclusion-share-exceeded:{len(excluded_nodes)}/{total}>{bound_pct}"
+        return fragment, None, [share_reason]
+    # `excluded_ids` is for the EDGE/HYPEREDGE cascade only — those cite nodes by
+    # id, so an id set is the right shape there.
+    #
+    # `kept_nodes` must NOT be derived from it, and the first draft of this
+    # function was: it filtered `n.get("id") in excluded_ids`, which asks a
+    # DIFFERENT question from the one `excluded_nodes` answered. Read in
+    # isolation that is wrong in two opposite directions — a node with no string
+    # `id` would be COUNTED as excluded and then KEPT (counts and bytes diverge),
+    # and an in-scope node sharing an id with an excluded one would be DROPPED
+    # (silent loss, under-counted).
+    #
+    # NEITHER IS REACHABLE END-TO-END, and that is measured rather than argued:
+    # staging validates node identity first and emits
+    # `semantic-node-identity-invalid` / `duplicate-semantic-node-identity`,
+    # neither of which is a survivable scope reason, so such a fragment refuses
+    # before this function runs. Both reaching cases were CONSTRUCTED and watched
+    # to be rejected — `probes-need-a-control-arm.md` rule 9 — and that arm is
+    # pinned by `test_a_malformed_node_id_refuses_upstream_and_never_reaches_sanitization`.
+    #
+    # So this is a latent-trap removal, not a live-bug fix; do not read it as
+    # evidence the upstream guard is absent. It is kept because it costs nothing
+    # and makes the two lists exact complements BY CONSTRUCTION rather than by
+    # coincidence — the property the counts depend on, and one that would quietly
+    # stop holding if that upstream identity check ever moved.
+    #
+    # (Cold lane, 0e088a04, finding 1 — and its finding 2 argued the `emptied`
+    # guard below was unreachable on the assumption that exclusion was by
+    # `source_file`. With the predicate restored here, that assumption is now
+    # true, which is the other reason to prefer this shape.)
+    excluded_ids = {n["id"] for n in excluded_nodes if isinstance(n.get("id"), str)}
+    kept_nodes = [
+        n for n in nodes if not (isinstance(n, dict) and n.get("source_file") not in declared)
+    ]
+    remaining_files = {n.get("source_file") for n in kept_nodes if isinstance(n, dict)}
+    emptied = sorted(declared - remaining_files)
+    if emptied:
+        # The omission direction: excluding scope-violating nodes must never be
+        # allowed to also erase a file the chunk was genuinely supposed to
+        # cover. Fragment left unchanged; this refuses like any other reason.
+        return fragment, None, [f"scope-exclusion-empties-declared-file:{path}" for path in emptied]
+    kept_edges: list[object] = []
+    excluded_edges: list[ScopeExcludedEdge] = []
+    for e in edges:
+        if isinstance(e, dict) and (
+            e.get("source") in excluded_ids or e.get("target") in excluded_ids
+        ):
+            excluded_edges.append(
+                ScopeExcludedEdge(
+                    source=str(e.get("source")),
+                    target=str(e.get("target")),
+                    relation=str(e.get("relation")),
+                )
+            )
+        else:
+            kept_edges.append(e)
+    kept_hyperedges: list[object] = []
+    excluded_hyperedge_ids: list[str] = []
+    for h in hyperedges:
+        members = h.get("nodes") if isinstance(h, dict) else None
+        if (
+            isinstance(h, dict)
+            and isinstance(members, list)
+            and any(m in excluded_ids for m in members)
+        ):
+            excluded_hyperedge_ids.append(str(h.get("id")))
+        else:
+            kept_hyperedges.append(h)
+    sanitized = {
+        **fragment,
+        "nodes": kept_nodes,
+        "edges": kept_edges,
+        "hyperedges": kept_hyperedges,
+    }
+    record = ScopeSanitization(
+        ordinal=ordinal,
+        total_node_count=total,
+        excluded_nodes=tuple(
+            ScopeExcludedNode(id=str(n.get("id")), source_file=str(n.get("source_file")))
+            for n in excluded_nodes
+        ),
+        excluded_count=len(excluded_nodes),
+        excluded_share=share,
+        excluded_edges=tuple(excluded_edges),
+        excluded_hyperedge_ids=tuple(excluded_hyperedge_ids),
+    )
+    return sanitized, record, []
 
 
 def _stamp_origin(fragment: dict[str, object]) -> tuple[dict[str, object], int]:
@@ -227,6 +499,25 @@ def discover(
                 reasons.append(f"{namespace[:12]}/chunk-{ordinal:04d}: run-namespace-mismatch")
                 continue
             problems = _chunk_reasons(receipt, fragment_raw, planned, candidate, config)
+            sanitization: ScopeSanitization | None = None
+            node_count, edge_count, hyperedge_count = (
+                receipt.node_count,
+                receipt.edge_count,
+                receipt.hyperedge_count,
+            )
+            if problems and _is_scope_sanitizable(problems):
+                _sanitized, sanitization, sanitize_problems = _sanitize_scope(
+                    json.loads(fragment_raw), receipt.source_paths, ordinal
+                )
+                if sanitization is not None:
+                    # These are the counts that will actually reach
+                    # `chunks.assemble` — see `StagedChunk`'s docstring.
+                    node_count -= sanitization.excluded_count
+                    edge_count -= len(sanitization.excluded_edges)
+                    hyperedge_count -= len(sanitization.excluded_hyperedge_ids)
+                    problems = []
+                else:
+                    problems = [*problems, *sanitize_problems]
             if problems:
                 reasons.extend(f"{namespace[:12]}/chunk-{ordinal:04d}: {p}" for p in problems)
                 continue
@@ -236,10 +527,11 @@ def discover(
                     total=receipt.chunk_total,
                     namespace=namespace,
                     path=stage / "semantic-fragment.json",
-                    node_count=receipt.node_count,
-                    edge_count=receipt.edge_count,
-                    hyperedge_count=receipt.hyperedge_count,
+                    node_count=node_count,
+                    edge_count=edge_count,
+                    hyperedge_count=hyperedge_count,
                     source_paths=receipt.source_paths,
+                    scope_sanitization=sanitization,
                 )
             )
     return grouped, reasons
@@ -315,9 +607,37 @@ def assemble(
     staging.mkdir(parents=True, exist_ok=True)
     for stale in staging.glob("chunk-[0-9][0-9][0-9][0-9].json"):
         stale.unlink()
+    for stale in staging.glob("chunk-[0-9][0-9][0-9][0-9]-scope-exclusions.json"):
+        stale.unlink()
     paths: list[Path] = []
     for staged in accepted:
-        fragment, _stamped = _stamp_origin(json.loads(staged.path.read_bytes()))
+        raw = json.loads(staged.path.read_bytes())
+        if staged.scope_sanitization is not None:
+            # Re-derived, not carried over from `discover()`: `_sanitize_scope`
+            # is a pure function of the untouched staged bytes plus
+            # `source_paths`, neither of which can have changed since
+            # discovery within one process run, so recomputing here is cheap
+            # and keeps this function trusting its own inputs rather than a
+            # struct built somewhere else. `semantic-fragment.json` itself is
+            # NEVER rewritten — this reassigns the in-memory `raw` only.
+            raw, record, sanitize_problems = _sanitize_scope(
+                raw, staged.source_paths, staged.ordinal
+            )
+            if record != staged.scope_sanitization:
+                unmatched = sanitize_problems or ["record disagreed with discovery"]
+                raise ValueError(
+                    f"chunk {staged.ordinal:04d} scope sanitization is not reproducible from "
+                    f"its own staged evidence: {unmatched}"
+                )
+            # RECORDED, not dropped silently — a reader finds exactly which
+            # nodes/edges/hyperedges never reached the assembled chunk without
+            # re-deriving it from the (untouched) staged fragment.
+            exclusions_out = staging / f"chunk-{staged.ordinal:04d}-scope-exclusions.json"
+            exclusions_out.write_text(
+                json.dumps(msgspec.to_builtins(record), indent=1, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        fragment, _stamped = _stamp_origin(raw)
         # The ordinal-bearing name. `chunks.assemble` no longer DEPENDS on distinct
         # names for its gate to fire, but its messages still read better for one,
         # and a reader tracing a refusal wants the chunk number.
@@ -361,5 +681,19 @@ def merge_main(repo_root: Path, args: list[str]) -> int:
         f"[kb-graphify-semantic-corpus-merge] assembled {len(accepted)}/{accepted[0].total} "
         f"chunk(s) -> {relative}: {nodes} nodes, {edges} edges, {hyperedges} hyperedges"
     )
+    for c in accepted:
+        if c.scope_sanitization is None:
+            continue
+        s = c.scope_sanitization
+        exclusions_relative = (
+            f"{_staging_dir(candidate).relative_to(repo_root)}"
+            f"/chunk-{c.ordinal:04d}-scope-exclusions.json"
+        )
+        print(
+            f"[kb-graphify-semantic-corpus-merge] chunk {c.ordinal:04d}: excluded "
+            f"{s.excluded_count}/{s.total_node_count} out-of-scope node(s) "
+            f"({s.excluded_share:.1%}), {len(s.excluded_edges)} edge(s), "
+            f"{len(s.excluded_hyperedge_ids)} hyperedge(s) -> {exclusions_relative}"
+        )
     print(f"[kb-graphify-semantic-corpus-merge] next: mise run kb-merge -- {relative}")
     return 0

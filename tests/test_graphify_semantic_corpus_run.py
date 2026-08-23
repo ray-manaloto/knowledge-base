@@ -385,12 +385,28 @@ def test_corpus_scope_failures_are_reasons_for_one_chunk_not_a_run_abort() -> No
 
 
 def _run_context(tmp_path: Path) -> graphify_semantic_corpus_run._RunContext:
-    """Build a context good enough to reach the driver's reduction call."""
+    """Build a context good enough to reach the driver's reduction call.
+
+    The Claude identity fields are DERIVED FROM `_config()` rather than
+    hardcoded. They used to read `version="2.1.233"` with `"0" * 64` digests
+    while `config` came from the real committed `execution-config.json` -- an
+    internally inconsistent fixture that only passed because nothing compared
+    the two halves. `_assert_claude_identity_matches_plan` compares them, and
+    ten tests in this file failed the moment it existed.
+
+    That is the guard finding a real defect in the FIXTURE, not the fixture
+    catching a defect in the guard, so the fix belongs here: these tests are
+    about staging, spend and callbacks, and a plan-mismatched identity was never
+    part of what any of them meant to assert. Note the graphify half was already
+    derived this way (`accepted_graphify_runtime()` below) -- only the Claude
+    half was invented, which is exactly the asymmetry #426's other half closed.
+    """
+    config = _config()
     preflight = graphify_semantic_slice.ClaudePreflight(
         executable="claude",
-        executable_sha256="0" * 64,
-        version="2.1.233",
-        help_sha256="0" * 64,
+        executable_sha256=config.claude_executable_sha256,
+        version=config.claude_version,
+        help_sha256=config.claude_help_sha256,
         required_flags=(),
         auth=graphify_semantic_slice.AuthIdentity(
             logged_in=True,
@@ -409,7 +425,7 @@ def _run_context(tmp_path: Path) -> graphify_semantic_corpus_run._RunContext:
         source_root=tmp_path / "src",
         inventory=_inventory(),
         ledger=_ledger(),
-        config=_config(),
+        config=config,
         preflight_receipt=preflight,
         run_namespace="a" * 64,
         metadata_path=tmp_path / "adapter-metadata.json",
@@ -1532,6 +1548,137 @@ def test_execute_refuses_before_any_spend_path_when_the_runtime_moved_since_plan
     monkeypatch.setattr(graphify_semantic_corpus_run, "_extract_corpus", _spend_path_reached)
 
     with pytest.raises(ValueError, match="Graphify runtime changed after plan"):
+        graphify_semantic_corpus_run.execute(
+            candidate,
+            tmp_path / "cache",
+            tmp_path / "source",
+            repo_root=repo_root,
+        )
+
+
+def test_the_pre_spend_claude_guard_refuses_an_identity_that_moved_since_the_plan(
+    tmp_path: Path,
+) -> None:
+    """#426's OTHER half: the Claude identity must be checked before any spend.
+
+    The graphify twin above has had this since #426. The Claude half did not,
+    and the asymmetry survived because two other checks look like they cover it:
+    `_adapter_overlay` compares the live binary against the PREFLIGHT RECEIPT
+    (both sides current -- a tautology w.r.t. the plan), and
+    `_provider_runtime_reasons` does compare against the plan but takes a
+    `SemanticReceipt`, which exists only after a chunk has been PAID FOR.
+
+    The control arm for "no pre-spend check existed" is empirical rather than
+    argued: on 2026-08-23 `verify` reported `execution_authorized: true` with
+    the live binary at 2.1.241 against a plan recorded at 2.1.240. Any pre-spend
+    plan-vs-live Claude check would have refused there.
+
+    Both directions armed, and PER FIELD -- a guard that fired on any difference
+    at all would also fire when only the help digest moved, which is a different
+    and much weaker signal. Here `version` and `executable_sha256` move while
+    `help_sha256` is held equal, so a guard that ignored the first two would
+    pass this test and a guard that keyed only on the third would fail it.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _fresh_plan(tmp_path, repo_root)
+    config = graphify_semantic_corpus_run._load_plan(candidate)[2]
+    moved_version = config.claude_version + ".test"
+    moved_sha = "0" * 64
+    assert moved_version != config.claude_version, "mutation was inert"
+    assert moved_sha != config.claude_executable_sha256, "mutation was inert"
+
+    consistent = graphify_semantic_slice.ClaudePreflight(
+        executable="claude",
+        executable_sha256=config.claude_executable_sha256,
+        version=config.claude_version,
+        help_sha256=config.claude_help_sha256,
+        required_flags=config.claude_required_flags,
+        auth=graphify_semantic_slice.AuthIdentity(
+            logged_in=True,
+            auth_method="claude.ai",
+            api_provider="firstParty",
+            subscription_type="max",
+        ),
+        environment_names=(),
+        graphify_runtime=config.graphify_runtime,
+        graphify_version=config.graphify_version,
+        graphify_semantic_fingerprint_sha256=config.graphify_semantic_fingerprint_sha256,
+    )
+
+    # POSITIVE CONTROL first: an identical identity must NOT raise, or the guard
+    # would refuse every legitimate run and still satisfy the arm below.
+    graphify_semantic_corpus_run._assert_claude_identity_matches_plan(consistent, config)
+
+    moved = msgspec.structs.replace(consistent, version=moved_version, executable_sha256=moved_sha)
+    with pytest.raises(ValueError, match="Claude identity changed after plan"):
+        graphify_semantic_corpus_run._assert_claude_identity_matches_plan(moved, config)
+
+    # The message must name WHICH fields moved and both values -- "identity
+    # changed" alone sends the reader back to the code to find out which half.
+    with pytest.raises(ValueError, match="Claude identity changed after plan") as excinfo:
+        graphify_semantic_corpus_run._assert_claude_identity_matches_plan(moved, config)
+    message = str(excinfo.value)
+    assert "claude_version" in message
+    assert "claude_executable_sha256" in message
+    assert moved_version in message, "the LIVE value must appear"
+    assert config.claude_version in message, "the PLAN value must appear"
+    # help_sha256 did NOT move, so it must be absent -- this is what proves the
+    # guard reports per field rather than dumping the whole struct.
+    assert "claude_help_sha256" not in message
+
+
+def test_execute_refuses_before_any_spend_path_when_the_claude_identity_moved(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The CALL SITE, not just the helper -- the lesson the graphify twin paid for.
+
+    Cold review P2-1 on the graphify half recorded that deleting the one line
+    wiring the guard into `execute()` left every test green, because the only
+    test called the helper directly. The same mutation is available here, so the
+    same second test is owed: drive `execute()` itself with `preflight` stubbed
+    to a moved Claude identity and EVERY reachable spend path stubbed to raise
+    loudly. Deleting the guard's call line then surfaces as the WRONG exception
+    (`AssertionError` from a stub) instead of a silent walk past the point where
+    a real Claude subprocess would launch.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    candidate = _fresh_plan(tmp_path, repo_root)
+    config = graphify_semantic_corpus_run._load_plan(candidate)[2]
+    moved_version = config.claude_version + ".test"
+    assert moved_version != config.claude_version, "mutation was inert"
+
+    def _moved_preflight(
+        *_args: object, **_kwargs: object
+    ) -> graphify_semantic_slice.ClaudePreflight:
+        return graphify_semantic_slice.ClaudePreflight(
+            executable="claude",
+            executable_sha256=config.claude_executable_sha256,
+            version=moved_version,
+            help_sha256=config.claude_help_sha256,
+            required_flags=config.claude_required_flags,
+            auth=graphify_semantic_slice.AuthIdentity(
+                logged_in=True,
+                auth_method="claude.ai",
+                api_provider="firstParty",
+                subscription_type="max",
+            ),
+            environment_names=(),
+            # The graphify half is held CORRECT on purpose: if it were also
+            # stale, its own guard would raise first and this test would pass
+            # without the Claude guard existing at all.
+            graphify_runtime=config.graphify_runtime,
+            graphify_version=config.graphify_version,
+            graphify_semantic_fingerprint_sha256=config.graphify_semantic_fingerprint_sha256,
+        )
+
+    def _spend_path_reached(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("spend path reached")
+
+    monkeypatch.setattr(graphify_semantic_slice, "preflight", _moved_preflight)
+    monkeypatch.setattr(graphify_semantic_corpus_run, "seeded_spend", _spend_path_reached)
+    monkeypatch.setattr(graphify_semantic_corpus_run, "_extract_corpus", _spend_path_reached)
+
+    with pytest.raises(ValueError, match="Claude identity changed after plan"):
         graphify_semantic_corpus_run.execute(
             candidate,
             tmp_path / "cache",

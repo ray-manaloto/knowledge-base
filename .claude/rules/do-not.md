@@ -62,10 +62,22 @@ The authoritative list of things agents (and humans) must not do in this repo.
    into a graphify call path, and never "temporarily" unset the cleaner to make
    something work.
 
-5. **Do NOT commit `graphify-out/` beyond `memory/`.** Everything else is
-   DERIVED and rebuilt by `kb-build` / `kb-artifacts`; at aggregate scale the
-   graph exceeds git/GitHub limits. Consumers query via `kb-serve` MCP or a
-   pushed graph DB, never a git blob.
+5. **Do NOT commit `graphify-out/` beyond `memory/` and
+   `graphify-semantic-corpus-chunks/`.** Everything else is DERIVED and rebuilt
+   by `kb-build` / `kb-artifacts`; at aggregate scale the graph exceeds
+   git/GitHub limits. Consumers query via `kb-serve` MCP or a pushed graph DB,
+   never a git blob.
+
+   **The second exception was added 2026-08-23 and the wording matters, because
+   the rule as written pointed the other way.** Ray settled #317 in favour of
+   TRACKING the retained provider evidence: a fresh clone and the hosted app see
+   only tracked files, and #301's acceptance rests on reproducibility. This rule
+   still said "beyond `memory/`" afterwards — so an agent following it literally
+   would have UNTRACKED 105 files representing $41.78 of paid extraction, and
+   been right to by the text. That is the shape this file exists to prevent, one
+   rule removed: a decision that lands in the repo but not in the instruction
+   that governs it. Keep the path off `.gitignore` too — an entry there un-tracks
+   it by the back door and silently re-opens #317.
 
 6. **Do NOT ingest a source outside the `sources/` contract.** Every source is
    either a `sources/<name>.manifest` pinned to an upstream commit, vendored

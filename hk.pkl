@@ -180,8 +180,35 @@ local proseExclude = baseExclude
   + List("graphify-out/memory/**", "docs/research/**", "docs/goals/*-goal.md", "docs/direction/**",
       "docs/session-review/runs/**",
       "sources/**",
+      "graphify-out/graphify-semantic-corpus-chunks/**",
+      "graphify-out/graphify-semantic-corpus/**",
       "**/graphify-out/.*.tmp",
       "**/graphify-semantic-corpus-authority-ledger.md")
+// `graphify-out/graphify-semantic-corpus-chunks/**` and
+// `graphify-out/graphify-semantic-corpus/**` — retained provider evidence and the
+// plan it was executed against. Ray, 2026-08-23: *"we shouldnt be checking typos
+// on graphify sources since that is not our data — we just need to take in what
+// they have."* Same category as `sources/**` two lines up, and the same argument
+// as every entry here: these bytes are a record of what a provider returned, and
+// a spell-checker "fixing" one edits the evidence.
+//
+// Measured on the run that prompted it: `typos` returns rc=2 against the staged
+// chunks, objecting eight times to one three-letter prefix — the same
+// wrongly-flagged prefix the ledger entry below is about — inside
+// model-generated extraction output. Those are not typos in anything authored
+// here, and they recur on every run: the corpus is ABOUT code, so the model
+// reaches for that prefix constantly when describing something resolved,
+// attributed or bound to the wrong thing.
+//
+// The prefix is deliberately NOT spelled anywhere in this file, for the reason
+// the ledger entry already records: `hk.pkl` is not on any exclusion list, so
+// naming it here re-breaks this very step. Measured twice now — the first draft
+// of THIS comment quoted four examples and turned the step red on its own text.
+//
+// FORMATTERS AND typos ONLY, per the asymmetry this whole list rests on:
+// `check_added_large_files` still reads this tree, which is deliberate — it is
+// the check that caught a superseded 2.8 MB cache namespace sitting there, and
+// removing that coverage would have hidden exactly the thing worth finding.
 // `docs/agents/graphify-semantic-corpus-authority-ledger.md` — the append-only
 // ledger `kb-setup graphify-semantic-corpus record --accept` writes: one bullet
 // of hashes per re-authorization. Machine-written, same class as
@@ -296,6 +323,33 @@ local lintSteps: Mapping<String, Step> = new {
   ["no_lint_skip"] = new Step {
     glob = pyGlob
     check = "uv run kb-setup no-lint-skip"
+  }
+
+  // --- Workflow scripts (U8b0) ---
+  //     `.claude/workflows/*.js` had no lint and no type check at all until
+  //     this step: `node --check` is a measured false green here (the file
+  //     starts with `export`, so the CJS parser bails at the export line and
+  //     reports success on syntactically broken code — see each file's own
+  //     header). biome is a real parser + linter, but every one of these
+  //     files ends with a bare top-level `return` — legal ONLY because the
+  //     Workflow runtime wraps the whole body in an async function it
+  //     supplies at execution time, never present in the committed source —
+  //     so `biome lint` on the raw file always reports a parse error,
+  //     independent of whether the file is actually broken. `noqa`-style
+  //     restructuring of the committed files to dodge that was the FIRST
+  //     mechanism tried here and it is IMPOSSIBLE, not just hard: `return`
+  //     outside a function is an early ECMAScript syntax error in every
+  //     parse goal, `export` or not (four control-armed biome probes; full
+  //     evidence in `.agent/kb/reports/agents/u8b0-workflow-lint-gate.md`).
+  //     `kb_setup.workflow_lint` therefore never touches the committed
+  //     files: it copies each into a temp dir, applies the exact transform
+  //     the files' own header already documented (strip `export`, wrap the
+  //     remainder in an async IIFE), and lints the COPY — surfacing biome's
+  //     real exit code. See that module's docstring for the full mechanism,
+  //     including why `noUnusedVariables` is disabled for the copies only.
+  ["workflow_lint"] = new Step {
+    glob = List(".claude/workflows/*.js")
+    check = "uv run kb-setup workflow-lint"
   }
 
   // --- Agent documentation (agnix) ---

@@ -160,7 +160,7 @@ if (typeof cfg === 'string') {
   try {
     cfg = JSON.parse(cfg)
   } catch (e) {
-    throw new Error('session-review: args arrived as an unparsable string: ' + e.message)
+    throw new Error(`session-review: args arrived as an unparsable string: ${e.message}`)
   }
 }
 
@@ -275,7 +275,7 @@ for (const required of ['sessions', 'handoffs']) {
 // session began, which is exactly the fact an mtime scope was silently getting
 // wrong.
 const SESSIONS = cfg.sessions
-  .map((s) => `  - ${s.path || s}` + (s.started_at ? `  (started ${s.started_at}, by ${s.time_source})` : ''))
+  .map((s) => `  - ${s.path || s}${s.started_at ? `  (started ${s.started_at}, by ${s.time_source})` : ''}`)
   .join('\n')
 
 const reportDir = cfg.reportDir || '.agent/kb/reports/agents'
@@ -292,7 +292,7 @@ review dropped a session holding 675 of the round's 1,693 tool calls that way.
 ${SESSIONS}
 Ray's standing directive: ${directive} — read it IN FULL before you conclude anything.
 Round handoffs, which are where the real instructions live — read every one:
-${(cfg.handoffs || []).map((h) => '  - ' + h).join('\n')}
+${(cfg.handoffs || []).map((h) => `  - ${h}`).join('\n')}
 
 ALREADY SETTLED BY THE USER — do NOT spend a probe re-deriving any of this:
 ${answered}
@@ -1074,7 +1074,7 @@ const threw = verdicts.reduce((n, v) => n + (v ? 0 : 1), 0)
 if (threw) log(`WARNING: ${threw} cross-check thunk(s) threw — counted as UNVERIFIED, not dropped`)
 const checked = verdicts.map((v, i) => v ?? { finding: behavioural[i], verdict: null })
 const confirmed = checked.filter((c) => c.verdict && !c.verdict.refuted).map((c) => c.finding)
-const refuted = checked.filter((c) => c.verdict && c.verdict.refuted)
+const refuted = checked.filter((c) => c.verdict?.refuted)
 // A cross-check agent that DIED returns a null verdict, which satisfies neither
 // filter above — so the finding fell out of `confirmed` AND `refuted` and reached
 // the synthesis in neither. Silent loss past the gate, and the same shape as the
@@ -1278,7 +1278,7 @@ PREVIOUS HANDOFFS — read every one IN FULL and reconcile against them per §7.
 This is the ONLY place their content enters this prompt. The lanes were given
 these paths too, but a lane returns FINDINGS: an item that is merely still owed
 is nobody's finding, so it reaches you through this block or not at all.
-${(cfg.handoffs || []).map((h) => '  - ' + h).join('\n')}
+${(cfg.handoffs || []).map((h) => `  - ${h}`).join('\n')}
 
 Then, SEPARATELY, propose MEMORY.md index lines for anything durable enough to
 outlive this round — one line each, in the existing style. Do not write MEMORY.md
