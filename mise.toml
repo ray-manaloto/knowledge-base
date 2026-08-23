@@ -702,7 +702,7 @@ run = "uv run kb-setup graphify-semantic-slice"
 timeout = "30m"
 
 [tasks.kb-graphify-semantic-corpus]
-description = "Plan, run, or verify complete pinned Graphify semantic coverage"
+description = "Plan, run, verify, or record complete pinned Graphify semantic coverage"
 run = "uv run kb-setup graphify-semantic-corpus"
 # A wall-clock hang guard, NOT the spend cap — `_MAX_TOTAL_COST_USD` already
 # bounds the money. A restart is NOT free at this layer either:
