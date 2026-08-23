@@ -424,6 +424,53 @@ def test_staging_ignores_extras_and_refuses_missing_members(
     assert "member-unavailable:execution-config.json" in missing.candidate_reasons
 
 
+def test_transaction_rolls_back_then_reraises_interrupts(tmp_path: Path) -> None:
+    """A Ctrl-C mid-accept must restore the state AND still interrupt the run.
+
+    `__exit__` used to return True for every exception, so a KeyboardInterrupt
+    was rolled back and then swallowed -- the run went on to print a report and
+    exit 1 as if it had merely failed (cold review, round 1).
+    """
+    canonical = tmp_path / "canonical"
+    authority = tmp_path / "authority.json"
+    ledger = tmp_path / "ledger.md"
+    authority.write_bytes(b'{"before":1}\n')
+    ledger.write_text("- before\n", encoding="utf-8")
+    state = record._RollbackState(
+        canonical_dir=canonical,
+        superseded_dir=None,
+        authority_path=authority,
+        authority_before=authority.read_bytes(),
+        ledger_path=ledger,
+        ledger_before=ledger.read_bytes(),
+    )
+
+    def mutate() -> None:
+        canonical.mkdir()
+        (canonical / "manifest.json").write_bytes(b"{}\n")
+        authority.write_bytes(b'{"after":2}\n')
+        ledger.write_text("- before\n- after\n", encoding="utf-8")
+
+    def interrupted() -> None:
+        with record._Transaction(state):
+            mutate()
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        interrupted()
+    assert not canonical.exists()
+    assert authority.read_bytes() == b'{"before":1}\n'
+    assert ledger.read_text(encoding="utf-8") == "- before\n"
+
+    # An ordinary Exception is still swallowed into `.error` after the same rollback.
+    with record._Transaction(state) as transaction:
+        mutate()
+        raise RuntimeError("simulated accept failure")
+    assert transaction.error == "simulated accept failure"
+    assert not canonical.exists()
+    assert authority.read_bytes() == b'{"before":1}\n'
+
+
 def test_nothing_to_record_is_refused(exact_plan: tuple[Path, Path], tmp_path: Path) -> None:
     candidate, source = exact_plan
     canonical, authority, ledger = _state(tmp_path, candidate)

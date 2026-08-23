@@ -183,6 +183,12 @@ class _Transaction:
         if exc is None:
             return False
         self.rollback.restore()
+        if not isinstance(exc, Exception):
+            # KeyboardInterrupt / SystemExit: the state is restored, but the
+            # interrupt is not this transaction's to swallow. Returning True here
+            # would let a Ctrl-C mid-accept print a report and exit 1 as if the
+            # run had merely failed (cold review, round 1).
+            return False
         self.error = str(exc)
         return True
 
