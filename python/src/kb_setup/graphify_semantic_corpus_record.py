@@ -373,16 +373,24 @@ def _ledger_line(inputs: _LedgerInputs) -> str:
         "unchanged" if not inputs.decision_moved else f"CHANGED: {','.join(inputs.decision_moved)}"
     )
     superseded_name = inputs.superseded.name if inputs.superseded is not None else "none"
+    # Every hash is written IN FULL. A short hex prefix can contain an
+    # English-looking bigram or trigram that the spell-checker reads as a word:
+    # on the first real accept, hk's `typos --write-changes` commit hook flagged
+    # the 12-char plan-manifest prefix and REWROTE the 8-char commit id (one
+    # letter inserted) — a corrupted hash in an authorization ledger. Probed
+    # 2026-08-23: every full 40/64-hex string passes typos' hex heuristic; 7-,
+    # 8- and 12-char prefixes do not. (This comment deliberately does not quote
+    # the offending prefixes — quoting them re-triggers the same check.)
     return (
         f"- **{inputs.timestamp}** — graphify {config.graphify_version} "
-        f"({config.graphify_commit[:12]}) · claude {config.claude_version} · "
+        f"({config.graphify_commit}) · claude {config.claude_version} · "
         f"effort {config.effort} · cap ${config.max_total_cost_usd} · "
         f"units {inventory.admitted_unit_count} / chunks {len(ledger.chunks)} · "
         f"decision digests: {decisions} · "
-        f"plan_manifest {inputs.before['plan_manifest_sha256'][:12]}→"
-        f"{inputs.after['plan_manifest_sha256'][:12]} · "
-        f"execution_config {inputs.before['execution_config_sha256'][:12]}→"
-        f"{inputs.after['execution_config_sha256'][:12]} · HEAD {inputs.head} · "
+        f"plan_manifest {inputs.before['plan_manifest_sha256']}→"
+        f"{inputs.after['plan_manifest_sha256']} · "
+        f"execution_config {inputs.before['execution_config_sha256']}→"
+        f"{inputs.after['execution_config_sha256']} · HEAD {inputs.head} · "
         f"superseded {superseded_name}"
     )
 
@@ -475,7 +483,7 @@ def _record_with_source(
         ledger_before = context.ledger_path.read_bytes()
         candidate_members = _members(staged)
         head = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             cwd=context.repo_root,
             check=True,
             capture_output=True,

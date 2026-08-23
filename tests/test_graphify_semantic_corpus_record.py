@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 import msgspec
@@ -40,10 +41,35 @@ def _copy_plan(source: Path, destination: Path) -> Path:
     return destination
 
 
+def _identity_moved_authority(plan: Path) -> bytes:
+    """An authority one IDENTITY-only move away from `plan`, independent of repo state.
+
+    The fixture used to copy the REAL recorded authority, which made every
+    "identity-only move" test depend on the real canonical plan being stale
+    relative to a fresh one — true until the first real `record --accept`
+    landed, false the moment it did (the tests flipped to "nothing to record").
+    A test must own its environment: derive the authority from the candidate
+    itself and perturb only the two identity digests.
+    """
+    digests = {
+        "advisories_sha256": graphify_semantic_corpus.sha256_path(plan / "advisories.json"),
+        "exclusions_sha256": graphify_semantic_corpus.sha256_path(plan / "exclusions.json"),
+        "execution_config_sha256": graphify_semantic_corpus.sha256_path(
+            plan / "execution-config.json"
+        ),
+        "plan_manifest_sha256": graphify_semantic_corpus.sha256_path(plan / "manifest.json"),
+    }
+    for name in record.IDENTITY_DIGESTS:
+        digests[name] = "0" * 8 + digests[name][8:]
+    return graphify_semantic_corpus.encode_canonical(
+        graphify_semantic_corpus.AuthorityRoots(schema_version=1, **digests)
+    )
+
+
 def _state(tmp_path: Path, candidate: Path) -> tuple[Path, Path, Path]:
     canonical = _copy_plan(candidate, tmp_path / "state/canonical")
     authority = tmp_path / "state/authority.json"
-    authority.write_bytes(graphify_semantic_corpus_authority.AUTHORITY_JSON)
+    authority.write_bytes(_identity_moved_authority(candidate))
     ledger = tmp_path / "state/authority-ledger.md"
     ledger.write_text(
         "---\nname: test-authority-ledger\ndescription: Isolated authority history.\n---\n\n"
@@ -108,15 +134,15 @@ def test_recorded_authority_is_loaded_from_canonical_data() -> None:
         strict=True,
     )
     assert path.read_bytes() == graphify_semantic_corpus.encode_canonical(authority)
-    assert authority == graphify_semantic_corpus.AuthorityRoots(
-        advisories_sha256="ff7323b1921752cf195f0869b17f348903ffd8a196248be3c5edcece4fcc93d9",
-        exclusions_sha256="1a63e48336f7130a1f68c57340706fd5cea3cbacf12c363bb339a7cae3e5b67e",
-        execution_config_sha256=(
-            "710dbbfb2d15ac05c9857bd6f0e14ed03a9b7a858e85936a9adbda568938d9da"
-        ),
-        plan_manifest_sha256=("b4b741b5f0bb992c16f42b57f1e855c751e2de1c331dde1f979c1b80c8fad719"),
-        schema_version=1,
-    )
+    # Structural, not literal: the four digests change on every `record --accept`
+    # (this test pinned the pre-first-accept values and broke on the first one).
+    # What must hold forever: five fields, four 64-hex digests, schema 1, and the
+    # file is exactly the canonical (sorted-key) encoding of what it decodes to.
+    assert authority.schema_version == 1
+    for name in (*record.IDENTITY_DIGESTS, *record.DECISION_DIGESTS):
+        digest = getattr(authority, name)
+        assert len(digest) == 64
+        assert set(digest) <= set("0123456789abcdef")
 
 
 def test_cli_routes_record_before_the_existing_corpus_parser(
@@ -242,6 +268,21 @@ def test_accept_replaces_only_plan_members_and_records_authority(
     ledger_after = ledger.read_text(encoding="utf-8")
     assert ledger_after.startswith(ledger_before)
     assert ledger_after.count("\n- **") == ledger_before.count("\n- **") + 1
+    # Hashes are recorded IN FULL: a 12-char prefix read as words to the
+    # spell-checker, whose --write-changes hook rewrote a short commit id.
+    appended = ledger_after[len(ledger_before) :]
+    assert report.digests_after["plan_manifest_sha256"] in appended
+    assert report.digests_after["execution_config_sha256"] in appended
+    assert report.digests_before["plan_manifest_sha256"] in appended
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=_REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert len(head) == 40
+    assert f"HEAD {head} " in appended
 
 
 def test_failed_post_accept_verification_rolls_everything_back(

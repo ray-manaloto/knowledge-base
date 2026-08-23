@@ -400,7 +400,7 @@ def _run_context(tmp_path: Path) -> graphify_semantic_corpus_run._RunContext:
         ),
         environment_names=(),
         graphify_runtime=graphify_semantic_slice.accepted_graphify_runtime(),
-        graphify_version="0.9.45",
+        graphify_version=graphify_semantic_slice.accepted_graphify_runtime().version,
         graphify_semantic_fingerprint_sha256="0" * 64,
     )
     return graphify_semantic_corpus_run._RunContext(
