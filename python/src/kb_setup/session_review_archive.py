@@ -224,7 +224,12 @@ def _load_run_json(run_json: Path) -> tuple[dict, str, dict] | ArchiveOutcome:
         return ArchiveOutcome(dest=None, refusal=f"cannot read --run-json {run_json}: {exc}")
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError as exc:
+    # `ValueError`, not `json.JSONDecodeError`: invalid-UTF-8 bytes make
+    # `json.loads` raise a BARE `UnicodeDecodeError` (verified — it is never
+    # wrapped into a `JSONDecodeError`), and `UnicodeDecodeError` is not one.
+    # Both subclass `ValueError`, which is the narrowest catch that covers
+    # both without also swallowing an unrelated `TypeError`/`KeyError`.
+    except ValueError as exc:
         return ArchiveOutcome(dest=None, refusal=f"--run-json {run_json} is not valid JSON: {exc}")
     if not isinstance(data, dict):
         return ArchiveOutcome(dest=None, refusal=f"--run-json {run_json} is not a JSON object")
@@ -307,8 +312,27 @@ def _resolve_handoff(
 
 
 def _resolve_date(date: str | None, result: dict) -> str | ArchiveOutcome:
-    """`--date`, or the latest `result.run_meta.sessions[].started_at`."""
+    """`--date`, or the latest `result.run_meta.sessions[].started_at`.
+
+    `--date` becomes a DIRECTORY NAME component (`_next_run_name` builds
+    `<date>-<n>` straight from it), so an unvalidated value is a path-
+    traversal surface: `--date ../../scratch` would let `plan.dest` escape
+    `docs/session-review/runs/` entirely, and the escape would only be
+    caught AFTER `_write` had already renamed the staged directory into
+    place — `plan.dest.relative_to(repo_root)` in the success return raises
+    once the write already happened, which is a discovered-too-late failure,
+    not a refusal. Validate BEFORE any of that, so a bad `--date` is rc 2 and
+    nothing is written, exactly like every other refusal in this module. The
+    derived path (from `run_meta.sessions[].started_at`) does not need this
+    check — it is always `_iso(...)`-shaped by construction — but every
+    `--date` did.
+    """
     if date is not None:
+        if not _DATE.match(date):
+            return ArchiveOutcome(
+                dest=None,
+                refusal=f"--date {date!r} is not YYYY-MM-DD",
+            )
         return date
     derived = _latest_session_date(result)
     if derived is None:
@@ -654,7 +678,13 @@ def _readme_row(run_dir: Path) -> _Row:
     # 3.14, and this repo's ruff config (target-version py314) ACTIVELY STRIPS
     # the parentheses via `mise run fmt` — see session_select.py's identical
     # comment. Written unparenthesized here to begin with.
-    except OSError, json.JSONDecodeError:
+    #
+    # `ValueError`, not `json.JSONDecodeError`: `.read_text(encoding="utf-8")`
+    # raises a bare `UnicodeDecodeError` on invalid UTF-8 bytes, which is not
+    # a `JSONDecodeError` — both subclass `ValueError`. This function's
+    # contract is NEVER RAISE (see the docstring), so a malformed run.json
+    # must fall through to the `?`-row return, not abort `regenerate_readme`.
+    except OSError, ValueError:
         return row
     if not isinstance(data, dict):
         return row
@@ -712,6 +742,11 @@ def _render_readme(rows: list[_Row]) -> str:
 
 #: `<YYYY-MM-DD>-<n>`, `n` unanchored so it matches any width.
 _RUN_DIR_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d+)$")
+
+#: A valid `--date` value. `_resolve_date` uses this to REFUSE rather than let
+#: an unvalidated `--date` become part of a directory name — see its own
+#: comment for what an unvalidated value can do.
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _run_dir_sort_key(path: Path) -> tuple[int, str, int, str]:
@@ -795,10 +830,19 @@ def main(args: list[str], repo_root: Path) -> int:
     for warning in outcome.warnings:
         print(f"session-review-archive: WARNING — {warning}", file=sys.stderr)
 
-    verb = "would write" if "--dry-run" in args else "wrote"
+    dry_run = "--dry-run" in args
+    verb = "would write" if dry_run else "wrote"
+    # `_preview` never calls `regenerate_readme` — a dry run writes NOTHING,
+    # README included — so `index_rows` is always 0 in that branch and
+    # printing "README.md regenerated (0 row(s))" would claim a write that
+    # never happened. Say plainly that it did not run.
+    readme_note = (
+        "README.md not regenerated (dry run)"
+        if dry_run
+        else f"README.md regenerated ({outcome.index_rows} row(s))"
+    )
     print(
         f"session-review-archive: {verb} {outcome.dest} "
-        f"({len(outcome.files_written)} file(s)); "
-        f"README.md regenerated ({outcome.index_rows} row(s))"
+        f"({len(outcome.files_written)} file(s)); {readme_note}"
     )
     return 0

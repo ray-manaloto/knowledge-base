@@ -52,6 +52,9 @@ comments. `[code]smith` is Blacksmith's autofix upsell check (always `skipping`)
   `_CURRENT_CLAUDE_VERSION = "2.1.240"` + executable digest will refuse the run's
   preflight until the claude resync advances them — which moves
   `semantic_slice_sha256`, so the ninth record is one `record --accept` by the tool.
+  [SUPERSEDED 2026-08-23 — see 'On the review's CONFIRMED P1' below: preflight does
+  NOT refuse on the Claude identity; the compare is post-hoc per chunk, which is why
+  the resync also closes that window.]
   Assumption recorded: the run keeps effort high / cap $63 unless Ray says otherwise.
 
 ## On clear-prep — the answer to the 73.5% context offer
@@ -109,9 +112,7 @@ and starts the deep extraction: *"Resync only, then clear-prep (Recommended)"*. 
 N+1 = slice constants (`_CURRENT_CLAUDE_*`, re-hash the installed `claude`, re-check
 the `--help` digest) + `sources/claude-code.manifest` + `currency.toml
 [tool.claude-code]` + the #464 comment, ninth `record --accept` by tool, `verify`
-authorized, review/ship/land, `/clear-prep` + session-review. N+2 = re-scope #455
-#456 #411 #457 #458, then `kb-graphify-semantic-corpus -- run` (26 chunks, cap $63,
-effort high), supervised.
+authorized, review/ship/land, `/clear-prep` + session-review. N+2 = re-scope #455 #456 #411 #457 #458, then `kb-graphify-semantic-corpus -- run` (26 chunks, cap $63, effort high), supervised.
 
 ### On the review's CONFIRMED P1 and on the review itself (AskUserQuestion, after the session-review workflow ran)
 

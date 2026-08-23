@@ -402,6 +402,59 @@ def test_archive_refuses_when_no_date_and_sessions_are_bare_strings(tmp_path: Pa
     assert "--date" in outcome.refusal
 
 
+def test_archive_refuses_a_date_that_would_escape_the_runs_directory(tmp_path: Path) -> None:
+    """`--date` becomes a directory name, and an unvalidated one is dangerous.
+
+    `../../scratch` would let `plan.dest` escape `docs/session-review/runs/`
+    entirely, and the escape would only surface AFTER the rename succeeded
+    (too late). Refused up front, nothing written.
+    """
+    repo = _repo(tmp_path)
+    report_dir = _write_report_dir(repo, "r1")
+    result = _bare_result(lanes=["circles"], report_dir=str(report_dir.relative_to(repo)))
+    run_json = _write_run_json(repo / "run.json", result)
+
+    outcome = archive_mod.archive(
+        repo, run_json=run_json, report_dir=None, handoff=None, date="../../scratch"
+    )
+    assert outcome.refusal is not None
+    assert "YYYY-MM-DD" in outcome.refusal
+    assert not (tmp_path / "scratch").exists()
+    assert list((repo / "docs" / "session-review" / "runs").iterdir()) == []
+
+
+def test_archive_refuses_a_date_with_the_wrong_digit_widths(tmp_path: Path) -> None:
+    """`2026-8-23` (single-digit month) is not `YYYY-MM-DD` and must refuse.
+
+    The control arm for the traversal test above, proving `_DATE` actually
+    discriminates rather than accepting everything.
+    """
+    repo = _repo(tmp_path)
+    report_dir = _write_report_dir(repo, "r1")
+    result = _bare_result(lanes=["circles"], report_dir=str(report_dir.relative_to(repo)))
+    run_json = _write_run_json(repo / "run.json", result)
+
+    outcome = archive_mod.archive(
+        repo, run_json=run_json, report_dir=None, handoff=None, date="2026-8-23"
+    )
+    assert outcome.refusal is not None
+    assert "YYYY-MM-DD" in outcome.refusal
+
+
+def test_archive_accepts_a_well_formed_date(tmp_path: Path) -> None:
+    """The control arm's control arm: a well-formed `--date` must still work."""
+    repo = _repo(tmp_path)
+    report_dir = _write_report_dir(repo, "r1")
+    result = _bare_result(lanes=["circles"], report_dir=str(report_dir.relative_to(repo)))
+    run_json = _write_run_json(repo / "run.json", result)
+
+    outcome = archive_mod.archive(
+        repo, run_json=run_json, report_dir=None, handoff=None, date="2026-08-23"
+    )
+    assert outcome.refusal is None
+    assert Path(_dest_of(outcome)).name == "2026-08-23-1"
+
+
 def test_archive_next_run_number_increments_for_same_date(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     (repo / "docs" / "session-review" / "runs" / "2026-08-23-1").mkdir()
@@ -456,6 +509,26 @@ def test_archive_refuses_when_run_json_is_not_a_recognised_shape(tmp_path: Path)
     assert "not a recognised workflow return" in outcome.refusal
 
 
+def test_archive_refuses_run_json_with_invalid_utf8_bytes(tmp_path: Path) -> None:
+    """Invalid UTF-8 makes `json.loads` raise a BARE `UnicodeDecodeError`.
+
+    Verified, never wrapped into a `JSONDecodeError` — which is not caught by
+    an `except json.JSONDecodeError`. Both subclass `ValueError`; this must
+    reach the SAME refusal contract as a bad-JSON `--run-json`, not an
+    uncaught traceback.
+    """
+    repo = _repo(tmp_path)
+    run_json = repo / "run.json"
+    run_json.write_bytes(b"\xff\xfe{")
+
+    outcome = archive_mod.archive(
+        repo, run_json=run_json, report_dir=None, handoff=None, date="2026-08-23"
+    )
+    assert outcome.refusal is not None
+    assert "not valid JSON" in outcome.refusal
+    assert outcome.dest is None
+
+
 def test_archive_dry_run_writes_nothing(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     report_dir = _write_report_dir(repo, "r1")
@@ -469,6 +542,28 @@ def test_archive_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert not (repo / _dest_of(outcome)).exists()
     runs_root = repo / "docs" / "session-review" / "runs"
     assert list(runs_root.iterdir()) == []
+
+
+def test_main_cli_dry_run_says_readme_was_not_regenerated(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A dry run writes NOTHING, README included — say so, don't claim a write.
+
+    `_preview` never calls `regenerate_readme`, so the summary must not claim
+    "regenerated (0 row(s))", which reads as a successful no-op write rather
+    than as "did not run".
+    """
+    repo = _repo(tmp_path)
+    report_dir = _write_report_dir(repo, "r1")
+    result = _bare_result(lanes=["circles"], report_dir=str(report_dir.relative_to(repo)))
+    run_json = _write_run_json(repo / "run.json", result)
+
+    rc = archive_mod.main(["--run-json", str(run_json), "--date", "2026-08-23", "--dry-run"], repo)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "would write" in out
+    assert "not regenerated (dry run)" in out
+    assert "regenerated (0 row(s))" not in out
 
 
 def test_main_cli_writes_and_returns_rc_0(
@@ -567,6 +662,28 @@ def test_regenerate_readme_handles_a_dir_with_no_run_json(tmp_path: Path) -> Non
     readme = (repo / "docs" / "session-review" / "README.md").read_text(encoding="utf-8")
     assert "[2026-08-18-2](runs/2026-08-18-2/)" in readme
     # Every count column is unreadable for this shape.
+    assert "| ? | ? | ? | ? | ? | ? | ? |" in readme
+
+
+def test_regenerate_readme_emits_a_question_mark_row_for_invalid_utf8(tmp_path: Path) -> None:
+    """`_readme_row`'s contract is NEVER RAISE, even on invalid UTF-8 bytes.
+
+    A `run.json` with invalid UTF-8 must not abort `regenerate_readme` for
+    every OTHER run in the directory — it degrades to a `?` row for that one
+    dir, same as a corrupted or absent `run.json`.
+    """
+    repo = _repo(tmp_path)
+    runs_root = repo / "docs" / "session-review" / "runs"
+    bad_dir = runs_root / "2026-08-23-1"
+    bad_dir.mkdir()
+    (bad_dir / "run.json").write_bytes(b"\xff\xfe{")
+    good_dir = runs_root / "2026-08-24-1"
+    good_dir.mkdir()
+
+    rows = archive_mod.regenerate_readme(repo)
+    assert rows == 2
+    readme = (repo / "docs" / "session-review" / "README.md").read_text(encoding="utf-8")
+    assert "[2026-08-23-1](runs/2026-08-23-1/)" in readme
     assert "| ? | ? | ? | ? | ? | ? | ? |" in readme
 
 

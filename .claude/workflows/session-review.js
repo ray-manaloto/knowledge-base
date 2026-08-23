@@ -681,6 +681,32 @@ neither is a broken join: a request whose previous_message_id is null (the
 first request of a conversation), and the last response of a session (it has
 no successor request).
 
+A SECOND, FORWARD PAIRING EXISTS TOO, and it is what turns the terminal-
+response class above from a bound into an exact count: each request's
+system[0].text contains the literal cc_prev_req=req_<id>, and that id IS the
+response FILENAME (req_<id>.response.json — the filename, NOT the response's
+own id field) of the PREVIOUS request's response in the same thread. Extract
+it with jq -r '.system[0].text | tostring' | grep -o
+'cc_prev_req=req_[A-Za-z0-9]*' — never load the system prompt itself into the
+report or a finding; the PII rule stands even for this one line inside it.
+Not every request carries the literal (a session's first request may not) —
+treat a miss the same as the backward join's null case, not as a broken
+probe, and control-arm it the same way: a request you KNOW has a predecessor
+must match.
+
+So a request R_k's OWN response is the response FILE named by its successor
+R_{k+1}'s cc_prev_req — which is what makes "the effort R_k ran at vs the size
+of R_k's own response" computable per request, and what makes the terminal-
+response class EXACTLY countable rather than only bounded: it is whichever
+response file no later request's cc_prev_req ever names.
+
+DO NOT MIX THE TWO KEYS. The backward join above compares a response's id
+field (msg_...) against a request's diagnostics.previous_message_id. This
+forward join compares a response's FILENAME (req_...) against a request's
+cc_prev_req. They are different identifier spaces that happen to share the
+same 8-character-prefix shape — run and report them as two separate joins,
+never zipped together as if they were one field.
+
 FINDINGS ARE COST-SHAPED, ranked by cost: the top-5 largest requests with
 their message counts (the O(n^2) context-resend pattern, measured elsewhere at
 roughly 1.17 MB/request and 95.7 MB over one long round); calls made at
@@ -1355,7 +1381,26 @@ return {
   run_meta: {
     output: OUTPUT,
     lanes: ACTIVE_LANES.map((l) => l.key),
-    sessions: cfg.sessions,
+    // NOT `cfg.sessions` verbatim. An object entry carries `path` — an
+    // ABSOLUTE transcript path under the machine's home directory
+    // (`/Users/…`) — and this return is written into TRACKED `run.json` by
+    // `kb_setup.session_review_archive`. Keep only what the archive task
+    // actually reads (`_latest_session_date` uses `started_at` alone) plus
+    // what is useful evidence without being a local filesystem layout: the
+    // session id and its timing/size facts. A bare-string entry (`s.path ||
+    // s` elsewhere in this file) keeps only its basename for the same
+    // reason — the directory portion is exactly the same absolute path.
+    sessions: cfg.sessions.map((s) =>
+      typeof s === 'string'
+        ? s.split('/').pop()
+        : {
+            session_id: s.session_id,
+            started_at: s.started_at,
+            last_written: s.last_written,
+            bytes: s.bytes,
+            time_source: s.time_source,
+          },
+    ),
     directive: cfg.directive ?? null,
     handoffs: cfg.handoffs ?? [],
     max_refuters: MAX_REFUTERS,

@@ -100,7 +100,7 @@ ending in a handoff. An unknown value for either now THROWS rather than silently
 falling back — a run that swept four lanes because one was misspelled reports as
 confidently as one that swept five.
 
-Nine lanes sweep independently, the highest-cost findings are adversarially
+Ten lanes sweep independently, the highest-cost findings are adversarially
 refuted, then one ranked synthesis. It returns findings; it changes nothing. The
 two lanes the 2026-08-18 directive added carry their own preflight needs:
 `bot-reviews` discovers the window's PRs itself with `gh`, and `pending-work`
@@ -126,11 +126,15 @@ model exhaustion only** — a session or weekly limit is shared across models, s
 switching cannot escape it.
 
 **The cross-check is capped** at `MAX_REFUTERS`, DERIVED rather than a fixed
-literal — `Math.max(6, 25 - 2 - ACTIVE_LANES.length - JUDGE_AGENTS_WORST)` —
-so the worst-case agent count stays under the 25-agent advisory ceiling no
-matter how many lanes are active. With today's lane sets this evaluates to
-**11** in both output modes; the exact figure moves with the lane count, so
-read `run_meta.max_refuters` on the return rather than assuming a number.
+literal — `Math.max(6, 25 - 2 - ACTIVE_LANES.length - JUDGE_AGENTS_WORST)`.
+With today's lane sets this evaluates to **11** in both output modes; the
+exact figure moves with the lane count, so read `run_meta.max_refuters` on
+the return rather than assuming a number. The `Math.max(6, …)` floor keeps a
+narrowed run's cross-check from starving to zero, at a stated price: it can
+only bind past roughly 14-16 active lanes (far beyond today's ten), and once
+it does the worst-case agent count is no longer guaranteed under the 25-agent
+advisory ceiling — see the comment beside `MAX_REFUTERS` in `session-review.js`
+for the exact thresholds per output mode.
 Anything past the cap is returned as **`not_triaged`** — a fourth state beside
 `confirmed`, `refuted` and `unverified`, and logged per finding. Read it: it
 means the review did not look, not that it looked and found nothing.
@@ -253,7 +257,7 @@ recollect; they read.
 ```text
 mise run kb-session-select -- --current
 Workflow({ name: 'session-review', args: {
-  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the seven below
+  output: 'handoff',          // the ARTIFACT; `lanes` defaults to the eight below
   handoffOut: '.agent/plans/session-<date>-<letter>.md',
   reportDir: '.agent/kb/reports/agents/<date>-session-review',   // DATED — the root default
                                                                   // overwrote prior evidence twice (#431)
