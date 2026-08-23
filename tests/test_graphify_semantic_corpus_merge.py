@@ -17,6 +17,7 @@ import msgspec
 import pytest
 from kb_setup import graphify_semantic_corpus as corpus
 from kb_setup import graphify_semantic_corpus_merge as merge
+from kb_setup import graphify_semantic_slice
 
 _NAMESPACE = "a" * 64
 _CACHE_NAMESPACE = "b" * 64
@@ -63,6 +64,195 @@ def _node(nid: str, source_file: str) -> dict[str, object]:
 
 def _fragment(nid: str, source_file: str) -> dict[str, object]:
     return {"nodes": [_node(nid, source_file)], "edges": [], "hyperedges": []}
+
+
+# --- Scope-sanitization fixtures --------------------------------------------
+#
+# Modeled on chunks 12 and 26 of the real 2026-08-23 corpus run rather than
+# copied from `graphify-out/graphify-semantic-corpus-chunks/`, which is
+# DERIVED/gitignored and absent from a fresh clone (see the module-level
+# docstring above). The shape that matters is preserved: a chunk that declares
+# several member paths, whose fragment holds a minority of nodes attributed to
+# a file NONE of the declared paths name (a report describing its own
+# artifacts), with an edge and a hyperedge that reference the misattributed
+# node — exactly what makes exclusion cascade, not just drop a node in
+# isolation.
+
+_SCOPE_A = "worked/x/README.md"
+_SCOPE_B = "worked/x/REPORT.md"
+
+
+def _edge(
+    source: str, target: str, source_file: str, *, relation: str = "references"
+) -> dict[str, object]:
+    """An edge in the adapter's own shape — see `chunks._EDGE_REQUIRED`."""
+    return {
+        "source": source,
+        "target": target,
+        "relation": relation,
+        "confidence": "EXTRACTED",
+        "confidence_score": 1,
+        "weight": 1,
+        "source_file": source_file,
+    }
+
+
+def _hyperedge(
+    hid: str, members: tuple[str, ...], source_file: str, *, relation: str = "participate_in"
+) -> dict[str, object]:
+    """A hyperedge in the adapter's own shape — see `chunks._HYPEREDGE_CONFIDENCE`."""
+    return {
+        "id": hid,
+        "label": hid.replace("_", " ").title(),
+        "nodes": list(members),
+        "relation": relation,
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.9,
+        "source_file": source_file,
+    }
+
+
+def _scope_fragment(out_of_scope_paths: tuple[str, ...]) -> dict[str, object]:
+    """9 in-scope nodes over `_SCOPE_A`/`_SCOPE_B`, plus one node per out-of-scope path.
+
+    Only the FIRST out-of-scope node is cited by an edge and a hyperedge — enough
+    to exercise the cascade without every excluded node needing its own
+    reference. The rest are still counted toward the excluded share, exactly
+    like chunk 26's `graph.html`/`manifest.json`, which the real fragment cited
+    only from `README.md`, not from every excluded node individually.
+    """
+    in_scope = [_node(f"readme_{i}", _SCOPE_A) for i in range(1, 5)] + [
+        _node(f"report_{i}", _SCOPE_B) for i in range(1, 6)
+    ]
+    out = [_node(f"out_{i}", path) for i, path in enumerate(out_of_scope_paths)]
+    edges = [_edge("readme_1", "report_1", _SCOPE_A)]
+    hyperedges = [_hyperedge("readme_set", ("readme_1", "readme_2", "readme_3"), _SCOPE_A)]
+    if out:
+        out0_id = str(out[0]["id"])
+        edges.append(_edge("report_2", out0_id, _SCOPE_B, relation="describes"))
+        hyperedges.append(_hyperedge("artifact_set", ("report_1", "report_2", out0_id), _SCOPE_B))
+    return {"nodes": [*in_scope, *out], "edges": edges, "hyperedges": hyperedges}
+
+
+def _scope_fragment_omits_b(out_of_scope_path: str) -> dict[str, object]:
+    """5 nodes over `_SCOPE_A` only, plus one out-of-scope node — `_SCOPE_B` gets NONE.
+
+    The out-of-scope node's share (1/6, ~16.7%) clears `_MAX_EXCLUDED_SHARE` on
+    its own, isolating the OTHER refusal: `_SCOPE_B` was never covered at all,
+    which excluding the out-of-scope node cannot fix and must not paper over.
+    """
+    nodes = [_node(f"readme_{i}", _SCOPE_A) for i in range(1, 6)] + [
+        _node("out_0", out_of_scope_path)
+    ]
+    return {"nodes": nodes, "edges": [], "hyperedges": []}
+
+
+def _scope_plan(tmp_path: Path, source_paths: tuple[str, ...]) -> Path:
+    """A one-chunk plan whose single chunk declares MULTIPLE member paths.
+
+    `_plan()` above packs one source file per chunk; chunk 26/12 of the real
+    run packed several, which is exactly the shape that lets the model
+    describe an artifact of one declared file while it was dispatched to read
+    another. A single-source plan cannot exhibit the bug this fixture exists
+    to reproduce.
+    """
+    candidate = tmp_path / "scope-plan"
+    candidate.mkdir(parents=True, exist_ok=True)
+    ledger = corpus.ChunkLedger(
+        token_budget=20000,
+        unit_count=len(source_paths),
+        chunks=(
+            corpus.PlannedChunk(
+                ordinal=1,
+                total=1,
+                estimated_tokens=100,
+                members=tuple(
+                    corpus.ChunkMember(
+                        unit_ordinal=i,
+                        path=path,
+                        slice_index=0,
+                        sha256="c" * 64,
+                        estimated_tokens=100,
+                    )
+                    for i, path in enumerate(source_paths)
+                ),
+            ),
+        ),
+    )
+    (candidate / "chunk-ledger.json").write_bytes(corpus.encode_canonical(ledger))
+    (candidate / "manifest.json").write_text('{"schema_id": "test"}')
+    (candidate / "execution-config.json").write_text(
+        json.dumps({"cache_namespace_sha256": _CACHE_NAMESPACE})
+    )
+    return candidate
+
+
+def _stage_fragment(
+    candidate: Path,
+    fragment: dict[str, object],
+    source_paths: tuple[str, ...],
+    *,
+    namespace: str = _NAMESPACE,
+    **overrides: object,
+) -> Path:
+    """Stage the ONE chunk `_scope_plan` declared, from an arbitrary fragment.
+
+    `status`/`reasons` are DERIVED from the REAL validator
+    (`graphify_semantic_slice.fragment_scope_reasons`), not hand-picked — these
+    tests are about what that derivation actually produces for a multi-source,
+    name-dropping fragment, and hand-picking the reasons would make the
+    fixture agree with itself instead of exercising the real rule (the same
+    reasoning as `test_assembled_chunk_passes_the_chunk_validator` above).
+    `overrides` still wins, for the one test that needs a reason the real
+    validator would never produce on its own.
+    """
+    ledger, config = merge._plan_members(candidate)
+    planned = ledger.chunks[0]
+    raw = corpus.encode_canonical(fragment)
+    fragment_nodes = fragment["nodes"]
+    fragment_edges = fragment["edges"]
+    fragment_hyperedges = fragment.get("hyperedges", [])
+    assert isinstance(fragment_nodes, list)
+    assert isinstance(fragment_edges, list)
+    assert isinstance(fragment_hyperedges, list)
+    counts = (len(fragment_nodes), len(fragment_edges), len(fragment_hyperedges))
+    reasons = graphify_semantic_slice.fragment_scope_reasons(fragment, source_paths=source_paths)
+    fields: dict[str, object] = {
+        "status": "failed" if reasons else "complete",
+        "cache_namespace_sha256": config.cache_namespace_sha256,
+        "run_namespace_sha256": namespace,
+        "chunk_ordinal": planned.ordinal,
+        "chunk_total": planned.total,
+        "chunk_sha256": corpus.sha256_bytes(corpus.encode_canonical(planned)),
+        "plan_manifest_sha256": corpus.sha256_path(candidate / "manifest.json"),
+        "execution_config_sha256": corpus.sha256_path(candidate / "execution-config.json"),
+        "prompt_contract_sha256": "d" * 64,
+        "structured_schema_sha256": "e" * 64,
+        "provider_prompt_sha256": "f" * 64,
+        "source_paths": source_paths,
+        "fragment_sha256": corpus.sha256_bytes(raw),
+        "fragment_size": len(raw),
+        "provider_receipt_sha256": "0" * 64,
+        "provider_receipt_size": 1,
+        "adapter_metadata_sha256": "1" * 64,
+        "adapter_metadata_size": 1,
+        "node_count": counts[0],
+        "edge_count": counts[1],
+        "hyperedge_count": counts[2],
+        "warnings": (),
+        "errors": (),
+        "reasons": tuple(reasons),
+    }
+    fields.update(overrides)
+    receipt = msgspec.convert(fields, type=corpus.ChunkStageReceipt, strict=False)
+    stage = merge.cache_root_for(candidate) / namespace / "chunks" / f"{planned.ordinal:04d}"
+    stage.mkdir(parents=True, exist_ok=True)
+    (stage / "semantic-fragment.json").write_bytes(raw)
+    (stage / "receipt.json").write_bytes(corpus.encode_canonical(receipt))
+    return stage
+
+
+# -----------------------------------------------------------------------------
 
 
 def _plan(tmp_path: Path, chunk_specs: list[tuple[int, str]]) -> Path:
@@ -326,3 +516,140 @@ def test_merge_main_reports_the_arithmetic_it_assembled(repo, capsys) -> None:
     assert "assembled 1/1 chunk(s)" in out
     assert "2 nodes, 0 edges, 0 hyperedges" in out
     assert "mise run kb-merge --" in out
+
+
+# --- Scope sanitization: chunks 12/26's shape, sanitized rather than refused ---
+
+
+def test_a_scope_mismatch_chunk_merges_with_exclusions_recorded_and_absent(repo) -> None:
+    """The success path: exactly the two survivable reasons, under the bound.
+
+    One out-of-scope node (10% of 10) with an edge and a hyperedge citing it —
+    all three must be dropped, recorded, and the REST of the chunk must reach
+    `chunks.assemble` unchanged. Asserted against the real chunk validator, not
+    just this module's own bookkeeping, for the same reason
+    `test_assembled_chunk_passes_the_chunk_validator` is.
+    """
+    from kb_setup import chunks
+
+    out_of_scope = "worked/x/graph.json"
+    candidate = _scope_plan(repo, (_SCOPE_A, _SCOPE_B))
+    _stage_fragment(candidate, _scope_fragment((out_of_scope,)), (_SCOPE_A, _SCOPE_B))
+
+    out, accepted = merge.assemble(repo, candidate, "corpus-probe")
+
+    (staged,) = accepted
+    sanitization = staged.scope_sanitization
+    assert sanitization is not None
+    assert sanitization.excluded_count == 1
+    assert sanitization.excluded_share == pytest.approx(0.1)
+    (excluded_node,) = sanitization.excluded_nodes
+    assert excluded_node.id == "out_0"
+    assert excluded_node.source_file == out_of_scope
+    (excluded_edge,) = sanitization.excluded_edges
+    assert excluded_edge.source == "report_2"
+    assert excluded_edge.target == "out_0"
+    assert sanitization.excluded_hyperedge_ids == ("artifact_set",)
+
+    # The counts a summary would print are the POST-exclusion ones.
+    assert staged.node_count == 9
+    assert staged.edge_count == 1
+    assert staged.hyperedge_count == 1
+
+    written = json.loads(out.read_text())
+    written_ids = {n["id"] for n in written["nodes"]}
+    assert "out_0" not in written_ids
+    assert written_ids == {f"readme_{i}" for i in range(1, 5)} | {
+        f"report_{i}" for i in range(1, 6)
+    }
+    assert all(e["source"] != "out_0" and e["target"] != "out_0" for e in written["edges"])
+    assert [h["id"] for h in written["hyperedges"]] == ["readme_set"]
+    assert chunks.validate(written) == []
+
+    # Discoverable without re-deriving it from the fragment.
+    record_path = merge._staging_dir(candidate) / "chunk-0001-scope-exclusions.json"
+    recorded = json.loads(record_path.read_text())
+    assert recorded["excluded_count"] == 1
+    assert recorded["excluded_nodes"] == [{"id": "out_0", "source_file": out_of_scope}]
+
+
+def test_dropping_only_the_node_without_the_cascade_would_still_refuse(repo) -> None:
+    """The control arm for the cascade in `_sanitize_scope`.
+
+    If exclusion stopped at the node and left the edge/hyperedge that cite it
+    in place, `chunks.assemble` would refuse the "sanitized" fragment anyway —
+    just later, and less legibly, than naming the real cause up front (the
+    module docstring's claim, made concrete). Node-only exclusion is not a
+    hypothetical near-miss; it is what a first attempt at this fix would most
+    naturally produce.
+    """
+    from kb_setup import chunks
+
+    raw = _scope_fragment(("worked/x/graph.json",))
+    raw_nodes = raw["nodes"]
+    assert isinstance(raw_nodes, list)
+    for node in raw_nodes:
+        assert isinstance(node, dict)
+        node["_origin"] = "semantic"
+    node_only = json.loads(json.dumps(raw))
+    node_only["nodes"] = [n for n in node_only["nodes"] if n["id"] != "out_0"]
+    issues = chunks.validate(node_only)
+    assert any("dangling" in i for i in issues)
+
+
+def test_excluded_share_over_the_bound_still_refuses(repo) -> None:
+    """Three out-of-scope nodes out of 12 (25%) crosses `_MAX_EXCLUDED_SHARE` (20%)."""
+    candidate = _scope_plan(repo, (_SCOPE_A, _SCOPE_B))
+    _stage_fragment(
+        candidate,
+        _scope_fragment(("worked/x/graph.json", "worked/x/graph.html", "worked/x/manifest.json")),
+        (_SCOPE_A, _SCOPE_B),
+    )
+    with pytest.raises(ValueError, match="scope-exclusion-share-exceeded"):
+        merge.assemble(repo, candidate, "corpus-probe")
+    # Nothing written on a refusal.
+    assert not merge._staging_dir(candidate).exists()
+
+
+def test_a_third_reason_alongside_the_two_scope_reasons_still_refuses(repo) -> None:
+    """Only the two scope reasons (plus their status restatement) are survivable.
+
+    `_is_scope_sanitizable` admits exactly those — anything else, and the
+    chunk refuses exactly as before.
+    """
+    candidate = _scope_plan(repo, (_SCOPE_A, _SCOPE_B))
+    _stage_fragment(
+        candidate,
+        _scope_fragment(("worked/x/graph.json",)),
+        (_SCOPE_A, _SCOPE_B),
+        reasons=(
+            "fragment-source-scope-mismatch",
+            "fragment-source-coverage-mismatch",
+            "some-other-reason",
+        ),
+    )
+    with pytest.raises(ValueError, match="run-reason:some-other-reason"):
+        merge.assemble(repo, candidate, "corpus-probe")
+
+
+def test_a_declared_file_left_at_zero_nodes_after_exclusion_still_refuses(repo) -> None:
+    """The omission direction.
+
+    Excluding the out-of-scope node cannot resurrect a declared file the
+    model never produced a single node for.
+    """
+    candidate = _scope_plan(repo, (_SCOPE_A, _SCOPE_B))
+    _stage_fragment(candidate, _scope_fragment_omits_b("worked/x/graph.json"), (_SCOPE_A, _SCOPE_B))
+    with pytest.raises(ValueError, match=f"scope-exclusion-empties-declared-file:{_SCOPE_B}"):
+        merge.assemble(repo, candidate, "corpus-probe")
+
+
+def test_merge_main_reports_the_scope_exclusion_it_made(repo, capsys) -> None:
+    """The CLI summary names the exclusion, not just the arithmetic that survived it."""
+    candidate = _scope_plan(repo, (_SCOPE_A, _SCOPE_B))
+    _stage_fragment(candidate, _scope_fragment(("worked/x/graph.json",)), (_SCOPE_A, _SCOPE_B))
+    assert merge.merge_main(repo, ["corpus-probe", str(candidate)]) == 0
+    out = capsys.readouterr().out
+    assert "9 nodes, 1 edges, 1 hyperedges" in out
+    assert "chunk 0001: excluded 1/10 out-of-scope node(s) (10.0%)" in out
+    assert "chunk-0001-scope-exclusions.json" in out
