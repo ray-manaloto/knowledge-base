@@ -66,12 +66,19 @@ graphify-out/graphify-semantic-corpus.superseded-*/
 # `kb-graphify-semantic-corpus-merge`, and the artifact that matters is the
 # committed `sources/extractions/<name>-docs.json` it assembles them into.
 #
-# `graphify-out/graphify-semantic-corpus-chunks/` is DELIBERATELY NOT listed. That
-# tree is the retained provider evidence for a run that cost real tokens, and
-# whether it should be committed is the open question in #317 (the corpus is
-# ignored while the slice is tracked). Adding it here would settle that question
-# silently, in a file nobody reads during review, so it is left visible as
-# untracked instead.
+# `graphify-out/graphify-semantic-corpus-chunks/` is DELIBERATELY NOT listed, and
+# is now TRACKED rather than merely visible. It is the retained provider evidence
+# for a run that cost real tokens, and whether to commit it was the open question
+# in #317 — the corpus plan ignored while the slice was tracked. Ray settled it
+# 2026-08-23 in favour of tracking, which is the reading that makes the corpus
+# reproducible from a fresh clone and from the hosted app at all: those see only
+# tracked files, and #301's acceptance rests on reproducibility.
+#
+# The paragraph this replaces said adding it here "would settle that question
+# silently, in a file nobody reads during review" — that reasoning was right and
+# is why the answer arrived through `kb-ship` refusing a dirty tree rather than
+# through an ignore rule. Keep it OFF this list: an entry here would un-track it
+# by the back door and re-open #317 without anyone deciding.
 graphify-out/graphify-semantic-corpus-assembly/
 graphify-out/graphify-semantic-corpus-prototype/
 graphify-out/graphify-semantic-corpus-prototype-corrected/
