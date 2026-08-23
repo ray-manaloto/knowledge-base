@@ -283,6 +283,107 @@ class Receipt:
         }
 
 
+#: `cold:<variant>` names an external reviewer CLI; maps the variant a lane
+#: entry carries to the `currency.toml` tool table (`[tool.<mise_key>]`) that
+#: pins it. `.claude/skills/kb-review/SKILL.md`'s cross-family table has two
+#: external lanes — `fable-orchestrator:codex-reviewer` (records `codex`) and
+#: `antigravity:review` (Google's plugin). The skill's only literal worked
+#: example anywhere in this repo is `cold:codex`; no `cold:antigravity`
+#: receipt has ever been written, so there is no precedent for which spelling
+#: that lane records. Rather than guess wrong and leave the check unable to
+#: fire, all three names a review report could plausibly carry — the plugin
+#: name, the mise_key, and the binary itself — map to the one tool row.
+#: A variant not in this map is not drift — see :func:`_reviewer_pin_gap`.
+_REVIEWER_CLI_MISE_KEYS: dict[str, str] = {
+    "codex": "codex",
+    "antigravity": "antigravity-cli",
+    "antigravity-cli": "antigravity-cli",
+    "agy": "antigravity-cli",
+}
+
+
+def _reviewer_pin_gap(repo_root: Path, data: dict[str, Any]) -> str | None:
+    """Return why a lane's reviewer CLI disagrees with its `mise.toml` pin, or None.
+
+    The cold lane is an external binary (`agy`, `codex`), and a receipt records
+    WHICH lane ran but never WHICH VERSION of it — so a drifted binary silently
+    turns the review gate into a stale review gate. `currency.toml`'s own
+    `[tool.antigravity-cli]` row states the stake: with `codex` out of credits,
+    antigravity IS the cold lane, so a stale `agy` is a stale review.
+
+    Ray's ruling (2026-08-23, decision 8 of the tracked execution plan): REFUSE,
+    not warn — a warning is measured worthless here. The warning-only
+    graph-first rule scored 0 compliance in 19 chances; the DENY that replaced
+    it took its violations 62 to 0.
+
+    **ASK THE BINARY. Never the install-directory name.** `mise.toml`'s own
+    comment records the trap: the `1.1.5` install directory once held a binary
+    that reported 1.1.10 back — the directory name is mise's label, not what
+    runs. So this reads :func:`kb_setup.currency.sync.observed_version`, which
+    executes `<binary> --version` and parses the real output, never
+    :func:`kb_setup.currency.sync.resolve_from_path`, which only reads a path
+    segment and would have passed the exact drift this function exists to catch.
+
+    **Offline only, and that is a real narrowing, not an oversight.** Ray's
+    directive that a review runs the *latest* agy belongs to `kb-currency`,
+    which already tracks `[tool.antigravity-cli]` against upstream — network,
+    advisory, never a gate. This function compares the PIN against the BINARY,
+    never against upstream; a network call on the `kb-ship` path would make
+    shipping depend on GitHub being reachable. Do not "complete" this later by
+    adding a fetch.
+
+    **Fails CLOSED on drift, OPEN on absence — the opposite bias from
+    `_check_self_managed`'s own "not installed is DRIFT" reading, two modules
+    over in `currency.sync`.** That function asks "is this host set up right";
+    this one asks "does a review that already happened deserve to gate a ship",
+    and a reviewer CLI simply absent from THIS host (`kb-ship` can run on a
+    machine that never ran the review) cannot be asserted to disagree with
+    anything. No variant, an unrecognised variant, a binary not on PATH, no
+    recorded pin, or an unreadable `--version` all read the same as "cannot
+    check", and this function passes rather than guesses —
+    `kb_setup.absent_binary`'s host-conditional shape (silently inert wherever
+    its tool is not installed) is the precedent.
+
+    **Runs from here (the WRITER) only — never from :func:`_all_reasons`,
+    which :func:`receipt_state` (the reader) also shares.** A live-host
+    comparison re-run at `kb-ship`/`kb-land` time would refuse an
+    already-honest receipt the moment an unrelated `mise use` bumps the pin
+    days later, which is not what a stale RECEIPT looks like. Keeping the
+    check write-only preserves the property the constraints ask for: `kb-ship`
+    then refuses for *no receipt* (this function's caller wrote none) rather
+    than for a receipt that reads as bad long after it was honest.
+    """
+    from kb_setup.currency import config, sync
+
+    try:
+        specs = config.load(repo_root)
+    except OSError, TypeError, ValueError:
+        return None  # currency.toml unreadable — cannot ask, so pass open.
+
+    for entry in _as_entries(data.get("lanes_ran", [])) or []:
+        _, sep, variant = str(entry).partition(_SKIP_SEPARATOR)
+        if not sep or variant not in _REVIEWER_CLI_MISE_KEYS:
+            continue
+        mise_key = _REVIEWER_CLI_MISE_KEYS[variant]
+        spec = next((s for s in specs if s.mise_key == mise_key), None)
+        if spec is None or not spec.applies_here():
+            continue
+        pinned, _extras = sync.pinned_version(repo_root, spec)
+        if not pinned:
+            continue  # no pin recorded — absence, not drift.
+        observed = sync.observed_version(spec.binary, spec.version_pattern, spec.version_args)
+        if not observed or observed == pinned:
+            continue  # not installed, unreadable, or in sync — none is drift.
+        return (
+            f"lane {entry!r} ran {spec.binary} {observed}, but mise.toml pins "
+            f"{mise_key} {pinned} — a drifted reviewer binary is a stale review. "
+            f"Sync them: `mise use {mise_key}@{observed}` if {observed} is the "
+            f"version you meant to review with (review its release notes "
+            f"first), or reinstall {mise_key}@{pinned} if it is not"
+        )
+    return None
+
+
 def rejection(repo_root: Path, receipt: Receipt) -> str | None:
     """Return why ``receipt`` would be rejected, or None if it would pass.
 
@@ -299,8 +400,14 @@ def rejection(repo_root: Path, receipt: Receipt) -> str | None:
     safe and only the wording was wrong; but "cannot drift apart" is exactly the
     sentence a reader trusts instead of re-checking, and the one place it did not
     hold is the field most likely to be wrong on a second review round. (#57)
+
+    **It does not cover :func:`_reviewer_pin_gap` either, and here that is
+    deliberate rather than a gap to close.** See that function's own docstring
+    for why a live-host comparison belongs at write time only.
     """
-    return _all_reasons(repo_root, receipt.as_payload(), receipt.sha)
+    return _all_reasons(repo_root, receipt.as_payload(), receipt.sha) or _reviewer_pin_gap(
+        repo_root, receipt.as_payload()
+    )
 
 
 def _all_reasons(repo_root: Path, data: dict[str, Any], sha: str) -> str | None:
