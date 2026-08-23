@@ -138,3 +138,28 @@ kb-session-review invoke snippet (#431's collision). The lesson is the skill's o
 §5 — the apply half is the half that gets skipped — and the standing brief is now:
 **a session-review run ends with its CONFIRMED findings applied or filed, named one
 by one, before the `/clear` question is asked.**
+
+### On the session-review workflow itself — VERBATIM, and built the same session
+
+Asked right after the "what did we do with the results" exchange:
+
+> update the session-review workflow to always create a detailed report in order to track exactly what was done?
+> is the session-review workflow parsing the telemetry files? if not, why not?
+
+Answered: handoff mode wrote only the handoff (report mode wrote the synthesis) and
+the tracked `docs/session-review/runs/<date>-<n>/` was hand-assembled every time; the
+telemetry sink (`.agent/telemetry/`, Claude Code's `OTEL_LOG_RAW_API_BODIES=file:`
+sink, enabled 2026-08-17 "maximum capture for self-learning", 2.5 GB) had NO reader —
+a sink with no consumer, the #461 shape. Scheduling answers (AskUserQuestion, verbatim):
+
+> /fable-orchestrator:orchestration implement option 1
+
+(option 1 = build the report-always change + the `kb-session-review-archive` task now,
+before `/clear`) and, on a telemetry lane: *"Yes — build it now with the report change"*.
+
+Built this session through the orchestration flow (spec rev3, two premise-verifier
+rounds, codex lane at xhigh, Gemini cold review ×2, live validation run archived by
+the new task): PR #466 `session-review-report-always`. The standing brief it adds:
+**every session-review run leaves its ranked synthesis on disk in both output modes and
+is archived by `mise run kb-session-review-archive`, never by hand; the `telemetry`
+lane is in the default handoff set.**
