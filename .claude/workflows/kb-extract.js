@@ -276,7 +276,7 @@ phase('Extract')
 const results = await parallel(
   sources.map((s) => () =>
     agent(promptFor(s), {
-      label: 'extract:' + s.key,
+      label: `extract:${s.key}`,
       phase: 'Extract',
       schema: SCHEMA,
       agentType: 'general-purpose',

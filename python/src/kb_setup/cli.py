@@ -70,7 +70,7 @@ def _print_usage() -> int:
         "graph-counts [--by-source] [name...] | "
         "write-attribution <path> [--window N] [--limit N] | "
         "model-limits [--write] [--observed-at DATE] [model...] | "
-        "md-budget | skill-lint | "
+        "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | skill-refresh | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "session-state [--no-pr] | context | "
@@ -333,6 +333,10 @@ def _dispatch_lint(repo_root: Path, cmd: str) -> int | None:
         from kb_setup import skill_lint
 
         return skill_lint.skill_lint_main(repo_root)
+    if cmd == "workflow-lint":
+        from kb_setup import workflow_lint
+
+        return workflow_lint.workflow_lint_main(repo_root)
     if cmd == "hk-test":
         from kb_setup import hk_test
 
@@ -534,7 +538,7 @@ def _dispatch_ops(repo_root: Path, cmd: str, rest: list[str]) -> int:
         "[--ref R --kind K --name N --comment C --force] | assemble <name> <chunk...> | "
         "brain [query|record|reflect|audit] | distill | arms <spec.toml> [--dry-run] | "
         "reclaim [--apply] [--only c1,c2] [--skip c1,c2] | "
-        "md-budget | skill-lint | "
+        "md-budget | skill-lint | workflow-lint | "
         "skill-score [--write] [skill...] | "
         "handoff-check [path] | gates [task...] [--stop] | check <path...> | "
         "session-state [--no-pr] | "
