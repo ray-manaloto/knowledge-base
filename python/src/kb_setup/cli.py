@@ -93,7 +93,7 @@ def _print_usage() -> int:
         "corpus-integrity | "
         "graphify-native-extract [--out DIR] [--target DIR] [--token-budget N] "
         "[--max-concurrency N] [--model NAME] [--allow-parallel-claude-cli] [--cluster] "
-        "[--dry-run] | "
+        "[--artifacts [VIEW...]] [--dry-run] | "
         "skillopt-contract | "
         "tool-sync <currency-tool-name> | "
         "skillopt-reviewed --packet P --target T --backend mock|handoff | "

@@ -54,6 +54,21 @@ _ARTIFACTS: list[tuple[str, list[str], str]] = [
 _REWRITES_GRAPH = frozenset({"report"})
 
 
+def known_views() -> tuple[str, ...]:
+    """The view names `only=` accepts, in registry order.
+
+    A single source of truth for a caller that wants to validate a requested
+    view BEFORE calling `generate` — an `only=` that matches zero registry
+    entries is not refused by `generate` itself: `selected` narrows to an
+    empty list and the run still prints "generating 0 artifact(s)" /
+    "all artifacts generated" and returns 0. A caller that wants a typo'd view
+    name reported rather than silently swallowed reads this list first.
+    `kb_setup.graphify_native_extract`'s `--artifacts <view>...` does exactly
+    that.
+    """
+    return tuple(name for name, _, _ in _ARTIFACTS)
+
+
 def _node_count(graph: Path) -> int:
     """Node count from graph.json (0 if unreadable — callers gate on it)."""
     try:
@@ -90,11 +105,28 @@ def _run_generator(repo_root: Path, exe: str, args: list[str]) -> int:
     return 0 if receipt.state is graphify_health.GraphifyState.COMPLETE else 3
 
 
-def generate(repo_root: Path, only: list[str] | None = None) -> int:
-    """Generate all artifacts (or the subset in `only`). Returns non-zero on any failure."""
-    graph = repo_root / "graphify-out" / "graph.json"
+def generate(
+    repo_root: Path, only: list[str] | None = None, *, graph_root: Path | None = None
+) -> int:
+    """Generate all artifacts (or the subset in `only`). Returns non-zero on any failure.
+
+    `graph_root` scopes where the graph lives, where each generator's `cwd` is
+    set, and where the prose graph + currency stamp are read/written. Defaults
+    to `repo_root` — today's behaviour for the aggregate `kb-artifacts` call
+    site (`cli.py`'s bare `artifacts.generate(repo_root, only=...)`), unchanged.
+
+    `repo_root` ALWAYS anchors `graphify_exe`/`ensure_runtime_deps`, even when
+    `graph_root` differs. Neither has an existence check or a fallback —
+    `graphify_exe` string-joins `.venv/bin/graphify` onto whatever root it is
+    given and returns it regardless — so a caller scoping `graph_root` to an
+    output tree with no `.venv/` of its own (e.g. `kb-graphify-native-extract
+    --artifacts`) MUST still pass the real project root as `repo_root`, or
+    every generator subprocess fails against a binary that does not exist.
+    """
+    graph_root = graph_root or repo_root
+    graph = graph_root / "graphify-out" / "graph.json"
     if not graph.is_file():
-        raise SystemExit("graphify-out/graph.json missing — run `mise run kb-build` first")
+        raise SystemExit(f"{graph} missing — run `mise run kb-build` first")
 
     ensure_runtime_deps(repo_root)  # scipy for svg, etc.
 
@@ -121,14 +153,14 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
     # "I regenerated everything", which was true for a full run and unsound in
     # general: it certified views whose bytes had changed at some earlier,
     # unobserved moment. See `sync.view_records`.
-    views_before = stamps.snapshot_views(repo_root)
+    views_before = stamps.snapshot_views(graph_root)
     exe = graphify_exe(repo_root)
     failures: list[str] = []
     for name, args, desc in selected:
         print(f"  → {name}: {desc}")
         rewrites = name in _REWRITES_GRAPH
         # clean_env: no non-Claude backend key reaches graphify (Gemini-free).
-        rc = _run_generator(repo_root, exe, args)
+        rc = _run_generator(graph_root, exe, args)
         if rc != 0:
             print(f"    FAILED ({name}, rc={rc})")
             failures.append(name)
@@ -139,7 +171,7 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
             # `graph.build` via `label`); `report` was the one exception, so
             # `kb-query --prose` went on describing whatever corpus existed
             # before this run (#175 cold review, finding 3).
-            if _derive_prose(repo_root, name) != 0:
+            if _derive_prose(graph_root, name) != 0:
                 failures.append(name)
 
     if failures:
@@ -149,7 +181,7 @@ def generate(repo_root: Path, only: list[str] | None = None) -> int:
     # Reached only when every selected generator returned 0 (the `failures` branch
     # returns 1 above), so every view that moved inside this bracket moved because
     # a generator that SUCCEEDED wrote it.
-    stamps.refresh_after_regen(repo_root, tag="kb-artifacts", views_before=views_before)
+    stamps.refresh_after_regen(graph_root, tag="kb-artifacts", views_before=views_before)
     return 0
 
 

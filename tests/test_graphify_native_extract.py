@@ -1,8 +1,15 @@
 # Copyright (c) 2026 Raymond Manaloto
-"""`graphify_native_extract` — dry-run only; this suite makes no provider call.
+"""`graphify_native_extract` — mostly dry-run only; no test makes a provider call.
 
 Every check builds its own `tmp_path` tree standing in for the repo root, so
 nothing reads or writes the real `sources/graphify` clone or `graphify-out/`.
+
+The `--artifacts` real-dispatch tests below are the one exception to
+"dry-run only": they call `_run_artifacts`/`native_extract_main` for real, with
+`kb_setup.artifacts.generate` replaced by a spy and `assert_pinned_graphify`
+stubbed out, so nothing here ever shells out to graphify or a provider — see
+the module's own "Verification scope" docstring section for why this one path
+earns a real-dispatch test where extract/cluster do not.
 """
 
 from __future__ import annotations
@@ -11,6 +18,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kb_setup import artifacts
 from kb_setup import graphify_native_extract as gne
 from kb_setup.result import Rc
 
@@ -347,3 +355,173 @@ def test_cluster_dry_run_output_names_cluster_only_and_the_out_path(
     printed = capsys.readouterr().out
     assert "cluster-only" in printed
     assert str(out) in printed
+
+
+# --- --artifacts --------------------------------------------------------------
+
+
+def test_artifacts_flag_with_no_names_means_all(tmp_path: Path) -> None:
+    opts = gne._parse(tmp_path, ["--artifacts"])
+    assert opts.artifacts is True
+    assert opts.artifacts_views == ()
+
+
+def test_artifacts_flag_consumes_view_names_until_the_next_flag(tmp_path: Path) -> None:
+    """Reverted (view consumption stops early or swallows --dry-run), this must fail."""
+    opts = gne._parse(tmp_path, ["--artifacts", "wiki", "graphml", "--dry-run"])
+    assert opts.artifacts_views == ("wiki", "graphml")
+    assert opts.dry_run is True
+
+
+def test_cluster_and_artifacts_together_is_rejected(tmp_path: Path) -> None:
+    rc = gne.native_extract_main(tmp_path, ["--cluster", "--artifacts"])
+    assert rc == Rc.BAD_REQUEST
+
+
+def test_main_artifacts_refuses_missing_graph_json_with_not_run(tmp_path: Path) -> None:
+    rc = gne.native_extract_main(tmp_path, ["--artifacts"])
+    assert rc == Rc.NOT_RUN
+
+
+def test_main_artifacts_never_requires_the_pinned_clone_target(tmp_path: Path) -> None:
+    """--artifacts is standalone, same as --cluster: no `sources/graphify` here.
+
+    Reverted to routing --artifacts through `_refuse_target`, this must fail.
+    """
+    _make_extracted_out(tmp_path)
+    rc = gne.native_extract_main(tmp_path, ["--artifacts", "--dry-run"])
+    assert rc == Rc.OK
+
+
+def test_artifacts_dry_run_exits_ok_without_invoking_generate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _make_extracted_out(tmp_path)
+
+    def _boom(*_args: object, **_kwargs: object) -> int:
+        raise AssertionError("artifacts.generate must not run under --artifacts --dry-run")
+
+    monkeypatch.setattr(artifacts, "generate", _boom)
+
+    rc = gne.native_extract_main(tmp_path, ["--artifacts", "--dry-run"])
+    assert rc == Rc.OK
+
+
+def test_artifacts_dry_run_output_names_both_roots_distinctly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The dry-run preview must show which value plays which role.
+
+    Reverted to printing only `opts.out` (or only `repo_root`), this must
+    fail: showing just one root is not a preview of what `_run_artifacts`
+    actually does with two DIFFERENT roots (`repo_root` anchors the exe/venv,
+    `opts.out` is `generate`'s `graph_root`) — a dry run that hides the split
+    this whole capability exists for is not a useful preview of it.
+    """
+    fake_repo_root = tmp_path / "real-repo-root"
+    out = tmp_path / "scoped-out"
+    opts = gne.Options(target=tmp_path / "sources/graphify", out=out, artifacts=True)
+
+    gne._print_artifacts_dry_run(fake_repo_root, opts)
+    printed = capsys.readouterr().out
+
+    assert str(out) in printed
+    assert str(fake_repo_root) in printed
+
+
+def test_run_artifacts_resolves_exe_against_repo_root_and_graph_against_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole point of `graph_root`.
+
+    Reverted to passing `opts.out` as `generate`'s `repo_root` (or `repo_root`
+    as its `graph_root`), this must fail — `graphify_exe`/`ensure_runtime_deps`
+    have no fallback and would resolve a `.venv/` that only exists at the real
+    project root.
+    """
+    out = _make_extracted_out(tmp_path)
+    calls: list[tuple[Path, list[str] | None, Path | None]] = []
+
+    def fake_generate(repo_root: Path, only: list[str] | None = None, *, graph_root=None) -> int:
+        calls.append((repo_root, only, graph_root))
+        return 0
+
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _r: None)
+    monkeypatch.setattr(artifacts, "generate", fake_generate)
+
+    opts = gne.Options(target=tmp_path / "sources/graphify", out=out, artifacts=True)
+    rc = gne._run_artifacts(tmp_path, opts)
+
+    assert rc == 0
+    assert calls == [(tmp_path, None, out)]
+
+
+def test_named_view_filter_flows_through_to_generate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = _make_extracted_out(tmp_path)
+    calls: list[list[str] | None] = []
+
+    def fake_generate(repo_root: Path, only: list[str] | None = None, *, graph_root=None) -> int:
+        calls.append(only)
+        return 0
+
+    monkeypatch.setattr(gne, "assert_pinned_graphify", lambda _r: None)
+    monkeypatch.setattr(artifacts, "generate", fake_generate)
+
+    opts = gne.Options(
+        target=tmp_path / "sources/graphify",
+        out=out,
+        artifacts=True,
+        artifacts_views=("wiki", "graphml"),
+    )
+    assert gne._run_artifacts(tmp_path, opts) == 0
+    assert calls == [["wiki", "graphml"]]
+
+
+def test_artifacts_dry_run_missing_graph_json_still_refuses(tmp_path: Path) -> None:
+    rc = gne.native_extract_main(tmp_path, ["--artifacts", "--dry-run"])
+    assert rc == Rc.NOT_RUN
+
+
+# --- unknown view names: the "0 artifacts = clean rc=0" trap ------------------
+
+
+def test_no_views_requested_is_never_refused() -> None:
+    assert gne._refuse_unknown_views(()) is None
+
+
+def test_known_view_names_are_not_refused() -> None:
+    assert gne._refuse_unknown_views(("wiki", "graphml")) is None
+
+
+def test_an_unknown_view_name_is_refused_and_named() -> None:
+    """Reverted (skip the check), this must fail.
+
+    A typo'd view would otherwise reach `artifacts.generate` as a silent,
+    rc=0 no-op.
+    """
+    problem = gne._refuse_unknown_views(("wiky",))
+    assert problem is not None
+    assert "wiky" in problem
+
+
+def test_one_unknown_among_known_views_is_still_refused() -> None:
+    """A mix of good and bad names must still refuse.
+
+    The known ones present don't excuse the one that isn't.
+    """
+    problem = gne._refuse_unknown_views(("wiki", "wiky"))
+    assert problem is not None
+    assert "wiky" in problem
+
+
+def test_main_refuses_an_unknown_artifact_view_with_bad_request(tmp_path: Path) -> None:
+    """End-to-end.
+
+    Reverted (view names never validated before `--dry-run` prints "all
+    good"), this must fail.
+    """
+    _make_extracted_out(tmp_path)
+    rc = gne.native_extract_main(tmp_path, ["--artifacts", "wiky", "--dry-run"])
+    assert rc == Rc.BAD_REQUEST

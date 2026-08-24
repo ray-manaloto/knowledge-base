@@ -109,11 +109,20 @@ never the full resolved dict handed to `subprocess.run`.
 
 ## Verification scope
 
-This module makes NO provider call, ever, including in its own tests: the
-only path this session's verification exercises is `--dry-run`, which prints
-the resolved plan and exits before `graphify_exe` is invoked at all. A human
-runs the real extraction separately (multi-hour, serial-by-default, no
-timeout is set here — the caller bounds it).
+This module makes NO provider call, ever, including in its own tests. For
+`extract`/`--cluster` the only path this session's verification exercises is
+`--dry-run`, which prints the resolved plan and exits before `graphify_exe` is
+invoked at all. A human runs the real extraction separately (multi-hour,
+serial-by-default, no timeout is set here — the caller bounds it).
+
+`--artifacts` is the one real (non-dry-run) path this suite DOES exercise,
+because the thing worth proving — that `_run_artifacts` hands `repo_root` and
+`opts.out` to `kb_setup.artifacts.generate` in the right roles (`repo_root` for
+the exe/venv anchor, `opts.out` as `graph_root`) — is exactly the wiring a
+`--dry-run` print string cannot verify on its own: a reverted arg order would
+still print a correct-looking preview. `kb_setup.artifacts.generate` itself is
+fully mocked in that test, so no graphify subprocess and no provider call ever
+runs; it is a one-line wiring check, not a real extraction.
 """
 
 from __future__ import annotations
@@ -167,10 +176,38 @@ class Options:
     model: str = DEFAULT_MODEL
     dry_run: bool = False
     cluster: bool = False
+    artifacts: bool = False
+    artifacts_views: tuple[str, ...] = ()
 
 
 class _UsageError(Exception):
     """Argv could not be parsed. Carries the message to print."""
+
+
+def _consume_view_names(argv: list[str], start: int) -> tuple[tuple[str, ...], int]:
+    """Every token from `start` that is not itself a flag, plus the next index.
+
+    `--artifacts wiki graphml --dry-run` stops at `--dry-run`, mirroring how
+    `kb-artifacts`'s own positional args already work (`cli.py`:
+    `artifacts.generate(root, only=rest or None)`). An empty result (bare
+    `--artifacts`) means "all", same as `only=None`.
+    """
+    views: list[str] = []
+    i = start
+    while i < len(argv) and not argv[i].startswith("--"):
+        views.append(argv[i])
+        i += 1
+    return tuple(views), i
+
+
+#: Flags that take no value and just flip a `bool` field on `Options` — kept as
+#: data rather than more `elif` branches so `_parse` stays under the repo's
+#: cyclomatic-complexity gate as flags are added.
+_BOOL_FLAGS = {
+    "--allow-parallel-claude-cli": "allow_parallel_claude_cli",
+    "--dry-run": "dry_run",
+    "--cluster": "cluster",
+}
 
 
 def _parse(repo_root: Path, argv: list[str]) -> Options:
@@ -178,15 +215,18 @@ def _parse(repo_root: Path, argv: list[str]) -> Options:
     out = repo_root / DEFAULT_OUT
     token_budget: int | None = None
     max_concurrency: int | None = None
-    allow_parallel = False
     model = DEFAULT_MODEL
-    dry_run = False
-    cluster = False
+    bool_fields = dict.fromkeys(_BOOL_FLAGS.values(), False)
+    artifacts_requested = False
+    artifacts_views: tuple[str, ...] = ()
 
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a == "--out" and i + 1 < len(argv):
+        if a in _BOOL_FLAGS:
+            bool_fields[_BOOL_FLAGS[a]] = True
+            i += 1
+        elif a == "--out" and i + 1 < len(argv):
             out = repo_root / argv[i + 1]
             i += 2
         elif a == "--token-budget" and i + 1 < len(argv):
@@ -201,27 +241,24 @@ def _parse(repo_root: Path, argv: list[str]) -> Options:
         elif a == "--target" and i + 1 < len(argv):
             target = repo_root / argv[i + 1]
             i += 2
-        elif a == "--allow-parallel-claude-cli":
-            allow_parallel = True
-            i += 1
-        elif a == "--dry-run":
-            dry_run = True
-            i += 1
-        elif a == "--cluster":
-            cluster = True
-            i += 1
+        elif a == "--artifacts":
+            artifacts_requested = True
+            artifacts_views, i = _consume_view_names(argv, i + 1)
         else:
             raise _UsageError(f"unrecognised argument: {a!r}")
+
+    if bool_fields["cluster"] and artifacts_requested:
+        raise _UsageError("pass at most one of --cluster / --artifacts")
 
     return Options(
         target=target,
         out=out,
         token_budget=token_budget,
         max_concurrency=max_concurrency,
-        allow_parallel_claude_cli=allow_parallel,
         model=model,
-        dry_run=dry_run,
-        cluster=cluster,
+        artifacts=artifacts_requested,
+        artifacts_views=artifacts_views,
+        **bool_fields,
     )
 
 
@@ -351,20 +388,23 @@ def _cluster_graph_json(opts: Options) -> Path:
 
 
 def _refuse_cluster_input(opts: Options) -> str | None:
-    """`None` if `--out` already holds a `graph.json` to cluster.
+    """`None` if `--out` already holds a `graph.json` to work with.
 
-    Otherwise the refusal message. `cluster-only` is a rerun-only verb — it
-    has nothing to do over an output tree extraction never wrote to. Refusing
-    (rather than letting graphify's own error surface, or silently no-op)
-    keeps this in the same shape as `_refuse_target`: a run that never asked
-    the question is not a pass.
+    Otherwise the refusal message. Shared by BOTH `--cluster` and
+    `--artifacts` (see `_dispatch_artifacts`) — `cluster-only` and every
+    artifact generator are rerun-only verbs that have nothing to do over an
+    output tree extraction never wrote to. Refusing (rather than letting
+    graphify's own error surface, or silently no-op) keeps this in the same
+    shape as `_refuse_target`: a run that never asked the question is not a
+    pass.
     """
     graph_json = _cluster_graph_json(opts)
     if not graph_json.is_file():
         return (
-            f"[graphify-native-extract] refusing --cluster — {graph_json} does not exist. "
-            "Run `mise run kb-graphify-native-extract` (without --cluster) first to "
-            f"produce it, or point --out at an existing extraction tree."
+            f"[graphify-native-extract] refusing — {graph_json} does not exist. "
+            "Run `mise run kb-graphify-native-extract` (with neither --cluster nor "
+            f"--artifacts) first to produce it, or point --out at an existing "
+            "extraction tree."
         )
     return None
 
@@ -472,6 +512,71 @@ def _dispatch_extract(repo_root: Path, exe: str, opts: Options) -> int:
     return _run_real(repo_root, exe, opts)
 
 
+def _refuse_unknown_views(views: tuple[str, ...]) -> str | None:
+    """`None` if every requested view name is one `artifacts.generate` knows.
+
+    Without this, `--artifacts wiky` (a typo) matches ZERO entries in
+    `artifacts._ARTIFACTS` — `generate`'s own `only=` filter silently narrows
+    to an empty selection and reports "0 artifacts generated" / "all
+    artifacts generated" as a CLEAN rc=0 run. That is exactly the "partial
+    success reported as success" failure mode this repo cares most about, so
+    an unrecognised name is refused here, before it ever reaches `generate`
+    as a silent no-op.
+    """
+    if not views:
+        return None
+    from kb_setup import artifacts
+
+    known = artifacts.known_views()
+    unknown = [v for v in views if v not in known]
+    if not unknown:
+        return None
+    return (
+        f"[graphify-native-extract] refusing --artifacts {' '.join(unknown)} — "
+        f"not a known view (known: {', '.join(known)})"
+    )
+
+
+def _print_artifacts_dry_run(repo_root: Path, opts: Options) -> None:
+    views = ", ".join(opts.artifacts_views) if opts.artifacts_views else "all (default registry)"
+    print("[graphify-native-extract] DRY RUN (--artifacts) — nothing was invoked")
+    print(f"  views: {views}")
+    print(f"  graph_root (data + cwd, never the aggregate graphify-out/): {opts.out}")
+    print(f"  repo_root (graphify exe + venv anchor only): {repo_root}")
+    print("  via kb_setup.artifacts.generate(repo_root, only=<views>, graph_root=<out>)")
+
+
+def _run_artifacts(repo_root: Path, opts: Options) -> int:
+    # Same rationale as `_run_real`/`_run_cluster`: checked here, the one place
+    # graphify actually runs.
+    assert_pinned_graphify(repo_root)
+    from kb_setup import artifacts
+
+    only = list(opts.artifacts_views) or None
+    return artifacts.generate(repo_root, only=only, graph_root=opts.out)
+
+
+def _dispatch_artifacts(repo_root: Path, opts: Options) -> int:
+    """`--artifacts`: standalone, never touches `opts.target`.
+
+    Reuses `kb_setup.artifacts.generate` rather than a second generator
+    registry — see that function's `graph_root` docstring for why `repo_root`
+    (never `opts.out`) still anchors `graphify_exe`/`ensure_runtime_deps`.
+    """
+    view_problem = _refuse_unknown_views(opts.artifacts_views)
+    if view_problem:
+        events.fail("graphify_native_extract.unknown_artifact_view", view_problem)
+        return Rc.BAD_REQUEST
+    artifacts_problem = _refuse_cluster_input(opts)
+    if artifacts_problem:
+        events.fail("graphify_native_extract.missing_artifacts_input", artifacts_problem)
+        return Rc.NOT_RUN
+    if opts.dry_run:
+        _print_artifacts_dry_run(repo_root, opts)
+        return Rc.OK
+    return _run_artifacts(repo_root, opts)
+
+
 def native_extract_main(repo_root: Path, argv: list[str]) -> int:
     """`uv run kb-setup graphify-native-extract [-- <flags>]`."""
     try:
@@ -481,7 +586,8 @@ def native_extract_main(repo_root: Path, argv: list[str]) -> int:
             "[graphify-native-extract] "
             f"{exc} — usage: kb-setup graphify-native-extract [--out DIR] "
             "[--target DIR] [--token-budget N] [--max-concurrency N] [--model NAME] "
-            "[--allow-parallel-claude-cli] [--cluster] [--dry-run]"
+            "[--allow-parallel-claude-cli] [--cluster] "
+            "[--artifacts [VIEW...]] [--dry-run]"
         )
         return Rc.BAD_REQUEST
 
@@ -493,4 +599,6 @@ def native_extract_main(repo_root: Path, argv: list[str]) -> int:
     exe = graphify_exe(repo_root)
     if opts.cluster:
         return _dispatch_cluster(repo_root, exe, opts)
+    if opts.artifacts:
+        return _dispatch_artifacts(repo_root, opts)
     return _dispatch_extract(repo_root, exe, opts)

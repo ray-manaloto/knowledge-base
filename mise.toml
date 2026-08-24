@@ -736,7 +736,7 @@ description = "Staged provider evidence still hashes to what its receipts record
 run = "uv run kb-setup corpus-integrity"
 
 [tasks.kb-graphify-native-extract]
-description = "graphify's OWN native deep extraction over the pinned sources/graphify clone"
+description = "graphify's OWN native deep extraction over the pinned sources/graphify clone; --cluster re-clusters an existing --out tree; --artifacts [view...] regenerates derived views (wiki/graphml/svg/...) over it"
 run = "uv run kb-setup graphify-native-extract"
 # No timeout here, deliberately — this is a multi-hour run that stays serial
 # by default (see the module docstring's GRAPHIFY_CLAUDE_CLI_PARALLEL section
@@ -745,7 +745,9 @@ run = "uv run kb-setup graphify-native-extract"
 # leash: that task dispatches unattended via `plan|run|verify`, this one is a
 # foreground `--dry-run`-first invocation a human is watching. `--cluster`
 # (re-cluster an existing --out tree, deterministic, no API) is instant and
-# also has no timeout of its own for the same reason.
+# also has no timeout of its own for the same reason. `--artifacts` (reuses
+# kb_setup.artifacts.generate against the --out tree, never the aggregate
+# graphify-out/) is likewise instant relative to extraction and untimed here.
 
 [tasks.kb-skillopt-contract]
 description = "Verify the exact SkillOpt VCS provenance, reviewed API/CLI, lock, and isolated mock dry-run"
