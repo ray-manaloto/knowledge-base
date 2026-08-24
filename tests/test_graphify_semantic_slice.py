@@ -1292,11 +1292,20 @@ def test_the_current_graphify_runtime_tracks_the_pinned_manifest_ref() -> None:
     the machine and not about this constant.
     """
     from kb_setup import manifest
+    from kb_setup.currency import config
 
     pinned = manifest.load(Path("sources/graphify.manifest")).ref
     current = graphify_semantic_slice._CURRENT_GRAPHIFY_RUNTIME
-    assert pinned == f"v{current.version}", (
-        f"sources/graphify.manifest pins {pinned} but _CURRENT_GRAPHIFY_RUNTIME "
+    # UNDER A FORK the manifest ref is a BRANCH, not a `v<version>` tag, so the
+    # comparison below can never hold and would report permanent false staleness
+    # on a pin that is exactly right (2026-08-24). The fork's `base_ref` is the
+    # release it sits on, which is what a version string can legitimately be
+    # compared against — and it is still a real check: rebasing the fork onto a
+    # newer upstream release moves `base_ref`, and this must move with it.
+    fork = next(s for s in config.load(Path()) if s.name == "graphify").fork
+    expected = fork.base_ref if fork is not None else pinned
+    assert expected == f"v{current.version}", (
+        f"expected ref {expected} but _CURRENT_GRAPHIFY_RUNTIME "
         f"declares {current.version}. A bump moves BOTH, and the version half of "
         f"every accepted pair derives from this object — so leaving it behind "
         f"rejects every non-authority run under the installed version."

@@ -126,8 +126,24 @@ class RuntimeIdentity(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     sdk_version: str
     executable: str
     sdk_fingerprint_sha256: str
-    wheel_sha256: str
-    sdist_sha256: str
+    #: The locked DISTRIBUTION's identity, in one of two mutually exclusive forms.
+    #:
+    #: A PyPI install locks a wheel and an sdist, and both hashes are recorded.
+    #: A GIT install (the fork, 2026-08-24) locks neither — uv writes
+    #: `source = {git = "<url>?rev=<sha>#<resolved-sha>"}` with no `wheels` and no
+    #: `sdist` key at all — so `git_commit` carries the identity instead.
+    #:
+    #: Empty defaults rather than a union type because the historical records in
+    #: `graphify_semantic_slice` are wheel-shaped and must keep decoding
+    #: unchanged; `runtime_identity` enforces that exactly one form is populated,
+    #: so "both empty" can never be mistaken for a valid identity.
+    #:
+    #: The git form is STRONGER, not a downgrade: a wheel hash identifies a built
+    #: artifact, while the resolved commit identifies the exact source tree it was
+    #: built from.
+    wheel_sha256: str = ""
+    sdist_sha256: str = ""
+    git_commit: str = ""
     schema_version: int = 1
 
 
@@ -224,8 +240,12 @@ class BaselineBuildInputs(msgspec.Struct, frozen=True, forbid_unknown_fields=Tru
 
 _BASELINE_SCHEMA = "graphify-deterministic-baseline/v0"
 _MAX_BASELINE_ARGS = 2
-_ACCEPTED_GRAPHIFY_VERSION = "0.9.48"
-_ACCEPTED_GRAPHIFY_REF = "v0.9.48"
+_ACCEPTED_GRAPHIFY_VERSION = "0.9.49"
+# FORKED 2026-08-24: this names WHAT RUNS, so it followed the pin onto the fork
+# (`currency.toml` binds it with `tracks = "manifest"`). Contrast the semantic
+# corpus/slice constants, which are snapshot identities of completed runs and
+# correctly hold at the upstream base `v0.9.48`.
+_ACCEPTED_GRAPHIFY_REF = "kb-pin/openai-cli-backend-v0.9.49"
 
 #: The public spelling of the version above, for the ONE cross-module consumer:
 #: `graphify_semantic_slice.preflight`'s `graphify_version` default. That was a
@@ -236,7 +256,23 @@ _ACCEPTED_GRAPHIFY_REF = "v0.9.48"
 #: reaching across the module boundary for a private name.
 ACCEPTED_GRAPHIFY_VERSION = _ACCEPTED_GRAPHIFY_VERSION
 _ACCEPTED_GRAPHIFY_EXECUTABLE = ".venv/bin/graphify"
-_ACCEPTED_GRAPHIFY_URL = "https://github.com/Graphify-Labs/graphify"
+# FORKED 2026-08-24 (Ray). This is the REVIEWED REMOTE — the repo the baseline's
+# historical evidence is pinned against — and it moved with the pin, because
+# `historical_graphify_manifest` refuses outright when this and
+# `sources/graphify.manifest` disagree ("Graphify historical source remote
+# identity drifted"). That refusal is correct and is why the constant is here:
+# evidence attributed to the wrong remote is evidence about a different program.
+#
+# It is deliberately NOT the same thing as `currency.toml`'s `[tool.graphify]
+# github`, which stays `Graphify-Labs/graphify`. That one names where RELEASES
+# are watched for — the rebase trigger — while this names where the code we
+# actually run comes from. Under a fork those are two different repos, and
+# collapsing them would either stop us seeing upstream releases or attribute our
+# fork's bytes to upstream.
+#
+# Reverts to `https://github.com/Graphify-Labs/graphify` when #2981 merges; see
+# `[tool.graphify.fork]`'s `clears_when`.
+_ACCEPTED_GRAPHIFY_URL = "https://github.com/ray-manaloto/graphify"
 # Deliberately NOT renamed at the 0.9.44 bump. The version in this string names
 # the release the defect was FIRST observed in, which is a stable identity; the
 # defect itself is still live — the 0.9.44 build receipt records this correction
@@ -254,15 +290,20 @@ _PAS_FILE_ID = "tests_fixtures_sample_pas_tests_fixtures_sample"
 _PAS_SOURCE_PATH = "tests/fixtures/sample.pas"
 _ACCEPTED_RUNTIME_HASHES = {
     "sdk_fingerprint_sha256": "b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    "wheel_sha256": "4f745d72d6c5165ef7132bf8b2819ef59707aa70cd99efd3a4fbc8c4ba43b4b9",
-    "sdist_sha256": "14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e",
+    # FORKED 2026-08-24: a git-locked dependency has NO wheel and NO sdist, so
+    # the two hashes that used to live here cannot exist and their absence is
+    # not a gap to paper over. `git_commit` is the substitute and it is a
+    # STRONGER identity — a wheel hash names a built artifact, a resolved
+    # commit names the source tree it was built from. Reverts to the wheel/sdist
+    # pair when #2981 merges and the pin returns to PyPI.
+    "git_commit": "cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8",
 }
 _ACCEPTED_AUTHORITY = BaselineAuthority(
     source_ref=_ACCEPTED_GRAPHIFY_REF,
-    source_commit="b2cd36267456c166788c95be6e68574064a92a42",
-    source_tree="be8636735370ed82708bb53eba33170e85acc369",
-    catalog_sha256="80a3f9796b278891d2a7bf2be89c18e7ae9dc60edffb06036a64a1b7ac904c26",
-    source_manifest_sha256="df726ec1e518a7a453326ece51d9f8e1d50b2bb0cf31b1236d7e09f3364ed2c6",
+    source_commit="cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8",
+    source_tree="a9cc5fde41d669af21e7a9685eb8c6af6d4cd450",
+    catalog_sha256="aafca9d6eca4c964fa1afdf2e4de50a08f494769cf9bd2f3a7eb43cee3abed8a",
+    source_manifest_sha256="bcc3a0d09536207c78dc2275df631e73a8e5ae7cbe42d31fa9b5114463b8e5bd",
     # 424 -> 429 detected, 416 -> 421 extracted across v0.9.46 -> v0.9.47 (and
     # 418 -> 424 / 410 -> 416 across v0.9.45 -> v0.9.46 before it). Both
     # RE-DERIVED by a real build against the installed 0.9.47, never carried
@@ -285,8 +326,21 @@ _ACCEPTED_AUTHORITY = BaselineAuthority(
     # ACCEPTED for every drifted key (#373). Before that it named the key only
     # and deleted its output, so the build could not tell you what to move the
     # constants to while refusing to run until you had.
-    detected_count=429,
-    extracted_count=421,
+    detected_count=450,
+    # FORKED 2026-08-24, then REBASED onto upstream v0.9.49 the same day:
+    # 429 -> 450 detected, 421 -> 442 extracted. RE-DERIVED
+    # by a real `kb-graphify-baseline build` against the INSTALLED fork, never
+    # carried forward, exactly as the note above requires.
+    #
+    # The +21/+21 is ACCOUNTED FOR rather than assumed, and it is the sanity
+    # check on the whole fork: #2981's own test files, the test files of the
+    # three sibling features replanted with it, and v0.9.49's ten new test
+    # modules. Every newly
+    # detected file was also extracted, so the gap between the two counts is
+    # UNCHANGED at 8 and no warning was emitted. A fork that changed the gap
+    # would mean it changed EXTRACTION behaviour, which is the thing a
+    # backend-only addition must not do.
+    extracted_count=442,
 )
 # The ignored-path control's fixture: an UNTRACKED file under a directory the
 # pinned source's own `.gitignore` matches. Untracked is load-bearing.
@@ -334,6 +388,49 @@ def _lock_hash(value: object, *, label: str) -> str:
     return value.removeprefix("sha256:")
 
 
+def _locked_distribution(package: dict[str, object]) -> dict[str, str]:
+    """The locked distribution's identity fields, for a PyPI **or** a git install.
+
+    Two shapes, and the git one is not a special case bolted on — it is what
+    `uv.lock` genuinely contains once a dependency is pinned to a fork:
+
+    * PyPI — a `wheels` list and an `sdist` table, each with a `sha256:` hash.
+    * git  — NEITHER key exists. uv writes only
+      ``source = {git = "<url>?rev=<sha>#<resolved-sha>"}``, and the fragment
+      after ``#`` is the RESOLVED commit, which is the identity to bind.
+
+    The old code demanded exactly one wheel and raised
+    "must bind exactly one universal wheel" otherwise. That message is correct
+    for a PyPI pin and actively misleading for a git one — it reads as a
+    malformed lock rather than a differently-shaped one — which is exactly how it
+    presented when graphify was forked: a hard failure in the runtime-identity
+    gate, several layers away from the pin that caused it.
+
+    Raises rather than returning a partial identity: a runtime whose distribution
+    cannot be identified must not be blessed, and "no hash and no commit" is the
+    one state that would let it be.
+    """
+    source = package.get("source")
+    if isinstance(source, dict) and isinstance(source.get("git"), str):
+        _, separator, resolved = source["git"].partition("#")
+        if not separator or not re.fullmatch(r"[0-9a-f]{40}", resolved):
+            raise ValueError(
+                "Graphify uv.lock git source has no resolved 40-hex commit after '#' — "
+                "the lock does not pin an exact tree"
+            )
+        return {"git_commit": resolved}
+    wheels = package.get("wheels")
+    if not isinstance(wheels, list) or len(wheels) != 1 or not isinstance(wheels[0], dict):
+        raise ValueError("Graphify uv.lock entry must bind exactly one universal wheel")
+    sdist = package.get("sdist")
+    if not isinstance(sdist, dict):
+        raise TypeError("Graphify uv.lock entry has no source distribution")
+    return {
+        "wheel_sha256": _lock_hash(wheels[0].get("hash"), label="wheel"),
+        "sdist_sha256": _lock_hash(sdist.get("hash"), label="sdist"),
+    }
+
+
 def runtime_identity(repo_root: Path) -> RuntimeIdentity:
     """Prove the installed Graphify runtime agrees with the exact uv lock artifacts."""
     from kb_setup import graphify_env, graphify_sdk
@@ -353,12 +450,7 @@ def runtime_identity(repo_root: Path) -> RuntimeIdentity:
         raise ValueError(f"uv.lock must contain exactly one graphifyy package, got {len(packages)}")
     package = packages[0]
     version = str(package.get("version", ""))
-    wheels = package.get("wheels")
-    if not isinstance(wheels, list) or len(wheels) != 1 or not isinstance(wheels[0], dict):
-        raise ValueError("Graphify uv.lock entry must bind exactly one universal wheel")
-    sdist = package.get("sdist")
-    if not isinstance(sdist, dict):
-        raise TypeError("Graphify uv.lock entry has no source distribution")
+    distribution = _locked_distribution(package)
     executable_path = Path(graphify_env.graphify_exe(repo_root))
     try:
         executable = str(executable_path.relative_to(repo_root))
@@ -375,8 +467,9 @@ def runtime_identity(repo_root: Path) -> RuntimeIdentity:
         sdk_version=graphify_sdk.running_sdk_version(),
         executable=executable,
         sdk_fingerprint_sha256=hashlib.sha256(fingerprint).hexdigest(),
-        wheel_sha256=_lock_hash(wheels[0].get("hash"), label="wheel"),
-        sdist_sha256=_lock_hash(sdist.get("hash"), label="sdist"),
+        wheel_sha256=distribution.get("wheel_sha256", ""),
+        sdist_sha256=distribution.get("sdist_sha256", ""),
+        git_commit=distribution.get("git_commit", ""),
     )
     if {identity.version, identity.cli_version, identity.sdk_version} != {
         graphify_env.pinned_graphify_version(repo_root)

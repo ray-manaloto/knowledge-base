@@ -154,11 +154,14 @@ def _write_public_candidate(root: Path) -> Path:
             "cli_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
             "sdk_version": graphify_baseline._ACCEPTED_GRAPHIFY_VERSION,
             "executable": ".venv/bin/graphify",
-            "sdk_fingerprint_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES[
-                "sdk_fingerprint_sha256"
-            ],
-            "wheel_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES["wheel_sha256"],
-            "sdist_sha256": graphify_baseline._ACCEPTED_RUNTIME_HASHES["sdist_sha256"],
+            # SPREAD, never key-by-key. The distribution identity has two shapes —
+            # `wheel_sha256`/`sdist_sha256` for a PyPI pin, `git_commit` for a git
+            # one — and this fixture named the wheel pair literally, so the moment
+            # graphify was forked (2026-08-24) it raised `KeyError: 'wheel_sha256'`
+            # in nine cases that had nothing to do with distributions. A fixture
+            # that re-states a constant instead of following it is a second copy
+            # to drift, and this is what that drift costs.
+            **graphify_baseline._ACCEPTED_RUNTIME_HASHES,
         },
         "controls.json": {
             "schema_version": 1,
@@ -234,6 +237,16 @@ def _write_public_candidate(root: Path) -> Path:
         extracted_count=1,
     )
     return root
+
+
+#: Which distribution key the ACCEPTED runtime identity actually carries.
+#: `wheel_sha256` under a PyPI pin, `git_commit` under a fork (2026-08-24) —
+#: derived rather than named, so a mutation arm always mutates a key that is
+#: really there. A literal would silently become a no-op mutation, which is the
+#: `a-surviving-arm-can-be-a-no-op` failure this file exists to avoid.
+_DISTRIBUTION_KEY = next(
+    k for k in graphify_baseline._ACCEPTED_RUNTIME_HASHES if k != "sdk_fingerprint_sha256"
+)
 
 
 def _verify_fixture_candidate(candidate: Path) -> graphify_baseline.BaselineVerification:
@@ -868,7 +881,11 @@ def test_public_verifier_requires_exact_runtime_ref_and_control_evidence(
     _rewrite_member(
         runtime,
         "runtime.json",
-        lambda payload: payload.__setitem__("wheel_sha256", "0" * 64),
+        # `_DISTRIBUTION_KEY`, not a literal: the accepted identity is
+        # wheel-shaped on a PyPI pin and git-shaped on a fork, and a literal
+        # here mutates a key the payload may not have — which mutates NOTHING
+        # and leaves an arm that can only pass.
+        lambda payload: payload.__setitem__(_DISTRIBUTION_KEY, "0" * 64),
     )
     source_ref = _write_public_candidate(tmp_path / "source-ref")
     manifest = json.loads((source_ref / "manifest.json").read_bytes())
@@ -884,7 +901,9 @@ def test_public_verifier_requires_exact_runtime_ref_and_control_evidence(
         _clear_control_reasons,
     )
 
-    assert "runtime-identity-drift:wheel_sha256" in _verify_fixture_candidate(runtime).reasons
+    assert (
+        f"runtime-identity-drift:{_DISTRIBUTION_KEY}" in _verify_fixture_candidate(runtime).reasons
+    )
     assert "source-ref-mismatch" in _verify_fixture_candidate(source_ref).reasons
     assert "controls-incomplete" in _verify_fixture_candidate(controls).reasons
 
@@ -1050,7 +1069,9 @@ def test_runtime_identity_binds_lock_cli_sdk_and_public_fingerprint() -> None:
     assert identity.version == graphify_baseline._ACCEPTED_GRAPHIFY_VERSION
     assert identity.cli_version == identity.sdk_version == identity.version
     assert identity.executable == graphify_baseline._ACCEPTED_GRAPHIFY_EXECUTABLE
-    for key in ("wheel_sha256", "sdist_sha256", "sdk_fingerprint_sha256"):
+    # Iterate the CONSTANT's own keys. Naming the wheel pair literally asserted
+    # the identity had a shape it only has under a PyPI pin.
+    for key in graphify_baseline._ACCEPTED_RUNTIME_HASHES:
         assert getattr(identity, key) == graphify_baseline._ACCEPTED_RUNTIME_HASHES[key], (
             f"the installed graphify's {key} is not the one the baseline accepts"
         )
@@ -1065,7 +1086,7 @@ def test_historical_baseline_source_does_not_reuse_current_manifest_pin(
     current = source_manifests.Manifest(
         name="graphify",
         path=tmp_path / "sources/graphify.manifest",
-        url="https://github.com/Graphify-Labs/graphify",
+        url=graphify_baseline._ACCEPTED_GRAPHIFY_URL,
         ref="v0.9.43",
         commit="7281f27eac568f77f50910f59f84543458f5dfd1",
         kind="code",

@@ -443,14 +443,19 @@ _ACCEPTED_GRAPHIFY_RUNTIME = RuntimeIdentity(
 # is a different digest with a different owner —
 # `_ACCEPTED_SEMANTIC_FINGERPRINT_SHA256` below — which moved in THIS round's
 # re-attest once the slice re-ran under 0.9.48; see that constant's own comment.
+# FORKED + REBASED 2026-08-24: 0.9.48 -> 0.9.49, and the distribution identity
+# changed SHAPE as well as value. A git-pinned install locks no wheel and no
+# sdist, so the two hashes that were here cannot exist; `git_commit` carries the
+# identity instead (see `RuntimeIdentity`). This constant answers "what may a NEW
+# run use", so unlike `_ACCEPTED_GRAPHIFY_RUNTIME` below it follows the pin and
+# does not wait on evidence — that is the whole reason there are two of them.
 _CURRENT_GRAPHIFY_RUNTIME = RuntimeIdentity(
-    version="0.9.48",
-    cli_version="0.9.48",
-    sdk_version="0.9.48",
+    version="0.9.49",
+    cli_version="0.9.49",
+    sdk_version="0.9.49",
     executable=".venv/bin/graphify",
     sdk_fingerprint_sha256="b10406f90fe7c369fc1396991679f6e4490e59f9351332c30b9fe2216f071157",
-    wheel_sha256="4f745d72d6c5165ef7132bf8b2819ef59707aa70cd99efd3a4fbc8c4ba43b4b9",
-    sdist_sha256="14eaac83804866940ccb34491ca69ab62b2b51e346f88356c5211a3d8cd5e41e",
+    git_commit="cdfb11c000ccbe3af1fbd1b9c41ab42718d54fc8",
 )
 # The version the COMMITTED SLICE RECEIPT was produced under, and therefore the
 # authority for it — `_receipt_reasons` compares the retained receipt against

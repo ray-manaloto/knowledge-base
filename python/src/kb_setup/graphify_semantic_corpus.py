@@ -19,6 +19,10 @@ import sys
 import tempfile
 from collections.abc import Mapping
 from html.parser import HTMLParser
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from kb_setup import manifest as source_manifests
 from pathlib import Path
 from types import ModuleType
 from typing import Protocol, runtime_checkable
@@ -299,12 +303,60 @@ class SourcePin(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
     tree: str
 
 
+def _authorized_source_manifest(repo_root: Path) -> source_manifests.Manifest:
+    """The Graphify source THIS layer is authorized against — base, not fork.
+
+    Ordinarily the live `sources/graphify.manifest`. Under a fork
+    (`[tool.graphify.fork]`, 2026-08-24) it is the UPSTREAM RELEASE the fork sits
+    on, reconstructed from the fork declaration.
+
+    That is not a workaround, it is what the layer means. Every plan, spend ledger
+    and authority digest here was recorded against a specific upstream tree, and
+    `_ACCEPTED_GRAPHIFY_{REF,COMMIT,TREE}` are frozen statements about the PAST.
+    Following the live manifest onto the fork would make this guard demand that
+    completed, authorized runs be re-recorded at a tree they were never performed
+    against — which is re-authorization by side effect, on a layer Ray's
+    2026-08-24 ruling superseded and whose retained provider evidence (#317) is
+    exactly what documents why. The circle this repo has paid for five times.
+
+    So the guard stays as strict as it was: it still refuses any drift, it just
+    measures against the right revision. Rebasing the fork moves `base_ref`, and
+    then it correctly fires again — because a rebase really would put these runs
+    on a tree nobody authorized.
+
+    Reads the fork declaration from `currency.toml` rather than restating it,
+    so there is one place a fork is declared and no second copy to drift.
+    """
+    from dataclasses import replace
+
+    from kb_setup import manifest as source_manifests
+    from kb_setup.currency import config
+
+    live = source_manifests.load(repo_root / "sources/graphify.manifest")
+    fork = next((s.fork for s in config.load(repo_root) if s.name == "graphify"), None)
+    if fork is None:
+        return live
+    # THIS LAYER'S OWN frozen constants, NOT `fork.base_ref`. The distinction was
+    # learned the hard way four hours after the fork: `base_ref` moved v0.9.48 ->
+    # v0.9.49 on the first rebase, and materialising at the moving base would have
+    # demanded these completed runs be re-recorded against a tree they were never
+    # performed on — re-authorization by side effect, which is the exact thing this
+    # function exists to prevent. `_ACCEPTED_GRAPHIFY_{REF,COMMIT}` say what these
+    # runs actually used, and they do not move when the fork does. `currency.toml`
+    # binds them with `tracks = "frozen"` for the same reason.
+    return replace(
+        live,
+        url=f"https://github.com/{fork.upstream}",
+        ref=_ACCEPTED_GRAPHIFY_REF,
+        commit=_ACCEPTED_GRAPHIFY_COMMIT,
+    )
+
+
 def admit_source(repo_root: Path, destination: Path) -> SourcePin:
     """Materialize the current #301 Graphify pin without reusing #300's old source."""
     from kb_setup import graph
-    from kb_setup import manifest as source_manifests
 
-    source_manifest = source_manifests.load(repo_root / "sources/graphify.manifest")
+    source_manifest = _authorized_source_manifest(repo_root)
     provenance = graph.materialize_source_snapshot(source_manifest, destination)
     observed = (
         source_manifest.ref,
