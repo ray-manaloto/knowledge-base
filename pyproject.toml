@@ -37,7 +37,6 @@ dependencies = [
 
 [project.scripts]
 kb-setup = "kb_setup.cli:main"
-kb-semantic-claude = "kb_setup.graphify_semantic_adapter:adapter_main"
 
 [project.optional-dependencies]
 # DELIBERATELY a floor and not an `==`, unlike the dev group below — this is the

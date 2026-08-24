@@ -170,19 +170,16 @@ os = ["macos"]
 # HOW TO REBASE: rebase `kb-pin/openai-cli-backend` in the fork onto the new
 # upstream tag, push, then move THREE things in one commit — `base_ref` and
 # `base_commit` below, `commit` in `sources/graphify.manifest`, and the `@<sha>`
-# in `pyproject.toml`. Moving `base_ref` will correctly light up all eight
-# FOUR `tracks = "fork_base"` bindings below: those record reviews performed
-# against a specific upstream release, and a rebase onto new code means those
-# reviews owe a re-read. That is the check working, not the check being noisy.
+# in `pyproject.toml`.
 #
-# THE SPLIT IS 4/4, and getting it wrong is not cosmetic. `graphify_baseline.py`
+# THE SPLIT WAS 4/4 while the semantic-corpus layer existed: `graphify_baseline.py`
 # and `sources/graphify.dispositions.json` describe WHAT RUNS — the live AST
 # baseline for the installed graphify — so they track the manifest onto the fork.
-# The four `graphify_semantic_{corpus,slice}.py` constants are SNAPSHOT
-# IDENTITIES of completed runs, digested into authorization ledgers, so they hold
-# at the base. All eight were marked `fork_base` on the first pass; the corpus
-# suite caught it by refusing a baseline that attested upstream's tree while
-# running the fork's code.
+# The other four bindings, on `graphify_semantic_{corpus,slice}.py`, held SNAPSHOT
+# IDENTITIES of completed runs at the fork base rather than the moving manifest.
+# That layer was removed 2026-08-24 (see `docs/archive/README.md`), and its four
+# `ref_binding` rows left with it — the four below, all `tracks = "manifest"`, are
+# what remains.
 [tool.graphify.fork]
 upstream = "Graphify-Labs/graphify"
 base_ref = "v0.9.49"
@@ -209,39 +206,6 @@ because a manifest can pin a correct tag beside the previous release's commit,
 and the same split is available to a code constant. Anchored on the leading
 newline + indent so it matches the authority literal rather than the identically
 named struct FIELD in the `BaselineAuthority` definition above it."""
-
-[[tool.graphify.ref_binding]]
-path = "python/src/kb_setup/graphify_semantic_corpus.py"
-pattern = '_ACCEPTED_GRAPHIFY_REF = "([^"]+)"'
-field = "ref"
-tracks = "frozen"
-expect = "v0.9.48"
-note = "the semantic corpus's accepted source tag"
-
-[[tool.graphify.ref_binding]]
-path = "python/src/kb_setup/graphify_semantic_corpus.py"
-pattern = '_ACCEPTED_GRAPHIFY_COMMIT = "([0-9a-f]{40})"'
-field = "commit"
-tracks = "frozen"
-expect = "b2cd36267456c166788c95be6e68574064a92a42"
-
-[[tool.graphify.ref_binding]]
-path = "python/src/kb_setup/graphify_semantic_slice.py"
-pattern = '\nSOURCE_REF = "([^"]+)"'
-field = "ref"
-tracks = "frozen"
-expect = "v0.9.48"
-note = """Found only because the 0.9.44 resync tripped over it. The slice pins the
-SNAPSHOT its committed evidence came from, and it lagged two releases behind the
-manifest with nothing reporting it — a fifth copy of the same revision in a fifth
-place. Bound at module scope (leading newline) so it cannot match a local."""
-
-[[tool.graphify.ref_binding]]
-path = "python/src/kb_setup/graphify_semantic_slice.py"
-pattern = '\nSOURCE_COMMIT = "([0-9a-f]{40})"'
-field = "commit"
-tracks = "frozen"
-expect = "b2cd36267456c166788c95be6e68574064a92a42"
 
 [[tool.graphify.ref_binding]]
 path = "sources/graphify.dispositions.json"

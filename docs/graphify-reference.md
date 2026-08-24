@@ -338,32 +338,27 @@ lever that still matters. In order:
    nothing in recall. It is still last: it is a retrieval rewrite, while rung 1 is a
    manifest field.
 
-## Corpus spend accounting — what the USD figures mean
+## Corpus spend accounting — what the USD figures meant (historical)
 
-The bespoke `graphify_semantic_corpus*` layer's caps (`_MAX_TOTAL_COST_USD`,
-per-chunk `max_cost_usd`) and its `SpendLedger` (`total_usd`, `charge()`,
-"resuming against N USD already charged") are real budget UNITS but **not
-literal dollars charged to a payment method** — checked against the installed
-source rather than assumed (2026-08-23). Every staged provider receipt carries
-`runtime.auth = {api_provider: "firstParty", auth_method: "claude.ai",
-subscription_type: "max"}`, and graphify's own pricing table for this backend
-(`llm.py` `BACKENDS["claude-cli"]["pricing"]`) is `{"input": 0.0, "output":
-0.0}`, with a comment reading "costs are billed to the plan, not
-pay-as-you-go API credit". The `total_cost_usd` these caps track is read from
-the Claude Code CLI's own JSON envelope — its self-reported API-equivalent
-VALUATION of Max-plan usage — not from graphify's pricing table (which is
-literally zero for this backend). The caps still matter: they bound Max-plan
-usage/rate-limit exposure, which is a real resource, just not a bill.
+This repo once had a bespoke `graphify_semantic_corpus*` layer alongside the
+CLI extraction path — its own corpus planner, its own `SpendLedger`
+(`_MAX_TOTAL_COST_USD`, per-chunk `max_cost_usd`, "resuming against N USD
+already charged") and its own provider receipts. It was removed 2026-08-24,
+ruled out as a re-implementation of the CLI's internals that had drifted from
+it (see `docs/archive/README.md`). Its spend figures were real budget UNITS
+but never literal dollars charged to a payment method: every staged provider
+receipt carried `runtime.auth = {api_provider: "firstParty", auth_method:
+"claude.ai", subscription_type: "max"}`, and graphify's own pricing table for
+that backend (`llm.py` `BACKENDS["claude-cli"]["pricing"]`) was `{"input":
+0.0, "output": 0.0}` — costs billed to the plan, not pay-as-you-go API
+credit. The `total_cost_usd` those caps tracked came from the Claude Code
+CLI's own JSON envelope, a self-reported API-equivalent VALUATION of Max-plan
+usage, not from graphify's (zero) pricing table. The caps still mattered while
+the layer existed: they bounded Max-plan usage/rate-limit exposure, a real
+resource, just not a bill.
 
-**This note lives here, not inline in `graphify_semantic_corpus.py` or
-`graphify_semantic_corpus_run.py`.** Both files are DIGESTED whole-byte into
-the plan's recorded authority (`planner_sha256`/`runner_sha256` in
-`_effective_config`, feeding `graphify_semantic_corpus_authority.json`) — even
-a docstring-only edit moves `execution_config_sha256` and fails
-`test_recorded_authority_authorizes_this_plan_and_only_this_plan` with
-`plan-authority-mismatch`. Re-recording that authority is a reviewed decision
-("Ray ruled re-record" appears throughout that file's history) and out of
-scope for a framing-accuracy fix — this doc is the correction instead.
+Extraction now goes through the `graphify` CLI only — no bespoke layer, no
+separate spend accounting to reconcile against this note.
 
 ## Work memory (the self-learning loop) — USE IT
 

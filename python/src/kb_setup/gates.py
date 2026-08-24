@@ -143,14 +143,11 @@ GATE_TASKS = (
     "eval",
     "graph-size",
     "hk-test",
-    "kb-corpus-integrity",
 )
-#: `kb-corpus-integrity` is here rather than in `hk.pkl` deliberately. It scans
-#: the whole staged-evidence tree, so it belongs with the other whole-repo
-#: audits (`brain-audit`, `eval`) at the ship boundary, not on every commit
-#: that happens to touch an unrelated file. Placement is NOT severity: it is a
-#: hard gate here, and `kb-ship` refuses to push while it is red — altered
-#: provider evidence must never leave this machine.
+#: `kb-corpus-integrity` WAS here, gating the semantic-corpus layer's staged
+#: evidence tree. It left with that layer's removal (2026-08-24) — see
+#: `docs/archive/README.md`. Its own deletion took its evidence tree with it,
+#: so nothing was left to scan.
 
 #: Gates that may run CONCURRENTLY with each other. Everything not named here
 #: runs EXCLUSIVE — alone, with nothing else in flight — and that default is the

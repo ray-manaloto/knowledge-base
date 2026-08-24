@@ -85,12 +85,6 @@ def _print_usage() -> int:
         "goal-outcome <pair> --result R [--turns N] [--note ...] | "
         "cc | cc-doctor | eval [--live] [--slow] | "
         "graphify-contract | graphify-baseline build|controls|verify [PATH] | "
-        "graphify-semantic-slice preflight|run|verify [PATH] | "
-        "graphify-semantic-corpus plan|run|verify [PATH] | "
-        "graphify-semantic-corpus record [--plan-dir PATH] [--accept] "
-        "[--accept-decision-change NAME[,NAME]] | "
-        "graphify-semantic-corpus-merge <name> [PLAN_DIR] [--partial] | "
-        "corpus-integrity | "
         "graphify-native-extract [--out DIR] [--target DIR] [--token-budget N] "
         "[--max-concurrency N] [--model NAME] [--allow-parallel-claude-cli] [--cluster] "
         "[--artifacts [VIEW...]] [--dry-run] | "
@@ -163,10 +157,6 @@ def _run(argv: list[str] | None = None) -> int:
     if cmd in {
         "graphify-contract",
         "graphify-baseline",
-        "graphify-semantic-slice",
-        "graphify-semantic-corpus",
-        "graphify-semantic-corpus-merge",
-        "corpus-integrity",
         "graphify-native-extract",
         "skillopt-contract",
     }:
@@ -250,30 +240,10 @@ def _dispatch_contract(repo_root: Path, cmd: str, rest: list[str]) -> int:
             # `runtime_identity`; `verify` never runs Graphify.
             graphify_env.assert_pinned_graphify(repo_root)
         return graphify_baseline.baseline_main(repo_root, rest)
-    if cmd == "graphify-semantic-slice":
-        from kb_setup import graphify_semantic_slice
-
-        return graphify_semantic_slice.semantic_main(repo_root, rest)
-    if cmd == "graphify-semantic-corpus":
-        if rest[:1] == ["record"]:
-            from kb_setup import graphify_semantic_corpus_record
-
-            return graphify_semantic_corpus_record.record_main(repo_root, rest[1:])
-        from kb_setup import graphify_semantic_corpus
-
-        return graphify_semantic_corpus.corpus_main(repo_root, rest)
-    if cmd == "corpus-integrity":
-        from kb_setup import corpus_integrity
-
-        return corpus_integrity.integrity_main(repo_root, rest)
     if cmd == "graphify-native-extract":
         from kb_setup import graphify_native_extract
 
         return graphify_native_extract.native_extract_main(repo_root, rest)
-    if cmd == "graphify-semantic-corpus-merge":
-        from kb_setup import graphify_semantic_corpus_merge
-
-        return graphify_semantic_corpus_merge.merge_main(repo_root, rest)
     from kb_setup import skillopt_contract
 
     return skillopt_contract.contract_main(repo_root)

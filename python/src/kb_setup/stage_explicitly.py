@@ -7,14 +7,17 @@ measurement is this session: `git add -A` swept derived corpus evidence under
 one session**, after the first one had been caught, amended out, and written up.
 Knowing the rule did not prevent the second or the third.
 
-WHY THAT PATH MATTERS, and why an ignore rule is not the answer. `do-not.md` #5:
-nothing under `graphify-out/` is committed except `memory/`. That tree is
-DELIBERATELY absent from `.gitignore`, and the comment there says why — it is
-retained provider evidence for a run that cost real tokens, and whether it should
-be tracked is the open question in #317. Ignoring it would settle that question
-silently; committing it settles it just as silently in the other direction. The
-untracked-and-visible state is the intended one, and a blanket `git add` is the
-one command that destroys it without anybody deciding anything.
+WHY THAT PATH MATTERED, and why an ignore rule was not the answer. `do-not.md`
+#5: nothing under `graphify-out/` is committed except `memory/`. That specific
+tree was DELIBERATELY absent from `.gitignore` at the time, for a reason worth
+keeping even though the tree itself is gone — it was retained provider evidence
+for a run that cost real tokens, and whether it should be tracked was the open
+question in #317 (settled 2026-08-23 in favour of tracking; the whole
+semantic-corpus layer it evidenced was then removed 2026-08-24, taking the tree
+with it — see `docs/archive/README.md`). The general point survives the
+specific path: ignoring untracked evidence settles a tracking question
+silently, committing it settles it just as silently the other way, and a
+blanket `git add` is the one command that removes anybody's chance to decide.
 
 WHY A DENY AND NOT A WARNING. This repo has the comparison on its own directives:
 the warning-only graph-first rule was complied with 0 times out of 19 in one
@@ -52,13 +55,13 @@ _BLANKET_PATHSPECS = frozenset({".", "./", ":/", "*"})
 _REASON = (
     "Do not stage with a blanket `git add`. Name the paths: "
     "`git add <path> [<path>...]`, or `git add -u` for tracked modifications "
-    "only. This repo keeps `graphify-out/graphify-semantic-corpus-chunks/` "
-    "UNTRACKED and deliberately out of .gitignore — it is provider evidence "
-    "that cost real tokens, and whether to track it is open in #317, so a "
-    "blanket add settles that question silently. Measured 2026-08-18: `git add "
-    "-A` swept it into a commit THREE times in one session, the first two "
-    "already caught and written up. Enforced by kb_setup.stage_explicitly; "
-    "Ray's ruling, zero tolerance on repeating mistakes."
+    "only. Untracked derived/evidence trees under graphify-out/ settle their "
+    "own tracking question by staying untracked until someone decides "
+    "otherwise (do-not.md #5) — a blanket add settles it silently. Measured "
+    "2026-08-18: `git add -A` swept one such tree into a commit THREE times "
+    "in one session, the first two already caught and written up. Enforced "
+    "by kb_setup.stage_explicitly; Ray's ruling, zero tolerance on repeating "
+    "mistakes."
 )
 
 
