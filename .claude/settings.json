@@ -122,5 +122,6 @@
       }
     }
   },
-  "teammateMode": "auto"
+  "teammateMode": "auto",
+  "outputStyle": "ELI5 Visual"
 }
