@@ -1,0 +1,419 @@
+<title>Two Extraction Paths</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700&family=Public+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:   #E9EAE6;
+    --panel:    #F6F7F4;
+    --panel-2:  #DFE2DB;
+    --edge:     #CCD0C9;
+    --ink:      #1A1D19;
+    --ink-soft: #4E5A4C;
+    --ink-dim:  #7C877A;
+    --keep:     #2E6B45;
+    --keep-bg:  #DCE9E0;
+    --del:      #A3462C;
+    --del-bg:   #F2DED6;
+    --hold:     #8A6D1F;
+    --hold-bg:  #EFE6CC;
+    --diagram-bg: #F6F7F4;
+    --shadow:   0 1px 2px rgba(26,29,25,.07), 0 10px 28px -18px rgba(26,29,25,.42);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #10130F;
+      --panel:    #181C16;
+      --panel-2:  #1F2620;
+      --edge:     #262C24;
+      --ink:      #E3E7E0;
+      --ink-soft: #A3AEA0;
+      --ink-dim:  #788376;
+      --keep:     #6FBF8C;
+      --keep-bg:  #16301F;
+      --del:      #E08A6B;
+      --del-bg:   #33201A;
+      --hold:     #D6B85C;
+      --hold-bg:  #2E2814;
+      --diagram-bg: #EEF0EB;
+      --shadow:   0 1px 2px rgba(0,0,0,.5), 0 10px 28px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:   #10130F;
+    --panel:    #181C16;
+    --panel-2:  #1F2620;
+    --edge:     #262C24;
+    --ink:      #E3E7E0;
+    --ink-soft: #A3AEA0;
+    --ink-dim:  #788376;
+    --keep:     #6FBF8C;
+    --keep-bg:  #16301F;
+    --del:      #E08A6B;
+    --del-bg:   #33201A;
+    --hold:     #D6B85C;
+    --hold-bg:  #2E2814;
+    --diagram-bg: #EEF0EB;
+    --shadow:   0 1px 2px rgba(0,0,0,.5), 0 10px 28px -18px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 1.25rem 7rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 42rem; margin: 0 auto; }
+  .wide { max-width: 62rem; margin: 0 auto; }
+
+  h1, h2, h3 { margin: 0; text-wrap: balance; font-family: "Bricolage Grotesque", ui-sans-serif, sans-serif; }
+  h1 { font-size: clamp(2.6rem, 7.5vw, 4.2rem); font-weight: 700; line-height: .97; letter-spacing: -.03em; }
+  h2 { font-size: clamp(1.7rem, 4vw, 2.35rem); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; }
+  h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; font-family: "Public Sans", sans-serif; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .69rem; letter-spacing: .19em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+
+  header { padding: 5rem 0 0; display: flex; flex-direction: column; gap: 1.35rem; }
+  .lede { font-size: 1.22rem; line-height: 1.5; color: var(--ink-soft); max-width: 33rem; }
+  .lede strong { color: var(--ink); font-weight: 700; }
+
+  section { padding-top: 4.4rem; display: flex; flex-direction: column; gap: 1.15rem; }
+  p { margin: 0; max-width: 35rem; }
+
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .855em; }
+  code { background: var(--panel); border: 1px solid var(--edge); border-radius: 3px; padding: .08em .34em; }
+
+  .figbox {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 5px;
+    padding: 1.5rem 1.3rem; box-shadow: var(--shadow); overflow-x: auto;
+  }
+  figure { margin: 1.1rem 0 0; display: flex; flex-direction: column; gap: .7rem; }
+  figcaption { font-size: .9rem; color: var(--ink-dim); max-width: 34rem; }
+
+  /* mermaid renders with its own light palette; pin a light plate so it stays
+     legible in dark mode instead of drawing dark-on-dark */
+  .mermaid {
+    background: var(--diagram-bg);
+    border-radius: 4px;
+    padding: 1.1rem .6rem;
+    text-align: center;
+    overflow-x: auto;
+  }
+
+  .ledger { display: flex; flex-direction: column; gap: .45rem; padding-top: .5rem; }
+  .row {
+    display: grid; grid-template-columns: 5.6rem 1fr auto; gap: .9rem; align-items: center;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 4px;
+    padding: .62rem .85rem;
+  }
+  .row.k { border-left: 3px solid var(--keep); }
+  .row.d { border-left: 3px solid var(--del); }
+  .row.h { border-left: 3px solid var(--hold); }
+  .tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .64rem; letter-spacing: .13em; text-transform: uppercase; font-weight: 600;
+    padding: .2rem .42rem; border-radius: 3px; text-align: center;
+  }
+  .t-k { background: var(--keep-bg); color: var(--keep); }
+  .t-d { background: var(--del-bg);  color: var(--del); }
+  .t-h { background: var(--hold-bg); color: var(--hold); }
+  .row .nm { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .82rem; overflow-wrap: anywhere; }
+  .row .sz { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .76rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+  .bigrow { display: flex; flex-wrap: wrap; gap: 2.4rem; align-items: flex-end; padding-top: .3rem; }
+  .stat { display: flex; flex-direction: column; gap: .25rem; }
+  .stat .cap { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+  .big { font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(2.6rem, 8vw, 4rem); font-weight: 700; line-height: .9; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+  .stat.d .big { color: var(--del); }
+  .stat.k .big { color: var(--keep); }
+
+  .callout {
+    background: var(--panel-2); border-left: 3px solid var(--ink-dim);
+    border-radius: 0 4px 4px 0; padding: 1.1rem 1.3rem; font-size: 1.04rem; max-width: 35rem;
+  }
+  .callout.q { border-left-color: var(--hold); background: var(--hold-bg); color: var(--ink); }
+
+  .opts { display: grid; gap: 1rem; grid-template-columns: 1fr; padding-top: .5rem; }
+  @media (min-width: 52rem) { .opts { grid-template-columns: repeat(3, 1fr); } }
+  .opt {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 5px;
+    padding: 1.25rem 1.2rem 1.4rem; display: flex; flex-direction: column; gap: .6rem; box-shadow: var(--shadow);
+  }
+  .opt.pick { border-color: var(--keep); border-width: 2px; padding: 1.18rem 1.13rem 1.33rem; }
+  .opt .lbl { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .64rem; letter-spacing: .15em; text-transform: uppercase; font-weight: 600; color: var(--ink-dim); }
+  .opt.pick .lbl { color: var(--keep); }
+  .opt p { font-size: .92rem; color: var(--ink-soft); max-width: none; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; }
+  th, td { text-align: left; padding: .58rem .7rem; border-bottom: 1px solid var(--edge); vertical-align: top; }
+  th { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .67rem; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-dim); font-weight: 600; }
+  td.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .79rem; overflow-wrap: anywhere; }
+  .tablebox { overflow-x: auto; background: var(--panel); border: 1px solid var(--edge); border-radius: 5px; padding: .25rem 1rem .15rem; box-shadow: var(--shadow); }
+
+  hr.rule { height: 1px; background: var(--edge); border: 0; margin: 0; }
+  footer { padding-top: 4rem; color: var(--ink-dim); font-size: .87rem; }
+  footer p { max-width: 35rem; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Extraction architecture · demolition plan</div>
+    <h1>Two extraction paths.<br>Only one is real.</h1>
+    <p class="lede">The repo has <strong>two ways</strong> to turn source files into graph nodes. One drives the <code>graphify</code> CLI. The other re-implements what that CLI already does inside. Your ruling: <strong>the second one goes.</strong></p>
+  </header>
+
+  <section>
+    <div class="eyebrow">The picture in one line</div>
+    <h2>A kitchen with two cooks</h2>
+    <p>You hired a chef (the <code>graphify</code> CLI). Somewhere along the way the kitchen also grew <strong>a second cook who watched the chef and rebuilt his recipes from scratch</strong> — his own knife work, his own timings, his own receipts.</p>
+    <p>Both cooks produce food. But now nobody knows which one made dinner, the second cook's recipes drift every time the chef learns something new, and <em>his recipes just broke because the chef changed how he slices.</em></p>
+    <div class="callout">Fire the second cook. Keep the chef, and keep the waiter who carries plates to the table.</div>
+  </section>
+
+  <section class="wide">
+    <figure class="figbox">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DCE9E0','primaryTextColor':'#1A1D19','primaryBorderColor':'#2E6B45','lineColor':'#4E5A4C','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  SRC[("sources/**<br/>the corpus")]
+
+  subgraph KEEP ["KEEP — really drives the CLI"]
+    NE["graphify_native_extract.py<br/>27 KB · subprocess"]
+  end
+
+  subgraph HOLD ["YOUR CALL — SDK, not CLI"]
+    BL["graphify_baseline.py<br/>81 KB · extract_checked()"]
+  end
+
+  CLI{{"graphify CLI<br/>extract · update"}}
+  SDK{{"graphify SDK<br/>in-process python"}}
+
+  subgraph DEL ["DELETE — re-implements the CLI's insides"]
+    SC["graphify_semantic_corpus.py<br/>160 KB"]
+    SL["graphify_semantic_slice.py<br/>96 KB"]
+    RUN["…_run · _merge · _record<br/>…_prototype · _authority"]
+    AD["graphify_semantic_adapter.py<br/>42 KB"]
+  end
+
+  PROV(["paid provider<br/>API calls"])
+  G[("graphify-out/<br/>graph.json")]
+
+  SRC --> NE
+  SRC --> BL
+  SRC -.-> SC
+  NE -->|"subprocess"| CLI
+  BL -->|"in-process"| SDK
+  SC --> SL --> AD --> PROV
+  SL -.->|"also in-process"| SDK
+  CLI --> G
+  SDK --> G
+  PROV --> RUN --> G
+
+  style DEL fill:#F2DED6,stroke:#A3462C,stroke-width:2px
+  style KEEP fill:#DCE9E0,stroke:#2E6B45,stroke-width:2px
+  style HOLD fill:#EFE6CC,stroke:#8A6D1F,stroke-width:2px
+  style CLI fill:#FFFFFF,stroke:#2E6B45,stroke-width:2px
+  style SDK fill:#FFFFFF,stroke:#8A6D1F,stroke-width:2px
+  style PROV fill:#EFE6CC,stroke:#8A6D1F
+</pre>
+      <figcaption>Three routes end at the same <code>graph.json</code>. Green shells out to the CLI. Red does the CLI's work itself and pays a provider directly — that one is removed. Amber calls graphify <em>in-process as a library</em>, which is neither of the other two.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="eyebrow">Correction · measured after you answered</div>
+    <h2>“Both stay” rested on a wrong premise</h2>
+    <p>I told you <code>graphify_baseline.py</code> was part of the CLI-driving path and you answered on that basis. <strong>A read-only codex pass then refuted it.</strong> The two kept modules do not work the same way at all:</p>
+    <div class="tablebox">
+      <table>
+        <tr><th>module</th><th>how it reaches graphify</th><th>is that “CLI only”?</th></tr>
+        <tr><td class="mono">graphify_native_extract.py</td><td><code>subprocess</code> → the <code>graphify</code> executable</td><td style="color:var(--keep);font-weight:600">yes, unambiguously</td></tr>
+        <tr><td class="mono">graphify_baseline.py</td><td><code>graphify_sdk.extract_checked()</code> — in-process python</td><td style="color:var(--hold);font-weight:600">no — it's the library</td></tr>
+      </table>
+    </div>
+    <p style="font-size:.9rem;color:var(--ink-dim)"><code>graphify_baseline.py:1825</code>, cited by the codex pass and not yet re-read by me — treat this row as lane-sourced until I confirm it in the code.</p>
+    <p>So “extraction via the CLI only” has <strong>two honest readings</strong>, and they disagree about an 81 KB module:</p>
+    <div class="opts" style="grid-template-columns:1fr 1fr">
+      <div class="opt pick">
+        <span class="lbl">Reading A · recommended</span>
+        <h3>The ban is on re-implementing</h3>
+        <p><code>baseline</code> calls graphify's own library and re-implements nothing. It does deterministic AST work — free, no provider, no drift. It <strong>stays</strong>.</p>
+      </div>
+      <div class="opt">
+        <span class="lbl">Reading B</span>
+        <h3>The ban is on not-the-CLI</h3>
+        <p>Taken literally, <code>baseline</code> is also in scope and must be rewritten to shell out. That is a real rewrite of 81 KB, not a deletion.</p>
+      </div>
+    </div>
+    <p>I recommend <strong>A</strong>: the failure you are removing is <em>drift from re-typing the CLI's internals</em>, and the library has a stable public seam that cannot drift the same way. But it is your ruling and the words point at B, so I am not choosing it for you.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">The size of it</div>
+    <h2>What comes out</h2>
+    <div class="bigrow">
+      <div class="stat d"><span class="cap">deleted</span><span class="big">~580<span style="font-size:.36em;letter-spacing:0"> KB</span></span></div>
+      <div class="stat d"><span class="cap">modules</span><span class="big">8</span></div>
+      <div class="stat k"><span class="cap">kept</span><span class="big">~108<span style="font-size:.36em;letter-spacing:0"> KB</span></span></div>
+      <div class="stat k"><span class="cap">modules</span><span class="big">2</span></div>
+    </div>
+    <p style="font-size:.9rem;color:var(--ink-dim)">Sizes are <code>ls -l</code> bytes on the working tree, measured this session. Module count excludes tests.</p>
+
+    <div class="ledger">
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus.py</span><span class="sz">160 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_slice.py</span><span class="sz">96 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus_run.py</span><span class="sz">64 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus_authority.py</span><span class="sz">42 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_adapter.py</span><span class="sz">42 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus_merge.py</span><span class="sz">33 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus_record.py</span><span class="sz">25 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus_prototype.py</span><span class="sz">18 KB</span></div>
+      <div class="row d"><span class="tag t-d">delete</span><span class="nm">graphify_semantic_corpus_authority.json</span><span class="sz">378 B</span></div>
+      <div class="row k"><span class="tag t-k">keep</span><span class="nm">graphify_native_extract.py</span><span class="sz">27 KB</span></div>
+      <div class="row h"><span class="tag t-h">your call</span><span class="nm">graphify_baseline.py</span><span class="sz">81 KB</span></div>
+      <div class="row h"><span class="tag t-h">your call</span><span class="nm">corpus_integrity.py</span><span class="sz">9 KB</span></div>
+    </div>
+  </section>
+
+  <section class="wide">
+    <div class="eyebrow">Before and after</div>
+    <h2>What an extraction looks like</h2>
+    <figure class="figbox">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DCE9E0','primaryTextColor':'#1A1D19','primaryBorderColor':'#2E6B45','lineColor':'#4E5A4C','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px','actorBkg':'#DCE9E0','actorBorder':'#2E6B45','noteBkgColor':'#EFE6CC','noteBorderColor':'#8A6D1F'}}}%%
+sequenceDiagram
+  autonumber
+  participant You as mise task
+  participant KB as kb_setup
+  participant CLI as graphify CLI
+  participant P as provider API
+  participant G as graph.json
+
+  rect rgb(242,222,214)
+  Note over KB,P: OLD PATH — deleted
+  You->>KB: kb-graphify-semantic-corpus
+  KB->>KB: plan the corpus itself
+  KB->>KB: slice files itself (own cap, own rules)
+  KB->>P: call the provider directly ($)
+  P-->>KB: fragments
+  KB->>KB: write its own receipts
+  KB->>G: merge
+  end
+
+  rect rgb(220,233,224)
+  Note over KB,G: NEW PATH — the only one
+  You->>KB: kb-graphify-native-extract
+  KB->>CLI: graphify extract / update
+  CLI->>G: writes the graph
+  CLI-->>KB: done
+  end
+</pre>
+      <figcaption>The old path's four middle steps are the CLI's own job, re-typed. Every time the CLI changes how it slices — as it just did — those re-typed steps go stale. That is not a bug that gets fixed once; it is a standing tax.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="eyebrow">Why now, concretely</div>
+    <h2>The drift already bit</h2>
+    <p>graphify shipped <em>“slice every text document type, not just five of them”</em> and added <code>.html</code> to its splittable list. A 1.85 MB file that used to arrive as <strong>one</strong> unit now arrives as <strong>~93</strong>. The old layer's own assumption — that one catalogue entry equals one unit — stopped being true, and <strong>24 tests went red.</strong></p>
+    <p>Those 24 tests live entirely in the layer being deleted. <strong>Retiring the layer retires the failure</strong>, which is why this ruling settles the question I was about to ask you separately.</p>
+    <div class="tablebox">
+      <table>
+        <tr><th>gate</th><th>now</th><th>after removal</th></tr>
+        <tr><td class="mono">test</td><td>FAIL rc=2 — 24 red</td><td style="color:var(--keep);font-weight:600">green (tests deleted with the layer)</td></tr>
+        <tr><td class="mono">kb-corpus-integrity</td><td>FAIL rc=1 — chunk 0009</td><td style="color:var(--hold);font-weight:600">depends on your answer below</td></tr>
+        <tr><td class="mono">lint · brain-audit · eval<br>graph-size · hk-test</td><td>PASS</td><td>PASS</td></tr>
+      </table>
+    </div>
+    <p style="font-size:.9rem;color:var(--ink-dim)">Gate states read from <code>.agent/kb/gates/gates-7e53655d6577….json</code>, recorded this session against a clean tree.</p>
+  </section>
+
+  <section class="wide">
+    <div class="eyebrow">The one open question</div>
+    <h2>What happens to the receipts?</h2>
+    <p style="max-width:35rem">The old path spent <strong>real money</strong> on provider calls, and it kept the receipts: <strong>105 files, ~1.97 MB, about $41.78</strong> of paid extraction, tracked in git on purpose. <code>corpus_integrity.py</code> is the gate that checks those receipts still hash to what was recorded.</p>
+
+    <figure class="figbox">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EFE6CC','primaryTextColor':'#1A1D19','primaryBorderColor':'#8A6D1F','lineColor':'#4E5A4C','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TB
+  subgraph GONE ["the layer being deleted"]
+    OLD["8 modules<br/>~580 KB"]
+  end
+  EV[("graphify-semantic-corpus-chunks/<br/>105 files · 1.97 MB · ~$41.78")]
+  CI["corpus_integrity.py<br/>9 KB"]
+  GATE{{"kb-corpus-integrity<br/>a SHIP GATE"}}
+
+  OLD -. "produced,<br/>long ago" .-> EV
+  CI -->|"hashes + compares"| EV
+  GATE --> CI
+
+  NOTE["imports NOTHING<br/>from the layer —<br/>it can stand alone"]
+  CI -.- NOTE
+
+  style GONE fill:#F2DED6,stroke:#A3462C,stroke-width:2px
+  style EV fill:#EFE6CC,stroke:#8A6D1F,stroke-width:2px
+  style CI fill:#DCE9E0,stroke:#2E6B45,stroke-width:2px
+  style GATE fill:#FFFFFF,stroke:#4E5A4C
+  style NOTE fill:#FFFFFF,stroke:#7C877A,stroke-dasharray: 4 3
+</pre>
+      <figcaption>The dotted arrow is the whole point: the evidence was <em>produced by</em> the dying layer, but the checker does not <em>depend on</em> it. Deleting the layer does not force any decision here — which is exactly why it is a choice rather than a consequence.</figcaption>
+    </figure>
+
+    <div class="callout q"><strong>The catch:</strong> that gate is <strong>currently red and cannot go green on its own.</strong> One chunk is off by <strong>−1 byte</strong> — the file hashes to <code>e0ec3c17891f</code> while every receipt says <code>b1f2713d4469</code>. The receipts agree with each other, so the <em>file</em> was altered after staging. Nothing regenerates it: the path that made it is being deleted.</div>
+
+    <div class="opts">
+      <div class="opt pick">
+        <span class="lbl">Option 1 · recommended</span>
+        <h3>Keep the receipts, keep the gate</h3>
+        <p>You retain the audit trail of what was paid for, and a fresh clone can still verify it. Matches #317, settled in favour of tracking.</p>
+        <p><strong>Cost:</strong> the gate stays red until someone restores that one byte. A permanently-red ship gate trains people to ignore it.</p>
+      </div>
+      <div class="opt">
+        <span class="lbl">Option 2</span>
+        <h3>Keep the receipts, drop the gate</h3>
+        <p>The 105 files stay in git as a historical record; <code>kb-corpus-integrity</code> leaves <code>GATE_TASKS</code>.</p>
+        <p><strong>Why it fits:</strong> a gate guards something that can still change. Nothing will ever write these files again, so it is guarding a museum.</p>
+      </div>
+      <div class="opt">
+        <span class="lbl">Option 3</span>
+        <h3>Delete both</h3>
+        <p>Full retirement — the path is gone, so its receipts are archaeology. Removes the red gate and ~2 MB.</p>
+        <p><strong>Irreversible:</strong> provider evidence is not regenerable at these digests. You would be spending $41.78 of proof for 2 MB.</p>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:1.1rem"><strong>One combination is a trap, so it is not offered:</strong> deleting the evidence while keeping the gate. With zero chunks to scan, <code>integrity_main()</code> returns <code>Rc.NOT_RUN</code> rather than success — by design, because a gate that never asked the question is not a pass. It would sit permanently red on the ship path.</div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Already decided</div>
+    <h2>What is settled</h2>
+    <div class="tablebox">
+      <table>
+        <tr><th>question</th><th>your answer</th></tr>
+        <tr><td>the native path</td><td><strong>Both stay</strong> — <code>graphify_native_extract</code> + <code>graphify_baseline</code> become the only extraction route</td></tr>
+        <tr><td>how it lands</td><td><strong>One branch</strong> — codex removes and commits, then a cold cross-family review before anything ships</td></tr>
+        <tr><td>codex version</td><td><strong>0.149.1</strong> — bump the <code>mise.toml</code> pin; it affects the orchestration lane</td></tr>
+        <tr><td>the 24 red tests</td><td><strong>Answered by this</strong> — they live in the deleted layer, so no re-curation and no code fix is needed</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <hr class="rule" style="margin-bottom:1.3rem">
+    <p>Source lives at <code>docs/artifacts/extraction-architecture.html</code> in the repo, so this page is versioned with the code it describes and is updated whenever that architecture changes — not regenerated from scratch each time.</p>
+    <p>Every size, gate state and digest on this page was measured this session against the working tree. The module inventory is being independently re-derived by a read-only codex pass; if that pass disagrees with this page, this page is corrected at the same URL.</p>
+  </footer>
+</div>
