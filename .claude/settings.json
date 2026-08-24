@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard search",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify\" hook-guard search",
             "timeout": 15
           }
         ]
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -C \"${CLAUDE_PROJECT_DIR:-.}\" -- graphify hook-guard read",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/graphify\" hook-guard read",
             "timeout": 15
           }
         ]
