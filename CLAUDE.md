@@ -78,13 +78,10 @@ Concretely:
 - **Prose (docs/URLs/blogs)**: `mise run kb-add -- <url>` fetches to `./raw`; semantic
   extraction is the **Claude host agent** (a Workflow fan-out of `general-purpose`
   subagents that read each raw file → `{nodes,edges}` → one combined chunk in
-  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. This is the only LLM
-  path and it is Claude — graphify's `claude-cli` backend is broken (#2076,
-  prose-wrapped JSON), Ollama/other backends are stripped.
-- **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a`
-  (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
-- **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM,
-  Gemini-free). Do not expect LLM-named communities (claude-cli #2076).
+  `sources/extractions/`), then `mise run kb-merge -- <chunk>`. Ollama/other
+  non-Claude backends are stripped.
+- **Video**: `mise run kb-add -- <yt-url>` then `mise run kb-transcribe -- raw/<yt>.m4a` (local faster-whisper — no key, no LLM), then host-agent extract the transcript.
+- **Label** after every merge: `mise run kb-label` — deterministic hub labels (no LLM, Gemini-free); LLM-named communities via claude-cli remain untested (#2076).
 
 ## Quick start
 

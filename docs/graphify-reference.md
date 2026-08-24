@@ -24,9 +24,19 @@ Plain dicts + NetworkX, no side effects outside `graphify-out/`.
   = pass 1 only, zero key/LLM. `--mode deep` = aggressive INFERRED edges (cache
   namespaced `semantic` vs `semantic-deep` since 0.9.17).
 - **Pass-3 backends** (`--backend`): `gemini/openai/kimi/deepseek/claude/bedrock`
-  (need keys), `ollama` (local), `claude-cli` (routes through `claude -p`, **BROKEN
-  on v8 — #2076, returns prose → 0 nodes**). **This KB FORBIDS every non-Claude
-  backend**: `kb_setup.graphify_env.clean_env()` strips Gemini/Google/OpenAI/Kimi/
+  (need keys), `ollama` (local), `claude-cli` (routes through `claude -p`). Issue
+  #2076 originally reported this **BROKEN on v8** (returns prose → 0 nodes); a
+  native `graphify extract --mode deep --backend claude-cli` run confirmed
+  **EXTRACTION works cleanly at the pinned 0.9.48** — 19/19 chunks, structured
+  JSON throughout, no prose-wrapping (`kb_setup.graphify_native_extract`; `llm.py`
+  passes `--json-schema` when the CLI supports it and prefers the envelope's
+  `structured_output`). That confirmation covers EXTRACTION only — labeling's use
+  of `claude-cli` (below) was not re-tested and #2076 remains the last evidence
+  there. **This KB FORBIDS every non-Claude backend** regardless — the host-agent
+  path below stays the ingestion default (Ray, 2026-08-23 ruling in
+  `docs/direction/`) even though the underlying backend claim it was founded on no
+  longer holds for extraction; retiring the host-agent layer is a separate, later
+  decision. `kb_setup.graphify_env.clean_env()` strips Gemini/Google/OpenAI/Kimi/
   DeepSeek/Azure/**Bedrock (`AWS_REGION`)**/Ollama from every graphify subprocess, so
   `detect_backend()` returns None (keeping only `ANTHROPIC_*`). Do NOT read "no key"
   as "no key present" — a global `GEMINI_API_KEY` exists and is deliberately blocked.
@@ -209,6 +219,15 @@ extended every time a source is ingested:
 - **`graphify merge-graphs <g1> <g2> [...] --out <path>`** — union-merge 2+ graph.json
   into one **cross-repo** graph. This is the code layer's merge path and is
   multi-repo-safe (no cross-project dedup).
+- **It has a hard 50 MB-per-input size cap, confirmed against the installed
+  0.9.48 `cli.py`** (`_MERGE_MAX_BYTES = 50 * 1024 * 1024`, `_MERGE_MAX_NODES =
+  100_000`; `_enforce_graph_size_cap_or_exit` runs before any graph is even
+  loaded and `sys.exit(1)`s over it). This repo's own aggregate `graphify-out/
+  graph.json` is ~772 MB — **`merge-graphs` cannot touch it**, independent of
+  whether `kb-build` is currently green. A graph produced by a standalone
+  native extraction (`graphify extract --mode deep`) therefore cannot be
+  merged into the aggregate at this scale; where such a graph's output should
+  live and how it should be queried is an open decision, not yet made.
 - **Cross-project dedup is DISABLED by design.** `build`/`build_merge` run
   `deduplicate_entities`, which **raises** once nodes span >1 repo (`main` in repo A
   ≠ repo B). Each source is already single-repo-deduped at extraction, so at
@@ -318,6 +337,33 @@ lever that still matters. In order:
    `merge-graphs` namespaces each input before `compose`. So federation costs
    nothing in recall. It is still last: it is a retrieval rewrite, while rung 1 is a
    manifest field.
+
+## Corpus spend accounting — what the USD figures mean
+
+The bespoke `graphify_semantic_corpus*` layer's caps (`_MAX_TOTAL_COST_USD`,
+per-chunk `max_cost_usd`) and its `SpendLedger` (`total_usd`, `charge()`,
+"resuming against N USD already charged") are real budget UNITS but **not
+literal dollars charged to a payment method** — checked against the installed
+source rather than assumed (2026-08-23). Every staged provider receipt carries
+`runtime.auth = {api_provider: "firstParty", auth_method: "claude.ai",
+subscription_type: "max"}`, and graphify's own pricing table for this backend
+(`llm.py` `BACKENDS["claude-cli"]["pricing"]`) is `{"input": 0.0, "output":
+0.0}`, with a comment reading "costs are billed to the plan, not
+pay-as-you-go API credit". The `total_cost_usd` these caps track is read from
+the Claude Code CLI's own JSON envelope — its self-reported API-equivalent
+VALUATION of Max-plan usage — not from graphify's pricing table (which is
+literally zero for this backend). The caps still matter: they bound Max-plan
+usage/rate-limit exposure, which is a real resource, just not a bill.
+
+**This note lives here, not inline in `graphify_semantic_corpus.py` or
+`graphify_semantic_corpus_run.py`.** Both files are DIGESTED whole-byte into
+the plan's recorded authority (`planner_sha256`/`runner_sha256` in
+`_effective_config`, feeding `graphify_semantic_corpus_authority.json`) — even
+a docstring-only edit moves `execution_config_sha256` and fails
+`test_recorded_authority_authorizes_this_plan_and_only_this_plan` with
+`plan-authority-mismatch`. Re-recording that authority is a reviewed decision
+("Ray ruled re-record" appears throughout that file's history) and out of
+scope for a framing-accuracy fix — this doc is the correction instead.
 
 ## Work memory (the self-learning loop) — USE IT
 
