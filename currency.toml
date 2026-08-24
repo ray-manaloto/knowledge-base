@@ -142,16 +142,67 @@ os = ["macos"]
 # A pattern that matches NOTHING is DRIFT, never a pass — a renamed anchor turns
 # a declared check into a silent no-op, which is the shape this engine refuses.
 
+# ── FORKED 2026-08-24 (Ray) ────────────────────────────────────────────────
+# graphify is the ONE tool this repo installs from our own fork. It is a
+# deliberately uncomfortable state and this block exists so it stays legible
+# rather than becoming the way things are.
+#
+# WHY: graphify 0.9.48 has no codex backend, and neither does upstream `v8`
+# (byte-identical to the v0.9.48 tag — control-armed, `compare/v0.9.47...v8`
+# reports ahead_by 14, so the endpoint discriminates). PR #2981 adds `openai-cli`,
+# a sibling of `claude-cli` that shells to the locally authenticated `codex` CLI.
+# It is OPEN, CI-green, applies cleanly to our pin, and has no maintainer review.
+# Ray's ruling was to take the WHOLE branch rather than cherry-pick, so the fork
+# carries four unrelated features too: a per-repo extract lock,
+# `--fallback-backend`, `watch --semantic`, and a batched neo4j/falkordb push.
+#
+# THE TRAP THIS BLOCK EXISTS FOR: the fork reports the SAME package name and the
+# SAME version string as the release it sits on — `graphifyy`, `0.9.48`. Nothing
+# about the version distinguishes a forked install from an upstream one, so every
+# check that reasons from the version number was blind to the fork and two of them
+# reported confident, permanent FALSE drift the moment the pin moved.
+#
+# WHAT DID NOT CHANGE: the upstream version check. Ray chose fork-aware state AND
+# rebase-on-each-release, so a new upstream release is still a finding — it is the
+# REBASE TRIGGER. Upstream ships roughly daily (15 releases in 15 days, measured
+# 2026-08-24), so expect this row to move often and treat it as work, not noise.
+#
+# HOW TO REBASE: rebase `kb-pin/openai-cli-backend` in the fork onto the new
+# upstream tag, push, then move THREE things in one commit — `base_ref` and
+# `base_commit` below, `commit` in `sources/graphify.manifest`, and the `@<sha>`
+# in `pyproject.toml`. Moving `base_ref` will correctly light up all eight
+# FOUR `tracks = "fork_base"` bindings below: those record reviews performed
+# against a specific upstream release, and a rebase onto new code means those
+# reviews owe a re-read. That is the check working, not the check being noisy.
+#
+# THE SPLIT IS 4/4, and getting it wrong is not cosmetic. `graphify_baseline.py`
+# and `sources/graphify.dispositions.json` describe WHAT RUNS — the live AST
+# baseline for the installed graphify — so they track the manifest onto the fork.
+# The four `graphify_semantic_{corpus,slice}.py` constants are SNAPSHOT
+# IDENTITIES of completed runs, digested into authorization ledgers, so they hold
+# at the base. All eight were marked `fork_base` on the first pass; the corpus
+# suite caught it by refusing a baseline that attested upstream's tree while
+# running the fork's code.
+[tool.graphify.fork]
+upstream = "Graphify-Labs/graphify"
+base_ref = "v0.9.49"
+base_commit = "282976b2f4066b55cf2fa346c3d5568f7ac044e2"
+pr = "#2981"
+reason = "graphify 0.9.48 and upstream v8 have no codex backend; PR #2981 adds openai-cli, which shells to the locally authenticated codex CLI"
+clears_when = "#2981 merges and ships to PyPI — then revert pyproject.toml to an == pin, point sources/graphify.manifest back at Graphify-Labs, and delete this block"
+
 [[tool.graphify.ref_binding]]
 path = "python/src/kb_setup/graphify_baseline.py"
 pattern = '_ACCEPTED_GRAPHIFY_REF = "([^"]+)"'
 field = "ref"
+tracks = "manifest"
 note = "the deterministic AST baseline's accepted source tag"
 
 [[tool.graphify.ref_binding]]
 path = "python/src/kb_setup/graphify_baseline.py"
 pattern = '\n    source_commit="([0-9a-f]{40})",'
 field = "commit"
+tracks = "manifest"
 note = """`_ACCEPTED_AUTHORITY.source_commit`. Bound SEPARATELY from the ref
 because the two are independent: `_check_manifest_commit` exists precisely
 because a manifest can pin a correct tag beside the previous release's commit,
@@ -163,17 +214,23 @@ named struct FIELD in the `BaselineAuthority` definition above it."""
 path = "python/src/kb_setup/graphify_semantic_corpus.py"
 pattern = '_ACCEPTED_GRAPHIFY_REF = "([^"]+)"'
 field = "ref"
+tracks = "frozen"
+expect = "v0.9.48"
 note = "the semantic corpus's accepted source tag"
 
 [[tool.graphify.ref_binding]]
 path = "python/src/kb_setup/graphify_semantic_corpus.py"
 pattern = '_ACCEPTED_GRAPHIFY_COMMIT = "([0-9a-f]{40})"'
 field = "commit"
+tracks = "frozen"
+expect = "b2cd36267456c166788c95be6e68574064a92a42"
 
 [[tool.graphify.ref_binding]]
 path = "python/src/kb_setup/graphify_semantic_slice.py"
 pattern = '\nSOURCE_REF = "([^"]+)"'
 field = "ref"
+tracks = "frozen"
+expect = "v0.9.48"
 note = """Found only because the 0.9.44 resync tripped over it. The slice pins the
 SNAPSHOT its committed evidence came from, and it lagged two releases behind the
 manifest with nothing reporting it — a fifth copy of the same revision in a fifth
@@ -183,17 +240,21 @@ place. Bound at module scope (leading newline) so it cannot match a local."""
 path = "python/src/kb_setup/graphify_semantic_slice.py"
 pattern = '\nSOURCE_COMMIT = "([0-9a-f]{40})"'
 field = "commit"
+tracks = "frozen"
+expect = "b2cd36267456c166788c95be6e68574064a92a42"
 
 [[tool.graphify.ref_binding]]
 path = "sources/graphify.dispositions.json"
 pattern = '"source_ref": "([^"]+)"'
 field = "ref"
+tracks = "manifest"
 note = "the committed disposition catalog — an ARTIFACT, not code, and it drifted too"
 
 [[tool.graphify.ref_binding]]
 path = "sources/graphify.dispositions.json"
 pattern = '"source_commit": "([0-9a-f]{40})"'
 field = "commit"
+tracks = "manifest"
 
 # ---- Step 4: what we are tracking upstream, and what we owe ourselves --------
 
@@ -987,8 +1048,28 @@ binary = "claude"
 github = "anthropics/claude-code"
 # ADDED 2026-08-08 (#242), same reason as `[tool.mise]`. This one drifted
 # furthest — the manifest sat at v2.1.222 against an installed 2.1.226 — and it
-# is the manifest that matters most, because `sources/agent-harness-docs` and
-# this pin are what a "what does Claude Code do?" query reads.
+# is the manifest that matters most, because the docs mirror and this pin are
+# what a "what does Claude Code do?" query reads.
+#
+# THE MIRROR CHANGED 2026-08-24 (Ray: use these "as the synced sources for claude
+# instead of sources/agent-harness-docs"). It is now
+# `sources/claude-code-docs` (thevibeworks/claude-code-docs), and the changelog
+# every review below reads is `content/en/docs/claude-code/changelog.md` — NOT
+# the old `docs/claude-code/changelog.md`. The path moved as well as the repo, so
+# a review that pastes a path out of one of the older `watch` notes below will
+# read a file that no longer exists.
+#
+# Why the swap is a strict improvement rather than a lateral move: the new mirror
+# is auto-updating (`.github/workflows/fetch-claude-docs.yml`, pushed daily), and
+# it carries `desktop-changelog.md` plus `content/github/anthropic-sdk-{python,
+# typescript}` and their per-package changelogs — none of which the old mirror
+# had. The old one is retired, not deferred: `agent-harness-docs.manifest` is
+# deleted, and its provenance lives in git history.
+#
+# The historical `watch` entries further down still SAY `sources/agent-harness-docs`.
+# That is deliberate — they are records of what a past review actually read, and
+# rewriting them would falsify the provenance they exist to carry. Read them as
+# history; use the path in this paragraph for anything new.
 manifest = "sources/claude-code.manifest"
 # `claude --version` prints `2.1.220 (Claude Code)`, whose last whitespace field
 # is `Code)` — the same trap mise's `2026.7.15 macos-arm64 (2026-07-27)` set,

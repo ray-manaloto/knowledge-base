@@ -1,0 +1,28 @@
+# Source manifest — reproducible-by-reference (Invariant 3).
+# Hacker News reading archive: 1,551 .org files, 342 MB. DEFERRED, not skipped — see build = defer below.
+url = https://github.com/thevibeworks/claude-reads-hn
+ref = main
+commit = b85eee0d478dfe2fdeac42a85b6f2ee3b472e8bd
+kind = docs
+# DEFERRED ON COST 2026-08-24 (Ray's ruling, and the reason `build = defer`
+# exists at all — see `kb_setup.manifest.Manifest.build`).
+#
+# NOT a defect. This source is healthy and would extract fine; it is simply the
+# most expensive item on the migration list and the least obviously a Claude
+# source. Measured at registration: 1,551 `.org` files against 7 `.md`, 342 MB,
+# GitHub reports the language as HTML. `.org` IS in graphify's `_PROSE_EXTS`
+# (`sources/graphify/graphify/detect.py:185`), so every one of those 1,551 files
+# would go through `--mode deep` as prose — roughly 29% of the whole four-source
+# claude prose load, for a Hacker News reading archive rather than Claude
+# documentation.
+#
+# WHAT WOULD CLEAR THIS — and this is the field's whole point, because it is not
+# "someone fixes something": a cheaper extraction backend (graphify PR #2981's
+# `openai-cli`, pinned in this repo's fork), a decision that the HN discussions
+# are worth their spend, or a scoping rule that takes a subset rather than all
+# 1,551 files. Any of the three is a BUDGET answer, not a repair.
+#
+# The pin above stays committed and fingerprinted either way: this is an
+# exclusion from the build, never from the record (Invariant 3).
+build = defer
+defer_reason = Ray 2026-08-24: 1,551 .org files (~29% of the four-source claude prose load) for an HN reading archive, not Claude docs. Clears on a cheaper backend, a ruling that it is worth the spend, or a subsetting rule — not on a fix
