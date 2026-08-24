@@ -2658,23 +2658,34 @@ def _cluster_study_graph(repo_root: Path, study_out: Path) -> None:
 
 
 def _drop_skipped_builds(manifests: list[mf.Manifest]) -> list[mf.Manifest]:
-    """Partition off `build = skip` sources, announcing each with its reason.
+    """Partition off excluded sources (`build = skip` / `defer`), each with its reason.
 
     Called BEFORE the clone, the detect preflight and the AST pass — those are the
     three things that cost, and the two that fail. Never silently: the hazard of
     this field is that it can turn a red build green by removing the source that
     was reporting a real problem, so every exclusion states why on its own line.
 
-    A skipped manifest is NOT dropped from the input fingerprints `build` takes
+    An excluded manifest is NOT dropped from the input fingerprints `build` takes
     first: the pin stays committed and fingerprinted, so the source remains
     reproducible-by-reference. It is excluded from this build, not from the record.
+
+    The state is printed alongside the reason because the two exclusions clear
+    differently — `skip` waits on a fix, `defer` waits on a budget or a backend —
+    and a reader triaging the backlog needs to know which queue a line is in.
+
+    Both tests here go through `Manifest.is_built` rather than comparing `build`
+    to a literal. When `defer` was introduced this function held the only two live
+    comparisons in the codebase, both spelled `!= "skip"`, which admits `defer`
+    and would have made the new state exclude nothing at all.
     """
-    kept = [m for m in manifests if m.build != "skip"]
+    kept = [m for m in manifests if m.is_built]
     if not kept:
-        raise SystemExit("every sources/*.manifest is build = skip — nothing to build")
+        raise SystemExit(
+            "every sources/*.manifest is excluded (build = skip / defer) — nothing to build"
+        )
     for m in manifests:
-        if m.build == "skip":
-            print(f"  [excluded] {m.name}: build = skip — {m.skip_reason}")
+        if not m.is_built:
+            print(f"  [excluded] {m.name}: build = {m.build} — {m.exclusion_reason}")
     return kept
 
 
